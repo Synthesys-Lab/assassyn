@@ -1,45 +1,23 @@
+use crate::Context;
+
+use super::ctx::Reference;
+
 pub struct Data {
+  parent: Option<Reference>,
   name: String,
   bits: usize,
 }
 
-enum Opcode {
-  Add,
-  Mul,
-}
-
-enum Operand {
-  Data(Data),
-  Expr(Expr),
-}
-
-pub struct Expr {
-  opcode: Opcode,
-  operands: Vec<Box<Operand>>
-}
-
-trait Arithmetic {
-  fn add(&self, other: &Data) -> Expr;
-  fn mul(&self, other: &Data) -> Expr;
-}
-
 impl Data {
-  pub fn new(name: &str, bits: usize) -> Self {
-    Data {
+
+  pub fn new(ctx: &mut Context, name: &str, bits: usize) -> Reference {
+    let res = Data {
+      parent: None,
       name: name.to_string(),
       bits,
-    }
+    };
+    ctx.insert(res)
   }
-
-  // pub fn add(&self, other: &Data) -> Expr {
-  //   Expr {
-  //     opcode: Opcode::Add,
-  //     operands: vec![
-  //       Box::new(),
-  //       Box::new(),
-  //     ]
-  //   }
-  // }
 
 }
 
