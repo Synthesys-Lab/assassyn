@@ -1,13 +1,13 @@
-use crate::{context::cur_ctx_mut, Reference};
+use crate::{context::{cur_ctx, cur_ctx_mut, IsElement, Parented}, Reference};
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 enum DataKind {
   Int,
   UInt,
   Float,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DataType {
   kind: DataKind,
   bits: usize,
@@ -56,6 +56,25 @@ impl ToString for DataType {
 
 }
 
+pub struct IntImm {
+  pub(crate) key: usize,
+  dtype: DataType,
+  value: u64,
+}
+
+impl IntImm {
+
+  pub(super) fn instantiate(dtype: DataType, value: u64) -> Self {
+    Self { key: 0, dtype, value, }
+  }
+
+  pub fn new<'a>(dtype: DataType, value: u64) -> &'a Box<IntImm> {
+    let res = cur_ctx_mut().int_imm(dtype, value);
+    res.as_ref::<IntImm>().unwrap()
+  }
+
+}
+
 pub struct Array {
   pub(crate) key: usize,
   scalar_ty: DataType,
@@ -68,22 +87,55 @@ impl Typed for Array {
   }
 }
 
+pub struct ArrayRead {
+  pub(crate) key: usize,
+  parent: Option<Reference>,
+  dtype: DataType,
+  array: Reference,
+  idx: Reference,
+}
+
+impl Parented for ArrayRead {
+
+  fn parent(&self) -> Option<Reference> {
+    self.parent.clone()
+  }
+
+}
+
+impl Typed for ArrayRead {
+
+  fn dtype(&self) -> &DataType {
+    &self.dtype
+  }
+
+}
+
 impl Array {
 
-  pub fn new(scalar_ty: DataType, size: usize) -> &Box<Array> {
+  pub fn new<'a>(scalar_ty: DataType, size: usize) -> &'a Box<Array> {
     let res = Self {
       key: 0,
       scalar_ty,
       size,
     };
-    cur_ctx_mut().insert(res).as_ref::<Self>().unwrap()
+    let key = cur_ctx_mut().insert(res);
+    cur_ctx().get(&key).unwrap()
   }
 
   pub fn size(&self) -> usize {
     self.size
   }
 
-  pub fn read(&self) {
+  pub fn read(&self, idx: Reference, reader: Reference) -> Reference {
+    let instance = ArrayRead {
+      key: 0,
+      parent: Some(reader),
+      dtype: self.scalar_ty.clone(),
+      array: self.as_super(),
+      idx,
+    };
+    cur_ctx_mut().insert(instance)
   }
 
 }

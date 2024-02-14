@@ -1,4 +1,4 @@
-use crate::data::{DataType, Typed};
+use crate::data::{ArrayRead, DataType, Typed};
 
 use super::module::Module;
 
@@ -38,6 +38,14 @@ impl Expr {
 
 }
 
+impl Parented for Expr {
+
+  fn parent(&self) -> Option<Reference> {
+    self.parent.clone()
+  }
+
+}
+
 impl ToString for Expr {
 
   fn to_string(&self) -> String {
@@ -62,20 +70,22 @@ pub trait Arithmetic<'a, T: Typed + Parented + IsElement<'a>> {
 macro_rules! binary_op {
   ($func: ident, $opcode: expr) => {
     fn $func(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference {
-      if self.parent != other.parent() {
-        panic!("{:?} & {:?} are not in the same module!",
-               self.as_super(), other.as_ref().as_super());
-      }
+      // FIXME(@were): We should not strictly check this here. O.w. we cannot do a + 1
+      //               (where 1 has no parent)
+      // if self.parent() != other.parent() {
+      //   panic!("{:?} & {:?} are not in the same module!",
+      //          self.as_super(), other.as_ref().as_super());
+      // }
       let res = Expr {
         key: 0,
-        parent: self.parent.clone(),
+        parent: self.parent().clone(),
         dtype: self.dtype().clone(),
         opcode: $opcode,
         operands: vec![self.as_super(), other.as_ref().as_super()],
         pred: pred.map(|x| x.as_super()),
       };
       let res = cur_ctx_mut().insert(res);
-      if let Some(parent) = &self.parent {
+      if let Some(parent) = &self.parent() {
         cur_ctx_mut().get_mut::<Module>(parent).unwrap().push(res.clone());
       } else {
         eprintln!("[WARN] No parent for {:?}", res);
@@ -91,6 +101,11 @@ impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, T> for Input {
 }
 
 impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, T> for Expr {
+  binary_op!(add, Opcode::Add);
+  binary_op!(mul, Opcode::Mul);
+}
+
+impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, T> for ArrayRead {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }

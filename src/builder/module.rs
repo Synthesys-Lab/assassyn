@@ -4,6 +4,7 @@ use super::{context::{cur_ctx_mut, Reference}, event::{Event, EventKind}, port::
 
 pub struct Module {
   pub(crate) key: usize,
+  pub(crate) parent: Option<Reference>,
   name: String,
   inputs: Vec<Reference>,
   dfg: Vec<Reference>,
@@ -30,6 +31,7 @@ impl Module {
   pub fn new(name: &str, inputs: Vec<Reference>) -> &Box<Module> {
     let module = Module {
       key: 0,
+      parent: None,
       name: name.to_string(),
       inputs,
       dfg: Vec::new(),

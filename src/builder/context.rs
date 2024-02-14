@@ -1,16 +1,20 @@
+use std::collections::HashMap;
+
 use slab;
 use once_cell::sync::Lazy;
 
-use crate::{data::{Array, DataType, Typed}, Module};
+use crate::{data::{Array, ArrayRead, DataType, IntImm, Typed}, Module};
 
-use super::{ arith::Expr, port::{Input, Output} };
+use super::{arith::Expr, port::{Input, Output}, system::System};
 
 pub(crate) struct Context {
   slab: slab::Slab<Element>,
+  int_cache: HashMap<(DataType, u64), Reference>,
 }
 
 pub trait IsElement<'a> {
   fn as_super(&self) -> Reference;
+  fn set_key(&mut self, key: usize);
   fn into_reference(key: usize) -> Reference;
   fn downcast(slab: &'a slab::Slab<Element>, key: &Reference) -> Result<&'a Box<Self>, String>;
   fn downcast_mut(slab: &'a mut slab::Slab<Element>, key: &Reference)
@@ -32,6 +36,10 @@ macro_rules! register_element {
 
     impl <'a> IsElement <'a> for $name {
 
+      fn set_key(&mut self, key: usize) {
+        self.key = key;
+      }
+
       fn as_super(&self) -> Reference {
         Reference::$name(self.key)
       }
@@ -40,7 +48,8 @@ macro_rules! register_element {
         Reference::$name(key)
       }
 
-      fn downcast(slab: &'a slab::Slab<Element>, key: &Reference) -> Result<&'a Box<$name>, String> {
+      fn downcast(slab: &'a slab::Slab<Element>, key: &Reference)
+        -> Result<&'a Box<$name>, String> {
         if let Reference::$name(key) = key {
           if let Element::$name(res) = &slab[*key] {
             return Ok(res)
@@ -59,7 +68,6 @@ macro_rules! register_element {
         Err(format!("IsElement::downcast: expecting {}, {:?}", stringify!($name), key))
       }
 
-
     }
 
   };
@@ -71,6 +79,9 @@ register_element!(Input);
 register_element!(Output);
 register_element!(Expr);
 register_element!(Array);
+register_element!(System);
+register_element!(ArrayRead);
+register_element!(IntImm);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reference {
@@ -79,6 +90,10 @@ pub enum Reference {
   Output(usize),
   Expr(usize),
   Array(usize),
+  System(usize),
+  ArrayRead(usize),
+  IntImm(usize),
+  Unknown,
 }
 
 impl <'a>Reference {
@@ -130,18 +145,15 @@ pub enum Element {
   Output(Box<Output>),
   Expr(Box<Expr>),
   Array(Box<Array>),
+  ArrayRead(Box<ArrayRead>),
+  System(Box<System>),
+  IntImm(Box<IntImm>),
 }
 
 impl Element {
 
-  fn set_key(&mut self, key: usize) {
-    match self {
-      Element::Module(module) => { module.key = key; }
-      Element::Input(data) => { data.key = key; }
-      Element::Output(data) => { data.key = key; }
-      Element::Expr(expr) => { expr.key = key; }
-      Element::Array(array) => { array.key = key; }
-    }
+  pub fn get_key(&self) -> usize {
+    cur_ctx().slab.key_of(self)
   }
 
 }
@@ -151,20 +163,34 @@ impl <'a>Context {
   pub fn new() -> Self {
     Context {
       slab: slab::Slab::new(),
+      int_cache: HashMap::new(),
     }
   }
 
-  pub fn insert<T: Into<Element> + IsElement<'a>>(&mut self, elem: T) -> Reference {
+  pub(super) fn int_imm(&mut self, dtype: DataType, value: u64) -> Reference {
+    let key = (dtype, value);
+    if let Some(res) = self.int_cache.get(&key) {
+      return res.clone()
+    }
+    let instance = IntImm::instantiate(key.0.clone(), key.1);
+    let res = cur_ctx_mut().insert(instance);
+    self.int_cache.insert(key, res.clone());
+    res
+  }
+
+  pub fn insert<T: Into<Element> + IsElement<'a> + 'a>(&mut self, elem: T) -> Reference {
     let key = self.slab.insert(elem.into());
-    self.slab.get_mut(key).unwrap().set_key(key);
-    T::into_reference(key)
+    let res = T::into_reference(key);
+    T::downcast_mut(&mut cur_ctx_mut().slab, &res).unwrap().set_key(key);
+    res
   }
 
   pub fn get<T: IsElement<'a>>(&'a self, key: &Reference) -> Result<&'a Box<T>, String> {
     T::downcast(&self.slab, key)
   }
 
-  pub fn get_mut<T: IsElement<'a>>(&'a mut self, key: &Reference) -> Result<&'a mut Box<T>, String> {
+  pub fn get_mut<T: IsElement<'a>>(&'a mut self, key: &Reference)
+    -> Result<&'a mut Box<T>, String> {
     T::downcast_mut(&mut self.slab, key)
   }
 
