@@ -10,7 +10,7 @@ pub(crate) struct Context {
 }
 
 pub trait IsElement<'a> {
-  fn as_ref(&self) -> Reference;
+  fn as_super(&self) -> Reference;
   fn into_reference(key: usize) -> Reference;
   fn downcast(slab: &'a slab::Slab<Element>, key: &Reference) -> Result<&'a Box<Self>, String>;
   fn downcast_mut(slab: &'a mut slab::Slab<Element>, key: &Reference) -> Result<&'a mut Box<Self>, String>;
@@ -31,7 +31,7 @@ macro_rules! register_element {
 
     impl <'a> IsElement <'a> for $name {
 
-      fn as_ref(&self) -> Reference {
+      fn as_super(&self) -> Reference {
         Reference::$name(self.key)
       }
 
@@ -69,7 +69,7 @@ register_element!(Input);
 register_element!(Output);
 register_element!(Expr);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reference {
   Module(usize),
   Input(usize),

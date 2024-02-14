@@ -67,7 +67,6 @@ impl Module {
 
   // TODO(@were): This is a temporary solution for proof of concept.
   pub fn elaborate(&self, data: Vec<usize>) {
-    // eprintln!("[{:x}] num outputs: {}", self as * const _ as usize, self.outputs.len());
     println!("fn {}(", self.name);
     for elem in self.inputs.iter() {
       let elem = elem.as_ref::<Input>().unwrap();
@@ -75,8 +74,8 @@ impl Module {
     }
     print!(") -> (");
     // TODO(@were): Fix this hardcoded stuff.
-    for _ in self.outputs.iter() {
-      print!("u{}, ", 32);
+    for elem in self.outputs.iter() {
+      print!("{}, ", elem.dtype().unwrap().to_string());
     }
     println!(") {{");
     for elem in self.dfg.iter() {

@@ -25,7 +25,8 @@ pub struct Expr {
   pub(crate) parent: Option<Reference>,
   dtype: DataType,
   opcode: Opcode,
-  operands: Vec<Reference>
+  operands: Vec<Reference>,
+  pred: Option<Reference>, // The predication for this expression
 }
 
 impl Expr {
@@ -53,19 +54,24 @@ impl ToString for Expr {
 }
 
 pub trait Arithmetic<T> {
-  fn add(&self, other: &Box<T>) -> Reference;
-  fn mul(&self, other: &Box<T>) -> Reference;
+  fn add(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference;
+  fn mul(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference;
 }
 
 macro_rules! binary_op {
   ($func: ident, $opcode: expr) => {
-    fn $func(&self, other: &Box<T>) -> Reference {
+    fn $func(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference {
+      if self.parent != other.parent() {
+        panic!("{:?} & {:?} are not in the same module!",
+               self.as_super(), other.as_ref().as_super());
+      }
       let res = Expr {
         key: 0,
         parent: self.parent.clone(),
         dtype: self.dtype().clone(),
         opcode: $opcode,
-        operands: vec![self.as_ref(), other.as_ref().as_ref()]
+        operands: vec![self.as_super(), other.as_ref().as_super()],
+        pred: pred.map(|x| x.as_super()),
       };
       let res = cur_ctx_mut().insert(res);
       if let Some(parent) = &self.parent {
