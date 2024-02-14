@@ -62,6 +62,7 @@ macro_rules! register_element {
     }
 
   };
+
 }
 
 register_element!(Module);

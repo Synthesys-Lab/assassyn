@@ -53,7 +53,7 @@ impl ToString for Expr {
 
 }
 
-pub trait Arithmetic<T> {
+pub trait Arithmetic<'a, T: Typed + Parented + IsElement<'a>> {
   fn add(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference;
   fn mul(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference;
 }
@@ -84,12 +84,12 @@ macro_rules! binary_op {
   };
 }
 
-impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<T> for Input {
+impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, T> for Input {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }
 
-impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<T> for Expr {
+impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, T> for Expr {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }

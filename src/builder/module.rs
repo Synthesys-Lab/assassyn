@@ -1,6 +1,6 @@
-use crate::{arith::Expr, context::cur_ctx, data::{Input, Typed}};
+use crate::{arith::Expr, context::{cur_ctx, IsElement}, data::{Input, Typed}};
 
-use super::{context::{Reference, cur_ctx_mut}, data::Output};
+use super::{context::{cur_ctx_mut, Reference}, data::Output, event::{Event, EventImpl}};
 
 pub struct Module {
   pub(crate) key: usize,
@@ -42,21 +42,39 @@ impl Module {
     cur_ctx().get::<Module>(&res).unwrap()
   }
 
+  /// Get the required element from the given vector and cast it to the required type.
+  ///
+  /// # Arguments
+  ///
+  /// `v` - The vector of references.
+  /// `i` - The index of the element.
+  fn get_and_cast<'a, T: IsElement<'a>>(v: &'a Vec<Reference>, i: usize) -> Option<&Box<T>> {
+    v.get(i).map(|elem| elem.as_ref::<T>().unwrap())
+  }
+
   /// Get the given input reference.
   ///
   /// # Arguments
   ///
   /// * `i` - The index of the input.
   pub fn get_input(&self, i: usize) -> Option<&Box<Input>> {
-    self.inputs.get(i).map(|elem| elem.as_ref::<Input>().unwrap())
+    Self::get_and_cast(&self.inputs, i)
+  }
+
+  /// Get the given output reference.
+  ///
+  /// # Arguments
+  ///
+  /// * `i` - The index of the outout.
+  pub fn get_output(&self, i: usize) -> Option<&Box<Output>> {
+    Self::get_and_cast(&self.outputs, i)
   }
 
   // TODO(@were): Check if outputs are set.
   // TODO(@were): Check the given references are with deta.
   // TODO(@were): Check the given references are part of the module.
-  pub fn set_output(&mut self, outputs: Vec<Reference>) {
+  pub fn set_outputs(&mut self, outputs: Vec<Reference>) {
     self.outputs = outputs.into_iter().map(|data| { Output::new(data) }).collect();
-    // eprintln!("[{:x}] num outputs: {}", self as * const _ as usize, self.outputs.len());
   }
 
   // TODO(@were): Later make this implicit.
@@ -92,6 +110,20 @@ impl Module {
     println!(");");
     println!("}}");
 
+  }
+
+  pub fn trigger(&self, other: &Module, data: Vec<Reference>) -> Event {
+    Event::Trigger(EventImpl::new(self.as_super(), other.as_super(), data, None))
+  }
+
+  /// Test the condition until it is true and then trigger the given module.
+  pub fn spin_trigger(&self, other: &Module, data: Vec<Reference>, cond: Reference) -> Event {
+    Event::Spin(EventImpl::new(self.as_super(), other.as_super(), data, Some(cond)))
+  }
+
+  /// Test the condition until it is true and then trigger the given module.
+  pub fn cond_trigger(&self, other: &Module, data: Vec<Reference>, cond: Reference) -> Event{
+    Event::Cond(EventImpl::new(self.as_super(), other.as_super(), data, Some(cond)))
   }
 
 }
