@@ -62,13 +62,27 @@ pub struct IntImm {
   value: u64,
 }
 
+impl Typed for IntImm {
+  fn dtype(&self) -> &DataType {
+    &self.dtype
+  }
+}
+
+impl Parented for IntImm {
+
+  fn parent(&self) -> Option<Reference> {
+    None
+  }
+
+}
+
 impl IntImm {
 
   pub(super) fn instantiate(dtype: DataType, value: u64) -> Self {
     Self { key: 0, dtype, value, }
   }
 
-  pub fn new<'a>(dtype: DataType, value: u64) -> &'a Box<IntImm> {
+  pub fn new<'a>(dtype: &DataType, value: u64) -> &'a Box<IntImm> {
     let res = cur_ctx_mut().int_imm(dtype, value);
     res.as_ref::<IntImm>().unwrap()
   }
@@ -93,6 +107,14 @@ pub struct ArrayRead {
   dtype: DataType,
   array: Reference,
   idx: Reference,
+}
+
+pub struct ArrayWrite {
+  pub(crate) key: usize,
+  parent: Option<Reference>,
+  array: Reference,
+  idx: Reference,
+  value: Reference,
 }
 
 impl Parented for ArrayRead {
@@ -127,15 +149,33 @@ impl Array {
     self.size
   }
 
-  pub fn read(&self, idx: Reference, reader: Reference) -> Reference {
+  pub fn read<'a, 'b>(&self, idx: &Box<impl IsElement<'b> + Parented + Typed>,
+                      reader: Reference) -> &'a Box<ArrayRead> {
     let instance = ArrayRead {
       key: 0,
       parent: Some(reader),
       dtype: self.scalar_ty.clone(),
       array: self.as_super(),
-      idx,
+      idx: idx.as_super(),
     };
-    cur_ctx_mut().insert(instance)
+    let res = cur_ctx_mut().insert(instance);
+    res.as_ref::<ArrayRead>().unwrap()
+  }
+
+  pub fn write<'a, 'b>(&self,
+                       idx: &Box<impl IsElement<'a> + Parented + Typed>,
+                       value: &Box<impl IsElement<'b> + Parented + Typed>,
+                       cond: Option<Reference>) -> &'a Box<ArrayWrite> {
+
+    let instance = ArrayWrite {
+      key: 0,
+      parent: None,
+      array: self.as_super(),
+      idx: idx.as_super(),
+      value: value.as_super(),
+    };
+    let res = cur_ctx_mut().insert(instance);
+    res.as_ref::<ArrayWrite>().unwrap()
   }
 
 }

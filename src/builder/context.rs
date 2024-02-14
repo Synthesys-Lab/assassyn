@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use slab;
 use once_cell::sync::Lazy;
 
-use crate::{data::{Array, ArrayRead, DataType, IntImm, Typed}, Module};
+use crate::{data::{Array, ArrayRead, ArrayWrite, DataType, IntImm, Typed}, Module};
 
 use super::{arith::Expr, port::{Input, Output}, system::System};
 
@@ -79,9 +79,10 @@ register_element!(Input);
 register_element!(Output);
 register_element!(Expr);
 register_element!(Array);
-register_element!(System);
 register_element!(ArrayRead);
+register_element!(ArrayWrite);
 register_element!(IntImm);
+register_element!(System);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reference {
@@ -92,6 +93,7 @@ pub enum Reference {
   Array(usize),
   System(usize),
   ArrayRead(usize),
+  ArrayWrite(usize),
   IntImm(usize),
   Unknown,
 }
@@ -146,6 +148,7 @@ pub enum Element {
   Expr(Box<Expr>),
   Array(Box<Array>),
   ArrayRead(Box<ArrayRead>),
+  ArrayWrite(Box<ArrayWrite>),
   System(Box<System>),
   IntImm(Box<IntImm>),
 }
@@ -167,8 +170,8 @@ impl <'a>Context {
     }
   }
 
-  pub(super) fn int_imm(&mut self, dtype: DataType, value: u64) -> Reference {
-    let key = (dtype, value);
+  pub(super) fn int_imm(&mut self, dtype: &DataType, value: u64) -> Reference {
+    let key = (dtype.clone(), value);
     if let Some(res) = self.int_cache.get(&key) {
       return res.clone()
     }

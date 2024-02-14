@@ -46,6 +46,14 @@ impl Parented for Expr {
 
 }
 
+impl Typed for Expr {
+
+  fn dtype(&self) -> &DataType {
+    &self.dtype
+  }
+
+}
+
 impl ToString for Expr {
 
   fn to_string(&self) -> String {
@@ -62,14 +70,14 @@ impl ToString for Expr {
 
 }
 
-pub trait Arithmetic<'a, T: Typed + Parented + IsElement<'a>> {
-  fn add(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference;
-  fn mul(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference;
+pub trait Arithmetic<'a, 'b, T: Typed + Parented + IsElement<'a>> {
+  fn add(&self, other: &Box<T>, pred: Option<&Box<T>>) -> &'b Box<Expr>;
+  fn mul(&self, other: &Box<T>, pred: Option<&Box<T>>) -> &'b Box<Expr>;
 }
 
 macro_rules! binary_op {
   ($func: ident, $opcode: expr) => {
-    fn $func(&self, other: &Box<T>, pred: Option<&Box<T>>) -> Reference {
+    fn $func(&self, other: &Box<T>, pred: Option<&Box<T>>) -> &'b Box<Expr> {
       // FIXME(@were): We should not strictly check this here. O.w. we cannot do a + 1
       //               (where 1 has no parent)
       // if self.parent() != other.parent() {
@@ -90,22 +98,22 @@ macro_rules! binary_op {
       } else {
         eprintln!("[WARN] No parent for {:?}", res);
       }
-      res
+      res.as_ref::<Expr>().unwrap()
     }
   };
 }
 
-impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, T> for Input {
+impl <'a, 'b, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, 'b, T> for Input {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }
 
-impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, T> for Expr {
+impl <'a, 'b, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, 'b, T> for Expr {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }
 
-impl <'a, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, T> for ArrayRead {
+impl <'a, 'b, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, 'b, T> for ArrayRead {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }
