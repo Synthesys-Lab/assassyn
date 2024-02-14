@@ -1,6 +1,6 @@
-use crate::{arith::Expr, context::{cur_ctx, IsElement}, data::{Input, Typed}};
+use crate::{arith::Expr, context::{cur_ctx, IsElement}, data::Typed};
 
-use super::{context::{cur_ctx_mut, Reference}, data::Output, event::{Event, EventImpl}};
+use super::{context::{cur_ctx_mut, Reference}, event::{Event, EventKind}, port::{Input, Output}};
 
 pub struct Module {
   pub(crate) key: usize,
@@ -113,17 +113,17 @@ impl Module {
   }
 
   pub fn trigger(&self, other: &Module, data: Vec<Reference>) -> Event {
-    Event::Trigger(EventImpl::new(self.as_super(), other.as_super(), data, None))
+    Event::new(self.as_super(), other.as_super(), data, EventKind::Trigger)
   }
 
   /// Test the condition until it is true and then trigger the given module.
   pub fn spin_trigger(&self, other: &Module, data: Vec<Reference>, cond: Reference) -> Event {
-    Event::Spin(EventImpl::new(self.as_super(), other.as_super(), data, Some(cond)))
+    Event::new(self.as_super(), other.as_super(), data, EventKind::Spin(cond))
   }
 
   /// Test the condition until it is true and then trigger the given module.
   pub fn cond_trigger(&self, other: &Module, data: Vec<Reference>, cond: Reference) -> Event{
-    Event::Cond(EventImpl::new(self.as_super(), other.as_super(), data, Some(cond)))
+    Event::new(self.as_super(), other.as_super(), data, EventKind::Cond(cond))
   }
 
 }

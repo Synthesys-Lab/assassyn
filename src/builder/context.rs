@@ -1,9 +1,9 @@
 use slab;
 use once_cell::sync::Lazy;
 
-use crate::{data::{DataType, Typed}, Module};
+use crate::{data::{Array, DataType, Typed}, Module};
 
-use super::{ arith::Expr, data::{Input, Output} };
+use super::{ arith::Expr, port::{Input, Output} };
 
 pub(crate) struct Context {
   slab: slab::Slab<Element>,
@@ -13,7 +13,8 @@ pub trait IsElement<'a> {
   fn as_super(&self) -> Reference;
   fn into_reference(key: usize) -> Reference;
   fn downcast(slab: &'a slab::Slab<Element>, key: &Reference) -> Result<&'a Box<Self>, String>;
-  fn downcast_mut(slab: &'a mut slab::Slab<Element>, key: &Reference) -> Result<&'a mut Box<Self>, String>;
+  fn downcast_mut(slab: &'a mut slab::Slab<Element>, key: &Reference)
+    -> Result<&'a mut Box<Self>, String>;
 }
 
 pub trait Parented {
@@ -69,6 +70,7 @@ register_element!(Module);
 register_element!(Input);
 register_element!(Output);
 register_element!(Expr);
+register_element!(Array);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reference {
@@ -76,6 +78,7 @@ pub enum Reference {
   Input(usize),
   Output(usize),
   Expr(usize),
+  Array(usize),
 }
 
 impl <'a>Reference {
@@ -126,6 +129,7 @@ pub enum Element {
   Input(Box<Input>),
   Output(Box<Output>),
   Expr(Box<Expr>),
+  Array(Box<Array>),
 }
 
 impl Element {
@@ -136,6 +140,7 @@ impl Element {
       Element::Input(data) => { data.key = key; }
       Element::Output(data) => { data.key = key; }
       Element::Expr(expr) => { expr.key = key; }
+      Element::Array(array) => { array.key = key; }
     }
   }
 

@@ -1,8 +1,9 @@
-use crate::data::{DataType, Input, Typed};
+use crate::data::{DataType, Typed};
 
 use super::module::Module;
 
 use super::context::{cur_ctx_mut, IsElement, Parented, Reference};
+use super::port::Input;
 
 enum Opcode {
   Add,
