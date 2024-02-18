@@ -1,11 +1,13 @@
-use crate::data::{ArrayRead, DataType, Typed};
+use crate::data::{DataType, Typed};
 
 use super::module::Module;
 
 use super::context::{cur_ctx_mut, IsElement, Parented, Reference};
 use super::port::Input;
 
-enum Opcode {
+pub(crate) enum Opcode {
+  Load,
+  Store,
   Add,
   Mul,
 }
@@ -16,6 +18,7 @@ impl ToString for Opcode {
     match self {
       Opcode::Add => "+".into(),
       Opcode::Mul => "*".into(),
+      _ => panic!("Not implemented!"),
     }
   }
 
@@ -31,6 +34,18 @@ pub struct Expr {
 }
 
 impl Expr {
+
+  pub(crate) fn new(dtype: DataType, opcode: Opcode, operands: Vec<Reference>,
+                    parent: Option<Reference>, pred: Option<Reference>) -> Self {
+    Self {
+      key: 0,
+      parent: None,
+      dtype,
+      opcode,
+      operands,
+      pred: None,
+    }
+  }
 
   pub fn dtype(&self) -> &DataType {
     &self.dtype
@@ -65,6 +80,7 @@ impl ToString for Expr {
                 self.opcode.to_string(),
                 self.operands[1].to_string())
       }
+      _ => panic!("Not implemented!"),
     }
   }
 
@@ -84,14 +100,13 @@ macro_rules! binary_op {
       //   panic!("{:?} & {:?} are not in the same module!",
       //          self.as_super(), other.as_ref().as_super());
       // }
-      let res = Expr {
-        key: 0,
-        parent: self.parent().clone(),
-        dtype: self.dtype().clone(),
-        opcode: $opcode,
-        operands: vec![self.as_super(), other.as_ref().as_super()],
-        pred: pred.map(|x| x.as_super()),
-      };
+      let res = Expr::new(
+        self.dtype().clone(),
+        $opcode,
+        vec![self.as_super(), other.as_ref().as_super()],
+        self.parent().clone(),
+        pred.map(|x| x.as_super()),
+      );
       let res = cur_ctx_mut().insert(res);
       if let Some(parent) = &self.parent() {
         cur_ctx_mut().get_mut::<Module>(parent).unwrap().push(res.clone());
@@ -109,11 +124,6 @@ impl <'a, 'b, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, 'b, T> for Inp
 }
 
 impl <'a, 'b, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, 'b, T> for Expr {
-  binary_op!(add, Opcode::Add);
-  binary_op!(mul, Opcode::Mul);
-}
-
-impl <'a, 'b, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, 'b, T> for ArrayRead {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }

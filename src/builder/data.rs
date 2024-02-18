@@ -1,7 +1,8 @@
-use crate::{context::{cur_ctx, cur_ctx_mut, IsElement, Parented}, Reference};
+use crate::{context::{cur_ctx, cur_ctx_mut, IsElement, Parented}, expr::{Expr, Opcode}, Reference};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum DataKind {
+  Void,
   Int,
   UInt,
   Float,
@@ -23,6 +24,13 @@ impl DataType {
     Self {
       kind,
       bits,
+    }
+  }
+
+  pub fn void() -> Self {
+    Self {
+      kind: DataKind::Void,
+      bits: 0,
     }
   }
 
@@ -51,6 +59,7 @@ impl ToString for DataType {
       DataKind::Int => format!("i{}", self.bits),
       DataKind::UInt => format!("u{}", self.bits),
       DataKind::Float => format!("f{}", self.bits),
+      DataKind::Void => String::from("()"),
     }
   }
 
@@ -101,38 +110,6 @@ impl Typed for Array {
   }
 }
 
-pub struct ArrayRead {
-  pub(crate) key: usize,
-  parent: Option<Reference>,
-  dtype: DataType,
-  array: Reference,
-  idx: Reference,
-}
-
-pub struct ArrayWrite {
-  pub(crate) key: usize,
-  parent: Option<Reference>,
-  array: Reference,
-  idx: Reference,
-  value: Reference,
-}
-
-impl Parented for ArrayRead {
-
-  fn parent(&self) -> Option<Reference> {
-    self.parent.clone()
-  }
-
-}
-
-impl Typed for ArrayRead {
-
-  fn dtype(&self) -> &DataType {
-    &self.dtype
-  }
-
-}
-
 impl Array {
 
   pub fn new<'a>(scalar_ty: DataType, size: usize) -> &'a Box<Array> {
@@ -150,32 +127,32 @@ impl Array {
   }
 
   pub fn read<'a, 'b>(&self, idx: &Box<impl IsElement<'b> + Parented + Typed>,
-                      reader: Reference) -> &'a Box<ArrayRead> {
-    let instance = ArrayRead {
-      key: 0,
-      parent: Some(reader),
-      dtype: self.scalar_ty.clone(),
-      array: self.as_super(),
-      idx: idx.as_super(),
-    };
+                      reader: Reference, cond: Option<Reference>) -> &'a Box<Expr> {
+    let instance = Expr::new(
+      self.scalar_ty.clone(),
+      Opcode::Load,
+      vec![self.as_super(), idx.as_super()],
+      Some(reader),
+      cond,
+    );
     let res = cur_ctx_mut().insert(instance);
-    res.as_ref::<ArrayRead>().unwrap()
+    res.as_ref::<Expr>().unwrap()
   }
 
   pub fn write<'a, 'b>(&self,
                        idx: &Box<impl IsElement<'a> + Parented + Typed>,
                        value: &Box<impl IsElement<'b> + Parented + Typed>,
-                       cond: Option<Reference>) -> &'a Box<ArrayWrite> {
+                       cond: Option<Reference>) -> &'a Box<Expr> {
 
-    let instance = ArrayWrite {
-      key: 0,
-      parent: None,
-      array: self.as_super(),
-      idx: idx.as_super(),
-      value: value.as_super(),
-    };
+    let instance = Expr::new(
+      DataType::void(),
+      Opcode::Store,
+      vec![value.as_super(), self.as_super(), idx.as_super()],
+      None,
+      None,
+    );
     let res = cur_ctx_mut().insert(instance);
-    res.as_ref::<ArrayWrite>().unwrap()
+    res.as_ref::<Expr>().unwrap()
   }
 
 }

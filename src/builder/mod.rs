@@ -4,7 +4,7 @@ pub mod port;
 pub mod data;
 pub mod module;
 pub mod context;
-pub mod arith;
+pub mod expr;
 pub mod event;
 pub mod system;
 

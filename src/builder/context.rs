@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use slab;
 use once_cell::sync::Lazy;
 
-use crate::{data::{Array, ArrayRead, ArrayWrite, DataType, IntImm, Typed}, Module};
+use crate::{data::{Array, DataType, IntImm, Typed}, Module};
 
-use super::{arith::Expr, port::{Input, Output}, system::System};
+use super::{expr::Expr, port::{Input, Output}, system::SysBuilder};
 
 pub(crate) struct Context {
   slab: slab::Slab<Element>,
@@ -79,10 +79,8 @@ register_element!(Input);
 register_element!(Output);
 register_element!(Expr);
 register_element!(Array);
-register_element!(ArrayRead);
-register_element!(ArrayWrite);
 register_element!(IntImm);
-register_element!(System);
+register_element!(SysBuilder);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reference {
@@ -91,7 +89,7 @@ pub enum Reference {
   Output(usize),
   Expr(usize),
   Array(usize),
-  System(usize),
+  SysBuilder(usize),
   ArrayRead(usize),
   ArrayWrite(usize),
   IntImm(usize),
@@ -147,9 +145,7 @@ pub enum Element {
   Output(Box<Output>),
   Expr(Box<Expr>),
   Array(Box<Array>),
-  ArrayRead(Box<ArrayRead>),
-  ArrayWrite(Box<ArrayWrite>),
-  System(Box<System>),
+  SysBuilder(Box<SysBuilder>),
   IntImm(Box<IntImm>),
 }
 

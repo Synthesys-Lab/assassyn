@@ -1,4 +1,6 @@
-use crate::{arith::Expr, context::{cur_ctx, IsElement}, data::Typed};
+use std::fmt::{Display, Formatter};
+
+use crate::{expr::Expr, context::{cur_ctx, IsElement}, data::Typed};
 
 use super::{context::{cur_ctx_mut, Reference}, event::{Event, EventKind}, port::{Input, Output}};
 
@@ -85,35 +87,7 @@ impl Module {
     expr
   }
 
-  // TODO(@were): This is a temporary solution for proof of concept.
-  pub fn elaborate(&self, data: Vec<usize>) {
-    println!("fn {}(", self.name);
-    for elem in self.inputs.iter() {
-      let elem = elem.as_ref::<Input>().unwrap();
-      println!("  {}: u{},", elem.name(), elem.dtype().bits());
-    }
-    print!(") -> (");
-    // TODO(@were): Fix this hardcoded stuff.
-    for elem in self.outputs.iter() {
-      print!("{}, ", elem.dtype().unwrap().to_string());
-    }
-    println!(") {{");
-    for elem in self.dfg.iter() {
-      let expr = elem.as_ref::<Expr>().unwrap();
-      println!("  {}", expr.to_string());
-    }
-    println!("}}\n");
-
-    println!("fn main() {{");
-    print!("  {}(", self.name);
-    for elem in data {
-      print!("{}, ", elem);
-    }
-    println!(");");
-    println!("}}");
-
-  }
-
+  /// Trigger another module's instance.
   pub fn trigger(&self, other: &Module, data: Vec<Reference>) -> Event {
     Event::new(self.as_super(), other.as_super(), data, EventKind::Trigger)
   }
@@ -126,6 +100,28 @@ impl Module {
   /// Test the condition until it is true and then trigger the given module.
   pub fn cond_trigger(&self, other: &Module, data: Vec<Reference>, cond: Reference) -> Event{
     Event::new(self.as_super(), other.as_super(), data, EventKind::Cond(cond))
+  }
+
+}
+
+impl Display for Module {
+
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "module {}(", self.name)?;
+    for elem in self.inputs.iter() {
+      let elem = elem.as_ref::<Input>().unwrap();
+      write!(f, "{}: {}, ", elem.name(), elem.dtype().to_string())?;
+    }
+    write!(f, ") -> (")?;
+    for elem in self.outputs.iter() {
+      write!(f, "{}, ", elem.dtype().unwrap().to_string())?;
+    }
+    write!(f, ") {{\n")?;
+    for elem in self.dfg.iter() {
+      let expr = elem.as_ref::<Expr>().unwrap();
+      write!(f, "  {}\n", expr.to_string())?;
+    }
+    write!(f, "}}\n")
   }
 
 }
