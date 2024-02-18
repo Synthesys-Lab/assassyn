@@ -126,13 +126,14 @@ impl Array {
     self.size
   }
 
-  pub fn read<'a, 'b>(&self, idx: &Box<impl IsElement<'b> + Parented + Typed>,
-                      reader: Reference, cond: Option<Reference>) -> &'a Box<Expr> {
+  pub fn read<'a, 'b>(&self, idx: &Box<impl IsElement<'b> + Typed>,
+                      cond: Option<Reference>,
+                      reader: Reference) -> &'a Box<Expr> {
     let instance = Expr::new(
       self.scalar_ty.clone(),
       Opcode::Load,
       vec![self.as_super(), idx.as_super()],
-      Some(reader),
+      reader,
       cond,
     );
     let res = cur_ctx_mut().insert(instance);
@@ -140,15 +141,16 @@ impl Array {
   }
 
   pub fn write<'a, 'b>(&self,
-                       idx: &Box<impl IsElement<'a> + Parented + Typed>,
-                       value: &Box<impl IsElement<'b> + Parented + Typed>,
-                       cond: Option<Reference>) -> &'a Box<Expr> {
+                       idx: &Box<impl IsElement<'a> + Typed>,
+                       value: &Box<impl IsElement<'b> + Typed>,
+                       cond: Option<Reference>,
+                       writer: Reference) -> &'a Box<Expr> {
 
     let instance = Expr::new(
       DataType::void(),
       Opcode::Store,
       vec![value.as_super(), self.as_super(), idx.as_super()],
-      None,
+      writer,
       None,
     );
     let res = cur_ctx_mut().insert(instance);

@@ -1,4 +1,4 @@
-use crate::builder::system::System;
+use crate::builder::system::SysBuilder;
 
-pub fn elaborate(sys: &System) {
+pub fn elaborate(sys: &SysBuilder) {
 }

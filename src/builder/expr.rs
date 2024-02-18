@@ -1,8 +1,6 @@
 use crate::data::{DataType, Typed};
 
-use super::module::Module;
-
-use super::context::{cur_ctx_mut, IsElement, Parented, Reference};
+use super::context::{cur_ctx_mut, IsElement, Reference};
 use super::port::Input;
 
 pub(crate) enum Opcode {
@@ -26,7 +24,7 @@ impl ToString for Opcode {
 
 pub struct Expr {
   pub(crate) key: usize,
-  pub(crate) parent: Option<Reference>,
+  pub(crate) parent: Reference,
   dtype: DataType,
   opcode: Opcode,
   operands: Vec<Reference>,
@@ -36,10 +34,10 @@ pub struct Expr {
 impl Expr {
 
   pub(crate) fn new(dtype: DataType, opcode: Opcode, operands: Vec<Reference>,
-                    parent: Option<Reference>, pred: Option<Reference>) -> Self {
+                    parent: Reference, pred: Option<Reference>) -> Self {
     Self {
       key: 0,
-      parent: None,
+      parent,
       dtype,
       opcode,
       operands,
@@ -49,14 +47,6 @@ impl Expr {
 
   pub fn dtype(&self) -> &DataType {
     &self.dtype
-  }
-
-}
-
-impl Parented for Expr {
-
-  fn parent(&self) -> Option<Reference> {
-    self.parent.clone()
   }
 
 }
@@ -86,14 +76,15 @@ impl ToString for Expr {
 
 }
 
-pub trait Arithmetic<'a, 'b, T: Typed + Parented + IsElement<'a>> {
-  fn add(&self, other: &Box<T>, pred: Option<&Box<T>>) -> &'b Box<Expr>;
-  fn mul(&self, other: &Box<T>, pred: Option<&Box<T>>) -> &'b Box<Expr>;
+pub trait Arithmetic<'a, 'b, 'c, T: Typed + IsElement<'a>, U: Typed + IsElement<'b>> {
+  fn add(&self, other: &Box<T>, pred: Option<&Box<U>>, parent: Reference) -> &'c Box<Expr>;
+  fn mul(&self, other: &Box<T>, pred: Option<&Box<U>>, parent: Reference) -> &'c Box<Expr>;
 }
 
 macro_rules! binary_op {
   ($func: ident, $opcode: expr) => {
-    fn $func(&self, other: &Box<T>, pred: Option<&Box<T>>) -> &'b Box<Expr> {
+    fn $func(&self, other: &Box<T>, pred: Option<&Box<U>>, parent: Reference)
+      -> &'c Box<Expr> {
       // FIXME(@were): We should not strictly check this here. O.w. we cannot do a + 1
       //               (where 1 has no parent)
       // if self.parent() != other.parent() {
@@ -104,26 +95,23 @@ macro_rules! binary_op {
         self.dtype().clone(),
         $opcode,
         vec![self.as_super(), other.as_ref().as_super()],
-        self.parent().clone(),
+        parent,
         pred.map(|x| x.as_super()),
       );
       let res = cur_ctx_mut().insert(res);
-      if let Some(parent) = &self.parent() {
-        cur_ctx_mut().get_mut::<Module>(parent).unwrap().push(res.clone());
-      } else {
-        eprintln!("[WARN] No parent for {:?}", res);
-      }
       res.as_ref::<Expr>().unwrap()
     }
   };
 }
 
-impl <'a, 'b, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, 'b, T> for Input {
+impl <'a, 'b, 'c, T: Typed + IsElement<'a>, U: Typed + IsElement<'b>>
+Arithmetic<'a, 'b, 'c, T, U> for Input {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }
 
-impl <'a, 'b, T: Typed + Parented + IsElement<'a>> Arithmetic<'a, 'b, T> for Expr {
+impl <'a, 'b, 'c, T: Typed + IsElement<'a>, U: Typed + IsElement<'b>>
+Arithmetic<'a, 'b, 'c, T, U> for Expr {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }

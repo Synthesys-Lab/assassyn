@@ -1,4 +1,4 @@
-use crate::{context::{cur_ctx_mut, IsElement}, data::Typed, Module, Reference};
+use crate::{context::{cur_ctx_mut, IsElement}, data::Typed, Arithmetic, Module, Reference};
 
 // The top function.
 pub struct SysBuilder {
@@ -35,7 +35,17 @@ impl SysBuilder {
     (module.as_super()).as_ref::<Module>().unwrap()
   }
 
-  pub fn create_add(&self, a: &Box<impl Typed>, b: &Box<impl Typed>) {
+  pub fn create_add<'a, 'b, 'c, T: Typed + IsElement<'a>, U: Typed + IsElement<'b>>(
+    &self, a: &Box<impl Arithmetic<'a, 'b, 'c, T, U>>,
+    b: &Box<T>,
+    pred: Option<&Box<U>>) {
+    if let Some(cur_mod) = &self.cur_mod {
+      let module = cur_mod.as_mut::<Module>().unwrap();
+      let parent = module.as_super();
+      let add = a.add(b, pred, parent);
+      module.push(add.as_super());
+    }
+    ()
   }
 
 }
