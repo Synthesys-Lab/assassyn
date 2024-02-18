@@ -3,7 +3,7 @@ use crate::data::{DataType, Typed};
 use super::context::{cur_ctx_mut, IsElement, Reference};
 use super::port::Input;
 
-pub(crate) enum Opcode {
+pub enum Opcode {
   Load,
   Store,
   Add,
@@ -76,15 +76,14 @@ impl ToString for Expr {
 
 }
 
-pub trait Arithmetic<'a, 'b, 'c, T: Typed + IsElement<'a>, U: Typed + IsElement<'b>> {
-  fn add(&self, other: &Box<T>, pred: Option<&Box<U>>, parent: Reference) -> &'c Box<Expr>;
-  fn mul(&self, other: &Box<T>, pred: Option<&Box<U>>, parent: Reference) -> &'c Box<Expr>;
+pub trait Arithmetic<'a, 'b, 'c, T: Typed + IsElement<'a>> {
+  fn add(&self, other: Reference, pred: Option<Reference>, parent: Reference) -> &'c Box<Expr>;
+  fn mul(&self, other: Reference, pred: Option<Reference>, parent: Reference) -> &'c Box<Expr>;
 }
 
 macro_rules! binary_op {
   ($func: ident, $opcode: expr) => {
-    fn $func(&self, other: &Box<T>, pred: Option<&Box<U>>, parent: Reference)
-      -> &'c Box<Expr> {
+    fn $func(&self, other: Reference, pred: Option<Reference>, parent: Reference) -> &'c Box<Expr> {
       // FIXME(@were): We should not strictly check this here. O.w. we cannot do a + 1
       //               (where 1 has no parent)
       // if self.parent() != other.parent() {
@@ -94,9 +93,9 @@ macro_rules! binary_op {
       let res = Expr::new(
         self.dtype().clone(),
         $opcode,
-        vec![self.as_super(), other.as_ref().as_super()],
+        vec![self.as_super(), other],
         parent,
-        pred.map(|x| x.as_super()),
+        pred,
       );
       let res = cur_ctx_mut().insert(res);
       res.as_ref::<Expr>().unwrap()
@@ -104,14 +103,14 @@ macro_rules! binary_op {
   };
 }
 
-impl <'a, 'b, 'c, T: Typed + IsElement<'a>, U: Typed + IsElement<'b>>
-Arithmetic<'a, 'b, 'c, T, U> for Input {
+impl <'a, 'b, 'c, T: Typed + IsElement<'a>>
+Arithmetic<'a, 'b, 'c, T> for Input {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }
 
-impl <'a, 'b, 'c, T: Typed + IsElement<'a>, U: Typed + IsElement<'b>>
-Arithmetic<'a, 'b, 'c, T, U> for Expr {
+impl <'a, 'b, 'c, T: Typed + IsElement<'a>>
+Arithmetic<'a, 'b, 'c, T> for Expr {
   binary_op!(add, Opcode::Add);
   binary_op!(mul, Opcode::Mul);
 }
