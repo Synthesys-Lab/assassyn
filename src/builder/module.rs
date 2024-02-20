@@ -107,7 +107,7 @@ impl Module {
 impl Display for Module {
 
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "module {}(", self.name)?;
+    write!(f, "  module {}(", self.name)?;
     for elem in self.inputs.iter() {
       let elem = elem.as_ref::<Input>().unwrap();
       write!(f, "{}: {}, ", elem.name(), elem.dtype().to_string())?;
@@ -119,9 +119,9 @@ impl Display for Module {
     write!(f, ") {{\n")?;
     for elem in self.dfg.iter() {
       let expr = elem.as_ref::<Expr>().unwrap();
-      write!(f, "  {}\n", expr.to_string())?;
+      write!(f, "    {}\n", expr.to_string())?;
     }
-    write!(f, "}}\n")
+    write!(f, "  }}\n")
   }
 
 }

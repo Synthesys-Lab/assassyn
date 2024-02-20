@@ -1,9 +1,21 @@
-use crate::{context::{cur_ctx_mut, IsElement}, data::Typed, expr::{Expr, Opcode}, port::Input, Arithmetic, DataType, Module, Reference};
+use std::fmt::Display;
+
+use crate::{
+  context::{cur_ctx_mut, IsElement},
+  data::{Array, Typed},
+  expr::{Expr, Opcode},
+  port::Input,
+  DataType,
+  Module,
+  Reference
+};
 
 // The top function.
 pub struct SysBuilder {
   pub(crate) key: usize,
   name: String,
+  // TODO(@were): Data.
+  arrays: Vec<Reference>,
   // TODO(@were): Add data.
   mods: Vec<Reference>,
   cur_mod: Option<Reference>,
@@ -32,6 +44,7 @@ impl SysBuilder {
     let instance = Self {
       key: 0,
       name: name.into(),
+      arrays: vec![],
       mods,
       cur_mod: None,
     };
@@ -72,6 +85,24 @@ impl SysBuilder {
     b: &Box<impl Typed + IsElement<'b>>,
     pred: Option<Reference>) -> &'b Box<Expr> {
     self.create_expr(a.dtype(), Opcode::Add, vec![a.as_super(), b.as_super()], pred)
+  }
+
+  pub fn create_array<'a>(&mut self, ty: DataType, name: &str, size: usize) -> &'a Box<Array> {
+    let instance = Array::new(ty, name.into(), size);
+    self.arrays.push(instance.as_super());
+    instance
+  }
+
+}
+
+impl Display for SysBuilder {
+
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "system {} {{\n", self.name)?;
+    for elem in self.mods.iter() {
+      write!(f, "\n{}\n", elem.as_ref::<Module>().unwrap())?;
+    }
+    write!(f, "}}")
   }
 
 }

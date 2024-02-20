@@ -100,6 +100,7 @@ impl IntImm {
 
 pub struct Array {
   pub(crate) key: usize,
+  name: String,
   scalar_ty: DataType,
   size: usize,
 }
@@ -112,10 +113,11 @@ impl Typed for Array {
 
 impl Array {
 
-  pub fn new<'a>(scalar_ty: DataType, size: usize) -> &'a Box<Array> {
+  pub fn new<'a>(scalar_ty: DataType, name: String, size: usize) -> &'a Box<Array> {
     let res = Self {
       key: 0,
       scalar_ty,
+      name,
       size,
     };
     let key = cur_ctx_mut().insert(res);
