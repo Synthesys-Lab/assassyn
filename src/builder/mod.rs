@@ -5,6 +5,5 @@ pub mod data;
 pub mod module;
 pub mod context;
 pub mod expr;
-pub mod event;
 pub mod system;
 

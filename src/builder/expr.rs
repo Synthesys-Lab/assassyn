@@ -8,6 +8,8 @@ pub enum Opcode {
   Store,
   Add,
   Mul,
+  Trigger,
+  SpinTrigger,
 }
 
 impl ToString for Opcode {

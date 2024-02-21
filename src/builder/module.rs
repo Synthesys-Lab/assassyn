@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::{expr::Expr, context::{cur_ctx, IsElement}, data::Typed};
 
-use super::{context::{cur_ctx_mut, Reference}, event::{Event, EventKind}, port::{Input, Output}};
+use super::{context::{cur_ctx_mut, Reference}, port::{Input, Output}};
 
 pub struct Module {
   pub(crate) key: usize,
@@ -82,24 +82,9 @@ impl Module {
   }
 
   // TODO(@were): Later make this implicit.
-  pub fn push(&mut self, expr: Reference) -> Reference {
+  pub(crate) fn push(&mut self, expr: Reference) -> Reference {
     self.dfg.push(expr.clone());
     expr
-  }
-
-  /// Trigger another module's instance.
-  pub fn trigger(&self, other: &Module, data: Vec<Reference>) -> Event {
-    Event::new(self.as_super(), other.as_super(), data, EventKind::Trigger)
-  }
-
-  /// Test the condition until it is true and then trigger the given module.
-  pub fn spin_trigger(&self, other: &Module, data: Vec<Reference>, cond: Reference) -> Event {
-    Event::new(self.as_super(), other.as_super(), data, EventKind::Spin(cond))
-  }
-
-  /// Test the condition until it is true and then trigger the given module.
-  pub fn cond_trigger(&self, other: &Module, data: Vec<Reference>, cond: Reference) -> Event{
-    Event::new(self.as_super(), other.as_super(), data, EventKind::Cond(cond))
   }
 
 }
