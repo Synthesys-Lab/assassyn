@@ -1,4 +1,10 @@
-use crate::{context::{cur_ctx, cur_ctx_mut, IsElement, Parented}, expr::{Expr, Opcode}, Reference};
+use std::fmt::Display;
+
+use crate::{
+  context::{cur_ctx_mut, IsElement, Parented},
+  expr::{Expr, Opcode},
+  Reference
+};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum DataKind {
@@ -105,6 +111,14 @@ pub struct Array {
   size: usize,
 }
 
+impl Display for Array {
+
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Array({}, {})", self.name, self.size)
+  }
+
+}
+
 impl Typed for Array {
   fn dtype(&self) -> &DataType {
     &self.scalar_ty
@@ -113,15 +127,13 @@ impl Typed for Array {
 
 impl Array {
 
-  pub fn new<'a>(scalar_ty: DataType, name: String, size: usize) -> &'a Box<Array> {
-    let res = Self {
+  pub fn new(scalar_ty: DataType, name: String, size: usize) -> Array {
+    Self {
       key: 0,
       scalar_ty,
       name,
       size,
-    };
-    let key = cur_ctx_mut().insert(res);
-    cur_ctx().get(&key).unwrap()
+    }
   }
 
   pub fn size(&self) -> usize {

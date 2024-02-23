@@ -18,7 +18,10 @@ impl ToString for Opcode {
     match self {
       Opcode::Add => "+".into(),
       Opcode::Mul => "*".into(),
-      _ => panic!("Not implemented!"),
+      Opcode::Load => "load".into(),
+      Opcode::Store => "store".into(),
+      Opcode::Trigger => "trigger".into(),
+      Opcode::SpinTrigger => "wait_until".into(),
     }
   }
 
@@ -64,15 +67,33 @@ impl Typed for Expr {
 impl ToString for Expr {
 
   fn to_string(&self) -> String {
+    let mnem = self.opcode.to_string();
     match self.opcode {
       Opcode::Add | Opcode::Mul => {
         format!("let _{} = {} {} {};",
                 self.key,
                 self.operands[0].to_string(),
-                self.opcode.to_string(),
+                mnem,
                 self.operands[1].to_string())
       }
-      _ => panic!("Not implemented!"),
+      Opcode::Load => {
+        format!("let _{} = {}[{}];",
+                self.key,
+                self.operands[0].to_string(),
+                self.operands[1].to_string())
+      }
+      Opcode::Store => {
+        format!("{}[{}] = {};",
+                self.operands[0].to_string(),
+                self.operands[1].to_string(),
+                self.operands[2].to_string())
+      }
+      Opcode::Trigger => {
+        format!("{} {};", mnem, self.operands[0].to_string())
+      }
+      Opcode::SpinTrigger => {
+        format!("{} {};", mnem, self.operands[0].to_string())
+      }
     }
   }
 

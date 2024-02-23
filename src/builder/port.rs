@@ -10,14 +10,13 @@ pub struct Input {
 
 impl Input {
 
-  pub fn new(dtype: &DataType, name: &str) -> Reference {
-    let res = Self {
+  pub fn new(dtype: &DataType, name: &str) -> Self {
+    Self {
       key: 0,
       parent: None,
       name: name.to_string(),
       dtype: dtype.clone()
-    };
-    cur_ctx_mut().insert(res)
+    }
   }
 
   pub fn name(&self) -> &String {

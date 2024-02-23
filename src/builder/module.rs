@@ -1,15 +1,14 @@
 use std::fmt::{Display, Formatter};
 
-use crate::{expr::Expr, context::{cur_ctx, IsElement}, data::Typed};
+use crate::{context::{IsElement, Reference}, data::Typed, expr::Expr};
 
-use super::{context::{cur_ctx_mut, Reference}, port::{Input, Output}};
+use super::{port::{Input, Output}, system::PortInfo};
 
 pub struct Module {
   pub(crate) key: usize,
-  pub(crate) parent: Option<Reference>,
   name: String,
-  inputs: Vec<Reference>,
-  dfg: Vec<Reference>,
+  inputs: Vec<Box<Input>>,
+  dfg: Vec<Expr>,
   outputs: Vec<Reference>,
 }
 
@@ -30,20 +29,15 @@ impl Module {
   /// let a = Input::new("a", 32);
   /// Module::new("a_plus_b", vec![a.clone()]);
   /// ```
-  pub fn new(name: &str, inputs: Vec<Reference>) -> &Box<Module> {
-    let module = Module {
+  pub fn new(name: &str, inputs: Vec<PortInfo>) -> Module {
+    let inputs = inputs.into_iter().map(|x| Input::new(&x.ty, x.name.as_str()).into()).collect();
+    Module {
       key: 0,
-      parent: None,
       name: name.to_string(),
       inputs,
       dfg: Vec::new(),
       outputs: Vec::new(),
-    };
-    let res = cur_ctx_mut().insert(module);
-    cur_ctx_mut().get::<Module>(&res).unwrap().inputs.iter().for_each(|elem| {
-      elem.as_mut::<Input>().unwrap().parent = Some(res.clone());
-    });
-    cur_ctx().get::<Module>(&res).unwrap()
+    }
   }
 
   /// Get the required element from the given vector and cast it to the required type.
@@ -62,7 +56,7 @@ impl Module {
   ///
   /// * `i` - The index of the input.
   pub fn get_input(&self, i: usize) -> Option<&Box<Input>> {
-    Self::get_and_cast(&self.inputs, i)
+    self.inputs.get(i)
   }
 
   /// Get the given output reference.
@@ -82,9 +76,9 @@ impl Module {
   }
 
   // TODO(@were): Later make this implicit.
-  pub(crate) fn push(&mut self, expr: Reference) -> Reference {
-    self.dfg.push(expr.clone());
-    expr
+  pub(crate) fn push(&mut self, expr: Expr) -> Reference {
+    self.dfg.push(expr);
+    self.dfg.last().unwrap().as_super()
   }
 
 }
@@ -94,7 +88,6 @@ impl Display for Module {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(f, "  module {}(", self.name)?;
     for elem in self.inputs.iter() {
-      let elem = elem.as_ref::<Input>().unwrap();
       write!(f, "{}: {}, ", elem.name(), elem.dtype().to_string())?;
     }
     write!(f, ") -> (")?;
@@ -103,8 +96,7 @@ impl Display for Module {
     }
     write!(f, ") {{\n")?;
     for elem in self.dfg.iter() {
-      let expr = elem.as_ref::<Expr>().unwrap();
-      write!(f, "    {}\n", expr.to_string())?;
+      write!(f, "    {}\n", elem.to_string())?;
     }
     write!(f, "  }}\n")
   }
