@@ -1,22 +1,20 @@
 use std::fmt::Display;
 
 use crate::{
-  context::{cur_ctx_mut, IsElement},
+  context::{Element, IsElement},
   data::Array,
-  expr::{Expr, Opcode},
-  DataType,
-  Module,
-  Reference
+  expr::{Expr, Opcode}, port::Input, DataType, Module, Reference
 };
 
 // The top function.
 pub struct SysBuilder {
   pub(crate) key: usize,
+  pub(crate) slab: slab::Slab<Element>,
   name: String,
   // TODO(@were): Data.
-  arrays: Vec<Array>,
+  arrays: Vec<Reference>,
   // TODO(@were): Add data.
-  mods: Vec<Module>,
+  mods: Vec<Reference>,
   cur_mod: Option<Reference>,
 }
 
@@ -38,58 +36,87 @@ impl PortInfo {
 
 impl SysBuilder {
 
-  pub fn new(name: &str) -> Reference {
-    let mods = vec![Module::new("driver", vec![])];
-    let instance = Self {
+  pub fn new(name: &str) -> Self {
+    let mut res = Self {
       key: 0,
       name: name.into(),
       arrays: vec![],
-      mods,
+      slab: slab::Slab::new(),
+      mods: Vec::new(),
       cur_mod: None,
     };
-    cur_ctx_mut().insert(instance)
+    let driver = Module::new("driver", vec![]);
+    let key = res.slab.insert(Element::Module(driver.into()));
+    res.mods.push(Reference::Module(key));
+    res
+  }
+
+  pub fn get<'a, T: IsElement<'a>>(&'a self, key: &Reference) -> Result<&'a Box<T>, String> {
+    T::downcast(&self.slab, key)
+  }
+
+  pub fn get_mut<'a, T: IsElement<'a>>(&'a mut self, key: &Reference)
+    -> Result<&'a mut Box<T>, String> {
+    T::downcast_mut(&mut self.slab, key)
   }
 
   pub fn get_driver(&self) -> &Module {
-    self.mods.first().unwrap()
+    self.get::<Module>(self.mods.first().unwrap()).unwrap()
   }
 
   pub fn set_current_module(&mut self, module: Reference) {
     self.cur_mod = Some(module);
   }
 
+  pub fn insert<'a, T: IsElement<'a> + Into<Element>>(&mut self, elem: T) -> Reference {
+    let key = self.slab.insert(elem.into());
+    T::into_reference(key)
+  }
+
   /// Create a new module, and set it as the current module to be built.
-  pub fn create_module(&mut self, name: &str, inputs: Vec<PortInfo>) -> &Module {
-    let module = Module::new(name, inputs);
-    self.mods.push(module);
-    self.cur_mod = Some(self.mods.last().unwrap().as_super());
-    self.mods.last().unwrap()
+  pub fn create_module(&mut self, name: &str, inputs: Vec<PortInfo>) -> Reference {
+    let ports = inputs
+      .into_iter()
+      .map(|x| { self.insert(Input::new(&x.ty, x.name.as_str())) })
+      .collect::<Vec<_>>();
+    let module = Module::new(name, ports);
+    let key = self.insert(module);
+    self.cur_mod = Some(key.clone());
+    key
   }
 
   pub fn create_expr(
-    &self,
+    &mut self,
     dtype: DataType,
     opcode: Opcode,
     operands: Vec<Reference>,
     pred: Option<Reference>) -> Reference {
-    if let Some(cur_mod) = &self.cur_mod {
-      let instance = Expr::new(dtype.clone(), opcode, operands, cur_mod.clone(), pred);
-      cur_mod.as_mut::<Module>().unwrap().push(instance)
+    let cur_mod = if let Some(cur_mod) = &self.cur_mod {
+      cur_mod.clone()
     } else {
       panic!("No module to insert into!");
-    }
+    };
+    let instance = Expr::new(dtype.clone(), opcode, operands, cur_mod.clone(), pred);
+    self.get_mut::<Module>(&cur_mod).unwrap().push(instance)
   }
 
-  pub fn create_trigger(&self, src: &Box<Module>, dst: &Box<Module>, mut data: Vec<Reference>) {
-    data.insert(0, src.as_super());
-    data.insert(1, dst.as_super());
+  pub fn create_trigger(
+    &mut self,
+    src: &Box<Module>,
+    dst: &Box<Module>,
+    mut data: Vec<Reference>) {
+    data.insert(0, src.upcast());
+    data.insert(1, dst.upcast());
     self.create_expr(DataType::void(), Opcode::Trigger, data, None);
   }
 
   pub fn create_spin_trigger(
-    &self, src: &Box<Module>, dst: &Box<Module>, mut data: Vec<Reference>) {
-    data.insert(0, src.as_super());
-    data.insert(1, dst.as_super());
+    &mut self,
+    src: &Box<Module>,
+    dst: &Box<Module>,
+    mut data: Vec<Reference>) {
+    data.insert(0, src.upcast());
+    data.insert(1, dst.upcast());
     self.create_expr(DataType::void(), Opcode::SpinTrigger, data, None);
   }
 
@@ -106,8 +133,9 @@ impl SysBuilder {
   /// An array can be a register, or memory.
   pub fn create_array(&mut self, ty: DataType, name: &str, size: usize) -> Reference {
     let instance = Array::new(ty, name.into(), size);
-    self.arrays.push(instance);
-    Reference::Array(self.arrays.len() - 1)
+    let key = self.insert(instance);
+    self.arrays.push(key.clone());
+    key
   }
 
   /// Create a read operation on an array.
@@ -139,10 +167,12 @@ impl Display for SysBuilder {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "system {} {{\n", self.name)?;
     for elem in self.arrays.iter() {
-      write!(f, "\n{}\n", elem)?;
+      let array = elem.as_ref::<Array>(self).unwrap();
+      write!(f, "\n{}\n", array)?;
     }
     for elem in self.mods.iter() {
-      write!(f, "\n{}\n", elem)?;
+      let module = elem.as_ref::<Module>(self).unwrap();
+      write!(f, "\n{}\n", module.to_string(self, 2))?;
     }
     write!(f, "}}")
   }

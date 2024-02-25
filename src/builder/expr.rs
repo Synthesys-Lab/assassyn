@@ -1,7 +1,6 @@
 use crate::data::{DataType, Typed};
 
-use super::context::{cur_ctx_mut, IsElement, Reference};
-use super::port::Input;
+use super::context::Reference;
 
 pub enum Opcode {
   Load,
@@ -97,44 +96,5 @@ impl ToString for Expr {
     }
   }
 
-}
-
-pub trait Arithmetic<'a, 'b, 'c, T: Typed + IsElement<'a>> {
-  fn add(&self, other: Reference, pred: Option<Reference>, parent: Reference) -> &'c Box<Expr>;
-  fn mul(&self, other: Reference, pred: Option<Reference>, parent: Reference) -> &'c Box<Expr>;
-}
-
-macro_rules! binary_op {
-  ($func: ident, $opcode: expr) => {
-    fn $func(&self, other: Reference, pred: Option<Reference>, parent: Reference) -> &'c Box<Expr> {
-      // FIXME(@were): We should not strictly check this here. O.w. we cannot do a + 1
-      //               (where 1 has no parent)
-      // if self.parent() != other.parent() {
-      //   panic!("{:?} & {:?} are not in the same module!",
-      //          self.as_super(), other.as_ref().as_super());
-      // }
-      let res = Expr::new(
-        self.dtype().clone(),
-        $opcode,
-        vec![self.as_super(), other],
-        parent,
-        pred,
-      );
-      let res = cur_ctx_mut().insert(res);
-      res.as_ref::<Expr>().unwrap()
-    }
-  };
-}
-
-impl <'a, 'b, 'c, T: Typed + IsElement<'a>>
-Arithmetic<'a, 'b, 'c, T> for Input {
-  binary_op!(add, Opcode::Add);
-  binary_op!(mul, Opcode::Mul);
-}
-
-impl <'a, 'b, 'c, T: Typed + IsElement<'a>>
-Arithmetic<'a, 'b, 'c, T> for Expr {
-  binary_op!(add, Opcode::Add);
-  binary_op!(mul, Opcode::Mul);
 }
 

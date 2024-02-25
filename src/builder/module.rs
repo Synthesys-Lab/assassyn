@@ -1,13 +1,11 @@
-use std::fmt::{Display, Formatter};
-
 use crate::{context::{IsElement, Reference}, data::Typed, expr::Expr};
 
-use super::{port::{Input, Output}, system::PortInfo};
+use super::{port::Input, system::SysBuilder};
 
 pub struct Module {
   pub(crate) key: usize,
   name: String,
-  inputs: Vec<Box<Input>>,
+  inputs: Vec<Reference>,
   dfg: Vec<Expr>,
   outputs: Vec<Reference>,
 }
@@ -29,8 +27,7 @@ impl Module {
   /// let a = Input::new("a", 32);
   /// Module::new("a_plus_b", vec![a.clone()]);
   /// ```
-  pub fn new(name: &str, inputs: Vec<PortInfo>) -> Module {
-    let inputs = inputs.into_iter().map(|x| Input::new(&x.ty, x.name.as_str()).into()).collect();
+  pub fn new(name: &str, inputs: Vec<Reference>) -> Module {
     Module {
       key: 0,
       name: name.to_string(),
@@ -40,65 +37,36 @@ impl Module {
     }
   }
 
-  /// Get the required element from the given vector and cast it to the required type.
-  ///
-  /// # Arguments
-  ///
-  /// `v` - The vector of references.
-  /// `i` - The index of the element.
-  fn get_and_cast<'a, T: IsElement<'a>>(v: &'a Vec<Reference>, i: usize) -> Option<&Box<T>> {
-    v.get(i).map(|elem| elem.as_ref::<T>().unwrap())
-  }
-
   /// Get the given input reference.
   ///
   /// # Arguments
   ///
   /// * `i` - The index of the input.
-  pub fn get_input(&self, i: usize) -> Option<&Box<Input>> {
+  pub fn get_input(&self, i: usize) -> Option<&Reference> {
     self.inputs.get(i)
   }
 
-  /// Get the given output reference.
-  ///
-  /// # Arguments
-  ///
-  /// * `i` - The index of the outout.
-  pub fn get_output(&self, i: usize) -> Option<&Box<Output>> {
-    Self::get_and_cast(&self.outputs, i)
-  }
-
-  // TODO(@were): Check if outputs are set.
-  // TODO(@were): Check the given references are with deta.
-  // TODO(@were): Check the given references are part of the module.
-  pub fn set_outputs(&mut self, outputs: Vec<Reference>) {
-    self.outputs = outputs.into_iter().map(|data| { Output::new(data) }).collect();
-  }
 
   // TODO(@were): Later make this implicit.
   pub(crate) fn push(&mut self, expr: Expr) -> Reference {
     self.dfg.push(expr);
-    self.dfg.last().unwrap().as_super()
+    self.dfg.last().unwrap().upcast()
   }
 
-}
-
-impl Display for Module {
-
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "  module {}(", self.name)?;
+  pub fn to_string(&self, sys: &SysBuilder, ident: usize) -> String {
+    let ident = "  ".repeat(ident);
+    let mut res = String::new();
+    res.push_str(format!("{}module {}(", ident, self.name).as_str());
     for elem in self.inputs.iter() {
-      write!(f, "{}: {}, ", elem.name(), elem.dtype().to_string())?;
+      let elem = elem.as_ref::<Input>(sys).unwrap();
+      res.push_str(format!("{}: {}, ", elem.name(), elem.dtype().to_string()).as_str());
     }
-    write!(f, ") -> (")?;
-    for elem in self.outputs.iter() {
-      write!(f, "{}, ", elem.dtype().unwrap().to_string())?;
-    }
-    write!(f, ") {{\n")?;
+    res.push_str(") {{\n");
     for elem in self.dfg.iter() {
-      write!(f, "    {}\n", elem.to_string())?;
+      res.push_str(format!("{}{}\n", ident, elem.to_string()).as_str());
     }
-    write!(f, "  }}\n")
+    res.push_str("  }}\n");
+    res
   }
 
 }

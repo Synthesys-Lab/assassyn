@@ -1,19 +1,9 @@
-use std::collections::HashMap;
+use crate::{data::{Array, IntImm}, Module};
 
-use slab;
-use once_cell::sync::Lazy;
-
-use crate::{data::{Array, DataType, IntImm, Typed}, Module};
-
-use super::{expr::Expr, port::{Input, Output}, system::SysBuilder};
-
-pub(crate) struct Context {
-  slab: slab::Slab<Element>,
-  int_cache: HashMap<(DataType, u64), Reference>,
-}
+use super::{expr::Expr, port::Input, system::SysBuilder};
 
 pub trait IsElement<'a> {
-  fn as_super(&self) -> Reference;
+  fn upcast(&self) -> Reference;
   fn set_key(&mut self, key: usize);
   fn into_reference(key: usize) -> Reference;
   fn downcast(slab: &'a slab::Slab<Element>, key: &Reference) -> Result<&'a Box<Self>, String>;
@@ -40,7 +30,7 @@ macro_rules! register_element {
         self.key = key;
       }
 
-      fn as_super(&self) -> Reference {
+      fn upcast(&self) -> Reference {
         Reference::$name(self.key)
       }
 
@@ -70,13 +60,13 @@ macro_rules! register_element {
 
     }
 
-  };
+
+  }
 
 }
 
 register_element!(Module);
 register_element!(Input);
-register_element!(Output);
 register_element!(Expr);
 register_element!(Array);
 register_element!(IntImm);
@@ -96,29 +86,25 @@ pub enum Reference {
   Unknown,
 }
 
-impl <'a>Reference {
+impl Reference {
 
-  pub fn as_ref<T: IsElement<'a>>(&self) -> Result<&'a Box<T>, String> {
-    cur_ctx().get::<T>(self)
-  }
-
-  pub fn as_mut<T: IsElement<'a>>(&self) -> Result<&'a mut Box<T>, String> {
-    cur_ctx_mut().get_mut::<T>(self)
-  }
-
-  pub fn dtype(&self) -> Result<DataType, String> {
+  pub fn get_key(&self) -> usize {
     match self {
-      Reference::Input(_) => {
-        Ok(self.as_ref::<Input>().unwrap().dtype().clone())
-      }
-      Reference::Output(_) => {
-        self.as_ref::<Output>().unwrap().data.dtype()
-      }
-      Reference::Expr(_) => {
-        Ok(self.as_ref::<Expr>().unwrap().dtype().clone())
-      }
-      _ => Err(format!("No type for {:?}", self))
+      Reference::Module(key) |
+      Reference::Input(key) |
+      Reference::Output(key) |
+      Reference::Expr(key) |
+      Reference::Array(key) |
+      Reference::SysBuilder(key) |
+      Reference::ArrayRead(key) |
+      Reference::ArrayWrite(key) |
+      Reference::IntImm(key) => *key,
+      Reference::Unknown => unreachable!("Unknown reference"),
     }
+  }
+
+  pub fn as_ref<'a, T: IsElement<'a>>(&self, sys: &'a SysBuilder) -> Result<&'a Box<T>, String> {
+    T::downcast(&sys.slab, self)
   }
 
 }
@@ -126,15 +112,7 @@ impl <'a>Reference {
 impl ToString for Reference {
 
   fn to_string(&self) -> String {
-    match self {
-      Reference::Input(_) => {
-        self.as_ref::<Input>().unwrap().name().clone()
-      }
-      Reference::Expr(key) => {
-        format!("_{}", key)
-      }
-      _ => unreachable!("Not supported yet {:?}", *self)
-    }
+    format!("_{}", self.get_key())
   }
 
 }
@@ -142,66 +120,9 @@ impl ToString for Reference {
 pub enum Element {
   Module(Box<Module>),
   Input(Box<Input>),
-  Output(Box<Output>),
   Expr(Box<Expr>),
   Array(Box<Array>),
   SysBuilder(Box<SysBuilder>),
   IntImm(Box<IntImm>),
-}
-
-impl Element {
-
-  pub fn get_key(&self) -> usize {
-    cur_ctx().slab.key_of(self)
-  }
-
-}
-
-impl <'a>Context {
-
-  pub fn new() -> Self {
-    Context {
-      slab: slab::Slab::new(),
-      int_cache: HashMap::new(),
-    }
-  }
-
-  pub(super) fn int_imm(&mut self, dtype: &DataType, value: u64) -> Reference {
-    let key = (dtype.clone(), value);
-    if let Some(res) = self.int_cache.get(&key) {
-      return res.clone()
-    }
-    let instance = IntImm::instantiate(key.0.clone(), key.1);
-    let res = cur_ctx_mut().insert(instance);
-    self.int_cache.insert(key, res.clone());
-    res
-  }
-
-  pub fn insert<T: Into<Element> + IsElement<'a> + 'a>(&mut self, elem: T) -> Reference {
-    let key = self.slab.insert(elem.into());
-    let res = T::into_reference(key);
-    T::downcast_mut(&mut cur_ctx_mut().slab, &res).unwrap().set_key(key);
-    res
-  }
-
-  pub fn get<T: IsElement<'a>>(&'a self, key: &Reference) -> Result<&'a Box<T>, String> {
-    T::downcast(&self.slab, key)
-  }
-
-  pub fn get_mut<T: IsElement<'a>>(&'a mut self, key: &Reference)
-    -> Result<&'a mut Box<T>, String> {
-    T::downcast_mut(&mut self.slab, key)
-  }
-
-}
-
-static mut CONTEXT: Lazy<Context> = Lazy::new(|| { Context::new() });
-
-pub(crate) fn cur_ctx_mut() -> &'static mut Context {
-  unsafe { &mut CONTEXT }
-}
-
-pub(crate) fn cur_ctx() -> &'static Context {
-  unsafe { &CONTEXT }
 }
 

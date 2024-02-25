@@ -2,7 +2,6 @@ pub mod builder;
 pub mod sim;
 
 pub use builder::expr;
-pub use builder::expr::Arithmetic;
 
 pub use builder::context;
 pub use builder::context::Reference;

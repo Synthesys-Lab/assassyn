@@ -1,10 +1,6 @@
 use std::fmt::Display;
 
-use crate::{
-  context::{cur_ctx_mut, IsElement, Parented},
-  expr::{Expr, Opcode},
-  Reference
-};
+use crate::{context::Parented, Reference};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 enum DataKind {
@@ -93,13 +89,8 @@ impl Parented for IntImm {
 
 impl IntImm {
 
-  pub(super) fn instantiate(dtype: DataType, value: u64) -> Self {
+  pub(super) fn new(dtype: DataType, value: u64) -> Self {
     Self { key: 0, dtype, value, }
-  }
-
-  pub fn new<'a>(dtype: &DataType, value: u64) -> &'a Box<IntImm> {
-    let res = cur_ctx_mut().int_imm(dtype, value);
-    res.as_ref::<IntImm>().unwrap()
   }
 
 }
@@ -138,37 +129,6 @@ impl Array {
 
   pub fn size(&self) -> usize {
     self.size
-  }
-
-  pub fn read<'a, 'b>(&self, idx: &Box<impl IsElement<'b> + Typed>,
-                      cond: Option<Reference>,
-                      reader: Reference) -> &'a Box<Expr> {
-    let instance = Expr::new(
-      self.scalar_ty.clone(),
-      Opcode::Load,
-      vec![self.as_super(), idx.as_super()],
-      reader,
-      cond,
-    );
-    let res = cur_ctx_mut().insert(instance);
-    res.as_ref::<Expr>().unwrap()
-  }
-
-  pub fn write<'a, 'b>(&self,
-                       idx: &Box<impl IsElement<'a> + Typed>,
-                       value: &Box<impl IsElement<'b> + Typed>,
-                       cond: Option<Reference>,
-                       writer: Reference) -> &'a Box<Expr> {
-
-    let instance = Expr::new(
-      DataType::void(),
-      Opcode::Store,
-      vec![value.as_super(), self.as_super(), idx.as_super()],
-      writer,
-      None,
-    );
-    let res = cur_ctx_mut().insert(instance);
-    res.as_ref::<Expr>().unwrap()
   }
 
 }
