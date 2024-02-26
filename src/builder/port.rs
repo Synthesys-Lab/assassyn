@@ -17,7 +17,7 @@ impl Input {
     }
   }
 
-  pub fn name(&self) -> &String {
+  pub fn get_name(&self) -> &String {
     &self.name
   }
 }

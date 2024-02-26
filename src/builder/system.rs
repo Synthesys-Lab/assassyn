@@ -56,6 +56,14 @@ impl SysBuilder {
     T::downcast(&self.slab, key)
   }
 
+  pub fn module_iter<'a>(&'a self) -> impl Iterator<Item = &'a Box<Module>> {
+    self.mods.iter().map(|x| x.as_ref::<Module>(self).unwrap())
+  }
+
+  pub fn array_iter<'a>(&'a self) -> impl Iterator<Item = &'a Box<Array>> {
+    self.arrays.iter().map(|x| x.as_ref::<Array>(self).unwrap())
+  }
+
   pub fn get_mut<'a, T: IsElement<'a>>(
     &'a mut self,
     key: &Reference,
@@ -120,9 +128,8 @@ impl SysBuilder {
     self.get_mut::<Module>(&cur_mod).unwrap().push(key)
   }
 
-  pub fn create_trigger(&mut self, src: Reference, dst: Reference, mut data: Vec<Reference>) {
-    data.insert(0, src);
-    data.insert(1, dst);
+  pub fn create_trigger(&mut self, dst: Reference, mut data: Vec<Reference>) {
+    data.insert(0, dst);
     self.create_expr(DataType::void(), Opcode::Trigger, data, None);
   }
 
@@ -165,8 +172,11 @@ impl SysBuilder {
     index: Reference,
     cond: Option<Reference>,
   ) -> Reference {
-    let operands = vec![array, index];
-    self.create_expr(dtype, Opcode::Load, operands, cond)
+    let operands = vec![array.clone(), index];
+    let res = self.create_expr(dtype, Opcode::Load, operands, cond);
+    let cur_mod = self.cur_mod.as_ref().unwrap().clone();
+    self.get_mut::<Module>(&cur_mod).unwrap().insert_array_used(array, Opcode::Load);
+    res
   }
 
   /// Create a write operation on an array.
@@ -177,8 +187,11 @@ impl SysBuilder {
     value: Reference,
     cond: Option<Reference>,
   ) -> Reference {
-    let operands = vec![array, index, value];
-    self.create_expr(DataType::void(), Opcode::Store, operands, cond)
+    let operands = vec![array.clone(), index, value];
+    let res = self.create_expr(DataType::void(), Opcode::Store, operands, cond);
+    let cur_mod = self.cur_mod.as_ref().unwrap().clone();
+    self.get_mut::<Module>(&cur_mod).unwrap().insert_array_used(array, Opcode::Store);
+    res
   }
 }
 

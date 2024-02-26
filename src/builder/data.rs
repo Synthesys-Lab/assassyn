@@ -103,7 +103,7 @@ pub struct Array {
 
 impl Display for Array {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Array: {}[{}]", self.name, self.size)
+    write!(f, "Array: {} {}[{}]", self.dtype().to_string(), self.name, self.size)
   }
 }
 

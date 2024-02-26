@@ -77,7 +77,7 @@ register_element!(Array);
 register_element!(IntImm);
 register_element!(SysBuilder);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Reference {
   Module(usize),
   Input(usize),
@@ -123,10 +123,13 @@ impl Reference {
       },
       Reference::Array(_) => {
         let array = self.as_ref::<Array>(sys).unwrap();
-        format!("(Array[{}] {})", array.get_size(), array.get_name())
+        format!("{}", array.get_name())
       },
       Reference::IntImm(_) => {
         self.as_ref::<IntImm>(sys).unwrap().to_string()
+      }
+      Reference::Input(_) => {
+        self.as_ref::<Input>(sys).unwrap().get_name().to_string()
       }
       Reference::Unknown => {
         panic!("Unknown reference")
