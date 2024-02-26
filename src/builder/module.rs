@@ -1,4 +1,5 @@
-use crate::{context::{IsElement, Reference}, data::Typed, expr::Expr};
+
+use crate::{context::Reference, data::Typed, expr::Expr};
 
 use super::{port::Input, system::SysBuilder};
 
@@ -6,8 +7,7 @@ pub struct Module {
   pub(crate) key: usize,
   name: String,
   inputs: Vec<Reference>,
-  dfg: Vec<Expr>,
-  outputs: Vec<Reference>,
+  dfg: Vec<Reference>,
 }
 
 pub struct Driver { }
@@ -33,7 +33,6 @@ impl Module {
       name: name.to_string(),
       inputs,
       dfg: Vec::new(),
-      outputs: Vec::new(),
     }
   }
 
@@ -46,26 +45,39 @@ impl Module {
     self.inputs.get(i)
   }
 
-
-  // TODO(@were): Later make this implicit.
-  pub(crate) fn push(&mut self, expr: Expr) -> Reference {
-    self.dfg.push(expr);
-    self.dfg.last().unwrap().upcast()
+  pub fn get_name(&self) -> &str {
+    self.name.as_str()
   }
 
-  pub fn to_string(&self, sys: &SysBuilder, ident: usize) -> String {
-    let ident = "  ".repeat(ident);
+  pub(crate) fn push(&mut self, expr: Reference) -> Reference {
+    self.dfg.push(expr);
+    self.dfg.last().unwrap().clone()
+  }
+
+  pub fn to_string(&self, sys: &SysBuilder, mut ident: usize) -> String {
     let mut res = String::new();
-    res.push_str(format!("{}module {}(", ident, self.name).as_str());
+    res.push_str(format!("{}module {}(", " ".repeat(ident), self.name).as_str());
     for elem in self.inputs.iter() {
       let elem = elem.as_ref::<Input>(sys).unwrap();
       res.push_str(format!("{}: {}, ", elem.name(), elem.dtype().to_string()).as_str());
     }
-    res.push_str(") {{\n");
-    for elem in self.dfg.iter() {
-      res.push_str(format!("{}{}\n", ident, elem.to_string()).as_str());
+    res.push_str(") {\n");
+    ident += 2;
+    if self.name.eq("driver") {
+      res.push_str(format!("{}while true {{\n", " ".repeat(ident)).as_str());
+      ident += 2;
     }
-    res.push_str("  }}\n");
+    for elem in self.dfg.iter() {
+      let expr = elem.as_ref::<Expr>(sys).unwrap();
+      res.push_str(format!("{}{}\n", " ".repeat(ident), expr.to_string(sys)).as_str());
+    }
+    if self.name.eq("driver") {
+      ident -= 2;
+      res.push_str(format!("{}}}\n", " ".repeat(ident)).as_str());
+    }
+    ident -= 2;
+    res.push_str(" ".repeat(ident).as_str());
+    res.push_str("}\n");
     res
   }
 

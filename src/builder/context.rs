@@ -4,7 +4,8 @@ use super::{expr::Expr, port::Input, system::SysBuilder};
 
 pub trait IsElement<'a> {
   fn upcast(&self) -> Reference;
-  fn set_key(&mut self, key: usize);
+  fn set_key(&'a mut self, key: usize);
+  fn get_key(&self) -> usize;
   fn into_reference(key: usize) -> Reference;
   fn downcast(slab: &'a slab::Slab<Element>, key: &Reference) -> Result<&'a Box<Self>, String>;
   fn downcast_mut(slab: &'a mut slab::Slab<Element>, key: &Reference)
@@ -26,8 +27,12 @@ macro_rules! register_element {
 
     impl <'a> IsElement <'a> for $name {
 
-      fn set_key(&mut self, key: usize) {
+      fn set_key(&'a mut self, key: usize) {
         self.key = key;
+      }
+
+      fn get_key(&self) -> usize {
+        self.key
       }
 
       fn upcast(&self) -> Reference {
@@ -109,10 +114,25 @@ impl Reference {
 
 }
 
-impl ToString for Reference {
+impl Reference {
 
-  fn to_string(&self) -> String {
-    format!("_{}", self.get_key())
+  pub fn to_string(&self, sys: &SysBuilder) -> String {
+    match self {
+      Reference::Module(_) => {
+        self.as_ref::<Module>(sys).unwrap().get_name().to_string()
+      },
+      Reference::Array(_) => {
+        let array = self.as_ref::<Array>(sys).unwrap();
+        format!("(Array[{}] {})", array.get_size(), array.get_name())
+      },
+      Reference::IntImm(_) => {
+        self.as_ref::<IntImm>(sys).unwrap().to_string()
+      }
+      Reference::Unknown => {
+        panic!("Unknown reference")
+      }
+      _ => { format!("_{}", self.get_key()) }
+    }
   }
 
 }

@@ -1,6 +1,6 @@
 use crate::data::{DataType, Typed};
 
-use super::context::Reference;
+use super::{context::Reference, system::SysBuilder};
 
 pub enum Opcode {
   Load,
@@ -63,35 +63,35 @@ impl Typed for Expr {
 
 }
 
-impl ToString for Expr {
+impl Expr {
 
-  fn to_string(&self) -> String {
+  pub fn to_string(&self, sys: &SysBuilder) -> String {
     let mnem = self.opcode.to_string();
     match self.opcode {
       Opcode::Add | Opcode::Mul => {
         format!("let _{} = {} {} {};",
                 self.key,
-                self.operands[0].to_string(),
+                self.operands[0].to_string(sys),
                 mnem,
-                self.operands[1].to_string())
+                self.operands[1].to_string(sys))
       }
       Opcode::Load => {
         format!("let _{} = {}[{}];",
                 self.key,
-                self.operands[0].to_string(),
-                self.operands[1].to_string())
+                self.operands[0].to_string(sys),
+                self.operands[1].to_string(sys))
       }
       Opcode::Store => {
         format!("{}[{}] = {};",
-                self.operands[0].to_string(),
-                self.operands[1].to_string(),
-                self.operands[2].to_string())
+                self.operands[0].to_string(sys),
+                self.operands[1].to_string(sys),
+                self.operands[2].to_string(sys))
       }
       Opcode::Trigger => {
-        format!("{} {};", mnem, self.operands[0].to_string())
+        format!("{} {};", mnem, self.operands[0].to_string(sys))
       }
       Opcode::SpinTrigger => {
-        format!("{} {};", mnem, self.operands[0].to_string())
+        format!("{} {};", mnem, self.operands[0].to_string(sys))
       }
     }
   }

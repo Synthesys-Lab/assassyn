@@ -95,6 +95,14 @@ impl IntImm {
 
 }
 
+impl Display for IntImm {
+
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "({}) {}", self.dtype.to_string(), self.value)
+  }
+
+}
+
 pub struct Array {
   pub(crate) key: usize,
   name: String,
@@ -105,12 +113,13 @@ pub struct Array {
 impl Display for Array {
 
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Array({}, {})", self.name, self.size)
+    write!(f, "Array: {}[{}]", self.name, self.size)
   }
 
 }
 
 impl Typed for Array {
+
   fn dtype(&self) -> &DataType {
     &self.scalar_ty
   }
@@ -127,8 +136,12 @@ impl Array {
     }
   }
 
-  pub fn size(&self) -> usize {
+  pub fn get_size(&self) -> usize {
     self.size
+  }
+
+  pub fn get_name(&self) -> &str {
+    self.name.as_str()
   }
 
 }

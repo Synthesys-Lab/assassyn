@@ -1,6 +1,5 @@
 use crate::{context::Parented, data::Typed, DataType, Reference};
 
-
 pub struct Input {
   pub(crate) key: usize,
   pub(super) parent: Option<Reference>,
@@ -9,35 +8,28 @@ pub struct Input {
 }
 
 impl Input {
-
   pub fn new(dtype: &DataType, name: &str) -> Self {
     Self {
       key: 0,
       parent: None,
       name: name.to_string(),
-      dtype: dtype.clone()
+      dtype: dtype.clone(),
     }
   }
 
   pub fn name(&self) -> &String {
     &self.name
   }
-
 }
 
 impl Typed for Input {
-
   fn dtype(&self) -> &DataType {
     &self.dtype
   }
-
 }
 
 impl Parented for Input {
-
   fn parent(&self) -> Option<Reference> {
     self.parent.clone()
   }
-
 }
-
