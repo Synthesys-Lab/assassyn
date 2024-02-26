@@ -92,6 +92,9 @@ fn dump_module(sys: &SysBuilder) {
         arg.dtype().to_string()
       );
     }
+    for elem in module.expr_iter(sys) {
+      println!("  {}", elem.to_string(sys));
+    }
     println!("}}\n");
   }
 }
