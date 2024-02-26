@@ -81,6 +81,10 @@ impl Module {
     self.inputs.iter().map(|x| x.as_ref::<Input>(sys).unwrap())
   }
 
+  pub fn expr_iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &'a Box<Expr>> {
+    self.dfg.iter().map(|x| x.as_ref::<Expr>(sys).unwrap())
+  }
+
   pub fn to_string(&self, sys: &SysBuilder, mut ident: usize) -> String {
     let mut res = String::new();
     res.push_str(format!("{}module {}(", " ".repeat(ident), self.name).as_str());

@@ -88,9 +88,9 @@ impl IntImm {
   }
 }
 
-impl Display for IntImm {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "({}) {}", self.dtype.to_string(), self.value)
+impl IntImm {
+  pub fn to_string(&self) -> String {
+    format!("({} as {})", self.value, self.dtype.to_string())
   }
 }
 
