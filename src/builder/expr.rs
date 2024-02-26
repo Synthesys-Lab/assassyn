@@ -52,6 +52,14 @@ impl Expr {
     }
   }
 
+  pub fn get_opcode(&self) -> Opcode {
+    self.opcode.clone()
+  }
+
+  pub fn get_operand(&self, i: usize) -> Option<&Reference> {
+    self.operands.get(i)
+  }
+
   pub fn dtype(&self) -> &DataType {
     &self.dtype
   }

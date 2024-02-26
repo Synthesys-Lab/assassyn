@@ -1,4 +1,113 @@
-use crate::{builder::system::SysBuilder, data::Typed, expr::Opcode};
+use std::collections::HashSet;
+
+use crate::{
+  builder::system::SysBuilder,
+  context::{IsElement, Visitor},
+  data::{Array, Typed},
+  expr::{Expr, Opcode},
+  port::Input,
+  IntImm, Module,
+};
+
+struct ElaborateModule<'a> {
+  sys: &'a SysBuilder,
+  port_idx: usize,
+  ops: Option<&'a HashSet<Opcode>>,
+}
+
+impl <'a> ElaborateModule<'a> {
+  fn new(sys: &'a SysBuilder) -> Self {
+    Self { sys, port_idx: 0, ops: None }
+  }
+}
+
+impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
+
+  fn visit_module(&mut self, module: &'a Module) -> String {
+    let mut res = String::new();
+    res.push_str(format!("// Elaborating module {}\n", module.get_name()).as_str());
+    res.push_str(format!(
+      "fn {}(q: &mut VecDeque<Event>, args: Vec<u64>",
+      module.get_name()
+    ).as_str());
+    for (array, ops) in module.array_iter(self.sys) {
+      self.ops = Some(ops);
+      res.push_str(self.visit_array(array).as_str());
+    }
+    res.push_str(") {{");
+    for (i, arg) in module.port_iter(self.sys).enumerate() {
+      self.port_idx = i;
+      res.push_str(self.visit_input(arg).as_str());
+    }
+    for elem in module.expr_iter(self.sys) {
+      res.push_str(self.visit_expr(elem).as_str());
+    }
+    println!("}}\n");
+    res
+  }
+
+  fn visit_input(&mut self, input: &Input) -> String {
+    format!(
+      "  let {} = (*args.get({}).unwrap()) as {};\n",
+      input.get_name(),
+      self.port_idx,
+      input.dtype().to_string()
+    )
+  }
+
+  fn visit_expr(&mut self, expr: &Expr) -> String {
+    match expr.get_opcode() {
+      Opcode::Add | Opcode::Mul => {
+        format!(
+          "  let _{} = {} {} {};\n",
+          expr.get_key(),
+          expr.get_operand(0).unwrap().to_string(self.sys),
+          expr.get_opcode().to_string(),
+          expr.get_operand(1).unwrap().to_string(self.sys)
+        )
+      }
+      Opcode::Load => {
+        format!(
+          "  let _{} = {}[{} as usize];\n",
+          expr.get_key(),
+          expr.get_operand(0).unwrap().to_string(self.sys),
+          expr.get_operand(1).unwrap().to_string(self.sys)
+        )
+      }
+      Opcode::Store => {
+        format!(
+          "  {}[{} as usize] = {};\n",
+          expr.get_operand(0).unwrap().to_string(self.sys),
+          expr.get_operand(1).unwrap().to_string(self.sys),
+          expr.get_operand(2).unwrap().to_string(self.sys)
+        )
+      }
+      Opcode::Trigger => {
+        "  // TODO: Trigger;\n".to_string()
+      }
+      _ => {
+        format!("  // TODO: Other opcode;\n")
+      }
+    }
+  }
+
+  fn visit_array(&mut self, array: &Array) -> String {
+    format!(
+      ", {}: &{}Vec<{}>",
+      array.get_name(),
+      if self.ops.unwrap().contains(&Opcode::Store) {
+        "mut "
+      } else {
+        ""
+      },
+      array.dtype().to_string()
+    )
+  }
+
+  fn visit_int_imm(&mut self, int_imm: &IntImm) -> String {
+    int_imm.to_string()
+  }
+}
 
 fn dump_runtime(sys: &SysBuilder) {
   println!("// Simulation runtime.");
@@ -65,37 +174,9 @@ fn dump_runtime(sys: &SysBuilder) {
 }
 
 fn dump_module(sys: &SysBuilder) {
-  for module in sys.module_iter() {
-    println!("// Elaborating module {}", module.get_name());
-    print!(
-      "fn {}(q: &mut VecDeque<Event>, args: Vec<u64>",
-      module.get_name()
-    );
-    for (array, ops) in module.array_iter(sys) {
-      print!(
-        ", {}: &{}Vec<{}>",
-        array.get_name(),
-        if ops.contains(&Opcode::Store) {
-          "mut "
-        } else {
-          ""
-        },
-        array.dtype().to_string()
-      );
-    }
-    println!(") {{");
-    for (i, arg) in module.port_iter(sys).enumerate() {
-      println!(
-        "  let {} = (*args.get({}).unwrap()) as {};",
-        arg.get_name(),
-        i,
-        arg.dtype().to_string()
-      );
-    }
-    for elem in module.expr_iter(sys) {
-      println!("  {}", elem.to_string(sys));
-    }
-    println!("}}\n");
+  let mut ee = ElaborateModule::new(sys);
+  for module in ee.sys.module_iter() {
+    ee.visit_module(module);
   }
 }
 
