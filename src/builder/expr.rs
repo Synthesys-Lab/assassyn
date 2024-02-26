@@ -60,6 +60,10 @@ impl Expr {
     self.operands.get(i)
   }
 
+  pub fn operand_iter(&self) -> impl Iterator<Item = &Reference> {
+    self.operands.iter()
+  }
+
   pub fn dtype(&self) -> &DataType {
     &self.dtype
   }

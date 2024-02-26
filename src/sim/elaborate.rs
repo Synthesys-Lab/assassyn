@@ -15,26 +15,32 @@ struct ElaborateModule<'a> {
   ops: Option<&'a HashSet<Opcode>>,
 }
 
-impl <'a> ElaborateModule<'a> {
+impl<'a> ElaborateModule<'a> {
   fn new(sys: &'a SysBuilder) -> Self {
-    Self { sys, port_idx: 0, ops: None }
+    Self {
+      sys,
+      port_idx: 0,
+      ops: None,
+    }
   }
 }
 
 impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
-
   fn visit_module(&mut self, module: &'a Module) -> String {
     let mut res = String::new();
     res.push_str(format!("// Elaborating module {}\n", module.get_name()).as_str());
-    res.push_str(format!(
-      "fn {}(q: &mut VecDeque<Event>, args: Vec<u64>",
-      module.get_name()
-    ).as_str());
+    res.push_str(
+      format!(
+        "fn {}(q: &mut VecDeque<Event>, args: Vec<u64>",
+        module.get_name()
+      )
+      .as_str(),
+    );
     for (array, ops) in module.array_iter(self.sys) {
       self.ops = Some(ops);
       res.push_str(self.visit_array(array).as_str());
     }
-    res.push_str(") {{");
+    res.push_str(") {\n");
     for (i, arg) in module.port_iter(self.sys).enumerate() {
       self.port_idx = i;
       res.push_str(self.visit_input(arg).as_str());
@@ -42,7 +48,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     for elem in module.expr_iter(self.sys) {
       res.push_str(self.visit_expr(elem).as_str());
     }
-    println!("}}\n");
+    res.push_str("}\n");
     res
   }
 
@@ -83,7 +89,18 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
         )
       }
       Opcode::Trigger => {
-        "  // TODO: Trigger;\n".to_string()
+        let module_name = expr
+          .get_operand(0)
+          .unwrap()
+          .as_ref::<Module>(self.sys)
+          .unwrap()
+          .get_name();
+        let mut res = format!("q.push_back(Event::Module_{}(vec![", module_name);
+        for args in expr.operand_iter().skip(1) {
+          res.push_str(format!("{}, ", args.to_string(self.sys)).as_str());
+        }
+        res.push_str("]);\n");
+        res
       }
       _ => {
         format!("  // TODO: Other opcode;\n")
@@ -174,10 +191,12 @@ fn dump_runtime(sys: &SysBuilder) {
 }
 
 fn dump_module(sys: &SysBuilder) {
-  let mut ee = ElaborateModule::new(sys);
-  for module in ee.sys.module_iter() {
-    ee.visit_module(module);
+  let mut em = ElaborateModule::new(sys);
+  let mut res = String::new();
+  for module in em.sys.module_iter() {
+    res.push_str(em.visit_module(module).as_str());
   }
+  println!("{}", res);
 }
 
 pub fn elaborate(sys: &SysBuilder) {

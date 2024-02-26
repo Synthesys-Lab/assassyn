@@ -10,7 +10,6 @@ use crate::{
 
 // The top function.
 pub struct SysBuilder {
-  pub(crate) key: usize,
   pub(crate) slab: slab::Slab<Element>,
   const_cache: HashMap<(DataType, u64), Reference>,
   name: String,
@@ -38,7 +37,6 @@ impl PortInfo {
 impl SysBuilder {
   pub fn new(name: &str) -> Self {
     let mut res = Self {
-      key: 0,
       name: name.into(),
       arrays: vec![],
       slab: slab::Slab::new(),

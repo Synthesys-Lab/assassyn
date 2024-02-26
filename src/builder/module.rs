@@ -108,7 +108,7 @@ impl Module {
     }
     ident -= 2;
     res.push_str(" ".repeat(ident).as_str());
-    res.push_str("}\n");
+    res.push_str("}\n\n");
     res
   }
 }
