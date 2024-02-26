@@ -120,9 +120,9 @@ impl SysBuilder {
     self.get_mut::<Module>(&cur_mod).unwrap().push(key)
   }
 
-  pub fn create_trigger(&mut self, src: &Box<Module>, dst: &Box<Module>, mut data: Vec<Reference>) {
-    data.insert(0, src.upcast());
-    data.insert(1, dst.upcast());
+  pub fn create_trigger(&mut self, src: Reference, dst: Reference, mut data: Vec<Reference>) {
+    data.insert(0, src);
+    data.insert(1, dst);
     self.create_expr(DataType::void(), Opcode::Trigger, data, None);
   }
 

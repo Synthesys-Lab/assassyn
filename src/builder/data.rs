@@ -21,12 +21,8 @@ pub trait Typed {
 }
 
 impl DataType {
-
   fn new(kind: DataKind, bits: usize) -> Self {
-    Self {
-      kind,
-      bits,
-    }
+    Self { kind, bits }
   }
 
   pub fn void() -> Self {
@@ -51,11 +47,9 @@ impl DataType {
   pub fn bits(&self) -> usize {
     self.bits
   }
-
 }
 
 impl ToString for DataType {
-  
   fn to_string(&self) -> String {
     match self.kind {
       DataKind::Int => format!("i{}", self.bits),
@@ -64,7 +58,6 @@ impl ToString for DataType {
       DataKind::Void => String::from("()"),
     }
   }
-
 }
 
 pub struct IntImm {
@@ -80,27 +73,25 @@ impl Typed for IntImm {
 }
 
 impl Parented for IntImm {
-
   fn parent(&self) -> Option<Reference> {
     None
   }
-
 }
 
 impl IntImm {
-
   pub(super) fn new(dtype: DataType, value: u64) -> Self {
-    Self { key: 0, dtype, value, }
+    Self {
+      key: 0,
+      dtype,
+      value,
+    }
   }
-
 }
 
 impl Display for IntImm {
-
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "({}) {}", self.dtype.to_string(), self.value)
   }
-
 }
 
 pub struct Array {
@@ -111,22 +102,18 @@ pub struct Array {
 }
 
 impl Display for Array {
-
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "Array: {}[{}]", self.name, self.size)
   }
-
 }
 
 impl Typed for Array {
-
   fn dtype(&self) -> &DataType {
     &self.scalar_ty
   }
 }
 
 impl Array {
-
   pub fn new(scalar_ty: DataType, name: String, size: usize) -> Array {
     Self {
       key: 0,
@@ -143,6 +130,4 @@ impl Array {
   pub fn get_name(&self) -> &str {
     self.name.as_str()
   }
-
 }
-
