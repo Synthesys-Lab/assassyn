@@ -18,7 +18,7 @@ pub trait IsElement<'a> {
 }
 
 pub trait Parented {
-  fn parent(&self) -> Option<Reference>;
+  fn parent(&self) -> Reference;
 }
 
 macro_rules! register_element {

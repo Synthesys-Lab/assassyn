@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use crate::{
-  context::{Element, IsElement},
+  reference::{Element, IsElement},
   data::Array,
   expr::{Expr, Opcode},
   port::Input,
@@ -32,6 +32,20 @@ impl PortInfo {
       ty,
     }
   }
+}
+
+macro_rules! create_binary_op_impl {
+  ($func_name:ident, $opcode: expr) => {
+    pub fn $func_name(
+      &mut self,
+      ty: DataType,
+      a: Reference,
+      b: Reference,
+      pred: Option<Reference>,
+    ) -> Reference {
+      self.create_expr(ty, $opcode, vec![a, b], pred)
+    }
+  };
 }
 
 impl SysBuilder {
@@ -103,6 +117,11 @@ impl SysBuilder {
       .map(|x| self.insert(Input::new(&x.ty, x.name.as_str())))
       .collect::<Vec<_>>();
     let module = Module::new(name, ports);
+    // Set the parents of the inputs after instantiating the parent module.
+    for i in 0..module.get_num_inputs() {
+      let input = module.get_input(i).unwrap();
+      self.get_mut::<Input>(input).unwrap().parent = module.upcast();
+    }
     let key = self.insert(module);
     self.mods.push(key.clone());
     self.cur_mod = Some(key.clone());
@@ -126,9 +145,14 @@ impl SysBuilder {
     self.get_mut::<Module>(&cur_mod).unwrap().push(key)
   }
 
-  pub fn create_trigger(&mut self, dst: Reference, mut data: Vec<Reference>) {
+  pub fn create_trigger(
+    &mut self,
+    dst: Reference,
+    mut data: Vec<Reference>,
+    cond: Option<Reference>,
+  ) {
     data.insert(0, dst);
-    self.create_expr(DataType::void(), Opcode::Trigger, data, None);
+    self.create_expr(DataType::void(), Opcode::Trigger, data, cond);
   }
 
   pub fn create_spin_trigger(
@@ -142,16 +166,13 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::SpinTrigger, data, None);
   }
 
-  /// Create an addition operation in the current module.
-  pub fn create_add<'a, 'b, 'c>(
-    &mut self,
-    ty: DataType,
-    a: Reference,
-    b: Reference,
-    pred: Option<Reference>,
-  ) -> Reference {
-    self.create_expr(ty, Opcode::Add, vec![a, b], pred)
-  }
+  create_binary_op_impl!(create_add, Opcode::Add);
+  create_binary_op_impl!(create_sub, Opcode::Sub);
+  create_binary_op_impl!(create_mul, Opcode::Mul);
+  create_binary_op_impl!(create_igt, Opcode::IGT);
+  create_binary_op_impl!(create_ige, Opcode::IGE);
+  create_binary_op_impl!(create_ilt, Opcode::ILT);
+  create_binary_op_impl!(create_ile, Opcode::ILE);
 
   /// Create a register array associated to this system.
   /// An array can be a register, or memory.
@@ -173,7 +194,10 @@ impl SysBuilder {
     let operands = vec![array.clone(), index];
     let res = self.create_expr(dtype, Opcode::Load, operands, cond);
     let cur_mod = self.cur_mod.as_ref().unwrap().clone();
-    self.get_mut::<Module>(&cur_mod).unwrap().insert_array_used(array, Opcode::Load);
+    self
+      .get_mut::<Module>(&cur_mod)
+      .unwrap()
+      .insert_array_used(array, Opcode::Load);
     res
   }
 
@@ -188,7 +212,10 @@ impl SysBuilder {
     let operands = vec![array.clone(), index, value];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands, cond);
     let cur_mod = self.cur_mod.as_ref().unwrap().clone();
-    self.get_mut::<Module>(&cur_mod).unwrap().insert_array_used(array, Opcode::Store);
+    self
+      .get_mut::<Module>(&cur_mod)
+      .unwrap()
+      .insert_array_used(array, Opcode::Store);
     res
   }
 }

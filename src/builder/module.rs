@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  context::Reference,
+  reference::Reference,
   data::{Array, Typed},
   expr::{Expr, Opcode},
 };
@@ -42,6 +42,10 @@ impl Module {
       dfg: Vec::new(),
       array_used: HashMap::new(),
     }
+  }
+
+  pub fn get_num_inputs(&self) -> usize {
+    self.inputs.len()
   }
 
   /// Get the given input reference.

@@ -1,19 +1,11 @@
 use std::fmt::Display;
 
-use crate::{context::Parented, Reference};
-
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum DataKind {
+pub enum DataType {
   Void,
-  Int,
-  UInt,
-  Float,
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct DataType {
-  kind: DataKind,
-  bits: usize,
+  Int(usize),
+  UInt(usize),
+  Fp32,
 }
 
 pub trait Typed {
@@ -21,41 +13,46 @@ pub trait Typed {
 }
 
 impl DataType {
-  fn new(kind: DataKind, bits: usize) -> Self {
-    Self { kind, bits }
-  }
-
   pub fn void() -> Self {
-    Self {
-      kind: DataKind::Void,
-      bits: 0,
-    }
+    DataType::Void
   }
 
   pub fn int(bits: usize) -> Self {
-    Self::new(DataKind::Int, bits)
+    DataType::Int(bits)
   }
 
   pub fn uint(bits: usize) -> Self {
-    Self::new(DataKind::UInt, bits)
+   DataType::UInt(bits)
   }
 
-  pub fn fp(bits: usize) -> Self {
-    Self::new(DataKind::Float, bits)
+  pub fn fp32() -> Self {
+    DataType::Fp32
   }
 
   pub fn bits(&self) -> usize {
-    self.bits
+    match self {
+      DataType::Void => 0,
+      DataType::Int(bits) => *bits,
+      DataType::UInt(bits) => *bits,
+      DataType::Fp32 => 32,
+    }
+  }
+
+  pub fn is_void(&self) -> bool {
+    match self {
+      DataType::Void => true,
+      _ => false,
+    }
   }
 }
 
 impl ToString for DataType {
   fn to_string(&self) -> String {
-    match self.kind {
-      DataKind::Int => format!("i{}", self.bits),
-      DataKind::UInt => format!("u{}", self.bits),
-      DataKind::Float => format!("f{}", self.bits),
-      DataKind::Void => String::from("()"),
+    match self {
+      &DataType::Int(_) => format!("i{}", self.bits()),
+      &DataType::UInt(_) => format!("u{}", self.bits()),
+      &DataType::Fp32 => format!("f{}", self.bits()),
+      &DataType::Void => String::from("()"),
     }
   }
 }
@@ -69,12 +66,6 @@ pub struct IntImm {
 impl Typed for IntImm {
   fn dtype(&self) -> &DataType {
     &self.dtype
-  }
-}
-
-impl Parented for IntImm {
-  fn parent(&self) -> Option<Reference> {
-    None
   }
 }
 
