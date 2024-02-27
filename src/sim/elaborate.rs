@@ -6,12 +6,14 @@ use std::{
 
 use crate::{
   builder::system::SysBuilder,
-  reference::{IsElement, Visitor},
   data::{Array, Typed},
   expr::{Expr, Opcode},
   port::Input,
+  reference::{IsElement, Visitor},
   IntImm, Module,
 };
+
+use super::Config;
 
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
@@ -45,6 +47,13 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
       res.push_str(self.visit_array(array).as_str());
     }
     res.push_str(") {\n");
+    res.push_str(
+      format!(
+        "  println!(\"{{}}:{{:04}} @Cycle {{}}: Invoking module {}\", file!(), line!(), stamp);\n",
+        module.get_name()
+      )
+      .as_str(),
+    );
     for (i, arg) in module.port_iter(self.sys).enumerate() {
       self.port_idx = i;
       res.push_str(self.visit_input(arg).as_str());
@@ -153,7 +162,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
   }
 }
 
-fn dump_runtime(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
+fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), std::io::Error> {
   fd.write("// Simulation runtime.\n".as_bytes())?;
   fd.write("enum Event {\n".as_bytes())?;
   for module in sys.module_iter() {
@@ -175,6 +184,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
   // TODO(@were): Profile the maxium size of all the FIFO channels.
   fd.write("fn main() {\n".as_bytes())?;
   fd.write("  let mut stamp: usize = 0;\n".as_bytes())?;
+  fd.write("  let mut idled: usize = 0;\n".as_bytes())?;
   for array in sys.array_iter() {
     fd.write(
       format!(
@@ -195,7 +205,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
   for module in sys.module_iter() {
     fd.write(
       format!(
-        "      Some(Event::Module_{}(src_stamp, args)) => {}(src_stamp, &mut q, args",
+        "      Some(Event::Module_{}(src_stamp, args)) => {{ {}(src_stamp, &mut q, args",
         module.get_name(),
         module.get_name()
       )
@@ -215,24 +225,29 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
         .as_bytes(),
       )?;
     }
-    fd.write("),\n".as_bytes())?;
+    fd.write(");".as_bytes())?;
+    if !module.get_name().eq("driver") {
+      fd.write(" idled = 0; continue; }\n".as_bytes())?;
+    } else {
+      fd.write(" }\n".as_bytes())?;
+    }
   }
   fd.write("      _ => {\n".as_bytes())?;
-  fd.write(
-    "        println!(\"No event to simulate @{}!\", stamp);\n".as_bytes(),
-  )?;
+  fd.write("        println!(\"No event to simulate @{}!\", stamp);\n".as_bytes())?;
   fd.write("        break;\n".as_bytes())?;
   fd.write("      }\n".as_bytes())?;
   fd.write("    }\n".as_bytes())?;
   fd.write("    if driver_only(&q) {\n".as_bytes())?;
-  fd.write(
-    "      println!(\"No event other than drivers, exit @{}!\", stamp);\n"
-      .as_bytes(),
-  )?;
-  fd.write("      break;\n".as_bytes())?;
+  fd.write("      idled = idled + 1;\n".as_bytes())?;
+  fd.write(format!("      if idled > {} {{\n", config.idle_threshold).as_bytes())?;
+  fd.write("        println!(\"No event other than drivers, exit @{}!\", stamp);\n".as_bytes())?;
+  fd.write("        break;\n".as_bytes())?;
+  fd.write("      }\n".as_bytes())?;
   fd.write("    }\n".as_bytes())?;
   fd.write("    stamp = stamp + 1; // tick the time stamp...\n".as_bytes())?;
-  fd.write("    q.push_back(Event::Module_driver(stamp, vec![]));\n".as_bytes())?;
+  fd.write(format!("    if stamp <= {} {{\n", config.sim_threshold).as_bytes())?;
+  fd.write("      q.push_back(Event::Module_driver(stamp, vec![]));\n".as_bytes())?;
+  fd.write("    }\n".as_bytes())?;
   fd.write("  }\n".as_bytes())?;
   fd.write("}\n\n".as_bytes())?;
   Ok(())
@@ -246,9 +261,9 @@ fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
   Ok(())
 }
 
-pub fn elaborate(sys: &SysBuilder, fname: String) -> Result<(), std::io::Error> {
-  let mut fd = fs::File::create(fname)?;
+pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
+  let mut fd = fs::File::create(config.fname.clone())?;
   fd.write("use std::collections::VecDeque;\n".as_bytes())?;
   dump_module(sys, &mut fd)?;
-  dump_runtime(sys, &mut fd)
+  dump_runtime(sys, &mut fd, config)
 }
