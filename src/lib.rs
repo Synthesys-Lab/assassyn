@@ -3,8 +3,8 @@ pub mod sim;
 
 pub use builder::expr;
 
-pub use builder::context;
-pub use builder::context::Reference;
+pub use builder::reference;
+pub use builder::reference::Reference;
 
 pub use builder::data::DataType;
 pub use builder::data::IntImm;
