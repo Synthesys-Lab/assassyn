@@ -37,7 +37,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     res.push_str(format!("// Elaborating module {}\n", module.get_name()).as_str());
     res.push_str(
       format!(
-        "fn {}(stamp: usize, q: &mut VecDeque<Event>, args: Vec<u64>",
+        "fn {}(stamp: usize, q: &mut BinaryHeap<Reverse<Event>>, args: Vec<u64>",
         module.get_name()
       )
       .as_str(),
@@ -106,11 +106,14 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
             .as_ref::<Module>(self.sys)
             .unwrap()
             .get_name();
-          let mut res = format!("q.push_back(Event::Module_{}(stamp + 1, vec![", module_name);
+          let mut res = format!(
+            "q.push(Reverse(Event::Module_{}(stamp + 1, vec![",
+            module_name
+          );
           for args in expr.operand_iter().skip(1) {
             res.push_str(format!("{} as u64, ", args.to_string(self.sys)).as_str());
           }
-          res.push_str("]))");
+          res.push_str("])))");
           res
         }
         _ => {
@@ -164,20 +167,79 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
 
 fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), std::io::Error> {
   fd.write("// Simulation runtime.\n".as_bytes())?;
+  // Dump the event enum. Each event corresponds to a module.
+  // Each event instance looks like this:
+  //
+  // enum Event {
+  //   Module_{module.get_name()}(time_stamp, args),
+  //   ...
+  // }
+  fd.write("#[derive(Debug, Eq, PartialEq)]\n".as_bytes())?;
   fd.write("enum Event {\n".as_bytes())?;
   for module in sys.module_iter() {
     fd.write(format!("  Module_{}(usize, Vec<u64>),\n", module.get_name()).as_bytes())?;
   }
-  fd.write("}\n\n".as_bytes())?;
+  fd.write("}\n".as_bytes())?;
 
-  fd.write("fn driver_only(q: &VecDeque<Event>) -> bool {\n".as_bytes())?;
-  fd.write("  for event in q.iter() {\n".as_bytes())?;
-  fd.write("    match event {\n".as_bytes())?;
-  fd.write("      Event::Module_driver(_, _) => continue,\n".as_bytes())?;
-  fd.write("      _ => return false,\n".as_bytes())?;
+  // Dump the event order functions.
+  // impl Event {
+  //   fn get_stamp(&self) -> usize {
+  //      match self {
+  //        Event::Module_{module.get_name()}(stamp, _) => *stamp,
+  //        ...
+  //      }
+  //   }
+  // }
+  fd.write("impl Event {\n".as_bytes())?;
+  fd.write("  fn get_stamp(&self) -> usize {\n".as_bytes())?;
+  fd.write("    match self {\n".as_bytes())?;
+  for module in sys.module_iter() {
+    fd.write(
+      format!(
+        "      Event::Module_{}(stamp, _) => *stamp,\n",
+        module.get_name()
+      )
+      .as_bytes(),
+    )?;
+  }
   fd.write("    }\n".as_bytes())?;
   fd.write("  }\n".as_bytes())?;
-  fd.write("  q.is_empty()\n".as_bytes())?;
+  fd.write("}\n".as_bytes())?;
+  // Dump the event order comparison.
+  // impl std::cmp::PartialOrd for Event {
+  //   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+  //     if self.get_stamp() == other.get_stamp() {
+  //       match (self, other) {
+  //         (Event::Module_driver(_, _), _) => Some(Ordering::Less),
+  //         _ => Some(Ordering::Equal),
+  //       }
+  //     }
+  //     Some(self.get_stamp().cmp(&other.get_stamp()))
+  //   }
+  // }
+  // impl std::cmp::Ord for Event {
+  //   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+  //     self.partial_cmp(other).unwrap()
+  //   }
+  // }
+  fd.write("impl PartialOrd for Event {\n".as_bytes())?;
+  fd.write("  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {\n".as_bytes())?;
+  fd.write("    if self.get_stamp() == other.get_stamp() {\n".as_bytes())?;
+  fd.write("      match (self, other) {\n".as_bytes())?;
+  fd.write(
+    "        (Event::Module_driver(_, _), _) => Some(std::cmp::Ordering::Less),\n".as_bytes(),
+  )?;
+  fd.write("        _ => Some(std::cmp::Ordering::Equal),\n".as_bytes())?;
+  fd.write("      }\n".as_bytes())?;
+  fd.write("    } else {\n".as_bytes())?;
+  fd.write("      Some(self.get_stamp().cmp(&other.get_stamp()))\n".as_bytes())?;
+  fd.write("    }\n".as_bytes())?;
+  fd.write("  }\n".as_bytes())?;
+  fd.write("}\n".as_bytes())?;
+  fd.write("impl Ord for Event {\n".as_bytes())?;
+  fd.write("  fn cmp(&self, other: &Self) -> Ordering {\n".as_bytes())?;
+  fd.write("    self.partial_cmp(other).unwrap()\n".as_bytes())?;
+  fd.write("  }\n".as_bytes())?;
   fd.write("}\n\n".as_bytes())?;
 
   // TODO(@were): Make all arguments of the modules FIFO channels.
@@ -196,16 +258,18 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       .as_bytes(),
     )?;
   }
-  fd.write("  let mut q: VecDeque<Event> = VecDeque::new();\n".as_bytes())?;
-  fd.write("  q.push_back(Event::Module_driver(stamp, vec![]));\n".as_bytes())?;
+  fd.write("  let mut q = BinaryHeap::new();\n".as_bytes())?;
+  // Push the initial events.
+  fd.write(format!("  for i in 0..{} {{\n", config.sim_threshold).as_bytes())?;
+  fd.write("    q.push(Reverse(Event::Module_driver(i, vec![])));\n".as_bytes())?;
+  fd.write("  }\n".as_bytes())?;
   // TODO(@were): Dump the time stamp of the simulation.
-  fd.write("  loop {\n".as_bytes())?;
-  fd.write("    let event = q.pop_front();\n".as_bytes())?;
-  fd.write("    match event {\n".as_bytes())?;
+  fd.write("  while let Some(event) = q.pop() {\n".as_bytes())?;
+  fd.write("    match event.0 {\n".as_bytes())?;
   for module in sys.module_iter() {
     fd.write(
       format!(
-        "      Some(Event::Module_{}(src_stamp, args)) => {{ {}(src_stamp, &mut q, args",
+        "      Event::Module_{}(src_stamp, args) => {{ {}(src_stamp, &mut q, args",
         module.get_name(),
         module.get_name()
       )
@@ -229,26 +293,22 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
     if !module.get_name().eq("driver") {
       fd.write(" idled = 0; continue; }\n".as_bytes())?;
     } else {
-      fd.write(" }\n".as_bytes())?;
+      fd.write(" idled += 1; stamp = src_stamp; }\n".as_bytes())?;
     }
   }
-  fd.write("      _ => {\n".as_bytes())?;
-  fd.write("        println!(\"No event to simulate @{}!\", stamp);\n".as_bytes())?;
-  fd.write("        break;\n".as_bytes())?;
-  fd.write("      }\n".as_bytes())?;
   fd.write("    }\n".as_bytes())?;
-  fd.write("    if driver_only(&q) {\n".as_bytes())?;
-  fd.write("      idled = idled + 1;\n".as_bytes())?;
-  fd.write(format!("      if idled > {} {{\n", config.idle_threshold).as_bytes())?;
-  fd.write("        println!(\"No event other than drivers, exit @{}!\", stamp);\n".as_bytes())?;
-  fd.write("        break;\n".as_bytes())?;
-  fd.write("      }\n".as_bytes())?;
-  fd.write("    }\n".as_bytes())?;
-  fd.write("    stamp = stamp + 1; // tick the time stamp...\n".as_bytes())?;
-  fd.write(format!("    if stamp <= {} {{\n", config.sim_threshold).as_bytes())?;
-  fd.write("      q.push_back(Event::Module_driver(stamp, vec![]));\n".as_bytes())?;
+  fd.write(format!("    if idled > {} {{\n", config.idle_threshold).as_bytes())?;
+  fd.write(
+    format!(
+      "      println!(\"Idled more than {} cycles, exit @{{}}!\", stamp);\n",
+      config.idle_threshold
+    )
+    .as_bytes(),
+  )?;
+  fd.write("      break;\n".as_bytes())?;
   fd.write("    }\n".as_bytes())?;
   fd.write("  }\n".as_bytes())?;
+  fd.write("  println!(\"No event to simulate @{}!\", stamp);\n".as_bytes())?;
   fd.write("}\n\n".as_bytes())?;
   Ok(())
 }
@@ -261,9 +321,15 @@ fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
   Ok(())
 }
 
+fn dump_header(fd: &mut File) -> Result<(), std::io::Error> {
+  fd.write("use std::collections::BinaryHeap;\n".as_bytes())?;
+  fd.write("use std::cmp::{PartialOrd, Ord, Ordering, Reverse};\n".as_bytes())?;
+  Ok(())
+}
+
 pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
   let mut fd = fs::File::create(config.fname.clone())?;
-  fd.write("use std::collections::VecDeque;\n".as_bytes())?;
+  dump_header(&mut fd)?;
   dump_module(sys, &mut fd)?;
   dump_runtime(sys, &mut fd, config)
 }
