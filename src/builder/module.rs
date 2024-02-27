@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
   reference::Reference,
-  data::{Array, Typed},
+  data::Array,
   expr::{Expr, Opcode},
 };
 
@@ -13,7 +13,7 @@ pub struct Module {
   pub(crate) key: usize,
   name: String,
   inputs: Vec<Reference>,
-  dfg: Vec<Reference>,
+  body: Vec<Reference>,
   /// The set of arrays used in the module.
   array_used: HashMap<Reference, HashSet<Opcode>>,
 }
@@ -39,7 +39,7 @@ impl Module {
       key: 0,
       name: name.to_string(),
       inputs,
-      dfg: Vec::new(),
+      body: Vec::new(),
       array_used: HashMap::new(),
     }
   }
@@ -62,8 +62,8 @@ impl Module {
   }
 
   pub(crate) fn push(&mut self, expr: Reference) -> Reference {
-    self.dfg.push(expr);
-    self.dfg.last().unwrap().clone()
+    self.body.push(expr);
+    self.body.last().unwrap().clone()
   }
 
   pub(super) fn insert_array_used(&mut self, array: Reference, opcode: Opcode) {
@@ -86,33 +86,7 @@ impl Module {
   }
 
   pub fn expr_iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &'a Box<Expr>> {
-    self.dfg.iter().map(|x| x.as_ref::<Expr>(sys).unwrap())
+    self.body.iter().map(|x| x.as_ref::<Expr>(sys).unwrap())
   }
 
-  pub fn to_string(&self, sys: &SysBuilder, mut ident: usize) -> String {
-    let mut res = String::new();
-    res.push_str(format!("{}module {}(", " ".repeat(ident), self.name).as_str());
-    for elem in self.inputs.iter() {
-      let elem = elem.as_ref::<Input>(sys).unwrap();
-      res.push_str(format!("{}: {}, ", elem.get_name(), elem.dtype().to_string()).as_str());
-    }
-    res.push_str(") {\n");
-    ident += 2;
-    if self.name.eq("driver") {
-      res.push_str(format!("{}while true {{\n", " ".repeat(ident)).as_str());
-      ident += 2;
-    }
-    for elem in self.dfg.iter() {
-      let expr = elem.as_ref::<Expr>(sys).unwrap();
-      res.push_str(format!("{}{}\n", " ".repeat(ident), expr.to_string(sys)).as_str());
-    }
-    if self.name.eq("driver") {
-      ident -= 2;
-      res.push_str(format!("{}}}\n", " ".repeat(ident)).as_str());
-    }
-    ident -= 2;
-    res.push_str(" ".repeat(ident).as_str());
-    res.push_str("}\n\n");
-    res
-  }
 }

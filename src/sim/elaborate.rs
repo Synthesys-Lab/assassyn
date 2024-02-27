@@ -117,33 +117,14 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
           res
         }
         _ => {
-          format!("  // TODO: Other opcode;\n")
+          format!("  // TODO: opcode: {}\n", expr.get_opcode().to_string())
         }
       }
     };
-    // TODO(@were): Propagate the predications of the expressions.
-    let pred = if let Some(pred) = expr.get_pred() {
-      Some(pred.to_string(self.sys))
-    } else {
-      None
-    };
     if expr.dtype().is_void() {
-      if let Some(pred) = pred {
-        format!("  if {} {{\n    {};\n  }}\n", pred, res)
-      } else {
-        format!("  {};\n", res)
-      }
+      format!("  {};\n", res)
     } else {
-      if let Some(pred) = pred {
-        format!(
-          "  let _{} = if {} {{ Some({}) }} else {{ None }};\n",
-          expr.get_key(),
-          pred,
-          res
-        )
-      } else {
-        format!("  let _{} = {};\n", expr.get_key(), res)
-      }
+      format!("  let _{} = {};\n", expr.get_key(), res)
     }
   }
 
@@ -161,7 +142,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
   }
 
   fn visit_int_imm(&mut self, int_imm: &IntImm) -> String {
-    int_imm.to_string()
+    format!("({} as {})", int_imm.get_value(), int_imm.dtype().to_string())
   }
 }
 

@@ -1,6 +1,6 @@
 use crate::{reference::Parented, data::{DataType, Typed}};
 
-use super::{reference::Reference, system::SysBuilder};
+use super::reference::Reference;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Opcode {
@@ -19,6 +19,8 @@ pub enum Opcode {
   // Eventual operations
   Trigger,
   SpinTrigger,
+  // Predicated operations
+  Predicate
 }
 
 impl Opcode {
@@ -48,17 +50,17 @@ impl ToString for Opcode {
       Opcode::Store => "store".into(),
       Opcode::Trigger => "trigger".into(),
       Opcode::SpinTrigger => "wait_until".into(),
+      Opcode::Predicate => "predicate".into(),
     }
   }
 }
 
 pub struct Expr {
   pub(super) key: usize,
-  parent: Reference,
+  pub(super) parent: (Reference, usize),
   dtype: DataType,
   opcode: Opcode,
   operands: Vec<Reference>,
-  pred: Option<Reference>, // The predication for this expression
 }
 
 impl Expr {
@@ -67,15 +69,13 @@ impl Expr {
     opcode: Opcode,
     operands: Vec<Reference>,
     parent: Reference,
-    pred: Option<Reference>,
   ) -> Self {
     Self {
       key: 0,
-      parent,
+      parent: (parent, 0),
       dtype,
       opcode,
       operands,
-      pred,
     }
   }
 
@@ -91,10 +91,6 @@ impl Expr {
     self.operands.iter()
   }
 
-  pub fn get_pred(&self) -> &Option<Reference> {
-    &self.pred
-  }
-
 }
 
 impl Typed for Expr {
@@ -103,64 +99,10 @@ impl Typed for Expr {
   }
 }
 
-impl Expr {
-  pub fn to_string(&self, sys: &SysBuilder) -> String {
-    let mnem = self.opcode.to_string();
-    let res = if self.opcode.is_binary() {
-      return format!(
-        "_{} = {} {} {}",
-        self.key,
-        self.operands[0].to_string(sys),
-        mnem,
-        self.operands[1].to_string(sys)
-      )
-    } else {
-      match self.opcode {
-        Opcode::Load => {
-          format!(
-            "_{} = {}[{}];",
-            self.key,
-            self.operands[0].to_string(sys),
-            self.operands[1].to_string(sys)
-          )
-        }
-        Opcode::Store => {
-          format!(
-            "{}[{}] = {}",
-            self.operands[0].to_string(sys),
-            self.operands[1].to_string(sys),
-            self.operands[2].to_string(sys)
-          )
-        }
-        Opcode::Trigger => {
-          let mut res = format!("self.{}(\"{}\", [", mnem, self.operands[0].to_string(sys));
-          for op in self.operands.iter().skip(1) {
-            res.push_str(op.to_string(sys).as_str());
-            res.push_str(", ");
-          }
-          res.push_str("])");
-          res
-        }
-        Opcode::SpinTrigger => {
-          format!("{} {}", mnem, self.operands[0].to_string(sys))
-        }
-        _ => {
-          panic!("Unimplemented opcode: {:?}", self.opcode);
-        }
-      }
-    };
-    if let Some(pred) = &self.pred {
-      format!("{} when {}", res, pred.to_string(sys))
-    } else {
-      res
-    }
-  }
-}
-
 impl Parented for Expr {
 
   fn parent(&self) -> Reference {
-    self.parent.clone()
+    self.parent.0.clone()
   }
 
 }

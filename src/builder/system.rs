@@ -1,10 +1,11 @@
 use std::{collections::HashMap, fmt::Display};
 
 use crate::{
-  reference::{Element, IsElement},
+  builder::ir_printer,
   data::Array,
   expr::{Expr, Opcode},
   port::Input,
+  reference::{Element, IsElement, Visitor},
   DataType, IntImm, Module, Reference,
 };
 
@@ -133,15 +134,30 @@ impl SysBuilder {
     dtype: DataType,
     opcode: Opcode,
     operands: Vec<Reference>,
-    pred: Option<Reference>,
+    cond: Option<Reference>,
   ) -> Reference {
     let cur_mod = if let Some(cur_mod) = &self.cur_mod {
       cur_mod.clone()
     } else {
       panic!("No module to insert into!");
     };
-    let instance = Expr::new(dtype.clone(), opcode, operands, cur_mod.clone(), pred);
-    let key = self.insert(instance);
+    let instance = Expr::new(dtype.clone(), opcode, operands, cur_mod.clone());
+    let key = {
+      let origin = self.insert(instance);
+      if let Some(cond) = cond {
+        let predicated = Expr::new(
+          DataType::void(),
+          Opcode::Predicate,
+          vec![cond, origin.clone()],
+          cur_mod.clone(),
+        );
+        let res = self.insert(predicated);
+        self.get_mut::<Expr>(&origin).unwrap().parent = (res.clone(), 1);
+        res
+      } else {
+        origin
+      }
+    };
     self.get_mut::<Module>(&cur_mod).unwrap().push(key)
   }
 
@@ -222,15 +238,19 @@ impl SysBuilder {
 
 impl Display for SysBuilder {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let mut printer = ir_printer::IRPrinter::new(self);
+
     write!(f, "system {} {{\n", self.name)?;
     for elem in self.arrays.iter() {
       let array = elem.as_ref::<Array>(self).unwrap();
-      write!(f, "\n  {};\n", array)?;
+      write!(f, "\n  {};\n", printer.visit_array(array))?;
     }
+    printer.inc_indent();
     for elem in self.mods.iter() {
       let module = elem.as_ref::<Module>(self).unwrap();
-      write!(f, "\n{}\n", module.to_string(self, 2))?;
+      write!(f, "\n{}\n", printer.visit_module(module))?;
     }
+    printer.dec_indent();
     write!(f, "}}")
   }
 }

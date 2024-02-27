@@ -1,5 +1,5 @@
 use crate::{
-  data::{Array, IntImm},
+  data::{Array, IntImm, Typed},
   Module,
 };
 
@@ -130,7 +130,10 @@ impl Reference {
         let array = self.as_ref::<Array>(sys).unwrap();
         format!("{}", array.get_name())
       }
-      Reference::IntImm(_) => self.as_ref::<IntImm>(sys).unwrap().to_string(),
+      Reference::IntImm(_) => {
+        let int_imm = self.as_ref::<IntImm>(sys).unwrap();
+        format!("{} as {}", int_imm.get_value(), int_imm.dtype().to_string())
+      }
       Reference::Input(_) => self.as_ref::<Input>(sys).unwrap().get_name().to_string(),
       Reference::Unknown => {
         panic!("Unknown reference")

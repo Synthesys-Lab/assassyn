@@ -6,4 +6,5 @@ pub mod module;
 pub mod reference;
 pub mod expr;
 pub mod system;
+pub mod ir_printer;
 
