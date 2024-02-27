@@ -2,31 +2,45 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::{
   builder::ir_printer,
-  data::Array,
+  data::{Array, Typed},
   expr::{Expr, Opcode},
   port::Input,
   reference::{Element, IsElement, Visitor},
   DataType, IntImm, Module, Reference,
 };
 
-// The top function.
+/// A `SysBuilder` struct not only serves as the data structure of the whole system,
+/// but also works as the syntax-sugared IR builder.
 pub struct SysBuilder {
-  pub(crate) slab: slab::Slab<Element>,
+  /// The slab to store all the elements in the system. We use a slab to maintain such a
+  /// highly redundant, and mutually referenced data structure.
+  pub(super) slab: slab::Slab<Element>,
+  /// The data structure caches the constant values.
   const_cache: HashMap<(DataType, u64), Reference>,
+  /// The name of the system.
   name: String,
-  // TODO(@were): Data.
+  /// The arrays of this system.
   arrays: Vec<Reference>,
-  // TODO(@were): Add data.
+  /// The modules of this system.
   mods: Vec<Reference>,
+  /// The current module to be built.
   cur_mod: Option<Reference>,
 }
 
+/// The information of an input of a module.
+/// We do not want to expose port constructors to the user, because ports are meaningless
+/// without a module.
 pub struct PortInfo {
   pub name: String,
   pub ty: DataType,
 }
 
 impl PortInfo {
+  /// Create a new port info.
+  /// # Arguments
+  ///
+  /// * `name` - The name of the port.
+  /// * `ty` - The data type of the port.
   pub fn new(name: &str, ty: DataType) -> Self {
     Self {
       name: name.into(),
@@ -50,6 +64,10 @@ macro_rules! create_binary_op_impl {
 }
 
 impl SysBuilder {
+  /// Create a new system.
+  /// # Arguments
+  ///
+  /// * `name` - The name of the system.
   pub fn new(name: &str) -> Self {
     let mut res = Self {
       name: name.into(),
@@ -65,40 +83,70 @@ impl SysBuilder {
     res
   }
 
-  pub fn get<'a, T: IsElement<'a>>(&'a self, key: &Reference) -> Result<&'a Box<T>, String> {
+  /// The helper function to get an element of the system and downcast it to its actual
+  /// type's immutable reference.
+  pub(crate) fn get<'a, T: IsElement<'a>>(&'a self, key: &Reference) -> Result<&'a Box<T>, String> {
     T::downcast(&self.slab, key)
   }
 
+  /// Iterate over all the modules of the system.
   pub fn module_iter<'a>(&'a self) -> impl Iterator<Item = &'a Box<Module>> {
     self.mods.iter().map(|x| x.as_ref::<Module>(self).unwrap())
   }
 
+  /// Iterate over all the arrays of the system.
   pub fn array_iter<'a>(&'a self) -> impl Iterator<Item = &'a Box<Array>> {
     self.arrays.iter().map(|x| x.as_ref::<Array>(self).unwrap())
   }
 
-  pub fn get_mut<'a, T: IsElement<'a>>(
+  /// The helper function to get an element of the system and downcast it to its actual type's
+  /// mutable reference.
+  pub(crate) fn get_mut<'a, T: IsElement<'a>>(
     &'a mut self,
     key: &Reference,
   ) -> Result<&'a mut Box<T>, String> {
     T::downcast_mut(&mut self.slab, key)
   }
 
+  /// Get the driver module. The driver module is special. It is invoked unconditionally every
+  /// cycle.
   pub fn get_driver(&self) -> &Module {
     self.get::<Module>(self.mods.first().unwrap()).unwrap()
   }
 
+  /// Set the current module to be built. All the created elements will be inserted into this
+  /// module.
+  ///
+  /// # Arguments
+  ///
+  /// * `module` - The reference of the module to be set as the current module.
   pub fn set_current_module(&mut self, module: Reference) {
     self.cur_mod = Some(module);
   }
 
-  pub fn insert<'a, T: IsElement<'a> + Into<Element> + 'a>(&'a mut self, elem: T) -> Reference {
+  /// The helper function to insert an element into the system's slab.
+  /// We adopt a slab to maintain such a highly redundant, and mutually referenced data structure.
+  ///
+  /// # Arguments
+  ///
+  /// * `elem` - The element to be inserted. An element can be any component of the system IR.
+  pub(super) fn insert<'a, T: IsElement<'a> + Into<Element> + 'a>(
+    &'a mut self,
+    elem: T,
+  ) -> Reference {
     let key = self.slab.insert(elem.into());
     let res = T::into_reference(key);
     self.get_mut::<T>(&res).unwrap().set_key(key);
     res
   }
 
+  /// The helper function to create a constant integer.
+  ///
+  /// # Arguments
+  ///
+  /// * `dtype` - The data type of the constant.
+  /// * `value` - The value of the constant.
+  // TODO(@were): What if the data type is bigger than 64 bits?
   pub fn get_const_int(&mut self, dtype: DataType, value: u64) -> Reference {
     let key = (dtype, value);
     if let Some(cached) = self.const_cache.get(&key) {
@@ -112,6 +160,12 @@ impl SysBuilder {
   }
 
   /// Create a new module, and set it as the current module to be built.
+  ///
+  /// # Arguments
+  ///
+  /// * `name` - The name of the module.
+  /// * `inputs` - The inputs' information to the module. Refer to `PortInfo` for more details.
+  // TODO(@were): Rename the module while this name is occupied.
   pub fn create_module(&mut self, name: &str, inputs: Vec<PortInfo>) -> Reference {
     let ports = inputs
       .into_iter()
@@ -129,6 +183,15 @@ impl SysBuilder {
     key
   }
 
+  /// The helper function to create an expression.
+  /// An expression is the basic building block of a module.
+  ///
+  /// # Arguments
+  /// * `dtype` - The result's data type of the expression.
+  /// * `opcode` - The operation code of the expression.
+  /// * `operands` - The operands of the expression.
+  /// * `cond` - The condition of executing this expression. If the condition is not `None`, the is
+  /// always executed.
   pub fn create_expr(
     &mut self,
     dtype: DataType,
@@ -161,6 +224,14 @@ impl SysBuilder {
     self.get_mut::<Module>(&cur_mod).unwrap().push(key)
   }
 
+  /// Create a trigger. A trigger sends a signal to invoke the given module.
+  /// The source module is the current module, and the destination is given.
+  ///
+  /// # Arguments
+  /// * `dst` - The destination module to be invoked.
+  /// * `data` - The data to be sent to the destination module.
+  /// * `cond` - The condition of triggering the destination. If None is given, the trigger is
+  /// unconditional.
   pub fn create_trigger(
     &mut self,
     dst: Reference,
@@ -171,14 +242,26 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::Trigger, data, cond);
   }
 
+  /// Create a spin trigger. A spin trigger repeats to test the condition
+  /// until it is true, and send a signal to invoke the given module module.
+  /// The source module is the current module, and the destination is given.
+  ///
+  /// NOTE: This created expression is more like a syntax sugar. It is equivalent create another
+  /// midman module, which trigers the destination module when the condition is true, and triggers
+  /// itself when the condition is false.
+  ///
+  /// # Arguments
+  /// * `cond` - The condition to be tested.
+  /// * `dst` - The destination module to be invoked.
+  /// * `data` - The data to be sent to the destination module.
   pub fn create_spin_trigger(
     &mut self,
-    src: &Box<Module>,
+    cond: Reference,
     dst: &Box<Module>,
     mut data: Vec<Reference>,
   ) {
-    data.insert(0, src.upcast());
-    data.insert(1, dst.upcast());
+    data.insert(0, dst.upcast());
+    data.insert(1, cond);
     self.create_expr(DataType::void(), Opcode::SpinTrigger, data, None);
   }
 
@@ -192,6 +275,13 @@ impl SysBuilder {
 
   /// Create a register array associated to this system.
   /// An array can be a register, or memory.
+  ///
+  /// # Arguments
+  /// * `ty` - The data type of data in the array.
+  /// * `name` - The name of the array.
+  /// * `size` - The size of the array.
+  // TODO(@were): Rename the array while this name is occupied.
+  // TODO(@were): Add array types, memory, register, or signal wire.
   pub fn create_array(&mut self, ty: DataType, name: &str, size: usize) -> Reference {
     let instance = Array::new(ty, name.into(), size);
     let key = self.insert(instance);
@@ -200,14 +290,19 @@ impl SysBuilder {
   }
 
   /// Create a read operation on an array.
+  ///
+  /// # Arguments
+  /// * `array` - The array to be read.
+  /// * `index` - The index to be read.
+  /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
   pub fn create_array_read<'elem>(
     &mut self,
-    dtype: DataType,
     array: Reference,
     index: Reference,
     cond: Option<Reference>,
   ) -> Reference {
     let operands = vec![array.clone(), index];
+    let dtype = self.get::<Array>(&array).unwrap().dtype().clone();
     let res = self.create_expr(dtype, Opcode::Load, operands, cond);
     let cur_mod = self.cur_mod.as_ref().unwrap().clone();
     self
@@ -218,6 +313,12 @@ impl SysBuilder {
   }
 
   /// Create a write operation on an array.
+  ///
+  /// # Arguments
+  /// * `array` - The array to be written.
+  /// * `index` - The index to be written.
+  /// * `value` - The value to be written.
+  /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
   pub fn create_array_write(
     &mut self,
     array: Reference,

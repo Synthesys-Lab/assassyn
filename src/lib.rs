@@ -1,5 +1,6 @@
 pub mod builder;
 pub mod sim;
+pub mod xform;
 
 pub use builder::expr;
 

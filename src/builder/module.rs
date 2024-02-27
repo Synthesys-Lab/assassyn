@@ -44,6 +44,7 @@ impl Module {
     }
   }
 
+  /// Get the number of inputs to the module.
   pub fn get_num_inputs(&self) -> usize {
     self.inputs.len()
   }
@@ -57,6 +58,7 @@ impl Module {
     self.inputs.get(i)
   }
 
+  /// Get the name of the module.
   pub fn get_name(&self) -> &str {
     self.name.as_str()
   }
