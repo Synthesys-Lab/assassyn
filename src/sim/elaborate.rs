@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fs::{self, File}, io::Write};
 
 use crate::{
   builder::system::SysBuilder,
@@ -126,46 +126,46 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
   }
 }
 
-fn dump_runtime(sys: &SysBuilder) {
-  println!("// Simulation runtime.");
-  println!("enum Event {{");
+fn dump_runtime(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
+  fd.write("// Simulation runtime.\n".as_bytes())?;
+  fd.write("enum Event {\n".as_bytes())?;
   for module in sys.module_iter() {
-    println!("  Module_{}(Vec<u64>),", module.get_name());
+    fd.write(format!("  Module_{}(Vec<u64>),\n", module.get_name()).as_bytes())?;
   }
-  println!("}}\n");
+  fd.write("}\n\n".as_bytes())?;
 
-  println!("fn driver_only(q: &VecDeque<Event>) -> bool {{");
-  println!("  for event in q.iter() {{");
-  println!("    match event {{");
-  println!("      Event::Module_driver(_) => continue,");
-  println!("      _ => return false,");
-  println!("    }}");
-  println!("  }}");
-  println!("  q.is_empty()");
-  println!("}}\n");
+  fd.write("fn driver_only(q: &VecDeque<Event>) -> bool {\n".as_bytes())?;
+  fd.write("  for event in q.iter() {\n".as_bytes())?;
+  fd.write("    match event {\n".as_bytes())?;
+  fd.write("      Event::Module_driver(_) => continue,\n".as_bytes())?;
+  fd.write("      _ => return false,\n".as_bytes())?;
+  fd.write("    }\n".as_bytes())?;
+  fd.write("  }\n".as_bytes())?;
+  fd.write("  q.is_empty()\n".as_bytes())?;
+  fd.write("}\n\n".as_bytes())?;
 
-  println!("fn main() {{");
+  fd.write("fn main() {\n".as_bytes())?;
   for array in sys.array_iter() {
-    println!(
-      "  let mut {} = vec![0 as {}; {}];",
+    fd.write(format!(
+      "  let mut {} = vec![0 as {}; {}];\n",
       array.get_name(),
       array.dtype().to_string(),
       array.get_size()
-    );
+    ).as_bytes())?;
   }
-  println!("  let mut q: VecDeque<Event> = VecDeque::new();");
-  println!("  q.push_back(Event::Module_driver(vec![]));");
-  println!("  loop {{");
-  println!("    let event = q.pop_front();");
-  println!("    match event {{");
+  fd.write("  let mut q: VecDeque<Event> = VecDeque::new();\n".as_bytes())?;
+  fd.write("  q.push_back(Event::Module_driver(vec![]));\n".as_bytes())?;
+  fd.write("  loop {\n".as_bytes())?;
+  fd.write("    let event = q.pop_front();\n".as_bytes())?;
+  fd.write("    match event {\n".as_bytes())?;
   for module in sys.module_iter() {
-    print!(
+    fd.write(format!(
       "      Some(Event::Module_{}(args)) => {}(&mut q, args",
       module.get_name(),
       module.get_name()
-    );
+    ).as_bytes())?;
     for (array, ops) in module.array_iter(sys) {
-      print!(
+      fd.write(format!(
         ", &{}{}",
         if ops.contains(&Opcode::Store) {
           "mut "
@@ -173,34 +173,35 @@ fn dump_runtime(sys: &SysBuilder) {
           ""
         },
         array.get_name(),
-      );
+      ).as_bytes())?;
     }
-    println!("),");
+    fd.write("),\n".as_bytes())?;
   }
-  println!("      _ => {{");
-  println!("        println!(\"Exit @{{}}:{{}}, b/c no event to simulate!\", file!(), line!());");
-  println!("        break;");
-  println!("      }}");
-  println!("    }}");
-  println!("    if driver_only(&q) {{");
-  println!("      println!(\"Exit @{{}}:{{}}, b/c all driver's to simulate!\", file!(), line!());");
-  println!("      break;");
-  println!("    }}");
-  println!("  }}");
-  println!("}}\n");
+  fd.write("      _ => {\n".as_bytes())?;
+  fd.write("        println!(\"Exit @{}:{}, b/c no event to simulate!\", file!(), line!());\n".as_bytes())?;
+  fd.write("        break;\n".as_bytes())?;
+  fd.write("      }\n".as_bytes())?;
+  fd.write("    }\n".as_bytes())?;
+  fd.write("    if driver_only(&q) {\n".as_bytes())?;
+  fd.write("      println!(\"Exit @{}:{}, b/c all driver's to simulate!\", file!(), line!());\n".as_bytes())?;
+  fd.write("      break;\n".as_bytes())?;
+  fd.write("    }\n".as_bytes())?;
+  fd.write("  }\n".as_bytes())?;
+  fd.write("}\n\n".as_bytes())?;
+  Ok(())
 }
 
-fn dump_module(sys: &SysBuilder) {
+fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
   let mut em = ElaborateModule::new(sys);
-  let mut res = String::new();
   for module in em.sys.module_iter() {
-    res.push_str(em.visit_module(module).as_str());
+    fd.write(em.visit_module(module).as_bytes())?;
   }
-  println!("{}", res);
+  Ok(())
 }
 
-pub fn elaborate(sys: &SysBuilder) {
-  println!("use std::collections::VecDeque;\n");
-  dump_module(sys);
-  dump_runtime(sys);
+pub fn elaborate(sys: &SysBuilder, fname: String) -> Result<(), std::io::Error> {
+  let mut fd = fs::File::create(fname)?;
+  fd.write("use std::collections::VecDeque;\n".as_bytes())?;
+  dump_module(sys, &mut fd)?;
+  dump_runtime(sys, &mut fd)
 }
