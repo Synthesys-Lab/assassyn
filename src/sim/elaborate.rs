@@ -19,6 +19,7 @@ struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   port_idx: usize,
   ops: Option<&'a HashSet<Opcode>>,
+  indent: usize,
 }
 
 impl<'a> ElaborateModule<'a> {
@@ -27,6 +28,7 @@ impl<'a> ElaborateModule<'a> {
       sys,
       port_idx: 0,
       ops: None,
+      indent: 0,
     }
   }
 }
@@ -58,9 +60,11 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
       self.port_idx = i;
       res.push_str(self.visit_input(arg).as_str());
     }
+    self.indent += 2;
     for elem in module.expr_iter(self.sys) {
       res.push_str(self.visit_expr(elem).as_str());
     }
+    self.indent -= 2;
     res.push_str("}\n");
     res
   }
@@ -116,15 +120,30 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
           res.push_str("])))");
           res
         }
+        Opcode::Predicate => {
+          let mut res = format!(
+            "{}if {} {{\n",
+            " ".repeat(self.indent),
+            expr.get_operand(0).unwrap().to_string(self.sys)
+          );
+          self.indent += 2;
+          for elem in expr.operand_iter().skip(1) {
+            let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+            res.push_str(self.visit_expr(expr).as_str());
+          }
+          self.indent -= 2;
+          res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
+          return res;
+        }
         _ => {
-          format!("  // TODO: opcode: {}\n", expr.get_opcode().to_string())
+          format!("// TODO: opcode: {}\n", expr.get_opcode().to_string())
         }
       }
     };
     if expr.dtype().is_void() {
-      format!("  {};\n", res)
+      format!("{}{};\n", " ".repeat(self.indent), res)
     } else {
-      format!("  let _{} = {};\n", expr.get_key(), res)
+      format!("{}let _{} = {};\n", " ".repeat(self.indent), expr.get_key(), res)
     }
   }
 

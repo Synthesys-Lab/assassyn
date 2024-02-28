@@ -1,6 +1,6 @@
 use crate::{
   data::{Array, IntImm, Typed},
-  Module,
+  DataType, Module,
 };
 
 use super::{expr::Expr, port::Input, system::SysBuilder};
@@ -91,12 +91,9 @@ register_element!(IntImm);
 pub enum Reference {
   Module(usize),
   Input(usize),
-  Output(usize),
   Expr(usize),
   Array(usize),
   SysBuilder(usize),
-  ArrayRead(usize),
-  ArrayWrite(usize),
   IntImm(usize),
   Unknown,
 }
@@ -106,14 +103,32 @@ impl Reference {
     match self {
       Reference::Module(key)
       | Reference::Input(key)
-      | Reference::Output(key)
       | Reference::Expr(key)
       | Reference::Array(key)
       | Reference::SysBuilder(key)
-      | Reference::ArrayRead(key)
-      | Reference::ArrayWrite(key)
       | Reference::IntImm(key) => *key,
       Reference::Unknown => unreachable!("Unknown reference"),
+    }
+  }
+
+  pub fn get_dtype(&self, sys: &SysBuilder) -> Option<DataType> {
+    match self {
+      Reference::Module(_) | Reference::Array(_) => None,
+      Reference::IntImm(_) => {
+        let int_imm = self.as_ref::<IntImm>(sys).unwrap();
+        int_imm.dtype().clone().into()
+      }
+      Reference::Input(_) => {
+        let input = self.as_ref::<Input>(sys).unwrap();
+        input.dtype().clone().into()
+      }
+      Reference::Expr(_) => {
+        let expr = self.as_ref::<Expr>(sys).unwrap();
+        expr.dtype().clone().into()
+      }
+      _ => {
+        panic!("Unknown reference")
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use crate::{
   builder::ir_printer,
@@ -49,18 +49,34 @@ impl PortInfo {
   }
 }
 
+/// Create a binary operation expression.
+///
+/// # Arguments
+/// * `ty` - The result's data type of the expression. If None is given, the data type will be
+/// inferred from the operands.
+/// * `a` - The first operand.
+/// * `b` - The second operand.
+/// * `pred` - The condition of executing this expression. If the condition is not `None`, this
+/// is always executed.
 macro_rules! create_binary_op_impl {
+
   ($func_name:ident, $opcode: expr) => {
     pub fn $func_name(
       &mut self,
-      ty: DataType,
+      ty: Option<DataType>,
       a: Reference,
       b: Reference,
       pred: Option<Reference>,
     ) -> Reference {
-      self.create_expr(ty, $opcode, vec![a, b], pred)
+      let res_ty = if let Some(ty) = ty {
+        ty
+      } else {
+        self.combine_types($opcode, &a, &b)
+      };
+      self.create_expr(res_ty, $opcode, vec![a, b], pred)
     }
   };
+
 }
 
 impl SysBuilder {
@@ -334,6 +350,46 @@ impl SysBuilder {
       .unwrap()
       .insert_array_used(array, Opcode::Store);
     res
+  }
+
+
+  /// The helper function to combine the data types of two references.
+  ///
+  /// # Arguments
+  /// * `op` - The operation code to be combined.
+  /// * `a` - The lhs operand.
+  /// * `b` - The rhs operand.
+  fn combine_types(&self, op: Opcode, a: &Reference, b: &Reference) -> DataType {
+    let aty = a.get_dtype(self).unwrap();
+    let bty = b.get_dtype(self).unwrap();
+    match op {
+      Opcode::Add | Opcode::Sub => {
+        match (&aty, &bty) {
+          (DataType::Int(a), DataType::Int(b)) => {
+            DataType::Int(*a.max(b))
+          }
+          (DataType::UInt(a), DataType::UInt(b)) => {
+            DataType::UInt(*a.max(b))
+          }
+          _ => panic!("Cannot combine types {} and {}", aty.to_string(), bty.to_string()),
+        }
+      }
+      Opcode::Mul => {
+        match (&aty, &bty) {
+          (DataType::Int(a), DataType::Int(b)) => {
+            DataType::Int(a + b)
+          }
+          (DataType::UInt(a), DataType::UInt(b)) => {
+            DataType::UInt(a.add(b))
+          }
+          _ => panic!("Cannot combine types {} and {}", aty.to_string(), bty.to_string()),
+        }
+      }
+      Opcode::IGT | Opcode::IGE | Opcode::ILT | Opcode::ILE => {
+        DataType::uint(1)
+      }
+      _ => panic!("Unsupported opcode {:?}", op),
+    }
   }
 }
 
