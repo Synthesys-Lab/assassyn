@@ -1,4 +1,4 @@
-use std::env::temp_dir;
+mod utils;
 
 use crate::builder::system::{PortInfo, SysBuilder};
 use crate::reference::IsElement;
@@ -11,10 +11,6 @@ fn helloworld() {
 
 #[test]
 fn trigger() {
-  let dir = temp_dir();
-
-  let fname = dir.join("trigger.rs");
-
   fn a_plus_b(sys: &mut SysBuilder) -> Reference {
     let int32 = DataType::int(32);
     let module = sys.create_module(
@@ -42,12 +38,11 @@ fn trigger() {
     let zero = sys.get_const_int(int32.clone(), 0);
     let one = sys.get_const_int(int32, 1);
     let a0 = sys.create_array_read(a.clone(), zero.clone(), None);
+    let hundred = sys.get_const_int(DataType::int(32), 100);
+    let cond = sys.create_ilt(None, a0.clone(), hundred, None);
+    sys.create_trigger(plus, vec![a0.clone(), a0.clone()], Some(cond));
     let acc = sys.create_add(None, a0, one, None);
     sys.create_array_write(a.clone(), zero.clone(), acc, None);
-    let plused = sys.create_array_read(a, zero, None);
-    let hundred = sys.get_const_int(DataType::int(32), 100);
-    let cond = sys.create_ilt(None, plused.clone(), hundred, None);
-    sys.create_trigger(plus, vec![plused.clone(), plused.clone()], Some(cond));
   }
 
   let mut sys = SysBuilder::new("main");
@@ -60,15 +55,19 @@ fn trigger() {
 
   println!("{}", sys);
 
-  let fname = fname.to_str().unwrap().to_string();
+  let src_name = utils::temp_dir(&"trigger.rs".to_string());
 
-  println!("Writing simulator code to {}", fname);
+  println!("Writing simulator code to {}", src_name);
 
   let config = sim::Config {
-    fname,
+    fname: src_name,
     sim_threshold: 200,
     idle_threshold: 200,
   };
 
   sim::elaborate(&sys, &config).unwrap();
+
+  let exec_name = utils::temp_dir(&"trigger".to_string());
+  utils::compile(&config.fname, &exec_name);
+
 }
