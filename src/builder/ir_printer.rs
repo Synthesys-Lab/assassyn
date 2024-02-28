@@ -63,8 +63,15 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
       res.push_str(format!("{}while true {{\n", " ".repeat(self.indent)).as_str());
       self.indent += 2;
     }
-    for expr in module.expr_iter(self.sys) {
+    let (mod_ref, at) = self.sys.get_insert_point();
+    for (i, expr) in module.expr_iter(self.sys).enumerate() {
+      if mod_ref == module.upcast() && at.unwrap_or_else(|| module.get_num_expr()) == i {
+        res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
+      }
       res.push_str(format!("{}\n", self.visit_expr(expr)).as_str());
+    }
+    if at.is_none() && mod_ref == module.upcast() {
+      res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
     }
     if module.get_name().eq("driver") {
       self.indent -= 2;
@@ -108,7 +115,7 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
       match expr.get_opcode() {
         Opcode::Load => {
           format!(
-            "_{} = {}[{}];",
+            "_{} = {}[{}]",
             expr.get_key(),
             expr.get_operand(0).unwrap().to_string(self.sys),
             expr.get_operand(1).unwrap().to_string(self.sys)

@@ -1,4 +1,7 @@
-use crate::{reference::Parented, data::{DataType, Typed}};
+use crate::{
+  data::{DataType, Typed},
+  reference::Parented,
+};
 
 use super::reference::Reference;
 
@@ -11,6 +14,9 @@ pub enum Opcode {
   Add,
   Sub,
   Mul,
+  BitwiseAnd,
+  BitwiseOr,
+  BitwiseXor,
   // Comparison operations
   IGT,
   ILT,
@@ -20,28 +26,36 @@ pub enum Opcode {
   Trigger,
   SpinTrigger,
   // Predicated operations
-  Predicate
+  Predicate,
 }
 
 impl Opcode {
-
   pub fn is_binary(&self) -> bool {
     match self {
-      Opcode::Add | Opcode::Mul | Opcode::Sub | Opcode::IGT | Opcode::ILT | Opcode::IGE | Opcode::ILE => true,
+      Opcode::Add
+      | Opcode::Mul
+      | Opcode::Sub
+      | Opcode::IGT
+      | Opcode::ILT
+      | Opcode::IGE
+      | Opcode::ILE
+      | Opcode::BitwiseAnd
+      | Opcode::BitwiseOr
+      | Opcode::BitwiseXor => true,
       _ => false,
     }
   }
-
 }
 
-
 impl ToString for Opcode {
-
   fn to_string(&self) -> String {
     match self {
       Opcode::Add => "+".into(),
-      Opcode::Mul => "*".into(),
       Opcode::Sub => "-".into(),
+      Opcode::Mul => "*".into(),
+      Opcode::BitwiseAnd => "&".into(),
+      Opcode::BitwiseOr => "|".into(),
+      Opcode::BitwiseXor => "^".into(),
       Opcode::IGT => ">".into(),
       Opcode::ILT => "<".into(),
       Opcode::IGE => ">=".into(),
@@ -90,7 +104,6 @@ impl Expr {
   pub fn operand_iter(&self) -> impl Iterator<Item = &Reference> {
     self.operands.iter()
   }
-
 }
 
 impl Typed for Expr {
@@ -100,10 +113,7 @@ impl Typed for Expr {
 }
 
 impl Parented for Expr {
-
   fn parent(&self) -> Reference {
     self.parent.0.clone()
   }
-
 }
-

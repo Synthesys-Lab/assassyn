@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  reference::Reference,
   data::Array,
   expr::{Expr, Opcode},
+  reference::Reference,
 };
 
 use super::{port::Input, system::SysBuilder};
@@ -49,6 +49,11 @@ impl Module {
     self.inputs.len()
   }
 
+  /// Get the number of expressions in the module.
+  pub fn get_num_expr(&self) -> usize {
+    self.body.len()
+  }
+
   /// Get the given input reference.
   ///
   /// # Arguments
@@ -63,9 +68,14 @@ impl Module {
     self.name.as_str()
   }
 
-  pub(crate) fn push(&mut self, expr: Reference) -> Reference {
-    self.body.push(expr);
-    self.body.last().unwrap().clone()
+  pub(crate) fn insert_at(
+    &mut self,
+    at: Option<usize>,
+    expr: Reference,
+  ) -> (Reference, Option<usize>) {
+    let idx = at.unwrap_or_else(|| self.body.len());
+    self.body.insert(idx, expr);
+    (self.body.get(idx).unwrap().clone(), at.map(|x| x + 1))
   }
 
   pub(super) fn insert_array_used(&mut self, array: Reference, opcode: Opcode) {
@@ -80,7 +90,10 @@ impl Module {
     &'a self,
     sys: &'a SysBuilder,
   ) -> impl Iterator<Item = (&'a Box<Array>, &'a HashSet<Opcode>)> {
-    self.array_used.iter().map(|(k, v)| (k.as_ref::<Array>(sys).unwrap(), v))
+    self
+      .array_used
+      .iter()
+      .map(|(k, v)| (k.as_ref::<Array>(sys).unwrap(), v))
   }
 
   pub fn port_iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &'a Box<Input>> {
@@ -90,5 +103,4 @@ impl Module {
   pub fn expr_iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &'a Box<Expr>> {
     self.body.iter().map(|x| x.as_ref::<Expr>(sys).unwrap())
   }
-
 }

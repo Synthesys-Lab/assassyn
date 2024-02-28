@@ -20,7 +20,7 @@ fn trigger() {
       let i1 = module.get_input(1).unwrap();
       (i0.clone(), i1.clone())
     };
-    sys.create_add(None, a, b, None);
+    sys.create_add(None, &a, &b, None);
     module
   }
 
@@ -31,12 +31,12 @@ fn trigger() {
     let a = sys.create_array(&int32, "cnt", 1);
     let zero = sys.get_const_int(&int32, 0);
     let one = sys.get_const_int(&int32, 1);
-    let a0 = sys.create_array_read(a.clone(), zero.clone(), None);
+    let a0 = sys.create_array_read(&a, &zero, None);
     let hundred = sys.get_const_int(&int32, 100);
-    let cond = sys.create_ilt(None, a0.clone(), hundred, None);
-    sys.create_trigger(plus, vec![a0.clone(), a0.clone()], Some(cond));
-    let acc = sys.create_add(None, a0, one, None);
-    sys.create_array_write(a.clone(), zero.clone(), acc, None);
+    let cond = sys.create_ilt(None, &a0, &hundred, None);
+    sys.create_trigger(&plus, vec![a0.clone(), a0.clone()], Some(cond));
+    let acc = sys.create_add(None, &a0, &one, None);
+    sys.create_array_write(&a, &zero, &acc, None);
   }
 
   let mut sys = SysBuilder::new("main");
