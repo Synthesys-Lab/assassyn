@@ -24,7 +24,7 @@ pub struct SysBuilder {
   /// The modules of this system.
   mods: Vec<Reference>,
   /// The current module to be built.
-  cur_mod: Option<Reference>,
+  cur_mod: Reference,
 }
 
 /// The information of an input of a module.
@@ -91,11 +91,12 @@ impl SysBuilder {
       slab: slab::Slab::new(),
       mods: Vec::new(),
       const_cache: HashMap::new(),
-      cur_mod: None,
+      cur_mod: Reference::Unknown,
     };
     let driver = Module::new("driver", vec![]);
     let key = res.slab.insert(Element::Module(driver.into()));
     res.mods.push(Reference::Module(key));
+    res.cur_mod = res.mods.first().unwrap().clone();
     res
   }
 
@@ -137,7 +138,7 @@ impl SysBuilder {
   ///
   /// * `module` - The reference of the module to be set as the current module.
   pub fn set_current_module(&mut self, module: Reference) {
-    self.cur_mod = Some(module);
+    self.cur_mod = module;
   }
 
   /// The helper function to insert an element into the system's slab.
@@ -163,8 +164,8 @@ impl SysBuilder {
   /// * `dtype` - The data type of the constant.
   /// * `value` - The value of the constant.
   // TODO(@were): What if the data type is bigger than 64 bits?
-  pub fn get_const_int(&mut self, dtype: DataType, value: u64) -> Reference {
-    let key = (dtype, value);
+  pub fn get_const_int(&mut self, dtype: &DataType, value: u64) -> Reference {
+    let key = (dtype.clone(), value);
     if let Some(cached) = self.const_cache.get(&key) {
       return cached.clone();
     }
@@ -195,7 +196,7 @@ impl SysBuilder {
     }
     let key = self.insert(module);
     self.mods.push(key.clone());
-    self.cur_mod = Some(key.clone());
+    self.cur_mod = key.clone();
     key
   }
 
@@ -215,12 +216,11 @@ impl SysBuilder {
     operands: Vec<Reference>,
     cond: Option<Reference>,
   ) -> Reference {
-    let cur_mod = if let Some(cur_mod) = &self.cur_mod {
-      cur_mod.clone()
-    } else {
-      panic!("No module to insert into!");
-    };
-    let instance = Expr::new(dtype.clone(), opcode, operands, cur_mod.clone());
+    match self.cur_mod {
+      Reference::Unknown => panic!("No current module is set"),
+      _ => {}
+    }
+    let instance = Expr::new(dtype.clone(), opcode, operands, self.cur_mod.clone());
     let key = {
       let origin = self.insert(instance);
       if let Some(cond) = cond {
@@ -228,7 +228,7 @@ impl SysBuilder {
           DataType::void(),
           Opcode::Predicate,
           vec![cond, origin.clone()],
-          cur_mod.clone(),
+          self.cur_mod.clone(),
         );
         let res = self.insert(predicated);
         self.get_mut::<Expr>(&origin).unwrap().parent = (res.clone(), 1);
@@ -237,6 +237,7 @@ impl SysBuilder {
         origin
       }
     };
+    let cur_mod = self.cur_mod.clone();
     self.get_mut::<Module>(&cur_mod).unwrap().push(key)
   }
 
@@ -298,8 +299,8 @@ impl SysBuilder {
   /// * `size` - The size of the array.
   // TODO(@were): Rename the array while this name is occupied.
   // TODO(@were): Add array types, memory, register, or signal wire.
-  pub fn create_array(&mut self, ty: DataType, name: &str, size: usize) -> Reference {
-    let instance = Array::new(ty, name.into(), size);
+  pub fn create_array(&mut self, ty: &DataType, name: &str, size: usize) -> Reference {
+    let instance = Array::new(ty.clone(), name.into(), size);
     let key = self.insert(instance);
     self.arrays.push(key.clone());
     key
@@ -320,7 +321,7 @@ impl SysBuilder {
     let operands = vec![array.clone(), index];
     let dtype = self.get::<Array>(&array).unwrap().dtype().clone();
     let res = self.create_expr(dtype, Opcode::Load, operands, cond);
-    let cur_mod = self.cur_mod.as_ref().unwrap().clone();
+    let cur_mod = self.cur_mod.clone();
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
@@ -344,7 +345,7 @@ impl SysBuilder {
   ) -> Reference {
     let operands = vec![array.clone(), index, value];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands, cond);
-    let cur_mod = self.cur_mod.as_ref().unwrap().clone();
+    let cur_mod = self.cur_mod.clone();
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
@@ -391,6 +392,7 @@ impl SysBuilder {
       _ => panic!("Unsupported opcode {:?}", op),
     }
   }
+
 }
 
 impl Display for SysBuilder {

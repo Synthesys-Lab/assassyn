@@ -1,3 +1,8 @@
+use super::utils;
+use crate::reference::IsElement;
+use crate::{sim, DataType, Module, Reference};
+use crate::builder::system::{PortInfo, SysBuilder};
+
 #[test]
 fn trigger() {
   fn a_plus_b(sys: &mut SysBuilder) -> Reference {
@@ -22,12 +27,12 @@ fn trigger() {
   fn build_driver(sys: &mut SysBuilder, plus: Reference) {
     let driver_module = sys.get_driver();
     sys.set_current_module(driver_module.upcast());
-    let a = sys.create_array(DataType::int(32), "cnt", 1);
     let int32 = DataType::int(32);
-    let zero = sys.get_const_int(int32.clone(), 0);
-    let one = sys.get_const_int(int32, 1);
+    let a = sys.create_array(&int32, "cnt", 1);
+    let zero = sys.get_const_int(&int32, 0);
+    let one = sys.get_const_int(&int32, 1);
     let a0 = sys.create_array_read(a.clone(), zero.clone(), None);
-    let hundred = sys.get_const_int(DataType::int(32), 100);
+    let hundred = sys.get_const_int(&int32, 100);
     let cond = sys.create_ilt(None, a0.clone(), hundred, None);
     sys.create_trigger(plus, vec![a0.clone(), a0.clone()], Some(cond));
     let acc = sys.create_add(None, a0, one, None);
