@@ -147,7 +147,7 @@ impl Reference {
       }
       Reference::IntImm(_) => {
         let int_imm = self.as_ref::<IntImm>(sys).unwrap();
-        format!("{} as {}", int_imm.get_value(), int_imm.dtype().to_string())
+        format!("({} as {})", int_imm.get_value(), int_imm.dtype().to_string())
       }
       Reference::Input(_) => self.as_ref::<Input>(sys).unwrap().get_name().to_string(),
       Reference::Unknown => {
