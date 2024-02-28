@@ -15,3 +15,5 @@ pub use builder::module::Module;
 
 pub use builder::port;
 
+#[cfg(test)]
+mod tests;
