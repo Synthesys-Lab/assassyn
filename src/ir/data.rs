@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum DataType {
   Void,
@@ -70,19 +68,19 @@ impl Typed for IntImm {
 }
 
 impl IntImm {
-  pub(super) fn new(dtype: DataType, value: u64) -> Self {
+
+  pub(crate) fn new(dtype: DataType, value: u64) -> Self {
     Self {
       key: 0,
       dtype,
       value,
     }
   }
-}
 
-impl IntImm {
-  pub fn to_string(&self) -> String {
-    format!("({} as {})", self.value, self.dtype.to_string())
+  pub fn get_value(&self) -> u64 {
+    self.value
   }
+
 }
 
 pub struct Array {
@@ -90,12 +88,6 @@ pub struct Array {
   name: String,
   scalar_ty: DataType,
   size: usize,
-}
-
-impl Display for Array {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Array: {} {}[{}]", self.dtype().to_string(), self.name, self.size)
-  }
 }
 
 impl Typed for Array {

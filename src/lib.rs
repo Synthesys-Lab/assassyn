@@ -1,16 +1,20 @@
 pub mod builder;
 pub mod sim;
+pub mod xform;
+pub mod ir;
 
-pub use builder::expr;
+pub use ir::expr;
 
-pub use builder::reference;
-pub use builder::reference::Reference;
+pub use ir::reference;
+pub use ir::reference::Reference;
 
-pub use builder::data::DataType;
-pub use builder::data::IntImm;
-pub use builder::data;
+pub use ir::data::DataType;
+pub use ir::data::IntImm;
+pub use ir::data;
 
-pub use builder::module::Module;
+pub use ir::module::Module;
 
-pub use builder::port;
+pub use ir::port;
 
+#[cfg(test)]
+mod tests;

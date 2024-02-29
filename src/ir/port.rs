@@ -29,7 +29,10 @@ impl Typed for Input {
 }
 
 impl Parented for Input {
-  fn parent(&self) -> Reference {
+  fn get_parent(&self) -> Reference {
     self.parent.clone()
+  }
+  fn set_parent(&mut self, parent: Reference) {
+    self.parent = parent;
   }
 }
