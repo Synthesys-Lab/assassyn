@@ -270,39 +270,31 @@ impl SysBuilder {
       Reference::Unknown => panic!("No current module is set"),
       _ => {}
     }
-    let instance = Expr::new(
-      dtype.clone(),
-      opcode,
-      operands,
-      self.inesert_point.0.clone(),
-    );
-    let (to_insert, value) = {
-      let origin = self.insert_element(instance);
-      if let Some(cond) = cond {
-        let predicated = Expr::new(
-          DataType::void(),
-          Opcode::Predicate,
-          vec![cond, origin.clone()],
-          self.inesert_point.0.clone(),
-        );
-        let res = self.insert_element(predicated);
-        Expr::downcast_mut(&mut self.slab, &origin)
-          .unwrap()
-          .set_parent(res.clone());
-        (res, origin)
-      } else {
-        (origin.clone(), origin)
-      }
-    };
-    let ip = self.inesert_point.clone();
-    // This is kinda ugly here, because I cannot borrow self as mutable twice.
-    // To remind myself update the insert point, both new insert point and the result are returned.
-    let (_, at) = self
-      .get_mut::<Block>(&ip.1)
-      .unwrap()
-      .insert_at(ip.2, to_insert);
-    self.inesert_point.2 = at;
-    value
+    if let Some(cond) = cond {
+      let block = self.create_block(cond.into());
+      let instance = Expr::new(dtype.clone(), opcode, operands, block.clone());
+      let value = self.insert_element(instance);
+      self
+        .get_mut::<Block>(&block)
+        .unwrap()
+        .push(value.clone())
+    } else {
+      let instance = Expr::new(
+        dtype.clone(),
+        opcode,
+        operands,
+        self.inesert_point.1.clone(),
+      );
+      let value = self.insert_element(instance);
+      self.insert_at_ip(value)
+    }
+  }
+
+  /// The helper function to insert an element into the current insert point.
+  fn insert_at_ip(&mut self, expr: Reference) -> Reference {
+    let InsertPoint(_, block, _) = &self.inesert_point;
+    let block = block.clone();
+    self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 
   /// Create a trigger. A trigger sends a signal to invoke the given module.

@@ -18,5 +18,6 @@ fn predication() {
   sys.create_array_write(&odd, &zero, &acc_odd, None);
   println!("{}", sys);
   xform::propagate_predications(&mut sys);
+  println!("{}", sys);
 }
 

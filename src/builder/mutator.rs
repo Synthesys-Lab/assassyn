@@ -14,7 +14,7 @@ use super::system::SysBuilder;
 #[macro_export]
 macro_rules! register_mutator {
 
-  ($mutator: ident, $orig: ty) => {
+  ($mutator: ident, $orig: ident) => {
 
     pub struct $mutator<'a> {
       sys: &'a mut SysBuilder,
@@ -37,7 +37,11 @@ macro_rules! register_mutator {
       type Mutator = $mutator<'a>;
 
       fn mutator(sys: &'a mut SysBuilder, elem: Reference) -> Self::Mutator {
-        $mutator { sys, elem }
+        if let Reference::$orig(_) = elem {
+          $mutator { sys, elem }
+        } else {
+          panic!("The reference {:?} is not a {}", elem, stringify!($orig));
+        }
       }
 
     }

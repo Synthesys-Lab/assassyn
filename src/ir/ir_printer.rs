@@ -153,7 +153,14 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
   fn visit_block(&mut self, block: &'a Block) -> String {
     let mut res = String::new();
     if let Some(cond) = block.get_pred() {
-      res.push_str(format!("if {} {{\n", cond.to_string(self.sys)).as_str());
+      res.push_str(
+        format!(
+          "{}if {} {{\n",
+          " ".repeat(self.indent),
+          cond.to_string(self.sys)
+        )
+        .as_str(),
+      );
       self.inc_indent();
     } else {
       res.push_str(format!("{}\n", block.get_key()).as_str());
@@ -162,21 +169,21 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
       match elem {
         Reference::Expr(_) => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(format!("{}{}\n", " ".repeat(self.indent), self.visit_expr(expr)).as_str());
+          res.push_str(format!("{}\n", self.visit_expr(expr)).as_str());
         }
         Reference::Block(_) => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(format!("{}{}\n", " ".repeat(self.indent), self.visit_block(block)).as_str());
+          res
+            .push_str(format!("{}\n", self.visit_block(block)).as_str());
         }
         _ => {
           panic!("Not an block-able element: {:?}", elem);
         }
       }
-
     }
     if block.get_pred().is_some() {
       self.dec_indent();
-      res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
+      res.push_str(format!("{}}}", " ".repeat(self.indent)).as_str());
     }
     res
   }

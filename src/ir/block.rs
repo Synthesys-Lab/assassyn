@@ -73,6 +73,23 @@ impl BlockMut<'_> {
     (self.get().get(idx).unwrap().clone(), at.map(|x| x + 1))
   }
 
+  /// Insert an expression at the current insert point of the SysBuilder, and maintain the
+  /// insert-at pointer forward.
+  ///
+  /// # Arguments
+  /// * `expr` - The expression to insert.
+  pub(crate) fn insert_at_ip(&mut self, expr: Reference) -> Reference {
+    let InsertPoint(_, _, at) = self.sys.inesert_point;
+    let (expr, new_at) = self.insert_at(at.clone(), expr.clone());
+    self.sys.inesert_point.2 = new_at;
+    expr
+  }
+
+  pub(crate) fn push(&mut self, expr: Reference) -> Reference {
+    self.get_mut().body.push(expr.clone());
+    expr
+  }
+
   pub(crate) fn erase(&mut self, expr: &Reference) {
     let idx = self
       .get()

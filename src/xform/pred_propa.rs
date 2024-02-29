@@ -4,7 +4,7 @@ use crate::{
   builder::system::SysBuilder,
   expr::Expr,
   ir::block::Block,
-  reference::{IsElement, Parented},
+  reference::IsElement,
   Reference,
 };
 
@@ -19,9 +19,7 @@ fn analyze_depth(sys: &SysBuilder) -> HashMap<Reference, usize> {
     ) {
       for expr in iter {
         depth_map.insert(expr.clone(), depth);
-        println!("{:?}'s depth is {}", expr, depth);
         if let Reference::Block(_) = expr {
-          println!("entering block...");
           let block_body = expr.as_ref::<Block>(sys).unwrap().iter();
           dfs(sys, block_body, depth + 1, depth_map);
         }
@@ -132,19 +130,10 @@ fn analyze_propagatable(
 ///   }
 /// ```
 pub fn propagate_predications(sys: &mut SysBuilder) {
-  let depth = analyze_depth(sys);
-  if let Some((src, dst)) = analyze_propagatable(sys, &depth) {
-    let dst_expr = dst.as_ref::<Expr>(sys).unwrap();
-    let orig_parent = src.as_ref::<Expr>(sys).unwrap().get_parent();
-    // sys.erase_from_parent(&src);
-    match orig_parent {
-      Reference::Expr(_) => {}
-      Reference::Module(_) => {}
-      _ => {
-        panic!("unexpected parent type");
-      }
-    }
-  } else {
-    println!("no propagatable predications found");
+  while let Some((src, dst)) = {
+    let depth = analyze_depth(sys);
+    analyze_propagatable(sys, &depth)
+  } {
+    sys.get_mut::<Expr>(&src).unwrap().move_to_new_parent(dst, None);
   }
 }
