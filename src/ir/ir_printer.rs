@@ -1,4 +1,5 @@
 use crate::{
+  builder::system::SysBuilder,
   data::{Array, Typed},
   expr::{Expr, Opcode},
   port::Input,
@@ -6,7 +7,7 @@ use crate::{
   IntImm, Module,
 };
 
-use super::{reference::Visitor, system::SysBuilder};
+use super::reference::Visitor;
 
 pub struct IRPrinter<'a> {
   indent: usize,
@@ -28,8 +29,6 @@ impl IRPrinter<'_> {
 }
 
 impl<'a> Visitor<'a, String> for IRPrinter<'a> {
-
-
   fn visit_input(&mut self, input: &'a Input) -> String {
     format!("{}: {}, ", input.get_name(), input.dtype().to_string())
   }
@@ -65,7 +64,7 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
     }
     let (mod_ref, at) = self.sys.get_insert_point();
     for (i, expr) in module.expr_iter(self.sys).enumerate() {
-      if mod_ref == module.upcast() && at.unwrap_or_else(|| module.get_num_expr()) == i {
+      if mod_ref == module.upcast() && at.unwrap_or_else(|| module.get_num_exprs(self.sys)) == i {
         res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
       }
       res.push_str(format!("{}\n", self.visit_expr(expr)).as_str());
@@ -95,8 +94,9 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
       )
     } else if let Opcode::Predicate = expr.get_opcode() {
       let mut tmp = format!(
-        "if {} {{\n",
-        expr.get_operand(0).unwrap().to_string(self.sys)
+        "if {} {{ // handle: _{}\n",
+        expr.get_operand(0).unwrap().to_string(self.sys),
+        expr.get_key()
       );
       self.indent += 2;
       for operand in expr.operand_iter().skip(1) {
@@ -123,10 +123,11 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
         }
         Opcode::Store => {
           format!(
-            "{}[{}] = {}",
+            "{}[{}] = {} // handle: _{}",
             expr.get_operand(0).unwrap().to_string(self.sys),
             expr.get_operand(1).unwrap().to_string(self.sys),
-            expr.get_operand(2).unwrap().to_string(self.sys)
+            expr.get_operand(2).unwrap().to_string(self.sys),
+            expr.get_key()
           )
         }
         Opcode::Trigger => {

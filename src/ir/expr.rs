@@ -1,6 +1,8 @@
 use crate::{
+  builder::{mutator::Mutable, system::SysBuilder},
   data::{DataType, Typed},
-  reference::Parented,
+  reference::{IsElement, Parented},
+  register_mutator,
 };
 
 use super::reference::Reference;
@@ -71,7 +73,7 @@ impl ToString for Opcode {
 
 pub struct Expr {
   pub(super) key: usize,
-  pub(super) parent: (Reference, usize),
+  parent: Reference,
   dtype: DataType,
   opcode: Opcode,
   operands: Vec<Reference>,
@@ -86,7 +88,7 @@ impl Expr {
   ) -> Self {
     Self {
       key: 0,
-      parent: (parent, 0),
+      parent,
       dtype,
       opcode,
       operands,
@@ -101,9 +103,14 @@ impl Expr {
     self.operands.get(i)
   }
 
+  pub fn get_num_operands(&self) -> usize {
+    self.operands.len()
+  }
+
   pub fn operand_iter(&self) -> impl Iterator<Item = &Reference> {
     self.operands.iter()
   }
+
 }
 
 impl Typed for Expr {
@@ -113,7 +120,39 @@ impl Typed for Expr {
 }
 
 impl Parented for Expr {
-  fn parent(&self) -> Reference {
-    self.parent.0.clone()
+  fn get_parent(&self) -> Reference {
+    self.parent.clone()
   }
+
+  fn set_parent(&mut self, parent: Reference) {
+    self.parent = parent;
+  }
+}
+
+register_mutator!(ExprMut, Expr);
+
+impl ExprMut<'_> {
+
+  pub fn move_to_new_parent(&mut self, parent: Reference) {
+
+  // /// Erase the given element from its parent.
+  // pub fn move_to_new_parent(&mut self, elem: Reference, new_parent: Reference) {
+  //   let expr = elem.as_ref::<Expr>(self).unwrap();
+  //   let parent = expr.get_parent();
+  //   match parent {
+  //     // Its parent is a predicate block.
+  //     Reference::Expr(_) => {}
+  //     // Its parent is a module.
+  //     Reference::Module(_) => {
+  //       let module = self.get_mut::<Module>(&parent).unwrap();
+  //       module.erase(&elem);
+  //     }
+  //     _ => {
+  //       panic!("unexpected parent type");
+  //     }
+  //   }
+  // }
+
+  }
+
 }

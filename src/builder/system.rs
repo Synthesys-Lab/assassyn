@@ -1,30 +1,34 @@
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use crate::{
-  builder::ir_printer,
   data::{Array, Typed},
   expr::{Expr, Opcode},
-  port::Input,
+  ir::{block::Block, ir_printer},
   reference::{Element, IsElement, Parented, Visitor},
   DataType, IntImm, Module, Reference,
 };
+
+use super::mutator::Mutable;
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct InsertPoint(pub Reference, pub Reference, pub Option<usize>);
 
 /// A `SysBuilder` struct not only serves as the data structure of the whole system,
 /// but also works as the syntax-sugared IR builder.
 pub struct SysBuilder {
   /// The slab to store all the elements in the system. We use a slab to maintain such a
   /// highly redundant, and mutually referenced data structure.
-  pub(super) slab: slab::Slab<Element>,
+  pub(crate) slab: slab::Slab<Element>,
   /// The data structure caches the constant values.
   const_cache: HashMap<(DataType, u64), Reference>,
   /// The name of the system.
   name: String,
   /// The global symbols in this system, including modules and arrays.
-  sym_tab: HashMap<String, Reference>,
+  pub(crate) sym_tab: HashMap<String, Reference>,
   /// The symbol table of this system to handle components with same identifiers.
   unique_ids: HashMap<String, usize>,
   /// The current module to be built.
-  inesert_point: (Reference, Option<usize>),
+  pub(crate) inesert_point: InsertPoint,
 }
 
 /// The information of an input of a module.
@@ -112,7 +116,7 @@ impl SysBuilder {
       sym_tab: HashMap::new(),
       slab: slab::Slab::new(),
       const_cache: HashMap::new(),
-      inesert_point: (Reference::Unknown, None),
+      inesert_point: InsertPoint(Reference::Unknown, Reference::Unknown, None),
       unique_ids: HashMap::new(),
     };
     res.create_module("driver", vec![]);
@@ -130,11 +134,11 @@ impl SysBuilder {
 
   /// The helper function to get an element of the system and downcast it to its actual type's
   /// mutable reference.
-  pub(crate) fn get_mut<'a, T: IsElement<'a>>(
+  pub(crate) fn get_mut<'a, T: IsElement<'a> + Mutable<'a, T>>(
     &'a mut self,
     key: &Reference,
-  ) -> Result<&'a mut Box<T>, String> {
-    T::downcast_mut(&mut self.slab, key)
+  ) -> Result<T::Mutator, String> {
+    Ok(T::mutator(self, key.clone()))
   }
 
   /// Get the driver module. The driver module is special. It is invoked unconditionally every
@@ -144,8 +148,8 @@ impl SysBuilder {
   }
 
   /// Get the current module to be built.
-  pub fn get_current_module(&self) -> &Module {
-    self.get::<Module>(&self.inesert_point.0).unwrap()
+  pub fn get_current_module(&self) -> Result<&Box<Module>, String> {
+    self.get::<Module>(&self.inesert_point.0)
   }
 
   /// Get the module by its name.
@@ -173,7 +177,13 @@ impl SysBuilder {
   ///
   /// * `module` - The reference of the module to be set as the current module.
   pub fn set_current_module(&mut self, module: Reference) {
-    self.inesert_point = (module, None);
+    let block = self
+      .get::<Module>(&module)
+      .unwrap()
+      .get_body(self)
+      .unwrap()
+      .upcast();
+    self.inesert_point = InsertPoint(module, block, None);
   }
 
   /// Set the insert before of the current builder.
@@ -184,16 +194,21 @@ impl SysBuilder {
   /// should be a part of the current module to be built. Ohterwise, an assertion failure will be
   /// raised.
   pub fn set_insert_before(&mut self, expr: Reference) {
-    assert!(expr.as_ref::<Expr>(self).unwrap().parent() == self.inesert_point.0);
-    let at = self
-      .get_current_module()
-      .expr_iter(self)
-      .position(|x| x.upcast() == expr);
-    self.inesert_point.1 = at;
+    let (block, module, at) = {
+      let block_ref = {
+        let expr = expr.as_ref::<Expr>(self).unwrap();
+        expr.get_parent()
+      };
+      let block = self.get::<Block>(&block_ref).unwrap();
+      let module = block.get_parent();
+      let at = block.iter(self).position(|x| x.upcast() == expr);
+      (block_ref, module, at)
+    };
+    self.inesert_point = InsertPoint(module, block, at);
   }
 
   /// Get the insert point of the current builder.
-  pub fn get_insert_point(&self) -> (Reference, Option<usize>) {
+  pub fn get_insert_point(&self) -> InsertPoint {
     self.inesert_point.clone()
   }
 
@@ -203,13 +218,13 @@ impl SysBuilder {
   /// # Arguments
   ///
   /// * `elem` - The element to be inserted. An element can be any component of the system IR.
-  pub(super) fn insert_element<'a, T: IsElement<'a> + Into<Element> + 'a>(
+  pub(crate) fn insert_element<'a, T: IsElement<'a> + Into<Element> + 'a>(
     &'a mut self,
     elem: T,
   ) -> Reference {
     let key = self.slab.insert(elem.into());
     let res = T::into_reference(key);
-    self.get_mut::<T>(&res).unwrap().set_key(key);
+    T::downcast_mut(&mut self.slab, &res).unwrap().set_key(key);
     res
   }
 
@@ -232,30 +247,6 @@ impl SysBuilder {
     key
   }
 
-  /// Create a new module, and set it as the current module to be built.
-  ///
-  /// # Arguments
-  ///
-  /// * `name` - The name of the module.
-  /// * `inputs` - The inputs' information to the module. Refer to `PortInfo` for more details.
-  pub fn create_module(&mut self, name: &str, inputs: Vec<PortInfo>) -> Reference {
-    let ports = inputs
-      .into_iter()
-      .map(|x| self.insert_element(Input::new(&x.ty, x.name.as_str())))
-      .collect::<Vec<_>>();
-    let module_name = self.identifier(name);
-    let module = Module::new(&module_name, ports);
-    // Set the parents of the inputs after instantiating the parent module.
-    for i in 0..module.get_num_inputs() {
-      let input = module.get_input(i).unwrap();
-      self.get_mut::<Input>(input).unwrap().parent = module.upcast();
-    }
-    let key = self.insert_element(module);
-    self.sym_tab.insert(module_name, key.clone());
-    self.inesert_point = (key.clone(), None);
-    key
-  }
-
   /// The helper function to create an expression.
   /// An expression is the basic building block of a module.
   ///
@@ -265,6 +256,9 @@ impl SysBuilder {
   /// * `operands` - The operands of the expression.
   /// * `cond` - The condition of executing this expression. If the condition is not `None`, the is
   /// always executed.
+  // TODO(@were): Should I rearrange the insert point based on the predication?
+  // If the predication is deeper than the current insert point, the inserted point should be
+  // inserted to the deepest predication block.
   pub fn create_expr(
     &mut self,
     dtype: DataType,
@@ -292,17 +286,22 @@ impl SysBuilder {
           self.inesert_point.0.clone(),
         );
         let res = self.insert_element(predicated);
-        self.get_mut::<Expr>(&origin).unwrap().parent = (res.clone(), 1);
+        Expr::downcast_mut(&mut self.slab, &origin)
+          .unwrap()
+          .set_parent(res);
         (res, origin)
       } else {
         (origin.clone(), origin)
       }
     };
-    let (cur_mod, at) = self.inesert_point.clone();
+    let ip = self.inesert_point.clone();
     // This is kinda ugly here, because I cannot borrow self as mutable twice.
     // To remind myself update the insert point, both new insert point and the result are returned.
-    let (_, at) = self.get_mut::<Module>(&cur_mod).unwrap().insert_at(at, to_insert);
-    self.inesert_point.1 = at;
+    let (_, at) = self
+      .get_mut::<Block>(&ip.1)
+      .unwrap()
+      .insert_at(ip.2, to_insert);
+    self.inesert_point.2 = at;
     value
   }
 
@@ -462,7 +461,8 @@ impl SysBuilder {
   /// * `id` - The original identifier.
   /// # Returns
   /// The unique identifier.
-  fn identifier(&mut self, id: &str) -> String {
+  // TODO(@were): Overengineer a dedicated module for this later.
+  pub(crate) fn identifier(&mut self, id: &str) -> String {
     // If the identifier is already in the symbol table, we append a number to it.
     if let Some(x) = self.unique_ids.get_mut(id.into()) {
       // Append a number after.
@@ -481,7 +481,6 @@ impl SysBuilder {
 impl Display for SysBuilder {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let mut printer = ir_printer::IRPrinter::new(self);
-
     write!(f, "system {} {{\n", self.name)?;
     for elem in self.array_iter() {
       write!(f, "\n  {};\n", printer.visit_array(elem))?;

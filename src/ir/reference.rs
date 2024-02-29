@@ -1,9 +1,8 @@
 use crate::{
-  data::{Array, IntImm, Typed},
-  DataType, Module,
+  builder::system::SysBuilder, data::{Array, IntImm, Typed}, DataType, Module
 };
 
-use super::{expr::Expr, port::Input, system::SysBuilder};
+use super::{block::Block, expr::Expr, port::Input};
 
 pub trait IsElement<'a> {
   fn upcast(&self) -> Reference;
@@ -18,7 +17,8 @@ pub trait IsElement<'a> {
 }
 
 pub trait Parented {
-  fn parent(&self) -> Reference;
+  fn get_parent(&self) -> Reference;
+  fn set_parent(&mut self, parent: Reference);
 }
 
 macro_rules! register_element {
@@ -86,6 +86,7 @@ register_element!(Input);
 register_element!(Expr);
 register_element!(Array);
 register_element!(IntImm);
+register_element!(Block);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Reference {
@@ -93,8 +94,8 @@ pub enum Reference {
   Input(usize),
   Expr(usize),
   Array(usize),
-  SysBuilder(usize),
   IntImm(usize),
+  Block(usize),
   Unknown,
 }
 
@@ -105,7 +106,7 @@ impl Reference {
       | Reference::Input(key)
       | Reference::Expr(key)
       | Reference::Array(key)
-      | Reference::SysBuilder(key)
+      | Reference::Block(key)
       | Reference::IntImm(key) => *key,
       Reference::Unknown => unreachable!("Unknown reference"),
     }
@@ -174,4 +175,5 @@ pub enum Element {
   Expr(Box<Expr>),
   Array(Box<Array>),
   IntImm(Box<IntImm>),
+  Block(Box<Block>),
 }

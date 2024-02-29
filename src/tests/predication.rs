@@ -1,4 +1,4 @@
-use crate::{builder::system::SysBuilder, DataType};
+use crate::{builder::system::SysBuilder, xform, DataType};
 
 #[test]
 fn predication() {
@@ -17,4 +17,6 @@ fn predication() {
   let acc_odd = sys.create_add(None, &odd0, &one, Some(&is_odd));
   sys.create_array_write(&odd, &zero, &acc_odd, None);
   println!("{}", sys);
+  xform::propagate_predications(&mut sys);
 }
+

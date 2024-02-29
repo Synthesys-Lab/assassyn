@@ -181,7 +181,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   }
   fd.write("}\n".as_bytes())?;
 
-  // Dump the event order functions.
+  // Dump the event stamp functions.
   // impl Event {
   //   fn get_stamp(&self) -> usize {
   //      match self {

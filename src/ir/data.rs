@@ -69,7 +69,7 @@ impl Typed for IntImm {
 
 impl IntImm {
 
-  pub(super) fn new(dtype: DataType, value: u64) -> Self {
+  pub(crate) fn new(dtype: DataType, value: u64) -> Self {
     Self {
       key: 0,
       dtype,
