@@ -8,10 +8,9 @@ use crate::{
   builder::system::SysBuilder,
   data::{Array, Typed},
   expr::{Expr, Opcode},
-  ir::block::Block,
   port::Input,
   reference::{IsElement, Visitor},
-  IntImm, Module, Reference,
+  IntImm, Module,
 };
 
 use super::Config;
@@ -20,7 +19,6 @@ struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   port_idx: usize,
   ops: Option<&'a HashSet<Opcode>>,
-  indent: usize,
 }
 
 impl<'a> ElaborateModule<'a> {
@@ -29,7 +27,6 @@ impl<'a> ElaborateModule<'a> {
       sys,
       port_idx: 0,
       ops: None,
-      indent: 0,
     }
   }
 }
@@ -61,23 +58,9 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
       self.port_idx = i;
       res.push_str(self.visit_input(arg).as_str());
     }
-    self.indent += 2;
-    for elem in module.get_body(self.sys).unwrap().iter() {
-      match elem {
-        Reference::Expr(_) => {
-          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(expr).as_str());
-        }
-        Reference::Block(_) => {
-          let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(block).as_str());
-        }
-        _ => {
-          panic!("Unexpected reference type: {:?}", elem);
-        }
-      }
+    for elem in module.expr_iter(self.sys) {
+      res.push_str(self.visit_expr(elem).as_str());
     }
-    self.indent -= 2;
     res.push_str("}\n");
     res
   }
@@ -134,19 +117,33 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
           res
         }
         _ => {
-          format!("// TODO: opcode: {}\n", expr.get_opcode().to_string())
+          format!("  // TODO: Other opcode;\n")
         }
       }
     };
-    if expr.dtype().is_void() {
-      format!("{}{};\n", " ".repeat(self.indent), res)
+    // TODO(@were): Propagate the predications of the expressions.
+    let pred = if let Some(pred) = expr.get_pred() {
+      Some(pred.to_string(self.sys))
     } else {
-      format!(
-        "{}let _{} = {};\n",
-        " ".repeat(self.indent),
-        expr.get_key(),
-        res
-      )
+      None
+    };
+    if expr.dtype().is_void() {
+      if let Some(pred) = pred {
+        format!("  if {} {{\n    {};\n  }}\n", pred, res)
+      } else {
+        format!("  {};\n", res)
+      }
+    } else {
+      if let Some(pred) = pred {
+        format!(
+          "  let _{} = if {} {{ Some({}) }} else {{ None }};\n",
+          expr.get_key(),
+          pred,
+          res
+        )
+      } else {
+        format!("  let _{} = {};\n", expr.get_key(), res)
+      }
     }
   }
 
@@ -164,39 +161,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
   }
 
   fn visit_int_imm(&mut self, int_imm: &IntImm) -> String {
-    format!(
-      "({} as {})",
-      int_imm.get_value(),
-      int_imm.dtype().to_string()
-    )
-  }
-
-  fn visit_block(&mut self, block: &'a Block) -> String {
-    let mut res = String::new();
-    if let Some(cond) = block.get_pred() {
-      res.push_str(format!("if {} {{\n", cond.to_string(self.sys)).as_str());
-    }
-    self.indent += 2;
-    for elem in block.iter() {
-      match elem {
-        &Reference::Expr(_) => {
-          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(expr).as_str());
-        }
-        &Reference::Block(_) => {
-          let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(block).as_str());
-        }
-        _ => {
-          panic!("Unexpected reference type: {:?}", elem);
-        }
-      }
-    }
-    self.indent -= 2;
-    if block.get_pred().is_some() {
-      res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
-    }
-    res
+    int_imm.to_string()
   }
 }
 
@@ -216,7 +181,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   }
   fd.write("}\n".as_bytes())?;
 
-  // Dump the event stamp functions.
+  // Dump the event order functions.
   // impl Event {
   //   fn get_stamp(&self) -> usize {
   //      match self {
