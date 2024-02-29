@@ -1,5 +1,5 @@
 use crate::{
-  builder::system::SysBuilder, data::{Array, IntImm, Typed}, DataType, Module
+  builder::system::SysBuilder, data::{Array, IntImm, Typed}, ir::ir_printer::IRPrinter, DataType, Module
 };
 
 use super::{block::Block, expr::Expr, port::Input};
@@ -127,7 +127,28 @@ impl Reference {
         let expr = self.as_ref::<Expr>(sys).unwrap();
         expr.dtype().clone().into()
       }
-      _ => {
+      Reference::Block(_) => None,
+      Reference::Unknown => {
+        panic!("Unknown reference")
+      }
+    }
+  }
+
+  pub fn get_parent(&self, sys: &SysBuilder) -> Option<Reference> {
+    match self {
+      Reference::Module(_) => None,
+      Reference::Array(_) => None,
+      Reference::IntImm(_) => None,
+      Reference::Input(_) => {
+        self.as_ref::<Input>(sys).unwrap().get_parent().into()
+      }
+      Reference::Block(_) => {
+        self.as_ref::<Block>(sys).unwrap().get_parent().into()
+      }
+      Reference::Expr(_) => {
+        self.as_ref::<Expr>(sys).unwrap().get_parent().into()
+      }
+      Reference::Unknown => {
         panic!("Unknown reference")
       }
     }
@@ -154,8 +175,12 @@ impl Reference {
       Reference::Unknown => {
         panic!("Unknown reference")
       }
-      _ => {
-        format!("_{}", self.get_key())
+      Reference::Block(_) => {
+        let expr = self.as_ref::<Block>(sys).unwrap();
+        IRPrinter::new(sys).visit_block(expr)
+      }
+      Reference::Expr(key) => {
+        format!("_{}", key)
       }
     }
   }
@@ -167,6 +192,7 @@ pub trait Visitor<'a, T> {
   fn visit_expr(&mut self, expr: &'a Expr) -> T;
   fn visit_array(&mut self, array: &'a Array) -> T;
   fn visit_int_imm(&mut self, int_imm: &'a IntImm) -> T;
+  fn visit_block(&mut self, block: &'a Block) -> T;
 }
 
 pub enum Element {

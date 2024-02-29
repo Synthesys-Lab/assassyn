@@ -201,7 +201,7 @@ impl SysBuilder {
       };
       let block = self.get::<Block>(&block_ref).unwrap();
       let module = block.get_parent();
-      let at = block.iter(self).position(|x| x.upcast() == expr);
+      let at = block.iter().position(|x| *x == expr);
       (block_ref, module, at)
     };
     self.inesert_point = InsertPoint(module, block, at);
@@ -288,7 +288,7 @@ impl SysBuilder {
         let res = self.insert_element(predicated);
         Expr::downcast_mut(&mut self.slab, &origin)
           .unwrap()
-          .set_parent(res);
+          .set_parent(res.clone());
         (res, origin)
       } else {
         (origin.clone(), origin)

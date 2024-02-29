@@ -5,7 +5,7 @@ use crate::{
   register_mutator,
 };
 
-use super::reference::Reference;
+use super::{block::Block, reference::Reference};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Opcode {
@@ -27,8 +27,6 @@ pub enum Opcode {
   // Eventual operations
   Trigger,
   SpinTrigger,
-  // Predicated operations
-  Predicate,
 }
 
 impl Opcode {
@@ -66,7 +64,6 @@ impl ToString for Opcode {
       Opcode::Store => "store".into(),
       Opcode::Trigger => "trigger".into(),
       Opcode::SpinTrigger => "wait_until".into(),
-      Opcode::Predicate => "predicate".into(),
     }
   }
 }
@@ -133,26 +130,14 @@ register_mutator!(ExprMut, Expr);
 
 impl ExprMut<'_> {
 
-  pub fn move_to_new_parent(&mut self, parent: Reference) {
-
-  // /// Erase the given element from its parent.
-  // pub fn move_to_new_parent(&mut self, elem: Reference, new_parent: Reference) {
-  //   let expr = elem.as_ref::<Expr>(self).unwrap();
-  //   let parent = expr.get_parent();
-  //   match parent {
-  //     // Its parent is a predicate block.
-  //     Reference::Expr(_) => {}
-  //     // Its parent is a module.
-  //     Reference::Module(_) => {
-  //       let module = self.get_mut::<Module>(&parent).unwrap();
-  //       module.erase(&elem);
-  //     }
-  //     _ => {
-  //       panic!("unexpected parent type");
-  //     }
-  //   }
-  // }
-
+  pub fn move_to_new_parent(&mut self, new_parent: Reference, at: Option<usize>) {
+    let old_parent = self.get().get_parent();
+    let expr = self.get().upcast();
+    let mut block_mut = self.sys.get_mut::<Block>(&old_parent).unwrap();
+    block_mut.erase(&expr);
+    let mut new_parent_mut = self.sys.get_mut::<Block>(&new_parent).unwrap();
+    new_parent_mut.insert_at(at, expr);
+    self.get_mut().set_parent(new_parent)
   }
 
 }

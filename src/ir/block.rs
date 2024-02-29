@@ -1,6 +1,8 @@
 use crate::{
-  builder::{mutator::Mutable, system::SysBuilder},
-  expr::Expr,
+  builder::{
+    mutator::Mutable,
+    system::{InsertPoint, SysBuilder},
+  },
   reference::{IsElement, Parented},
   register_mutator, Reference,
 };
@@ -22,6 +24,10 @@ impl Block {
     }
   }
 
+  pub fn get_pred(&self) -> Option<Reference> {
+    self.pred.clone()
+  }
+
   pub fn get_num_exprs(&self) -> usize {
     self.body.len()
   }
@@ -30,8 +36,8 @@ impl Block {
     self.body.get(idx)
   }
 
-  pub fn iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &'a Box<Expr>> {
-    self.body.iter().map(|x| x.as_ref::<Expr>(sys).unwrap())
+  pub fn iter<'a>(&'a self) -> impl Iterator<Item = &Reference> {
+    self.body.iter()
   }
 }
 
@@ -66,6 +72,16 @@ impl BlockMut<'_> {
     self.get_mut().body.insert(idx, expr);
     (self.get().get(idx).unwrap().clone(), at.map(|x| x + 1))
   }
+
+  pub(crate) fn erase(&mut self, expr: &Reference) {
+    let idx = self
+      .get()
+      .body
+      .iter()
+      .position(|x| *x == *expr)
+      .expect("Element not found");
+    self.get_mut().body.remove(idx);
+  }
 }
 
 impl SysBuilder {
@@ -74,8 +90,12 @@ impl SysBuilder {
     let parent = self.get_current_module().unwrap().upcast();
     let instance = Block::new(cond, parent.clone());
     let block = self.insert_element(instance);
-    let ip = &self.get_insert_point();
-    self.get_mut::<Block>(&ip.1).unwrap().insert_at(ip.2, block);
+    let InsertPoint(_, insert_block, at) = &self.get_insert_point();
+    let (block, new_at) = self
+      .get_mut::<Block>(insert_block)
+      .unwrap()
+      .insert_at(at.clone(), block.clone());
+    self.inesert_point.2 = new_at;
     block
   }
 }

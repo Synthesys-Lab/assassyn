@@ -1,38 +1,62 @@
+use std::collections::HashMap;
+
 use crate::{
   builder::system::SysBuilder,
-  expr::{Expr, Opcode},
+  expr::Expr,
+  ir::block::Block,
   reference::{IsElement, Parented},
   Reference,
 };
 
-fn deepest_operand(expr: &Expr, sys: &SysBuilder) -> Option<(usize, Reference)> {
+fn analyze_depth(sys: &SysBuilder) -> HashMap<Reference, usize> {
+  let mut depth_map = HashMap::new();
+  for module in sys.module_iter() {
+    fn dfs<'a>(
+      sys: &SysBuilder,
+      iter: impl Iterator<Item = &'a Reference>,
+      depth: usize,
+      depth_map: &mut HashMap<Reference, usize>,
+    ) {
+      for expr in iter {
+        depth_map.insert(expr.clone(), depth);
+        println!("{:?}'s depth is {}", expr, depth);
+        if let Reference::Block(_) = expr {
+          println!("entering block...");
+          let block_body = expr.as_ref::<Block>(sys).unwrap().iter();
+          dfs(sys, block_body, depth + 1, depth_map);
+        }
+      }
+    }
+    dfs(sys, module.get_body(sys).unwrap().iter(), 0, &mut depth_map);
+  }
+  depth_map
+}
+
+fn deepest_operand(
+  expr: &Expr,
+  sys: &SysBuilder,
+  depth_map: &HashMap<Reference, usize>,
+) -> Option<(usize, Reference)> {
   if let Some((depth, parent)) = expr
     .operand_iter()
-    .take({
-      if expr.get_opcode() == Opcode::Predicate {
-        1
-      } else {
-        expr.get_num_operands()
-      }
-    })
     .filter(|x| match x {
       Reference::Expr(_) => true,
       _ => false,
     })
-    .map(|x| x.as_ref::<Expr>(sys).unwrap())
     .fold(None, |acc: Option<(usize, Reference)>, x| {
+      let new_depth = *depth_map.get(&x).unwrap();
       if let Some((depth, parent)) = acc {
-        if x.get_depth() > depth {
-          Some((x.get_depth(), x.get_parent()))
+        if new_depth > depth {
+          Some((new_depth, x.get_parent(sys).unwrap()))
         } else {
           Some((depth, parent))
         }
       } else {
-        Some((x.get_depth(), x.get_parent()))
+        Some((new_depth, x.get_parent(sys).unwrap()))
       }
     })
   {
-    if depth > expr.get_depth() {
+    if depth > *depth_map.get(&expr.upcast()).unwrap() {
       return Some((depth, parent));
     }
   }
@@ -41,19 +65,32 @@ fn deepest_operand(expr: &Expr, sys: &SysBuilder) -> Option<(usize, Reference)> 
 
 fn analyze_expr_block<'a>(
   sys: &SysBuilder,
-  iter: impl Iterator<Item = &'a Box<Expr>>,
+  iter: impl Iterator<Item = &'a Reference>,
+  depth: &HashMap<Reference, usize>,
 ) -> Option<(Reference, Reference)> {
-  for expr in iter {
-    if let Some((_, parent)) = deepest_operand(expr, sys) {
-      return Some((expr.upcast(), parent));
-    }
-    if expr.get_opcode() == Opcode::Predicate {
-      let body = expr.operand_iter().skip(1).filter_map(|x| match x {
-        Reference::Expr(_) => Some(x.as_ref::<Expr>(sys).unwrap()),
-        _ => None,
-      });
-      if let Some((_, parent)) = analyze_expr_block(sys, body) {
-        return Some((expr.upcast(), parent));
+  for elem in iter {
+    match elem {
+      Reference::Expr(_) => {
+        let expr = elem.as_ref::<Expr>(sys).unwrap();
+        if let Some((_, parent)) = deepest_operand(expr, sys, depth) {
+          return Some((expr.upcast(), parent));
+        }
+      }
+      Reference::Block(_) => {
+        let block = elem.as_ref::<Block>(sys).unwrap();
+        if let Some(cond) = block.get_pred() {
+          let expr = cond.as_ref::<Expr>(sys).unwrap();
+          if let Some((_, parent)) = deepest_operand(expr, sys, depth) {
+            return Some((elem.clone(), parent));
+          }
+        }
+        let body = block.iter();
+        if let Some(res) = analyze_expr_block(sys, body, depth) {
+          return Some(res);
+        }
+      }
+      _ => {
+        panic!("unexpected reference type");
       }
     }
   }
@@ -64,9 +101,12 @@ fn analyze_expr_block<'a>(
 /// # Returns
 /// * The expression to be moved into the new predication block. If None is returned, no propagation
 /// is found.
-fn analyze_propagatable(sys: &mut SysBuilder) -> Option<(Reference, Reference)> {
+fn analyze_propagatable(
+  sys: &mut SysBuilder,
+  depth: &HashMap<Reference, usize>,
+) -> Option<(Reference, Reference)> {
   for module in sys.module_iter() {
-    if let Some(res) = analyze_expr_block(sys, module.expr_iter(sys)) {
+    if let Some(res) = analyze_expr_block(sys, module.iter(sys), depth) {
       return res.into();
     }
   }
@@ -92,11 +132,11 @@ fn analyze_propagatable(sys: &mut SysBuilder) -> Option<(Reference, Reference)> 
 ///   }
 /// ```
 pub fn propagate_predications(sys: &mut SysBuilder) {
-  if let Some((src, dst)) = analyze_propagatable(sys) {
+  let depth = analyze_depth(sys);
+  if let Some((src, dst)) = analyze_propagatable(sys, &depth) {
     let dst_expr = dst.as_ref::<Expr>(sys).unwrap();
-    assert!(dst_expr.get_opcode() == Opcode::Predicate);
     let orig_parent = src.as_ref::<Expr>(sys).unwrap().get_parent();
-    sys.erase_from_parent(&src);
+    // sys.erase_from_parent(&src);
     match orig_parent {
       Reference::Expr(_) => {}
       Reference::Module(_) => {}

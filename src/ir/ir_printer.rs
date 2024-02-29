@@ -1,13 +1,13 @@
 use crate::{
-  builder::system::SysBuilder,
+  builder::system::{InsertPoint, SysBuilder},
   data::{Array, Typed},
   expr::{Expr, Opcode},
   port::Input,
   reference::IsElement,
-  IntImm, Module,
+  IntImm, Module, Reference,
 };
 
-use super::reference::Visitor;
+use super::{block::Block, reference::Visitor};
 
 pub struct IRPrinter<'a> {
   indent: usize,
@@ -62,14 +62,26 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
       res.push_str(format!("{}while true {{\n", " ".repeat(self.indent)).as_str());
       self.indent += 2;
     }
-    let (mod_ref, at) = self.sys.get_insert_point();
-    for (i, expr) in module.expr_iter(self.sys).enumerate() {
-      if mod_ref == module.upcast() && at.unwrap_or_else(|| module.get_num_exprs(self.sys)) == i {
+    let InsertPoint(cur_mod, _, at) = self.sys.get_insert_point();
+    for (i, elem) in module.get_body(self.sys).unwrap().iter().enumerate() {
+      if cur_mod == module.upcast() && at.unwrap_or_else(|| module.get_num_exprs(self.sys)) == i {
         res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
       }
-      res.push_str(format!("{}\n", self.visit_expr(expr)).as_str());
+      match elem {
+        Reference::Expr(_) => {
+          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+          res.push_str(format!("{}\n", self.visit_expr(expr)).as_str());
+        }
+        Reference::Block(_) => {
+          let block = elem.as_ref::<Block>(self.sys).unwrap();
+          res.push_str(format!("{}\n", self.visit_block(block)).as_str());
+        }
+        _ => {
+          panic!("Not an block-able element: {:?}", elem);
+        }
+      }
     }
-    if at.is_none() && mod_ref == module.upcast() {
+    if at.is_none() && cur_mod == module.upcast() {
       res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
     }
     if module.get_name().eq("driver") {
@@ -92,25 +104,6 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
         mnem,
         expr.get_operand(1).unwrap().to_string(self.sys)
       )
-    } else if let Opcode::Predicate = expr.get_opcode() {
-      let mut tmp = format!(
-        "if {} {{ // handle: _{}\n",
-        expr.get_operand(0).unwrap().to_string(self.sys),
-        expr.get_key()
-      );
-      self.indent += 2;
-      for operand in expr.operand_iter().skip(1) {
-        tmp.push_str(
-          format!(
-            "{}\n",
-            self.visit_expr(operand.as_ref::<Expr>(self.sys).unwrap())
-          )
-          .as_str(),
-        );
-      }
-      self.indent -= 2;
-      tmp.push_str(format!("{}}}", " ".repeat(self.indent)).as_str());
-      tmp
     } else {
       match expr.get_opcode() {
         Opcode::Load => {
@@ -156,5 +149,35 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
       }
     };
     format!("{}{}", " ".repeat(self.indent), res)
+  }
+  fn visit_block(&mut self, block: &'a Block) -> String {
+    let mut res = String::new();
+    if let Some(cond) = block.get_pred() {
+      res.push_str(format!("if {} {{\n", cond.to_string(self.sys)).as_str());
+      self.inc_indent();
+    } else {
+      res.push_str(format!("{}\n", block.get_key()).as_str());
+    }
+    for elem in block.iter() {
+      match elem {
+        Reference::Expr(_) => {
+          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+          res.push_str(format!("{}{}\n", " ".repeat(self.indent), self.visit_expr(expr)).as_str());
+        }
+        Reference::Block(_) => {
+          let block = elem.as_ref::<Block>(self.sys).unwrap();
+          res.push_str(format!("{}{}\n", " ".repeat(self.indent), self.visit_block(block)).as_str());
+        }
+        _ => {
+          panic!("Not an block-able element: {:?}", elem);
+        }
+      }
+
+    }
+    if block.get_pred().is_some() {
+      self.dec_indent();
+      res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
+    }
+    res
   }
 }

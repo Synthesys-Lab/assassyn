@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
   builder::{mutator::Mutable, system::{InsertPoint, PortInfo, SysBuilder}},
   data::Array,
-  expr::{Expr, Opcode},
+  expr::Opcode,
   reference::{IsElement, Parented, Reference},
   register_mutator,
 };
@@ -73,7 +73,7 @@ impl Module {
   }
 
   /// Get the number of expressions in the module.
-  pub fn get_body(&self, sys: &SysBuilder) -> Result<&Box<Block>, String> {
+  pub fn get_body<'a>(&'a self, sys: &'a SysBuilder) -> Result<&'a Box<Block>, String> {
     self.body.as_ref::<Block>(sys)
   }
 
@@ -91,8 +91,8 @@ impl Module {
     self.inputs.iter().map(|x| x.as_ref::<Input>(sys).unwrap())
   }
 
-  pub fn expr_iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &'a Box<Expr>> {
-    self.get_body(sys).unwrap().iter(sys)
+  pub fn iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &Reference> {
+    self.get_body(sys).unwrap().iter()
   }
 
 }
@@ -106,7 +106,7 @@ impl <'a>ModuleMut<'a> {
     if !self.get().array_used.contains_key(&array) {
       self.get_mut().array_used.insert(array.clone(), HashSet::new());
     }
-    let operations = self.get().array_used.get_mut(&array).unwrap();
+    let operations = self.get_mut().array_used.get_mut(&array).unwrap();
     operations.insert(opcode);
   }
 

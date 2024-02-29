@@ -8,9 +8,10 @@ use crate::{
   builder::system::SysBuilder,
   data::{Array, Typed},
   expr::{Expr, Opcode},
+  ir::block::Block,
   port::Input,
   reference::{IsElement, Visitor},
-  IntImm, Module,
+  IntImm, Module, Reference,
 };
 
 use super::Config;
@@ -61,8 +62,20 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
       res.push_str(self.visit_input(arg).as_str());
     }
     self.indent += 2;
-    for elem in module.expr_iter(self.sys) {
-      res.push_str(self.visit_expr(elem).as_str());
+    for elem in module.get_body(self.sys).unwrap().iter() {
+      match elem {
+        Reference::Expr(_) => {
+          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+          res.push_str(self.visit_expr(expr).as_str());
+        }
+        Reference::Block(_) => {
+          let block = elem.as_ref::<Block>(self.sys).unwrap();
+          res.push_str(self.visit_block(block).as_str());
+        }
+        _ => {
+          panic!("Unexpected reference type: {:?}", elem);
+        }
+      }
     }
     self.indent -= 2;
     res.push_str("}\n");
@@ -120,21 +133,6 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
           res.push_str("])))");
           res
         }
-        Opcode::Predicate => {
-          let mut res = format!(
-            "{}if {} {{\n",
-            " ".repeat(self.indent),
-            expr.get_operand(0).unwrap().to_string(self.sys)
-          );
-          self.indent += 2;
-          for elem in expr.operand_iter().skip(1) {
-            let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-            res.push_str(self.visit_expr(expr).as_str());
-          }
-          self.indent -= 2;
-          res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
-          return res;
-        }
         _ => {
           format!("// TODO: opcode: {}\n", expr.get_opcode().to_string())
         }
@@ -143,7 +141,12 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     if expr.dtype().is_void() {
       format!("{}{};\n", " ".repeat(self.indent), res)
     } else {
-      format!("{}let _{} = {};\n", " ".repeat(self.indent), expr.get_key(), res)
+      format!(
+        "{}let _{} = {};\n",
+        " ".repeat(self.indent),
+        expr.get_key(),
+        res
+      )
     }
   }
 
@@ -161,7 +164,39 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
   }
 
   fn visit_int_imm(&mut self, int_imm: &IntImm) -> String {
-    format!("({} as {})", int_imm.get_value(), int_imm.dtype().to_string())
+    format!(
+      "({} as {})",
+      int_imm.get_value(),
+      int_imm.dtype().to_string()
+    )
+  }
+
+  fn visit_block(&mut self, block: &'a Block) -> String {
+    let mut res = String::new();
+    if let Some(cond) = block.get_pred() {
+      res.push_str(format!("if {} {{\n", cond.to_string(self.sys)).as_str());
+    }
+    self.indent += 2;
+    for elem in block.iter() {
+      match elem {
+        &Reference::Expr(_) => {
+          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+          res.push_str(self.visit_expr(expr).as_str());
+        }
+        &Reference::Block(_) => {
+          let block = elem.as_ref::<Block>(self.sys).unwrap();
+          res.push_str(self.visit_block(block).as_str());
+        }
+        _ => {
+          panic!("Unexpected reference type: {:?}", elem);
+        }
+      }
+    }
+    self.indent -= 2;
+    if block.get_pred().is_some() {
+      res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
+    }
+    res
   }
 }
 
