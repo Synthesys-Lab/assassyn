@@ -225,6 +225,7 @@ impl BaseNode {
 }
 
 impl BaseNode {
+
   pub fn to_string(&self, sys: &SysBuilder) -> String {
     match self {
       BaseNode::Module(_) => self.as_ref::<Module>(sys).unwrap().get_name().to_string(),
@@ -253,6 +254,7 @@ impl BaseNode {
       }
     }
   }
+
 }
 
 pub trait Visitor<'a, T: Default> {

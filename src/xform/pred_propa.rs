@@ -4,7 +4,7 @@ use crate::{
   builder::system::SysBuilder,
   expr::Expr,
   ir::block::Block,
-  reference::IsElement,
+  node::IsElement,
   BaseNode,
 };
 

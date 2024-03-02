@@ -10,7 +10,7 @@ use crate::{
   expr::{Expr, Opcode},
   ir::block::Block,
   port::Input,
-  reference::{IsElement, Visitor},
+  node::{IsElement, Visitor},
   IntImm, Module, BaseNode,
 };
 

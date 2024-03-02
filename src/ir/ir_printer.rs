@@ -3,11 +3,11 @@ use crate::{
   data::{Array, Typed},
   expr::{Expr, Opcode},
   port::Input,
-  reference::IsElement,
+  node::IsElement,
   IntImm, Module, BaseNode,
 };
 
-use super::{block::Block, reference::Visitor};
+use super::{block::Block, node::Visitor};
 
 pub struct IRPrinter<'a> {
   indent: usize,

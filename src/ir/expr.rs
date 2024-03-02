@@ -1,9 +1,9 @@
 use crate::{
   data::{DataType, Typed},
-  reference::{IsElement, Parented, ExprMut},
+  node::{IsElement, Parented, ExprMut},
 };
 
-use super::{block::Block, reference::BaseNode};
+use super::{block::Block, node::BaseNode};
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Opcode {

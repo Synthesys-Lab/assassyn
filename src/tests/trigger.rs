@@ -1,6 +1,6 @@
 use super::utils;
 use crate::builder::system::{PortInfo, SysBuilder};
-use crate::reference::IsElement;
+use crate::node::IsElement;
 use crate::{sim, DataType, Module, BaseNode};
 
 #[test]

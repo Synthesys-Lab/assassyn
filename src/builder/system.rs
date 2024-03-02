@@ -4,7 +4,7 @@ use crate::{
   data::{Array, Typed},
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer},
-  reference::{Element, IsElement, Parented, Visitor, Mutable, Referencable},
+  node::{Element, IsElement, Parented, Visitor, Mutable},
   DataType, IntImm, Module, BaseNode,
 };
 
@@ -65,10 +65,10 @@ macro_rules! create_binary_op_impl {
     pub fn $func_name(
       &mut self,
       ty: Option<DataType>,
-      a: &Reference,
-      b: &Reference,
-      pred: Option<&Reference>,
-    ) -> Reference {
+      a: &BaseNode,
+      b: &BaseNode,
+      pred: Option<&BaseNode>,
+    ) -> BaseNode {
       let res_ty = if let Some(ty) = ty {
         ty
       } else {
@@ -92,7 +92,7 @@ macro_rules! impl_typed_iter {
         .sym_tab
         .iter()
         .filter(|(_, v)| {
-          if let Reference::$ty(_) = v {
+          if let BaseNode::$ty(_) = v {
             true
           } else {
             false

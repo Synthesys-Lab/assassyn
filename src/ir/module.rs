@@ -4,7 +4,7 @@ use crate::{
   builder::system::{InsertPoint, PortInfo, SysBuilder},
   data::Array,
   expr::Opcode,
-  reference::{IsElement, ModuleMut, Parented, BaseNode},
+  node::{IsElement, ModuleMut, Parented, BaseNode},
 };
 
 use super::{block::Block, port::Input};

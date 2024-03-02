@@ -1,4 +1,4 @@
-use crate::{builder::system::SysBuilder, reference::IsElement, DataType, BaseNode};
+use crate::{builder::system::SysBuilder, node::IsElement, DataType, BaseNode};
 
 #[test]
 fn spin_trigger() {
