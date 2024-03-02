@@ -1,11 +1,11 @@
 use super::utils;
-use crate::reference::IsElement;
-use crate::{sim, DataType, Module, Reference};
 use crate::builder::system::{PortInfo, SysBuilder};
+use crate::reference::IsElement;
+use crate::{sim, DataType, Module, BaseNode};
 
 #[test]
 fn trigger() {
-  fn a_plus_b(sys: &mut SysBuilder) -> Reference {
+  fn a_plus_b(sys: &mut SysBuilder) -> BaseNode {
     let int32 = DataType::int(32);
     let module = sys.create_module(
       "a_plus_b",
@@ -24,7 +24,7 @@ fn trigger() {
     module
   }
 
-  fn build_driver(sys: &mut SysBuilder, plus: Reference) {
+  fn build_driver(sys: &mut SysBuilder, plus: BaseNode) {
     let driver_module = sys.get_driver();
     sys.set_current_module(driver_module.upcast());
     let int32 = DataType::int(32);
@@ -72,4 +72,3 @@ fn trigger() {
     .count();
   assert_eq!(times_invoked, 100);
 }
-

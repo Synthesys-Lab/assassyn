@@ -1,11 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  builder::{mutator::Mutable, system::{InsertPoint, PortInfo, SysBuilder}},
+  builder::system::{InsertPoint, PortInfo, SysBuilder},
   data::Array,
   expr::Opcode,
-  reference::{IsElement, Parented, Reference},
-  register_mutator,
+  reference::{IsElement, ModuleMut, Parented, BaseNode},
 };
 
 use super::{block::Block, port::Input};
@@ -14,10 +13,10 @@ use super::{block::Block, port::Input};
 pub struct Module {
   pub(crate) key: usize,
   name: String,
-  inputs: Vec<Reference>,
-  body: Reference,
+  inputs: Vec<BaseNode>,
+  body: BaseNode,
   /// The set of arrays used in the module.
-  array_used: HashMap<Reference, HashSet<Opcode>>,
+  array_used: HashMap<BaseNode, HashSet<Opcode>>,
 }
 
 pub struct Driver {}
@@ -36,12 +35,12 @@ impl Module {
   /// let a = Input::new("a", 32);
   /// Module::new("a_plus_b", vec![a.clone()]);
   /// ```
-  pub fn new(name: &str, inputs: Vec<Reference>) -> Module {
+  pub fn new(name: &str, inputs: Vec<BaseNode>) -> Module {
     Module {
       key: 0,
       name: name.to_string(),
       inputs,
-      body: Reference::Unknown,
+      body: BaseNode::Unknown,
       array_used: HashMap::new(),
     }
   }
@@ -56,7 +55,7 @@ impl Module {
   /// # Arguments
   ///
   /// * `i` - The index of the input.
-  pub fn get_input(&self, i: usize) -> Option<&Reference> {
+  pub fn get_input(&self, i: usize) -> Option<&BaseNode> {
     self.inputs.get(i)
   }
 
@@ -91,18 +90,16 @@ impl Module {
     self.inputs.iter().map(|x| x.as_ref::<Input>(sys).unwrap())
   }
 
-  pub fn iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &Reference> {
+  pub fn iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &BaseNode> {
     self.get_body(sys).unwrap().iter()
   }
 
 }
 
-register_mutator!(ModuleMut, Module);
-
 impl <'a>ModuleMut<'a> {
 
   /// Maintain the redundant information, array used in the module.
-  pub fn insert_array_used(&mut self, array: Reference, opcode: Opcode) {
+  pub fn insert_array_used(&mut self, array: BaseNode, opcode: Opcode) {
     if !self.get().array_used.contains_key(&array) {
       self.get_mut().array_used.insert(array.clone(), HashSet::new());
     }
@@ -120,7 +117,7 @@ impl SysBuilder {
   ///
   /// * `name` - The name of the module.
   /// * `inputs` - The inputs' information to the module. Refer to `PortInfo` for more details.
-  pub fn create_module(&mut self, name: &str, inputs: Vec<PortInfo>) -> Reference {
+  pub fn create_module(&mut self, name: &str, inputs: Vec<PortInfo>) -> BaseNode {
     let ports = inputs
       .into_iter()
       .map(|x| self.insert_element(Input::new(&x.ty, x.name.as_str())))

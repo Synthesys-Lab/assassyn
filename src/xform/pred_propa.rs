@@ -5,21 +5,21 @@ use crate::{
   expr::Expr,
   ir::block::Block,
   reference::IsElement,
-  Reference,
+  BaseNode,
 };
 
-fn analyze_depth(sys: &SysBuilder) -> HashMap<Reference, usize> {
+fn analyze_depth(sys: &SysBuilder) -> HashMap<BaseNode, usize> {
   let mut depth_map = HashMap::new();
   for module in sys.module_iter() {
     fn dfs<'a>(
       sys: &SysBuilder,
-      iter: impl Iterator<Item = &'a Reference>,
+      iter: impl Iterator<Item = &'a BaseNode>,
       depth: usize,
-      depth_map: &mut HashMap<Reference, usize>,
+      depth_map: &mut HashMap<BaseNode, usize>,
     ) {
       for expr in iter {
         depth_map.insert(expr.clone(), depth);
-        if let Reference::Block(_) = expr {
+        if let BaseNode::Block(_) = expr {
           let block_body = expr.as_ref::<Block>(sys).unwrap().iter();
           dfs(sys, block_body, depth + 1, depth_map);
         }
@@ -33,15 +33,15 @@ fn analyze_depth(sys: &SysBuilder) -> HashMap<Reference, usize> {
 fn deepest_operand(
   expr: &Expr,
   sys: &SysBuilder,
-  depth_map: &HashMap<Reference, usize>,
-) -> Option<(usize, Reference)> {
+  depth_map: &HashMap<BaseNode, usize>,
+) -> Option<(usize, BaseNode)> {
   if let Some((depth, parent)) = expr
     .operand_iter()
     .filter(|x| match x {
-      Reference::Expr(_) => true,
+      BaseNode::Expr(_) => true,
       _ => false,
     })
-    .fold(None, |acc: Option<(usize, Reference)>, x| {
+    .fold(None, |acc: Option<(usize, BaseNode)>, x| {
       let new_depth = *depth_map.get(&x).unwrap();
       if let Some((depth, parent)) = acc {
         if new_depth > depth {
@@ -63,18 +63,18 @@ fn deepest_operand(
 
 fn analyze_expr_block<'a>(
   sys: &SysBuilder,
-  iter: impl Iterator<Item = &'a Reference>,
-  depth: &HashMap<Reference, usize>,
-) -> Option<(Reference, Reference)> {
+  iter: impl Iterator<Item = &'a BaseNode>,
+  depth: &HashMap<BaseNode, usize>,
+) -> Option<(BaseNode, BaseNode)> {
   for elem in iter {
     match elem {
-      Reference::Expr(_) => {
+      BaseNode::Expr(_) => {
         let expr = elem.as_ref::<Expr>(sys).unwrap();
         if let Some((_, parent)) = deepest_operand(expr, sys, depth) {
           return Some((expr.upcast(), parent));
         }
       }
-      Reference::Block(_) => {
+      BaseNode::Block(_) => {
         let block = elem.as_ref::<Block>(sys).unwrap();
         if let Some(cond) = block.get_pred() {
           let expr = cond.as_ref::<Expr>(sys).unwrap();
@@ -101,8 +101,8 @@ fn analyze_expr_block<'a>(
 /// is found.
 fn analyze_propagatable(
   sys: &mut SysBuilder,
-  depth: &HashMap<Reference, usize>,
-) -> Option<(Reference, Reference)> {
+  depth: &HashMap<BaseNode, usize>,
+) -> Option<(BaseNode, BaseNode)> {
   for module in sys.module_iter() {
     if let Some(res) = analyze_expr_block(sys, module.iter(sys), depth) {
       return res.into();

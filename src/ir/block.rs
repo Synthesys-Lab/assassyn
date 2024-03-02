@@ -1,21 +1,18 @@
 use crate::{
-  builder::{
-    mutator::Mutable,
-    system::{InsertPoint, SysBuilder},
-  },
-  reference::{IsElement, Parented},
-  register_mutator, Reference,
+  builder::system::{InsertPoint, SysBuilder},
+  reference::{IsElement, Parented, BlockMut},
+  BaseNode,
 };
 
 pub struct Block {
   pub(crate) key: usize,
-  pred: Option<Reference>,
-  body: Vec<Reference>,
-  parent: Reference,
+  pred: Option<BaseNode>,
+  body: Vec<BaseNode>,
+  parent: BaseNode,
 }
 
 impl Block {
-  pub(crate) fn new(pred: Option<Reference>, parent: Reference) -> Block {
+  pub(crate) fn new(pred: Option<BaseNode>, parent: BaseNode) -> Block {
     Block {
       key: 0,
       pred,
@@ -24,7 +21,7 @@ impl Block {
     }
   }
 
-  pub fn get_pred(&self) -> Option<Reference> {
+  pub fn get_pred(&self) -> Option<BaseNode> {
     self.pred.clone()
   }
 
@@ -32,26 +29,24 @@ impl Block {
     self.body.len()
   }
 
-  pub fn get(&self, idx: usize) -> Option<&Reference> {
+  pub fn get(&self, idx: usize) -> Option<&BaseNode> {
     self.body.get(idx)
   }
 
-  pub fn iter<'a>(&'a self) -> impl Iterator<Item = &Reference> {
+  pub fn iter<'a>(&'a self) -> impl Iterator<Item = &BaseNode> {
     self.body.iter()
   }
 }
 
 impl Parented for Block {
-  fn get_parent(&self) -> Reference {
+  fn get_parent(&self) -> BaseNode {
     self.parent.clone()
   }
 
-  fn set_parent(&mut self, parent: Reference) {
+  fn set_parent(&mut self, parent: BaseNode) {
     self.parent = parent;
   }
 }
-
-register_mutator!(BlockMut, Block);
 
 impl BlockMut<'_> {
   /// Insert an expression at the given position of the module.
@@ -66,8 +61,8 @@ impl BlockMut<'_> {
   pub(crate) fn insert_at(
     &mut self,
     at: Option<usize>,
-    expr: Reference,
-  ) -> (Reference, Option<usize>) {
+    expr: BaseNode,
+  ) -> (BaseNode, Option<usize>) {
     let idx = at.unwrap_or_else(|| self.get().get_num_exprs());
     self.get_mut().body.insert(idx, expr);
     (self.get().get(idx).unwrap().clone(), at.map(|x| x + 1))
@@ -78,19 +73,19 @@ impl BlockMut<'_> {
   ///
   /// # Arguments
   /// * `expr` - The expression to insert.
-  pub(crate) fn insert_at_ip(&mut self, expr: Reference) -> Reference {
+  pub(crate) fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
     let InsertPoint(_, _, at) = self.sys.inesert_point;
     let (expr, new_at) = self.insert_at(at.clone(), expr.clone());
     self.sys.inesert_point.2 = new_at;
     expr
   }
 
-  pub(crate) fn push(&mut self, expr: Reference) -> Reference {
+  pub(crate) fn push(&mut self, expr: BaseNode) -> BaseNode {
     self.get_mut().body.push(expr.clone());
     expr
   }
 
-  pub(crate) fn erase(&mut self, expr: &Reference) {
+  pub(crate) fn erase(&mut self, expr: &BaseNode) {
     let idx = self
       .get()
       .body
@@ -103,7 +98,7 @@ impl BlockMut<'_> {
 
 impl SysBuilder {
   /// Create a block.
-  pub fn create_block(&mut self, cond: Option<Reference>) -> Reference {
+  pub fn create_block(&mut self, cond: Option<BaseNode>) -> BaseNode {
     let parent = self.get_current_module().unwrap().upcast();
     let instance = Block::new(cond, parent.clone());
     let block = self.insert_element(instance);

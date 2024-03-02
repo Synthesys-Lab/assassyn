@@ -11,7 +11,7 @@ use crate::{
   ir::block::Block,
   port::Input,
   reference::{IsElement, Visitor},
-  IntImm, Module, Reference,
+  IntImm, Module, BaseNode,
 };
 
 use super::Config;
@@ -64,11 +64,11 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     self.indent += 2;
     for elem in module.get_body(self.sys).unwrap().iter() {
       match elem {
-        Reference::Expr(_) => {
+        BaseNode::Expr(_) => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
           res.push_str(self.visit_expr(expr).as_str());
         }
-        Reference::Block(_) => {
+        BaseNode::Block(_) => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
           res.push_str(self.visit_block(block).as_str());
         }
@@ -179,11 +179,11 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     self.indent += 2;
     for elem in block.iter() {
       match elem {
-        &Reference::Expr(_) => {
+        &BaseNode::Expr(_) => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
           res.push_str(self.visit_expr(expr).as_str());
         }
-        &Reference::Block(_) => {
+        &BaseNode::Block(_) => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
           res.push_str(self.visit_block(block).as_str());
         }

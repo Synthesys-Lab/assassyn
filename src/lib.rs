@@ -6,7 +6,7 @@ pub mod ir;
 pub use ir::expr;
 
 pub use ir::reference;
-pub use ir::reference::Reference;
+pub use ir::reference::BaseNode;
 
 pub use ir::data::DataType;
 pub use ir::data::IntImm;

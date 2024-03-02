@@ -2,6 +2,3 @@
 
 pub mod system;
 
-#[macro_use]
-pub mod mutator;
-

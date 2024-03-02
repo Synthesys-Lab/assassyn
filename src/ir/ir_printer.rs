@@ -4,7 +4,7 @@ use crate::{
   expr::{Expr, Opcode},
   port::Input,
   reference::IsElement,
-  IntImm, Module, Reference,
+  IntImm, Module, BaseNode,
 };
 
 use super::{block::Block, reference::Visitor};
@@ -68,11 +68,11 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
         res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
       }
       match elem {
-        Reference::Expr(_) => {
+        BaseNode::Expr(_) => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
           res.push_str(format!("{}\n", self.visit_expr(expr)).as_str());
         }
-        Reference::Block(_) => {
+        BaseNode::Block(_) => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
           res.push_str(format!("{}\n", self.visit_block(block)).as_str());
         }
@@ -90,7 +90,7 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
     }
     self.indent -= 2;
     res.push_str(" ".repeat(self.indent).as_str());
-    res.push_str("}\n\n");
+    res.push_str("}\n");
     res
   }
 
@@ -124,24 +124,42 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
           )
         }
         Opcode::Trigger => {
-          let mut res = format!(
-            "self.{}(\"{}\", [",
-            mnem,
-            expr.get_operand(0).unwrap().to_string(self.sys)
-          );
+          let mut res = format!("call {}(", expr.get_operand(0).unwrap().to_string(self.sys));
           for op in expr.operand_iter().skip(1) {
             res.push_str(op.to_string(self.sys).as_str());
             res.push_str(", ");
           }
-          res.push_str("])");
+          res.push_str(")");
           res
         }
         Opcode::SpinTrigger => {
-          format!(
-            "{} {}",
-            mnem,
-            expr.get_operand(0).unwrap().to_string(self.sys)
-          )
+          let mut res = String::new();
+          self.indent += 2;
+          res.push_str(
+            format!(
+              "async {{\n{}while !{}[{}] {{ }} // Not move on until this is true\n",
+              " ".repeat(self.indent),
+              expr.get_operand(1).unwrap().to_string(self.sys),
+              expr.get_operand(2).unwrap().to_string(self.sys),
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}call {}(",
+              " ".repeat(self.indent),
+              expr.get_operand(0).unwrap().to_string(self.sys)
+            )
+            .as_str(),
+          );
+          for op in expr.operand_iter().skip(3) {
+            res.push_str(op.to_string(self.sys).as_str());
+            res.push_str(", ");
+          }
+          res.push_str(")\n");
+          self.indent -= 2;
+          res.push_str(format!("{}}}", " ".repeat(self.indent)).as_str());
+          res
         }
         _ => {
           panic!("Unimplemented opcode: {:?}", expr.get_opcode());
@@ -167,14 +185,13 @@ impl<'a> Visitor<'a, String> for IRPrinter<'a> {
     }
     for elem in block.iter() {
       match elem {
-        Reference::Expr(_) => {
+        BaseNode::Expr(_) => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
           res.push_str(format!("{}\n", self.visit_expr(expr)).as_str());
         }
-        Reference::Block(_) => {
+        BaseNode::Block(_) => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res
-            .push_str(format!("{}\n", self.visit_block(block)).as_str());
+          res.push_str(format!("{}\n", self.visit_block(block)).as_str());
         }
         _ => {
           panic!("Not an block-able element: {:?}", elem);

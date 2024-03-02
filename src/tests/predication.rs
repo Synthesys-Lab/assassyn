@@ -20,4 +20,3 @@ fn predication() {
   xform::propagate_predications(&mut sys);
   println!("{}", sys);
 }
-

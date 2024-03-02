@@ -1,8 +1,8 @@
-use crate::{reference::Parented, data::Typed, DataType, Reference};
+use crate::{reference::Parented, data::Typed, DataType, BaseNode};
 
 pub struct Input {
   pub(crate) key: usize,
-  pub(super) parent: Reference,
+  pub(super) parent: BaseNode,
   name: String,
   dtype: DataType,
 }
@@ -11,7 +11,7 @@ impl Input {
   pub fn new(dtype: &DataType, name: &str) -> Self {
     Self {
       key: 0,
-      parent: Reference::Unknown, // Make a placeholder when instantiating.
+      parent: BaseNode::Unknown, // Make a placeholder when instantiating.
       name: name.to_string(),
       dtype: dtype.clone(),
     }
@@ -29,10 +29,10 @@ impl Typed for Input {
 }
 
 impl Parented for Input {
-  fn get_parent(&self) -> Reference {
+  fn get_parent(&self) -> BaseNode {
     self.parent.clone()
   }
-  fn set_parent(&mut self, parent: Reference) {
+  fn set_parent(&mut self, parent: BaseNode) {
     self.parent = parent;
   }
 }
