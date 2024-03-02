@@ -3,8 +3,8 @@ use std::{collections::HashMap, fmt::Display, ops::Add};
 use crate::{
   data::{Array, Typed},
   expr::{Expr, Opcode},
-  ir::{block::Block, ir_printer},
-  node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, Parented, Referencable, Visitor},
+  ir::{block::Block, ir_printer, visitor::Visitor},
+  node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, Parented, Referencable},
   BaseNode, DataType, IntImm, Module,
 };
 

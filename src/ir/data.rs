@@ -20,7 +20,7 @@ impl DataType {
   }
 
   pub fn uint(bits: usize) -> Self {
-   DataType::UInt(bits)
+    DataType::UInt(bits)
   }
 
   pub fn fp32() -> Self {
@@ -68,7 +68,6 @@ impl Typed for IntImm {
 }
 
 impl IntImm {
-
   pub(crate) fn new(dtype: DataType, value: u64) -> Self {
     Self {
       key: 0,
@@ -80,7 +79,6 @@ impl IntImm {
   pub fn get_value(&self) -> u64 {
     self.value
   }
-
 }
 
 pub struct Array {

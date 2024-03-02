@@ -1,6 +1,6 @@
 use crate::{
   builder::system::{InsertPoint, SysBuilder},
-  node::{IsElement, Parented, BlockMut},
+  node::{BlockMut, IsElement, Parented},
   BaseNode,
 };
 

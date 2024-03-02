@@ -6,7 +6,7 @@ use crate::{
   BaseNode,
 };
 
-use super::{block::Block, node::Visitor};
+use super::{block::Block, visitor::Visitor};
 
 pub struct IRPrinter<'a> {
   indent: usize,

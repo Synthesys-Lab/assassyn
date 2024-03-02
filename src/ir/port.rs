@@ -1,4 +1,4 @@
-use crate::{node::Parented, data::Typed, DataType, BaseNode};
+use crate::{data::Typed, node::Parented, BaseNode, DataType};
 
 pub struct Input {
   pub(crate) key: usize,

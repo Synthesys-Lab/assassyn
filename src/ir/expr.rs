@@ -1,6 +1,6 @@
 use crate::{
   data::{DataType, Typed},
-  node::{IsElement, Parented, ExprMut},
+  node::{ExprMut, IsElement, Parented},
 };
 
 use super::{block::Block, node::BaseNode};
@@ -107,7 +107,6 @@ impl Expr {
   pub fn operand_iter(&self) -> impl Iterator<Item = &BaseNode> {
     self.operands.iter()
   }
-
 }
 
 impl Typed for Expr {
@@ -127,7 +126,6 @@ impl Parented for Expr {
 }
 
 impl ExprMut<'_> {
-
   pub fn move_to_new_parent(&mut self, new_parent: BaseNode, at: Option<usize>) {
     let old_parent = self.get().get_parent();
     let expr = self.get().upcast();
@@ -137,5 +135,4 @@ impl ExprMut<'_> {
     new_parent_mut.insert_at(at, expr);
     self.get_mut().set_parent(new_parent)
   }
-
 }

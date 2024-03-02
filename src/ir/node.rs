@@ -3,7 +3,7 @@ use std::ops::Deref;
 use crate::{
   builder::system::SysBuilder,
   data::{Array, IntImm, Typed},
-  ir::ir_printer::IRPrinter,
+  ir::{ir_printer::IRPrinter, visitor::Visitor},
   DataType, Module,
 };
 
@@ -241,7 +241,6 @@ impl BaseNode {
 }
 
 impl BaseNode {
-
   pub fn to_string(&self, sys: &SysBuilder) -> String {
     match self {
       BaseNode::Module(_) => self.as_ref::<Module>(sys).unwrap().get_name().to_string(),
@@ -270,16 +269,6 @@ impl BaseNode {
       }
     }
   }
-
-}
-
-pub trait Visitor<T: Default> {
-  fn visit_module(&mut self, module: &ModuleRef<'_>) -> T;
-  fn visit_input(&mut self, input: &InputRef<'_>) -> T;
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> T;
-  fn visit_array(&mut self, array: &ArrayRef<'_>) -> T;
-  fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> T;
-  fn visit_block(&mut self, block: &BlockRef<'_>) -> T;
 }
 
 pub enum Element {

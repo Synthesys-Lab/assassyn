@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  builder::system::{InsertPoint, PortInfo, SysBuilder}, data::Array, expr::Opcode, node::{ArrayRef, BaseNode, BlockRef, InputRef, IsElement, ModuleMut, ModuleRef, Parented}
+  builder::system::{InsertPoint, PortInfo, SysBuilder},
+  data::Array,
+  expr::Opcode,
+  node::{ArrayRef, BaseNode, BlockRef, InputRef, IsElement, ModuleMut, ModuleRef, Parented},
 };
 
 use super::{block::Block, port::Input};
@@ -70,14 +73,19 @@ impl<'sys> ModuleRef<'sys> {
 
   /// Get the number of expressions in the module.
   pub fn get_body<'elem>(&self) -> BlockRef<'elem>
-    where 'sys: 'elem {
+  where
+    'sys: 'elem,
+  {
     self.body.as_ref::<Block>(self.sys).unwrap()
   }
 
   pub(crate) fn array_iter<'borrow, 'res>(
     &'borrow self,
   ) -> impl Iterator<Item = (ArrayRef<'res>, &HashSet<Opcode>)>
-    where 'sys: 'borrow, 'sys: 'res, {
+  where
+    'sys: 'borrow,
+    'sys: 'res,
+  {
     self
       .array_used
       .iter()
@@ -85,13 +93,16 @@ impl<'sys> ModuleRef<'sys> {
   }
 
   pub fn port_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = InputRef<'res>> + 'res
-    where 'sys: 'borrow, 'sys: 'res, 'borrow: 'res {
+  where
+    'sys: 'borrow,
+    'sys: 'res,
+    'borrow: 'res,
+  {
     self
       .inputs
       .iter()
       .map(|x| x.as_ref::<Input>(self.sys).unwrap())
   }
-
 }
 
 impl<'a> ModuleMut<'a> {

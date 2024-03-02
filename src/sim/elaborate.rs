@@ -8,8 +8,8 @@ use crate::{
   builder::system::SysBuilder,
   data::Typed,
   expr::{Expr, Opcode},
-  ir::block::Block,
-  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef, Visitor},
+  ir::{block::Block, visitor::Visitor},
+  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef},
   BaseNode, Module,
 };
 
