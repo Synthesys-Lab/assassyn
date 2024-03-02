@@ -1,10 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  builder::system::{InsertPoint, PortInfo, SysBuilder},
-  data::Array,
-  expr::Opcode,
-  node::{IsElement, ModuleMut, Parented, BaseNode},
+  builder::system::{InsertPoint, PortInfo, SysBuilder}, data::Array, expr::Opcode, node::{ArrayRef, BaseNode, BlockRef, InputRef, IsElement, ModuleMut, ModuleRef, Parented}
 };
 
 use super::{block::Block, port::Input};
@@ -16,7 +13,7 @@ pub struct Module {
   inputs: Vec<BaseNode>,
   body: BaseNode,
   /// The set of arrays used in the module.
-  array_used: HashMap<BaseNode, HashSet<Opcode>>,
+  pub(crate) array_used: HashMap<BaseNode, HashSet<Opcode>>,
 }
 
 pub struct Driver {}
@@ -44,10 +41,12 @@ impl Module {
       array_used: HashMap::new(),
     }
   }
+}
 
+impl<'sys> ModuleRef<'sys> {
   /// Get the number of inputs to the module.
   pub fn get_num_inputs(&self) -> usize {
-    self.inputs.len()
+    self.get().inputs.len()
   }
 
   /// Get the given input reference.
@@ -64,53 +63,52 @@ impl Module {
     self.name.as_str()
   }
 
-  // TODO(@were): Overengineer a *Ref class for these methods accepts a sys reference.
-
   /// Get the number of expressions in the module.
-  pub fn get_num_exprs(&self, sys: &SysBuilder) -> usize {
-    self.get_body(sys).unwrap().get_num_exprs()
+  pub fn get_num_exprs(&self) -> usize {
+    self.get_body().get_num_exprs()
   }
 
   /// Get the number of expressions in the module.
-  pub fn get_body<'a>(&'a self, sys: &'a SysBuilder) -> Result<&'a Box<Block>, String> {
-    self.body.as_ref::<Block>(sys)
+  pub fn get_body<'elem>(&self) -> BlockRef<'elem>
+    where 'sys: 'elem {
+    self.body.as_ref::<Block>(self.sys).unwrap()
   }
 
-  pub(crate) fn array_iter<'a>(
-    &'a self,
-    sys: &'a SysBuilder,
-  ) -> impl Iterator<Item = (&'a Box<Array>, &'a HashSet<Opcode>)> {
+  pub(crate) fn array_iter<'borrow, 'res>(
+    &'borrow self,
+  ) -> impl Iterator<Item = (ArrayRef<'res>, &HashSet<Opcode>)>
+    where 'sys: 'borrow, 'sys: 'res, {
     self
       .array_used
       .iter()
-      .map(|(k, v)| (k.as_ref::<Array>(sys).unwrap(), v))
+      .map(|(k, v)| (k.as_ref::<Array>(self.sys).unwrap(), v))
   }
 
-  pub fn port_iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &'a Box<Input>> {
-    self.inputs.iter().map(|x| x.as_ref::<Input>(sys).unwrap())
-  }
-
-  pub fn iter<'a>(&'a self, sys: &'a SysBuilder) -> impl Iterator<Item = &BaseNode> {
-    self.get_body(sys).unwrap().iter()
+  pub fn port_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = InputRef<'res>> + 'res
+    where 'sys: 'borrow, 'sys: 'res, 'borrow: 'res {
+    self
+      .inputs
+      .iter()
+      .map(|x| x.as_ref::<Input>(self.sys).unwrap())
   }
 
 }
 
-impl <'a>ModuleMut<'a> {
-
+impl<'a> ModuleMut<'a> {
   /// Maintain the redundant information, array used in the module.
   pub fn insert_array_used(&mut self, array: BaseNode, opcode: Opcode) {
     if !self.get().array_used.contains_key(&array) {
-      self.get_mut().array_used.insert(array.clone(), HashSet::new());
+      self
+        .get_mut()
+        .array_used
+        .insert(array.clone(), HashSet::new());
     }
     let operations = self.get_mut().array_used.get_mut(&array).unwrap();
     operations.insert(opcode);
   }
-
 }
 
 impl SysBuilder {
-
   /// Create a new module, and set it as the current module to be built.
   ///
   /// # Arguments
@@ -125,8 +123,8 @@ impl SysBuilder {
     let module_name = self.identifier(name);
     let module = Module::new(&module_name, ports);
     // Set the parents of the inputs after instantiating the parent module.
-    for i in 0..module.get_num_inputs() {
-      let input = module.get_input(i).unwrap();
+    for i in 0..module.inputs.len() {
+      let input = &module.inputs[i];
       Input::downcast_mut(&mut self.slab, input)
         .unwrap()
         .set_parent(module.upcast());
@@ -139,6 +137,4 @@ impl SysBuilder {
     self.inesert_point = InsertPoint(module.clone(), body, None);
     module
   }
-
 }
-

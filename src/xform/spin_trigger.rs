@@ -31,7 +31,7 @@ fn iter_over_body<'a>(
 
 fn find_spin_trigger(sys: &SysBuilder) -> Option<BaseNode> {
   for module in sys.module_iter() {
-    if let Some(x) = iter_over_body(sys, module.get_body(sys).unwrap().iter()) {
+    if let Some(x) = iter_over_body(sys, module.get_body().iter()) {
       return x.into()
     }
   }

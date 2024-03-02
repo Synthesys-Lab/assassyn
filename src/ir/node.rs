@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::{
   builder::system::SysBuilder,
   data::{Array, IntImm, Typed},
@@ -7,16 +9,16 @@ use crate::{
 
 use super::{block::Block, expr::Expr, port::Input};
 
-pub trait IsElement<'a> {
+pub trait IsElement<'elem, 'sys: 'elem> {
   fn upcast(&self) -> BaseNode;
-  fn set_key(&'a mut self, key: usize);
+  fn set_key(&mut self, key: usize);
   fn get_key(&self) -> usize;
   fn into_reference(key: usize) -> BaseNode;
-  fn downcast(slab: &'a slab::Slab<Element>, key: &BaseNode) -> Result<&'a Box<Self>, String>;
+  fn downcast(slab: &'sys slab::Slab<Element>, key: &BaseNode) -> Result<&'elem Box<Self>, String>;
   fn downcast_mut(
-    slab: &'a mut slab::Slab<Element>,
+    slab: &'sys mut slab::Slab<Element>,
     key: &BaseNode,
-  ) -> Result<&'a mut Box<Self>, String>;
+  ) -> Result<&'elem mut Box<Self>, String>;
 }
 
 pub trait Parented {
@@ -24,19 +26,17 @@ pub trait Parented {
   fn set_parent(&mut self, parent: BaseNode);
 }
 
-pub trait Mutable<'a, T: IsElement<'a>> {
+pub trait Mutable<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys>> {
   type Mutator;
-  fn mutator(sys: &'a mut SysBuilder, elem: BaseNode) -> Self::Mutator;
+  fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Self::Mutator;
 }
 
-pub trait Referencable<'a, T: IsElement<'a>> {
-  type BaseNode;
-  fn reference(sys: &'a SysBuilder, elem: BaseNode) -> Self::BaseNode;
+pub trait Referencable<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys>> {
+  type Reference;
+  fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Self::Reference;
 }
-
 
 macro_rules! register_element {
-
   ($name:ident, $reference: ident, $mutator: ident) => {
     impl Into<Element> for $name {
       fn into(self) -> Element {
@@ -44,8 +44,8 @@ macro_rules! register_element {
       }
     }
 
-    impl<'a> IsElement<'a> for $name {
-      fn set_key(&'a mut self, key: usize) {
+    impl<'elem, 'sys: 'elem> IsElement<'elem, 'sys> for $name {
+      fn set_key(&mut self, key: usize) {
         self.key = key;
       }
 
@@ -62,9 +62,9 @@ macro_rules! register_element {
       }
 
       fn downcast(
-        slab: &'a slab::Slab<Element>,
+        slab: &'sys slab::Slab<Element>,
         key: &BaseNode,
-      ) -> Result<&'a Box<$name>, String> {
+      ) -> Result<&'elem Box<$name>, String> {
         if let BaseNode::$name(key) = key {
           if let Element::$name(res) = &slab[*key] {
             return Ok(res);
@@ -78,9 +78,9 @@ macro_rules! register_element {
       }
 
       fn downcast_mut(
-        slab: &'a mut slab::Slab<Element>,
+        slab: &'sys mut slab::Slab<Element>,
         key: &BaseNode,
-      ) -> Result<&'a mut Box<$name>, String> {
+      ) -> Result<&'elem mut Box<$name>, String> {
         if let BaseNode::$name(key) = key {
           if let Element::$name(res) = &mut slab[*key] {
             return Ok(res);
@@ -99,55 +99,68 @@ macro_rules! register_element {
       pub(crate) elem: BaseNode,
     }
 
-    pub struct $reference<'a> {
-      sys: &'a SysBuilder,
+    pub struct $reference<'sys> {
+      pub(crate) sys: &'sys SysBuilder,
       elem: BaseNode,
     }
 
-    impl <'a> $reference<'a> {
-
-      pub fn get(&self) -> &Box<$name> {
+    impl<'sys> $reference<'sys> {
+      pub fn get<'borrow, 'res>(&'borrow self) -> &'res Box<$name>
+      where
+        'sys: 'borrow,
+        'sys: 'res,
+        'borrow: 'res,
+      {
         <$name>::downcast(&self.sys.slab, &self.elem).unwrap()
       }
-
     }
 
-    impl <'a> $mutator<'a> {
+    impl Deref for $reference<'_> {
+      type Target = Box<$name>;
 
-      pub fn get_mut(&mut self) -> &mut Box<$name> {
+      fn deref(&self) -> &Self::Target {
+        self.get()
+      }
+    }
+
+    impl<'sys> $mutator<'sys> {
+      pub fn get_mut<'borrow>(&'borrow mut self) -> &'borrow mut Box<$name>
+      where
+        'sys: 'borrow,
+      {
         <$name>::downcast_mut(&mut self.sys.slab, &self.elem).unwrap()
       }
 
-      pub fn get(&self) -> &Box<$name> {
+      pub fn get<'borrow>(&'borrow self) -> &'borrow Box<$name>
+      where
+        'sys: 'borrow,
+      {
         <$name>::downcast(&self.sys.slab, &self.elem).unwrap()
       }
-
     }
 
-    impl <'a> Mutable<'a, $name> for $name {
-      type Mutator = $mutator<'a>;
+    impl<'elem, 'sys: 'elem> Mutable<'elem, 'sys, $name> for $name {
+      type Mutator = $mutator<'sys>;
 
-      fn mutator(sys: &'a mut SysBuilder, elem: BaseNode) -> Self::Mutator {
+      fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Self::Mutator {
         if let BaseNode::$name(_) = elem {
           $mutator { sys, elem }
         } else {
           panic!("The reference {:?} is not a {}", elem, stringify!($name));
         }
       }
-
     }
 
-    impl <'a> Referencable<'a, $name> for $name {
-      type BaseNode = $reference<'a>;
+    impl<'elem, 'sys: 'elem> Referencable<'elem, 'sys, $name> for $name {
+      type Reference = $reference<'sys>;
 
-      fn reference(sys: &'a SysBuilder, elem: BaseNode) -> Self::BaseNode {
+      fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Self::Reference {
         if let BaseNode::$name(_) = elem {
           $reference { sys, elem }
         } else {
           panic!("The reference {:?} is not a {}", elem, stringify!($name));
         }
       }
-
     }
   };
 }
@@ -219,13 +232,15 @@ impl BaseNode {
     }
   }
 
-  pub fn as_ref<'a, T: IsElement<'a>>(&self, sys: &'a SysBuilder) -> Result<&'a Box<T>, String> {
-    T::downcast(&sys.slab, self)
+  pub fn as_ref<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Referencable<'elem, 'sys, T>>(
+    &self,
+    sys: &'sys SysBuilder,
+  ) -> Result<T::Reference, String> {
+    Ok(T::reference(sys, self.clone()))
   }
 }
 
 impl BaseNode {
-
   pub fn to_string(&self, sys: &SysBuilder) -> String {
     match self {
       BaseNode::Module(_) => self.as_ref::<Module>(sys).unwrap().get_name().to_string(),
@@ -246,24 +261,23 @@ impl BaseNode {
         panic!("Unknown reference")
       }
       BaseNode::Block(_) => {
-        let expr = self.as_ref::<Block>(sys).unwrap();
-        IRPrinter::new(sys).visit_block(expr)
+        let block = self.as_ref::<Block>(sys).unwrap();
+        IRPrinter::new(sys).visit_block(block)
       }
       BaseNode::Expr(key) => {
         format!("_{}", key)
       }
     }
   }
-
 }
 
-pub trait Visitor<'a, T: Default> {
-  fn visit_module(&mut self, module: &'a Module) -> T;
-  fn visit_input(&mut self, input: &'a Input) -> T;
-  fn visit_expr(&mut self, expr: &'a Expr) -> T;
-  fn visit_array(&mut self, array: &'a Array) -> T;
-  fn visit_int_imm(&mut self, int_imm: &'a IntImm) -> T;
-  fn visit_block(&mut self, block: &'a Block) -> T;
+pub trait Visitor<T: Default> {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> T;
+  fn visit_input(&mut self, input: InputRef<'_>) -> T;
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> T;
+  fn visit_array(&mut self, array: ArrayRef<'_>) -> T;
+  fn visit_int_imm(&mut self, int_imm: IntImmRef<'_>) -> T;
+  fn visit_block(&mut self, block: BlockRef<'_>) -> T;
 }
 
 pub enum Element {
@@ -274,4 +288,3 @@ pub enum Element {
   IntImm(Box<IntImm>),
   Block(Box<Block>),
 }
-

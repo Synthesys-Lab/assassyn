@@ -4,8 +4,8 @@ use crate::{
   data::{Array, Typed},
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer},
-  node::{Element, IsElement, Parented, Visitor, Mutable},
-  DataType, IntImm, Module, BaseNode,
+  node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, Parented, Referencable, Visitor},
+  BaseNode, DataType, IntImm, Module,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -85,9 +85,9 @@ macro_rules! create_binary_op_impl {
 }
 
 macro_rules! impl_typed_iter {
-  ($func_name:ident, $ty: ident) => {
+  ($func_name:ident, $ty: ident, $ty_ref: ident) => {
     /// Iterate over all the modules of the system.
-    pub fn $func_name<'a>(&'a self) -> impl Iterator<Item = &'a Box<$ty>> {
+    pub fn $func_name<'a>(&'a self) -> impl Iterator<Item = $ty_ref<'a>> {
       self
         .sym_tab
         .iter()
@@ -124,17 +124,20 @@ impl SysBuilder {
 
   /// The helper function to get an element of the system and downcast it to its actual
   /// type's immutable reference.
-  pub(crate) fn get<'a, T: IsElement<'a>>(&'a self, key: &BaseNode) -> Result<&'a Box<T>, String> {
-    T::downcast(&self.slab, key)
+  pub(crate) fn get<'elem, 'sys: 'elem, T: IsElement<'sys, 'elem> + Referencable<'sys, 'elem, T>>(
+    &'sys self,
+    key: &BaseNode,
+  ) -> Result<T::Reference, String> {
+    Ok(T::reference(self, key.clone()))
   }
 
-  impl_typed_iter!(module_iter, Module);
-  impl_typed_iter!(array_iter, Array);
+  impl_typed_iter!(module_iter, Module, ModuleRef);
+  impl_typed_iter!(array_iter, Array, ArrayRef);
 
   /// The helper function to get an element of the system and downcast it to its actual type's
   /// mutable reference.
-  pub(crate) fn get_mut<'a, T: IsElement<'a> + Mutable<'a, T>>(
-    &'a mut self,
+  pub(crate) fn get_mut<'elem, 'sys: 'elem, T: IsElement<'sys, 'elem> + Mutable<'sys, 'elem, T>>(
+    &'sys mut self,
     key: &BaseNode,
   ) -> Result<T::Mutator, String> {
     Ok(T::mutator(self, key.clone()))
@@ -142,17 +145,17 @@ impl SysBuilder {
 
   /// Get the driver module. The driver module is special. It is invoked unconditionally every
   /// cycle.
-  pub fn get_driver(&self) -> &Module {
+  pub fn get_driver<'a>(&'a self) -> ModuleRef<'a> {
     self.get_module("driver").unwrap()
   }
 
   /// Get the current module to be built.
-  pub fn get_current_module(&self) -> Result<&Box<Module>, String> {
+  pub fn get_current_module<'a>(&'a self) -> Result<ModuleRef<'a>, String> {
     self.get::<Module>(&self.inesert_point.0)
   }
 
   /// Get the module by its name.
-  pub fn get_module(&self, name: &str) -> Option<&Box<Module>> {
+  pub fn get_module<'a>(&'a self, name: &str) -> Option<ModuleRef<'a>> {
     if let Some(reference) = self.sym_tab.get(name) {
       reference.as_ref::<Module>(self).unwrap().into()
     } else {
@@ -161,7 +164,7 @@ impl SysBuilder {
   }
 
   /// Get the array by its name.
-  pub fn get_array(&self, name: &str) -> Option<&Box<Array>> {
+  pub fn get_array<'a>(&'a self, name: &str) -> Option<ArrayRef<'a>> {
     if let Some(reference) = self.sym_tab.get(name) {
       reference.as_ref::<Array>(self).unwrap().into()
     } else {
@@ -179,8 +182,7 @@ impl SysBuilder {
     let block = self
       .get::<Module>(&module)
       .unwrap()
-      .get_body(self)
-      .unwrap()
+      .get_body()
       .upcast();
     self.inesert_point = InsertPoint(module, block, None);
   }
@@ -217,8 +219,8 @@ impl SysBuilder {
   /// # Arguments
   ///
   /// * `elem` - The element to be inserted. An element can be any component of the system IR.
-  pub(crate) fn insert_element<'a, T: IsElement<'a> + Into<Element> + 'a>(
-    &'a mut self,
+  pub(crate) fn insert_element<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Into<Element> + 'sys>(
+    &'sys mut self,
     elem: T,
   ) -> BaseNode {
     let key = self.slab.insert(elem.into());
@@ -273,10 +275,7 @@ impl SysBuilder {
       let block = self.create_block(cond.into());
       let instance = Expr::new(dtype.clone(), opcode, operands, block.clone());
       let value = self.insert_element(instance);
-      self
-        .get_mut::<Block>(&block)
-        .unwrap()
-        .push(value.clone())
+      self.get_mut::<Block>(&block).unwrap().push(value.clone())
     } else {
       let instance = Expr::new(
         dtype.clone(),
@@ -490,4 +489,3 @@ impl Display for SysBuilder {
     write!(f, "}}")
   }
 }
-

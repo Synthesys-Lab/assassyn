@@ -6,12 +6,11 @@ use std::{
 
 use crate::{
   builder::system::SysBuilder,
-  data::{Array, Typed},
+  data::Typed,
   expr::{Expr, Opcode},
   ir::block::Block,
-  port::Input,
-  node::{IsElement, Visitor},
-  IntImm, Module, BaseNode,
+  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef, Visitor},
+  BaseNode, Module,
 };
 
 use super::Config;
@@ -19,7 +18,7 @@ use super::Config;
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   port_idx: usize,
-  ops: Option<&'a HashSet<Opcode>>,
+  ops: Option<HashSet<Opcode>>,
   indent: usize,
 }
 
@@ -34,8 +33,8 @@ impl<'a> ElaborateModule<'a> {
   }
 }
 
-impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
-  fn visit_module(&mut self, module: &'a Module) -> String {
+impl Visitor<String> for ElaborateModule<'_> {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> String {
     let mut res = String::new();
     res.push_str(format!("// Elaborating module {}\n", module.get_name()).as_str());
     res.push_str(
@@ -45,9 +44,10 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
       )
       .as_str(),
     );
-    for (array, ops) in module.array_iter(self.sys) {
-      self.ops = Some(ops);
+    for (array, ops) in module.array_iter() {
+      self.ops = Some(ops.clone());
       res.push_str(self.visit_array(array).as_str());
+      self.ops = None;
     }
     res.push_str(") {\n");
     res.push_str(
@@ -57,12 +57,12 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
       )
       .as_str(),
     );
-    for (i, arg) in module.port_iter(self.sys).enumerate() {
+    for (i, arg) in module.port_iter().enumerate() {
       self.port_idx = i;
       res.push_str(self.visit_input(arg).as_str());
     }
     self.indent += 2;
-    for elem in module.get_body(self.sys).unwrap().iter() {
+    for elem in module.get_body().iter() {
       match elem {
         BaseNode::Expr(_) => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
@@ -82,7 +82,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     res
   }
 
-  fn visit_input(&mut self, input: &Input) -> String {
+  fn visit_input(&mut self, input: InputRef<'_>) -> String {
     format!(
       "  let {} = (*args.get({}).unwrap()) as {};\n",
       input.get_name(),
@@ -91,7 +91,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     )
   }
 
-  fn visit_expr(&mut self, expr: &Expr) -> String {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> String {
     let res = if expr.get_opcode().is_binary() {
       format!(
         "{} {} {}",
@@ -117,12 +117,12 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
           )
         }
         Opcode::Trigger => {
-          let module_name = expr
+          let module_ref = expr
             .get_operand(0)
             .unwrap()
             .as_ref::<Module>(self.sys)
-            .unwrap()
-            .get_name();
+            .unwrap();
+          let module_name = module_ref.get_name();
           let mut res = format!(
             "q.push(Reverse(Event::Module_{}(stamp + 1, vec![",
             module_name
@@ -150,11 +150,11 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     }
   }
 
-  fn visit_array(&mut self, array: &Array) -> String {
+  fn visit_array(&mut self, array: ArrayRef<'_>) -> String {
     format!(
       ", {}: &{}Vec<{}>",
       array.get_name(),
-      if self.ops.unwrap().contains(&Opcode::Store) {
+      if self.ops.is_some() && self.ops.as_ref().unwrap().contains(&Opcode::Store) {
         "mut "
       } else {
         ""
@@ -163,7 +163,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     )
   }
 
-  fn visit_int_imm(&mut self, int_imm: &IntImm) -> String {
+  fn visit_int_imm(&mut self, int_imm: IntImmRef<'_>) -> String {
     format!(
       "({} as {})",
       int_imm.get_value(),
@@ -171,7 +171,7 @@ impl<'a> Visitor<'a, String> for ElaborateModule<'a> {
     )
   }
 
-  fn visit_block(&mut self, block: &'a Block) -> String {
+  fn visit_block(&mut self, block: BlockRef<'_>) -> String {
     let mut res = String::new();
     if let Some(cond) = block.get_pred() {
       res.push_str(format!("if {} {{\n", cond.to_string(self.sys)).as_str());
@@ -310,7 +310,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )
       .as_bytes(),
     )?;
-    for (array, ops) in module.array_iter(sys) {
+    for (array, ops) in module.array_iter() {
       fd.write(
         format!(
           ", &{}{}",

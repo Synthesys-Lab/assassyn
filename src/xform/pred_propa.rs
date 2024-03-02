@@ -4,7 +4,7 @@ use crate::{
   builder::system::SysBuilder,
   expr::Expr,
   ir::block::Block,
-  node::IsElement,
+  node::{ExprRef, IsElement},
   BaseNode,
 };
 
@@ -20,18 +20,19 @@ fn analyze_depth(sys: &SysBuilder) -> HashMap<BaseNode, usize> {
       for expr in iter {
         depth_map.insert(expr.clone(), depth);
         if let BaseNode::Block(_) = expr {
-          let block_body = expr.as_ref::<Block>(sys).unwrap().iter();
-          dfs(sys, block_body, depth + 1, depth_map);
+          let block = expr.as_ref::<Block>(sys).unwrap();
+          let body_iter = block.iter();
+          dfs(sys, body_iter, depth + 1, depth_map);
         }
       }
     }
-    dfs(sys, module.get_body(sys).unwrap().iter(), 0, &mut depth_map);
+    dfs(sys, module.get_body().iter(), 0, &mut depth_map);
   }
   depth_map
 }
 
-fn deepest_operand(
-  expr: &Expr,
+fn deepest_operand<'a>(
+  expr: &ExprRef<'a>,
   sys: &SysBuilder,
   depth_map: &HashMap<BaseNode, usize>,
 ) -> Option<(usize, BaseNode)> {
@@ -70,7 +71,7 @@ fn analyze_expr_block<'a>(
     match elem {
       BaseNode::Expr(_) => {
         let expr = elem.as_ref::<Expr>(sys).unwrap();
-        if let Some((_, parent)) = deepest_operand(expr, sys, depth) {
+        if let Some((_, parent)) = deepest_operand(&expr, sys, depth) {
           return Some((expr.upcast(), parent));
         }
       }
@@ -78,7 +79,7 @@ fn analyze_expr_block<'a>(
         let block = elem.as_ref::<Block>(sys).unwrap();
         if let Some(cond) = block.get_pred() {
           let expr = cond.as_ref::<Expr>(sys).unwrap();
-          if let Some((_, parent)) = deepest_operand(expr, sys, depth) {
+          if let Some((_, parent)) = deepest_operand(&expr, sys, depth) {
             return Some((elem.clone(), parent));
           }
         }
@@ -104,7 +105,7 @@ fn analyze_propagatable(
   depth: &HashMap<BaseNode, usize>,
 ) -> Option<(BaseNode, BaseNode)> {
   for module in sys.module_iter() {
-    if let Some(res) = analyze_expr_block(sys, module.iter(sys), depth) {
+    if let Some(res) = analyze_expr_block(sys, module.get_body().iter(), depth) {
       return res.into();
     }
   }
@@ -134,6 +135,9 @@ pub fn propagate_predications(sys: &mut SysBuilder) {
     let depth = analyze_depth(sys);
     analyze_propagatable(sys, &depth)
   } {
-    sys.get_mut::<Expr>(&src).unwrap().move_to_new_parent(dst, None);
+    sys
+      .get_mut::<Expr>(&src)
+      .unwrap()
+      .move_to_new_parent(dst, None);
   }
 }
