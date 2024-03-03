@@ -1,13 +1,13 @@
 use crate::{data::Typed, node::{NodeKind, Parented}, BaseNode, DataType};
 
-pub struct Input {
+pub struct FIFO {
   pub(crate) key: usize,
   pub(super) parent: BaseNode,
   name: String,
   dtype: DataType,
 }
 
-impl Input {
+impl FIFO {
   pub fn new(dtype: &DataType, name: &str) -> Self {
     Self {
       key: 0,
@@ -20,15 +20,19 @@ impl Input {
   pub fn get_name(&self) -> &String {
     &self.name
   }
-}
 
-impl Typed for Input {
-  fn dtype(&self) -> &DataType {
-    &self.dtype
+  pub fn scalar_ty(&self) -> DataType {
+    self.dtype.clone()
   }
 }
 
-impl Parented for Input {
+impl Typed for FIFO {
+  fn dtype(&self) -> DataType {
+    DataType::void()
+  }
+}
+
+impl Parented for FIFO {
   fn get_parent(&self) -> BaseNode {
     self.parent.clone()
   }

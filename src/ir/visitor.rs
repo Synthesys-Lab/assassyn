@@ -2,8 +2,8 @@ use crate::{
   builder::system::SysBuilder,
   data::Array,
   expr::Expr,
-  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, ModuleRef, NodeKind},
-  port::Input,
+  node::{ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, ModuleRef, NodeKind},
+  port::FIFO,
   BaseNode, IntImm, Module,
 };
 
@@ -18,7 +18,7 @@ pub trait Visitor<T> {
     None
   }
 
-  fn visit_input(&mut self, _: &InputRef<'_>) -> Option<T> {
+  fn visit_input(&mut self, _: &FIFORef<'_>) -> Option<T> {
     None
   }
 
@@ -27,7 +27,7 @@ pub trait Visitor<T> {
       if let Some(x) = self.dispatch(
         expr.sys,
         elem,
-        vec![NodeKind::Module, NodeKind::Array, NodeKind::Input],
+        vec![NodeKind::Module, NodeKind::Array, NodeKind::FIFO],
       ) {
         return x.into();
       }
@@ -69,7 +69,7 @@ pub trait Visitor<T> {
       NodeKind::Expr => self.visit_expr(&node.as_ref::<Expr>(sys).unwrap()),
       NodeKind::Block => self.visit_block(&node.as_ref::<Block>(sys).unwrap()),
       NodeKind::Module => self.visit_module(&node.as_ref::<Module>(sys).unwrap()),
-      NodeKind::Input => self.visit_input(&node.as_ref::<Input>(sys).unwrap()),
+      NodeKind::FIFO => self.visit_input(&node.as_ref::<FIFO>(sys).unwrap()),
       NodeKind::Array => self.visit_array(&node.as_ref::<Array>(sys).unwrap()),
       NodeKind::IntImm => self.visit_int_imm(&node.as_ref::<IntImm>(sys).unwrap()),
       NodeKind::Unknown => {

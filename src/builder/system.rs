@@ -1,11 +1,7 @@
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use crate::{
-  data::{Array, Typed},
-  expr::{Expr, Opcode},
-  ir::{block::Block, ir_printer, visitor::Visitor},
-  node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable},
-  BaseNode, DataType, IntImm, Module,
+  data::Array, expr::{Expr, Opcode}, ir::{block::Block, ir_printer, visitor::Visitor}, node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable}, port::FIFO, BaseNode, DataType, IntImm, Module
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -60,8 +56,8 @@ impl PortInfo {
 /// * `b` - The second operand.
 /// * `pred` - The condition of executing this expression. If the condition is not `None`, this
 /// is always executed.
-macro_rules! create_binary_op_impl {
-  ($func_name:ident, $opcode: expr) => {
+macro_rules! create_arith_op_impl {
+  (binary, $func_name:ident, $opcode: expr) => {
     pub fn $func_name(
       &mut self,
       ty: Option<DataType>,
@@ -80,6 +76,13 @@ macro_rules! create_binary_op_impl {
         vec![a.clone(), b.clone()],
         pred.map(|x| x.clone()),
       )
+    }
+  };
+
+  (unary, $func_name:ident, $opcode: expr) => {
+    pub fn $func_name(&mut self, x: &BaseNode, pred: Option<&BaseNode>) -> BaseNode {
+      let res_ty = x.get_dtype(self).unwrap();
+      self.create_expr(res_ty, $opcode, vec![x.clone()], pred.map(|x| x.clone()))
     }
   };
 }
@@ -124,7 +127,11 @@ impl SysBuilder {
 
   /// The helper function to get an element of the system and downcast it to its actual
   /// type's immutable reference.
-  pub(crate) fn get<'elem, 'sys: 'elem, T: IsElement<'sys, 'elem> + Referencable<'sys, 'elem, T>>(
+  pub(crate) fn get<
+    'elem,
+    'sys: 'elem,
+    T: IsElement<'sys, 'elem> + Referencable<'sys, 'elem, T>,
+  >(
     &'sys self,
     key: &BaseNode,
   ) -> Result<T::Reference, String> {
@@ -179,11 +186,7 @@ impl SysBuilder {
   ///
   /// * `module` - The reference of the module to be set as the current module.
   pub fn set_current_module(&mut self, module: BaseNode) {
-    let block = self
-      .get::<Module>(&module)
-      .unwrap()
-      .get_body()
-      .upcast();
+    let block = self.get::<Module>(&module).unwrap().get_body().upcast();
     self.inesert_point = InsertPoint(module, block, None);
   }
 
@@ -195,15 +198,30 @@ impl SysBuilder {
   /// should be a part of the current module to be built. Ohterwise, an assertion failure will be
   /// raised.
   pub fn set_insert_before(&mut self, expr: BaseNode) {
-    let (block, module, at) = {
+    let (module, block, at) = {
       let block_ref = {
         let expr = expr.as_ref::<Expr>(self).unwrap();
         expr.get_parent()
       };
-      let block = self.get::<Block>(&block_ref).unwrap();
-      let module = block.get_parent();
-      let at = block.iter().position(|x| *x == expr);
-      (block_ref, module, at)
+      let at = block_ref
+        .as_ref::<Block>(self)
+        .unwrap()
+        .iter()
+        .position(|x| *x == expr);
+      let module = {
+        // TODO(@were): Make this a method function.
+        let mut runner = block_ref.clone();
+        while runner.get_kind() != NodeKind::Module {
+          let parent: BaseNode = match runner.get_kind() {
+            NodeKind::Expr => runner.as_ref::<Expr>(self).unwrap().get_parent(),
+            NodeKind::Block => runner.as_ref::<Block>(self).unwrap().get_parent(),
+            _ => panic!("Invalid parent type"),
+          };
+          runner = parent;
+        }
+        runner
+      };
+      (module, block_ref, at)
     };
     self.inesert_point = InsertPoint(module, block, at);
   }
@@ -219,7 +237,11 @@ impl SysBuilder {
   /// # Arguments
   ///
   /// * `elem` - The element to be inserted. An element can be any component of the system IR.
-  pub(crate) fn insert_element<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Into<Element> + 'sys>(
+  pub(crate) fn insert_element<
+    'elem,
+    'sys: 'elem,
+    T: IsElement<'elem, 'sys> + Into<Element> + 'sys,
+  >(
     &'sys mut self,
     elem: T,
   ) -> BaseNode {
@@ -304,10 +326,10 @@ impl SysBuilder {
     &mut self,
     dst: &BaseNode,
     mut data: Vec<BaseNode>,
-    cond: Option<BaseNode>,
+    pred: Option<BaseNode>,
   ) {
     data.insert(0, dst.clone());
-    self.create_expr(DataType::void(), Opcode::Trigger, data, cond);
+    self.create_expr(DataType::void(), Opcode::Trigger, data, pred);
   }
 
   /// Create a spin trigger. A spin trigger repeats to test the condition
@@ -339,16 +361,19 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::SpinTrigger, data, pred);
   }
 
-  create_binary_op_impl!(create_add, Opcode::Add);
-  create_binary_op_impl!(create_sub, Opcode::Sub);
-  create_binary_op_impl!(create_bitwise_and, Opcode::BitwiseAnd);
-  create_binary_op_impl!(create_bitwise_or, Opcode::BitwiseOr);
-  create_binary_op_impl!(create_bitwise_xor, Opcode::BitwiseXor);
-  create_binary_op_impl!(create_mul, Opcode::Mul);
-  create_binary_op_impl!(create_igt, Opcode::IGT);
-  create_binary_op_impl!(create_ige, Opcode::IGE);
-  create_binary_op_impl!(create_ilt, Opcode::ILT);
-  create_binary_op_impl!(create_ile, Opcode::ILE);
+  create_arith_op_impl!(binary, create_add, Opcode::Add);
+  create_arith_op_impl!(binary, create_sub, Opcode::Sub);
+  create_arith_op_impl!(binary, create_bitwise_and, Opcode::BitwiseAnd);
+  create_arith_op_impl!(binary, create_bitwise_or, Opcode::BitwiseOr);
+  create_arith_op_impl!(binary, create_bitwise_xor, Opcode::BitwiseXor);
+  create_arith_op_impl!(binary, create_mul, Opcode::Mul);
+  create_arith_op_impl!(binary, create_igt, Opcode::IGT);
+  create_arith_op_impl!(binary, create_ige, Opcode::IGE);
+  create_arith_op_impl!(binary, create_ilt, Opcode::ILT);
+  create_arith_op_impl!(binary, create_ile, Opcode::ILE);
+
+  create_arith_op_impl!(unary, create_neg, Opcode::Neg);
+  create_arith_op_impl!(unary, create_flip, Opcode::Flip);
 
   /// Create a register array associated to this system.
   /// An array can be a register, or memory.
@@ -379,7 +404,7 @@ impl SysBuilder {
     cond: Option<BaseNode>,
   ) -> BaseNode {
     let operands = vec![array.clone(), index.clone()];
-    let dtype = self.get::<Array>(&array).unwrap().dtype().clone();
+    let dtype = self.get::<Array>(&array).unwrap().scalar_ty().clone();
     let res = self.create_expr(dtype, Opcode::Load, operands, cond);
     let cur_mod = self.inesert_point.0.clone();
     self
@@ -446,6 +471,34 @@ impl SysBuilder {
       Opcode::IGT | Opcode::IGE | Opcode::ILT | Opcode::ILE => DataType::uint(1),
       _ => panic!("Unsupported opcode {:?}", op),
     }
+  }
+
+  /// Create a FIFO pop operation.
+  ///
+  /// # Arguments
+  /// * `fifo` - The FIFO to be popped.
+  /// * `num_elems` - The number of elements to be popped. If None is given, the number of elements
+  /// is one.
+  /// * `cond` - The condition of popping the FIFO. If None is given, the pop is unconditional.
+  pub fn create_fifo_pop(
+    &mut self,
+    fifo: &BaseNode,
+    num_elems: Option<BaseNode>,
+    cond: Option<BaseNode>,
+  ) -> BaseNode {
+    let num_elems = if let Some(num_elems) = num_elems {
+      num_elems
+    } else {
+      self.get_const_int(&DataType::uint(32), 1)
+    };
+    let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
+    let res = self.create_expr(
+      ty,
+      Opcode::FIFOPop,
+      vec![fifo.clone(), num_elems],
+      cond,
+    );
+    res
   }
 
   /// The helper function to generate a unique identifier.

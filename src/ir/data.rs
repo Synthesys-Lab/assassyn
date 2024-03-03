@@ -7,7 +7,7 @@ pub enum DataType {
 }
 
 pub trait Typed {
-  fn dtype(&self) -> &DataType;
+  fn dtype(&self) -> DataType;
 }
 
 impl DataType {
@@ -62,8 +62,8 @@ pub struct IntImm {
 }
 
 impl Typed for IntImm {
-  fn dtype(&self) -> &DataType {
-    &self.dtype
+  fn dtype(&self) -> DataType {
+    self.dtype.clone()
   }
 }
 
@@ -89,8 +89,8 @@ pub struct Array {
 }
 
 impl Typed for Array {
-  fn dtype(&self) -> &DataType {
-    &self.scalar_ty
+  fn dtype(&self) -> DataType {
+    DataType::void()
   }
 }
 
@@ -110,5 +110,9 @@ impl Array {
 
   pub fn get_name(&self) -> &str {
     self.name.as_str()
+  }
+
+  pub fn scalar_ty(&self) -> DataType {
+    self.scalar_ty.clone()
   }
 }

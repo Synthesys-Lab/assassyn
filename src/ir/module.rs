@@ -4,10 +4,10 @@ use crate::{
   builder::system::{InsertPoint, PortInfo, SysBuilder},
   data::Array,
   expr::Opcode,
-  node::{ArrayRef, BaseNode, BlockRef, InputRef, IsElement, ModuleMut, ModuleRef, NodeKind, Parented},
+  node::{ArrayRef, BaseNode, BlockRef, FIFORef, IsElement, ModuleMut, ModuleRef, NodeKind, Parented},
 };
 
-use super::{block::Block, port::Input};
+use super::{block::Block, port::FIFO};
 
 /// The data structure for a module.
 pub struct Module {
@@ -32,7 +32,7 @@ impl Module {
   /// # Example
   ///
   /// ```
-  /// let a = Input::new("a", 32);
+  /// let a = FIFO::new("a", 32);
   /// Module::new("a_plus_b", vec![a.clone()]);
   /// ```
   pub fn new(name: &str, inputs: Vec<BaseNode>) -> Module {
@@ -62,7 +62,7 @@ impl<'sys> ModuleRef<'sys> {
   }
 
   /// Get the name of the module.
-  pub fn get_name(&self) -> &str {
+  pub fn get_name<'res, 'elem: 'res>(&'elem self) -> &'res str {
     self.name.as_str()
   }
 
@@ -92,7 +92,7 @@ impl<'sys> ModuleRef<'sys> {
       .map(|(k, v)| (k.as_ref::<Array>(self.sys).unwrap(), v))
   }
 
-  pub fn port_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = InputRef<'res>> + 'res
+  pub fn port_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = FIFORef<'res>> + 'res
   where
     'sys: 'borrow,
     'sys: 'res,
@@ -101,7 +101,7 @@ impl<'sys> ModuleRef<'sys> {
     self
       .inputs
       .iter()
-      .map(|x| x.as_ref::<Input>(self.sys).unwrap())
+      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
 }
 
@@ -129,14 +129,14 @@ impl SysBuilder {
   pub fn create_module(&mut self, name: &str, inputs: Vec<PortInfo>) -> BaseNode {
     let ports = inputs
       .into_iter()
-      .map(|x| self.insert_element(Input::new(&x.ty, x.name.as_str())))
+      .map(|x| self.insert_element(FIFO::new(&x.ty, x.name.as_str())))
       .collect::<Vec<_>>();
     let module_name = self.identifier(name);
     let module = Module::new(&module_name, ports);
     // Set the parents of the inputs after instantiating the parent module.
     for i in 0..module.inputs.len() {
       let input = &module.inputs[i];
-      Input::downcast_mut(&mut self.slab, input)
+      FIFO::downcast_mut(&mut self.slab, input)
         .unwrap()
         .set_parent(module.upcast());
     }

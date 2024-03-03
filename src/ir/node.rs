@@ -7,7 +7,7 @@ use crate::{
   DataType, Module,
 };
 
-use super::{block::Block, expr::Expr, port::Input};
+use super::{block::Block, expr::Expr, port::FIFO};
 
 pub trait IsElement<'elem, 'sys: 'elem> {
   fn upcast(&self) -> BaseNode;
@@ -168,7 +168,7 @@ macro_rules! register_element {
 }
 
 register_element!(Module, ModuleRef, ModuleMut);
-register_element!(Input, InputRef, InputMut);
+register_element!(FIFO, FIFORef, FIFOMut);
 register_element!(Expr, ExprRef, ExprMut);
 register_element!(Array, ArrayRef, ArrayMut);
 register_element!(IntImm, IntImmRef, IntImmMut);
@@ -177,7 +177,7 @@ register_element!(Block, BlockRef, BlockMut);
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeKind {
   Module,
-  Input,
+  FIFO,
   Expr,
   Array,
   IntImm,
@@ -215,8 +215,8 @@ impl BaseNode {
         let int_imm = self.as_ref::<IntImm>(sys).unwrap();
         int_imm.dtype().clone().into()
       }
-      NodeKind::Input => {
-        let input = self.as_ref::<Input>(sys).unwrap();
+      NodeKind::FIFO => {
+        let input = self.as_ref::<FIFO>(sys).unwrap();
         input.dtype().clone().into()
       }
       NodeKind::Expr => {
@@ -235,7 +235,7 @@ impl BaseNode {
       NodeKind::Module => None,
       NodeKind::Array => None,
       NodeKind::IntImm => None,
-      NodeKind::Input => self.as_ref::<Input>(sys).unwrap().get_parent().into(),
+      NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
       NodeKind::Unknown => {
@@ -244,7 +244,7 @@ impl BaseNode {
     }
   }
 
-  pub fn as_ref<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Referencable<'elem, 'sys, T>>(
+  pub fn as_ref<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Referencable<'elem, 'sys, T>> (
     &self,
     sys: &'sys SysBuilder,
   ) -> Result<T::Reference, String> {
@@ -268,7 +268,7 @@ impl BaseNode {
           int_imm.dtype().to_string()
         )
       }
-      NodeKind::Input => self.as_ref::<Input>(sys).unwrap().get_name().to_string(),
+      NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_name().to_string(),
       NodeKind::Unknown => {
         panic!("Unknown reference")
       }
@@ -285,7 +285,7 @@ impl BaseNode {
 
 pub enum Element {
   Module(Box<Module>),
-  Input(Box<Input>),
+  FIFO(Box<FIFO>),
   Expr(Box<Expr>),
   Array(Box<Array>),
   IntImm(Box<IntImm>),

@@ -8,8 +8,11 @@ use crate::{
   builder::system::SysBuilder,
   data::Typed,
   expr::{Expr, Opcode},
-  ir::{block::Block, visitor::Visitor},
-  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef, NodeKind}, Module,
+  ir::{block::Block, port::FIFO, visitor::Visitor},
+  node::{
+    ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, IsElement, ModuleRef, NodeKind, Parented,
+  },
+  Module,
 };
 
 use super::Config;
@@ -81,13 +84,14 @@ impl Visitor<String> for ElaborateModule<'_> {
     res.into()
   }
 
-  fn visit_input(&mut self, input: &InputRef<'_>) -> Option<String> {
+  fn visit_input(&mut self, input: &FIFORef<'_>) -> Option<String> {
     format!(
       "  let {} = (*args.get({}).unwrap()) as {};\n",
       input.get_name(),
       self.port_idx,
       input.dtype().to_string()
-    ).into()
+    )
+    .into()
   }
 
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
@@ -97,6 +101,12 @@ impl Visitor<String> for ElaborateModule<'_> {
         expr.get_operand(0).unwrap().to_string(self.sys),
         expr.get_opcode().to_string(),
         expr.get_operand(1).unwrap().to_string(self.sys)
+      )
+    } else if expr.get_opcode().is_unary() {
+      format!(
+        "{}{}",
+        expr.get_opcode().to_string(),
+        expr.get_operand(0).unwrap().to_string(self.sys)
       )
     } else {
       match expr.get_opcode() {
@@ -132,7 +142,40 @@ impl Visitor<String> for ElaborateModule<'_> {
           res.push_str("])))");
           res
         }
+        Opcode::FIFOPop => {
+          // TODO(@were): Support multiple pop.
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          let module_name = fifo
+            .get_parent()
+            .as_ref::<Module>(self.sys)
+            .unwrap()
+            .get_name()
+            .to_string();
+          let fifo_name = fifo.get_name();
+          format!("{}_{}.pop().unwrap()", module_name, fifo_name)
+        }
+        Opcode::FIFOPush => {
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          let value = expr.get_operand(1).unwrap().to_string(self.sys);
+          let module_name = fifo
+            .get_parent()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap()
+            .get_name()
+            .clone();
+          let fifo_name = fifo.get_name();
+          format!("{}_{}.push({})", module_name, fifo_name, value)
+        }
         _ => {
+          assert!(expr.get_opcode().is_unary() || expr.get_opcode().is_binary());
           format!("// TODO: opcode: {}\n", expr.get_opcode().to_string())
         }
       }
@@ -146,7 +189,8 @@ impl Visitor<String> for ElaborateModule<'_> {
         expr.get_key(),
         res
       )
-    }.into()
+    }
+    .into()
   }
 
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
@@ -159,7 +203,8 @@ impl Visitor<String> for ElaborateModule<'_> {
         ""
       },
       array.dtype().to_string()
-    ).into()
+    )
+    .into()
   }
 
   fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> Option<String> {
@@ -167,7 +212,8 @@ impl Visitor<String> for ElaborateModule<'_> {
       "({} as {})",
       int_imm.get_value(),
       int_imm.dtype().to_string()
-    ).into()
+    )
+    .into()
   }
 
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {

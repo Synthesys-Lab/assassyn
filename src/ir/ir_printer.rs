@@ -2,7 +2,10 @@ use crate::{
   builder::system::{InsertPoint, SysBuilder},
   data::Typed,
   expr::{Expr, Opcode},
-  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef, NodeKind},
+  node::{
+    ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, IsElement, ModuleRef, NodeKind, Parented,
+  },
+  port::FIFO, Module,
 };
 
 use super::{block::Block, visitor::Visitor};
@@ -27,8 +30,8 @@ impl IRPrinter<'_> {
 }
 
 impl Visitor<String> for IRPrinter<'_> {
-  fn visit_input(&mut self, input: &InputRef<'_>) -> Option<String> {
-    format!("{}: {}, ", input.get_name(), input.dtype().to_string()).into()
+  fn visit_input(&mut self, input: &FIFORef<'_>) -> Option<String> {
+    format!("{}: fifo<{}>, ", input.get_name(), input.scalar_ty().to_string()).into()
   }
 
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
@@ -105,6 +108,13 @@ impl Visitor<String> for IRPrinter<'_> {
         mnem,
         expr.get_operand(1).unwrap().to_string(self.sys)
       )
+    } else if expr.get_opcode().is_unary() {
+      format!(
+        "_{} = {} {}",
+        expr.get_key(),
+        mnem,
+        expr.get_operand(0).unwrap().to_string(self.sys)
+      )
     } else {
       match expr.get_opcode() {
         Opcode::Load => {
@@ -161,6 +171,37 @@ impl Visitor<String> for IRPrinter<'_> {
           self.indent -= 2;
           res.push_str(format!("{}}}", " ".repeat(self.indent)).as_str());
           res
+        }
+        Opcode::FIFOPop => {
+          // TODO(@were): Support multiple pop.
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          let module_name = {
+            let parent = fifo.get_parent();
+            let module = parent.as_ref::<Module>(self.sys).unwrap();
+            module.get_name().to_string()
+          };
+          let fifo_name = fifo.get_name();
+          format!("_{} = {}.{}.pop()", expr.get_key(), module_name, fifo_name)
+        }
+        Opcode::FIFOPush => {
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          let value = expr.get_operand(1).unwrap().to_string(self.sys);
+          let module_name = fifo
+            .get_parent()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap()
+            .get_name()
+            .clone();
+          let fifo_name = fifo.get_name();
+          format!("{}.{}.push({})", module_name, fifo_name, value)
         }
         _ => {
           panic!("Unimplemented opcode: {:?}", expr.get_opcode());

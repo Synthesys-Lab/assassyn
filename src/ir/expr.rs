@@ -23,7 +23,12 @@ pub enum Opcode {
   IGE,
   ILE,
   EQ,
+  // Unary operations
+  Neg,
+  Flip,
   // Eventual operations
+  FIFOPush,
+  FIFOPop,
   Trigger,
   SpinTrigger,
 }
@@ -44,6 +49,12 @@ impl Opcode {
       _ => false,
     }
   }
+  pub fn is_unary(&self) -> bool {
+    match self {
+      Opcode::Neg | Opcode::Flip => true,
+      _ => false,
+    }
+  }
 }
 
 impl ToString for Opcode {
@@ -60,10 +71,14 @@ impl ToString for Opcode {
       Opcode::IGE => ">=".into(),
       Opcode::ILE => "<=".into(),
       Opcode::EQ => "==".into(),
+      Opcode::Neg => "-".into(),
+      Opcode::Flip => "!".into(),
       Opcode::Load => "load".into(),
       Opcode::Store => "store".into(),
       Opcode::Trigger => "trigger".into(),
       Opcode::SpinTrigger => "wait_until".into(),
+      Opcode::FIFOPush => "push".into(),
+      Opcode::FIFOPop => "pop".into(),
     }
   }
 }
@@ -110,8 +125,8 @@ impl Expr {
 }
 
 impl Typed for Expr {
-  fn dtype(&self) -> &DataType {
-    &self.dtype
+  fn dtype(&self) -> DataType {
+    self.dtype.clone()
   }
 }
 
@@ -126,6 +141,7 @@ impl Parented for Expr {
 }
 
 impl ExprMut<'_> {
+
   pub fn move_to_new_parent(&mut self, new_parent: BaseNode, at: Option<usize>) {
     let old_parent = self.get().get_parent();
     let expr = self.get().upcast();
@@ -134,5 +150,13 @@ impl ExprMut<'_> {
     let mut new_parent_mut = self.sys.get_mut::<Block>(&new_parent).unwrap();
     new_parent_mut.insert_at(at, expr);
     self.get_mut().set_parent(new_parent)
+  }
+
+  /// Erase the expression from its parent block
+  pub fn erase_from_parent(&mut self) {
+    let parent = self.get().get_parent();
+    let expr = self.get().upcast();
+    let mut block_mut = self.sys.get_mut::<Block>(&parent).unwrap();
+    block_mut.erase(&expr);
   }
 }
