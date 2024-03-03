@@ -1,7 +1,12 @@
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use crate::{
-  data::Array, expr::{Expr, Opcode}, ir::{block::Block, ir_printer, visitor::Visitor}, node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable}, port::FIFO, BaseNode, DataType, IntImm, Module
+  data::Array,
+  expr::{Expr, Opcode},
+  ir::{block::Block, ir_printer, visitor::Visitor},
+  node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable},
+  port::FIFO,
+  BaseNode, DataType, IntImm, Module,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -492,12 +497,7 @@ impl SysBuilder {
       self.get_const_int(&DataType::uint(32), 1)
     };
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-    let res = self.create_expr(
-      ty,
-      Opcode::FIFOPop,
-      vec![fifo.clone(), num_elems],
-      cond,
-    );
+    let res = self.create_expr(ty, Opcode::FIFOPop, vec![fifo.clone(), num_elems], cond);
     res
   }
 

@@ -4,7 +4,7 @@ use crate::{
   builder::system::{InsertPoint, PortInfo, SysBuilder},
   data::Array,
   expr::Opcode,
-  node::{ArrayRef, BaseNode, BlockRef, FIFORef, IsElement, ModuleMut, ModuleRef, NodeKind, Parented},
+  node::{ArrayRef, BaseNode, BlockRef, FIFORef, ModuleMut, ModuleRef, NodeKind, Parented},
 };
 
 use super::{block::Block, port::FIFO};
@@ -127,20 +127,22 @@ impl SysBuilder {
   /// * `name` - The name of the module.
   /// * `inputs` - The inputs' information to the module. Refer to `PortInfo` for more details.
   pub fn create_module(&mut self, name: &str, inputs: Vec<PortInfo>) -> BaseNode {
+    let n_inputs = inputs.len();
     let ports = inputs
       .into_iter()
       .map(|x| self.insert_element(FIFO::new(&x.ty, x.name.as_str())))
       .collect::<Vec<_>>();
     let module_name = self.identifier(name);
     let module = Module::new(&module_name, ports);
-    // Set the parents of the inputs after instantiating the parent module.
-    for i in 0..module.inputs.len() {
-      let input = &module.inputs[i];
-      FIFO::downcast_mut(&mut self.slab, input)
-        .unwrap()
-        .set_parent(module.upcast());
-    }
     let module = self.insert_element(module);
+    // Set the parents of the inputs after instantiating the parent module.
+    for i in 0..n_inputs {
+      let input = module.as_ref::<Module>(self).unwrap().get_input(i).unwrap().clone();
+      self.get_mut::<FIFO>(&input)
+        .unwrap()
+        .get_mut()
+        .set_parent(module.clone());
+    }
     self.sym_tab.insert(module_name, module.clone());
     let body = Block::new(None, module.clone());
     let body = self.insert_element(body);

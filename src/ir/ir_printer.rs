@@ -36,10 +36,10 @@ impl Visitor<String> for IRPrinter<'_> {
 
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     format!(
-      "Array: {} {}[{}]",
-      array.dtype().to_string(),
+      "Array: {}[{} x {}]",
       array.get_name(),
-      array.get_size()
+      array.get_size(),
+      array.scalar_ty().to_string(),
     )
     .into()
   }
