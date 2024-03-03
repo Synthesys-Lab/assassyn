@@ -1,4 +1,4 @@
-use crate::{builder::system::SysBuilder, node::IsElement, DataType, BaseNode};
+use crate::{builder::system::SysBuilder, node::IsElement, xform, BaseNode, DataType};
 
 #[test]
 fn spin_trigger() {
@@ -24,6 +24,7 @@ fn spin_trigger() {
   let mut sys = SysBuilder::new("main");
   let empty_module = empty(&mut sys);
   driver(&mut sys, empty_module);
-
+  println!("{}", sys);
+  xform::rewrite_spin_triggers(&mut sys);
   println!("{}", sys);
 }

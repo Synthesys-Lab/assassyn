@@ -9,8 +9,7 @@ use crate::{
   data::Typed,
   expr::{Expr, Opcode},
   ir::{block::Block, visitor::Visitor},
-  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef},
-  BaseNode, Module,
+  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef, NodeKind}, Module,
 };
 
 use super::Config;
@@ -34,7 +33,7 @@ impl<'a> ElaborateModule<'a> {
 }
 
 impl Visitor<String> for ElaborateModule<'_> {
-  fn visit_module(&mut self, module: &ModuleRef<'_>) -> String {
+  fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
     let mut res = String::new();
     res.push_str(format!("// Elaborating module {}\n", module.get_name()).as_str());
     res.push_str(
@@ -46,7 +45,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     );
     for (array, ops) in module.array_iter() {
       self.ops = Some(ops.clone());
-      res.push_str(self.visit_array(&array).as_str());
+      res.push_str(self.visit_array(&array).unwrap().as_str());
       self.ops = None;
     }
     res.push_str(") {\n");
@@ -59,18 +58,18 @@ impl Visitor<String> for ElaborateModule<'_> {
     );
     for (i, arg) in module.port_iter().enumerate() {
       self.port_idx = i;
-      res.push_str(self.visit_input(&arg).as_str());
+      res.push_str(self.visit_input(&arg).unwrap().as_str());
     }
     self.indent += 2;
     for elem in module.get_body().iter() {
-      match elem {
-        BaseNode::Expr(_) => {
+      match elem.get_kind() {
+        NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(&expr).as_str());
+          res.push_str(self.visit_expr(&expr).unwrap().as_str());
         }
-        BaseNode::Block(_) => {
+        NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(&block).as_str());
+          res.push_str(self.visit_block(&block).unwrap().as_str());
         }
         _ => {
           panic!("Unexpected reference type: {:?}", elem);
@@ -79,19 +78,19 @@ impl Visitor<String> for ElaborateModule<'_> {
     }
     self.indent -= 2;
     res.push_str("}\n");
-    res
+    res.into()
   }
 
-  fn visit_input(&mut self, input: &InputRef<'_>) -> String {
+  fn visit_input(&mut self, input: &InputRef<'_>) -> Option<String> {
     format!(
       "  let {} = (*args.get({}).unwrap()) as {};\n",
       input.get_name(),
       self.port_idx,
       input.dtype().to_string()
-    )
+    ).into()
   }
 
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> String {
+  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
     let res = if expr.get_opcode().is_binary() {
       format!(
         "{} {} {}",
@@ -147,10 +146,10 @@ impl Visitor<String> for ElaborateModule<'_> {
         expr.get_key(),
         res
       )
-    }
+    }.into()
   }
 
-  fn visit_array(&mut self, array: &ArrayRef<'_>) -> String {
+  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     format!(
       ", {}: &{}Vec<{}>",
       array.get_name(),
@@ -160,32 +159,32 @@ impl Visitor<String> for ElaborateModule<'_> {
         ""
       },
       array.dtype().to_string()
-    )
+    ).into()
   }
 
-  fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> String {
+  fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> Option<String> {
     format!(
       "({} as {})",
       int_imm.get_value(),
       int_imm.dtype().to_string()
-    )
+    ).into()
   }
 
-  fn visit_block(&mut self, block: &BlockRef<'_>) -> String {
+  fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
     if let Some(cond) = block.get_pred() {
       res.push_str(format!("if {} {{\n", cond.to_string(self.sys)).as_str());
     }
     self.indent += 2;
     for elem in block.iter() {
-      match elem {
-        &BaseNode::Expr(_) => {
+      match elem.get_kind() {
+        NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(&expr).as_str());
+          res.push_str(self.visit_expr(&expr).unwrap().as_str());
         }
-        &BaseNode::Block(_) => {
+        NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(&block).as_str());
+          res.push_str(self.visit_block(&block).unwrap().as_str());
         }
         _ => {
           panic!("Unexpected reference type: {:?}", elem);
@@ -196,7 +195,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     if block.get_pred().is_some() {
       res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
     }
-    res
+    res.into()
   }
 }
 
@@ -351,7 +350,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
 fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
   let mut em = ElaborateModule::new(sys);
   for module in em.sys.module_iter() {
-    fd.write(em.visit_module(&module).as_bytes())?;
+    fd.write(em.visit_module(&module).unwrap().as_bytes())?;
   }
   Ok(())
 }

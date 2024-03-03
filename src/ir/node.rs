@@ -54,42 +54,44 @@ macro_rules! register_element {
       }
 
       fn upcast(&self) -> BaseNode {
-        BaseNode::$name(self.key)
+        BaseNode::new(NodeKind::$name, self.key)
       }
 
       fn into_reference(key: usize) -> BaseNode {
-        BaseNode::$name(key)
+        BaseNode::new(NodeKind::$name, key)
       }
 
       fn downcast(
         slab: &'sys slab::Slab<Element>,
-        key: &BaseNode,
+        node: &BaseNode,
       ) -> Result<&'elem Box<$name>, String> {
-        if let BaseNode::$name(key) = key {
-          if let Element::$name(res) = &slab[*key] {
+        if let NodeKind::$name = node.get_kind() {
+          if let Element::$name(res) = &slab[node.get_key()] {
             return Ok(res);
           }
         }
         Err(format!(
-          "IsElement::downcast: expecting {}, {:?}",
+          "IsElement::downcast: expecting {}, {:?}({})",
           stringify!($name),
-          key
+          node.get_kind(),
+          node.get_key()
         ))
       }
 
       fn downcast_mut(
         slab: &'sys mut slab::Slab<Element>,
-        key: &BaseNode,
+        node: &BaseNode,
       ) -> Result<&'elem mut Box<$name>, String> {
-        if let BaseNode::$name(key) = key {
-          if let Element::$name(res) = &mut slab[*key] {
+        if let NodeKind::$name = node.get_kind() {
+          if let Element::$name(res) = &mut slab[node.get_key()] {
             return Ok(res);
           }
         }
         Err(format!(
-          "IsElement::downcast: expecting {}, {:?}",
+          "IsElement::downcast: expecting {}, {:?}({})",
           stringify!($name),
-          key
+          node.get_kind(),
+          node.get_key()
         ))
       }
     }
@@ -143,7 +145,7 @@ macro_rules! register_element {
       type Mutator = $mutator<'sys>;
 
       fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Self::Mutator {
-        if let BaseNode::$name(_) = elem {
+        if let NodeKind::$name = elem.get_kind() {
           $mutator { sys, elem }
         } else {
           panic!("The reference {:?} is not a {}", elem, stringify!($name));
@@ -155,7 +157,7 @@ macro_rules! register_element {
       type Reference = $reference<'sys>;
 
       fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Self::Reference {
-        if let BaseNode::$name(_) = elem {
+        if let NodeKind::$name = elem.get_kind() {
           $reference { sys, elem }
         } else {
           panic!("The reference {:?} is not a {}", elem, stringify!($name));
@@ -173,60 +175,70 @@ register_element!(IntImm, IntImmRef, IntImmMut);
 register_element!(Block, BlockRef, BlockMut);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum BaseNode {
-  Module(usize),
-  Input(usize),
-  Expr(usize),
-  Array(usize),
-  IntImm(usize),
-  Block(usize),
+pub enum NodeKind {
+  Module,
+  Input,
+  Expr,
+  Array,
+  IntImm,
+  Block,
   Unknown,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct BaseNode {
+  kind: NodeKind,
+  key: usize,
+}
+
 impl BaseNode {
+  pub fn new(kind: NodeKind, key: usize) -> Self {
+    Self { kind, key }
+  }
+
+  pub fn unknown() -> Self {
+    Self::new(NodeKind::Unknown, 0)
+  }
+
   pub fn get_key(&self) -> usize {
-    match self {
-      BaseNode::Module(key)
-      | BaseNode::Input(key)
-      | BaseNode::Expr(key)
-      | BaseNode::Array(key)
-      | BaseNode::Block(key)
-      | BaseNode::IntImm(key) => *key,
-      BaseNode::Unknown => unreachable!("Unknown reference"),
-    }
+    self.key
+  }
+
+  pub fn get_kind(&self) -> NodeKind {
+    self.kind.clone()
   }
 
   pub fn get_dtype(&self, sys: &SysBuilder) -> Option<DataType> {
-    match self {
-      BaseNode::Module(_) | BaseNode::Array(_) => None,
-      BaseNode::IntImm(_) => {
+    match self.kind {
+      NodeKind::Module | NodeKind::Array => None,
+      NodeKind::IntImm => {
         let int_imm = self.as_ref::<IntImm>(sys).unwrap();
         int_imm.dtype().clone().into()
       }
-      BaseNode::Input(_) => {
+      NodeKind::Input => {
         let input = self.as_ref::<Input>(sys).unwrap();
         input.dtype().clone().into()
       }
-      BaseNode::Expr(_) => {
+      NodeKind::Expr => {
         let expr = self.as_ref::<Expr>(sys).unwrap();
         expr.dtype().clone().into()
       }
-      BaseNode::Block(_) => None,
-      BaseNode::Unknown => {
+      NodeKind::Block => None,
+      NodeKind::Unknown => {
         panic!("Unknown reference")
       }
     }
   }
 
   pub fn get_parent(&self, sys: &SysBuilder) -> Option<BaseNode> {
-    match self {
-      BaseNode::Module(_) => None,
-      BaseNode::Array(_) => None,
-      BaseNode::IntImm(_) => None,
-      BaseNode::Input(_) => self.as_ref::<Input>(sys).unwrap().get_parent().into(),
-      BaseNode::Block(_) => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
-      BaseNode::Expr(_) => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
-      BaseNode::Unknown => {
+    match self.get_kind() {
+      NodeKind::Module => None,
+      NodeKind::Array => None,
+      NodeKind::IntImm => None,
+      NodeKind::Input => self.as_ref::<Input>(sys).unwrap().get_parent().into(),
+      NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
+      NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
+      NodeKind::Unknown => {
         panic!("Unknown reference")
       }
     }
@@ -242,13 +254,13 @@ impl BaseNode {
 
 impl BaseNode {
   pub fn to_string(&self, sys: &SysBuilder) -> String {
-    match self {
-      BaseNode::Module(_) => self.as_ref::<Module>(sys).unwrap().get_name().to_string(),
-      BaseNode::Array(_) => {
+    match self.get_kind() {
+      NodeKind::Module => self.as_ref::<Module>(sys).unwrap().get_name().to_string(),
+      NodeKind::Array => {
         let array = self.as_ref::<Array>(sys).unwrap();
         format!("{}", array.get_name())
       }
-      BaseNode::IntImm(_) => {
+      NodeKind::IntImm => {
         let int_imm = self.as_ref::<IntImm>(sys).unwrap();
         format!(
           "({} as {})",
@@ -256,16 +268,16 @@ impl BaseNode {
           int_imm.dtype().to_string()
         )
       }
-      BaseNode::Input(_) => self.as_ref::<Input>(sys).unwrap().get_name().to_string(),
-      BaseNode::Unknown => {
+      NodeKind::Input => self.as_ref::<Input>(sys).unwrap().get_name().to_string(),
+      NodeKind::Unknown => {
         panic!("Unknown reference")
       }
-      BaseNode::Block(_) => {
+      NodeKind::Block => {
         let block = self.as_ref::<Block>(sys).unwrap();
-        IRPrinter::new(sys).visit_block(&block)
+        IRPrinter::new(sys).visit_block(&block).unwrap()
       }
-      BaseNode::Expr(key) => {
-        format!("_{}", key)
+      NodeKind::Expr => {
+        format!("_{}", self.get_key())
       }
     }
   }

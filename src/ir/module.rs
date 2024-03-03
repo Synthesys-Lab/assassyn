@@ -4,7 +4,7 @@ use crate::{
   builder::system::{InsertPoint, PortInfo, SysBuilder},
   data::Array,
   expr::Opcode,
-  node::{ArrayRef, BaseNode, BlockRef, InputRef, IsElement, ModuleMut, ModuleRef, Parented},
+  node::{ArrayRef, BaseNode, BlockRef, InputRef, IsElement, ModuleMut, ModuleRef, NodeKind, Parented},
 };
 
 use super::{block::Block, port::Input};
@@ -40,7 +40,7 @@ impl Module {
       key: 0,
       name: name.to_string(),
       inputs,
-      body: BaseNode::Unknown,
+      body: BaseNode::new(NodeKind::Unknown, 0),
       array_used: HashMap::new(),
     }
   }

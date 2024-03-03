@@ -1,4 +1,4 @@
-use crate::{data::Typed, node::Parented, BaseNode, DataType};
+use crate::{data::Typed, node::{NodeKind, Parented}, BaseNode, DataType};
 
 pub struct Input {
   pub(crate) key: usize,
@@ -11,7 +11,7 @@ impl Input {
   pub fn new(dtype: &DataType, name: &str) -> Self {
     Self {
       key: 0,
-      parent: BaseNode::Unknown, // Make a placeholder when instantiating.
+      parent: BaseNode::new(NodeKind::Unknown, 0), // Make a placeholder when instantiating.
       name: name.to_string(),
       dtype: dtype.clone(),
     }

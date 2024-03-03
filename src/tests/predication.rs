@@ -6,7 +6,7 @@ fn predication() {
   let int32 = DataType::int(32);
   let a = sys.create_array(&int32, "a", 1);
   let odd = sys.create_array(&int32, "odd", 1);
-  let even = sys.create_array(&int32, "even", 1);
+  /*let even = */sys.create_array(&int32, "even", 1);
   let zero = sys.get_const_int(&int32, 0);
   let a0 = sys.create_array_read(&a, &zero, None);
   let one = sys.get_const_int(&int32, 1);

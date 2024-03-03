@@ -4,7 +4,7 @@ use crate::{
   data::{Array, Typed},
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer, visitor::Visitor},
-  node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, Parented, Referencable},
+  node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable},
   BaseNode, DataType, IntImm, Module,
 };
 
@@ -92,7 +92,7 @@ macro_rules! impl_typed_iter {
         .sym_tab
         .iter()
         .filter(|(_, v)| {
-          if let BaseNode::$ty(_) = v {
+          if let NodeKind::$ty = v.get_kind() {
             true
           } else {
             false
@@ -114,7 +114,7 @@ impl SysBuilder {
       sym_tab: HashMap::new(),
       slab: slab::Slab::new(),
       const_cache: HashMap::new(),
-      inesert_point: InsertPoint(BaseNode::Unknown, BaseNode::Unknown, None),
+      inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
       unique_ids: HashMap::new(),
     };
     // TODO(@were): Make driver a self-triggered module. DO NOT use a "while true" loop.
@@ -267,10 +267,7 @@ impl SysBuilder {
     operands: Vec<BaseNode>,
     cond: Option<BaseNode>,
   ) -> BaseNode {
-    match self.inesert_point.0 {
-      BaseNode::Unknown => panic!("No current module is set"),
-      _ => {}
-    }
+    self.get_current_module().unwrap();
     if let Some(cond) = cond {
       let block = self.create_block(cond.into());
       let instance = Expr::new(dtype.clone(), opcode, operands, block.clone());
@@ -479,11 +476,11 @@ impl Display for SysBuilder {
     let mut printer = ir_printer::IRPrinter::new(self);
     write!(f, "system {} {{\n", self.name)?;
     for elem in self.array_iter() {
-      write!(f, "\n  {};\n", printer.visit_array(&elem))?;
+      write!(f, "  {};\n", printer.visit_array(&elem).unwrap())?;
     }
     printer.inc_indent();
     for elem in self.module_iter() {
-      write!(f, "\n{}\n", printer.visit_module(&elem))?;
+      write!(f, "\n{}", printer.visit_module(&elem).unwrap())?;
     }
     printer.dec_indent();
     write!(f, "}}")

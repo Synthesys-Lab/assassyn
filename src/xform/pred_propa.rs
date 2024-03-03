@@ -4,7 +4,7 @@ use crate::{
   builder::system::SysBuilder,
   expr::Expr,
   ir::block::Block,
-  node::{ExprRef, IsElement},
+  node::{ExprRef, IsElement, NodeKind},
   BaseNode,
 };
 
@@ -19,7 +19,7 @@ fn analyze_depth(sys: &SysBuilder) -> HashMap<BaseNode, usize> {
     ) {
       for expr in iter {
         depth_map.insert(expr.clone(), depth);
-        if let BaseNode::Block(_) = expr {
+        if let NodeKind::Block = expr.get_kind() {
           let block = expr.as_ref::<Block>(sys).unwrap();
           let body_iter = block.iter();
           dfs(sys, body_iter, depth + 1, depth_map);
@@ -38,8 +38,8 @@ fn deepest_operand<'a>(
 ) -> Option<(usize, BaseNode)> {
   if let Some((depth, parent)) = expr
     .operand_iter()
-    .filter(|x| match x {
-      BaseNode::Expr(_) => true,
+    .filter(|x| match x.get_kind() {
+      NodeKind::Expr => true,
       _ => false,
     })
     .fold(None, |acc: Option<(usize, BaseNode)>, x| {
@@ -68,14 +68,14 @@ fn analyze_expr_block<'a>(
   depth: &HashMap<BaseNode, usize>,
 ) -> Option<(BaseNode, BaseNode)> {
   for elem in iter {
-    match elem {
-      BaseNode::Expr(_) => {
+    match elem.get_kind() {
+      NodeKind::Expr => {
         let expr = elem.as_ref::<Expr>(sys).unwrap();
         if let Some((_, parent)) = deepest_operand(&expr, sys, depth) {
           return Some((expr.upcast(), parent));
         }
       }
-      BaseNode::Block(_) => {
+      NodeKind::Block => {
         let block = elem.as_ref::<Block>(sys).unwrap();
         if let Some(cond) = block.get_pred() {
           let expr = cond.as_ref::<Expr>(sys).unwrap();

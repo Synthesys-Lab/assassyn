@@ -2,8 +2,7 @@ use crate::{
   builder::system::{InsertPoint, SysBuilder},
   data::Typed,
   expr::{Expr, Opcode},
-  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef},
-  BaseNode,
+  node::{ArrayRef, BlockRef, ExprRef, InputRef, IntImmRef, IsElement, ModuleRef, NodeKind},
 };
 
 use super::{block::Block, visitor::Visitor};
@@ -28,33 +27,35 @@ impl IRPrinter<'_> {
 }
 
 impl Visitor<String> for IRPrinter<'_> {
-  fn visit_input(&mut self, input: &InputRef<'_>) -> String {
-    format!("{}: {}, ", input.get_name(), input.dtype().to_string())
+  fn visit_input(&mut self, input: &InputRef<'_>) -> Option<String> {
+    format!("{}: {}, ", input.get_name(), input.dtype().to_string()).into()
   }
 
-  fn visit_array(&mut self, array: &ArrayRef<'_>) -> String {
+  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     format!(
       "Array: {} {}[{}]",
       array.dtype().to_string(),
       array.get_name(),
       array.get_size()
     )
+    .into()
   }
 
-  fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> String {
+  fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> Option<String> {
     format!(
       "({} as {})",
       int_imm.get_value(),
       int_imm.dtype().to_string()
     )
+    .into()
   }
 
-  fn visit_module(&mut self, module: &ModuleRef<'_>) -> String {
+  fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
     let mut res = String::new();
     res.push_str(format!("{}module {}(", " ".repeat(self.indent), module.get_name()).as_str());
     module.get();
     for elem in module.port_iter() {
-      res.push_str(self.visit_input(&elem).as_str());
+      res.push_str(self.visit_input(&elem).unwrap().as_str());
     }
     res.push_str(") {\n");
     self.indent += 2;
@@ -67,14 +68,14 @@ impl Visitor<String> for IRPrinter<'_> {
       if cur_mod == module.upcast() && at.unwrap_or_else(|| module.get_num_exprs()) == i {
         res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
       }
-      match elem {
-        BaseNode::Expr(_) => {
+      match elem.get_kind() {
+        NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(format!("{}\n", self.visit_expr(&expr)).as_str());
+          res.push_str(format!("{}\n", self.visit_expr(&expr).unwrap()).as_str());
         }
-        BaseNode::Block(_) => {
+        NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(format!("{}\n", self.visit_block(&block)).as_str());
+          res.push_str(format!("{}\n", self.visit_block(&block).unwrap()).as_str());
         }
         _ => {
           panic!("Not an block-able element: {:?}", elem);
@@ -91,10 +92,10 @@ impl Visitor<String> for IRPrinter<'_> {
     self.indent -= 2;
     res.push_str(" ".repeat(self.indent).as_str());
     res.push_str("}\n");
-    res
+    res.into()
   }
 
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> String {
+  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
     let mnem = expr.get_opcode().to_string();
     let res = if expr.get_opcode().is_binary() {
       format!(
@@ -166,9 +167,9 @@ impl Visitor<String> for IRPrinter<'_> {
         }
       }
     };
-    format!("{}{}", " ".repeat(self.indent), res)
+    format!("{}{}", " ".repeat(self.indent), res).into()
   }
-  fn visit_block(&mut self, block: &BlockRef<'_>) -> String {
+  fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
     if let Some(cond) = block.get_pred() {
       res.push_str(
@@ -184,14 +185,14 @@ impl Visitor<String> for IRPrinter<'_> {
       res.push_str(format!("{}\n", block.get_key()).as_str());
     }
     for elem in block.iter() {
-      match elem {
-        BaseNode::Expr(_) => {
+      match elem.get_kind() {
+        NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(format!("{}\n", self.visit_expr(&expr)).as_str());
+          res.push_str(format!("{}\n", self.visit_expr(&expr).unwrap()).as_str());
         }
-        BaseNode::Block(_) => {
+        NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(format!("{}\n", self.visit_block(&block)).as_str());
+          res.push_str(format!("{}\n", self.visit_block(&block).unwrap()).as_str());
         }
         _ => {
           panic!("Not an block-able element: {:?}", elem);
@@ -202,6 +203,6 @@ impl Visitor<String> for IRPrinter<'_> {
       self.dec_indent();
       res.push_str(format!("{}}}", " ".repeat(self.indent)).as_str());
     }
-    res
+    res.into()
   }
 }
