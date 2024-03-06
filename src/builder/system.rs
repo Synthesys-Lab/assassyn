@@ -330,11 +330,15 @@ impl SysBuilder {
   pub fn create_trigger(
     &mut self,
     dst: &BaseNode,
-    mut data: Vec<BaseNode>,
+    data: Vec<BaseNode>,
     pred: Option<BaseNode>,
   ) {
-    data.insert(0, dst.clone());
-    self.create_expr(DataType::void(), Opcode::Trigger, data, pred);
+    let dst = dst.as_ref::<Module>(self).unwrap();
+    let ports = dst.port_iter().map(|x| x.upcast()).collect::<Vec<_>>();
+    for (port, arg) in ports.iter().zip(data.iter()) {
+      self.create_fifo_push(&port, arg.clone(), None);
+    }
+    self.create_expr(DataType::void(), Opcode::Trigger, vec![], pred);
   }
 
   /// Create a spin trigger. A spin trigger repeats to test the condition
@@ -394,6 +398,16 @@ impl SysBuilder {
     let key = self.insert_element(instance);
     self.sym_tab.insert(array_name, key.clone());
     key
+  }
+
+  pub fn create_fifo_push(
+    &mut self,
+    fifo: &BaseNode,
+    value: BaseNode,
+    cond: Option<BaseNode>,
+  ) -> BaseNode {
+    let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![fifo.clone(), value], cond);
+    res
   }
 
   /// Create a read operation on an array.
