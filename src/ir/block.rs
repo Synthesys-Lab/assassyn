@@ -33,7 +33,7 @@ impl Block {
     self.body.get(idx)
   }
 
-  pub fn iter<'a>(&'a self) -> impl Iterator<Item = &BaseNode> {
+  pub fn iter<'a>(&'a self) -> impl Iterator<Item = &BaseNode> + 'a {
     self.body.iter()
   }
 }
