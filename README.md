@@ -8,7 +8,6 @@ language, and verfication.
 
 **Users**: The frontend of this language is embedded in RUST, so just simply add this project to
 your `Cargo.toml`, and use it!
-
 TODO: Add a project uses this project as a submodule to demonstrate the usage.
 
 **Developers**: All the test cases are located in `src/tests`, you can use the command below to
@@ -33,3 +32,4 @@ Refer [our design doc](./designs/design-doc.md) for more details.
 
 ## A Demonstrative Example
 
+TODO: Make a demonstrative example here.

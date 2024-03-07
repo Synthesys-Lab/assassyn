@@ -194,12 +194,11 @@ impl Visitor<String> for IRPrinter<'_> {
             .as_ref::<FIFO>(self.sys)
             .unwrap();
           let value = expr.get_operand(1).unwrap().to_string(self.sys);
-          let module_name = fifo
-            .get_parent()
-            .as_ref::<FIFO>(self.sys)
-            .unwrap()
-            .get_name()
-            .clone();
+          let module_name = {
+            let module = fifo.get_parent();
+            let module = module.as_ref::<Module>(self.sys).unwrap();
+            module.get_name().to_string()
+          };
           let fifo_name = fifo.get_name();
           format!("{}.{}.push({})", module_name, fifo_name, value)
         }

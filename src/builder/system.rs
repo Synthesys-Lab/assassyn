@@ -333,12 +333,27 @@ impl SysBuilder {
     data: Vec<BaseNode>,
     pred: Option<BaseNode>,
   ) {
-    let dst = dst.as_ref::<Module>(self).unwrap();
-    let ports = dst.port_iter().map(|x| x.upcast()).collect::<Vec<_>>();
+    let dst_module = dst.as_ref::<Module>(self).unwrap();
+    let ports = dst_module.port_iter().map(|x| x.upcast()).collect::<Vec<_>>();
+
+    let restore_ip = if let Some(pred) = pred {
+      let restore_ip = self.get_insert_point();
+      let new_block = self.create_block(pred.into());
+      self.inesert_point.1 = new_block;
+      self.inesert_point.2 = None;
+      Some(restore_ip)
+    } else {
+      None
+    };
+
     for (port, arg) in ports.iter().zip(data.iter()) {
       self.create_fifo_push(&port, arg.clone(), None);
     }
-    self.create_expr(DataType::void(), Opcode::Trigger, vec![], pred);
+    self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()], None);
+
+    if let Some(restore_ip) = restore_ip {
+      self.inesert_point = restore_ip;
+    }
   }
 
   /// Create a spin trigger. A spin trigger repeats to test the condition
