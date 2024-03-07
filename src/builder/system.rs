@@ -327,14 +327,13 @@ impl SysBuilder {
   /// * `data` - The data to be sent to the destination module.
   /// * `cond` - The condition of triggering the destination. If None is given, the trigger is
   /// unconditional.
-  pub fn create_trigger(
-    &mut self,
-    dst: &BaseNode,
-    data: Vec<BaseNode>,
-    pred: Option<BaseNode>,
-  ) {
+  pub fn create_trigger(&mut self, dst: &BaseNode, data: Vec<BaseNode>, pred: Option<BaseNode>) {
+    let current_module = self.get_current_module().unwrap().upcast();
     let dst_module = dst.as_ref::<Module>(self).unwrap();
-    let ports = dst_module.port_iter().map(|x| x.upcast()).collect::<Vec<_>>();
+    let ports = dst_module
+      .port_iter()
+      .map(|x| x.upcast())
+      .collect::<Vec<_>>();
 
     let restore_ip = if let Some(pred) = pred {
       let restore_ip = self.get_insert_point();
@@ -348,6 +347,10 @@ impl SysBuilder {
 
     for (port, arg) in ports.iter().zip(data.iter()) {
       self.create_fifo_push(&port, arg.clone(), None);
+      self
+        .get_mut::<Module>(&current_module)
+        .unwrap()
+        .insert_external_interface(port.clone(), Opcode::FIFOPush);
     }
     self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()], None);
 
@@ -421,7 +424,12 @@ impl SysBuilder {
     value: BaseNode,
     cond: Option<BaseNode>,
   ) -> BaseNode {
-    let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![fifo.clone(), value], cond);
+    let res = self.create_expr(
+      DataType::void(),
+      Opcode::FIFOPush,
+      vec![fifo.clone(), value],
+      cond,
+    );
     res
   }
 
@@ -444,7 +452,7 @@ impl SysBuilder {
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
-      .insert_array_used(array.clone(), Opcode::Load);
+      .insert_external_interface(array.clone(), Opcode::Load);
     res
   }
 
@@ -468,7 +476,7 @@ impl SysBuilder {
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
-      .insert_array_used(array.clone(), Opcode::Store);
+      .insert_external_interface(array.clone(), Opcode::Store);
     res
   }
 

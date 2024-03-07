@@ -9,7 +9,9 @@ use crate::{
   data::Typed,
   expr::{Expr, Opcode},
   ir::{block::Block, port::FIFO, visitor::Visitor},
-  node::{BlockRef, ExprRef, IntImmRef, IsElement, ModuleRef, NodeKind, Parented},
+  node::{
+    ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, IsElement, ModuleRef, NodeKind, Parented,
+  },
   Module,
 };
 
@@ -17,17 +19,60 @@ use super::Config;
 
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
-  ops: Option<HashSet<Opcode>>,
   indent: usize,
 }
 
 impl<'a> ElaborateModule<'a> {
   fn new(sys: &'a SysBuilder) -> Self {
-    Self {
-      sys,
-      ops: None,
-      indent: 0,
-    }
+    Self { sys, indent: 0 }
+  }
+}
+
+struct InterfDecl<'a>(String, &'a HashSet<Opcode>);
+
+impl<'a> Visitor<String> for InterfDecl<'a> {
+  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
+    format!(
+      "  {}: &{}Vec<{}>,\n",
+      array.get_name(),
+      if self.1.contains(&Opcode::Store) {
+        "mut "
+      } else {
+        ""
+      },
+      array.scalar_ty().to_string()
+    )
+    .into()
+  }
+
+  fn visit_input(&mut self, fifo: &FIFORef<'_>) -> Option<String> {
+    format!(
+      "  {}_{}: &mut VecDeque<{}>,\n",
+      self.0,
+      fifo.get_name(),
+      fifo.scalar_ty().to_string()
+    )
+    .into()
+  }
+}
+
+struct InterfArgFeeder<'ops>(String, &'ops HashSet<Opcode>);
+
+impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
+  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
+    format!(
+      ", /*Array*/&{}{}",
+      if self.1.contains(&Opcode::Store) {
+        "mut "
+      } else {
+        ""
+      },
+      array.get_name(),
+    )
+    .into()
+  }
+  fn visit_input(&mut self, fifo: &FIFORef<'_>) -> Option<String> {
+    format!(", /*FIFO*/&mut {}_{}", self.0, fifo.get_name(),).into()
   }
 }
 
@@ -49,21 +94,10 @@ impl Visitor<String> for ElaborateModule<'_> {
         .as_str(),
       );
     }
-    for (array, ops) in module.array_iter() {
-      self.ops = Some(ops.clone());
-      let array_str = format!(
-        "  {}: &{}Vec<{}>,\n",
-        array.get_name(),
-        if self.ops.is_some() && self.ops.as_ref().unwrap().contains(&Opcode::Store) {
-          "mut "
-        } else {
-          ""
-        },
-        array.scalar_ty().to_string()
-      );
-
+    for (array, ops) in module.ext_interf_iter() {
+      let mut ie = InterfDecl(module.get_name().to_string(), ops);
+      let array_str = ie.dispatch(module.sys, array, vec![]).unwrap();
       res.push_str(array_str.as_str());
-      self.ops = None;
     }
     res.push_str(") {\n");
     res.push_str(
@@ -132,15 +166,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             .as_ref::<Module>(self.sys)
             .unwrap();
           let module_name = module_ref.get_name();
-          let mut res = format!(
-            "q.push(Reverse(Event::Module_{}(stamp + 1, vec![",
-            module_name
-          );
-          for args in expr.operand_iter().skip(1) {
-            res.push_str(format!("{} as u64, ", args.to_string(self.sys)).as_str());
-          }
-          res.push_str("])))");
-          res
+          format!("q.push(Reverse(Event::Module_{}(stamp + 1)));", module_name)
         }
         Opcode::FIFOPop => {
           // TODO(@were): Support multiple pop.
@@ -292,9 +318,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write("  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {\n".as_bytes())?;
   fd.write("    if self.get_stamp() == other.get_stamp() {\n".as_bytes())?;
   fd.write("      match (self, other) {\n".as_bytes())?;
-  fd.write(
-    "        (Event::Module_driver(_, _), _) => Some(std::cmp::Ordering::Less),\n".as_bytes(),
-  )?;
+  fd.write("        (Event::Module_driver(_), _) => Some(std::cmp::Ordering::Less),\n".as_bytes())?;
   fd.write("        _ => Some(std::cmp::Ordering::Equal),\n".as_bytes())?;
   fd.write("      }\n".as_bytes())?;
   fd.write("    } else {\n".as_bytes())?;
@@ -345,7 +369,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write("  let mut q = BinaryHeap::new();\n".as_bytes())?;
   // Push the initial events.
   fd.write(format!("  for i in 0..{} {{\n", config.sim_threshold).as_bytes())?;
-  fd.write("    q.push(Reverse(Event::Module_driver(i, vec![])));\n".as_bytes())?;
+  fd.write("    q.push(Reverse(Event::Module_driver(i)));\n".as_bytes())?;
   fd.write("  }\n".as_bytes())?;
   // TODO(@were): Dump the time stamp of the simulation.
   fd.write("  while let Some(event) = q.pop() {\n".as_bytes())?;
@@ -358,7 +382,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )
       .as_bytes(),
     )?;
-    fd.write(format!("        {}(src_stamp, &mut event_q", module.get_name()).as_bytes())?;
+    fd.write(format!("        {}(src_stamp, &mut q", module.get_name()).as_bytes())?;
     for (i, port) in module.port_iter().enumerate() {
       fd.write(
         format!(
@@ -370,19 +394,10 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
         .as_bytes(),
       )?;
     }
-    for (array, ops) in module.array_iter() {
-      fd.write(
-        format!(
-          ", /*Array*/&{}{}",
-          if ops.contains(&Opcode::Store) {
-            "mut "
-          } else {
-            ""
-          },
-          array.get_name(),
-        )
-        .as_bytes(),
-      )?;
+    for (array, ops) in module.ext_interf_iter() {
+      InterfArgFeeder(module.get_name().to_string(), ops)
+        .dispatch(sys, array, vec![])
+        .unwrap();
     }
     fd.write(");\n".as_bytes())?;
     if !module.get_name().eq("driver") {
@@ -421,6 +436,7 @@ fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
 }
 
 fn dump_header(fd: &mut File) -> Result<(), std::io::Error> {
+  fd.write("use std::collections::VecDeque;\n".as_bytes())?;
   fd.write("use std::collections::BinaryHeap;\n".as_bytes())?;
   fd.write("use std::cmp::{PartialOrd, Ord, Ordering, Reverse};\n".as_bytes())?;
   Ok(())

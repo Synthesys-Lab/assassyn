@@ -2,9 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
   builder::system::{InsertPoint, PortInfo, SysBuilder},
-  data::Array,
   expr::Opcode,
-  node::{ArrayRef, BaseNode, BlockRef, FIFORef, ModuleMut, ModuleRef, NodeKind, Parented},
+  node::{BaseNode, BlockRef, FIFORef, ModuleMut, ModuleRef, NodeKind, Parented},
 };
 
 use super::{block::Block, port::FIFO};
@@ -15,8 +14,8 @@ pub struct Module {
   name: String,
   inputs: Vec<BaseNode>,
   body: BaseNode,
-  /// The set of arrays used in the module.
-  pub(crate) array_used: HashMap<BaseNode, HashSet<Opcode>>,
+  /// The set of external interfaces used by the module.
+  pub(crate) external_interfaces: HashMap<BaseNode, HashSet<Opcode>>,
 }
 
 pub struct Driver {}
@@ -41,7 +40,7 @@ impl Module {
       name: name.to_string(),
       inputs,
       body: BaseNode::new(NodeKind::Unknown, 0),
-      array_used: HashMap::new(),
+      external_interfaces: HashMap::new(),
     }
   }
 }
@@ -79,17 +78,14 @@ impl<'sys> ModuleRef<'sys> {
     self.body.as_ref::<Block>(self.sys).unwrap()
   }
 
-  pub(crate) fn array_iter<'borrow, 'res>(
+  pub(crate) fn ext_interf_iter<'borrow, 'res>(
     &'borrow self,
-  ) -> impl Iterator<Item = (ArrayRef<'res>, &HashSet<Opcode>)>
+  ) -> impl Iterator<Item = (&BaseNode, &HashSet<Opcode>)>
   where
     'sys: 'borrow,
     'sys: 'res,
   {
-    self
-      .array_used
-      .iter()
-      .map(|(k, v)| (k.as_ref::<Array>(self.sys).unwrap(), v))
+    self.external_interfaces.iter()
   }
 
   pub fn port_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = FIFORef<'res>> + 'res
@@ -107,14 +103,14 @@ impl<'sys> ModuleRef<'sys> {
 
 impl<'a> ModuleMut<'a> {
   /// Maintain the redundant information, array used in the module.
-  pub fn insert_array_used(&mut self, array: BaseNode, opcode: Opcode) {
-    if !self.get().array_used.contains_key(&array) {
+  pub(crate) fn insert_external_interface(&mut self, array: BaseNode, opcode: Opcode) {
+    if !self.get().external_interfaces.contains_key(&array) {
       self
         .get_mut()
-        .array_used
+        .external_interfaces
         .insert(array.clone(), HashSet::new());
     }
-    let operations = self.get_mut().array_used.get_mut(&array).unwrap();
+    let operations = self.get_mut().external_interfaces.get_mut(&array).unwrap();
     operations.insert(opcode);
   }
 }
@@ -137,8 +133,14 @@ impl SysBuilder {
     let module = self.insert_element(module);
     // Set the parents of the inputs after instantiating the parent module.
     for i in 0..n_inputs {
-      let input = module.as_ref::<Module>(self).unwrap().get_input(i).unwrap().clone();
-      self.get_mut::<FIFO>(&input)
+      let input = module
+        .as_ref::<Module>(self)
+        .unwrap()
+        .get_input(i)
+        .unwrap()
+        .clone();
+      self
+        .get_mut::<FIFO>(&input)
         .unwrap()
         .get_mut()
         .set_parent(module.clone());

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
   builder::system::{InsertPoint, SysBuilder},
   data::Typed,
@@ -5,7 +7,8 @@ use crate::{
   node::{
     ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, IsElement, ModuleRef, NodeKind, Parented,
   },
-  port::FIFO, Module,
+  port::FIFO,
+  Module,
 };
 
 use super::{block::Block, visitor::Visitor};
@@ -29,9 +32,41 @@ impl IRPrinter<'_> {
   }
 }
 
+struct ExtInterDumper<'a>(String, &'a HashSet<Opcode>);
+
+impl Visitor<String> for ExtInterDumper<'_> {
+  fn visit_input(&mut self, input: &FIFORef<'_>) -> Option<String> {
+    let mut res = format!(
+      "{}.{}: fifo<{}> {{",
+      self.0,
+      input.get_name(),
+      input.scalar_ty().to_string()
+    );
+    for op in self.1.iter() {
+      res.push_str(format!("{:?}, ", op).as_str());
+    }
+    res.push_str("}");
+    res.into()
+  }
+  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
+    format!(
+      "Array: {}[{} x {}]",
+      array.get_name(),
+      array.get_size(),
+      array.scalar_ty().to_string(),
+    )
+    .into()
+  }
+}
+
 impl Visitor<String> for IRPrinter<'_> {
   fn visit_input(&mut self, input: &FIFORef<'_>) -> Option<String> {
-    format!("{}: fifo<{}>, ", input.get_name(), input.scalar_ty().to_string()).into()
+    format!(
+      "{}: fifo<{}>, ",
+      input.get_name(),
+      input.scalar_ty().to_string()
+    )
+    .into()
   }
 
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
@@ -55,6 +90,18 @@ impl Visitor<String> for IRPrinter<'_> {
 
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
     let mut res = String::new();
+    for (elem, ops) in module.ext_interf_iter() {
+      res.push_str(
+        format!(
+          "{}// {}\n",
+          " ".repeat(self.indent),
+          ExtInterDumper(module.get_name().to_string(), ops)
+            .dispatch(module.sys, elem, vec![])
+            .unwrap()
+        )
+        .as_str(),
+      );
+    }
     res.push_str(format!("{}module {}(", " ".repeat(self.indent), module.get_name()).as_str());
     module.get();
     for elem in module.port_iter() {
