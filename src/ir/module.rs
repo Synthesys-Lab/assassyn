@@ -18,8 +18,6 @@ pub struct Module {
   pub(crate) external_interfaces: HashMap<BaseNode, HashSet<Opcode>>,
 }
 
-pub struct Driver {}
-
 impl Module {
   /// Returns a reference to the created new module.
   ///
