@@ -32,30 +32,35 @@ impl IRPrinter<'_> {
   }
 }
 
-struct ExtInterDumper<'a>(String, &'a HashSet<Opcode>);
+struct ExtInterDumper<'a>(&'a HashSet<Opcode>);
 
 impl Visitor<String> for ExtInterDumper<'_> {
   fn visit_input(&mut self, input: &FIFORef<'_>) -> Option<String> {
+    let module = input.get_parent().as_ref::<Module>(input.sys).unwrap();
     let mut res = format!(
-      "{}.{}: fifo<{}> {{",
-      self.0,
+      "{}.{}: fifo<{}>, {{ ",
+      module.get_name(),
       input.get_name(),
       input.scalar_ty().to_string()
     );
-    for op in self.1.iter() {
+    for op in self.0.iter() {
       res.push_str(format!("{:?}, ", op).as_str());
     }
     res.push_str("}");
     res.into()
   }
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
-    format!(
-      "Array: {}[{} x {}]",
+    let mut res = format!(
+      "Array: {}[{} x {}], {{ ",
       array.get_name(),
       array.get_size(),
       array.scalar_ty().to_string(),
-    )
-    .into()
+    );
+    for op in self.0.iter() {
+      res.push_str(format!("{:?}, ", op).as_str());
+    }
+    res.push_str("}");
+    res.into()
   }
 }
 
@@ -95,7 +100,7 @@ impl Visitor<String> for IRPrinter<'_> {
         format!(
           "{}// {}\n",
           " ".repeat(self.indent),
-          ExtInterDumper(module.get_name().to_string(), ops)
+          ExtInterDumper(ops)
             .dispatch(module.sys, elem, vec![])
             .unwrap()
         )

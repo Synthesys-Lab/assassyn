@@ -28,14 +28,14 @@ impl<'a> ElaborateModule<'a> {
   }
 }
 
-struct InterfDecl<'a>(String, &'a HashSet<Opcode>);
+struct InterfDecl<'a>(&'a HashSet<Opcode>);
 
 impl<'a> Visitor<String> for InterfDecl<'a> {
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     format!(
-      "  {}: &{}Vec<{}>,\n",
+      "  {}: &{}Vec<{}>,",
       array.get_name(),
-      if self.1.contains(&Opcode::Store) {
+      if self.0.contains(&Opcode::Store) {
         "mut "
       } else {
         ""
@@ -46,9 +46,10 @@ impl<'a> Visitor<String> for InterfDecl<'a> {
   }
 
   fn visit_input(&mut self, fifo: &FIFORef<'_>) -> Option<String> {
+    let module = fifo.get_parent().as_ref::<Module>(fifo.sys).unwrap();
     format!(
-      "  {}_{}: &mut VecDeque<{}>,\n",
-      self.0,
+      "  {}_{}: &mut VecDeque<{}>,",
+      module.get_name(),
       fifo.get_name(),
       fifo.scalar_ty().to_string()
     )
@@ -56,13 +57,13 @@ impl<'a> Visitor<String> for InterfDecl<'a> {
   }
 }
 
-struct InterfArgFeeder<'ops>(String, &'ops HashSet<Opcode>);
+struct InterfArgFeeder<'ops>(&'ops HashSet<Opcode>);
 
 impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     format!(
-      ", /*Array*/&{}{}",
-      if self.1.contains(&Opcode::Store) {
+      ", /*Ext.Intef.Array*/&{}{}",
+      if self.0.contains(&Opcode::Store) {
         "mut "
       } else {
         ""
@@ -72,7 +73,13 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
     .into()
   }
   fn visit_input(&mut self, fifo: &FIFORef<'_>) -> Option<String> {
-    format!(", /*FIFO*/&mut {}_{}", self.0, fifo.get_name(),).into()
+    let module = fifo.get_parent().as_ref::<Module>(fifo.sys).unwrap();
+    format!(
+      ", /*Ext.Interf.FIFO*/&mut {}_{}",
+      module.get_name(),
+      fifo.get_name(),
+    )
+    .into()
   }
 }
 
@@ -86,7 +93,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     for port in module.port_iter() {
       res.push_str(
         format!(
-          "  {}_{}: &mut VecDeque<{}>,\n",
+          "  {}_{}: &mut VecDeque<{}>, // input\n",
           module.get_name(),
           port.get_name(),
           port.scalar_ty().to_string()
@@ -95,9 +102,9 @@ impl Visitor<String> for ElaborateModule<'_> {
       );
     }
     for (array, ops) in module.ext_interf_iter() {
-      let mut ie = InterfDecl(module.get_name().to_string(), ops);
+      let mut ie = InterfDecl(ops);
       let array_str = ie.dispatch(module.sys, array, vec![]).unwrap();
-      res.push_str(array_str.as_str());
+      res.push_str(format!("{} // external interface\n", array_str).as_str());
     }
     res.push_str(") {\n");
     res.push_str(
@@ -166,7 +173,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             .as_ref::<Module>(self.sys)
             .unwrap();
           let module_name = module_ref.get_name();
-          format!("q.push(Reverse(Event::Module_{}(stamp + 1)));", module_name)
+          format!("q.push(Reverse(Event::Module_{}(stamp + 1)))", module_name)
         }
         Opcode::FIFOPop => {
           // TODO(@were): Support multiple pop.
@@ -395,9 +402,12 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )?;
     }
     for (array, ops) in module.ext_interf_iter() {
-      InterfArgFeeder(module.get_name().to_string(), ops)
-        .dispatch(sys, array, vec![])
-        .unwrap();
+      fd.write(
+        InterfArgFeeder(ops)
+          .dispatch(sys, array, vec![])
+          .unwrap()
+          .as_bytes(),
+      )?;
     }
     fd.write(");\n".as_bytes())?;
     if !module.get_name().eq("driver") {

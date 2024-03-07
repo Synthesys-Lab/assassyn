@@ -63,14 +63,14 @@ fn trigger() {
 
   sim::elaborate(&sys, &config).unwrap();
 
-  // let exec_name = utils::temp_dir(&"trigger".to_string());
-  // utils::compile(&config.fname, &exec_name);
+  let exec_name = utils::temp_dir(&"trigger".to_string());
+  utils::compile(&config.fname, &exec_name);
 
-  // let output = utils::run(&exec_name);
-  // let times_invoked = String::from_utf8(output.stdout)
-  //   .unwrap()
-  //   .lines()
-  //   .filter(|x| x.contains("Invoking module a_plus_b"))
-  //   .count();
-  // assert_eq!(times_invoked, 100);
+  let output = utils::run(&exec_name);
+  let times_invoked = String::from_utf8(output.stdout)
+    .unwrap()
+    .lines()
+    .filter(|x| x.contains("Simulating module a_plus_b"))
+    .count();
+  assert_eq!(times_invoked, 100);
 }
