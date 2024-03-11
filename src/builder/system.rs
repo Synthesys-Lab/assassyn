@@ -5,7 +5,7 @@ use crate::{
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer, visitor::Visitor},
   node::{
-    ArrayRef, CacheKey, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable,
+    ArrayRef, BlockRef, CacheKey, Element, IsElement, ModuleRef, Mutable, NodeKind, Referencable
   },
   port::FIFO,
   BaseNode, DataType, IntImm, Module,
@@ -168,6 +168,10 @@ impl SysBuilder {
     self.get::<Module>(&self.inesert_point.0)
   }
 
+  pub fn get_current_block<'a>(&'a self) -> Result<BlockRef<'a>, String> {
+    self.get::<Block>(&self.inesert_point.1)
+  }
+
   /// Get the module by its name.
   pub fn get_module<'a>(&'a self, name: &str) -> Option<ModuleRef<'a>> {
     if let Some(reference) = self.sym_tab.get(name) {
@@ -192,8 +196,21 @@ impl SysBuilder {
   /// # Arguments
   ///
   /// * `module` - The reference of the module to be set as the current module.
-  pub fn set_current_module(&mut self, module: BaseNode) {
-    let block = self.get::<Module>(&module).unwrap().get_body().upcast();
+  pub fn set_current_module(&mut self, module: &BaseNode) {
+    let block = self.get::<Module>(module).unwrap().get_body().upcast();
+    self.inesert_point = InsertPoint(module.clone(), block, None);
+  }
+
+  /// Set the current insert point to the given block.
+  ///
+  /// # Arguments
+  ///
+  /// * `block` - The reference of the block to be set as the insert point.
+  pub fn set_current_block(&mut self, block: BaseNode) {
+    let module = {
+      let block = block.as_ref::<Block>(self).unwrap();
+      block.get_module().upcast()
+    };
     self.inesert_point = InsertPoint(module, block, None);
   }
 
@@ -204,29 +221,30 @@ impl SysBuilder {
   /// * `expr` - The reference of the expression to be set as the insert point. NOTE: This expr
   /// should be a part of the current module to be built. Ohterwise, an assertion failure will be
   /// raised.
-  pub fn set_insert_before(&mut self, expr: BaseNode) {
+  pub fn set_insert_before(&mut self, node: &BaseNode) {
+    // Make this more general, the insert before point can also be a block.
+    // Which leads to something like this:
+    // module-body [
+    //   // something here...
+    //   // [insert-point]
+    //   block a[
+    //   ]
+    // ]
     let (module, block, at) = {
       let block_ref = {
-        let expr = expr.as_ref::<Expr>(self).unwrap();
-        expr.get_parent()
+        let parent = node.get_parent(self).unwrap();
+        assert_eq!(parent.get_kind(), NodeKind::Block);
+        parent
       };
       let at = block_ref
         .as_ref::<Block>(self)
         .unwrap()
         .iter()
-        .position(|x| *x == expr);
+        .position(|x| *x == *node);
       let module = {
         // TODO(@were): Make this a method function.
-        let mut runner = block_ref.clone();
-        while runner.get_kind() != NodeKind::Module {
-          let parent: BaseNode = match runner.get_kind() {
-            NodeKind::Expr => runner.as_ref::<Expr>(self).unwrap().get_parent(),
-            NodeKind::Block => runner.as_ref::<Block>(self).unwrap().get_parent(),
-            _ => panic!("Invalid parent type"),
-          };
-          runner = parent;
-        }
-        runner
+        let block = block_ref.as_ref::<Block>(self).unwrap();
+        block.get_module().upcast()
       };
       (module, block_ref, at)
     };
@@ -393,6 +411,10 @@ impl SysBuilder {
     if let Some(restore_ip) = restore_ip {
       self.inesert_point = restore_ip;
     }
+  }
+
+  pub fn create_async_trigger(&mut self, dst: &BaseNode, pred: Option<BaseNode>) -> BaseNode {
+    self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()], pred)
   }
 
   /// Create a spin trigger. A spin trigger repeats to test the condition

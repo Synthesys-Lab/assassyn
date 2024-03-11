@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  builder::system::{InsertPoint, PortInfo, SysBuilder},
+  builder::system::{PortInfo, SysBuilder},
   expr::Opcode,
   node::{BaseNode, BlockRef, FIFORef, ModuleMut, ModuleRef, NodeKind, Parented},
 };
@@ -147,7 +147,6 @@ impl SysBuilder {
     let body = Block::new(None, module.clone());
     let body = self.insert_element(body);
     self.get_mut::<Module>(&module).unwrap().get_mut().body = body.clone();
-    self.inesert_point = InsertPoint(module.clone(), body, None);
     module
   }
 }

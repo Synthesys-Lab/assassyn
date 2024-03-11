@@ -1,7 +1,7 @@
 use crate::{
   builder::system::{InsertPoint, SysBuilder},
-  node::{BlockMut, IsElement, Parented},
-  BaseNode,
+  node::{BlockMut, BlockRef, IsElement, ModuleRef, NodeKind, Parented},
+  BaseNode, Module,
 };
 
 pub struct Block {
@@ -36,6 +36,7 @@ impl Block {
   pub fn iter<'a>(&'a self) -> impl Iterator<Item = &BaseNode> + 'a {
     self.body.iter()
   }
+
 }
 
 impl Parented for Block {
@@ -46,6 +47,22 @@ impl Parented for Block {
   fn set_parent(&mut self, parent: BaseNode) {
     self.parent = parent;
   }
+}
+
+impl BlockRef<'_> {
+
+  pub fn get_module(&self) -> ModuleRef<'_> {
+    let mut runner = self.upcast().clone();
+    while runner.get_kind() != NodeKind::Module {
+      let parent: BaseNode = match runner.get_kind() {
+        NodeKind::Block => runner.as_ref::<Block>(self.sys).unwrap().get_parent(),
+        _ => panic!("Invalid parent type"),
+      };
+      runner = parent;
+    }
+    runner.as_ref::<Module>(self.sys).unwrap()
+  }
+
 }
 
 impl BlockMut<'_> {
@@ -99,8 +116,8 @@ impl BlockMut<'_> {
 impl SysBuilder {
   /// Create a block.
   pub fn create_block(&mut self, cond: Option<BaseNode>) -> BaseNode {
-    let parent = self.get_current_module().unwrap().upcast();
-    let instance = Block::new(cond, parent.clone());
+    let parent = self.get_current_block().unwrap().upcast();
+    let instance = Block::new(cond, parent);
     let block = self.insert_element(instance);
     let InsertPoint(_, insert_block, at) = &self.get_insert_point();
     let (block, new_at) = self

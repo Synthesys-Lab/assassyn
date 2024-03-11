@@ -14,6 +14,7 @@ fn trigger() {
         PortInfo::new("b", int32.clone()),
       ],
     );
+    sys.set_current_module(&module);
     let (a, b) = {
       let module = module.as_ref::<Module>(&sys).unwrap();
       let i0 = module.get_input(0).unwrap().clone();
@@ -28,7 +29,7 @@ fn trigger() {
 
   fn build_driver(sys: &mut SysBuilder, plus: BaseNode) {
     let driver_module = sys.get_driver();
-    sys.set_current_module(driver_module.upcast());
+    sys.set_current_module(&driver_module.upcast());
     let int32 = DataType::int(32);
     let a = sys.create_array(&int32, "cnt", 1);
     let zero = sys.get_const_int(&int32, 0);
