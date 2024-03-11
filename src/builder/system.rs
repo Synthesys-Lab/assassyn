@@ -1,10 +1,10 @@
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use crate::{
-  data::Array,
+  data::{Array, Handle},
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer, visitor::Visitor},
-  node::{ArrayRef, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable},
+  node::{ArrayRef, CacheKey, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable},
   port::FIFO,
   BaseNode, DataType, IntImm, Module,
 };
@@ -19,7 +19,7 @@ pub struct SysBuilder {
   /// highly redundant, and mutually referenced data structure.
   pub(crate) slab: slab::Slab<Element>,
   /// The data structure caches the constant values.
-  const_cache: HashMap<(DataType, u64), BaseNode>,
+  cached_nodes: HashMap<CacheKey, BaseNode>,
   /// The name of the system.
   name: String,
   /// The global symbols in this system, including modules and arrays.
@@ -121,7 +121,7 @@ impl SysBuilder {
       name: name.into(),
       sym_tab: HashMap::new(),
       slab: slab::Slab::new(),
-      const_cache: HashMap::new(),
+      cached_nodes: HashMap::new(),
       inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
       unique_ids: HashMap::new(),
     };
@@ -264,14 +264,30 @@ impl SysBuilder {
   /// * `value` - The value of the constant.
   // TODO(@were): What if the data type is bigger than 64 bits?
   pub fn get_const_int(&mut self, dtype: &DataType, value: u64) -> BaseNode {
-    let key = (dtype.clone(), value);
-    if let Some(cached) = self.const_cache.get(&key) {
+    let cache_key = CacheKey::IntImm((dtype.clone(), value));
+    if let Some(cached) = self.cached_nodes.get(&cache_key) {
       return cached.clone();
     }
-    let cloned_key = key.clone();
-    let instance = IntImm::new(key.0, key.1);
+    let instance = IntImm::new(dtype.clone(), value);
     let key = self.insert_element(instance);
-    self.const_cache.insert(cloned_key, key.clone());
+    self.cached_nodes.insert(cache_key, key.clone());
+    key
+  }
+
+  /// The helper function to create a handle to an array access.
+  ///
+  /// # Arguments
+  ///
+  /// * `array` - The array to be accessed.
+  /// * `idx` - The index to be accessed.
+  pub fn create_handle(&mut self, array: &BaseNode, idx: &BaseNode) -> BaseNode {
+    let cached_key = CacheKey::Handle((array.clone(), idx.clone()));
+    if let Some(cached) = self.cached_nodes.get(&cached_key) {
+      return cached.clone();
+    }
+    let instance = Handle::new(array.clone(), idx.clone());
+    let key = self.insert_element(instance);
+    self.cached_nodes.insert(cached_key, key.clone());
     key
   }
 
@@ -368,23 +384,20 @@ impl SysBuilder {
   /// itself when the condition is false.
   ///
   /// # Arguments
-  /// * `array` - The data array to be tested.
-  /// * `idx` - The index of the data array to be tested.
+  /// * `array` - A pointer to the an array element, which serves as an handle to a "lock".
   /// * `dst` - The destination module to be invoked.
   /// * `data` - The data to be sent to the destination module.
   /// * `pred` - The condition of triggering the destination. If None is given, the trigger is
   /// always on.
   pub fn create_spin_trigger(
     &mut self,
-    array: &BaseNode,
-    idx: &BaseNode,
+    handle: &BaseNode,
     dst: &BaseNode,
     mut data: Vec<BaseNode>,
     pred: Option<BaseNode>,
   ) {
-    data.insert(0, dst.clone());
-    data.insert(1, array.clone());
-    data.insert(2, idx.clone());
+    data.insert(0, handle.clone());
+    data.insert(1, dst.clone());
     self.create_expr(DataType::void(), Opcode::SpinTrigger, data, pred);
   }
 
@@ -436,18 +449,16 @@ impl SysBuilder {
   /// Create a read operation on an array.
   ///
   /// # Arguments
-  /// * `array` - The array to be read.
-  /// * `index` - The index to be read.
+  /// * `handle` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
   pub fn create_array_read<'elem>(
     &mut self,
-    array: &BaseNode,
-    index: &BaseNode,
+    handle: &BaseNode,
     cond: Option<BaseNode>,
   ) -> BaseNode {
-    let operands = vec![array.clone(), index.clone()];
+    let array = self.get::<Handle>(&handle).unwrap().get_array().clone();
     let dtype = self.get::<Array>(&array).unwrap().scalar_ty().clone();
-    let res = self.create_expr(dtype, Opcode::Load, operands, cond);
+    let res = self.create_expr(dtype, Opcode::Load, vec![handle.clone()], cond);
     let cur_mod = self.inesert_point.0.clone();
     self
       .get_mut::<Module>(&cur_mod)
@@ -459,18 +470,17 @@ impl SysBuilder {
   /// Create a write operation on an array.
   ///
   /// # Arguments
-  /// * `array` - The array to be written.
-  /// * `index` - The index to be written.
+  /// * `handle` - The pointer to the array element.
   /// * `value` - The value to be written.
   /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
   pub fn create_array_write(
     &mut self,
-    array: &BaseNode,
-    index: &BaseNode,
+    handle: &BaseNode,
     value: &BaseNode,
     cond: Option<BaseNode>,
   ) -> BaseNode {
-    let operands = vec![array.clone(), index.clone(), value.clone()];
+    let array = self.get::<Handle>(&handle).unwrap().get_array().clone();
+    let operands = vec![handle.clone(), value.clone()];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands, cond);
     let cur_mod = self.inesert_point.0.clone();
     self

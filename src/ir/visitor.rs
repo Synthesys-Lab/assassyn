@@ -1,8 +1,8 @@
 use crate::{
   builder::system::SysBuilder,
-  data::Array,
+  data::{Array, Handle},
   expr::Expr,
-  node::{ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, ModuleRef, NodeKind},
+  node::{ArrayRef, BlockRef, ExprRef, FIFORef, HandleRef, IntImmRef, ModuleRef, NodeKind},
   port::FIFO,
   BaseNode, IntImm, Module,
 };
@@ -51,6 +51,10 @@ pub trait Visitor<T> {
     None
   }
 
+  fn visit_handle(&mut self, _: &HandleRef<'_>) -> Option<T> {
+    None
+  }
+
   fn enter(&mut self, sys: &SysBuilder) -> Option<T> {
     for elem in sys.module_iter() {
       let res = self.visit_module(&elem);
@@ -72,6 +76,7 @@ pub trait Visitor<T> {
       NodeKind::FIFO => self.visit_input(&node.as_ref::<FIFO>(sys).unwrap()),
       NodeKind::Array => self.visit_array(&node.as_ref::<Array>(sys).unwrap()),
       NodeKind::IntImm => self.visit_int_imm(&node.as_ref::<IntImm>(sys).unwrap()),
+      NodeKind::Handle => self.visit_handle(&node.as_ref::<Handle>(sys).unwrap()),
       NodeKind::Unknown => {
         panic!("Unknown node type")
       }

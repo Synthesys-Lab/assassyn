@@ -1,4 +1,6 @@
-#[derive(Clone, PartialEq, Eq, Hash)]
+use crate::BaseNode;
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum DataType {
   Void,
   Int(usize),
@@ -79,6 +81,33 @@ impl IntImm {
   pub fn get_value(&self) -> u64 {
     self.value
   }
+}
+
+/// Handle is like a "pointer" to an array element.
+pub struct Handle {
+  pub(crate) key: usize,
+  array: BaseNode,
+  idx: BaseNode,
+}
+
+impl Handle {
+
+  pub fn new(array: BaseNode, idx: BaseNode) -> Self {
+    Self {
+      key: 0,
+      array,
+      idx,
+    }
+  }
+
+  pub fn get_array(&self) -> &BaseNode {
+    &self.array
+  }
+
+  pub fn get_idx(&self) -> &BaseNode {
+    &self.idx
+  }
+
 }
 
 pub struct Array {

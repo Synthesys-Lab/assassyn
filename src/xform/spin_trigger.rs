@@ -50,12 +50,10 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       parent.get_name().to_string()
     };
     let mut mutator = sys.get_mut::<Expr>(&spin_trigger).unwrap();
-    // dest module
-    let dest_module = mutator.get().get_operand(0).unwrap().clone();
     // cond array
-    let cond_array = mutator.get().get_operand(1).unwrap().clone();
-    // data array index
-    let cond_array_idx = mutator.get().get_operand(2).unwrap().clone();
+    let lock_handle = mutator.get().get_operand(0).unwrap().clone();
+    // dest module
+    let dest_module = mutator.get().get_operand(1).unwrap().clone();
     // data to new trigger
     let data = mutator
       .get()
@@ -85,7 +83,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     mutator.sys.set_current_module(agent.clone());
     let agent_module = mutator.sys.get_current_module().unwrap();
     let data_to_dst = agent_module.port_iter().map(|x| x.upcast()).collect();
-    let cond = mutator.sys.create_array_read(&cond_array, &cond_array_idx, None);
+    let cond = mutator.sys.create_array_read(&lock_handle, None);
     mutator.sys.create_trigger(&dest_module, data_to_dst, Some(cond.clone()));
     let flip_cond = mutator.sys.create_flip(&cond, None);
     mutator.sys.create_trigger(&agent, vec![], Some(flip_cond));

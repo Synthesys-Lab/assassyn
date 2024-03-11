@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
   builder::system::SysBuilder,
-  data::Typed,
+  data::{Handle, Typed},
   expr::{Expr, Opcode},
   ir::{block::Block, port::FIFO, visitor::Visitor},
   node::{
@@ -152,18 +152,20 @@ impl Visitor<String> for ElaborateModule<'_> {
     } else {
       match expr.get_opcode() {
         Opcode::Load => {
+          let handle = expr.get_operand(0).unwrap().as_ref::<Handle>(expr.sys).unwrap();
           format!(
             "{}[{} as usize]",
-            expr.get_operand(0).unwrap().to_string(self.sys),
-            expr.get_operand(1).unwrap().to_string(self.sys)
+            handle.get_array().to_string(expr.sys),
+            handle.get_idx().to_string(expr.sys)
           )
         }
         Opcode::Store => {
+          let handle = expr.get_operand(0).unwrap().as_ref::<Handle>(expr.sys).unwrap();
           format!(
             "{}[{} as usize] = {}",
-            expr.get_operand(0).unwrap().to_string(self.sys),
+            handle.get_array().to_string(expr.sys),
+            handle.get_idx().to_string(expr.sys),
             expr.get_operand(1).unwrap().to_string(self.sys),
-            expr.get_operand(2).unwrap().to_string(self.sys)
           )
         }
         Opcode::Trigger => {

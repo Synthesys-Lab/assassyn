@@ -16,6 +16,8 @@ fn check(sys: &mut SysBuilder, before: bool) {
     let a = sys.get_array("a").unwrap().upcast();
     (a, odd)
   };
+  let ptr_a0 = sys.create_handle(&a, &zero);
+  let ptr_odd0 = sys.create_handle(&odd, &zero);
 
   let body = sys.get_driver().get_body();
   let mut iter = body.iter();
@@ -23,7 +25,7 @@ fn check(sys: &mut SysBuilder, before: bool) {
   {
     let read = read.as_ref::<Expr>(&sys).unwrap();
     assert_eq!(read.get_opcode(), Opcode::Load);
-    assert_eq!(read.get_operand(0).unwrap(), &a);
+    assert_eq!(read.get_operand(0).unwrap(), &ptr_a0);
   }
   let add = iter.next().unwrap();
   {
@@ -36,9 +38,8 @@ fn check(sys: &mut SysBuilder, before: bool) {
   {
     let write = write.as_ref::<Expr>(&sys).unwrap();
     assert_eq!(write.get_opcode(), Opcode::Store);
-    assert_eq!(write.get_operand(0).unwrap(), &a);
-    assert_eq!(write.get_operand(1).unwrap(), &zero);
-    assert_eq!(write.get_operand(2).unwrap(), add);
+    assert_eq!(write.get_operand(0).unwrap(), &ptr_a0);
+    assert_eq!(write.get_operand(1).unwrap(), add);
   }
   let and = iter.next().unwrap();
   {
@@ -55,8 +56,7 @@ fn check(sys: &mut SysBuilder, before: bool) {
     {
       let read = read.as_ref::<Expr>(&sys).unwrap();
       assert_eq!(read.get_opcode(), Opcode::Load);
-      assert_eq!(read.get_operand(0).unwrap(), &odd);
-      assert_eq!(read.get_operand(1).unwrap(), &zero);
+      assert_eq!(read.get_operand(0).unwrap(), &ptr_odd0);
     }
     let (mut iter_to_check, mut iter_to_end) = if before {
       (iter, expr_iter)
@@ -75,9 +75,8 @@ fn check(sys: &mut SysBuilder, before: bool) {
     {
       let write = write.as_ref::<Expr>(&sys).unwrap();
       assert_eq!(write.get_opcode(), Opcode::Store);
-      assert_eq!(write.get_operand(0).unwrap(), &odd);
-      assert_eq!(write.get_operand(1).unwrap(), &zero);
-      assert_eq!(write.get_operand(2).unwrap(), acc_odd);
+      assert_eq!(write.get_operand(0).unwrap(), &ptr_odd0);
+      assert_eq!(write.get_operand(1).unwrap(), acc_odd);
     }
     assert!(iter_to_check.next().is_none());
   }
@@ -90,14 +89,16 @@ fn predication_propagation() {
   let a = sys.create_array(&int32, "a", 1);
   let odd = sys.create_array(&int32, "odd", 1);
   let zero = sys.get_const_int(&int32, 0);
-  let a0 = sys.create_array_read(&a, &zero, None);
+  let ptr_a = sys.create_handle(&a, &zero);
+  let a0 = sys.create_array_read(&ptr_a, None);
   let one = sys.get_const_int(&int32, 1);
   let plused = sys.create_add(None, &a0, &one, None);
-  sys.create_array_write(&a, &zero, &plused, None);
+  sys.create_array_write(&ptr_a, &plused, None);
   let is_odd = sys.create_bitwise_and(None, &a0, &one, None);
-  let odd0 = sys.create_array_read(&odd, &zero, Some(is_odd.clone()));
+  let ptr_odd = sys.create_handle(&odd, &zero);
+  let odd0 = sys.create_array_read(&ptr_odd, Some(is_odd.clone()));
   let acc_odd = sys.create_add(None, &odd0, &one, None);
-  sys.create_array_write(&odd, &zero, &acc_odd, None);
+  sys.create_array_write(&ptr_odd, &acc_odd, None);
   println!("{}", sys);
   check(&mut sys, true);
   xform::propagate_predications(&mut sys);
