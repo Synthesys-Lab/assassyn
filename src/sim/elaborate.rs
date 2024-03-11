@@ -109,7 +109,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     res.push_str(") {\n");
     res.push_str(
       format!(
-        "  println!(\"{{}}:{{:04}} @Cycle {{}}: Simulating module {}\", file!(), line!(), stamp);\n",
+        "  println!(\"{{}}:{{:04}} @Cycle {{}}.{{}}: Simulating module {}\", file!(), line!(), stamp / 100, stamp % 100);\n",
         module.get_name()
       )
       .as_str(),
@@ -152,7 +152,11 @@ impl Visitor<String> for ElaborateModule<'_> {
     } else {
       match expr.get_opcode() {
         Opcode::Load => {
-          let handle = expr.get_operand(0).unwrap().as_ref::<Handle>(expr.sys).unwrap();
+          let handle = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<Handle>(expr.sys)
+            .unwrap();
           format!(
             "{}[{} as usize]",
             handle.get_array().to_string(expr.sys),
@@ -160,7 +164,11 @@ impl Visitor<String> for ElaborateModule<'_> {
           )
         }
         Opcode::Store => {
-          let handle = expr.get_operand(0).unwrap().as_ref::<Handle>(expr.sys).unwrap();
+          let handle = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<Handle>(expr.sys)
+            .unwrap();
           format!(
             "{}[{} as usize] = {}",
             handle.get_array().to_string(expr.sys),
@@ -175,7 +183,10 @@ impl Visitor<String> for ElaborateModule<'_> {
             .as_ref::<Module>(self.sys)
             .unwrap();
           let module_name = module_ref.get_name();
-          format!("q.push(Reverse(Event::Module_{}(stamp + 1)))", module_name)
+          format!(
+            "q.push(Reverse(Event::Module_{}(stamp + 100)))",
+            module_name
+          )
         }
         Opcode::FIFOPop => {
           // TODO(@were): Support multiple pop.
@@ -378,7 +389,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write("  let mut q = BinaryHeap::new();\n".as_bytes())?;
   // Push the initial events.
   fd.write(format!("  for i in 0..{} {{\n", config.sim_threshold).as_bytes())?;
-  fd.write("    q.push(Reverse(Event::Module_driver(i)));\n".as_bytes())?;
+  fd.write("    q.push(Reverse(Event::Module_driver(i * 100)));\n".as_bytes())?;
   fd.write("  }\n".as_bytes())?;
   // TODO(@were): Dump the time stamp of the simulation.
   fd.write("  while let Some(event) = q.pop() {\n".as_bytes())?;

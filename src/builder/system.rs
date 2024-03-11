@@ -4,7 +4,9 @@ use crate::{
   data::{Array, Handle},
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer, visitor::Visitor},
-  node::{ArrayRef, CacheKey, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable},
+  node::{
+    ArrayRef, CacheKey, Element, IsElement, ModuleRef, Mutable, NodeKind, Parented, Referencable,
+  },
   port::FIFO,
   BaseNode, DataType, IntImm, Module,
 };
@@ -335,15 +337,20 @@ impl SysBuilder {
     self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 
-  /// Create a trigger. A trigger sends a signal to invoke the given module.
-  /// The source module is the current module, and the destination is given.
+  /// Create a bundled trigger. Let the current module invoke the given module (destination)
+  /// with all input data ready and pushed to the destination module's port FIFO.
   ///
   /// # Arguments
   /// * `dst` - The destination module to be invoked.
   /// * `data` - The data to be sent to the destination module.
   /// * `cond` - The condition of triggering the destination. If None is given, the trigger is
   /// unconditional.
-  pub fn create_trigger(&mut self, dst: &BaseNode, data: Vec<BaseNode>, pred: Option<BaseNode>) {
+  pub fn create_bundled_trigger(
+    &mut self,
+    dst: &BaseNode,
+    data: Vec<BaseNode>,
+    pred: Option<BaseNode>,
+  ) {
     let current_module = self.get_current_module().unwrap().upcast();
     let dst_module = dst.as_ref::<Module>(self).unwrap();
     let ports = dst_module
@@ -361,14 +368,17 @@ impl SysBuilder {
       None
     };
 
+    let mut args = vec![dst.clone()];
     for (port, arg) in ports.iter().zip(data.iter()) {
       self.create_fifo_push(&port, arg.clone(), None);
+      args.push(self.create_handle(port, arg));
       self
         .get_mut::<Module>(&current_module)
         .unwrap()
         .insert_external_interface(port.clone(), Opcode::FIFOPush);
     }
-    self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()], None);
+    // TODO: Make all FIFO push associate to this trigger to enforce the timing of data arrival.
+    self.create_expr(DataType::void(), Opcode::Trigger, args, None);
 
     if let Some(restore_ip) = restore_ip {
       self.inesert_point = restore_ip;

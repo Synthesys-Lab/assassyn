@@ -226,7 +226,7 @@ impl BaseNode {
       }
       NodeKind::FIFO => {
         let input = self.as_ref::<FIFO>(sys).unwrap();
-        input.dtype().clone().into()
+        input.scalar_ty().clone().into()
       }
       NodeKind::Expr => {
         let expr = self.as_ref::<Expr>(sys).unwrap();

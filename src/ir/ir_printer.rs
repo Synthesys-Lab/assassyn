@@ -185,12 +185,11 @@ impl Visitor<String> for IRPrinter<'_> {
           )
         }
         Opcode::Trigger => {
-          let mut res = format!("call {}(", expr.get_operand(0).unwrap().to_string(self.sys));
+          let mut res = format!("async call {}, ", expr.get_operand(0).unwrap().to_string(self.sys));
           for op in expr.operand_iter().skip(1) {
             res.push_str(op.to_string(self.sys).as_str());
             res.push_str(", ");
           }
-          res.push_str(")");
           res
         }
         Opcode::SpinTrigger => {
@@ -249,7 +248,7 @@ impl Visitor<String> for IRPrinter<'_> {
             module.get_name().to_string()
           };
           let fifo_name = fifo.get_name();
-          format!("{}.{}.push({})", module_name, fifo_name, value)
+          format!("{}.{}.push({}) // handle: _{}", module_name, fifo_name, value, fifo.get_key())
         }
         _ => {
           panic!("Unimplemented opcode: {:?}", expr.get_opcode());

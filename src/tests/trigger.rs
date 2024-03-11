@@ -37,7 +37,7 @@ fn trigger() {
     let a0 = sys.create_array_read(&handle, None);
     let hundred = sys.get_const_int(&int32, 100);
     let cond = sys.create_ilt(None, &a0, &hundred, None);
-    sys.create_trigger(&plus, vec![a0.clone(), a0.clone()], Some(cond));
+    sys.create_bundled_trigger(&plus, vec![a0.clone(), a0.clone()], Some(cond));
     let acc = sys.create_add(None, &a0, &one, None);
     sys.create_array_write(&handle, &acc, None);
   }

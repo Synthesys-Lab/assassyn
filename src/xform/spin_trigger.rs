@@ -50,15 +50,15 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       parent.get_name().to_string()
     };
     let mut mutator = sys.get_mut::<Expr>(&spin_trigger).unwrap();
-    // cond array
+    // Conditional lock.
     let lock_handle = mutator.get().get_operand(0).unwrap().clone();
-    // dest module
+    // Destination module
     let dest_module = mutator.get().get_operand(1).unwrap().clone();
     // data to new trigger
     let data = mutator
       .get()
       .operand_iter()
-      .skip(3)
+      .skip(2)
       .map(|x| x.clone())
       .collect::<Vec<_>>();
     // mutator.sys.create_trigger(dst, data, cond)
@@ -78,15 +78,15 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     // Create trigger to the agent module.
     mutator.sys.set_current_module(parent.clone());
     mutator.sys.set_insert_before(mutator.get().upcast());
-    mutator.sys.create_trigger(&agent, data, None);
+    mutator.sys.create_bundled_trigger(&agent, data, None);
     // Create trigger to the destination module.
     mutator.sys.set_current_module(agent.clone());
     let agent_module = mutator.sys.get_current_module().unwrap();
     let data_to_dst = agent_module.port_iter().map(|x| x.upcast()).collect();
     let cond = mutator.sys.create_array_read(&lock_handle, None);
-    mutator.sys.create_trigger(&dest_module, data_to_dst, Some(cond.clone()));
+    mutator.sys.create_bundled_trigger(&dest_module, data_to_dst, Some(cond.clone()));
     let flip_cond = mutator.sys.create_flip(&cond, None);
-    mutator.sys.create_trigger(&agent, vec![], Some(flip_cond));
+    mutator.sys.create_bundled_trigger(&agent, vec![], Some(flip_cond));
     mutator.erase_from_parent();
   } else {
     println!("No spin triggers found");
