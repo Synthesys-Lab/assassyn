@@ -283,6 +283,11 @@ impl SysBuilder {
   /// * `array` - The array to be accessed.
   /// * `idx` - The index to be accessed.
   pub fn create_handle(&mut self, array: &BaseNode, idx: &BaseNode) -> BaseNode {
+    assert_eq!(array.get_kind(), NodeKind::Array);
+    match idx.get_dtype(self).unwrap() {
+      DataType::Int(_) | DataType::UInt(_) => {}
+      _ => panic!("Invalid index type"),
+    }
     let cached_key = CacheKey::Handle((array.clone(), idx.clone()));
     if let Some(cached) = self.cached_nodes.get(&cached_key) {
       return cached.clone();
@@ -369,9 +374,14 @@ impl SysBuilder {
     };
 
     let mut args = vec![dst.clone()];
+    assert_eq!(ports.len(), data.len(), "Data size mismatch");
     for (port, arg) in ports.iter().zip(data.iter()) {
-      self.create_fifo_push(&port, arg.clone(), None);
-      args.push(self.create_handle(port, arg));
+      {
+        let port = port.as_ref::<FIFO>(self).unwrap();
+        assert_eq!(port.scalar_ty(), arg.get_dtype(self).unwrap());
+      }
+      let push = self.create_fifo_push(&port, arg.clone(), None);
+      args.push(push);
       self
         .get_mut::<Module>(&current_module)
         .unwrap()
