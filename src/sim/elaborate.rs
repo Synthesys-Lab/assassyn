@@ -170,7 +170,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             .as_ref::<Handle>(expr.sys)
             .unwrap();
           format!(
-            "{}[{} as usize] = {}",
+            "q.push(Reverse(Event::Array_commit_{}(stamp + 50, {} as usize, {})))",
             handle.get_array().to_string(expr.sys),
             handle.get_idx().to_string(expr.sys),
             expr.get_operand(1).unwrap().to_string(self.sys),
@@ -218,7 +218,10 @@ impl Visitor<String> for ElaborateModule<'_> {
             .get_name()
             .to_string();
           let fifo_name = fifo.get_name();
-          format!("{}_{}.push_back({})", module_name, fifo_name, value)
+          format!(
+            "q.push(Reverse(Event::FIFO_push_{}_{}(stamp + 50, {})))",
+            module_name, fifo_name, value
+          )
         }
         _ => {
           assert!(expr.get_opcode().is_unary() || expr.get_opcode().is_binary());
@@ -285,13 +288,37 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   // enum Event {
   //   Module_{module.get_name()}(time_stamp, args),
   //   ...
+  //   FIFO_push_{module.get_name()}_{port.get_name()}(time_stamp, value),
+  //   ...
+  //   Array_commit_{array.get_name()}(time_stamp, idx, value),
   // }
   fd.write("#[derive(Debug, Eq, PartialEq)]\n".as_bytes())?;
   fd.write("enum Event {\n".as_bytes())?;
   for module in sys.module_iter() {
     fd.write(format!("  Module_{}(usize),\n", module.get_name()).as_bytes())?;
+    for port in module.port_iter() {
+      fd.write(
+        format!(
+          "  FIFO_push_{}_{}(usize, {}),\n",
+          module.get_name(),
+          port.get_name(),
+          port.scalar_ty().to_string(),
+        )
+        .as_bytes(),
+      )?;
+    }
   }
-  fd.write("}\n".as_bytes())?;
+  for array in sys.array_iter() {
+    fd.write(
+      format!(
+        "  Array_commit_{}(usize, usize, {}),\n",
+        array.get_name(),
+        array.scalar_ty().to_string()
+      )
+      .as_bytes(),
+    )?;
+  }
+  fd.write("}\n\n".as_bytes())?;
 
   // Dump the event stamp functions.
   // impl Event {
@@ -432,6 +459,38 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       fd.write("        stamp = src_stamp;\n".as_bytes())?;
       fd.write("      }\n".as_bytes())?;
     }
+  }
+  for module in sys.module_iter() {
+    for port in module.port_iter() {
+      fd.write(
+        format!(
+          "      Event::FIFO_push_{}_{}(src_stamp, value) => {{\n",
+          module.get_name(),
+          port.get_name()
+        )
+        .as_bytes(),
+      )?;
+      fd.write(
+        format!(
+          "        {}_{}.push_back(value);\n",
+          module.get_name(),
+          port.get_name()
+        )
+        .as_bytes(),
+      )?;
+      fd.write("      }\n".as_bytes())?;
+    }
+  }
+  for array in sys.array_iter() {
+    fd.write(
+      format!(
+        "      Event::Array_commit_{}(src_stamp, idx, value) => {{\n",
+        array.get_name()
+      )
+      .as_bytes(),
+    )?;
+    fd.write(format!("        {}[idx] = value;\n", array.get_name()).as_bytes())?;
+    fd.write("      }\n".as_bytes())?;
   }
   fd.write("    }\n".as_bytes())?;
   fd.write(format!("    if idled > {} {{\n", config.idle_threshold).as_bytes())?;
