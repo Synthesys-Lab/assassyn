@@ -109,7 +109,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     res.push_str(") {\n");
     res.push_str(
       format!(
-        "  println!(\"{{}}:{{:04}} @Cycle {{}}.{{}}: Simulating module {}\", file!(), line!(), stamp / 100, stamp % 100);\n",
+        "  println!(\"@line:{{:<6}} {{}}: Simulating module {}\", line!(), cyclize(stamp));\n",
         module.get_name()
       )
       .as_str(),
@@ -282,6 +282,14 @@ impl Visitor<String> for ElaborateModule<'_> {
 
 fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), std::io::Error> {
   fd.write("// Simulation runtime.\n".as_bytes())?;
+  // Dump the helper function of cycles.
+  // fn cyclize(stamp: usize) -> String {
+  //   format!("{}.{:02}", stamp / 100, stamp % 100")
+  // }
+  fd.write("fn cyclize(stamp: usize) -> String {\n".as_bytes())?;
+  fd.write("  format!(\"Cycle @{}.{:02}\", stamp / 100, stamp % 100)\n".as_bytes())?;
+  fd.write("}\n\n".as_bytes())?;
+
   // Dump the event enum. Each event corresponds to a module.
   // Each event instance looks like this:
   //
@@ -443,6 +451,14 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )?;
       fd.write(
         format!(
+          "        println!(\"@line:{{:<6}} {{}}: Commit FIFO {}.{} push {{}}\", line!(), cyclize(event.0.stamp), value);\n",
+          module.get_name(),
+          port.get_name()
+        )
+        .as_bytes(),
+      )?;
+      fd.write(
+        format!(
           "        {}_{}.push_back(value);\n",
           module.get_name(),
           port.get_name()
@@ -460,6 +476,13 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )
       .as_bytes(),
     )?;
+    fd.write(
+      format!(
+        "        println!(\"@line:{{:<6}} {{}}: Commit array {} write\", line!(), cyclize(event.0.stamp));\n",
+        array.get_name()
+      )
+      .as_bytes(),
+    )?;
     fd.write(format!("        {}[idx] = value;\n", array.get_name()).as_bytes())?;
     fd.write("      }\n".as_bytes())?;
   }
@@ -467,7 +490,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write(format!("    if idled > {} {{\n", config.idle_threshold).as_bytes())?;
   fd.write(
     format!(
-      "      println!(\"Idled more than {} cycles, exit @{{}}!\", stamp);\n",
+      "      println!(\"Idled more than {} cycles, exit @{{}}!\", cyclize(stamp));\n",
       config.idle_threshold
     )
     .as_bytes(),
@@ -475,7 +498,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write("      break;\n".as_bytes())?;
   fd.write("    }\n".as_bytes())?;
   fd.write("  }\n".as_bytes())?;
-  fd.write("  println!(\"No event to simulate @{}!\", stamp);\n".as_bytes())?;
+  fd.write("  println!(\"No event to simulate {}!\", cyclize(stamp));\n".as_bytes())?;
   fd.write("}\n\n".as_bytes())?;
   Ok(())
 }
