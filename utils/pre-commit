@@ -2,7 +2,7 @@
 # before checking anything in.
 
 
-for i in `git status --porcelain | awk '{ if (($1 == "M" || $1 == "A") && substr($2, length($2) - 0) == ".rs") print $2 }'`
+for i in `git status --porcelain | awk '{ if (($1 == "M" || $1 == "A") && substr($2, length($2) - 2) == ".rs") print $2 }'`
 do
   echo "Formatting: $i"
   rustfmt $i --config max_width=100,tab_spaces=2
