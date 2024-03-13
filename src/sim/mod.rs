@@ -1,6 +1,5 @@
-pub mod elaborate;
 pub mod config;
+pub mod elaborate;
 
-pub use elaborate::elaborate;
 pub use config::Config;
-
+pub use elaborate::elaborate;

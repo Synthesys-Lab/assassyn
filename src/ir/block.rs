@@ -36,7 +36,6 @@ impl Block {
   pub fn iter<'a>(&'a self) -> impl Iterator<Item = &BaseNode> + 'a {
     self.body.iter()
   }
-
 }
 
 impl Parented for Block {
@@ -50,7 +49,6 @@ impl Parented for Block {
 }
 
 impl BlockRef<'_> {
-
   pub fn get_module(&self) -> ModuleRef<'_> {
     let mut runner = self.upcast().clone();
     while runner.get_kind() != NodeKind::Module {
@@ -67,16 +65,12 @@ impl BlockRef<'_> {
   pub fn next(&self) -> Option<BaseNode> {
     let parent = self.get().get_parent();
     if let Ok(block) = self.sys.get::<Block>(&parent) {
-      let idx = block
-        .body
-        .iter()
-        .position(|x| *x == self.upcast());
+      let idx = block.body.iter().position(|x| *x == self.upcast());
       block.body.get(idx.unwrap()).map(|x| x.clone())
     } else {
       None
     }
   }
-
 }
 
 impl BlockMut<'_> {

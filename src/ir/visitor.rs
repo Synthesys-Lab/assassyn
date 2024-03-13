@@ -2,7 +2,7 @@ use crate::{
   builder::system::SysBuilder,
   data::{Array, ArrayPtr},
   expr::Expr,
-  node::{ArrayRef, BlockRef, ExprRef, FIFORef, ArrayPtrRef, IntImmRef, ModuleRef, NodeKind},
+  node::{ArrayPtrRef, ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, ModuleRef, NodeKind},
   port::FIFO,
   BaseNode, IntImm, Module,
 };

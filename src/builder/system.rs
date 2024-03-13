@@ -5,7 +5,7 @@ use crate::{
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer, visitor::Visitor},
   node::{
-    ArrayRef, BlockRef, CacheKey, Element, IsElement, ModuleRef, Mutable, NodeKind, Referencable
+    ArrayRef, BlockRef, CacheKey, Element, IsElement, ModuleRef, Mutable, NodeKind, Referencable,
   },
   port::FIFO,
   BaseNode, DataType, IntImm, Module,
@@ -493,11 +493,7 @@ impl SysBuilder {
   /// # Arguments
   /// * `ptr` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
-  pub fn create_array_read<'elem>(
-    &mut self,
-    ptr: &BaseNode,
-    cond: Option<BaseNode>,
-  ) -> BaseNode {
+  pub fn create_array_read<'elem>(&mut self, ptr: &BaseNode, cond: Option<BaseNode>) -> BaseNode {
     let array = self.get::<ArrayPtr>(&ptr).unwrap().get_array().clone();
     let dtype = self.get::<Array>(&array).unwrap().scalar_ty().clone();
     let res = self.create_expr(dtype, Opcode::Load, vec![ptr.clone()], cond);

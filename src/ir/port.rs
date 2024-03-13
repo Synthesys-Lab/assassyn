@@ -1,4 +1,8 @@
-use crate::{data::Typed, node::{NodeKind, Parented}, BaseNode, DataType};
+use crate::{
+  data::Typed,
+  node::{NodeKind, Parented},
+  BaseNode, DataType,
+};
 
 pub struct FIFO {
   pub(crate) key: usize,

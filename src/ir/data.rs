@@ -118,13 +118,8 @@ pub struct ArrayPtr {
 }
 
 impl ArrayPtr {
-
   pub fn new(array: BaseNode, idx: BaseNode) -> Self {
-    Self {
-      key: 0,
-      array,
-      idx,
-    }
+    Self { key: 0, array, idx }
   }
 
   pub fn get_array(&self) -> &BaseNode {
@@ -138,7 +133,6 @@ impl ArrayPtr {
   pub fn is_const(&self) -> bool {
     self.get_idx().get_kind() == NodeKind::IntImm
   }
-
 }
 
 pub struct Array {

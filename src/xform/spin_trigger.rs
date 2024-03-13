@@ -82,7 +82,10 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     // Create trigger to the destination module.
     mutator.sys.set_current_module(&agent);
     let agent_module = mutator.sys.get_current_module().unwrap();
-    let agent_ports = agent_module.port_iter().map(|x| x.upcast()).collect::<Vec<_>>();
+    let agent_ports = agent_module
+      .port_iter()
+      .map(|x| x.upcast())
+      .collect::<Vec<_>>();
     let cond = mutator.sys.create_array_read(&lock_handle, None);
     let block = mutator.sys.create_block(Some(cond.clone()));
     mutator.sys.set_current_block(block.clone());
@@ -90,7 +93,9 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       .iter()
       .map(|x| mutator.sys.create_fifo_pop(x, None, None))
       .collect::<Vec<_>>();
-    mutator.sys.create_bundled_trigger(&dest_module, data_to_dst, None);
+    mutator
+      .sys
+      .create_bundled_trigger(&dest_module, data_to_dst, None);
     mutator.sys.set_insert_before(&block);
     let flip_cond = mutator.sys.create_flip(&cond, None);
     // Send the data from agent to the actual inokee.
