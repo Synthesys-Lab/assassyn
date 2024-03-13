@@ -1,3 +1,5 @@
+// TODO(@were): Remove all the predications and move to blocks.
+
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use crate::{
@@ -373,13 +375,41 @@ impl SysBuilder {
     dst: &BaseNode,
     data: Vec<BaseNode>,
     pred: Option<BaseNode>,
-  ) {
+  ) -> BaseNode {
     let current_module = self.get_current_module().unwrap().upcast();
-    let dst_module = dst.as_ref::<Module>(self).unwrap();
-    let ports = dst_module
-      .port_iter()
-      .map(|x| x.upcast())
-      .collect::<Vec<_>>();
+
+    // Handle callback trigger
+    let (ports, types) = {
+      match dst.get_kind() {
+        NodeKind::Module => {
+          let dst_module = dst.as_ref::<Module>(self).unwrap();
+          (
+            dst_module
+              .port_iter()
+              .map(|x| x.upcast())
+              .collect::<Vec<_>>()
+              .into(),
+            None,
+          )
+        }
+        NodeKind::Expr => {
+          let expr = dst.as_ref::<Expr>(self).unwrap();
+          assert_eq!(expr.get_opcode(), Opcode::FIFOPop);
+          if let DataType::Module(types) = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<FIFO>(self)
+            .unwrap()
+            .scalar_ty()
+          {
+            (None, types.iter().map(|x| x.as_ref().clone()).collect::<Vec<_>>().into())
+          } else {
+            panic!("Invalid destination");
+          }
+        }
+        _ => panic!("Invalid destination"),
+      }
+    };
 
     let restore_ip = if let Some(pred) = pred {
       let restore_ip = self.get_insert_point();
@@ -392,27 +422,44 @@ impl SysBuilder {
     };
 
     let mut args = vec![dst.clone()];
-    assert_eq!(ports.len(), data.len(), "Data size mismatch");
-    for (port, arg) in ports.iter().zip(data.iter()) {
-      {
-        let port = port.as_ref::<FIFO>(self).unwrap();
-        assert_eq!(port.scalar_ty(), arg.get_dtype(self).unwrap());
+    let res = if let Some(ports) = ports {
+      assert_eq!(ports.len(), data.len(), "Data size mismatch!");
+      for (port, arg) in ports.iter().zip(data.iter()) {
+        {
+          let port = port.as_ref::<FIFO>(self).unwrap();
+          assert_eq!(port.scalar_ty(), arg.get_dtype(self).unwrap());
+        }
+        let push = self.create_fifo_push(&port, arg.clone(), None);
+        args.push(push);
+        self
+          .get_mut::<Module>(&current_module)
+          .unwrap()
+          .insert_external_interface(port.clone(), Opcode::FIFOPush);
       }
-      let push = self.create_fifo_push(&port, arg.clone(), None);
-      args.push(push);
-      self
-        .get_mut::<Module>(&current_module)
-        .unwrap()
-        .insert_external_interface(port.clone(), Opcode::FIFOPush);
-    }
-    // TODO: Make all FIFO push associate to this trigger to enforce the timing of data arrival.
-    self.create_expr(DataType::void(), Opcode::Trigger, args, None);
-
+      // TODO: Make all FIFO push associate to this trigger to enforce the timing of data arrival.
+      self.create_expr(DataType::void(), Opcode::Trigger, args, None)
+    } else if let Some(types) = types {
+      assert_eq!(types.len(), data.len(), "Signature mismatch!");
+      for (ty, arg) in types.iter().zip(data.iter()) {
+        assert_eq!(ty, &arg.get_dtype(self).unwrap());
+      }
+      self.create_expr(DataType::void(), Opcode::CallbackTrigger, args, None)
+    } else {
+      panic!("Invalid destination");
+    };
     if let Some(restore_ip) = restore_ip {
       self.inesert_point = restore_ip;
     }
+    res
   }
 
+  /// Create a trigger just invoke the given module (destination) without checking the readiness
+  /// of the data. This is something more like a state machine trigger.
+  ///
+  /// # Arguments
+  /// * `dst` - The destination module to be invoked.
+  /// * `pred` - The condition of triggering the destination. If None is given, the trigger is
+  /// always triggered.
   pub fn create_async_trigger(&mut self, dst: &BaseNode, pred: Option<BaseNode>) -> BaseNode {
     self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()], pred)
   }

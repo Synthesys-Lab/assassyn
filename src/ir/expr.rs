@@ -30,7 +30,9 @@ pub enum Opcode {
   FIFOPush,
   FIFOPop,
   Trigger,
+  // Level-2 syntax sugar, will be written by synthesizable operations
   SpinTrigger,
+  CallbackTrigger,
 }
 
 impl Opcode {
@@ -77,6 +79,7 @@ impl ToString for Opcode {
       Opcode::Store => "store".into(),
       Opcode::Trigger => "trigger".into(),
       Opcode::SpinTrigger => "wait_until".into(),
+      Opcode::CallbackTrigger => "callback".into(),
       Opcode::FIFOPush => "push".into(),
       Opcode::FIFOPop => "pop".into(),
     }

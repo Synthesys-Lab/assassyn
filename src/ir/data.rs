@@ -6,7 +6,7 @@ pub enum DataType {
   Int(usize),
   UInt(usize),
   Fp32,
-  Module,
+  Module(Vec<Box<DataType>>),
 }
 
 pub trait Typed {
@@ -16,6 +16,10 @@ pub trait Typed {
 impl DataType {
   pub fn void() -> Self {
     DataType::Void
+  }
+
+  pub fn module(inputs: Vec<DataType>) -> Self {
+    DataType::Module(inputs.into_iter().map(|x| Box::new(x)).collect())
   }
 
   pub fn int(bits: usize) -> Self {
@@ -36,7 +40,7 @@ impl DataType {
       DataType::Int(bits) => *bits,
       DataType::UInt(bits) => *bits,
       DataType::Fp32 => 32,
-      DataType::Module => 0,
+      DataType::Module(_) => 0,
     }
   }
 
@@ -76,7 +80,7 @@ impl ToString for DataType {
       &DataType::UInt(_) => format!("u{}", self.bits()),
       &DataType::Fp32 => format!("f{}", self.bits()),
       &DataType::Void => String::from("()"),
-      &DataType::Module => String::from("module"),
+      &DataType::Module(_) => String::from("module"),
     }
   }
 }
