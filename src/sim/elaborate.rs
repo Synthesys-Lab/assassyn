@@ -224,7 +224,9 @@ impl Visitor<String> for ElaborateModule<'_> {
           let fifo_name = namify(fifo.get_name());
           format!(
             "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO_push_{}_{}({}) }}))",
-            namify(&module_name), fifo_name, value
+            namify(&module_name),
+            fifo_name,
+            value
           )
         }
         _ => {
@@ -444,6 +446,16 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write("  }\n".as_bytes())?;
   // TODO(@were): Dump the time stamp of the simulation.
   fd.write("  while let Some(event) = q.pop() {\n".as_bytes())?;
+  fd.write(format!("    if event.0.stamp / 100 > {} {{", config.sim_threshold).as_bytes())?;
+  fd.write(
+    format!(
+      "      println!(\"Exceed the simulation threshold {}, exit!\");\n",
+      config.sim_threshold
+    )
+    .as_bytes(),
+  )?;
+  fd.write("      break;\n".as_bytes())?;
+  fd.write("    }\n".as_bytes())?;
   fd.write("    match event.0.kind {\n".as_bytes())?;
   for module in sys.module_iter() {
     fd.write(
@@ -549,7 +561,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write("      break;\n".as_bytes())?;
   fd.write("    }\n".as_bytes())?;
   fd.write("  }\n".as_bytes())?;
-  fd.write("  println!(\"No event to simulate {}!\", cyclize(stamp));\n".as_bytes())?;
+  fd.write("  println!(\"Finish simulation: {}!\", cyclize(stamp));\n".as_bytes())?;
   fd.write("}\n\n".as_bytes())?;
   Ok(())
 }
