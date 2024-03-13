@@ -402,7 +402,14 @@ impl SysBuilder {
             .unwrap()
             .scalar_ty()
           {
-            (None, types.iter().map(|x| x.as_ref().clone()).collect::<Vec<_>>().into())
+            (
+              None,
+              types
+                .iter()
+                .map(|x| x.as_ref().clone())
+                .collect::<Vec<_>>()
+                .into(),
+            )
           } else {
             panic!("Invalid destination");
           }

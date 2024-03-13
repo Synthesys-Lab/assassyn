@@ -8,7 +8,6 @@ use crate::{
 
 #[test]
 fn callback() {
-
   fn memory(sys: &mut SysBuilder) -> BaseNode {
     let int32 = DataType::int(32);
     let port = PortInfo::new("addr", int32.clone());
