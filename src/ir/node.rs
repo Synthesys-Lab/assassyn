@@ -219,7 +219,11 @@ impl BaseNode {
 
   pub fn get_dtype(&self, sys: &SysBuilder) -> Option<DataType> {
     match self.kind {
-      NodeKind::Module | NodeKind::Array => None,
+      NodeKind::Module => {
+        let module = self.as_ref::<Module>(sys).unwrap();
+        module.dtype().clone().into()
+      }
+      NodeKind::Array => None,
       NodeKind::IntImm => {
         let int_imm = self.as_ref::<IntImm>(sys).unwrap();
         int_imm.dtype().clone().into()

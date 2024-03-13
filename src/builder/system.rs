@@ -3,7 +3,7 @@
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use crate::{
-  data::{Array, ArrayPtr},
+  data::{Array, ArrayPtr, Typed},
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer, visitor::Visitor},
   node::{
@@ -395,13 +395,8 @@ impl SysBuilder {
         NodeKind::Expr => {
           let expr = dst.as_ref::<Expr>(self).unwrap();
           assert_eq!(expr.get_opcode(), Opcode::FIFOPop);
-          if let DataType::Module(types) = expr
-            .get_operand(0)
-            .unwrap()
-            .as_ref::<FIFO>(self)
-            .unwrap()
-            .scalar_ty()
-          {
+          let ty = expr.get().dtype();
+          if let DataType::Module(types) = ty {
             (
               None,
               types
@@ -411,7 +406,7 @@ impl SysBuilder {
                 .into(),
             )
           } else {
-            panic!("Invalid destination");
+            panic!("Invalid destination, {:?}", dst);
           }
         }
         _ => panic!("Invalid destination"),
@@ -449,6 +444,7 @@ impl SysBuilder {
       assert_eq!(types.len(), data.len(), "Signature mismatch!");
       for (ty, arg) in types.iter().zip(data.iter()) {
         assert_eq!(ty, &arg.get_dtype(self).unwrap());
+        args.push(arg.clone());
       }
       self.create_expr(DataType::void(), Opcode::CallbackTrigger, args, None)
     } else {

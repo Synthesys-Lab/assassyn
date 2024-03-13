@@ -75,12 +75,19 @@ impl DataType {
 
 impl ToString for DataType {
   fn to_string(&self) -> String {
-    match self {
+    match &self {
       &DataType::Int(_) => format!("i{}", self.bits()),
       &DataType::UInt(_) => format!("u{}", self.bits()),
       &DataType::Fp32 => format!("f{}", self.bits()),
       &DataType::Void => String::from("()"),
-      &DataType::Module(_) => String::from("module"),
+      &DataType::Module(args) => format!(
+        "module[{}]",
+        args
+          .iter()
+          .map(|x| x.to_string())
+          .collect::<Vec<String>>()
+          .join(", ")
+      ),
     }
   }
 }

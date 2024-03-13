@@ -2,8 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
   builder::system::{PortInfo, SysBuilder},
+  data::Typed,
   expr::Opcode,
   node::{BaseNode, BlockRef, FIFORef, ModuleMut, ModuleRef, NodeKind, Parented},
+  DataType,
 };
 
 use super::{block::Block, port::FIFO};
@@ -110,6 +112,17 @@ impl<'a> ModuleMut<'a> {
     }
     let operations = self.get_mut().external_interfaces.get_mut(&array).unwrap();
     operations.insert(opcode);
+  }
+}
+
+impl Typed for ModuleRef<'_> {
+  fn dtype(&self) -> DataType {
+    let types = self
+      .inputs
+      .iter()
+      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
+      .collect::<Vec<_>>();
+    DataType::module(types)
   }
 }
 
