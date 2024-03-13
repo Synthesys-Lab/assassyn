@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use crate::{
   builder::system::SysBuilder,
-  data::{Array, Handle, IntImm, Typed},
+  data::{Array, ArrayPtr, IntImm, Typed},
   ir::{ir_printer::IRPrinter, visitor::Visitor},
   DataType, Module,
 };
@@ -173,7 +173,7 @@ register_element!(Expr, ExprRef, ExprMut);
 register_element!(Array, ArrayRef, ArrayMut);
 register_element!(IntImm, IntImmRef, IntImmMut);
 register_element!(Block, BlockRef, BlockMut);
-register_element!(Handle, HandleRef, HandleMut);
+register_element!(ArrayPtr, ArrayPtrRef, ArrayPtrMut);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum NodeKind {
@@ -183,7 +183,7 @@ pub enum NodeKind {
   Array,
   IntImm,
   Block,
-  Handle,
+  ArrayPtr,
   Unknown,
 }
 
@@ -197,7 +197,7 @@ pub struct BaseNode {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum CacheKey {
   IntImm((DataType, u64)),
-  Handle((BaseNode, BaseNode)),
+  ArrayPtr((BaseNode, BaseNode)),
 }
 
 impl BaseNode {
@@ -233,7 +233,7 @@ impl BaseNode {
         expr.dtype().clone().into()
       }
       NodeKind::Block => None,
-      NodeKind::Handle => None,
+      NodeKind::ArrayPtr => None,
       NodeKind::Unknown => {
         panic!("Unknown reference")
       }
@@ -245,7 +245,7 @@ impl BaseNode {
       NodeKind::Module => None,
       NodeKind::Array => None,
       NodeKind::IntImm => None,
-      NodeKind::Handle => None,
+      NodeKind::ArrayPtr => None,
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
@@ -287,8 +287,8 @@ impl BaseNode {
         let block = self.as_ref::<Block>(sys).unwrap();
         IRPrinter::new(sys).visit_block(&block).unwrap()
       }
-      NodeKind::Handle => {
-        let handle = self.as_ref::<Handle>(sys).unwrap();
+      NodeKind::ArrayPtr => {
+        let handle = self.as_ref::<ArrayPtr>(sys).unwrap();
         let array = handle.get_array();
         let idx = handle.get_idx();
         format!("{}[{}]", array.to_string(sys), idx.to_string(sys))
@@ -307,5 +307,5 @@ pub enum Element {
   Array(Box<Array>),
   IntImm(Box<IntImm>),
   Block(Box<Block>),
-  Handle(Box<Handle>),
+  ArrayPtr(Box<ArrayPtr>),
 }

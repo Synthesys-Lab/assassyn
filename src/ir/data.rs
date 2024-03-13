@@ -85,7 +85,7 @@ impl IntImm {
 
 /// Handle is like a "pointer" to an array element.
 /// It is similar to LLVM's `GetElementPtrInst`, but 1-d.
-pub struct Handle {
+pub struct ArrayPtr {
   pub(crate) key: usize,
   /// The array to be accessed.
   array: BaseNode,
@@ -93,7 +93,7 @@ pub struct Handle {
   idx: BaseNode,
 }
 
-impl Handle {
+impl ArrayPtr {
 
   pub fn new(array: BaseNode, idx: BaseNode) -> Self {
     Self {

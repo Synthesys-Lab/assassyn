@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use crate::{
-  data::{Array, Handle},
+  data::{Array, ArrayPtr},
   expr::{Expr, Opcode},
   ir::{block::Block, ir_printer, visitor::Visitor},
   node::{
@@ -300,17 +300,17 @@ impl SysBuilder {
   ///
   /// * `array` - The array to be accessed.
   /// * `idx` - The index to be accessed.
-  pub fn create_handle(&mut self, array: &BaseNode, idx: &BaseNode) -> BaseNode {
+  pub fn create_array_ptr(&mut self, array: &BaseNode, idx: &BaseNode) -> BaseNode {
     assert_eq!(array.get_kind(), NodeKind::Array);
     match idx.get_dtype(self).unwrap() {
       DataType::Int(_) | DataType::UInt(_) => {}
       _ => panic!("Invalid index type"),
     }
-    let cached_key = CacheKey::Handle((array.clone(), idx.clone()));
+    let cached_key = CacheKey::ArrayPtr((array.clone(), idx.clone()));
     if let Some(cached) = self.cached_nodes.get(&cached_key) {
       return cached.clone();
     }
-    let instance = Handle::new(array.clone(), idx.clone());
+    let instance = ArrayPtr::new(array.clone(), idx.clone());
     let key = self.insert_element(instance);
     self.cached_nodes.insert(cached_key, key.clone());
     key
@@ -491,16 +491,16 @@ impl SysBuilder {
   /// Create a read operation on an array.
   ///
   /// # Arguments
-  /// * `handle` - The pointer to the array element.
+  /// * `ptr` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
   pub fn create_array_read<'elem>(
     &mut self,
-    handle: &BaseNode,
+    ptr: &BaseNode,
     cond: Option<BaseNode>,
   ) -> BaseNode {
-    let array = self.get::<Handle>(&handle).unwrap().get_array().clone();
+    let array = self.get::<ArrayPtr>(&ptr).unwrap().get_array().clone();
     let dtype = self.get::<Array>(&array).unwrap().scalar_ty().clone();
-    let res = self.create_expr(dtype, Opcode::Load, vec![handle.clone()], cond);
+    let res = self.create_expr(dtype, Opcode::Load, vec![ptr.clone()], cond);
     let cur_mod = self.inesert_point.0.clone();
     self
       .get_mut::<Module>(&cur_mod)
@@ -512,17 +512,17 @@ impl SysBuilder {
   /// Create a write operation on an array.
   ///
   /// # Arguments
-  /// * `handle` - The pointer to the array element.
+  /// * `ptr` - The pointer to the array element.
   /// * `value` - The value to be written.
   /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
   pub fn create_array_write(
     &mut self,
-    handle: &BaseNode,
+    ptr: &BaseNode,
     value: &BaseNode,
     cond: Option<BaseNode>,
   ) -> BaseNode {
-    let array = self.get::<Handle>(&handle).unwrap().get_array().clone();
-    let operands = vec![handle.clone(), value.clone()];
+    let array = self.get::<ArrayPtr>(&ptr).unwrap().get_array().clone();
+    let operands = vec![ptr.clone(), value.clone()];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands, cond);
     let cur_mod = self.inesert_point.0.clone();
     self

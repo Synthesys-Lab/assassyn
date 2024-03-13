@@ -1,6 +1,6 @@
 use crate::{
   data::{DataType, Typed},
-  node::{ExprMut, IsElement, Parented},
+  node::{ExprMut, ExprRef, IsElement, Parented},
 };
 
 use super::{block::Block, node::BaseNode};
@@ -140,8 +140,17 @@ impl Parented for Expr {
   }
 }
 
-impl ExprMut<'_> {
+impl ExprRef<'_> {
+  // Get the next expression in the block
+  pub fn next(&self) -> Option<BaseNode> {
+    let parent = self.get().get_parent();
+    let block = self.sys.get::<Block>(&parent).unwrap();
+    let pos = block.iter().position(|x| *x == self.upcast());
+    block.get().get(pos.unwrap()).map(|x| x.clone())
+  }
+}
 
+impl ExprMut<'_> {
   pub fn move_to_new_parent(&mut self, new_parent: BaseNode, at: Option<usize>) {
     let old_parent = self.get().get_parent();
     let expr = self.get().upcast();

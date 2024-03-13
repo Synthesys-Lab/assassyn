@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
   builder::system::SysBuilder,
-  data::{Handle, Typed},
+  data::{ArrayPtr, Typed},
   expr::{Expr, Opcode},
   ir::{block::Block, port::FIFO, visitor::Visitor},
   node::{
@@ -155,7 +155,7 @@ impl Visitor<String> for ElaborateModule<'_> {
           let handle = expr
             .get_operand(0)
             .unwrap()
-            .as_ref::<Handle>(expr.sys)
+            .as_ref::<ArrayPtr>(expr.sys)
             .unwrap();
           format!(
             "{}[{} as usize]",
@@ -167,7 +167,7 @@ impl Visitor<String> for ElaborateModule<'_> {
           let handle = expr
             .get_operand(0)
             .unwrap()
-            .as_ref::<Handle>(expr.sys)
+            .as_ref::<ArrayPtr>(expr.sys)
             .unwrap();
           format!(
             "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::Array_commit_{}({} as usize, {}) }}))",

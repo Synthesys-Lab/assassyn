@@ -63,6 +63,20 @@ impl BlockRef<'_> {
     runner.as_ref::<Module>(self.sys).unwrap()
   }
 
+  /// Get the next node in the IR tree.
+  pub fn next(&self) -> Option<BaseNode> {
+    let parent = self.get().get_parent();
+    if let Ok(block) = self.sys.get::<Block>(&parent) {
+      let idx = block
+        .body
+        .iter()
+        .position(|x| *x == self.upcast());
+      block.body.get(idx.unwrap()).map(|x| x.clone())
+    } else {
+      None
+    }
+  }
+
 }
 
 impl BlockMut<'_> {

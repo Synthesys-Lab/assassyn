@@ -16,8 +16,8 @@ fn check(sys: &mut SysBuilder, before: bool) {
     let a = sys.get_array("a").unwrap().upcast();
     (a, odd)
   };
-  let ptr_a0 = sys.create_handle(&a, &zero);
-  let ptr_odd0 = sys.create_handle(&odd, &zero);
+  let ptr_a0 = sys.create_array_ptr(&a, &zero);
+  let ptr_odd0 = sys.create_array_ptr(&odd, &zero);
 
   let body = sys.get_driver().get_body();
   let mut iter = body.iter();
@@ -85,17 +85,21 @@ fn check(sys: &mut SysBuilder, before: bool) {
 #[test]
 fn predication_propagation() {
   let mut sys = SysBuilder::new("main");
+  {
+    let driver = sys.get_driver().upcast();
+    sys.set_current_module(&driver);
+  }
   let int32 = DataType::int(32);
   let a = sys.create_array(&int32, "a", 1);
   let odd = sys.create_array(&int32, "odd", 1);
   let zero = sys.get_const_int(&int32, 0);
-  let ptr_a = sys.create_handle(&a, &zero);
+  let ptr_a = sys.create_array_ptr(&a, &zero);
   let a0 = sys.create_array_read(&ptr_a, None);
   let one = sys.get_const_int(&int32, 1);
   let plused = sys.create_add(None, &a0, &one, None);
   sys.create_array_write(&ptr_a, &plused, None);
   let is_odd = sys.create_bitwise_and(None, &a0, &one, None);
-  let ptr_odd = sys.create_handle(&odd, &zero);
+  let ptr_odd = sys.create_array_ptr(&odd, &zero);
   let odd0 = sys.create_array_read(&ptr_odd, Some(is_odd.clone()));
   let acc_odd = sys.create_add(None, &odd0, &one, None);
   sys.create_array_write(&ptr_odd, &acc_odd, None);

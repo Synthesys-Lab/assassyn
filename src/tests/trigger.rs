@@ -34,7 +34,7 @@ fn trigger() {
     let a = sys.create_array(&int32, "cnt", 1);
     let zero = sys.get_const_int(&int32, 0);
     let one = sys.get_const_int(&int32, 1);
-    let handle = sys.create_handle(&a, &zero);
+    let handle = sys.create_array_ptr(&a, &zero);
     let a0 = sys.create_array_read(&handle, None);
     let hundred = sys.get_const_int(&int32, 100);
     let cond = sys.create_ilt(None, &a0, &hundred, None);
