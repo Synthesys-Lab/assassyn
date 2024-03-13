@@ -55,4 +55,7 @@ fn spin_trigger() {
   elaborate(&sys, &config).unwrap();
   let exec_name = utils::temp_dir(&"trigger".to_string());
   utils::compile(&config.fname, &exec_name);
+
+  // TODO(@were): Make a time timeout here.
+  utils::run(&exec_name);
 }
