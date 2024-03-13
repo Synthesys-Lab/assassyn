@@ -1,7 +1,7 @@
 use super::utils;
 use crate::builder::system::{PortInfo, SysBuilder};
 use crate::node::IsElement;
-use crate::{sim, DataType, Module, BaseNode};
+use crate::{sim, BaseNode, DataType, Module};
 
 #[test]
 fn trigger() {
