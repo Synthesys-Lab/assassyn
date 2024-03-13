@@ -255,7 +255,7 @@ impl BaseNode {
     }
   }
 
-  pub fn as_ref<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Referencable<'elem, 'sys, T>> (
+  pub fn as_ref<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Referencable<'elem, 'sys, T>>(
     &self,
     sys: &'sys SysBuilder,
   ) -> Result<T::Reference, String> {

@@ -6,6 +6,7 @@ pub enum DataType {
   Int(usize),
   UInt(usize),
   Fp32,
+  Module,
 }
 
 pub trait Typed {
@@ -35,6 +36,7 @@ impl DataType {
       DataType::Int(bits) => *bits,
       DataType::UInt(bits) => *bits,
       DataType::Fp32 => 32,
+      DataType::Module => 0,
     }
   }
 
@@ -74,6 +76,7 @@ impl ToString for DataType {
       &DataType::UInt(_) => format!("u{}", self.bits()),
       &DataType::Fp32 => format!("f{}", self.bits()),
       &DataType::Void => String::from("()"),
+      &DataType::Module => String::from("module"),
     }
   }
 }

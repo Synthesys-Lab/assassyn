@@ -46,7 +46,7 @@ impl Module {
 impl<'sys> ModuleRef<'sys> {
   /// Get the number of inputs to the module.
   pub fn get_num_inputs(&self) -> usize {
-    self.get().inputs.len()
+    self.inputs.len()
   }
 
   /// Get the given input reference.
