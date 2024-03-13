@@ -1,7 +1,5 @@
 use crate::{
-  builder::system::{PortInfo, SysBuilder},
-  node::IsElement,
-  xform, BaseNode, DataType, Module,
+  builder::system::{PortInfo, SysBuilder}, node::IsElement, sim::{self, elaborate}, tests::utils, xform, BaseNode, DataType, Module
 };
 
 #[test]
@@ -24,7 +22,7 @@ fn spin_trigger() {
     let driver = sys.get_driver().upcast();
     sys.set_current_module(&driver);
     let int32 = DataType::int(32);
-    let stamp = sys.create_array(&int32, "stamp", 1);
+    let stamp = sys.create_array(&int32, "cnt", 1);
     let zero = sys.get_const_int(&int32, 0);
     let a0ptr = sys.create_array_ptr(&stamp, &zero);
     let a0 = sys.create_array_read(&a0ptr, None);
@@ -45,7 +43,16 @@ fn spin_trigger() {
   let sqr_module = squarer(&mut sys);
   driver(&mut sys, sqr_module);
   println!("{}", sys);
-  xform::propagate_predications(&mut sys);
-  xform::rewrite_spin_triggers(&mut sys);
+  xform::basic(&mut sys);
   println!("{}", sys);
+
+  let config = sim::Config {
+    fname:utils::temp_dir(&String::from("spin_trigger.rs")),
+    sim_threshold: 200,
+    idle_threshold: 200,
+  };
+
+  elaborate(&sys, &config).unwrap();
+  let exec_name = utils::temp_dir(&"trigger".to_string());
+  utils::compile(&config.fname, &exec_name);
 }

@@ -5,9 +5,14 @@ use std::{
 };
 
 use crate::{
-  builder::system::SysBuilder, data::{ArrayPtr, Typed}, expr::{Expr, Opcode}, ir::{block::Block, port::FIFO, visitor::Visitor}, node::{
+  builder::system::SysBuilder,
+  data::{ArrayPtr, Typed},
+  expr::{Expr, Opcode},
+  ir::{block::Block, port::FIFO, visitor::Visitor},
+  node::{
     ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, IsElement, ModuleRef, NodeKind, Parented,
-  }, DataType, Module
+  },
+  DataType, Module,
 };
 
 use super::Config;
@@ -29,13 +34,13 @@ impl<'a> Visitor<String> for InterfDecl<'a> {
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     format!(
       "  {}: &{}Vec<{}>,",
-      array.get_name(),
+      namify(array.get_name()),
       if self.0.contains(&Opcode::Store) {
         "mut "
       } else {
         ""
       },
-      array.scalar_ty().to_string()
+      dtype_to_rust_type(&array.scalar_ty())
     )
     .into()
   }
@@ -44,9 +49,9 @@ impl<'a> Visitor<String> for InterfDecl<'a> {
     let module = fifo.get_parent().as_ref::<Module>(fifo.sys).unwrap();
     format!(
       "  {}_{}: &mut VecDeque<{}>,",
-      module.get_name(),
-      fifo.get_name(),
-      fifo.scalar_ty().to_string()
+      namify(module.get_name()),
+      namify(fifo.get_name()),
+      dtype_to_rust_type(&fifo.scalar_ty())
     )
     .into()
   }
@@ -63,7 +68,7 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
       } else {
         ""
       },
-      array.get_name(),
+      namify(array.get_name()),
     )
     .into()
   }
@@ -71,8 +76,8 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
     let module = fifo.get_parent().as_ref::<Module>(fifo.sys).unwrap();
     format!(
       ", /*Ext.Interf.FIFO*/&mut {}_{}",
-      module.get_name(),
-      fifo.get_name(),
+      namify(module.get_name()),
+      namify(fifo.get_name()),
     )
     .into()
   }
@@ -81,17 +86,17 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
 impl Visitor<String> for ElaborateModule<'_> {
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
     let mut res = String::new();
-    res.push_str(format!("// Elaborating module {}\n", module.get_name()).as_str());
-    res.push_str(format!("fn {}(\n", module.get_name()).as_str());
+    res.push_str(format!("// Elaborating module {}\n", namify(module.get_name())).as_str());
+    res.push_str(format!("fn {}(\n", namify(module.get_name())).as_str());
     res.push_str("  stamp: usize,\n");
     res.push_str("  q: &mut BinaryHeap<Reverse<Event>>,\n");
     for port in module.port_iter() {
       res.push_str(
         format!(
           "  {}_{}: &mut VecDeque<{}>, // input\n",
-          module.get_name(),
-          port.get_name(),
-          port.scalar_ty().to_string()
+          namify(module.get_name()),
+          namify(port.get_name()),
+          dtype_to_rust_type(&port.scalar_ty())
         )
         .as_str(),
       );
@@ -105,7 +110,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     res.push_str(
       format!(
         "  println!(\"@line:{{:<6}} {{}}: Simulating module {}\", line!(), cyclize(stamp));\n",
-        module.get_name()
+        namify(module.get_name())
       )
       .as_str(),
     );
@@ -154,8 +159,8 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap();
           format!(
             "{}[{} as usize]",
-            handle.get_array().to_string(expr.sys),
-            handle.get_idx().to_string(expr.sys)
+            namify(&handle.get_array().to_string(expr.sys)),
+            namify(&handle.get_idx().to_string(expr.sys))
           )
         }
         Opcode::Store => {
@@ -166,8 +171,8 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap();
           format!(
             "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::Array_commit_{}({} as usize, {}) }}))",
-            handle.get_array().to_string(expr.sys),
-            handle.get_idx().to_string(expr.sys),
+            namify(&handle.get_array().to_string(expr.sys)),
+            namify(&handle.get_idx().to_string(expr.sys)),
             expr.get_operand(1).unwrap().to_string(self.sys),
           )
         }
@@ -177,7 +182,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap()
             .as_ref::<Module>(self.sys)
             .unwrap();
-          let module_name = module_ref.get_name();
+          let module_name = namify(module_ref.get_name());
           format!(
             "q.push(Reverse(Event{{ stamp: stamp + 100, kind: EventKind::Module_{} }}))",
             module_name
@@ -196,8 +201,12 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap()
             .get_name()
             .to_string();
-          let fifo_name = fifo.get_name();
-          format!("{}_{}.pop_front().unwrap()", module_name, fifo_name)
+          let fifo_name = namify(fifo.get_name());
+          format!(
+            "{}_{}.pop_front().unwrap()",
+            namify(&module_name),
+            fifo_name
+          )
         }
         Opcode::FIFOPush => {
           let fifo = expr
@@ -212,10 +221,10 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap()
             .get_name()
             .to_string();
-          let fifo_name = fifo.get_name();
+          let fifo_name = namify(fifo.get_name());
           format!(
             "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO_push_{}_{}({}) }}))",
-            module_name, fifo_name, value
+            namify(&module_name), fifo_name, value
           )
         }
         _ => {
@@ -249,7 +258,18 @@ impl Visitor<String> for ElaborateModule<'_> {
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
     if let Some(cond) = block.get_pred() {
-      res.push_str(format!("  if {} {{\n", cond.to_string(self.sys)).as_str());
+      res.push_str(
+        format!(
+          "  if {}{} {{\n",
+          cond.to_string(self.sys),
+          if cond.get_dtype(block.sys).unwrap().bits() == 1 {
+            "".into()
+          } else {
+            format!(" != 0")
+          }
+        )
+        .as_str(),
+      );
     }
     self.indent += 2;
     for elem in block.iter() {
@@ -286,9 +306,13 @@ fn dtype_to_rust_type(dtype: &DataType) -> String {
       "i8".to_string()
     } else {
       format!("i{}", dtype.bits().next_power_of_two())
-    }
+    };
   }
   panic!("Not implemented yet!")
+}
+
+fn namify(name: &str) -> String {
+  name.replace(".", "_")
 }
 
 fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), std::io::Error> {
@@ -314,14 +338,14 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write("#[derive(Debug, Eq, PartialEq)]\n".as_bytes())?;
   fd.write("enum EventKind {\n".as_bytes())?;
   for module in sys.module_iter() {
-    fd.write(format!("  Module_{},\n", module.get_name()).as_bytes())?;
+    fd.write(format!("  Module_{},\n", namify(module.get_name())).as_bytes())?;
     for port in module.port_iter() {
       fd.write(
         format!(
           "  FIFO_push_{}_{}({}),\n",
-          module.get_name(),
-          port.get_name(),
-          port.scalar_ty().to_string(),
+          namify(module.get_name()),
+          namify(port.get_name()),
+          dtype_to_rust_type(&port.scalar_ty()),
         )
         .as_bytes(),
       )?;
@@ -331,8 +355,8 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
     fd.write(
       format!(
         "  Array_commit_{}(usize, {}),\n",
-        array.get_name(),
-        array.scalar_ty().to_string()
+        namify(array.get_name()),
+        dtype_to_rust_type(&array.scalar_ty())
       )
       .as_bytes(),
     )?;
@@ -384,9 +408,13 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   for array in sys.array_iter() {
     fd.write(
       format!(
-        "  let mut {} = vec![0 as {}; {}];\n",
-        array.get_name(),
-        array.scalar_ty().to_string(),
+        "  let mut {} = vec![{}; {}];\n",
+        namify(array.get_name()),
+        if array.scalar_ty().bits() == 1 {
+          "false".into()
+        } else {
+          format!("0 as {}", dtype_to_rust_type(&array.scalar_ty()))
+        },
         array.get_size()
       )
       .as_bytes(),
@@ -398,9 +426,9 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       fd.write(
         format!(
           "  let mut {}_{} : VecDeque<{}> = VecDeque::new();\n",
-          module.get_name(),
-          port.get_name(),
-          port.scalar_ty().to_string()
+          namify(module.get_name()),
+          namify(port.get_name()),
+          dtype_to_rust_type(&port.scalar_ty())
         )
         .as_bytes(),
       )?;
@@ -418,15 +446,27 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   fd.write("  while let Some(event) = q.pop() {\n".as_bytes())?;
   fd.write("    match event.0.kind {\n".as_bytes())?;
   for module in sys.module_iter() {
-    fd.write(format!("      EventKind::Module_{} => {{\n", module.get_name(),).as_bytes())?;
-    fd.write(format!("        {}(event.0.stamp, &mut q", module.get_name()).as_bytes())?;
+    fd.write(
+      format!(
+        "      EventKind::Module_{} => {{\n",
+        namify(module.get_name())
+      )
+      .as_bytes(),
+    )?;
+    fd.write(
+      format!(
+        "        {}(event.0.stamp, &mut q",
+        namify(module.get_name())
+      )
+      .as_bytes(),
+    )?;
     for (i, port) in module.port_iter().enumerate() {
       fd.write(
         format!(
           ", /*FIFO.{}*/ &mut {}_{}",
           i,
-          module.get_name(),
-          port.get_name()
+          namify(module.get_name()),
+          namify(port.get_name())
         )
         .as_bytes(),
       )?;
@@ -455,24 +495,24 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       fd.write(
         format!(
           "      EventKind::FIFO_push_{}_{}(value) => {{\n",
-          module.get_name(),
-          port.get_name()
+          namify(module.get_name()),
+          namify(port.get_name())
         )
         .as_bytes(),
       )?;
       fd.write(
         format!(
           "        println!(\"@line:{{:<6}} {{}}: Commit FIFO {}.{} push {{}}\", line!(), cyclize(event.0.stamp), value);\n",
-          module.get_name(),
-          port.get_name()
+          namify(module.get_name()),
+          namify(port.get_name())
         )
         .as_bytes(),
       )?;
       fd.write(
         format!(
           "        {}_{}.push_back(value);\n",
-          module.get_name(),
-          port.get_name()
+          namify(module.get_name()),
+          namify(port.get_name())
         )
         .as_bytes(),
       )?;
@@ -483,18 +523,18 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
     fd.write(
       format!(
         "      EventKind::Array_commit_{}(idx, value) => {{\n",
-        array.get_name()
+        namify(array.get_name())
       )
       .as_bytes(),
     )?;
     fd.write(
       format!(
         "        println!(\"@line:{{:<6}} {{}}: Commit array {} write\", line!(), cyclize(event.0.stamp));\n",
-        array.get_name()
+        namify(array.get_name())
       )
       .as_bytes(),
     )?;
-    fd.write(format!("        {}[idx] = value;\n", array.get_name()).as_bytes())?;
+    fd.write(format!("        {}[idx] = value;\n", namify(array.get_name())).as_bytes())?;
     fd.write("      }\n".as_bytes())?;
   }
   fd.write("    }\n".as_bytes())?;

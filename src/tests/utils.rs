@@ -16,6 +16,10 @@ pub(super) fn compile(src: &String, exe: &String) {
   println!("Successfully compiled to {}", exe);
 }
 
+/// Put the given file into a temporary directory and return the path.
+///
+/// # Arguments
+/// * `fname` - The name of the file to put into the temporary directory.
 pub(super) fn temp_dir(fname: &String) -> String {
   let dir = std::env::temp_dir();
   let fname = dir.join(fname);

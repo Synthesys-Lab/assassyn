@@ -72,7 +72,7 @@ impl ToString for Opcode {
       Opcode::ILE => "<=".into(),
       Opcode::EQ => "==".into(),
       Opcode::Neg => "-".into(),
-      Opcode::Flip => "~".into(),
+      Opcode::Flip => "!".into(),
       Opcode::Load => "load".into(),
       Opcode::Store => "store".into(),
       Opcode::Trigger => "trigger".into(),
