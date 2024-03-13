@@ -5,14 +5,9 @@ use std::{
 };
 
 use crate::{
-  builder::system::SysBuilder,
-  data::{ArrayPtr, Typed},
-  expr::{Expr, Opcode},
-  ir::{block::Block, port::FIFO, visitor::Visitor},
-  node::{
+  builder::system::SysBuilder, data::{ArrayPtr, Typed}, expr::{Expr, Opcode}, ir::{block::Block, port::FIFO, visitor::Visitor}, node::{
     ArrayRef, BlockRef, ExprRef, FIFORef, IntImmRef, IsElement, ModuleRef, NodeKind, Parented,
-  },
-  Module,
+  }, DataType, Module
 };
 
 use super::Config;
@@ -246,7 +241,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     format!(
       "({} as {})",
       int_imm.get_value(),
-      int_imm.dtype().to_string()
+      dtype_to_rust_type(&int_imm.dtype())
     )
     .into()
   }
@@ -278,6 +273,22 @@ impl Visitor<String> for ElaborateModule<'_> {
     }
     res.into()
   }
+}
+
+fn dtype_to_rust_type(dtype: &DataType) -> String {
+  if dtype.is_int() {
+    let bits = dtype.bits();
+    return if bits.is_power_of_two() && bits >= 8 && bits <= 64 {
+      format!("i{}", dtype.bits())
+    } else if bits == 1 {
+      "bool".to_string()
+    } else if bits.is_power_of_two() && bits < 8 {
+      "i8".to_string()
+    } else {
+      format!("i{}", dtype.bits().next_power_of_two())
+    }
+  }
+  panic!("Not implemented yet!")
 }
 
 fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), std::io::Error> {

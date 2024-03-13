@@ -38,6 +38,27 @@ impl DataType {
     }
   }
 
+  pub fn is_signed(&self) -> bool {
+    match self {
+      DataType::Int(_) | DataType::Fp32 => true,
+      _ => false,
+    }
+  }
+
+  pub fn is_fp(&self) -> bool {
+    match self {
+      DataType::Fp32 => true,
+      _ => false,
+    }
+  }
+
+  pub fn is_int(&self) -> bool {
+    match self {
+      DataType::Int(_) => true,
+      _ => false,
+    }
+  }
+
   pub fn is_void(&self) -> bool {
     match self {
       DataType::Void => true,

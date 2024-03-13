@@ -26,20 +26,26 @@ fn spin_trigger() {
     let int32 = DataType::int(32);
     let stamp = sys.create_array(&int32, "stamp", 1);
     let zero = sys.get_const_int(&int32, 0);
-    let handle = sys.create_array_ptr(&stamp, &zero);
-    let a0 = sys.create_array_read(&handle, None);
+    let a0ptr = sys.create_array_ptr(&stamp, &zero);
+    let a0 = sys.create_array_read(&a0ptr, None);
     let one = sys.get_const_int(&int32, 1);
+    let is_odd = sys.create_bitwise_and(None, &a0, &one, None);
+    let is_even = sys.create_flip(&is_odd, None);
     let plused = sys.create_add(None, &a0, &one, None);
-    sys.create_array_write(&handle, &plused, None);
+    sys.create_array_write(&a0ptr, &plused, None);
     let lock = sys.create_array(&DataType::int(1), "lock", 1);
-    let lock_handle = sys.create_array_ptr(&lock, &zero);
-    sys.create_spin_trigger(&lock_handle, &dst, vec![a0], None);
+    let lock_ptr = sys.create_array_ptr(&lock, &zero);
+    sys.create_spin_trigger(&lock_ptr, &dst, vec![a0], Some(is_odd));
+    let lock_val = sys.create_array_read(&lock_ptr, Some(is_even));
+    let flipped = sys.create_flip(&lock_val, None);
+    sys.create_array_write(&lock_ptr, &flipped, None);
   }
 
   let mut sys = SysBuilder::new("main");
   let sqr_module = squarer(&mut sys);
   driver(&mut sys, sqr_module);
   println!("{}", sys);
+  xform::propagate_predications(&mut sys);
   xform::rewrite_spin_triggers(&mut sys);
   println!("{}", sys);
 }
