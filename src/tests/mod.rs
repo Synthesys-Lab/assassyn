@@ -3,6 +3,7 @@ mod pred_propa;
 mod spin_trigger;
 mod trigger;
 mod utils;
+mod parser;
 
 // TODO(@were): Add an test for IR builder.
 // TODO(@were): Add assertion for predication test.

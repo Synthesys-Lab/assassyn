@@ -1,5 +1,4 @@
 #[feature(concat_idents)]
-
 #[macro_export]
 macro_rules! module_builder {
 
@@ -12,4 +11,3 @@ macro_rules! module_builder {
   };
 
 }
-
