@@ -16,7 +16,7 @@ macro_rules! parse_type {
 }
 
 #[macro_export]
-macro_rules! parse_idx { 
+macro_rules! parse_idx {
 
   ($sys:ident [ $idx:literal ]) => {
     $sys.get_const_int(&parse_type!(int 32), $idx)

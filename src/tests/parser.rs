@@ -1,9 +1,9 @@
 use crate::{
   builder::system::{InsertPoint, PortInfo, SysBuilder},
-  Module,
   data::Array,
+  emit_ports,
   ir::block::Block,
-  module_builder, parse_idx, parse_port, parse_stmts, parse_type, BaseNode, DataType, emit_ports,
+  module_builder, parse_idx, parse_port, parse_stmts, parse_type, BaseNode, DataType, Module,
 };
 
 use paste::paste;
