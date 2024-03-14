@@ -121,7 +121,7 @@ impl SysBuilder {
   ///
   /// * `name` - The name of the system.
   pub fn new(name: &str) -> Self {
-    let mut res = Self {
+    let res = Self {
       name: name.into(),
       sym_tab: HashMap::new(),
       slab: slab::Slab::new(),
@@ -129,8 +129,6 @@ impl SysBuilder {
       inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
       unique_ids: HashMap::new(),
     };
-    // TODO(@were): Make driver a self-triggered module. DO NOT use a "while true" loop.
-    res.create_module("driver", vec![]);
     res
   }
 
@@ -203,6 +201,11 @@ impl SysBuilder {
     self.inesert_point = InsertPoint(module.clone(), block, None);
   }
 
+  /// Get the current insert point of this builder.
+  pub fn get_current_ip(&self) -> InsertPoint {
+    self.inesert_point.clone()
+  }
+
   /// Set the current insert point to the given block.
   ///
   /// # Arguments
@@ -256,6 +259,14 @@ impl SysBuilder {
   /// Get the insert point of the current builder.
   pub fn get_insert_point(&self) -> InsertPoint {
     self.inesert_point.clone()
+  }
+
+  /// Set the insert point of the current builder.
+  ///
+  /// # Arguments
+  /// * `ip` - The insert point to be set.
+  pub fn set_insert_point(&mut self, ip: InsertPoint) {
+    self.inesert_point = ip;
   }
 
   /// The helper function to insert an element into the system's slab.
