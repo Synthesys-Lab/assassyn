@@ -50,6 +50,11 @@ macro_rules! parse_stmts {
     parse_stmts!($sys $($rest)*);
   };
 
+  ($sys:ident $dst:ident = $a:ident . pop ( ) ; $($rest:tt)*) => {
+    let $dst = $sys.create_fifo_pop(&$a, None, None);
+    parse_stmts!($sys $($rest)*);
+  };
+
   ($sys:ident $dst:ident = $a:ident . $op:ident ( $b:literal ) ; $($rest:tt)*) => {
     let dtype = $a.get_dtype(&$sys).unwrap();
     let rhs = $sys.get_const_int(&dtype, $b);
@@ -61,7 +66,7 @@ macro_rules! parse_stmts {
 
   ($sys:ident $dst:ident = $a:ident . $op:ident ( $b:ident ) ; $($rest:tt)*) => {
     paste! {
-      let $dst = $sys.[<create_ $op>](None, &$a, $b, None);
+      let $dst = $sys.[<create_ $op>](None, &$a, &$b, None);
     }
     parse_stmts!($sys $($rest)*);
   };
@@ -75,6 +80,11 @@ macro_rules! parse_stmts {
       let $dst = $sys.create_array_read(&[<$dst _idx>], None);
     }
     // $sys.create_index(None, $a, $idx, None);
+    parse_stmts!($sys $($rest)*);
+  };
+
+  ($sys:ident async $func:ident ( $($args:ident),* $(,)? ) ; $($rest:tt)* ) => {
+    $sys.create_bundled_trigger(&$func, vec![$($args.clone()),*], None);
     parse_stmts!($sys $($rest)*);
   };
 
@@ -140,8 +150,7 @@ macro_rules! emit_ports {
 
 #[macro_export]
 macro_rules! module_builder {
-  ($name:ident [$($id:ident : $ty:ident < $bits:literal >),* $(,)?] {
-    externals: [$($ext:ident),* $(,)?];
+  ($name:ident [$($id:ident : $ty:ident < $bits:literal >),* $(,)?] [$($ext:ident),* $(,)?] {
     $($body:tt)*
   }) => {
     paste! {
