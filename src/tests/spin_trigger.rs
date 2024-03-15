@@ -1,9 +1,13 @@
 use crate::{
-  frontend::{self, *}, module_builder, sim::{self, elaborate}, tests::utils, xform
+  frontend::{self, *},
+  module_builder,
+  sim::{self, elaborate},
+  tests::utils,
+  xform,
 };
 
-use paste::paste;
 use crate::*;
+use paste::paste;
 
 #[test]
 fn spin_trigger() {
