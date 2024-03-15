@@ -23,7 +23,7 @@ fn spin_trigger() {
   }
 
   fn driver(sys: &mut SysBuilder, dst: BaseNode) {
-    let driver = sys.get_driver().upcast();
+    let driver = sys.create_module("driver", vec![]);
     sys.set_current_module(&driver);
     let int32 = DataType::int(32);
     let stamp = sys.create_array(&int32, "cnt", 1);
@@ -63,7 +63,7 @@ fn spin_trigger() {
   };
 
   elaborate(&sys, &config).unwrap();
-  let exec_name = utils::temp_dir(&"trigger".to_string());
+  let exec_name = utils::temp_dir(&"spin_trigger".to_string());
   utils::compile(&config.fname, &exec_name);
 
   // TODO(@were): Make a time timeout here.

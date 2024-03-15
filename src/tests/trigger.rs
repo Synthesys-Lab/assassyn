@@ -1,6 +1,5 @@
 use super::utils;
 use crate::builder::system::{PortInfo, SysBuilder};
-use crate::node::IsElement;
 use crate::{sim, BaseNode, DataType, Module};
 
 #[test]
@@ -28,14 +27,14 @@ fn trigger() {
   }
 
   fn build_driver(sys: &mut SysBuilder, plus: BaseNode) {
-    let driver_module = sys.get_driver();
-    sys.set_current_module(&driver_module.upcast());
+    let driver = sys.create_module("driver", vec![]);
+    sys.set_current_module(&driver);
     let int32 = DataType::int(32);
     let a = sys.create_array(&int32, "cnt", 1);
     let zero = sys.get_const_int(&int32, 0);
     let one = sys.get_const_int(&int32, 1);
     let handle = sys.create_array_ptr(&a, &zero);
-    let a0 = sys.create_array_read(&handle, None);
+    let a0 = sys.create_array_read(&handle);
     let hundred = sys.get_const_int(&int32, 100);
     let cond = sys.create_ilt(None, &a0, &hundred);
     let block = sys.create_block(Some(cond));

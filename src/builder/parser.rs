@@ -51,7 +51,7 @@ macro_rules! parse_stmts {
   };
 
   ($sys:ident $dst:ident = $a:ident . pop ( ) ; $($rest:tt)*) => {
-    let $dst = $sys.create_fifo_pop(&$a, None, None);
+    let $dst = $sys.create_fifo_pop(&$a, None);
     parse_stmts!($sys $($rest)*);
   };
 
@@ -59,14 +59,14 @@ macro_rules! parse_stmts {
     let dtype = $a.get_dtype(&$sys).unwrap();
     let rhs = $sys.get_const_int(&dtype, $b);
     paste! {
-      let $dst = $sys.[<create_ $op>](None, &$a, &rhs, None);
+      let $dst = $sys.[<create_ $op>](None, &$a, &rhs);
     }
     parse_stmts!($sys $($rest)*);
   };
 
   ($sys:ident $dst:ident = $a:ident . $op:ident ( $b:ident ) ; $($rest:tt)*) => {
     paste! {
-      let $dst = $sys.[<create_ $op>](None, &$a, &$b, None);
+      let $dst = $sys.[<create_ $op>](None, &$a, &$b);
     }
     parse_stmts!($sys $($rest)*);
   };
@@ -77,14 +77,14 @@ macro_rules! parse_stmts {
         let idx = parse_idx!($sys $idx);
         $sys.create_array_ptr(&$a, &idx)
       };
-      let $dst = $sys.create_array_read(&[<$dst _idx>], None);
+      let $dst = $sys.create_array_read(&[<$dst _idx>]);
     }
     // $sys.create_index(None, $a, $idx, None);
     parse_stmts!($sys $($rest)*);
   };
 
   ($sys:ident async $func:ident ( $($args:ident),* $(,)? ) ; $($rest:tt)* ) => {
-    $sys.create_bundled_trigger(&$func, vec![$($args.clone()),*], None);
+    $sys.create_bundled_trigger(&$func, vec![$($args.clone()),*]);
     parse_stmts!($sys $($rest)*);
   };
 
@@ -111,7 +111,7 @@ macro_rules! parse_stmts {
         let idx = parse_idx!($sys $idx);
         $sys.create_array_ptr(&$a, &idx)
       };
-      $sys.create_array_write(&[<$a _idx>], &$value, None);
+      $sys.create_array_write(&[<$a _idx>], &$value);
     }
     // $sys.create_index(None, $a, $idx, None);
     parse_stmts!($sys $($rest)*);

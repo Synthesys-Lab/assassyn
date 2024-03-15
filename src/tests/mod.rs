@@ -1,6 +1,5 @@
 mod callback;
 mod parser;
-mod pred_propa;
 mod spin_trigger;
 mod trigger;
 mod utils;

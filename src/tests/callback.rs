@@ -1,6 +1,5 @@
 use crate::{
   builder::system::{PortInfo, SysBuilder},
-  node::IsElement,
   BaseNode, DataType, Module,
 };
 
@@ -26,7 +25,7 @@ fn callback() {
   }
 
   fn driver(sys: &mut SysBuilder, mwcb: BaseNode, sqr: BaseNode) {
-    let driver = sys.get_driver().upcast();
+    let driver = sys.create_module("driver", vec![]);
     sys.set_current_module(&driver);
     let int32 = DataType::int(32);
     let cnt = sys.create_array(&int32, "cnt", 1);

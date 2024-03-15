@@ -146,12 +146,6 @@ impl SysBuilder {
     Ok(T::mutator(self, key.clone()))
   }
 
-  /// Get the driver module. The driver module is special. It is invoked unconditionally every
-  /// cycle.
-  pub fn get_driver<'a>(&'a self) -> ModuleRef<'a> {
-    self.get_module("driver").unwrap()
-  }
-
   /// Get the current module to be built.
   pub fn get_current_module<'a>(&'a self) -> Result<ModuleRef<'a>, String> {
     self.get::<Module>(&self.inesert_point.0)
