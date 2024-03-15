@@ -1,7 +1,6 @@
 use super::utils;
 use crate::frontend::{self, SysBuilder};
-use crate::*;
-use paste::paste;
+use crate::{module_builder, sim};
 
 #[test]
 fn trigger() {

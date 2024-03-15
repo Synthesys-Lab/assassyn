@@ -1,22 +1,28 @@
 use crate::{
-  frontend::{self, *},
-  module_builder,
+  frontend::*,
   sim::{self, elaborate},
   tests::utils,
   xform,
 };
 
-use crate::*;
-use paste::paste;
-
 #[test]
 fn spin_trigger() {
-  module_builder!(
-    squarer[a:int<32>][] {
-      a = a.pop();
-      _b = a.mul(a);
-    }
-  );
+  // module_builder!(
+  //   squarer[a:int<32>][] {
+  //     a = a.pop();
+  //     _b = a.mul(a);
+  //   }
+  // );
+
+  // module_builder!(
+  //   driver[][sqr] {
+  //     lock = array(int<1>, 1);
+  //     cnt = array(int<32>, 1);
+  //     v = cnt[0];
+  //     is_odd = v.bitwise_and(1);
+  //     // is_even = is_odd.flip();
+  //   }
+  // );
 
   fn squarer(sys: &mut SysBuilder) -> BaseNode {
     let int32 = DataType::int(32);
@@ -61,7 +67,7 @@ fn spin_trigger() {
 
   let mut sys = SysBuilder::new("main");
 
-  squarer_builder(&mut sys);
+  // squarer_builder(&mut sys);
 
   let sqr_module = squarer(&mut sys);
   driver(&mut sys, sqr_module);
