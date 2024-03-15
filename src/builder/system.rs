@@ -67,22 +67,13 @@ impl PortInfo {
 /// is always executed.
 macro_rules! create_arith_op_impl {
   (binary, $func_name:ident, $opcode: expr) => {
-    pub fn $func_name(
-      &mut self,
-      ty: Option<DataType>,
-      a: &BaseNode,
-      b: &BaseNode,
-    ) -> BaseNode {
+    pub fn $func_name(&mut self, ty: Option<DataType>, a: &BaseNode, b: &BaseNode) -> BaseNode {
       let res_ty = if let Some(ty) = ty {
         ty
       } else {
         self.combine_types($opcode, a, b)
       };
-      self.create_expr(
-        res_ty,
-        $opcode,
-        vec![a.clone(), b.clone()],
-      )
+      self.create_expr(res_ty, $opcode, vec![a.clone(), b.clone()])
     }
   };
 
@@ -346,14 +337,14 @@ impl SysBuilder {
     operands: Vec<BaseNode>,
   ) -> BaseNode {
     self.get_current_module().unwrap();
-      let instance = Expr::new(
-        dtype.clone(),
-        opcode,
-        operands,
-        self.inesert_point.1.clone(),
-      );
-      let value = self.insert_element(instance);
-      self.insert_at_ip(value)
+    let instance = Expr::new(
+      dtype.clone(),
+      opcode,
+      operands,
+      self.inesert_point.1.clone(),
+    );
+    let value = self.insert_element(instance);
+    self.insert_at_ip(value)
   }
 
   /// The helper function to insert an element into the current insert point.
@@ -371,11 +362,7 @@ impl SysBuilder {
   /// * `data` - The data to be sent to the destination module.
   /// * `cond` - The condition of triggering the destination. If None is given, the trigger is
   /// unconditional.
-  pub fn create_bundled_trigger(
-    &mut self,
-    dst: &BaseNode,
-    data: Vec<BaseNode>,
-  ) -> BaseNode {
+  pub fn create_bundled_trigger(&mut self, dst: &BaseNode, data: Vec<BaseNode>) -> BaseNode {
     let current_module = self.get_current_module().unwrap().upcast();
 
     // Handle callback trigger
@@ -509,11 +496,7 @@ impl SysBuilder {
     key
   }
 
-  pub fn create_fifo_push(
-    &mut self,
-    fifo: &BaseNode,
-    value: BaseNode,
-  ) -> BaseNode {
+  pub fn create_fifo_push(&mut self, fifo: &BaseNode, value: BaseNode) -> BaseNode {
     let res = self.create_expr(
       DataType::void(),
       Opcode::FIFOPush,
@@ -545,11 +528,7 @@ impl SysBuilder {
   /// * `ptr` - The pointer to the array element.
   /// * `value` - The value to be written.
   /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
-  pub fn create_array_write(
-    &mut self,
-    ptr: &BaseNode,
-    value: &BaseNode,
-  ) -> BaseNode {
+  pub fn create_array_write(&mut self, ptr: &BaseNode, value: &BaseNode) -> BaseNode {
     let array = self.get::<ArrayPtr>(&ptr).unwrap().get_array().clone();
     let operands = vec![ptr.clone(), value.clone()];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands);
@@ -603,11 +582,7 @@ impl SysBuilder {
   /// * `num_elems` - The number of elements to be popped. If None is given, the number of elements
   /// is one.
   /// * `cond` - The condition of popping the FIFO. If None is given, the pop is unconditional.
-  pub fn create_fifo_pop(
-    &mut self,
-    fifo: &BaseNode,
-    num_elems: Option<BaseNode>,
-  ) -> BaseNode {
+  pub fn create_fifo_pop(&mut self, fifo: &BaseNode, num_elems: Option<BaseNode>) -> BaseNode {
     let num_elems = if let Some(num_elems) = num_elems {
       num_elems
     } else {
