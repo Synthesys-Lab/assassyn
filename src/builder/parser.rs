@@ -1,3 +1,6 @@
+// TODO(@were): Shall we migrate these parser rules to proc-macros so that at least we have fewer
+// macros to import.
+
 #[macro_export]
 macro_rules! parse_port {
   ($id:ident int $bits:literal) => {
@@ -152,6 +155,13 @@ macro_rules! emit_ports {
   (emit $sys:ident $module:ident, $index:expr, $id:ident) => {
     let module_ref = $module.as_ref::<frontend::Module>($sys).unwrap();
     let $id = module_ref.get_input($index).unwrap().clone();
+  };
+
+  (enter $sys:ident $module:ident, $port:ident) => {
+    let $port = {
+      emit_ports!(emit $sys $module, 0, $port);
+      $port
+    };
   };
 
   (enter $sys:ident $module:ident, $($ports:ident)+) => {

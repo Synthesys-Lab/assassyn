@@ -1,5 +1,4 @@
 mod callback;
-mod parser;
 mod spin_trigger;
 mod trigger;
 mod utils;

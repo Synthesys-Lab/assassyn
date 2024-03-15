@@ -1,12 +1,19 @@
 use crate::{
-  frontend::*,
-  sim::{self, elaborate},
-  tests::utils,
-  xform,
+  frontend::{self, *}, module_builder, sim::{self, elaborate}, tests::utils, xform
 };
+
+use paste::paste;
+use crate::*;
 
 #[test]
 fn spin_trigger() {
+  module_builder!(
+    squarer[a:int<32>][] {
+      a = a.pop();
+      _b = a.mul(a);
+    }
+  );
+
   fn squarer(sys: &mut SysBuilder) -> BaseNode {
     let int32 = DataType::int(32);
     let port = PortInfo::new("i0", int32.clone());
@@ -49,6 +56,9 @@ fn spin_trigger() {
   }
 
   let mut sys = SysBuilder::new("main");
+
+  squarer_builder(&mut sys);
+
   let sqr_module = squarer(&mut sys);
   driver(&mut sys, sqr_module);
   println!("{}", sys);
