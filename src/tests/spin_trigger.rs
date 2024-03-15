@@ -16,9 +16,9 @@ fn spin_trigger() {
     let i0 = {
       let module = module.as_ref::<Module>(sys).unwrap();
       let i0_port = module.get_input(0).unwrap().clone();
-      sys.create_fifo_pop(&i0_port, None, None)
+      sys.create_fifo_pop(&i0_port, None)
     };
-    sys.create_mul(Some(int32), &i0, &i0, None);
+    sys.create_mul(Some(int32), &i0, &i0);
     module
   }
 
@@ -29,18 +29,24 @@ fn spin_trigger() {
     let stamp = sys.create_array(&int32, "cnt", 1);
     let zero = sys.get_const_int(&int32, 0);
     let a0ptr = sys.create_array_ptr(&stamp, &zero);
-    let a0 = sys.create_array_read(&a0ptr, None);
+    let a0 = sys.create_array_read(&a0ptr);
     let one = sys.get_const_int(&int32, 1);
-    let is_odd = sys.create_bitwise_and(None, &a0, &one, None);
-    let is_even = sys.create_flip(&is_odd, None);
-    let plused = sys.create_add(None, &a0, &one, None);
-    sys.create_array_write(&a0ptr, &plused, None);
+    let is_odd = sys.create_bitwise_and(None, &a0, &one);
+    let is_even = sys.create_flip(&is_odd);
+    let plused = sys.create_add(None, &a0, &one);
+    sys.create_array_write(&a0ptr, &plused);
     let lock = sys.create_array(&DataType::int(1), "lock", 1);
     let lock_ptr = sys.create_array_ptr(&lock, &zero);
-    sys.create_spin_trigger(&lock_ptr, &dst, vec![a0], Some(is_odd));
-    let lock_val = sys.create_array_read(&lock_ptr, Some(is_even));
-    let flipped = sys.create_flip(&lock_val, None);
-    sys.create_array_write(&lock_ptr, &flipped, None);
+    let orig_block = sys.get_current_block().unwrap().upcast();
+    let block = sys.create_block(Some(is_odd));
+    sys.set_current_block(block.clone());
+    sys.create_spin_trigger(&lock_ptr, &dst, vec![a0]);
+    sys.set_current_block(orig_block);
+    let block = sys.create_block(Some(is_even));
+    sys.set_current_block(block.clone());
+    let lock_val = sys.create_array_read(&lock_ptr);
+    let flipped = sys.create_flip(&lock_val);
+    sys.create_array_write(&lock_ptr, &flipped);
   }
 
   let mut sys = SysBuilder::new("main");

@@ -19,9 +19,9 @@ fn callback() {
         module.get_input(1).unwrap().clone(),
       )
     };
-    let data = sys.create_fifo_pop(&data, None, None);
-    let callback = sys.create_fifo_pop(&callback, None, None);
-    sys.create_bundled_trigger(&callback, vec![data], None);
+    let data = sys.create_fifo_pop(&data, None);
+    let callback = sys.create_fifo_pop(&callback, None);
+    sys.create_bundled_trigger(&callback, vec![data]);
     res
   }
 
@@ -32,11 +32,11 @@ fn callback() {
     let cnt = sys.create_array(&int32, "cnt", 1);
     let zero = sys.get_const_int(&int32, 0);
     let a0ptr = sys.create_array_ptr(&cnt, &zero);
-    let a0 = sys.create_array_read(&a0ptr, None);
+    let a0 = sys.create_array_read(&a0ptr);
     let one = sys.get_const_int(&int32, 1);
-    let plused = sys.create_add(None, &a0, &one, None);
-    sys.create_array_write(&a0ptr, &plused, None);
-    sys.create_bundled_trigger(&mwcb, vec![a0, sqr], None);
+    let plused = sys.create_add(None, &a0, &one);
+    sys.create_array_write(&a0ptr, &plused);
+    sys.create_bundled_trigger(&mwcb, vec![a0, sqr]);
   }
 
   fn squarer(sys: &mut SysBuilder) -> BaseNode {
@@ -47,9 +47,9 @@ fn callback() {
     let i0 = {
       let module = module.as_ref::<Module>(sys).unwrap();
       let i0_port = module.get_input(0).unwrap().clone();
-      sys.create_fifo_pop(&i0_port, None, None)
+      sys.create_fifo_pop(&i0_port, None)
     };
-    sys.create_mul(Some(int32), &i0, &i0, None);
+    sys.create_mul(Some(int32), &i0, &i0);
     module
   }
 

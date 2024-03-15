@@ -19,11 +19,11 @@ fn trigger() {
       let module = module.as_ref::<Module>(&sys).unwrap();
       let i0 = module.get_input(0).unwrap().clone();
       let i1 = module.get_input(1).unwrap().clone();
-      let a = sys.create_fifo_pop(&i0, None, None);
-      let b = sys.create_fifo_pop(&i1, None, None);
+      let a = sys.create_fifo_pop(&i0, None);
+      let b = sys.create_fifo_pop(&i1, None);
       (a, b)
     };
-    sys.create_add(None, &a, &b, None);
+    sys.create_add(None, &a, &b);
     module
   }
 
@@ -37,10 +37,12 @@ fn trigger() {
     let handle = sys.create_array_ptr(&a, &zero);
     let a0 = sys.create_array_read(&handle, None);
     let hundred = sys.get_const_int(&int32, 100);
-    let cond = sys.create_ilt(None, &a0, &hundred, None);
-    sys.create_bundled_trigger(&plus, vec![a0.clone(), a0.clone()], Some(cond));
-    let acc = sys.create_add(None, &a0, &one, None);
-    sys.create_array_write(&handle, &acc, None);
+    let cond = sys.create_ilt(None, &a0, &hundred);
+    let block = sys.create_block(Some(cond));
+    sys.set_current_block(block);
+    sys.create_bundled_trigger(&plus, vec![a0.clone(), a0.clone()]);
+    let acc = sys.create_add(None, &a0, &one);
+    sys.create_array_write(&handle, &acc);
   }
 
   let mut sys = SysBuilder::new("main");
