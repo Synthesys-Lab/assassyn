@@ -105,11 +105,6 @@ impl BlockMut<'_> {
     expr
   }
 
-  pub(crate) fn push(&mut self, expr: BaseNode) -> BaseNode {
-    self.get_mut().body.push(expr.clone());
-    expr
-  }
-
   pub(crate) fn erase(&mut self, expr: &BaseNode) {
     let idx = self
       .get()
