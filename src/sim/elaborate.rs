@@ -65,14 +65,16 @@ impl Visitor<String> for NodeRefDumper {
         let array = node.as_ref::<Array>(sys).unwrap();
         namify(array.get_name()).into()
       }
-      NodeKind::FIFO => {
-        namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into()
-      }
+      NodeKind::FIFO => namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into(),
       NodeKind::IntImm => {
         let int_imm = node.as_ref::<IntImm>(sys).unwrap();
-        Some(format!("{} as {}", int_imm.get_value(), dtype_to_rust_type(&int_imm.dtype())))
+        Some(format!(
+          "{} as {}",
+          int_imm.get_value(),
+          dtype_to_rust_type(&int_imm.dtype())
+        ))
       }
-      _ => Some(format!("_{}", node.get_key()))
+      _ => Some(format!("_{}", node.get_key())),
     }
   }
 }
@@ -177,8 +179,12 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap();
           format!(
             "{}[{} as usize]",
-            NodeRefDumper.dispatch(expr.sys, &handle.get_array(), vec![]).unwrap(),
-            NodeRefDumper.dispatch(expr.sys, &handle.get_idx(), vec![]).unwrap()
+            NodeRefDumper
+              .dispatch(expr.sys, &handle.get_array(), vec![])
+              .unwrap(),
+            NodeRefDumper
+              .dispatch(expr.sys, &handle.get_idx(), vec![])
+              .unwrap()
           )
         }
         Opcode::Store => {
