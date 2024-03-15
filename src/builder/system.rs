@@ -2,16 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
-use crate::{
-  data::{Array, ArrayPtr, Typed},
-  expr::{Expr, Opcode},
-  ir::{block::Block, ir_printer, visitor::Visitor},
-  node::{
-    ArrayRef, BlockRef, CacheKey, Element, IsElement, ModuleRef, Mutable, NodeKind, Referencable,
-  },
-  port::FIFO,
-  BaseNode, DataType, IntImm, Module,
-};
+use crate::{frontend::*, ir::{ir_printer::IRPrinter, visitor::Visitor}};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
@@ -612,7 +603,7 @@ impl SysBuilder {
 
 impl Display for SysBuilder {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut printer = ir_printer::IRPrinter::new(self);
+    let mut printer = IRPrinter::new(self);
     write!(f, "system {} {{\n", self.name)?;
     for elem in self.array_iter() {
       write!(f, "  {};\n", printer.visit_array(&elem).unwrap())?;

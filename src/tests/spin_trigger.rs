@@ -1,10 +1,4 @@
-use crate::{
-  builder::system::{PortInfo, SysBuilder},
-  node::IsElement,
-  sim::{self, elaborate},
-  tests::utils,
-  xform, BaseNode, DataType, Module,
-};
+use crate::{frontend::*, sim::{self, elaborate}, tests::utils, xform};
 
 #[test]
 fn spin_trigger() {

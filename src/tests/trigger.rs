@@ -1,56 +1,38 @@
 use super::utils;
-use crate::builder::system::{PortInfo, SysBuilder};
-use crate::{sim, BaseNode, DataType, Module};
+use paste::paste;
+use crate::*;
+use crate::frontend::{self, SysBuilder};
 
 #[test]
 fn trigger() {
-  fn a_plus_b(sys: &mut SysBuilder) -> BaseNode {
-    let int32 = DataType::int(32);
-    let module = sys.create_module(
-      "a_plus_b",
-      vec![
-        PortInfo::new("a", int32.clone()),
-        PortInfo::new("b", int32.clone()),
-      ],
-    );
-    sys.set_current_module(&module);
-    let (a, b) = {
-      let module = module.as_ref::<Module>(&sys).unwrap();
-      let i0 = module.get_input(0).unwrap().clone();
-      let i1 = module.get_input(1).unwrap().clone();
-      let a = sys.create_fifo_pop(&i0, None);
-      let b = sys.create_fifo_pop(&i1, None);
-      (a, b)
-    };
-    sys.create_add(None, &a, &b);
-    module
-  }
+  module_builder!(
+    adder[a:int<32>, b:int<32>][] {
+      a  = a.pop();
+      b  = b.pop();
+      _c = a.add(b);
+    }
+  );
 
-  fn build_driver(sys: &mut SysBuilder, plus: BaseNode) {
-    let driver = sys.create_module("driver", vec![]);
-    sys.set_current_module(&driver);
-    let int32 = DataType::int(32);
-    let a = sys.create_array(&int32, "cnt", 1);
-    let zero = sys.get_const_int(&int32, 0);
-    let one = sys.get_const_int(&int32, 1);
-    let handle = sys.create_array_ptr(&a, &zero);
-    let a0 = sys.create_array_read(&handle);
-    let hundred = sys.get_const_int(&int32, 100);
-    let cond = sys.create_ilt(None, &a0, &hundred);
-    let block = sys.create_block(Some(cond));
-    sys.set_current_block(block);
-    sys.create_bundled_trigger(&plus, vec![a0.clone(), a0.clone()]);
-    let acc = sys.create_add(None, &a0, &one);
-    sys.create_array_write(&handle, &acc);
-  }
+  module_builder!(
+    driver[/*in-ports*/] [/*external interf*/adder] {
+      cnt    = array(int<32>, 1);
+      read   = cnt[0];
+      plus   = read.add(1);
+      cnt[0] = plus;
+      cond   = read.ilt(100);
+      when cond {
+        async adder(read, read);
+      }
+    }
+  );
 
   let mut sys = SysBuilder::new("main");
 
   // Create a trivial module.
-  let m1 = a_plus_b(&mut sys);
+  let m1 = adder_builder(&mut sys);
 
   // Build the driver module.
-  build_driver(&mut sys, m1);
+  driver_builder(&mut sys, m1);
 
   println!("{}", sys);
 

@@ -1,14 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-  builder::system::{PortInfo, SysBuilder},
-  data::Typed,
-  expr::Opcode,
-  node::{BaseNode, BlockRef, FIFORef, ModuleMut, ModuleRef, NodeKind, Parented},
-  DataType,
-};
-
-use super::{block::Block, port::FIFO};
+use crate::frontend::*;
 
 /// The data structure for a module.
 pub struct Module {
