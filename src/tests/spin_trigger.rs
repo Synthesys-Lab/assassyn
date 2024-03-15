@@ -1,4 +1,9 @@
-use crate::{frontend::*, sim::{self, elaborate}, tests::utils, xform};
+use crate::{
+  frontend::*,
+  sim::{self, elaborate},
+  tests::utils,
+  xform,
+};
 
 #[test]
 fn spin_trigger() {

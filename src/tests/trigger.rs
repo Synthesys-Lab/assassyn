@@ -1,7 +1,7 @@
 use super::utils;
-use paste::paste;
-use crate::*;
 use crate::frontend::{self, SysBuilder};
+use crate::*;
+use paste::paste;
 
 #[test]
 fn trigger() {
@@ -55,7 +55,7 @@ fn trigger() {
   let times_invoked = String::from_utf8(output.stdout)
     .unwrap()
     .lines()
-    .filter(|x| x.contains("Simulating module a_plus_b"))
+    .filter(|x| x.contains("Simulating module adder"))
     .count();
   assert_eq!(times_invoked, 100);
 }

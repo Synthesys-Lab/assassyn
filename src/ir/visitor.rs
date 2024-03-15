@@ -1,7 +1,4 @@
-use crate::{
-  builder::system::SysBuilder,
-  frontend::*,
-};
+use crate::{builder::system::SysBuilder, frontend::*};
 
 use super::block::Block;
 

@@ -1,4 +1,4 @@
-use crate::frontend::{BaseNode, DataType, NodeKind, Typed, Parented};
+use crate::frontend::{BaseNode, DataType, NodeKind, Parented, Typed};
 
 pub struct FIFO {
   pub(crate) key: usize,

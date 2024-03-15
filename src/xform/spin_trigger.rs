@@ -1,5 +1,7 @@
 use crate::{
-  builder::system::{PortInfo, SysBuilder}, frontend::*, ir::visitor::Visitor
+  builder::system::{PortInfo, SysBuilder},
+  frontend::*,
+  ir::visitor::Visitor,
 };
 
 struct SpinTriggerFinder {

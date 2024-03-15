@@ -21,6 +21,12 @@ impl<'a> ElaborateModule<'a> {
 
 struct InterfDecl<'a>(&'a HashSet<Opcode>);
 
+macro_rules! dump_ref {
+  ($sys:expr, $value:expr) => {
+    NodeRefDumper.dispatch($sys, $value, vec![]).unwrap()
+  };
+}
+
 impl<'a> Visitor<String> for InterfDecl<'a> {
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     format!(
@@ -49,6 +55,27 @@ impl<'a> Visitor<String> for InterfDecl<'a> {
 }
 
 struct InterfArgFeeder<'ops>(&'ops HashSet<Opcode>);
+
+struct NodeRefDumper;
+
+impl Visitor<String> for NodeRefDumper {
+  fn dispatch(&mut self, sys: &SysBuilder, node: &BaseNode, _: Vec<NodeKind>) -> Option<String> {
+    match node.get_kind() {
+      NodeKind::Array => {
+        let array = node.as_ref::<Array>(sys).unwrap();
+        namify(array.get_name()).into()
+      }
+      NodeKind::FIFO => {
+        namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into()
+      }
+      NodeKind::IntImm => {
+        let int_imm = node.as_ref::<IntImm>(sys).unwrap();
+        Some(format!("{} as {}", int_imm.get_value(), dtype_to_rust_type(&int_imm.dtype())))
+      }
+      _ => Some(format!("_{}", node.get_key()))
+    }
+  }
+}
 
 impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
@@ -130,15 +157,15 @@ impl Visitor<String> for ElaborateModule<'_> {
     let res = if expr.get_opcode().is_binary() {
       format!(
         "{} {} {}",
-        expr.get_operand(0).unwrap().to_string(self.sys),
+        dump_ref!(self.sys, expr.get_operand(0).unwrap()),
         expr.get_opcode().to_string(),
-        expr.get_operand(1).unwrap().to_string(self.sys)
+        dump_ref!(self.sys, expr.get_operand(1).unwrap()),
       )
     } else if expr.get_opcode().is_unary() {
       format!(
         "{}{}",
         expr.get_opcode().to_string(),
-        expr.get_operand(0).unwrap().to_string(self.sys)
+        dump_ref!(self.sys, expr.get_operand(0).unwrap())
       )
     } else {
       match expr.get_opcode() {
@@ -150,8 +177,8 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap();
           format!(
             "{}[{} as usize]",
-            namify(&handle.get_array().to_string(expr.sys)),
-            namify(&handle.get_idx().to_string(expr.sys))
+            NodeRefDumper.dispatch(expr.sys, &handle.get_array(), vec![]).unwrap(),
+            NodeRefDumper.dispatch(expr.sys, &handle.get_idx(), vec![]).unwrap()
           )
         }
         Opcode::Store => {
@@ -162,9 +189,9 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap();
           format!(
             "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::Array_commit_{}({} as usize, {}) }}))",
-            namify(&handle.get_array().to_string(expr.sys)),
-            namify(&handle.get_idx().to_string(expr.sys)),
-            expr.get_operand(1).unwrap().to_string(self.sys),
+            NodeRefDumper.dispatch(expr.sys, &handle.get_array(), vec![]).unwrap(),
+            NodeRefDumper.dispatch(expr.sys, &handle.get_idx(), vec![]).unwrap(),
+            dump_ref!(expr.sys, expr.get_operand(1).unwrap()),
           )
         }
         Opcode::Trigger => {
@@ -205,7 +232,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
-          let value = expr.get_operand(1).unwrap().to_string(self.sys);
+          let value = dump_ref!(self.sys, expr.get_operand(1).unwrap());
           let module_name = fifo
             .get_parent()
             .as_ref::<Module>(self.sys)
@@ -254,7 +281,7 @@ impl Visitor<String> for ElaborateModule<'_> {
       res.push_str(
         format!(
           "  if {}{} {{\n",
-          cond.to_string(self.sys),
+          dump_ref!(self.sys, &cond),
           if cond.get_dtype(block.sys).unwrap().bits() == 1 {
             "".into()
           } else {

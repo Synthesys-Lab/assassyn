@@ -76,12 +76,7 @@ impl Visitor<String> for IRPrinter<'_> {
   }
 
   fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> Option<String> {
-    format!(
-      "({}:{})",
-      int_imm.get_value(),
-      int_imm.dtype().to_string()
-    )
-    .into()
+    format!("({}:{})", int_imm.get_value(), int_imm.dtype().to_string()).into()
   }
 
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {

@@ -1,5 +1,5 @@
-use crate::*;
 use crate::frontend::*;
+use crate::*;
 use paste::paste;
 
 #[test]

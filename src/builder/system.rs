@@ -2,7 +2,10 @@
 
 use std::{collections::HashMap, fmt::Display, ops::Add};
 
-use crate::{frontend::*, ir::{ir_printer::IRPrinter, visitor::Visitor}};
+use crate::{
+  frontend::*,
+  ir::{ir_printer::IRPrinter, visitor::Visitor},
+};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
