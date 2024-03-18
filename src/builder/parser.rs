@@ -127,7 +127,37 @@ macro_rules! parse_stmts {
   // spin call
   // spin <lock> <func> ( <args>,* )
   // TODO(@were): Fill the body.
-  ($sys:ident spin $lock:ident [ $idx:tt ] $func:ident ( $($args:ident),* $(,)? ) ; $($rest:tt)* ) => {
+  ($sys:ident spin $lock:ident $idx:tt $func:ident ( $($args:ident),* $(,)? ) ; $($rest:tt)* ) => {
+    let ip_restore = $sys.get_insert_point();
+    let cur_name = $sys.get_current_module().unwrap().get_name().to_string();
+    let ports = vec![$($args.clone()),*].iter().enumerate().map(|x| {
+      $crate::frontend::PortInfo::new(
+        format!("arg.{}", x.0).as_str(), x.1.get_dtype(&$sys).unwrap())
+    }).collect::<Vec<_>>();
+    let agent = $sys.create_module(
+      format!("agent.{}.to.{}", cur_name, stringify!($func)).as_str(), ports);
+    $sys.set_current_module(&agent);
+    let idx = $crate::parse_idx!($sys $idx);
+    let lock_ptr = $sys.create_array_ptr(&$lock, &idx);
+    let lock_val = $sys.create_array_read(&lock_ptr);
+    let agent_body = $sys.get_current_module().unwrap().get_body().upcast();
+    let block = $sys.create_block(Some(lock_val.clone()));
+    $sys.set_current_block(block.clone());
+    let inputs = {
+      let module = $sys.get_current_module().unwrap();
+      let ports = (0..module.get_num_inputs()).map(|x| {
+        module.get_input(x).unwrap().clone()
+      }).collect::<Vec<_>>();
+      ports.into_iter().map(|x| { $sys.create_fifo_pop(&x, None) }).collect()
+    };
+    $sys.create_bundled_trigger(&$func, inputs);
+    $sys.set_current_block(agent_body);
+    let flip = $sys.create_flip(&lock_val);
+    let else_block = $sys.create_block(Some(flip));
+    $sys.set_current_block(else_block);
+    $sys.create_trigger(&agent);
+    $sys.set_insert_point(ip_restore);
+    $sys.create_bundled_trigger(&agent, vec![$($args.clone()),*]);
     // let lock_ptr = $sys.create_array_ptr(&$lock, &0);
     // let lock = $sys.create_spin_trigger(&lock_ptr, &$func, vec![$($args.clone()),*]);
     $crate::parse_stmts!($sys $($rest)*);
