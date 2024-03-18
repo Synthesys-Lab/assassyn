@@ -1,5 +1,5 @@
 use super::utils;
-use crate::frontend::{self, SysBuilder};
+use crate::builder::system::SysBuilder;
 use crate::{module_builder, sim};
 
 #[test]
@@ -26,10 +26,8 @@ fn trigger() {
   );
 
   let mut sys = SysBuilder::new("main");
-
   // Create a trivial module.
   let m1 = adder_builder(&mut sys);
-
   // Build the driver module.
   driver_builder(&mut sys, m1);
 

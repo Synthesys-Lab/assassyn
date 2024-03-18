@@ -425,7 +425,7 @@ impl SysBuilder {
   /// * `dst` - The destination module to be invoked.
   /// * `pred` - The condition of triggering the destination. If None is given, the trigger is
   /// always triggered.
-  pub fn create_async_trigger(&mut self, dst: &BaseNode) -> BaseNode {
+  pub fn create_trigger(&mut self, dst: &BaseNode) -> BaseNode {
     self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()])
   }
 

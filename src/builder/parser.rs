@@ -40,12 +40,11 @@ macro_rules! parse_stmts {
   ($sys:ident when $cond:ident { $($body:tt)* } $($rest:tt)*) => {
     let ip = $sys.get_insert_point();
     let block = $sys.create_block(Some($cond.clone()));
-    $sys.set_insert_point(frontend::InsertPoint(ip.0.clone(), block.clone(), None));
+    $sys.set_insert_point($crate::frontend::InsertPoint(ip.0.clone(), block.clone(), None));
     $crate::parse_stmts!($sys $($body)*);
-    let new_at = block.as_ref::<frontend::Block>(&$sys).unwrap().next();
+    let new_at = block.as_ref::<$crate::frontend::Block>(&$sys).unwrap().next();
     $sys.set_current_block(ip.1);
     if let Some(new_at) = new_at {
-      println!("Inserting before {:?}", new_at);
       $sys.set_insert_before(&new_at);
     }
     $crate::parse_stmts!($sys $($rest)*);
@@ -85,6 +84,15 @@ macro_rules! parse_stmts {
     $crate::parse_stmts!($sys $($rest)*);
   };
 
+  // unary operations
+  // <id> = <operand-id> . <op> ( )
+  ($sys:ident $dst:ident = $a:ident . $op:ident ( ) ; $($rest:tt)*) => {
+    paste::paste! {
+      let $dst = $sys.[<create_ $op>](&$a);
+    }
+    $crate::parse_stmts!($sys $($rest)*);
+  };
+
   // array read
   // <id> = <array> [ <idx> ]
   ($sys:ident $dst:ident = $a:ident $idx:tt ; $($rest:tt)* ) => {
@@ -102,6 +110,14 @@ macro_rules! parse_stmts {
   // async <func> ( <args>,* )
   ($sys:ident async $func:ident ( $($args:ident),* $(,)? ) ; $($rest:tt)* ) => {
     $sys.create_bundled_trigger(&$func, vec![$($args.clone()),*]);
+    $crate::parse_stmts!($sys $($rest)*);
+  };
+
+  // spin call
+  // spin <lock> <func> ( <args>,* )
+  ($sys:ident spin $lock:ident [ $idx:tt ] $func:ident ( $($args:ident),* $(,)? ) ; $($rest:tt)* ) => {
+    // let lock_ptr = $sys.create_array_ptr(&$lock, &0);
+    // let lock = $sys.create_spin_trigger(&lock_ptr, &$func, vec![$($args.clone()),*]);
     $crate::parse_stmts!($sys $($rest)*);
   };
 
@@ -177,18 +193,56 @@ macro_rules! emit_ports {
 }
 
 #[macro_export]
+macro_rules! emit_signature {
+
+  (enter) => {
+    $crate::frontend::BaseNode
+  };
+
+  (enter $($ret:ident),+) => {
+    ( $crate::frontend::BaseNode, $crate::emit_signature!(emit $($ret),+) )
+  };
+
+  (emit $ret:ident, $($rest:ident),*) => {
+    $crate::frontend::BaseNode, $crate::emit_signature!(emit $($rest),*)
+  };
+
+  (emit $ret:ident) => {
+    $crate::frontend::BaseNode
+  };
+
+  (emit) => {
+  }
+
+}
+
+#[macro_export]
+macro_rules! emit_rets {
+
+  (enter $res:ident) => {
+    $res
+  };
+
+  (enter $res:ident  $($ret:ident),* ) => {
+    ( $res, $($ret),* )
+  };
+
+}
+
+#[macro_export]
 macro_rules! module_builder {
   ($name:ident [$($id:ident : $ty:ident < $bits:literal >),* $(,)?] [$($ext:ident),* $(,)?] {
     $($body:tt)*
-  }) => {
+  } $(. expose( $($ret:ident),* $(,)? ))? ) => {
     paste::paste! {
-      fn [<$name _builder>](sys: &mut SysBuilder, $($ext: $crate::frontend::BaseNode),*) -> $crate::frontend::BaseNode {
+      fn [<$name _builder>](sys: &mut SysBuilder, $($ext: $crate::frontend::BaseNode),*)
+        -> $crate::emit_signature!(enter $( $($ret),* )?) {
         let ports = vec![$($crate::parse_port!($id $ty $bits)),*];
         let res = sys.create_module(stringify!($name), ports);
         $crate::emit_ports!(enter sys res, $($id)*);
         sys.set_current_module(&res);
         $crate::parse_stmts!( sys $($body)* );
-        return res;
+        return $crate::emit_rets!(enter res $( $($ret),* )?)
       }
     }
   };

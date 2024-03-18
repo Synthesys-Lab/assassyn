@@ -1,42 +1,49 @@
 use crate::{
+  module_builder,
   frontend::*,
   sim::{self, elaborate},
   tests::utils,
   xform,
 };
 
+fn raw() -> SysBuilder {
+
+  module_builder!(
+    squarer[a:int<32>][] {
+      a = a.pop();
+      _b = a.mul(a);
+    }
+  );
+
+  module_builder!(
+    driver[][sqr] {
+      lock = array(int<1>, 1);
+      cnt = array(int<32>, 1);
+      v = cnt[0];
+      is_odd = v.bitwise_and(1);
+      is_even = is_odd.flip();
+      when is_odd {
+        spin lock[0] sqr(v);
+      }
+      when is_even {
+        flipped = lock.flip();
+        lock[0] = flipped;
+      }
+    }.expose(lock)
+  );
+
+  let mut res = SysBuilder::new("raw");
+
+  let sqr = squarer_builder(&mut res);
+  let _driver = driver_builder(&mut res, sqr);
+
+  res
+}
+
 #[test]
 fn spin_trigger() {
-  // module_builder!(
-  //   squarer[a:int<32>][] {
-  //     a = a.pop();
-  //     _b = a.mul(a);
-  //   }
-  // );
 
-  // module_builder!(
-  //   driver[][sqr] {
-  //     lock = array(int<1>, 1);
-  //     cnt = array(int<32>, 1);
-  //     v = cnt[0];
-  //     is_odd = v.bitwise_and(1);
-  //     // is_even = is_odd.flip();
-  //   }
-  // );
 
-  fn squarer(sys: &mut SysBuilder) -> BaseNode {
-    let int32 = DataType::int(32);
-    let port = PortInfo::new("i0", int32.clone());
-    let module = sys.create_module("square", vec![port]);
-    sys.set_current_module(&module);
-    let i0 = {
-      let module = module.as_ref::<Module>(sys).unwrap();
-      let i0_port = module.get_input(0).unwrap().clone();
-      sys.create_fifo_pop(&i0_port, None)
-    };
-    sys.create_mul(Some(int32), &i0, &i0);
-    module
-  }
 
   fn driver(sys: &mut SysBuilder, dst: BaseNode) {
     let driver = sys.create_module("driver", vec![]);
@@ -65,15 +72,12 @@ fn spin_trigger() {
     sys.create_array_write(&lock_ptr, &flipped);
   }
 
-  let mut sys = SysBuilder::new("main");
+  let raw_sys = raw();
 
-  // squarer_builder(&mut sys);
-
-  let sqr_module = squarer(&mut sys);
-  driver(&mut sys, sqr_module);
-  println!("{}", sys);
-  xform::basic(&mut sys);
-  println!("{}", sys);
+  // driver(&mut sys, sqr_module);
+  // println!("{}", sys);
+  // xform::basic(&mut sys);
+  // println!("{}", sys);
 
   let config = sim::Config {
     fname: utils::temp_dir(&String::from("spin_trigger.rs")),
@@ -81,7 +85,7 @@ fn spin_trigger() {
     idle_threshold: 200,
   };
 
-  elaborate(&sys, &config).unwrap();
+  // elaborate(&sys, &config).unwrap();
   let exec_name = utils::temp_dir(&"spin_trigger".to_string());
   utils::compile(&config.fname, &exec_name);
 
