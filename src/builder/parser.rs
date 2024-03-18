@@ -106,8 +106,19 @@ macro_rules! parse_stmts {
     $crate::parse_stmts!($sys $($rest)*);
   };
 
+  // self call
+  // self ( )
+  ($sys:ident async self ( ) ; $($rest:tt)* ) => {
+    {
+      let dst = $sys.get_current_module().unwrap().upcast();
+      $sys.create_trigger(&dst);
+    }
+    $crate::parse_stmts!($sys $($rest)*);
+  };
+
   // call
   // async <func> ( <args>,* )
+  // TODO(@were): Parse the arguments to support literal and identifier.
   ($sys:ident async $func:ident ( $($args:ident),* $(,)? ) ; $($rest:tt)* ) => {
     $sys.create_bundled_trigger(&$func, vec![$($args.clone()),*]);
     $crate::parse_stmts!($sys $($rest)*);
@@ -115,6 +126,7 @@ macro_rules! parse_stmts {
 
   // spin call
   // spin <lock> <func> ( <args>,* )
+  // TODO(@were): Fill the body.
   ($sys:ident spin $lock:ident [ $idx:tt ] $func:ident ( $($args:ident),* $(,)? ) ; $($rest:tt)* ) => {
     // let lock_ptr = $sys.create_array_ptr(&$lock, &0);
     // let lock = $sys.create_spin_trigger(&lock_ptr, &$func, vec![$($args.clone()),*]);

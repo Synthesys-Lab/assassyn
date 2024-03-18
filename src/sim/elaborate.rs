@@ -565,7 +565,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
     )?;
     fd.write(
       format!(
-        "        println!(\"@line:{{:<6}} {{}}: Commit array {} write\", line!(), cyclize(event.0.stamp));\n",
+        "        println!(\"@line:{{:<6}} {{}}: Commit array {} write {{}}\", line!(), cyclize(event.0.stamp), value);\n",
         namify(array.get_name())
       )
       .as_bytes(),
