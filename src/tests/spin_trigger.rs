@@ -1,13 +1,12 @@
 use crate::{
-  module_builder,
   frontend::*,
+  module_builder,
   sim::{self, elaborate},
   tests::utils,
   xform,
 };
 
 fn raw() -> SysBuilder {
-
   module_builder!(
     squarer[a:int<32>][] {
       a = a.pop();
@@ -42,9 +41,6 @@ fn raw() -> SysBuilder {
 
 #[test]
 fn spin_trigger() {
-
-
-
   fn driver(sys: &mut SysBuilder, dst: BaseNode) {
     let driver = sys.create_module("driver", vec![]);
     sys.set_current_module(&driver);
