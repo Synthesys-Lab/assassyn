@@ -2,11 +2,17 @@
 // macros to import.
 
 #[macro_export]
-macro_rules! parse_port {
-  ($id:ident int $bits:literal) => {
-    $crate::frontend::PortInfo::new(stringify!($id), $crate::frontend::DataType::int($bits))
+macro_rules! emit_port_decl {
+
+  ( [ $ports:tt ] ) => {
+    vec![ $crate::emit_port_decl!(emit $ports) ]
   };
-  ($id:ident uint $bits:literal) => {
+
+  (emit $id:ident : int < $bits:literal >, $rest:tt) => {
+    $crate::frontend::PortInfo::new(stringify!($id), $crate::frontend::DataType::int($bits)),
+    $crate::emit_port_decl!(emit $rest)
+  };
+  (emit $id:ident : uint < $bits:literal >) => {
     $crate::frontend::PortInfo::new(stringify!($id), $crate::frontend::DataType::uint($bits))
   };
 }
@@ -202,7 +208,7 @@ macro_rules! parse_stmts {
 }
 
 #[macro_export]
-macro_rules! emit_ports {
+macro_rules! extract_ports {
 
   (emit $sys:ident $module:ident, $index:expr, $id:ident $($rest:ident)+ ) => {
     let module_ref = $module.as_ref::<$crate::frontend::Module>($sys).unwrap();
@@ -235,18 +241,18 @@ macro_rules! emit_ports {
 }
 
 #[macro_export]
-macro_rules! emit_signature {
+macro_rules! emit_returns {
 
   (enter) => {
     $crate::frontend::BaseNode
   };
 
   (enter $($ret:ident),+) => {
-    ( $crate::frontend::BaseNode, $crate::emit_signature!(emit $($ret),+) )
+    ( $crate::frontend::BaseNode, $crate::emit_returns!(emit $($ret),+) )
   };
 
   (emit $ret:ident, $($rest:ident),*) => {
-    $crate::frontend::BaseNode, $crate::emit_signature!(emit $($rest),*)
+    $crate::frontend::BaseNode, $crate::emit_returns!(emit $($rest),*)
   };
 
   (emit $ret:ident) => {
@@ -273,15 +279,15 @@ macro_rules! emit_rets {
 
 #[macro_export]
 macro_rules! module_builder {
-  ($name:ident [$($id:ident : $ty:ident < $bits:literal >),* $(,)?] [$($ext:ident),* $(,)?] {
+  ($name:ident $iports:tt [$($ext:ident),* $(,)?] {
     $($body:tt)*
   } $(. expose( $($ret:ident),* $(,)? ))? ) => {
     paste::paste! {
       fn [<$name _builder>](sys: &mut SysBuilder, $($ext: $crate::frontend::BaseNode),*)
-        -> $crate::emit_signature!(enter $( $($ret),* )?) {
-        let ports = vec![$($crate::parse_port!($id $ty $bits)),*];
+        -> $crate::emit_returns!(enter $( $($ret),* )?) {
+        let ports = vec![$crate::emit_port_decl!($iports)];
         let res = sys.create_module(stringify!($name), ports);
-        $crate::emit_ports!(enter sys res, $($id)*);
+        $crate::extract_ports!(enter sys res, $iports);
         sys.set_current_module(&res);
         $crate::parse_stmts!( sys $($body)* );
         return $crate::emit_rets!(enter res $( $($ret),* )?)

@@ -1,7 +1,12 @@
-use crate::frontend::*;
+use crate::{frontend::*, module_builder};
 
 #[test]
 fn callback() {
+  module_builder!(
+    callbacked[callback:module(int<32>, int<32>),][] {
+    }
+  );
+
   fn module_with_callback(sys: &mut SysBuilder) -> BaseNode {
     let int32 = DataType::int(32);
     let port = PortInfo::new("addr", int32.clone());
