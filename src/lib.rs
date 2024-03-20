@@ -1,4 +1,3 @@
-use codegen::expr_to_type;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parse;
@@ -7,49 +6,9 @@ use syn::{braced, bracketed};
 use syn::{parse_macro_input, Token};
 
 mod codegen;
+mod parser;
 
-struct TypeParser {
-  ty: TokenStream,
-}
-
-impl Parse for TypeParser {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    match input.cursor().ident() {
-      Some((id, _)) => match id.to_string().as_str() {
-        "int" | "uint" => {
-          return Ok(TypeParser {
-            ty: codegen::expr_to_type(input.parse::<syn::Expr>()?)?,
-          })
-        }
-        _ => {
-          return Err(syn::Error::new(
-            id.span(),
-            format!("Unsupported type: {}", id.to_string()),
-          ));
-        }
-      },
-      None => unreachable!(),
-    }
-  }
-}
-
-struct Argument {
-  id: syn::Ident,
-  ty: TokenStream,
-}
-
-impl Parse for Argument {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let id = input
-      .parse::<syn::Ident>()
-      .map_err(|e| syn::Error::new(e.span(), "Expected a port id"))?;
-    let _ = input
-      .parse::<syn::Token![:]>()
-      .map_err(|e| syn::Error::new(e.span(), "Expected : to specify the type of the port"))?;
-    let ty = input.parse::<TypeParser>()?.ty;
-    Ok(Argument { id, ty })
-  }
-}
+use parser::*;
 
 struct ModuleParser {
   module_name: syn::Ident,
@@ -60,7 +19,7 @@ struct ModuleParser {
 }
 
 enum Instruction {
-  Assign(syn::Ident, syn::Expr),
+  Assign((syn::Ident, syn::Expr)),
 }
 
 struct BodyParser {
@@ -73,14 +32,14 @@ impl Parse for BodyParser {
     let _ = braced!(content in input);
     let mut stmts = Vec::new();
     while !content.is_empty() {
-      let master = content.parse::<syn::Ident>()?;
       // a = <expr>
-      if content.peek(syn::Token![=]) {
+      if content.peek(syn::Ident) {
+        let left = content.parse::<syn::Ident>()?;
         content.parse::<syn::Token![=]>()?;
-        let expr = content.parse::<syn::Expr>()?;
-        content.parse::<syn::Token![;]>()?;
-        stmts.push(Instruction::Assign(master, expr));
+        let assign = content.parse::<syn::Expr>()?;
+        stmts.push(Instruction::Assign((left, assign)));
       }
+      content.parse::<syn::Token![;]>()?;
     }
     Ok(BodyParser { stmts })
   }
@@ -148,6 +107,15 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     (port_ids.into(), port_decls.into(), port_peeks.into())
   };
 
+  let mut body = TokenStream::new();
+  for stmt in parsed_module.body.stmts.iter() {
+    match codegen::emit_parse_instruction(stmt) {
+      Ok(x) => body.extend::<TokenStream>(x),
+      Err(e) => return e.to_compile_error().into(),
+    }
+  }
+  let body: proc_macro2::TokenStream = body.into();
+
   // codegen external interfaces
   let ext_interf: proc_macro2::TokenStream = {
     let ext_interf = &parsed_module.ext_interf;
@@ -158,8 +126,6 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     res.into()
   };
 
-  eprintln!("codegen is done!");
-
   let res = quote! {
     fn #builder_name (sys: &mut eir::frontend::SysBuilder, #ext_interf) -> eir::frontend::BaseNode {
       let module = sys.create_module(stringify!(#module_name), vec![#port_decls]);
@@ -168,11 +134,12 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         #port_peeks
         ( #port_ids )
       };
+      #body
       module
     }
   };
 
-  eprintln!("{}", res);
+  // eprintln!("{}", res);
 
   res.into()
 }
