@@ -1,35 +1,38 @@
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
-use syn::spanned::Spanned;
+use syn::{parse::Parse, spanned::Spanned};
 
 use crate::Instruction;
 
-pub(crate) fn expr_to_type(raw: syn::Expr) -> syn::Result<TokenStream> {
-  if let syn::Expr::Path(path) = raw {
-    assert_eq!(path.path.segments.len(), 1);
-    let stripped = path.path.segments.iter().next().unwrap();
-    let id = stripped.ident.clone();
-    match &stripped.arguments {
-      syn::PathArguments::AngleBracketed(args) => {
-        assert_eq!(args.args.len(), 1);
-        let arg = args.args.iter().next().unwrap();
-        let bits = arg.into_token_stream();
-        let res = quote! { eir::frontend::DataType::#id(#bits) };
-        return Ok(res.into());
+pub(crate) struct ExprToType(pub(crate) TokenStream);
+
+impl Parse for ExprToType {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let tyid = input.parse::<syn::Ident>()?;
+    match tyid.to_string().as_str() {
+      "int" | "uint" => {
+        input.parse::<syn::Token![::]>()?;
+        input.parse::<syn::Token![<]>()?;
+        let bits = input.parse::<syn::LitInt>()?;
+        input.parse::<syn::Token![>]>()?;
+        Ok(ExprToType(
+          quote!(eir::frontend::DataType::#tyid(#bits)).into(),
+        ))
       }
-      _ => unreachable!(),
+      _ => {
+        return Err(syn::Error::new(
+          tyid.span(),
+          format!("Unsupported type: {}", tyid.to_string()),
+        ));
+      }
     }
   }
-  Err(syn::Error::new(
-    raw.span(),
-    format!(
-      "Expected {{int/uint}}<{{bits}}>, but got {}",
-      raw.into_token_stream()
-    ),
-  ))
 }
 
-pub(crate) fn emit_expr_body(expr: &syn::Expr, name: &syn::Ident) -> syn::Result<TokenStream> {
+pub(crate) fn emit_expr_body(
+  expr: &syn::Expr,
+  name: Option<&syn::Ident>,
+) -> syn::Result<TokenStream> {
   match expr {
     syn::Expr::MethodCall(method) => {
       let receiver = method.receiver.clone();
@@ -60,24 +63,20 @@ pub(crate) fn emit_expr_body(expr: &syn::Expr, name: &syn::Ident) -> syn::Result
       }
     }
     syn::Expr::Call(call) => {
-      let func = call.func.clone();
-      match func.as_ref() {
-        syn::Expr::Path(path) => {
-          let id = path.path.segments.iter().next().unwrap().ident.clone();
-          match id.to_string().as_str() {
-            "array" => {
-              let mut args = call.args.iter();
-              let ty: proc_macro2::TokenStream = expr_to_type(args.next().unwrap().clone())?.into();
-              let size = args.next().unwrap();
-              Ok(quote!(sys.create_array(&#ty, stringify!(#name), #size);).into())
-            }
-            _ => {
-              return Err(syn::Error::new(
-                call.span(),
-                format!("Not supported func call {}", quote!(#call)),
-              ));
-            }
-          }
+      let id = syn::parse::<syn::Ident>(call.func.to_token_stream().into())?;
+      match id.to_string().as_str() {
+        "array" => {
+          let mut args = call.args.iter();
+          let mut sys = syn::Ident::new("sys", call.func.span());
+          let raw_ty = args.next().unwrap().clone();
+          let ty: proc_macro2::TokenStream =
+            match syn::parse::<ExprToType>(raw_ty.into_token_stream().into()) {
+              Ok(ty) => ty.0.into(),
+              Err(e) => return Err(e),
+            };
+          let size = args.next().unwrap();
+          let name = name.unwrap();
+          Ok(quote!(sys.create_array(&#ty, stringify!(#name), #size);).into())
         }
         _ => {
           return Err(syn::Error::new(
@@ -99,10 +98,18 @@ pub(crate) fn emit_expr_body(expr: &syn::Expr, name: &syn::Ident) -> syn::Result
 pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStream> {
   match inst {
     Instruction::Assign((left, right)) => {
-      let right: proc_macro2::TokenStream = emit_expr_body(right, left)?.into();
+      let right: proc_macro2::TokenStream = emit_expr_body(right, Some(left))?.into();
+      Ok(quote! { let #left = #right; }.into())
+    }
+    Instruction::ArrayAssign((array, idx, right)) => {
+      let right: proc_macro2::TokenStream = emit_expr_body(right, None)?.into();
+      let idx_id = syn::Ident::new("idx", idx.span());
+      let idx: proc_macro2::TokenStream = emit_expr_body(idx, Some(&idx_id))?.into();
       Ok(
         quote! {
-          let #left = #right;
+          let #idx_id = #idx;
+          let ptr = sys.create_array_ptr(&#array, &#idx);
+          sys.create_array_write(&ptr, #right);
         }
         .into(),
       )
