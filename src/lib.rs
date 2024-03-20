@@ -1,3 +1,4 @@
+use codegen::expr_to_type;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parse;
@@ -5,30 +6,29 @@ use syn::punctuated::Punctuated;
 use syn::{braced, bracketed};
 use syn::{parse_macro_input, Token};
 
+mod codegen;
+
 struct TypeParser {
   ty: TokenStream,
 }
 
 impl Parse for TypeParser {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let id = input.parse::<syn::Ident>()?;
-    match id.to_string().as_str() {
-      "int" | "uint" => {
-        let _ = input
-          .parse::<syn::Token![<]>()
-          .map_err(|e| syn::Error::new(e.span(), "Expected <"))?;
-        let bits = input.parse::<syn::LitInt>()?;
-        let _ = input
-          .parse::<syn::Token![>]>()
-          .map_err(|e| syn::Error::new(e.span(), "Expected >"))?;
-        Ok(TypeParser {
-          ty: quote! {eir::frontend::DataType::#id(#bits)}.into(),
-        })
-      }
-      _ => Err(syn::Error::new(
-        id.span(),
-        format!("Unsupported type: {}", id.to_string()),
-      )),
+    match input.cursor().ident() {
+      Some((id, _)) => match id.to_string().as_str() {
+        "int" | "uint" => {
+          return Ok(TypeParser {
+            ty: codegen::expr_to_type(input.parse::<syn::Expr>()?)?,
+          })
+        }
+        _ => {
+          return Err(syn::Error::new(
+            id.span(),
+            format!("Unsupported type: {}", id.to_string()),
+          ));
+        }
+      },
+      None => unreachable!(),
     }
   }
 }
