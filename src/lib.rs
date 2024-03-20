@@ -1,8 +1,9 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parse;
-use syn::parse_macro_input;
+use syn::punctuated::Punctuated;
 use syn::{braced, bracketed};
+use syn::{parse_macro_input, Token};
 
 struct TypeParser {
   ty: TokenStream,
@@ -32,71 +33,29 @@ impl Parse for TypeParser {
   }
 }
 
-struct ArgumentParser {
-  ids: Vec<syn::Ident>,
-  tys: Vec<TokenStream>,
+struct Argument {
+  id: syn::Ident,
+  ty: TokenStream,
 }
 
-impl Parse for ArgumentParser {
+impl Parse for Argument {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let content;
-    let _ = bracketed!(content in input);
-    let mut ids = Vec::new();
-    let mut tys = Vec::new();
-    while !content.is_empty() {
-      let id = content
-        .parse::<syn::Ident>()
-        .map_err(|e| syn::Error::new(e.span(), "Expected a port id"))?;
-      ids.push(id);
-      let _ = content
-        .parse::<syn::Token![:]>()
-        .map_err(|e| syn::Error::new(e.span(), "Expected : to specify the type of the port"))?;
-      let ty = content.parse::<TypeParser>()?;
-      tys.push(ty.ty);
-      if content.is_empty() {
-        break;
-      }
-      content
-        .parse::<syn::Token![,]>()
-        .map_err(|e| syn::Error::new(e.span(), "Each port should be separated by a comma"))?;
-    }
-    Ok(ArgumentParser { ids, tys })
-  }
-}
-
-struct ExternalInterfParser {
-  ids: Vec<syn::Ident>,
-}
-
-impl Parse for ExternalInterfParser {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let content;
-    let _ = bracketed!(content in input);
-    let mut ids = Vec::new();
-    while !content.is_empty() {
-      let id = input
-        .parse::<syn::Ident>()
-        .map_err(|e| syn::Error::new(e.span(), "Expected external interface id"))?;
-      ids.push(id);
-      if content.is_empty() {
-        break;
-      }
-      input.parse::<syn::Token![,]>().map_err(|e| {
-        syn::Error::new(
-          e.span(),
-          "Each external interface id should be separated by a comma",
-        )
-      })?;
-    }
-    Ok(ExternalInterfParser { ids })
+    let id = input
+      .parse::<syn::Ident>()
+      .map_err(|e| syn::Error::new(e.span(), "Expected a port id"))?;
+    let _ = input
+      .parse::<syn::Token![:]>()
+      .map_err(|e| syn::Error::new(e.span(), "Expected : to specify the type of the port"))?;
+    let ty = input.parse::<TypeParser>()?.ty;
+    Ok(Argument { id, ty })
   }
 }
 
 struct ModuleParser {
   module_name: syn::Ident,
   builder_name: syn::Ident,
-  ports: ArgumentParser,
-  ext_interf: ExternalInterfParser,
+  ports: Punctuated<Argument, Token![,]>,
+  ext_interf: Punctuated<syn::Ident, Token![,]>,
   body: BodyParser,
 }
 
@@ -134,8 +93,12 @@ impl Parse for ModuleParser {
       .map_err(|e| syn::Error::new(e.span(), "Expected module name"))?;
     let module_name = tok.clone();
     let builder_name = syn::Ident::new(&format!("{}_builder", module_name.to_string()), tok.span());
-    let ports = input.parse::<ArgumentParser>()?;
-    let ext_interf = input.parse::<ExternalInterfParser>()?;
+    let raw_ports;
+    bracketed!(raw_ports in input);
+    let ports = raw_ports.parse_terminated(Argument::parse, Token![,])?;
+    let raw_ext_interf;
+    bracketed!(raw_ext_interf in input);
+    let ext_interf = raw_ext_interf.parse_terminated(syn::Ident::parse, Token![,])?;
     let body = input.parse::<BodyParser>()?;
 
     let res = Ok(ModuleParser {
@@ -173,15 +136,12 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     let mut port_ids = TokenStream::new();
     let mut port_decls = TokenStream::new();
     let mut port_peeks = TokenStream::new();
-    for (i, elem) in ports.ids.iter().enumerate() {
-      port_ids.extend::<TokenStream>(quote! { #elem, }.into());
-      port_peeks.extend::<TokenStream>(
-        quote! { let #elem = module.get_input(#i).unwrap().clone(); }.into(),
-      );
-    }
-    for elem in ports.ids.iter().zip(ports.tys.iter()) {
-      let id = elem.0;
-      let ty = proc_macro2::TokenStream::from(elem.1.clone());
+    for (i, elem) in ports.iter().enumerate() {
+      let (id, ty) = (elem.id.clone(), elem.ty.clone());
+      port_ids.extend::<TokenStream>(quote! { #id, }.into());
+      port_peeks
+        .extend::<TokenStream>(quote! { let #id = module.get_input(#i).unwrap().clone(); }.into());
+      let ty = proc_macro2::TokenStream::from(ty.clone());
       port_decls
         .extend::<TokenStream>(quote! {eir::frontend::PortInfo::new(stringify!(#id), #ty),}.into());
     }
@@ -192,7 +152,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   let ext_interf: proc_macro2::TokenStream = {
     let ext_interf = &parsed_module.ext_interf;
     let mut res = TokenStream::new();
-    for elem in ext_interf.ids.iter() {
+    for elem in ext_interf.iter() {
       res.extend::<TokenStream>(quote! { #elem, }.into());
     }
     res.into()

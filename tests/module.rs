@@ -5,6 +5,7 @@ fn foo() {
   // module_builder!(driver[][] {});
 
   module_builder!(sqr[a:int<32>][] {
+    cnt = array(int::<32>, 1);
     a = a.pop();
     b = a.mul(a);
   });
