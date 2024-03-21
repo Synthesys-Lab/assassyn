@@ -10,6 +10,7 @@ pub(crate) struct TypeParser {
 
 pub(crate) enum Instruction {
   Assign((syn::Ident, syn::Expr)),
+  ArrayAlloc((syn::Ident, proc_macro2::TokenStream, syn::LitInt)),
   ArrayAssign((ArrayAccess, syn::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
   AsyncCall((syn::Ident, Vec<(syn::Ident, syn::Expr)>)),
@@ -110,6 +111,21 @@ impl Parse for Body {
                 if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
                   let aa = content.parse::<ArrayAccess>()?;
                   stmts.push(Instruction::ArrayRead((id, aa)));
+                } else if {
+                  // <id> = array(<ty>, <size>);
+                  if let Some((id, _)) = content.cursor().ident() {
+                    id.to_string() == "array"
+                  } else {
+                    false
+                  }
+                } {
+                  content.parse::<syn::Ident>()?; // array
+                  let args;
+                  syn::parenthesized!(args in content);
+                  let ty = args.parse::<EmitType>()?;
+                  args.parse::<syn::Token![,]>()?;
+                  let size = args.parse::<syn::LitInt>()?;
+                  stmts.push(Instruction::ArrayAlloc((id, ty.0.into(), size)));
                 } else {
                   let assign = content.parse::<syn::Expr>()?;
                   stmts.push(Instruction::Assign((id, assign)));

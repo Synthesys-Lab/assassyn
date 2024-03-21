@@ -11,7 +11,7 @@ impl Parse for EmitType {
     let tyid = input.parse::<syn::Ident>()?;
     match tyid.to_string().as_str() {
       "int" | "uint" => {
-        input.parse::<syn::Token![::]>()?;
+        // input.parse::<syn::Token![::]>()?;
         input.parse::<syn::Token![<]>()?;
         let bits = input.parse::<syn::LitInt>()?;
         input.parse::<syn::Token![>]>()?;
@@ -56,10 +56,7 @@ impl Parse for EmitIDOrConst {
   }
 }
 
-pub(crate) fn emit_expr_body(
-  expr: &syn::Expr,
-  name: Option<&syn::Ident>,
-) -> syn::Result<TokenStream> {
+pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<TokenStream> {
   match expr {
     syn::Expr::MethodCall(method) => {
       let receiver = method.receiver.clone();
@@ -119,18 +116,6 @@ pub(crate) fn emit_expr_body(
     syn::Expr::Call(call) => {
       let id = syn::parse::<syn::Ident>(call.func.to_token_stream().into())?;
       match id.to_string().as_str() {
-        "array" => {
-          let mut args = call.args.iter();
-          let raw_ty = args.next().unwrap().clone();
-          let ty: proc_macro2::TokenStream =
-            match syn::parse::<EmitType>(raw_ty.into_token_stream().into()) {
-              Ok(ty) => ty.0.into(),
-              Err(e) => return Err(e),
-            };
-          let size = args.next().unwrap();
-          let name = name.unwrap();
-          Ok(quote!(sys.create_array(#ty, stringify!(#name), #size);).into())
-        }
         _ => {
           return Err(syn::Error::new(
             call.span(),
@@ -168,13 +153,13 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
   Ok(
     match inst {
       Instruction::Assign((left, right)) => {
-        let right: proc_macro2::TokenStream = emit_expr_body(right, Some(left))?.into();
+        let right: proc_macro2::TokenStream = emit_expr_body(right)?.into();
         quote! {
           let #left = #right;
         }
       }
       Instruction::ArrayAssign((aa, right)) => {
-        let right: proc_macro2::TokenStream = emit_expr_body(right, None)?.into();
+        let right: proc_macro2::TokenStream = emit_expr_body(right)?.into();
         let array_ptr = emit_array_access(aa)?;
         quote! {{
           let ptr = #array_ptr;
@@ -196,8 +181,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         let binds = args
           .iter()
           .map(|(k, v)| {
-            let value =
-              emit_expr_body(v, None).expect(format!("Failed to emit {}", quote! {v}).as_str());
+            let value = emit_expr_body(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
             let value: proc_macro2::TokenStream = value.into();
             quote! {
               binds.insert(stringify!(#k).to_string(), #value)
@@ -212,6 +196,11 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           #(#binds);*;
           sys.create_bound_trigger(#module, binds);
         }}
+      }
+      Instruction::ArrayAlloc((id, ty, size)) => {
+        quote! {
+          let #id = sys.create_array(#ty, stringify!(#id), #size);
+        }
       }
       Instruction::When((cond, body)) => {
         let body = body

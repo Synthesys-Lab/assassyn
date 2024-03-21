@@ -1,4 +1,6 @@
 use eda4eda::module_builder;
+use eir::test_utils;
+use eir::frontend::SysBuilder;
 
 module_builder!(
   squarer[a:int::<32>][] {
@@ -77,16 +79,16 @@ fn syntactical_sugar() -> SysBuilder {
 }
 
 fn testit(fname: &str, sys: SysBuilder) {
-  let config = sim::Config {
-    fname: utils::temp_dir(&format!("{}.rs", fname)),
+  let config = eir::sim::Config {
+    fname: test_utils::temp_dir(&format!("{}.rs", fname)),
     sim_threshold: 200,
     idle_threshold: 200,
   };
-  elaborate(&sys, &config).unwrap();
-  let exec_name = utils::temp_dir(&fname.to_string());
-  utils::compile(&config.fname, &exec_name);
+  eir::sim::elaborate(&sys, &config).unwrap();
+  let exec_name = test_utils::temp_dir(&fname.to_string());
+  test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
-  utils::run(&exec_name);
+  test_utils::run(&exec_name);
 }
 
 #[test]
