@@ -63,7 +63,6 @@ pub(crate) fn emit_expr_body(
   match expr {
     syn::Expr::MethodCall(method) => {
       let receiver = method.receiver.clone();
-      // let args = method.args.iter().map(|arg| emit_expr_body(arg).unwrap());
       match method.method.to_string().as_str() {
         "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" => {
           let method_id = format!("create_{}", method.method.to_string());
@@ -76,13 +75,32 @@ pub(crate) fn emit_expr_body(
           if !operands.next().is_none() {
             return Err(syn::Error::new(
               method.span(),
-              "[CG.BinOP] Should be like \"a.add(b)\" should have only 1 operand in the argument list",
+              "[CG.BinOP] Like \"a.add(b)\" should have only 1 operand in the argument list",
             ));
           }
           Ok(
             quote! {{
               let rhs = #b;
               let res = sys.#method_id(None, #a.clone(), rhs);
+              res
+            }}
+            .into(),
+          )
+        }
+        "flip" => {
+          let method_id = format!("create_{}", method.method.to_string());
+          let method_id = syn::Ident::new(&method_id, method.method.span());
+          let mut operands = method.args.iter();
+          let a = &method.receiver;
+          if !operands.next().is_none() {
+            return Err(syn::Error::new(
+              method.span(),
+              "[CG.Unary] Like \"a.flip()\" should have no operand in the argument list",
+            ));
+          }
+          Ok(
+            quote! {{
+              let res = sys.#method_id(None, #a.clone());
               res
             }}
             .into(),

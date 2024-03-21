@@ -1,12 +1,7 @@
-use crate::{
-  frontend::*,
-  module_builder,
-  sim::{self, elaborate},
-  tests::utils,
-};
+use eda4eda::module_builder;
 
 module_builder!(
-  squarer[a:int<32>][] {
+  squarer[a:int::<32>][] {
     a  = a.pop();
     _b = a.mul(a);
   }
@@ -14,12 +9,12 @@ module_builder!(
 
 fn manual() -> SysBuilder {
   module_builder!(
-    spin_agent[a:int<32>][sqr] {
-      lock = array(int<1>, 1);
+    spin_agent[a:int::<32>][sqr] {
+      lock = array(int::<1>, 1);
       v    = lock[0];
       when v {
         a = a.pop();
-        async sqr(a);
+        async sqr {a: a};
       }
       nv = v.flip();
       when nv {
@@ -30,14 +25,14 @@ fn manual() -> SysBuilder {
 
   module_builder!(
     driver[][spin_agent, lock] {
-      cnt = array(int<32>, 1);
+      cnt = array(int::<32>, 1);
       v = cnt[0];
       is_odd = v.bitwise_and(1);
       is_even = is_odd.flip();
       v = v.add(1);
       cnt[0] = v;
       when is_odd {
-        async spin_agent(v);
+        async spin_agent { a: v };
       }
       when is_even {
         lv = lock[0];
@@ -57,8 +52,8 @@ fn manual() -> SysBuilder {
 fn syntactical_sugar() -> SysBuilder {
   module_builder!(
     driver[][sqr] {
-      cnt = array(int<32>, 1);
-      lock = array(int<1>, 1);
+      cnt = array(int::<32>, 1);
+      lock = array(int::<1>, 1);
       v = cnt[0];
       is_odd = v.bitwise_and(1);
       is_even = is_odd.flip();
