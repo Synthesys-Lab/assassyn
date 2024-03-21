@@ -11,7 +11,8 @@ fn foo() {
   module_builder!(driver[][] {
     cnt = array(int::<32>, 1);
     k = cnt[0.int::<32>];
-    // cnt[0] = k.add(1);
+    v = k.add(1);
+    cnt[0] = v;
   });
 
   // let mut sys = eir::frontend::SysBuilder::new("a");

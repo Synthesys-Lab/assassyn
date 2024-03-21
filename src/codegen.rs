@@ -79,7 +79,14 @@ pub(crate) fn emit_expr_body(
               "[CG.BinOP] Should be like \"a.add(b)\" should have only 1 operand in the argument list",
             ));
           }
-          Ok(quote!(sys.#method_id(None, #a.clone(), #b.clone());).into())
+          Ok(
+            quote! {{
+              let rhs = #b;
+              let res = sys.#method_id(None, #a.clone(), rhs);
+              res
+            }}
+            .into(),
+          )
         }
         "pop" => {
           let method_id = syn::Ident::new("create_fifo_pop", method.method.span());
@@ -114,6 +121,10 @@ pub(crate) fn emit_expr_body(
         }
       }
     }
+    syn::Expr::Path(path) => {
+      let id = syn::parse::<syn::Ident>(path.to_token_stream().into())?;
+      Ok(quote!(#id.clone()).into())
+    }
     _ => {
       return Err(syn::Error::new(
         expr.span(),
@@ -147,17 +158,19 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
       Instruction::ArrayAssign((aa, right)) => {
         let right: proc_macro2::TokenStream = emit_expr_body(right, None)?.into();
         let array_ptr = emit_array_access(aa)?;
-        quote! {
+        quote! {{
           let ptr = #array_ptr;
           let value = #right;
           sys.create_array_write(ptr, value);
-        }
+        }}
       }
       Instruction::ArrayRead((id, aa)) => {
         let array_ptr = emit_array_access(aa)?;
         quote! {
-          let ptr = #array_ptr;
-          let #id = sys.create_array_read(ptr);
+          let #id = {
+            let ptr = #array_ptr;
+            sys.create_array_read(ptr)
+          };
         }
       }
     }

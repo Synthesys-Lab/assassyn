@@ -66,32 +66,33 @@ impl Parse for Body {
     let mut stmts = Vec::new();
     while !content.is_empty() {
       if content.peek(syn::Ident) {
-        let id = content.parse::<Ident>()?;
-        // <id> = <expr>
-        if content.peek(syn::Token![=]) {
-          content.parse::<syn::Token![=]>()?;
-          // to handle the expression in k = a[0.int::<32>]
-          if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
-            let aa = content.parse::<ArrayAccess>()?;
-            stmts.push(Instruction::ArrayRead((id, aa)));
-          } else {
-            let assign = content.parse::<syn::Expr>()?;
-            stmts.push(Instruction::Assign((id, assign)));
-          }
-        } else if content.peek(syn::token::Bracket) {
+        if content.peek2(syn::token::Bracket) {
           // <id>[<expr>] = <expr>
           let aa = content.parse::<ArrayAccess>()?;
           content.parse::<syn::Token![=]>()?;
           let right = content.parse::<syn::Expr>()?;
           stmts.push(Instruction::ArrayAssign((aa, right)));
         } else {
-          return Err(syn::Error::new(
-            content.span(),
-            "Expected an assignment or an expression",
-          ));
+          // <id> = <expr>
+          let id = content.parse::<Ident>()?;
+          if content.peek(syn::Token![=]) {
+            content.parse::<syn::Token![=]>()?;
+            // to handle the expression in k = a[0.int::<32>]
+            if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
+              let aa = content.parse::<ArrayAccess>()?;
+              stmts.push(Instruction::ArrayRead((id, aa)));
+            } else {
+              let assign = content.parse::<syn::Expr>()?;
+              stmts.push(Instruction::Assign((id, assign)));
+            }
+          } else {
+            return Err(syn::Error::new(
+              content.span(),
+              "Expected an assignment or an expression",
+            ));
+          }
         }
       }
-      eprintln!("commit ;");
       content.parse::<syn::Token![;]>()?;
     }
     Ok(Body { stmts })
