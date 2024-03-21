@@ -61,7 +61,7 @@ impl<'sys> ModuleRef<'sys> {
     self
       .inputs
       .iter()
-      .find(|x| x.as_ref::<FIFO>(self.sys).unwrap().get_name() == name)
+      .find(|x| x.as_ref::<FIFO>(self.sys).unwrap().get_name().eq(name))
       .map(|x| x.clone())
   }
 

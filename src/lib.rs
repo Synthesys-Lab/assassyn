@@ -69,8 +69,12 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     for (i, elem) in ports.iter().enumerate() {
       let (id, ty) = (elem.id.clone(), elem.ty.clone());
       port_ids.extend::<TokenStream>(quote! { #id, }.into());
-      port_peeks
-        .extend::<TokenStream>(quote! { let #id = module.get_input(#i).unwrap().clone(); }.into());
+      port_peeks.extend::<TokenStream>(
+        quote! {
+          let #id = module.get_input(#i).expect(format!("Index {} exceed!", #i).as_str()).clone();
+        }
+        .into(),
+      );
       let ty = proc_macro2::TokenStream::from(ty.clone());
       port_decls
         .extend::<TokenStream>(quote! {eir::frontend::PortInfo::new(stringify!(#id), #ty),}.into());
@@ -101,9 +105,13 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
   let res = quote! {
     fn #builder_name (sys: &mut eir::frontend::SysBuilder, #ext_interf) -> eir::frontend::BaseNode {
+      use eir::frontend::IsElement;
       let module = sys.create_module(stringify!(#module_name), vec![#port_decls]);
+      sys.set_current_module(module.clone());
       let ( #port_ids ) = {
-        let module = module.as_ref::<eir::frontend::Module>(&sys).unwrap();
+        let module = module
+          .as_ref::<eir::frontend::Module>(&sys)
+          .expect("[Init Port] No current module!");
         #port_peeks
         ( #port_ids )
       };
@@ -112,7 +120,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     }
   };
 
-  eprintln!("Raw Source Code:\n{}", res);
+  // eprintln!("Raw Source Code:\n{}", res);
 
   res.into()
 }

@@ -10,6 +10,30 @@ use crate::{
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
 
+impl InsertPoint {
+  pub fn next(&self, sys: &SysBuilder) -> Option<Self> {
+    let InsertPoint(module, block, at) = self;
+    let block = block.as_ref::<Block>(sys).unwrap();
+    if let Some(cur_at) = at {
+      if cur_at + 1 < block.get_num_exprs() {
+        return InsertPoint(module.clone(), block.upcast(), Some(cur_at + 1)).into();
+      } else {
+        return InsertPoint(module.clone(), block.upcast(), None).into();
+      }
+    } else {
+      if let Some(nxt_block) = block.next() {
+        return InsertPoint(module.clone(), nxt_block, Some(0)).into();
+      } else {
+        if let Ok(block_parent) = block.get_parent().as_ref::<Block>(sys) {
+          return InsertPoint(module.clone(), block_parent.upcast(), None).into();
+        } else {
+          return None;
+        }
+      }
+    };
+  }
+}
+
 /// A `SysBuilder` struct not only serves as the data structure of the whole system,
 /// but also works as the syntax-sugared IR builder.
 pub struct SysBuilder {
@@ -183,6 +207,11 @@ impl SysBuilder {
     self.inesert_point.clone()
   }
 
+  /// Set the current insert point.
+  pub fn set_current_ip(&mut self, ip: InsertPoint) {
+    self.inesert_point = ip;
+  }
+
   /// Set the current insert point to the given block.
   ///
   /// # Arguments
@@ -203,7 +232,7 @@ impl SysBuilder {
   /// * `expr` - The reference of the expression to be set as the insert point. NOTE: This expr
   /// should be a part of the current module to be built. Ohterwise, an assertion failure will be
   /// raised.
-  pub fn set_insert_before(&mut self, node: &BaseNode) {
+  pub fn set_insert_before(&mut self, node: BaseNode) {
     // Make this more general, the insert before point can also be a block.
     // Which leads to something like this:
     // module-body [
@@ -222,7 +251,7 @@ impl SysBuilder {
         .as_ref::<Block>(self)
         .unwrap()
         .iter()
-        .position(|x| *x == *node);
+        .position(|x| *x == node);
       let module = {
         // TODO(@were): Make this a method function.
         let block = block_ref.as_ref::<Block>(self).unwrap();
@@ -427,6 +456,38 @@ impl SysBuilder {
   /// always triggered.
   pub fn create_trigger(&mut self, dst: BaseNode) -> BaseNode {
     self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()])
+  }
+
+  /// Create a trigger. Push all the values to the corresponding named ports.
+  pub fn create_bound_trigger(
+    &mut self,
+    dst: BaseNode,
+    binds: HashMap<String, BaseNode>,
+  ) -> BaseNode {
+    let current_module = self.get_current_module().unwrap().upcast();
+    let mut bundle = vec![dst.clone()];
+    assert_eq!(
+      binds.len(),
+      dst.as_ref::<Module>(self).unwrap().get_num_inputs()
+    );
+    for (name, value) in binds {
+      let dst_ref = dst
+        .as_ref::<Module>(self)
+        .expect(format!("{:?} is NOT a module", dst).as_str());
+      let port = dst_ref
+        .get_input_by_name(&name)
+        .expect(format!("{} is NOT an input of {:?}", name, dst).as_str());
+      assert_eq!(
+        port.as_ref::<FIFO>(self).unwrap().scalar_ty(),
+        value.get_dtype(self).unwrap()
+      );
+      bundle.push(self.create_fifo_push(port.clone(), value));
+      self
+        .get_mut::<Module>(&current_module)
+        .unwrap()
+        .insert_external_interface(port, Opcode::FIFOPush);
+    }
+    self.create_expr(DataType::void(), Opcode::Trigger, bundle)
   }
 
   /// Create a spin trigger. A spin trigger repeats to test the condition

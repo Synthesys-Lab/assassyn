@@ -75,7 +75,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       .create_module(format!("{}.async.agent", parent_name).as_str(), ports);
     // Create trigger to the agent module.
     mutator.sys.set_current_module(parent.clone());
-    mutator.sys.set_insert_before(&mutator.get().upcast());
+    mutator.sys.set_insert_before(mutator.get().upcast());
     mutator.sys.create_bundled_trigger(agent.clone(), data);
     // Create trigger to the destination module.
     mutator.sys.set_current_module(agent.clone());
@@ -94,7 +94,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     mutator
       .sys
       .create_bundled_trigger(dest_module.clone(), data_to_dst);
-    mutator.sys.set_insert_before(&block);
+    mutator.sys.set_insert_before(block);
     let flip_cond = mutator.sys.create_flip(&cond);
     let block = mutator.sys.create_block(Some(flip_cond));
     mutator.sys.set_current_block(block.clone());

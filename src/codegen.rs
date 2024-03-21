@@ -175,42 +175,24 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
       }
       Instruction::AsyncCall((id, args)) => {
         let module = id;
-        let param = args
+        let binds = args
           .iter()
-          .enumerate()
-          .map(|(idx, (k, _))| {
-            let var_id = syn::Ident::new(&format!("port_{}", idx), k.span());
-            var_id
-          })
-          .collect::<Vec<_>>();
-        let ports = args
-          .iter()
-          .enumerate()
-          .map(|(idx, (k, _))| {
-            let port_id = param.get(idx).unwrap();
-            quote! { let #port_id = module.get_input_by_name(stringify!(#k)).unwrap().clone() }
-          })
-          .collect::<Vec<_>>();
-        let pushes = args
-          .iter()
-          .enumerate()
-          .map(|(idx, (_, v))| {
-            let port_id = param.get(idx).unwrap();
-            let value = emit_expr_body(v, None).unwrap();
+          .map(|(k, v)| {
+            let value =
+              emit_expr_body(v, None).expect(format!("Failed to emit {}", quote! {v}).as_str());
             let value: proc_macro2::TokenStream = value.into();
             quote! {
-              let #port_id = {
-                let value = #value;
-                sys.create_fifo_push(#port_id, value)
-              }
+              binds.insert(stringify!(#k).to_string(), #value)
             }
           })
           .collect::<Vec<_>>();
         quote! {{
-          let module = sys.get_current_module().unwrap();
-          #(#ports);*;
-          #(#pushes);*;
-          sys.create_bundled_trigger(#module, vec![#(#param),*]);
+          let callee = #module
+            .as_ref::<eir::frontend::Module>(sys)
+            .expect(format!("[Push Bind] {} is not a module", stringify!(#module)).as_str());
+          let mut binds = std::collections::HashMap::new();
+          #(#binds);*;
+          sys.create_bound_trigger(#module, binds);
         }}
       }
       Instruction::When((cond, body)) => {
@@ -228,16 +210,16 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         }
         quote! {{
           let cond = #cond;
-          let ip = sys.get_current_ip();
           let block = sys.create_block(Some(cond));
           sys.set_current_block(block.clone());
           #(#unwraped_body)*;
-          if let Some(next) = block.as_ref::<eir::frontend::Block>().unwrap().next() {
-            sys.set_current_ip(next);
-          } else {
-            sys.set_current_module(ip.0.clone());
-            sys.set_current_block(block);
-          }
+          let cur_module = sys
+            .get_current_module()
+            .expect("[When] No current module")
+            .upcast();
+          let ip = sys.get_current_ip();
+          let ip = ip.next(sys).expect("[When] No next ip");
+          sys.set_current_ip(ip);
         }}
       }
     }
