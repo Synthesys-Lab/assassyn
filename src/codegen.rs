@@ -2,11 +2,11 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse::Parse, spanned::Spanned};
 
-use crate::Instruction;
+use crate::{ArrayAccess, Instruction};
 
-pub(crate) struct ExprToType(pub(crate) TokenStream);
+pub(crate) struct EmitType(pub(crate) TokenStream);
 
-impl Parse for ExprToType {
+impl Parse for EmitType {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let tyid = input.parse::<syn::Ident>()?;
     match tyid.to_string().as_str() {
@@ -15,16 +15,43 @@ impl Parse for ExprToType {
         input.parse::<syn::Token![<]>()?;
         let bits = input.parse::<syn::LitInt>()?;
         input.parse::<syn::Token![>]>()?;
-        Ok(ExprToType(
-          quote!(eir::frontend::DataType::#tyid(#bits)).into(),
+        Ok(EmitType(
+          quote! { eir::frontend::DataType::#tyid(#bits) }.into(),
         ))
       }
       _ => {
         return Err(syn::Error::new(
           tyid.span(),
-          format!("Unsupported type: {}", tyid.to_string()),
+          format!("[CG.Type] Unsupported type: {}", tyid.to_string()),
         ));
       }
+    }
+  }
+}
+
+pub(crate) struct EmitIDOrConst(pub(crate) TokenStream);
+
+impl Parse for EmitIDOrConst {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    if let Some(_) = input.cursor().ident() {
+      let id = input.clone().parse::<syn::Ident>()?;
+      Ok(EmitIDOrConst(id.into_token_stream().into()))
+    } else if let Some(_) = input.cursor().literal() {
+      let lit = input.parse::<syn::LitInt>()?;
+      let ty = if input.peek(syn::Token![.]) {
+        input.parse::<syn::Token![.]>()?;
+        input.parse::<EmitType>()?
+      } else {
+        EmitType(quote! { eir::frontend::DataType::int(32) }.into())
+      };
+      let ty: proc_macro2::TokenStream = ty.0.into();
+      let res = quote! { sys.get_const_int(#ty, #lit) };
+      Ok(EmitIDOrConst(res.into()))
+    } else {
+      Err(syn::Error::new(
+        input.span(),
+        "Expected identifier or literal",
+      ))
     }
   }
 }
@@ -44,13 +71,15 @@ pub(crate) fn emit_expr_body(
           let mut operands = method.args.iter();
           let a = &method.receiver;
           let b = operands.next().unwrap();
+          let b = syn::parse::<EmitIDOrConst>(b.into_token_stream().into())?.0;
+          let b: proc_macro2::TokenStream = b.into();
           if !operands.next().is_none() {
             return Err(syn::Error::new(
               method.span(),
-              "Binary op call like \"a.add(b)\" should have only 1 operand in the argument list",
+              "[CG.BinOP] Should be like \"a.add(b)\" should have only 1 operand in the argument list",
             ));
           }
-          Ok(quote!(sys.#method_id(None, &#a, &#b);).into())
+          Ok(quote!(sys.#method_id(None, #a.clone(), #b.clone());).into())
         }
         "pop" => {
           let method_id = syn::Ident::new("create_fifo_pop", method.method.span());
@@ -67,21 +96,20 @@ pub(crate) fn emit_expr_body(
       match id.to_string().as_str() {
         "array" => {
           let mut args = call.args.iter();
-          let mut sys = syn::Ident::new("sys", call.func.span());
           let raw_ty = args.next().unwrap().clone();
           let ty: proc_macro2::TokenStream =
-            match syn::parse::<ExprToType>(raw_ty.into_token_stream().into()) {
+            match syn::parse::<EmitType>(raw_ty.into_token_stream().into()) {
               Ok(ty) => ty.0.into(),
               Err(e) => return Err(e),
             };
           let size = args.next().unwrap();
           let name = name.unwrap();
-          Ok(quote!(sys.create_array(&#ty, stringify!(#name), #size);).into())
+          Ok(quote!(sys.create_array(#ty, stringify!(#name), #size);).into())
         }
         _ => {
           return Err(syn::Error::new(
             call.span(),
-            format!("Not supported func call {}", quote!(#call)),
+            format!("[CG.FuncCall] Not supported: {}", quote!(#call)),
           ));
         }
       }
@@ -89,30 +117,50 @@ pub(crate) fn emit_expr_body(
     _ => {
       return Err(syn::Error::new(
         expr.span(),
-        format!("Not supported expr {}", quote!(#expr)),
+        format!("[CG.Expr] Not supported: {}", quote!(#expr)),
       ));
     }
   }
 }
 
+fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> {
+  let id = aa.id.clone();
+  let idx: proc_macro2::TokenStream = aa.idx.clone().into();
+  Ok(
+    quote! {{
+      let idx = #idx;
+      sys.create_array_ptr(#id.clone(), idx)
+    }}
+    .into(),
+  )
+}
+
 pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStream> {
-  match inst {
-    Instruction::Assign((left, right)) => {
-      let right: proc_macro2::TokenStream = emit_expr_body(right, Some(left))?.into();
-      Ok(quote! { let #left = #right; }.into())
-    }
-    Instruction::ArrayAssign((array, idx, right)) => {
-      let right: proc_macro2::TokenStream = emit_expr_body(right, None)?.into();
-      let idx_id = syn::Ident::new("idx", idx.span());
-      let idx: proc_macro2::TokenStream = emit_expr_body(idx, Some(&idx_id))?.into();
-      Ok(
+  Ok(
+    match inst {
+      Instruction::Assign((left, right)) => {
+        let right: proc_macro2::TokenStream = emit_expr_body(right, Some(left))?.into();
         quote! {
-          let #idx_id = #idx;
-          let ptr = sys.create_array_ptr(&#array, &#idx);
-          sys.create_array_write(&ptr, #right);
+          let #left = #right;
         }
-        .into(),
-      )
+      }
+      Instruction::ArrayAssign((aa, right)) => {
+        let right: proc_macro2::TokenStream = emit_expr_body(right, None)?.into();
+        let array_ptr = emit_array_access(aa)?;
+        quote! {
+          let ptr = #array_ptr;
+          let value = #right;
+          sys.create_array_write(ptr, value);
+        }
+      }
+      Instruction::ArrayRead((id, aa)) => {
+        let array_ptr = emit_array_access(aa)?;
+        quote! {
+          let ptr = #array_ptr;
+          let #id = sys.create_array_read(ptr);
+        }
+      }
     }
-  }
+    .into(),
+  )
 }

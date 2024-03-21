@@ -1,15 +1,21 @@
 use proc_macro::TokenStream;
 use syn::{braced, parse::Parse, Ident};
 
-use crate::{codegen::ExprToType, Instruction};
+use crate::codegen::{EmitIDOrConst, EmitType};
 
 pub(crate) struct TypeParser {
   pub(crate) ty: TokenStream,
 }
 
+pub(crate) enum Instruction {
+  Assign((syn::Ident, syn::Expr)),
+  ArrayAssign((ArrayAccess, syn::Expr)),
+  ArrayRead((syn::Ident, ArrayAccess)),
+}
+
 impl Parse for TypeParser {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    match ExprToType::parse(input.clone()) {
+    match EmitType::parse(input.clone()) {
       Ok(ty) => Ok(TypeParser { ty: ty.0 }),
       Err(err) => Err(err),
     }
@@ -34,11 +40,26 @@ impl Parse for Argument {
   }
 }
 
-pub(crate) struct BodyParser {
+pub(crate) struct Body {
   pub(crate) stmts: Vec<Instruction>,
 }
 
-impl Parse for BodyParser {
+pub(crate) struct ArrayAccess {
+  pub(crate) id: syn::Ident,
+  pub(crate) idx: TokenStream,
+}
+
+impl Parse for ArrayAccess {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let id = input.parse::<syn::Ident>()?;
+    let idx;
+    syn::bracketed!(idx in input);
+    let idx = idx.parse::<EmitIDOrConst>()?.0;
+    Ok(ArrayAccess { id, idx })
+  }
+}
+
+impl Parse for Body {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let content;
     let _ = braced!(content in input);
@@ -49,16 +70,20 @@ impl Parse for BodyParser {
         // <id> = <expr>
         if content.peek(syn::Token![=]) {
           content.parse::<syn::Token![=]>()?;
-          let assign = content.parse::<syn::Expr>()?;
-          stmts.push(Instruction::Assign((id, assign)));
+          // to handle the expression in k = a[0.int::<32>]
+          if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
+            let aa = content.parse::<ArrayAccess>()?;
+            stmts.push(Instruction::ArrayRead((id, aa)));
+          } else {
+            let assign = content.parse::<syn::Expr>()?;
+            stmts.push(Instruction::Assign((id, assign)));
+          }
         } else if content.peek(syn::token::Bracket) {
           // <id>[<expr>] = <expr>
-          let idx;
-          syn::bracketed!(idx in content);
-          let idx = idx.parse::<syn::Expr>()?;
+          let aa = content.parse::<ArrayAccess>()?;
           content.parse::<syn::Token![=]>()?;
-          let assign = content.parse::<syn::Expr>()?;
-          stmts.push(Instruction::ArrayAssign((id, idx, assign)));
+          let right = content.parse::<syn::Expr>()?;
+          stmts.push(Instruction::ArrayAssign((aa, right)));
         } else {
           return Err(syn::Error::new(
             content.span(),
@@ -66,8 +91,9 @@ impl Parse for BodyParser {
           ));
         }
       }
+      eprintln!("commit ;");
       content.parse::<syn::Token![;]>()?;
     }
-    Ok(BodyParser { stmts })
+    Ok(Body { stmts })
   }
 }

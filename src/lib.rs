@@ -15,12 +15,7 @@ struct ModuleParser {
   builder_name: syn::Ident,
   ports: Punctuated<Argument, Token![,]>,
   ext_interf: Punctuated<syn::Ident, Token![,]>,
-  body: BodyParser,
-}
-
-pub(crate) enum Instruction {
-  Assign((syn::Ident, syn::Expr)),
-  ArrayAssign((syn::Ident, syn::Expr, syn::Expr)),
+  body: Body,
 }
 
 impl Parse for ModuleParser {
@@ -36,7 +31,7 @@ impl Parse for ModuleParser {
     let raw_ext_interf;
     bracketed!(raw_ext_interf in input);
     let ext_interf = raw_ext_interf.parse_terminated(syn::Ident::parse, Token![,])?;
-    let body = input.parse::<BodyParser>()?;
+    let body = input.parse::<Body>()?;
 
     let res = Ok(ModuleParser {
       module_name,
@@ -91,6 +86,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     }
   }
   let body: proc_macro2::TokenStream = body.into();
+  eprintln!("[Parser] Body successfully parsed!");
 
   // codegen external interfaces
   let ext_interf: proc_macro2::TokenStream = {
@@ -101,6 +97,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     }
     res.into()
   };
+  eprintln!("[CodeGen] External interaces successfully generated!");
 
   let res = quote! {
     fn #builder_name (sys: &mut eir::frontend::SysBuilder, #ext_interf) -> eir::frontend::BaseNode {
@@ -115,7 +112,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     }
   };
 
-  // eprintln!("{}", res);
+  eprintln!("Raw Source Code:\n{}", res);
 
   res.into()
 }
