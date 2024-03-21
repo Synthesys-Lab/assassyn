@@ -96,7 +96,7 @@ macro_rules! create_arith_op_impl {
   };
 
   (unary, $func_name:ident, $opcode: expr) => {
-    pub fn $func_name(&mut self, x: &BaseNode) -> BaseNode {
+    pub fn $func_name(&mut self, x: BaseNode) -> BaseNode {
       let res_ty = x.get_dtype(self).unwrap();
       self.create_expr(res_ty, $opcode, vec![x.clone()])
     }
@@ -381,69 +381,50 @@ impl SysBuilder {
   /// unconditional.
   pub fn create_bundled_trigger(&mut self, dst: BaseNode, data: Vec<BaseNode>) -> BaseNode {
     let current_module = self.get_current_module().unwrap().upcast();
+    let mut args = vec![dst.clone()];
 
     // Handle callback trigger
-    let (ports, types) = {
-      match dst.get_kind() {
-        NodeKind::Module => {
-          let dst_module = dst.as_ref::<Module>(self).unwrap();
-          (
-            dst_module
-              .port_iter()
-              .map(|x| x.upcast())
-              .collect::<Vec<_>>()
-              .into(),
-            None,
-          )
-        }
-        NodeKind::Expr => {
-          let expr = dst.as_ref::<Expr>(self).unwrap();
-          assert_eq!(expr.get_opcode(), Opcode::FIFOPop);
-          let ty = expr.get().dtype();
-          if let DataType::Module(types) = ty {
-            (
-              None,
-              types
-                .iter()
-                .map(|x| x.as_ref().clone())
-                .collect::<Vec<_>>()
-                .into(),
-            )
-          } else {
-            panic!("Invalid destination, {:?}", dst);
+    let res = match dst.get_kind() {
+      NodeKind::Module => {
+        let ports = dst
+          .as_ref::<Module>(self)
+          .unwrap()
+          .port_iter()
+          .map(|x| x.upcast())
+          .collect::<Vec<_>>();
+        assert_eq!(ports.len(), data.len(), "Data size mismatch!");
+        for (port, arg) in ports.iter().zip(data.iter()) {
+          {
+            let port = port.as_ref::<FIFO>(self).unwrap();
+            assert_eq!(port.scalar_ty(), arg.get_dtype(self).unwrap());
           }
+          let push_handle = self.create_fifo_push(port.clone(), arg.clone());
+          args.push(push_handle);
+          self
+            .get_mut::<Module>(&current_module)
+            .unwrap()
+            .insert_external_interface(port.clone(), Opcode::FIFOPush);
         }
-        _ => panic!("Invalid destination"),
+        self.create_expr(DataType::void(), Opcode::CallbackTrigger, args)
       }
+      NodeKind::Expr => {
+        let expr = dst.as_ref::<Expr>(self).unwrap();
+        assert_eq!(expr.get_opcode(), Opcode::FIFOPop);
+        let ty = expr.dtype();
+        let types = if let DataType::Module(types) = ty {
+          types.iter().map(|x| x.as_ref().clone()).collect::<Vec<_>>()
+        } else {
+          panic!("Invalid destination, {:?}", dst);
+        };
+        assert_eq!(types.len(), data.len(), "Data size mismatch!");
+        for (ty, arg) in types.iter().zip(data.iter()) {
+          assert_eq!(ty, &arg.get_dtype(self).unwrap());
+        }
+        self.create_expr(DataType::void(), Opcode::CallbackTrigger, args)
+      }
+      _ => panic!("Invalid destination"),
     };
 
-    let mut args = vec![dst.clone()];
-    let res = if let Some(ports) = ports {
-      assert_eq!(ports.len(), data.len(), "Data size mismatch!");
-      for (port, arg) in ports.iter().zip(data.iter()) {
-        {
-          let port = port.as_ref::<FIFO>(self).unwrap();
-          assert_eq!(port.scalar_ty(), arg.get_dtype(self).unwrap());
-        }
-        let push = self.create_fifo_push(port.clone(), arg.clone());
-        args.push(push);
-        self
-          .get_mut::<Module>(&current_module)
-          .unwrap()
-          .insert_external_interface(port.clone(), Opcode::FIFOPush);
-      }
-      // TODO: Make all FIFO push associate to this trigger to enforce the timing of data arrival.
-      self.create_expr(DataType::void(), Opcode::Trigger, args)
-    } else if let Some(types) = types {
-      assert_eq!(types.len(), data.len(), "Signature mismatch!");
-      for (ty, arg) in types.iter().zip(data.iter()) {
-        assert_eq!(ty, &arg.get_dtype(self).unwrap());
-        args.push(arg.clone());
-      }
-      self.create_expr(DataType::void(), Opcode::CallbackTrigger, args)
-    } else {
-      panic!("Invalid destination");
-    };
     res
   }
 
@@ -502,12 +483,50 @@ impl SysBuilder {
   /// * `array` - A pointer to the an array element, which serves as an handle to a "lock".
   /// * `dst` - The destination module to be invoked.
   /// * `data` - The data to be sent to the destination module.
-  /// * `pred` - The condition of triggering the destination. If None is given, the trigger is
-  /// always on.
   pub fn create_spin_trigger(&mut self, handle: BaseNode, dst: BaseNode, mut data: Vec<BaseNode>) {
-    data.insert(0, handle.clone());
-    data.insert(1, dst.clone());
-    self.create_expr(DataType::void(), Opcode::SpinTrigger, data);
+    let caller_name = self.get_current_module().unwrap().get_name().to_string();
+    let callee = dst.as_ref::<Module>(self).unwrap();
+    assert_eq!(data.len(), callee.get_num_inputs());
+
+    let mut ports = vec![];
+    for (i, each) in data.iter().enumerate() {
+      let arg_dtype = each.get_dtype(self).unwrap();
+      assert_eq!(
+        arg_dtype,
+        callee.get_input(i).unwrap().get_dtype(self).unwrap()
+      );
+      ports.push(PortInfo::new(format!("arg.{}", i).as_str(), arg_dtype));
+    }
+    let callee_name = callee.get_name().to_string();
+
+    let agent = self.create_module(
+      format!("async.{}.to.{}", caller_name, callee_name).as_str(),
+      ports,
+    );
+    data.insert(0, dst.clone());
+    // Create trigger to the agent module.
+    self.create_bundled_trigger(agent.clone(), data);
+    // Create trigger to the destination module.
+    self.set_current_module(agent.clone());
+    let agent_module = self.get_current_module().unwrap();
+    let agent_ports = agent_module
+      .port_iter()
+      .map(|x| x.upcast())
+      .collect::<Vec<_>>();
+    let cond = self.create_array_read(handle);
+    let block = self.create_block(Some(cond.clone()));
+    self.set_current_block(block.clone());
+    let data_to_dst = agent_ports
+      .iter()
+      .map(|x| self.create_fifo_pop(x, None))
+      .collect::<Vec<_>>();
+    self.create_bundled_trigger(dst.clone(), data_to_dst);
+    self.set_insert_before(block);
+    let flip_cond = self.create_flip(cond);
+    let block = self.create_block(Some(flip_cond));
+    self.set_current_block(block.clone());
+    // Send the data from agent to the actual inokee.
+    self.create_trigger(agent.clone());
   }
 
   create_arith_op_impl!(binary, create_add, Opcode::Add);

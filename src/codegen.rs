@@ -97,7 +97,7 @@ pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<TokenStream> {
           }
           Ok(
             quote! {{
-              let res = sys.#method_id(None, #a.clone());
+              let res = sys.#method_id(#a.clone());
               res
             }}
             .into(),
