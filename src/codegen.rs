@@ -175,35 +175,42 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
       }
       Instruction::AsyncCall((id, args)) => {
         let module = id;
-        let ports = args
-          .iter()
-          .enumerate()
-          .map(|(idx, (k, v))| {
-            let v = emit_expr_body(v, None).unwrap();
-            let v: proc_macro2::TokenStream = v.into();
-            let var_id = syn::Ident::new(&format!("arg_{}", idx), k.span());
-            let port = quote! {
-              let #var_id = {
-                let port = module.get_input_by_name(stringify!(#k)).unwrap().clone();
-                let to_push = #v;
-                sys.create_fifo_push(port, to_push)
-              }
-            };
-            port
-          })
-          .collect::<Vec<_>>();
-        let args = args
+        let param = args
           .iter()
           .enumerate()
           .map(|(idx, (k, _))| {
-            let var_id = syn::Ident::new(&format!("arg_{}", idx), k.span());
+            let var_id = syn::Ident::new(&format!("port_{}", idx), k.span());
             var_id
+          })
+          .collect::<Vec<_>>();
+        let ports = args
+          .iter()
+          .enumerate()
+          .map(|(idx, (k, _))| {
+            let port_id = param.get(idx).unwrap();
+            quote! { let #port_id = module.get_input_by_name(stringify!(#k)).unwrap().clone() }
+          })
+          .collect::<Vec<_>>();
+        let pushes = args
+          .iter()
+          .enumerate()
+          .map(|(idx, (_, v))| {
+            let port_id = param.get(idx).unwrap();
+            let value = emit_expr_body(v, None).unwrap();
+            let value: proc_macro2::TokenStream = value.into();
+            quote! {
+              let #port_id = {
+                let value = #value;
+                sys.create_fifo_push(#port_id, value)
+              };
+            }
           })
           .collect::<Vec<_>>();
         quote! {{
           let module = sys.get_current_module().unwrap();
           #(#ports);*;
-          sys.create_bundled_trigger(#module, vec![#(#args),*]);
+          #(#pushes);*;
+          sys.create_bundled_trigger(#module, vec![#(#param),*]);
         }}
       }
     }

@@ -16,6 +16,7 @@ fn foo() {
     async adder { a: v, b: v };
   });
 
-  // let mut sys = eir::frontend::SysBuilder::new("a");
-  // sqr_builder(&mut sys);
+  let mut sys = eir::frontend::SysBuilder::new("main");
+  let adder = adder_builder(&mut sys);
+  driver_builder(&mut sys, adder);
 }
