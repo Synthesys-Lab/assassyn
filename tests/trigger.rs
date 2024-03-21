@@ -5,7 +5,7 @@ use eir::test_utils;
 #[test]
 fn trigger() {
   module_builder!(
-    adder[a:int<32>, b:int<32>][] {
+    adder[a:int::<32>, b:int::<32>][] {
       a  = a.pop();
       b  = b.pop();
       _c = a.add(b);
@@ -14,22 +14,22 @@ fn trigger() {
 
   module_builder!(
     driver[/*in-ports*/] [/*external interf*/adder] {
-      cnt    = array(int<32>, 1);
+      cnt    = array(int::<32>, 1);
       read   = cnt[0];
       plus   = read.add(1);
       cnt[0] = plus;
       cond   = read.ilt(100);
       when cond {
-        async adder(read, read);
+        async adder { a: read, b: read };
       }
     }
   );
 
   let mut sys = SysBuilder::new("main");
   // Create a trivial module.
-  let m1 = adder_builder(&mut sys);
+  let adder = adder_builder(&mut sys);
   // Build the driver module.
-  driver_builder(&mut sys, m1);
+  driver_builder(&mut sys, adder);
 
   println!("{}", sys);
 

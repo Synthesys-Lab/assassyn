@@ -65,7 +65,7 @@ pub(crate) fn emit_expr_body(
       let receiver = method.receiver.clone();
       // let args = method.args.iter().map(|arg| emit_expr_body(arg).unwrap());
       match method.method.to_string().as_str() {
-        "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" => {
+        "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" => {
           let method_id = format!("create_{}", method.method.to_string());
           let method_id = syn::Ident::new(&method_id, method.method.span());
           let mut operands = method.args.iter();
@@ -202,7 +202,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
               let #port_id = {
                 let value = #value;
                 sys.create_fifo_push(#port_id, value)
-              };
+              }
             }
           })
           .collect::<Vec<_>>();
@@ -211,6 +211,33 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           #(#ports);*;
           #(#pushes);*;
           sys.create_bundled_trigger(#module, vec![#(#param),*]);
+        }}
+      }
+      Instruction::When((cond, body)) => {
+        let body = body
+          .stmts
+          .iter()
+          .map(|x| emit_parse_instruction(x))
+          .collect::<Vec<_>>();
+        let mut unwraped_body: Vec<proc_macro2::TokenStream> = vec![];
+        for elem in body.into_iter() {
+          match elem {
+            Ok(x) => unwraped_body.push(x.into()),
+            Err(e) => return Err(e.clone()),
+          }
+        }
+        quote! {{
+          let cond = #cond;
+          let ip = sys.get_current_ip();
+          let block = sys.create_block(Some(cond));
+          sys.set_current_block(block.clone());
+          #(#unwraped_body)*;
+          if let Some(next) = block.as_ref::<eir::frontend::Block>().unwrap().next() {
+            sys.set_current_ip(next);
+          } else {
+            sys.set_current_module(ip.0.clone());
+            sys.set_current_block(block);
+          }
         }}
       }
     }

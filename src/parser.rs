@@ -13,6 +13,7 @@ pub(crate) enum Instruction {
   ArrayAssign((ArrayAccess, syn::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
   AsyncCall((syn::Ident, Vec<(syn::Ident, syn::Expr)>)),
+  When((syn::Ident, Box<Body>)),
 }
 
 impl Parse for TypeParser {
@@ -42,10 +43,6 @@ impl Parse for Argument {
   }
 }
 
-pub(crate) struct Body {
-  pub(crate) stmts: Vec<Instruction>,
-}
-
 pub(crate) struct ArrayAccess {
   pub(crate) id: syn::Ident,
   pub(crate) idx: TokenStream,
@@ -59,6 +56,10 @@ impl Parse for ArrayAccess {
     let idx = idx.parse::<EmitIDOrConst>()?.0;
     Ok(ArrayAccess { id, idx })
   }
+}
+
+pub(crate) struct Body {
+  pub(crate) stmts: Vec<Instruction>,
 }
 
 impl Parse for Body {
@@ -82,31 +83,44 @@ impl Parse for Body {
           .collect::<Vec<_>>();
         stmts.push(Instruction::AsyncCall((func, fields)));
       } else if content.peek(syn::Ident) {
-        // Parse non-keyword-leading statements
-        if content.peek2(syn::token::Bracket) {
-          // <id>[<expr>] = <expr>
-          let aa = content.parse::<ArrayAccess>()?;
-          content.parse::<syn::Token![=]>()?;
-          let right = content.parse::<syn::Expr>()?;
-          stmts.push(Instruction::ArrayAssign((aa, right)));
-        } else {
-          // <id> = <expr>
-          let id = content.parse::<Ident>()?;
-          if content.peek(syn::Token![=]) {
-            content.parse::<syn::Token![=]>()?;
-            // to handle the expression in k = a[0.int::<32>]
-            if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
+        match content.cursor().ident().unwrap().0.to_string().as_str() {
+          // when <cond> { ... }
+          "when" => {
+            content.parse::<syn::Ident>()?;
+            // TODO(@were): To keep it simple, for now, only a ident is allowed.
+            let cond = content.parse::<syn::Ident>()?;
+            let body = content.parse::<Body>()?;
+            stmts.push(Instruction::When((cond, Box::new(body))));
+            continue; // NO ;
+          }
+          _ => {
+            // Parse non-keyword-leading statements
+            if content.peek2(syn::token::Bracket) {
+              // <id>[<expr>] = <expr>
               let aa = content.parse::<ArrayAccess>()?;
-              stmts.push(Instruction::ArrayRead((id, aa)));
+              content.parse::<syn::Token![=]>()?;
+              let right = content.parse::<syn::Expr>()?;
+              stmts.push(Instruction::ArrayAssign((aa, right)));
             } else {
-              let assign = content.parse::<syn::Expr>()?;
-              stmts.push(Instruction::Assign((id, assign)));
+              // <id> = <expr>
+              let id = content.parse::<Ident>()?;
+              if content.peek(syn::Token![=]) {
+                content.parse::<syn::Token![=]>()?;
+                // to handle the expression in k = a[0.int::<32>]
+                if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
+                  let aa = content.parse::<ArrayAccess>()?;
+                  stmts.push(Instruction::ArrayRead((id, aa)));
+                } else {
+                  let assign = content.parse::<syn::Expr>()?;
+                  stmts.push(Instruction::Assign((id, assign)));
+                }
+              } else {
+                return Err(syn::Error::new(
+                  content.span(),
+                  "Expected an assignment or an expression",
+                ));
+              }
             }
-          } else {
-            return Err(syn::Error::new(
-              content.span(),
-              "Expected an assignment or an expression",
-            ));
           }
         }
       }
