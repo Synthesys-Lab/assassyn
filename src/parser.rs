@@ -1,5 +1,6 @@
 use proc_macro::TokenStream;
-use syn::{braced, parse::Parse, Ident};
+use quote::ToTokens;
+use syn::{braced, parse::Parse, ExprStruct, Ident};
 
 use crate::codegen::{EmitIDOrConst, EmitType};
 
@@ -11,6 +12,7 @@ pub(crate) enum Instruction {
   Assign((syn::Ident, syn::Expr)),
   ArrayAssign((ArrayAccess, syn::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
+  AsyncCall((syn::Ident, Vec<(syn::Ident, syn::Expr)>)),
 }
 
 impl Parse for TypeParser {
@@ -65,7 +67,22 @@ impl Parse for Body {
     let _ = braced!(content in input);
     let mut stmts = Vec::new();
     while !content.is_empty() {
-      if content.peek(syn::Ident) {
+      if content.peek(syn::token::Async) {
+        // async <func-id> { <id>: <expr>, ... }
+        content.parse::<syn::token::Async>()?;
+        let args = content.parse::<ExprStruct>()?;
+        let func = syn::parse::<Ident>(args.path.into_token_stream().into())?;
+        let fields = args
+          .fields
+          .iter()
+          .map(|x| match &x.member {
+            syn::Member::Named(id) => (id.clone(), x.expr.clone()),
+            _ => panic!("Expected a named member"),
+          })
+          .collect::<Vec<_>>();
+        stmts.push(Instruction::AsyncCall((func, fields)));
+      } else if content.peek(syn::Ident) {
+        // Parse non-keyword-leading statements
         if content.peek2(syn::token::Bracket) {
           // <id>[<expr>] = <expr>
           let aa = content.parse::<ArrayAccess>()?;

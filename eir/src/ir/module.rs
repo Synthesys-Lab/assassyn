@@ -48,8 +48,21 @@ impl<'sys> ModuleRef<'sys> {
   /// # Arguments
   ///
   /// * `i` - The index of the input.
-  pub fn get_input(&self, i: usize) -> Option<&BaseNode> {
-    self.inputs.get(i)
+  pub fn get_input(&self, i: usize) -> Option<BaseNode> {
+    self.inputs.get(i).map(|x| x.clone())
+  }
+
+  /// Get the input by name.
+  ///
+  /// # Arguments
+  ///
+  /// * `name` - The name of the input.
+  pub fn get_input_by_name(&self, name: &str) -> Option<BaseNode> {
+    self
+      .inputs
+      .iter()
+      .find(|x| x.as_ref::<FIFO>(self.sys).unwrap().get_name() == name)
+      .map(|x| x.clone())
   }
 
   /// Get the name of the module.

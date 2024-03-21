@@ -396,7 +396,7 @@ impl SysBuilder {
           let port = port.as_ref::<FIFO>(self).unwrap();
           assert_eq!(port.scalar_ty(), arg.get_dtype(self).unwrap());
         }
-        let push = self.create_fifo_push(port, arg.clone());
+        let push = self.create_fifo_push(port.clone(), arg.clone());
         args.push(push);
         self
           .get_mut::<Module>(&current_module)
@@ -479,7 +479,7 @@ impl SysBuilder {
     key
   }
 
-  pub fn create_fifo_push(&mut self, fifo: &BaseNode, value: BaseNode) -> BaseNode {
+  pub fn create_fifo_push(&mut self, fifo: BaseNode, value: BaseNode) -> BaseNode {
     let res = self.create_expr(
       DataType::void(),
       Opcode::FIFOPush,

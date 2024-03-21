@@ -93,7 +93,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     let ext_interf = &parsed_module.ext_interf;
     let mut res = TokenStream::new();
     for elem in ext_interf.iter() {
-      res.extend::<TokenStream>(quote! { #elem, }.into());
+      res.extend::<TokenStream>(quote! { #elem: eir::frontend::BaseNode, }.into());
     }
     res.into()
   };
