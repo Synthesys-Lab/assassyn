@@ -630,7 +630,7 @@ impl SysBuilder {
   /// * `num_elems` - The number of elements to be popped. If None is given, the number of elements
   /// is one.
   /// * `cond` - The condition of popping the FIFO. If None is given, the pop is unconditional.
-  pub fn create_fifo_pop(&mut self, fifo: &BaseNode, num_elems: Option<BaseNode>) -> BaseNode {
+  pub fn create_fifo_pop(&mut self, fifo: BaseNode, num_elems: Option<BaseNode>) -> BaseNode {
     let num_elems = if let Some(num_elems) = num_elems {
       num_elems
     } else {

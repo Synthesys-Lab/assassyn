@@ -89,7 +89,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     mutator.sys.set_current_block(block.clone());
     let data_to_dst = agent_ports
       .iter()
-      .map(|x| mutator.sys.create_fifo_pop(x, None))
+      .map(|x| mutator.sys.create_fifo_pop(x.clone(), None))
       .collect::<Vec<_>>();
     mutator.sys.create_bundled_trigger(dest_module, data_to_dst);
     mutator.sys.set_insert_before(block);

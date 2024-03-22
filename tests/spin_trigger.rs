@@ -78,12 +78,13 @@ fn syntactical_sugar() -> SysBuilder {
   res
 }
 
-fn testit(fname: &str, sys: SysBuilder) {
+fn testit(fname: &str, mut sys: SysBuilder) {
   let config = eir::sim::Config {
     fname: test_utils::temp_dir(&format!("{}.rs", fname)),
     sim_threshold: 200,
     idle_threshold: 200,
   };
+  eir::xform::basic(&mut sys);
   eir::sim::elaborate(&sys, &config).unwrap();
   let exec_name = test_utils::temp_dir(&fname.to_string());
   test_utils::compile(&config.fname, &exec_name);

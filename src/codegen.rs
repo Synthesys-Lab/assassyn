@@ -77,8 +77,9 @@ pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<TokenStream> {
           }
           Ok(
             quote! {{
-              let rhs = #b;
-              let res = sys.#method_id(None, #a.clone(), rhs);
+              let lhs = #a.clone();
+              let rhs = #b.clone();
+              let res = sys.#method_id(None, lhs, rhs);
               res
             }}
             .into(),
@@ -105,7 +106,7 @@ pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<TokenStream> {
         }
         "pop" => {
           let method_id = syn::Ident::new("create_fifo_pop", method.method.span());
-          Ok(quote!(sys.#method_id(&#receiver, None);).into())
+          Ok(quote!(sys.#method_id(#receiver.clone(), None);).into())
         }
         _ => Err(syn::Error::new(
           method.span(),
@@ -245,7 +246,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           }
         }
         quote! {{
-          let cond = #cond;
+          let cond = #cond.clone();
           let block = sys.create_block(Some(cond));
           sys.set_current_block(block.clone());
           #(#unwraped_body)*;
