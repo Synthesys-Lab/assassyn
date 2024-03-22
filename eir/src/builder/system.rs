@@ -509,49 +509,9 @@ impl SysBuilder {
   /// * `dst` - The destination module to be invoked.
   /// * `data` - The data to be sent to the destination module.
   pub fn create_spin_trigger(&mut self, handle: BaseNode, dst: BaseNode, mut data: Vec<BaseNode>) {
-    let caller_name = self.get_current_module().unwrap().get_name().to_string();
-    let callee = dst.as_ref::<Module>(self).unwrap();
-    assert_eq!(data.len(), callee.get_num_inputs());
-
-    let mut ports = vec![];
-    for (i, each) in data.iter().enumerate() {
-      let arg_dtype = each.get_dtype(self).unwrap();
-      assert_eq!(
-        arg_dtype,
-        callee.get_input(i).unwrap().get_dtype(self).unwrap()
-      );
-      ports.push(PortInfo::new(format!("arg.{}", i).as_str(), arg_dtype));
-    }
-    let callee_name = callee.get_name().to_string();
-
-    let agent = self.create_module(
-      format!("async.{}.to.{}", caller_name, callee_name).as_str(),
-      ports,
-    );
-    data.insert(0, dst.clone());
-    // Create trigger to the agent module.
-    self.create_bundled_trigger(agent.clone(), data);
-    // Create trigger to the destination module.
-    self.set_current_module(agent.clone());
-    let agent_module = self.get_current_module().unwrap();
-    let agent_ports = agent_module
-      .port_iter()
-      .map(|x| x.upcast())
-      .collect::<Vec<_>>();
-    let cond = self.create_array_read(handle);
-    let block = self.create_block(Some(cond.clone()));
-    self.set_current_block(block.clone());
-    let data_to_dst = agent_ports
-      .iter()
-      .map(|x| self.create_fifo_pop(x, None))
-      .collect::<Vec<_>>();
-    self.create_bundled_trigger(dst.clone(), data_to_dst);
-    self.set_insert_before(block);
-    let flip_cond = self.create_flip(cond);
-    let block = self.create_block(Some(flip_cond));
-    self.set_current_block(block.clone());
-    // Send the data from agent to the actual inokee.
-    self.create_trigger(agent.clone());
+    data.insert(0, handle.clone());
+    data.insert(1, dst.clone());
+    self.create_expr(DataType::void(), Opcode::SpinTrigger, data);
   }
 
   create_arith_op_impl!(binary, create_add, Opcode::Add);
