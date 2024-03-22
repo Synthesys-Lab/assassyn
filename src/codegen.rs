@@ -2,30 +2,31 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse::Parse, spanned::Spanned};
 
-use crate::{ArrayAccess, Instruction};
+use crate::{ArrayAccess, DType, Instruction};
 
-pub(crate) struct EmitType(pub(crate) TokenStream);
+use eir::frontend::DataType;
 
-impl Parse for EmitType {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let tyid = input.parse::<syn::Ident>()?;
-    match tyid.to_string().as_str() {
-      "int" | "uint" => {
-        // input.parse::<syn::Token![::]>()?;
-        input.parse::<syn::Token![<]>()?;
-        let bits = input.parse::<syn::LitInt>()?;
-        input.parse::<syn::Token![>]>()?;
-        Ok(EmitType(
-          quote! { eir::frontend::DataType::#tyid(#bits) }.into(),
-        ))
-      }
-      _ => {
-        return Err(syn::Error::new(
-          tyid.span(),
-          format!("[CG.Type] Unsupported type: {}", tyid.to_string()),
-        ));
-      }
+pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
+  match &dtype.dtype {
+    DataType::Int(bits) => Ok(quote! { eir::frontend::DataType::int(#bits) }.into()),
+    DataType::UInt(bits) => Ok(quote! { eir::frontend::DataType::uint(#bits) }.into()),
+    DataType::Module(args) => {
+      let args = args
+        .iter()
+        .map(|x| {
+          emit_type(&DType {
+            span: dtype.span.clone(),
+            dtype: x.as_ref().clone(),
+          })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+      let args = args
+        .into_iter()
+        .map(|x| x.into())
+        .collect::<Vec<proc_macro2::TokenStream>>();
+      Ok(quote! { eir::frontend::DataType::module(vec![#(#args.into()),*]) }.into())
     }
+    _ => Err(syn::Error::new(dtype.span.into(), "Unsupported type")),
   }
 }
 
@@ -40,11 +41,12 @@ impl Parse for EmitIDOrConst {
       let lit = input.parse::<syn::LitInt>()?;
       let ty = if input.peek(syn::Token![.]) {
         input.parse::<syn::Token![.]>()?;
-        input.parse::<EmitType>()?
+        let dtype = input.parse::<DType>()?;
+        emit_type(&dtype)?
       } else {
-        EmitType(quote! { eir::frontend::DataType::int(32) }.into())
+        quote! { eir::frontend::DataType::int(32) }.into()
       };
-      let ty: proc_macro2::TokenStream = ty.0.into();
+      let ty: proc_macro2::TokenStream = ty.into();
       let res = quote! { sys.get_const_int(#ty, #lit) };
       Ok(EmitIDOrConst(res.into()))
     } else {
@@ -228,6 +230,8 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         .into()
       }
       Instruction::ArrayAlloc((id, ty, size)) => {
+        let ty = emit_type(ty)?;
+        let ty: proc_macro2::TokenStream = ty.into();
         quote! {
           let #id = sys.create_array(#ty, stringify!(#id), #size);
         }

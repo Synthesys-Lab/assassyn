@@ -1,16 +1,62 @@
 use proc_macro::TokenStream;
 use quote::ToTokens;
-use syn::{braced, parse::Parse, ExprStruct, Ident};
+use syn::{braced, parenthesized, parse::Parse, ExprStruct, Ident};
 
-use crate::codegen::{EmitIDOrConst, EmitType};
+use crate::codegen::EmitIDOrConst;
 
-pub(crate) struct TypeParser {
-  pub(crate) ty: TokenStream,
+#[derive(Clone)]
+pub(crate) struct DType {
+  pub(crate) span: proc_macro2::Span,
+  pub(crate) dtype: eir::frontend::DataType,
+}
+
+impl Parse for DType {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let span = input.cursor().span().clone();
+    let tyid = input.parse::<syn::Ident>()?;
+    match tyid.to_string().as_str() {
+      "int" => {
+        input.parse::<syn::Token![<]>()?;
+        let bits = input.parse::<syn::LitInt>()?;
+        input.parse::<syn::Token![>]>()?;
+        Ok(DType {
+          span,
+          dtype: eir::frontend::DataType::int(bits.base10_parse::<usize>().unwrap()),
+        })
+      }
+      "uint" => {
+        input.parse::<syn::Token![<]>()?;
+        let bits = input.parse::<syn::LitInt>()?;
+        input.parse::<syn::Token![>]>()?;
+        Ok(DType {
+          span,
+          dtype: eir::frontend::DataType::uint(bits.base10_parse::<usize>().unwrap()),
+        })
+      }
+      "module" => {
+        let args;
+        parenthesized!(args in input);
+        let parsed_args = args.parse_terminated(DType::parse, syn::Token![,])?;
+        Ok(DType {
+          span,
+          dtype: eir::frontend::DataType::module(
+            parsed_args.iter().map(|x| x.dtype.clone().into()).collect(),
+          ),
+        })
+      }
+      _ => {
+        return Err(syn::Error::new(
+          tyid.span(),
+          format!("[CG.Type] Unsupported type: {}", tyid.to_string()),
+        ));
+      }
+    }
+  }
 }
 
 pub(crate) enum Instruction {
   Assign((syn::Ident, syn::Expr)),
-  ArrayAlloc((syn::Ident, proc_macro2::TokenStream, syn::LitInt)),
+  ArrayAlloc((syn::Ident, DType, syn::LitInt)),
   ArrayAssign((ArrayAccess, syn::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
   AsyncCall((syn::Ident, Vec<(syn::Ident, syn::Expr)>)),
@@ -18,18 +64,9 @@ pub(crate) enum Instruction {
   When((syn::Ident, Box<Body>)),
 }
 
-impl Parse for TypeParser {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    match EmitType::parse(input.clone()) {
-      Ok(ty) => Ok(TypeParser { ty: ty.0 }),
-      Err(err) => Err(err),
-    }
-  }
-}
-
 pub(crate) struct Argument {
   pub(crate) id: syn::Ident,
-  pub(crate) ty: TokenStream,
+  pub(crate) ty: DType,
 }
 
 impl Parse for Argument {
@@ -40,7 +77,7 @@ impl Parse for Argument {
     let _ = input
       .parse::<syn::Token![:]>()
       .map_err(|e| syn::Error::new(e.span(), "Expected : to specify the type of the port"))?;
-    let ty = input.parse::<TypeParser>()?.ty;
+    let ty = input.parse::<DType>()?;
     Ok(Argument { id, ty })
   }
 }
@@ -153,10 +190,10 @@ impl Parse for Body {
                   content.parse::<syn::Ident>()?; // array
                   let args;
                   syn::parenthesized!(args in content);
-                  let ty = args.parse::<EmitType>()?;
+                  let ty = args.parse::<DType>()?;
                   args.parse::<syn::Token![,]>()?;
                   let size = args.parse::<syn::LitInt>()?;
-                  stmts.push(Instruction::ArrayAlloc((id, ty.0.into(), size)));
+                  stmts.push(Instruction::ArrayAlloc((id, ty, size)));
                 } else {
                   let assign = content.parse::<syn::Expr>()?;
                   stmts.push(Instruction::Assign((id, assign)));

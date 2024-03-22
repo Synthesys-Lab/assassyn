@@ -89,7 +89,10 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         }
         .into(),
       );
-      let ty = proc_macro2::TokenStream::from(ty.clone());
+      let ty: proc_macro2::TokenStream = match codegen::emit_type(&ty) {
+        Ok(x) => x.into(),
+        Err(e) => return e.to_compile_error().into(),
+      };
       port_decls
         .extend::<TokenStream>(quote! {eir::frontend::PortInfo::new(stringify!(#id), #ty),}.into());
     }
