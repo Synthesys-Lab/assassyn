@@ -13,7 +13,7 @@ fn manual() -> SysBuilder {
   module_builder!(
     spin_agent[a:int<32>][sqr] {
       lock = array(int<1>, 1);
-      v    = lock[0];
+      v = lock[0];
       when v {
         a = a.pop();
         async sqr {a: a};
@@ -62,7 +62,7 @@ fn syntactical_sugar() -> SysBuilder {
       v = v.add(1);
       cnt[0] = v;
       when is_odd {
-        spin lock[0] sqr(v);
+        spin lock[0] sqr{ a: v };
       }
       when is_even {
         lv = lock[0];

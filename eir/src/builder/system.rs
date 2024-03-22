@@ -439,6 +439,31 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()])
   }
 
+  /// Convert bind format to a vector of BaseNode corresponding to the original port order.
+  pub fn bind_to_vec(&mut self, dst: BaseNode, binds: HashMap<String, BaseNode>) -> Vec<BaseNode> {
+    let module = dst.as_ref::<Module>(self).unwrap();
+    assert_eq!(module.get_num_inputs(), binds.len());
+    let mut res = vec![BaseNode::unknown(); binds.len()];
+    for (k, v) in binds.iter() {
+      let pos = module.port_iter().position(|x| x.get_name() == k).unwrap();
+      let fifo = module.get_input(pos).unwrap().as_ref::<FIFO>(self).unwrap();
+      assert_eq!(fifo.scalar_ty(), v.get_dtype(self).unwrap());
+      res[pos] = v.clone();
+    }
+    res
+  }
+
+  /// Create a spin trigger with bound format of arguments given.
+  pub fn create_spin_trigger_bound(
+    &mut self,
+    handle: BaseNode,
+    dst: BaseNode,
+    binds: HashMap<String, BaseNode>,
+  ) {
+    let data = self.bind_to_vec(dst.clone(), binds);
+    self.create_spin_trigger(handle, dst, data);
+  }
+
   /// Create a trigger. Push all the values to the corresponding named ports.
   pub fn create_bound_trigger(
     &mut self,
