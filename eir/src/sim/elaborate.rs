@@ -254,7 +254,9 @@ impl Visitor<String> for ElaborateModule<'_> {
           )
         }
         _ => {
-          assert!(expr.get_opcode().is_unary() || expr.get_opcode().is_binary());
+          if !(expr.get_opcode().is_unary() || expr.get_opcode().is_binary()) {
+            panic!("Unknown opcode: {:?}", expr.get_opcode());
+          }
           format!("// TODO: opcode: {}\n", expr.get_opcode().to_string())
         }
       }

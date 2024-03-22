@@ -405,7 +405,7 @@ impl SysBuilder {
             .unwrap()
             .insert_external_interface(port.clone(), Opcode::FIFOPush);
         }
-        self.create_expr(DataType::void(), Opcode::CallbackTrigger, args)
+        self.create_expr(DataType::void(), Opcode::Trigger, args)
       }
       NodeKind::Expr => {
         let expr = dst.as_ref::<Expr>(self).unwrap();
