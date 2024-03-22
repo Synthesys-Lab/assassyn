@@ -14,6 +14,7 @@ pub(crate) enum Instruction {
   ArrayAssign((ArrayAccess, syn::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
   AsyncCall((syn::Ident, Vec<(syn::Ident, syn::Expr)>)),
+  SpinCall((ArrayAccess, syn::Ident, Vec<(syn::Ident, syn::Expr)>)),
   When((syn::Ident, Box<Body>)),
 }
 
@@ -59,6 +60,27 @@ impl Parse for ArrayAccess {
   }
 }
 
+pub(crate) struct FuncCall {
+  pub(crate) func: syn::Ident,
+  pub(crate) args: Vec<(proc_macro2::Ident, syn::Expr)>,
+}
+
+impl Parse for FuncCall {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let raw = input.parse::<ExprStruct>()?;
+    let func = syn::parse::<Ident>(raw.path.into_token_stream().into())?;
+    let args = raw
+      .fields
+      .iter()
+      .map(|x| match &x.member {
+        syn::Member::Named(id) => (id.clone(), x.expr.clone()),
+        _ => panic!("Expected a named member"),
+      })
+      .collect::<Vec<_>>();
+    Ok(FuncCall { func, args })
+  }
+}
+
 pub(crate) struct Body {
   pub(crate) stmts: Vec<Instruction>,
 }
@@ -70,19 +92,21 @@ impl Parse for Body {
     let mut stmts = Vec::new();
     while !content.is_empty() {
       if content.peek(syn::token::Async) {
-        // async <func-id> { <id>: <expr>, ... }
         content.parse::<syn::token::Async>()?;
-        let args = content.parse::<ExprStruct>()?;
-        let func = syn::parse::<Ident>(args.path.into_token_stream().into())?;
-        let fields = args
-          .fields
-          .iter()
-          .map(|x| match &x.member {
-            syn::Member::Named(id) => (id.clone(), x.expr.clone()),
-            _ => panic!("Expected a named member"),
-          })
-          .collect::<Vec<_>>();
-        stmts.push(Instruction::AsyncCall((func, fields)));
+        // async self {}
+        if content.peek(syn::token::SelfValue) {
+          content.parse::<syn::token::SelfValue>()?;
+          let _placeholder;
+          braced!(_placeholder in content);
+          stmts.push(Instruction::AsyncCall((
+            Ident::new("self", content.span()),
+            vec![],
+          )));
+        } else {
+          // async <func-id> { <id>: <expr>, ... }
+          let call = content.parse::<FuncCall>()?;
+          stmts.push(Instruction::AsyncCall((call.func, call.args)));
+        }
       } else if content.peek(syn::Ident) {
         match content.cursor().ident().unwrap().0.to_string().as_str() {
           // when <cond> { ... }
@@ -93,6 +117,13 @@ impl Parse for Body {
             let body = content.parse::<Body>()?;
             stmts.push(Instruction::When((cond, Box::new(body))));
             continue; // NO ;
+          }
+          // spin <array-ptr> <func-id> { <id>: <expr> }
+          "spin" => {
+            content.parse::<syn::Ident>()?; // spin
+            let lock = content.parse::<ArrayAccess>()?;
+            let call = content.parse::<FuncCall>()?;
+            stmts.push(Instruction::SpinCall((lock, call.func, call.args)));
           }
           _ => {
             // Parse non-keyword-leading statements

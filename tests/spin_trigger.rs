@@ -20,9 +20,9 @@ fn manual() -> SysBuilder {
       }
       nv = v.flip();
       when nv {
-        async self();
+        async self {};
       }
-    }.expose(lock)
+    }.expose[lock]
   );
 
   module_builder!(
@@ -54,8 +54,8 @@ fn manual() -> SysBuilder {
 fn syntactical_sugar() -> SysBuilder {
   module_builder!(
     driver[][sqr] {
-      cnt = array(int::<32>, 1);
-      lock = array(int::<1>, 1);
+      cnt = array(int<32>, 1);
+      lock = array(int<1>, 1);
       v = cnt[0];
       is_odd = v.bitwise_and(1);
       is_even = is_odd.flip();

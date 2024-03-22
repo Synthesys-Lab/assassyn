@@ -16,6 +16,7 @@ struct ModuleParser {
   ports: Punctuated<Argument, Token![,]>,
   ext_interf: Punctuated<syn::Ident, Token![,]>,
   body: Body,
+  exposes: Option<Punctuated<syn::Ident, Token![,]>>,
 }
 
 impl Parse for ModuleParser {
@@ -32,6 +33,18 @@ impl Parse for ModuleParser {
     bracketed!(raw_ext_interf in input);
     let ext_interf = raw_ext_interf.parse_terminated(syn::Ident::parse, Token![,])?;
     let body = input.parse::<Body>()?;
+    // .expose(<var-id>) is optional
+    let exposes = if input.peek(Token![.]) {
+      input.parse::<Token![.]>()?;
+      let expose_kw = input.parse::<syn::Ident>()?;
+      assert_eq!(expose_kw.to_string(), "expose");
+      let exposes;
+      bracketed!(exposes in input);
+      let exposes = exposes.parse_terminated(syn::Ident::parse, Token![,])?;
+      Some(exposes)
+    } else {
+      None
+    };
 
     let res = Ok(ModuleParser {
       module_name,
@@ -39,6 +52,7 @@ impl Parse for ModuleParser {
       ports,
       ext_interf,
       body,
+      exposes,
     });
 
     res
@@ -103,8 +117,23 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   };
   eprintln!("[CodeGen] External interaces successfully generated!");
 
+  let (ret_tys, ret_vals): (proc_macro2::TokenStream, proc_macro2::TokenStream) =
+    if let Some(exposes) = parsed_module.exposes {
+      let mut vals: proc_macro::TokenStream = quote! { module, }.into();
+      let mut tys: proc_macro::TokenStream = quote! { eir::frontend::BaseNode, }.into();
+      for elem in exposes.iter() {
+        vals.extend::<TokenStream>(quote! { #elem, }.into());
+        tys.extend::<TokenStream>(quote! { eir::frontend::BaseNode, }.into());
+      }
+      let vals: proc_macro2::TokenStream = vals.into();
+      let tys: proc_macro2::TokenStream = tys.into();
+      (quote! { ( #tys ) }, quote! { ( #vals ) })
+    } else {
+      (quote! { eir::frontend::BaseNode }, quote! { module })
+    };
+
   let res = quote! {
-    fn #builder_name (sys: &mut eir::frontend::SysBuilder, #ext_interf) -> eir::frontend::BaseNode {
+    fn #builder_name (sys: &mut eir::frontend::SysBuilder, #ext_interf) -> #ret_tys {
       use eir::frontend::IsElement;
       let module = sys.create_module(stringify!(#module_name), vec![#port_decls]);
       sys.set_current_module(module.clone());
@@ -116,7 +145,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         ( #port_ids )
       };
       #body
-      module
+      #ret_vals
     }
   };
 

@@ -178,24 +178,38 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
       }
       Instruction::AsyncCall((id, args)) => {
         let module = id;
-        let binds = args
-          .iter()
-          .map(|(k, v)| {
-            let value = emit_expr_body(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
-            let value: proc_macro2::TokenStream = value.into();
-            quote! {
-              binds.insert(stringify!(#k).to_string(), #value)
-            }
-          })
-          .collect::<Vec<_>>();
-        quote! {{
-          let callee = #module
-            .as_ref::<eir::frontend::Module>(sys)
-            .expect(format!("[Push Bind] {} is not a module", stringify!(#module)).as_str());
-          let mut binds = std::collections::HashMap::new();
-          #(#binds);*;
-          sys.create_bound_trigger(#module, binds);
-        }}
+        if id.to_string() == "self" {
+          quote! {{
+            let module = sys
+              .get_current_module()
+              .expect("[Push Bind] No current module to self.trigger")
+              .upcast();
+            sys.create_trigger(module);
+          }}
+        } else {
+          let binds = args
+            .iter()
+            .map(|(k, v)| {
+              let value =
+                emit_expr_body(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
+              let value: proc_macro2::TokenStream = value.into();
+              quote! {
+                binds.insert(stringify!(#k).to_string(), #value)
+              }
+            })
+            .collect::<Vec<_>>();
+          quote! {{
+            let callee = #module
+              .as_ref::<eir::frontend::Module>(sys)
+              .expect(format!("[Push Bind] {} is not a module", stringify!(#module)).as_str());
+            let mut binds = std::collections::HashMap::new();
+            #(#binds);*;
+            sys.create_bound_trigger(#module, binds);
+          }}
+        }
+      }
+      Instruction::SpinCall((lock, func, args)) => {
+        todo!()
       }
       Instruction::ArrayAlloc((id, ty, size)) => {
         quote! {
