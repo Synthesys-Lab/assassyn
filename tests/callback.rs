@@ -6,4 +6,16 @@ fn callback() {
     driver[][] {
     }
   );
+
+  module_builder!(
+    callback[][] {
+    }
+  );
+
+  module_builder!(
+    memory_read[addr:int<32>, callback: module(int<32>)][] {
+      addr = addr.pop();
+      callback = callback.pop();
+    }
+  );
 }
