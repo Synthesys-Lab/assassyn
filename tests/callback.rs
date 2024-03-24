@@ -16,6 +16,8 @@ fn callback() {
     memory_read[addr:int<32>, callback: module(int<32>)][] {
       addr = addr.pop();
       callback = callback.pop();
+      // wait for 200 cycles
+      // fabricate some data.
     }
   );
 }

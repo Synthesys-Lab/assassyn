@@ -2,7 +2,10 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse::Parse, spanned::Spanned};
 
-use crate::{ArrayAccess, DType, Instruction};
+use crate::{
+  expr::{DType, Expr},
+  ArrayAccess, Instruction,
+};
 
 use eir::frontend::DataType;
 
@@ -30,6 +33,7 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
   }
 }
 
+// TODO(@were): Fully deprecate this later.
 pub(crate) struct EmitIDOrConst(pub(crate) TokenStream);
 
 impl Parse for EmitIDOrConst {
@@ -140,9 +144,21 @@ pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<TokenStream> {
   }
 }
 
+fn emit_parsed_expr(expr: &Expr) -> syn::Result<TokenStream> {
+  match expr {
+    Expr::Ident(id) => Ok(id.into_token_stream().into()),
+    Expr::Const((ty, lit)) => {
+      let ty = emit_type(ty)?;
+      let ty: proc_macro2::TokenStream = ty.into();
+      let res = quote! { sys.get_const_int(#ty, #lit) };
+      Ok(res.into())
+    }
+  }
+}
+
 fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> {
   let id = aa.id.clone();
-  let idx: proc_macro2::TokenStream = aa.idx.clone().into();
+  let idx: proc_macro2::TokenStream = emit_parsed_expr(&aa.idx)?.into();
   Ok(
     quote! {{
       let idx = #idx;

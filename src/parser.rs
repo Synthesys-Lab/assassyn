@@ -1,58 +1,7 @@
-use proc_macro::TokenStream;
 use quote::ToTokens;
-use syn::{braced, parenthesized, parse::Parse, ExprStruct, Ident};
+use syn::{braced, parse::Parse, ExprStruct, Ident};
 
-use crate::codegen::EmitIDOrConst;
-
-#[derive(Clone)]
-pub(crate) struct DType {
-  pub(crate) span: proc_macro2::Span,
-  pub(crate) dtype: eir::frontend::DataType,
-}
-
-impl Parse for DType {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let span = input.cursor().span().clone();
-    let tyid = input.parse::<syn::Ident>()?;
-    match tyid.to_string().as_str() {
-      "int" => {
-        input.parse::<syn::Token![<]>()?;
-        let bits = input.parse::<syn::LitInt>()?;
-        input.parse::<syn::Token![>]>()?;
-        Ok(DType {
-          span,
-          dtype: eir::frontend::DataType::int(bits.base10_parse::<usize>().unwrap()),
-        })
-      }
-      "uint" => {
-        input.parse::<syn::Token![<]>()?;
-        let bits = input.parse::<syn::LitInt>()?;
-        input.parse::<syn::Token![>]>()?;
-        Ok(DType {
-          span,
-          dtype: eir::frontend::DataType::uint(bits.base10_parse::<usize>().unwrap()),
-        })
-      }
-      "module" => {
-        let args;
-        parenthesized!(args in input);
-        let parsed_args = args.parse_terminated(DType::parse, syn::Token![,])?;
-        Ok(DType {
-          span,
-          dtype: eir::frontend::DataType::module(
-            parsed_args.iter().map(|x| x.dtype.clone().into()).collect(),
-          ),
-        })
-      }
-      _ => {
-        return Err(syn::Error::new(
-          tyid.span(),
-          format!("[CG.Type] Unsupported type: {}", tyid.to_string()),
-        ));
-      }
-    }
-  }
-}
+use crate::expr::{DType, Expr};
 
 pub(crate) enum Instruction {
   Assign((syn::Ident, syn::Expr)),
@@ -84,7 +33,7 @@ impl Parse for Argument {
 
 pub(crate) struct ArrayAccess {
   pub(crate) id: syn::Ident,
-  pub(crate) idx: TokenStream,
+  pub(crate) idx: Expr,
 }
 
 impl Parse for ArrayAccess {
@@ -92,7 +41,7 @@ impl Parse for ArrayAccess {
     let id = input.parse::<syn::Ident>()?;
     let idx;
     syn::bracketed!(idx in input);
-    let idx = idx.parse::<EmitIDOrConst>()?.0;
+    let idx = idx.parse::<Expr>()?;
     Ok(ArrayAccess { id, idx })
   }
 }

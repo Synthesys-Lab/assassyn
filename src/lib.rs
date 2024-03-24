@@ -6,6 +6,7 @@ use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, Token};
 
 mod codegen;
+mod expr;
 mod parser;
 
 use parser::*;
