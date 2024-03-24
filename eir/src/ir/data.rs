@@ -71,6 +71,13 @@ impl DataType {
       _ => false,
     }
   }
+
+  pub fn is_module(&self) -> bool {
+    match self {
+      DataType::Module(_) => true,
+      _ => false,
+    }
+  }
 }
 
 impl ToString for DataType {

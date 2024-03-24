@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::frontend::SysBuilder;
+use eir::{frontend::SysBuilder, sim, test_utils};
 
 #[test]
 fn callback() {
@@ -39,4 +39,13 @@ fn callback() {
   let _ = driver_builder(&mut sys, sqr, memory_read);
 
   println!("{}", sys);
+
+  let src_name = test_utils::temp_dir(&"callback.rs".to_string());
+  let config = sim::Config {
+    fname: src_name,
+    idle_threshold: 1000,
+    sim_threshold: 1000,
+  };
+
+  sim::elaborate(&sys, &config).unwrap();
 }

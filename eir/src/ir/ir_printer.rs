@@ -13,11 +13,9 @@ impl IRPrinter<'_> {
   pub fn new(sys: &SysBuilder) -> IRPrinter {
     IRPrinter { indent: 0, sys }
   }
-
   pub fn inc_indent(&mut self) {
     self.indent += 2;
   }
-
   pub fn dec_indent(&mut self) {
     self.indent -= 2;
   }
@@ -40,6 +38,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
     res.push_str("}");
     res.into()
   }
+
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     let mut res = format!(
       "Array: {}[{} x {}], {{ ",
@@ -228,24 +227,32 @@ impl Visitor<String> for IRPrinter<'_> {
           format!("_{} = {}.{}.pop()", expr.get_key(), module_name, fifo_name)
         }
         Opcode::FIFOPush => {
-          let fifo = expr
-            .get_operand(0)
+          let module_name = expr.get_operand(0).unwrap().to_string(self.sys);
+          let fifo_idx = expr
+            .get_operand(1)
             .unwrap()
-            .as_ref::<FIFO>(self.sys)
+            .as_ref::<IntImm>(self.sys)
             .unwrap();
-          let value = expr.get_operand(1).unwrap().to_string(self.sys);
-          let module_name = {
-            let module = fifo.get_parent();
-            let module = module.as_ref::<Module>(self.sys).unwrap();
-            module.get_name().to_string()
+          let idx = fifo_idx.get_value();
+          let module = expr.get_operand(0).unwrap();
+          let fifo_name = if let Ok(module) = module.as_ref::<Module>(self.sys) {
+            let fifo = module
+              .get_input(idx as usize)
+              .unwrap()
+              .as_ref::<FIFO>(self.sys)
+              .unwrap();
+            fifo.get_name().clone()
+          } else {
+            "".to_string()
           };
-          let fifo_name = fifo.get_name();
+          let to_push = format!("{}.{}", module_name, idx);
+          let value = expr.get_operand(2).unwrap().to_string(self.sys);
           format!(
-            "{}.{}.push({}) // handle: _{}",
-            module_name,
-            fifo_name,
+            "{}.push({}) // handle: _{}, fifo: {}",
+            to_push,
             value,
-            expr.get_key()
+            expr.get_key(),
+            fifo_name,
           )
         }
         Opcode::CallbackTrigger => {

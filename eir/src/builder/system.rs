@@ -417,11 +417,12 @@ impl SysBuilder {
           panic!("Invalid destination, {:?}", dst);
         };
         assert_eq!(types.len(), data.len(), "Data size mismatch!");
-        for (ty, arg) in types.iter().zip(data.iter()) {
+        for (idx, (ty, arg)) in types.iter().zip(data.iter()).enumerate() {
           assert_eq!(ty, &arg.get_dtype(self).unwrap());
-          args.push(arg.clone());
+          let push_handle = self.create_module_fifo_push(dst.clone(), idx, arg.clone());
+          args.push(push_handle);
         }
-        self.create_expr(DataType::void(), Opcode::CallbackTrigger, args)
+        self.create_expr(DataType::void(), Opcode::Trigger, args)
       }
       _ => panic!("Invalid destination"),
     };
@@ -429,14 +430,10 @@ impl SysBuilder {
     res
   }
 
-  /// Create a trigger just invoke the given module (destination) without checking the readiness
+  /// Create a trigger invoke itself without checking the readiness
   /// of the data. This is something more like a state machine trigger.
-  ///
-  /// # Arguments
-  /// * `dst` - The destination module to be invoked.
-  /// * `pred` - The condition of triggering the destination. If None is given, the trigger is
-  /// always triggered.
-  pub fn create_trigger(&mut self, dst: BaseNode) -> BaseNode {
+  pub fn create_self_trigger(&mut self) -> BaseNode {
+    let dst = self.get_current_module().unwrap().upcast();
     self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()])
   }
 
@@ -550,13 +547,25 @@ impl SysBuilder {
     key
   }
 
-  pub fn create_fifo_push(&mut self, fifo: BaseNode, value: BaseNode) -> BaseNode {
-    let res = self.create_expr(
-      DataType::void(),
-      Opcode::FIFOPush,
-      vec![fifo.clone(), value],
-    );
+  fn create_module_fifo_push(&mut self, dst: BaseNode, idx: usize, value: BaseNode) -> BaseNode {
+    if value.get_kind() == NodeKind::Module {
+      let mut dst_mut = self.get_mut::<Module>(&dst).unwrap();
+      dst_mut.insert_external_interface(value.clone(), Opcode::FIFOPush);
+    } else if value.get_dtype(self).unwrap().is_module() {
+      println!("[Warning] For now, only direct module reference supported.");
+    }
+    let idx = self.get_const_int(DataType::uint(32), idx as u64);
+    let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![dst, idx, value]);
     res
+  }
+
+  /// Create a determined FIFO push operation.
+  pub fn create_fifo_push(&mut self, fifo: BaseNode, value: BaseNode) -> BaseNode {
+    let fifo = self.get::<FIFO>(&fifo).unwrap();
+    let module = fifo.get_parent();
+    assert_eq!(module.get_kind(), NodeKind::Module);
+    let idx = fifo.idx();
+    self.create_module_fifo_push(module, idx, value)
   }
 
   /// Create a read operation on an array.

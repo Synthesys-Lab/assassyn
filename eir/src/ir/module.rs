@@ -155,11 +155,9 @@ impl SysBuilder {
         .get_input(i)
         .unwrap()
         .clone();
-      self
-        .get_mut::<FIFO>(&input)
-        .unwrap()
-        .get_mut()
-        .set_parent(module.clone());
+      let mut fifo_mut = self.get_mut::<FIFO>(&input).unwrap();
+      fifo_mut.get_mut().set_parent(module.clone());
+      fifo_mut.get_mut().set_idx(i);
     }
     self.sym_tab.insert(module_name, module.clone());
     let body = Block::new(None, module.clone());

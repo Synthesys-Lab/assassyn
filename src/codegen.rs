@@ -234,7 +234,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
               .get_current_module()
               .expect("[Push Bind] No current module to self.trigger")
               .upcast();
-            sys.create_trigger(module);
+            sys.create_self_trigger();
           }}
         } else {
           match args {

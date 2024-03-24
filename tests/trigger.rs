@@ -34,9 +34,6 @@ fn trigger() {
   println!("{}", sys);
 
   let src_name = test_utils::temp_dir(&"trigger.rs".to_string());
-
-  println!("Writing simulator code to {}", src_name);
-
   let config = eir::sim::Config {
     fname: src_name,
     sim_threshold: 200,

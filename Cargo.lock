@@ -15,7 +15,7 @@ dependencies = [
  "eir",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.52",
 ]
 
 [[package]]
@@ -23,7 +23,10 @@ name = "eir"
 version = "0.1.0"
 dependencies = [
  "paste",
+ "proc-macro2",
+ "quote",
  "slab",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -57,6 +60,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f92a496fb766b417c996b9c5e57daf2f7ad3b0bebe1ccfca4856390e3d3bb67"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "syn"
+version = "1.0.109"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72b64191b275b66ffe2469e8af2c1cfe3bafa67b529ead792a6d0160888b4237"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
 ]
 
 [[package]]

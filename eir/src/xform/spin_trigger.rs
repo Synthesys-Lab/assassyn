@@ -97,7 +97,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     let block = mutator.sys.create_block(Some(flip_cond));
     mutator.sys.set_current_block(block.clone());
     // Send the data from agent to the actual inokee.
-    mutator.sys.create_trigger(agent);
+    mutator.sys.create_self_trigger();
     mutator.erase_from_parent();
   } else {
     println!("No spin triggers found");

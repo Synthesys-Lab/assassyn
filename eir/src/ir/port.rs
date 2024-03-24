@@ -5,6 +5,7 @@ pub struct FIFO {
   pub(super) parent: BaseNode,
   name: String,
   dtype: DataType,
+  idx: usize,
 }
 
 impl FIFO {
@@ -14,7 +15,16 @@ impl FIFO {
       parent: BaseNode::new(NodeKind::Unknown, 0), // Make a placeholder when instantiating.
       name: name.to_string(),
       dtype: dtype.clone(),
+      idx: usize::MAX,
     }
+  }
+
+  pub fn idx(&self) -> usize {
+    self.idx
+  }
+
+  pub(crate) fn set_idx(&mut self, idx: usize) {
+    self.idx = idx;
   }
 
   pub fn get_name(&self) -> &String {
