@@ -1,24 +1,18 @@
-use quote::ToTokens;
-use syn::{braced, parse::Parse, ExprStruct, Ident};
+use syn::{braced, parse::Parse, Ident};
 
-use crate::expr::{DType, Expr};
+use crate::ast::{ast, DType, Expr};
 
 pub(crate) enum Instruction {
   Assign((syn::Ident, syn::Expr)),
   ArrayAlloc((syn::Ident, DType, syn::LitInt)),
-  ArrayAssign((ArrayAccess, syn::Expr)),
-  ArrayRead((syn::Ident, ArrayAccess)),
-  AsyncCall((syn::Ident, Vec<(syn::Ident, syn::Expr)>)),
-  SpinCall((ArrayAccess, syn::Ident, Vec<(syn::Ident, syn::Expr)>)),
+  ArrayAssign((ast::ArrayAccess, syn::Expr)),
+  ArrayRead((syn::Ident, ast::ArrayAccess)),
+  AsyncCall(ast::FuncCall),
+  SpinCall((ast::ArrayAccess, ast::FuncCall)),
   When((syn::Ident, Box<Body>)),
 }
 
-pub(crate) struct Argument {
-  pub(crate) id: syn::Ident,
-  pub(crate) ty: DType,
-}
-
-impl Parse for Argument {
+impl Parse for ast::Argument {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let id = input
       .parse::<syn::Ident>()
@@ -27,43 +21,40 @@ impl Parse for Argument {
       .parse::<syn::Token![:]>()
       .map_err(|e| syn::Error::new(e.span(), "Expected : to specify the type of the port"))?;
     let ty = input.parse::<DType>()?;
-    Ok(Argument { id, ty })
+    Ok(ast::Argument { id, ty })
   }
 }
 
-pub(crate) struct ArrayAccess {
-  pub(crate) id: syn::Ident,
-  pub(crate) idx: Expr,
-}
-
-impl Parse for ArrayAccess {
+impl Parse for ast::ArrayAccess {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let id = input.parse::<syn::Ident>()?;
     let idx;
     syn::bracketed!(idx in input);
     let idx = idx.parse::<Expr>()?;
-    Ok(ArrayAccess { id, idx })
+    Ok(ast::ArrayAccess { id, idx })
   }
 }
 
-pub(crate) struct FuncCall {
-  pub(crate) func: syn::Ident,
-  pub(crate) args: Vec<(proc_macro2::Ident, syn::Expr)>,
+impl Parse for ast::KVPair {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let key = input.parse::<syn::Ident>()?;
+    let _ = input.parse::<syn::Token![:]>()?;
+    let value = input.parse::<Expr>()?;
+    Ok(ast::KVPair { key, value })
+  }
 }
 
-impl Parse for FuncCall {
+impl Parse for ast::FuncCall {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let raw = input.parse::<ExprStruct>()?;
-    let func = syn::parse::<Ident>(raw.path.into_token_stream().into())?;
-    let args = raw
-      .fields
-      .iter()
-      .map(|x| match &x.member {
-        syn::Member::Named(id) => (id.clone(), x.expr.clone()),
-        _ => panic!("Expected a named member"),
-      })
+    let func = input.parse::<syn::Ident>()?;
+    let content;
+    let _ = braced!(content in input);
+    let args = content.parse_terminated(ast::KVPair::parse, syn::Token![,])?;
+    let args = args
+      .into_iter()
+      .map(|x| (x.key, x.value))
       .collect::<Vec<_>>();
-    Ok(FuncCall { func, args })
+    Ok(ast::FuncCall { func, args })
   }
 }
 
@@ -84,14 +75,15 @@ impl Parse for Body {
           content.parse::<syn::token::SelfValue>()?;
           let _placeholder;
           braced!(_placeholder in content);
-          stmts.push(Instruction::AsyncCall((
-            Ident::new("self", content.span()),
-            vec![],
-          )));
+          let func_call = ast::FuncCall {
+            func: Ident::new("self", content.span()),
+            args: vec![],
+          };
+          stmts.push(Instruction::AsyncCall(func_call));
         } else {
           // async <func-id> { <id>: <expr>, ... }
-          let call = content.parse::<FuncCall>()?;
-          stmts.push(Instruction::AsyncCall((call.func, call.args)));
+          let call = content.parse::<ast::FuncCall>()?;
+          stmts.push(Instruction::AsyncCall(call));
         }
       } else if content.peek(syn::Ident) {
         match content.cursor().ident().unwrap().0.to_string().as_str() {
@@ -107,15 +99,15 @@ impl Parse for Body {
           // spin <array-ptr> <func-id> { <id>: <expr> }
           "spin" => {
             content.parse::<syn::Ident>()?; // spin
-            let lock = content.parse::<ArrayAccess>()?;
-            let call = content.parse::<FuncCall>()?;
-            stmts.push(Instruction::SpinCall((lock, call.func, call.args)));
+            let lock = content.parse::<ast::ArrayAccess>()?;
+            let call = content.parse::<ast::FuncCall>()?;
+            stmts.push(Instruction::SpinCall((lock, call)));
           }
           _ => {
             // Parse non-keyword-leading statements
             if content.peek2(syn::token::Bracket) {
               // <id>[<expr>] = <expr>
-              let aa = content.parse::<ArrayAccess>()?;
+              let aa = content.parse::<ast::ArrayAccess>()?;
               content.parse::<syn::Token![=]>()?;
               let right = content.parse::<syn::Expr>()?;
               stmts.push(Instruction::ArrayAssign((aa, right)));
@@ -126,7 +118,7 @@ impl Parse for Body {
                 content.parse::<syn::Token![=]>()?;
                 // to handle the expression in k = a[0.int::<32>]
                 if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
-                  let aa = content.parse::<ArrayAccess>()?;
+                  let aa = content.parse::<ast::ArrayAccess>()?;
                   stmts.push(Instruction::ArrayRead((id, aa)));
                 } else if {
                   // <id> = array(<ty>, <size>);

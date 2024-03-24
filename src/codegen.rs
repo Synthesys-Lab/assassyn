@@ -3,8 +3,9 @@ use quote::{quote, ToTokens};
 use syn::{parse::Parse, spanned::Spanned};
 
 use crate::{
-  expr::{DType, Expr},
-  ArrayAccess, Instruction,
+  ast::ast::ArrayAccess,
+  ast::expr::{DType, Expr},
+  Instruction,
 };
 
 use eir::frontend::DataType;
@@ -168,13 +169,11 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   )
 }
 
-pub(crate) fn emit_binds(
-  args: &Vec<(proc_macro2::Ident, syn::Expr)>,
-) -> Vec<proc_macro2::TokenStream> {
+pub(crate) fn emit_binds(args: &Vec<(syn::Ident, Expr)>) -> Vec<proc_macro2::TokenStream> {
   args
     .iter()
     .map(|(k, v)| {
-      let value = emit_expr_body(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
+      let value = emit_parsed_expr(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
       let value: proc_macro2::TokenStream = value.into();
       quote! {
         binds.insert(stringify!(#k).to_string(), #value)
@@ -210,7 +209,9 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           };
         }
       }
-      Instruction::AsyncCall((id, args)) => {
+      Instruction::AsyncCall(call) => {
+        let id = &call.func;
+        let args = &call.args;
         if id.to_string() == "self" {
           quote! {{
             let module = sys
@@ -231,8 +232,9 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           }}
         }
       }
-      Instruction::SpinCall((lock, func, args)) => {
-        let binds = emit_binds(args);
+      Instruction::SpinCall((lock, call)) => {
+        let func = &call.func;
+        let binds = emit_binds(&call.args);
         let emitted_lock = emit_array_access(lock)?;
         quote! {{
           let callee = #func
