@@ -9,12 +9,13 @@ mod ast;
 mod codegen;
 mod parser;
 
+use ast::node;
 use parser::*;
 
 struct ModuleParser {
   module_name: syn::Ident,
   builder_name: syn::Ident,
-  ports: Punctuated<Argument, Token![,]>,
+  ports: Punctuated<node::Argument, Token![,]>,
   ext_interf: Punctuated<syn::Ident, Token![,]>,
   body: Body,
   exposes: Option<Punctuated<syn::Ident, Token![,]>>,
@@ -29,7 +30,7 @@ impl Parse for ModuleParser {
     let builder_name = syn::Ident::new(&format!("{}_builder", module_name.to_string()), tok.span());
     let raw_ports;
     bracketed!(raw_ports in input);
-    let ports = raw_ports.parse_terminated(Argument::parse, Token![,])?;
+    let ports = raw_ports.parse_terminated(node::Argument::parse, Token![,])?;
     let raw_ext_interf;
     bracketed!(raw_ext_interf in input);
     let ext_interf = raw_ext_interf.parse_terminated(syn::Ident::parse, Token![,])?;

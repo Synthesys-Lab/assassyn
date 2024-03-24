@@ -3,8 +3,8 @@ use quote::{quote, ToTokens};
 use syn::{parse::Parse, spanned::Spanned};
 
 use crate::{
-  ast::ast::ArrayAccess,
   ast::expr::{DType, Expr},
+  ast::node::ArrayAccess,
   Instruction,
 };
 
@@ -176,7 +176,8 @@ pub(crate) fn emit_binds(args: &Vec<(syn::Ident, Expr)>) -> Vec<proc_macro2::Tok
       let value = emit_parsed_expr(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
       let value: proc_macro2::TokenStream = value.into();
       quote! {
-        binds.insert(stringify!(#k).to_string(), #value)
+        let value = #value.clone();
+        binds.insert(stringify!(#k).to_string(), value)
       }
     })
     .collect::<Vec<_>>()

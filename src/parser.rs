@@ -1,18 +1,18 @@
 use syn::{braced, parse::Parse, Ident};
 
-use crate::ast::{ast, DType, Expr};
+use crate::ast::{node, DType, Expr};
 
 pub(crate) enum Instruction {
   Assign((syn::Ident, syn::Expr)),
   ArrayAlloc((syn::Ident, DType, syn::LitInt)),
-  ArrayAssign((ast::ArrayAccess, syn::Expr)),
-  ArrayRead((syn::Ident, ast::ArrayAccess)),
-  AsyncCall(ast::FuncCall),
-  SpinCall((ast::ArrayAccess, ast::FuncCall)),
+  ArrayAssign((node::ArrayAccess, syn::Expr)),
+  ArrayRead((syn::Ident, node::ArrayAccess)),
+  AsyncCall(node::FuncCall),
+  SpinCall((node::ArrayAccess, node::FuncCall)),
   When((syn::Ident, Box<Body>)),
 }
 
-impl Parse for ast::Argument {
+impl Parse for node::Argument {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let id = input
       .parse::<syn::Ident>()
@@ -21,40 +21,40 @@ impl Parse for ast::Argument {
       .parse::<syn::Token![:]>()
       .map_err(|e| syn::Error::new(e.span(), "Expected : to specify the type of the port"))?;
     let ty = input.parse::<DType>()?;
-    Ok(ast::Argument { id, ty })
+    Ok(node::Argument { id, ty })
   }
 }
 
-impl Parse for ast::ArrayAccess {
+impl Parse for node::ArrayAccess {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let id = input.parse::<syn::Ident>()?;
     let idx;
     syn::bracketed!(idx in input);
     let idx = idx.parse::<Expr>()?;
-    Ok(ast::ArrayAccess { id, idx })
+    Ok(node::ArrayAccess { id, idx })
   }
 }
 
-impl Parse for ast::KVPair {
+impl Parse for node::KVPair {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let key = input.parse::<syn::Ident>()?;
     let _ = input.parse::<syn::Token![:]>()?;
     let value = input.parse::<Expr>()?;
-    Ok(ast::KVPair { key, value })
+    Ok(node::KVPair { key, value })
   }
 }
 
-impl Parse for ast::FuncCall {
+impl Parse for node::FuncCall {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let func = input.parse::<syn::Ident>()?;
     let content;
     let _ = braced!(content in input);
-    let args = content.parse_terminated(ast::KVPair::parse, syn::Token![,])?;
+    let args = content.parse_terminated(node::KVPair::parse, syn::Token![,])?;
     let args = args
       .into_iter()
       .map(|x| (x.key, x.value))
       .collect::<Vec<_>>();
-    Ok(ast::FuncCall { func, args })
+    Ok(node::FuncCall { func, args })
   }
 }
 
@@ -75,14 +75,14 @@ impl Parse for Body {
           content.parse::<syn::token::SelfValue>()?;
           let _placeholder;
           braced!(_placeholder in content);
-          let func_call = ast::FuncCall {
+          let func_call = node::FuncCall {
             func: Ident::new("self", content.span()),
             args: vec![],
           };
           stmts.push(Instruction::AsyncCall(func_call));
         } else {
           // async <func-id> { <id>: <expr>, ... }
-          let call = content.parse::<ast::FuncCall>()?;
+          let call = content.parse::<node::FuncCall>()?;
           stmts.push(Instruction::AsyncCall(call));
         }
       } else if content.peek(syn::Ident) {
@@ -99,15 +99,15 @@ impl Parse for Body {
           // spin <array-ptr> <func-id> { <id>: <expr> }
           "spin" => {
             content.parse::<syn::Ident>()?; // spin
-            let lock = content.parse::<ast::ArrayAccess>()?;
-            let call = content.parse::<ast::FuncCall>()?;
+            let lock = content.parse::<node::ArrayAccess>()?;
+            let call = content.parse::<node::FuncCall>()?;
             stmts.push(Instruction::SpinCall((lock, call)));
           }
           _ => {
             // Parse non-keyword-leading statements
             if content.peek2(syn::token::Bracket) {
               // <id>[<expr>] = <expr>
-              let aa = content.parse::<ast::ArrayAccess>()?;
+              let aa = content.parse::<node::ArrayAccess>()?;
               content.parse::<syn::Token![=]>()?;
               let right = content.parse::<syn::Expr>()?;
               stmts.push(Instruction::ArrayAssign((aa, right)));
@@ -118,7 +118,7 @@ impl Parse for Body {
                 content.parse::<syn::Token![=]>()?;
                 // to handle the expression in k = a[0.int::<32>]
                 if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
-                  let aa = content.parse::<ast::ArrayAccess>()?;
+                  let aa = content.parse::<node::ArrayAccess>()?;
                   stmts.push(Instruction::ArrayRead((id, aa)));
                 } else if {
                   // <id> = array(<ty>, <size>);
