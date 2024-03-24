@@ -52,6 +52,10 @@ impl<'a> Visitor<String> for InterfDecl<'a> {
   fn visit_input(&mut self, _: &FIFORef<'_>) -> Option<String> {
     String::from("").into()
   }
+
+  fn visit_module(&mut self, _: &ModuleRef<'_>) -> Option<String> {
+    String::from("").into()
+  }
 }
 
 struct InterfArgFeeder<'ops>(&'ops HashSet<Opcode>);
@@ -74,6 +78,10 @@ impl Visitor<String> for NodeRefDumper {
           dtype_to_rust_type(&int_imm.dtype())
         ))
       }
+      NodeKind::Module => {
+        let module_name = namify(node.as_ref::<Module>(sys).unwrap().get_name());
+        format!("Box::new(EventKind::Module_{})", module_name).into()
+      }
       _ => Some(format!("_{}", node.get_key())),
     }
   }
@@ -93,6 +101,9 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
     .into()
   }
   fn visit_input(&mut self, _: &FIFORef<'_>) -> Option<String> {
+    format!("").into()
+  }
+  fn visit_module(&mut self, _: &ModuleRef<'_>) -> Option<String> {
     format!("").into()
   }
 }
@@ -191,15 +202,18 @@ impl Visitor<String> for ElaborateModule<'_> {
           )
         }
         Opcode::Trigger => {
-          let module_ref = expr
-            .get_operand(0)
-            .unwrap()
-            .as_ref::<Module>(self.sys)
-            .unwrap();
-          let module_name = namify(module_ref.get_name());
+          let to_trigger =
+            if let Ok(module) = expr.get_operand(0).unwrap().as_ref::<Module>(self.sys) {
+              format!("EventKind::Module_{}", namify(module.get_name()))
+            } else {
+              format!(
+                "{}.as_ref().clone()",
+                dump_ref!(self.sys, expr.get_operand(0).unwrap())
+              )
+            };
           format!(
-            "q.push(Reverse(Event{{ stamp: stamp + 100, kind: EventKind::Module_{} }}))",
-            module_name
+            "q.push(Reverse(Event{{ stamp: stamp + 100, kind: {} }}))",
+            to_trigger
           )
         }
         Opcode::FIFOPop => {
@@ -212,23 +226,27 @@ impl Visitor<String> for ElaborateModule<'_> {
           format!("inputs.{}.pop_front().unwrap()", fifo.idx())
         }
         Opcode::FIFOPush => {
-          let module = expr
-            .get_operand(0)
-            .unwrap()
-            .as_ref::<Module>(self.sys)
-            .unwrap();
           let value = dump_ref!(self.sys, expr.get_operand(2).unwrap());
           let fifo_idx = expr
             .get_operand(1)
             .unwrap()
             .as_ref::<IntImm>(self.sys)
-            .unwrap();
-          format!(
-            "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO_push_{}_{}({}) }}))",
-            namify(&module.get_name()),
-            fifo_idx.get_value(),
-            value
-          )
+            .unwrap()
+            .get_value();
+          if let Ok(module) = expr.get_operand(0).unwrap().as_ref::<Module>(self.sys) {
+            format!(
+              "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO_push_{}_{}({}) }}))",
+              namify(&module.get_name()),
+              fifo_idx,
+              value
+            )
+          } else {
+            let module = dump_ref!(self.sys, expr.get_operand(0).unwrap());
+            format!(
+              "q.push(Reverse(Event{{ stamp: stamp + 50, kind: to_push({}.as_ref().clone(), {}, {} as u64) }}))",
+              module, fifo_idx, value
+            )
+          }
         }
         Opcode::CallbackTrigger => "// TODO: opcode: CallbackTrigger...".to_string(),
         _ => {
@@ -315,13 +333,8 @@ fn dtype_to_rust_type(dtype: &DataType) -> String {
     };
   }
   match dtype {
-    DataType::Module(args) => {
-      let args = args
-        .iter()
-        .map(|arg| dtype_to_rust_type(arg))
-        .collect::<Vec<String>>()
-        .join(", ");
-      format!("(EventKind, {})", args)
+    DataType::Module(_) => {
+      format!("Box<EventKind>",)
     }
     _ => panic!("Not implemented yet!"),
   }
@@ -353,7 +366,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   //   ...
   //   Array_commit_{array.get_name()}(idx, value),
   // }
-  fd.write("#[derive(Debug, Eq, PartialEq)]\n".as_bytes())?;
+  fd.write("#[derive(Clone, Debug, Eq, PartialEq)]\n".as_bytes())?;
   fd.write("enum EventKind {\n".as_bytes())?;
   for module in sys.module_iter() {
     fd.write(format!("  Module_{},\n", namify(module.get_name())).as_bytes())?;
@@ -378,6 +391,28 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       .as_bytes(),
     )?;
   }
+  fd.write("}\n\n".as_bytes())?;
+  fd.write("fn to_push(ek: EventKind, idx: usize, value: u64) -> EventKind {\n".as_bytes())?;
+  fd.write("  match (ek.clone(), idx) {\n".as_bytes())?;
+  for module in sys.module_iter() {
+    for (i, port) in module.port_iter().enumerate() {
+      if !port.scalar_ty().is_int() {
+        continue;
+      }
+      fd.write(
+        format!(
+          "    (EventKind::Module_{}, {}) => EventKind::FIFO_push_{}(value as {}),\n",
+          namify(module.get_name()),
+          i,
+          namify(fifo_name!(port).as_str()),
+          dtype_to_rust_type(&port.scalar_ty())
+        )
+        .as_bytes(),
+      )?;
+    }
+  }
+  fd.write("    _ => panic!(\"Unknown event to push, {:?}, {}\", ek, idx),\n".as_bytes())?;
+  fd.write("  }\n".as_bytes())?;
   fd.write("}\n\n".as_bytes())?;
 
   // Dump the event runtime.
@@ -516,7 +551,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )?;
       fd.write(
         format!(
-          "        println!(\"@line:{{:<6}} {{}}: Commit FIFO {}.{} push {{}}\", line!(), cyclize(event.0.stamp), value);\n",
+          "        println!(\"@line:{{:<6}} {{}}: Commit FIFO {}.{} push {{:?}}\", line!(), cyclize(event.0.stamp), value);\n",
           namify(module.get_name()),
           namify(port.get_name())
         )

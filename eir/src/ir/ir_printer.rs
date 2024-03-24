@@ -52,6 +52,10 @@ impl Visitor<String> for ExtInterDumper<'_> {
     res.push_str("}");
     res.into()
   }
+
+  fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
+    format!("Module: {}", module.get_name()).into()
+  }
 }
 
 impl Visitor<String> for IRPrinter<'_> {
