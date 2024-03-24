@@ -149,7 +149,7 @@ impl SysBuilder {
     &'sys self,
     key: &BaseNode,
   ) -> Result<T::Reference, String> {
-    Ok(T::reference(self, key.clone()))
+    T::reference(self, key.clone())
   }
 
   impl_typed_iter!(module_iter, Module, ModuleRef);
@@ -161,7 +161,7 @@ impl SysBuilder {
     &'sys mut self,
     key: &BaseNode,
   ) -> Result<T::Mutator, String> {
-    Ok(T::mutator(self, key.clone()))
+    T::mutator(self, key.clone())
   }
 
   /// Get the current module to be built.
@@ -419,6 +419,7 @@ impl SysBuilder {
         assert_eq!(types.len(), data.len(), "Data size mismatch!");
         for (ty, arg) in types.iter().zip(data.iter()) {
           assert_eq!(ty, &arg.get_dtype(self).unwrap());
+          args.push(arg.clone());
         }
         self.create_expr(DataType::void(), Opcode::CallbackTrigger, args)
       }
@@ -480,9 +481,14 @@ impl SysBuilder {
       let dst_ref = dst
         .as_ref::<Module>(self)
         .expect(format!("{:?} is NOT a module", dst).as_str());
-      let port = dst_ref
-        .get_input_by_name(&name)
-        .expect(format!("{} is NOT an input of {:?}", name, dst).as_str());
+      let port = dst_ref.get_input_by_name(&name).expect(
+        format!(
+          "\"{}\" is NOT an input of Module \"{}\"",
+          name,
+          dst_ref.get_name()
+        )
+        .as_str(),
+      );
       assert_eq!(
         port.as_ref::<FIFO>(self).unwrap().scalar_ty(),
         value.get_dtype(self).unwrap()

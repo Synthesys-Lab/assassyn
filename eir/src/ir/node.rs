@@ -24,12 +24,12 @@ pub trait Parented {
 
 pub trait Mutable<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys>> {
   type Mutator;
-  fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Self::Mutator;
+  fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Result<Self::Mutator, String>;
 }
 
 pub trait Referencable<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys>> {
   type Reference;
-  fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Self::Reference;
+  fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Result<Self::Reference, String>;
 }
 
 macro_rules! register_element {
@@ -140,11 +140,15 @@ macro_rules! register_element {
     impl<'elem, 'sys: 'elem> Mutable<'elem, 'sys, $name> for $name {
       type Mutator = $mutator<'sys>;
 
-      fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Self::Mutator {
+      fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Result<Self::Mutator, String> {
         if let NodeKind::$name = elem.get_kind() {
-          $mutator { sys, elem }
+          Ok($mutator { sys, elem })
         } else {
-          panic!("The reference {:?} is not a {}", elem, stringify!($name));
+          Err(format!(
+            "Expecting {}, but {:?} is given",
+            stringify!($name),
+            elem
+          ))
         }
       }
     }
@@ -152,11 +156,15 @@ macro_rules! register_element {
     impl<'elem, 'sys: 'elem> Referencable<'elem, 'sys, $name> for $name {
       type Reference = $reference<'sys>;
 
-      fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Self::Reference {
+      fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Result<Self::Reference, String> {
         if let NodeKind::$name = elem.get_kind() {
-          $reference { sys, elem }
+          Ok($reference { sys, elem })
         } else {
-          panic!("The reference {:?} is not a {}", elem, stringify!($name));
+          Err(format!(
+            "Expecting {}, but {:?} is given",
+            stringify!($name),
+            elem
+          ))
         }
       }
     }
@@ -259,7 +267,7 @@ impl BaseNode {
     &self,
     sys: &'sys SysBuilder,
   ) -> Result<T::Reference, String> {
-    Ok(T::reference(sys, self.clone()))
+    T::reference(sys, self.clone())
   }
 }
 

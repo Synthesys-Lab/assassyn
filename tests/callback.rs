@@ -7,7 +7,7 @@ fn callback() {
     driver[][sqr, memory_read] {
       cnt = array(int<32>, 1);
       v = cnt[0];
-      async memory_read { addr: v, callback: sqr };
+      async memory_read { addr: v, func: sqr };
       plused = v.add(1);
       cnt[0] = plused;
     }
@@ -17,19 +17,19 @@ fn callback() {
     sqr[a:int<32>][] {
       a = a.pop();
       _b = a.mul(a);
-      // TODO(@were): Implement a logger?
+      // TODO(@were): Implement a logger!
       // log("{}", b);
     }
   );
 
   module_builder!(
-    memory_read[addr:int<32>, callback: module(int<32>)][] {
+    memory_read[addr:int<32>, func: module(int<32>)][] {
       addr = addr.pop();
-      callback = callback.pop();
+      func = func.pop();
       // TODO(@were): How to make this wait for 200 cycles?
       dram = array(int<32>, 16384);
       value = dram[addr];
-      // async callback(value);
+      async func(value);
     }
   );
 

@@ -169,7 +169,7 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   )
 }
 
-pub(crate) fn emit_binds(args: &FuncArgs) -> Vec<proc_macro2::TokenStream> {
+pub(crate) fn emit_args(args: &FuncArgs) -> Vec<proc_macro2::TokenStream> {
   match args {
     FuncArgs::Bound(binds) => binds
       .iter()
@@ -190,7 +190,8 @@ pub(crate) fn emit_binds(args: &FuncArgs) -> Vec<proc_macro2::TokenStream> {
         let value: proc_macro2::TokenStream = value.into();
         let id = syn::Ident::new(&format!("arg_{}", i), Span::call_site());
         quote! {
-          let #id = #value.clone()
+          let #id = #value.clone();
+          args.push(#id);
         }
       })
       .collect::<Vec<_>>(),
@@ -236,20 +237,38 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
             sys.create_trigger(module);
           }}
         } else {
-          let binds = emit_binds(args);
-          quote! {{
-            let callee = #id
-              .as_ref::<eir::frontend::Module>(sys)
-              .expect(format!("[Push Bind] {} is not a module", stringify!(#id)).as_str());
-            let mut binds = std::collections::HashMap::new();
-            #(#binds);*;
-            sys.create_trigger_bound(#id, binds);
-          }}
+          match args {
+            FuncArgs::Bound(_) => {
+              let binds = emit_args(args);
+              quote! {{
+                let callee = #id
+                  .as_ref::<eir::frontend::Module>(sys)
+                  .expect(
+                    format!(
+                      "[Push Bind] {}:{}: {} should be a moudule!",
+                      file!(),
+                      line!(),
+                      stringify!(#id)).as_str());
+                let mut binds = std::collections::HashMap::new();
+                #(#binds);*;
+                sys.create_trigger_bound(#id, binds);
+              }}
+            }
+            FuncArgs::Plain(_) => {
+              let args = emit_args(args);
+              quote! {{
+                  let mut args = vec![];
+                  #(#args);*;
+                  sys.create_trigger_bundled(#id, args);
+                }
+              }
+            }
+          }
         }
       }
       Instruction::SpinCall((lock, call)) => {
         let func = &call.func;
-        let binds = emit_binds(&call.args);
+        let binds = emit_args(&call.args);
         let emitted_lock = emit_array_access(lock)?;
         quote! {{
           let callee = #func
