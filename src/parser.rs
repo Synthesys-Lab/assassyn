@@ -2,16 +2,6 @@ use syn::{braced, parse::Parse, Ident};
 
 use crate::ast::{node, DType, Expr};
 
-pub(crate) enum Instruction {
-  Assign((syn::Ident, syn::Expr)),
-  ArrayAlloc((syn::Ident, DType, syn::LitInt)),
-  ArrayAssign((node::ArrayAccess, syn::Expr)),
-  ArrayRead((syn::Ident, node::ArrayAccess)),
-  AsyncCall(node::FuncCall),
-  SpinCall((node::ArrayAccess, node::FuncCall)),
-  When((syn::Ident, Box<Body>)),
-}
-
 impl Parse for node::Argument {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let id = input
@@ -58,11 +48,7 @@ impl Parse for node::FuncCall {
   }
 }
 
-pub(crate) struct Body {
-  pub(crate) stmts: Vec<Instruction>,
-}
-
-impl Parse for Body {
+impl Parse for node::Body {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let content;
     let _ = braced!(content in input);
@@ -79,11 +65,11 @@ impl Parse for Body {
             func: Ident::new("self", content.span()),
             args: vec![],
           };
-          stmts.push(Instruction::AsyncCall(func_call));
+          stmts.push(node::Instruction::AsyncCall(func_call));
         } else {
           // async <func-id> { <id>: <expr>, ... }
           let call = content.parse::<node::FuncCall>()?;
-          stmts.push(Instruction::AsyncCall(call));
+          stmts.push(node::Instruction::AsyncCall(call));
         }
       } else if content.peek(syn::Ident) {
         match content.cursor().ident().unwrap().0.to_string().as_str() {
@@ -92,8 +78,8 @@ impl Parse for Body {
             content.parse::<syn::Ident>()?;
             // TODO(@were): To keep it simple, for now, only a ident is allowed.
             let cond = content.parse::<syn::Ident>()?;
-            let body = content.parse::<Body>()?;
-            stmts.push(Instruction::When((cond, Box::new(body))));
+            let body = content.parse::<node::Body>()?;
+            stmts.push(node::Instruction::When((cond, Box::new(body))));
             continue; // NO ;
           }
           // spin <array-ptr> <func-id> { <id>: <expr> }
@@ -101,7 +87,7 @@ impl Parse for Body {
             content.parse::<syn::Ident>()?; // spin
             let lock = content.parse::<node::ArrayAccess>()?;
             let call = content.parse::<node::FuncCall>()?;
-            stmts.push(Instruction::SpinCall((lock, call)));
+            stmts.push(node::Instruction::SpinCall((lock, call)));
           }
           _ => {
             // Parse non-keyword-leading statements
@@ -110,7 +96,7 @@ impl Parse for Body {
               let aa = content.parse::<node::ArrayAccess>()?;
               content.parse::<syn::Token![=]>()?;
               let right = content.parse::<syn::Expr>()?;
-              stmts.push(Instruction::ArrayAssign((aa, right)));
+              stmts.push(node::Instruction::ArrayAssign((aa, right)));
             } else {
               // <id> = <expr>
               let id = content.parse::<Ident>()?;
@@ -119,7 +105,7 @@ impl Parse for Body {
                 // to handle the expression in k = a[0.int::<32>]
                 if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
                   let aa = content.parse::<node::ArrayAccess>()?;
-                  stmts.push(Instruction::ArrayRead((id, aa)));
+                  stmts.push(node::Instruction::ArrayRead((id, aa)));
                 } else if {
                   // <id> = array(<ty>, <size>);
                   if let Some((id, _)) = content.cursor().ident() {
@@ -134,10 +120,10 @@ impl Parse for Body {
                   let ty = args.parse::<DType>()?;
                   args.parse::<syn::Token![,]>()?;
                   let size = args.parse::<syn::LitInt>()?;
-                  stmts.push(Instruction::ArrayAlloc((id, ty, size)));
+                  stmts.push(node::Instruction::ArrayAlloc((id, ty, size)));
                 } else {
                   let assign = content.parse::<syn::Expr>()?;
-                  stmts.push(Instruction::Assign((id, assign)));
+                  stmts.push(node::Instruction::Assign((id, assign)));
                 }
               } else {
                 return Err(syn::Error::new(
@@ -151,6 +137,6 @@ impl Parse for Body {
       }
       content.parse::<syn::Token![;]>()?;
     }
-    Ok(Body { stmts })
+    Ok(node::Body { stmts })
   }
 }

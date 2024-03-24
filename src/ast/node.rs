@@ -20,3 +20,17 @@ pub(crate) struct KVPair {
   pub(crate) key: syn::Ident,
   pub(crate) value: Expr,
 }
+
+pub(crate) struct Body {
+  pub(crate) stmts: Vec<Instruction>,
+}
+
+pub(crate) enum Instruction {
+  Assign((syn::Ident, syn::Expr)),
+  ArrayAlloc((syn::Ident, DType, syn::LitInt)),
+  ArrayAssign((ArrayAccess, syn::Expr)),
+  ArrayRead((syn::Ident, ArrayAccess)),
+  AsyncCall(FuncCall),
+  SpinCall((ArrayAccess, FuncCall)),
+  When((syn::Ident, Box<Body>)),
+}

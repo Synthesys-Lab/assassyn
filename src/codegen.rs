@@ -4,8 +4,7 @@ use syn::{parse::Parse, spanned::Spanned};
 
 use crate::{
   ast::expr::{DType, Expr},
-  ast::node::ArrayAccess,
-  Instruction,
+  ast::node::{ArrayAccess, Instruction},
 };
 
 use eir::frontend::DataType;

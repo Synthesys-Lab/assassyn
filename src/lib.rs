@@ -10,14 +10,13 @@ mod codegen;
 mod parser;
 
 use ast::node;
-use parser::*;
 
 struct ModuleParser {
   module_name: syn::Ident,
   builder_name: syn::Ident,
   ports: Punctuated<node::Argument, Token![,]>,
   ext_interf: Punctuated<syn::Ident, Token![,]>,
-  body: Body,
+  body: node::Body,
   exposes: Option<Punctuated<syn::Ident, Token![,]>>,
 }
 
@@ -34,7 +33,7 @@ impl Parse for ModuleParser {
     let raw_ext_interf;
     bracketed!(raw_ext_interf in input);
     let ext_interf = raw_ext_interf.parse_terminated(syn::Ident::parse, Token![,])?;
-    let body = input.parse::<Body>()?;
+    let body = input.parse::<node::Body>()?;
     // .expose(<var-id>) is optional
     let exposes = if input.peek(Token![.]) {
       input.parse::<Token![.]>()?;
@@ -109,7 +108,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     }
   }
   let body: proc_macro2::TokenStream = body.into();
-  eprintln!("[Parser] Body successfully parsed!");
+  eprintln!("[Parser] node::Body successfully parsed!");
 
   // codegen external interfaces
   let ext_interf: proc_macro2::TokenStream = {
