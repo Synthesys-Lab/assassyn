@@ -379,7 +379,7 @@ impl SysBuilder {
   /// * `data` - The data to be sent to the destination module.
   /// * `cond` - The condition of triggering the destination. If None is given, the trigger is
   /// unconditional.
-  pub fn create_bundled_trigger(&mut self, dst: BaseNode, data: Vec<BaseNode>) -> BaseNode {
+  pub fn create_trigger_bundled(&mut self, dst: BaseNode, data: Vec<BaseNode>) -> BaseNode {
     let current_module = self.get_current_module().unwrap().upcast();
     let mut args = vec![dst.clone()];
 
@@ -465,7 +465,7 @@ impl SysBuilder {
   }
 
   /// Create a trigger. Push all the values to the corresponding named ports.
-  pub fn create_bound_trigger(
+  pub fn create_trigger_bound(
     &mut self,
     dst: BaseNode,
     binds: HashMap<String, BaseNode>,

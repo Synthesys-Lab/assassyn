@@ -1,7 +1,7 @@
 use super::DType;
 use super::Expr;
 
-pub(crate) struct Argument {
+pub(crate) struct PortDecl {
   pub(crate) id: syn::Ident,
   pub(crate) ty: DType,
 }
@@ -13,7 +13,12 @@ pub(crate) struct ArrayAccess {
 
 pub(crate) struct FuncCall {
   pub(crate) func: syn::Ident,
-  pub(crate) args: Vec<(syn::Ident, Expr)>,
+  pub(crate) args: FuncArgs,
+}
+
+pub(crate) enum FuncArgs {
+  Bound(Vec<(syn::Ident, Expr)>),
+  Plain(Vec<Expr>),
 }
 
 pub(crate) struct KVPair {

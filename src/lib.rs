@@ -14,7 +14,7 @@ use ast::node;
 struct ModuleParser {
   module_name: syn::Ident,
   builder_name: syn::Ident,
-  ports: Punctuated<node::Argument, Token![,]>,
+  ports: Punctuated<node::PortDecl, Token![,]>,
   ext_interf: Punctuated<syn::Ident, Token![,]>,
   body: node::Body,
   exposes: Option<Punctuated<syn::Ident, Token![,]>>,
@@ -29,7 +29,7 @@ impl Parse for ModuleParser {
     let builder_name = syn::Ident::new(&format!("{}_builder", module_name.to_string()), tok.span());
     let raw_ports;
     bracketed!(raw_ports in input);
-    let ports = raw_ports.parse_terminated(node::Argument::parse, Token![,])?;
+    let ports = raw_ports.parse_terminated(node::PortDecl::parse, Token![,])?;
     let raw_ext_interf;
     bracketed!(raw_ext_interf in input);
     let ext_interf = raw_ext_interf.parse_terminated(syn::Ident::parse, Token![,])?;

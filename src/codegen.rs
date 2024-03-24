@@ -1,10 +1,11 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{parse::Parse, spanned::Spanned};
 
-use crate::{
-  ast::expr::{DType, Expr},
-  ast::node::{ArrayAccess, Instruction},
+use crate::ast::{
+  expr::{DType, Expr},
+  node::{ArrayAccess, FuncArgs, Instruction},
 };
 
 use eir::frontend::DataType;
@@ -168,18 +169,32 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   )
 }
 
-pub(crate) fn emit_binds(args: &Vec<(syn::Ident, Expr)>) -> Vec<proc_macro2::TokenStream> {
-  args
-    .iter()
-    .map(|(k, v)| {
-      let value = emit_parsed_expr(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
-      let value: proc_macro2::TokenStream = value.into();
-      quote! {
-        let value = #value.clone();
-        binds.insert(stringify!(#k).to_string(), value)
-      }
-    })
-    .collect::<Vec<_>>()
+pub(crate) fn emit_binds(args: &FuncArgs) -> Vec<proc_macro2::TokenStream> {
+  match args {
+    FuncArgs::Bound(binds) => binds
+      .iter()
+      .map(|(k, v)| {
+        let value = emit_parsed_expr(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
+        let value: proc_macro2::TokenStream = value.into();
+        quote! {
+          let value = #value.clone();
+          binds.insert(stringify!(#k).to_string(), value)
+        }
+      })
+      .collect::<Vec<_>>(),
+    FuncArgs::Plain(vec) => vec
+      .iter()
+      .enumerate()
+      .map(|(i, x)| {
+        let value = emit_parsed_expr(x).expect(format!("Failed to emit {}", quote! {x}).as_str());
+        let value: proc_macro2::TokenStream = value.into();
+        let id = syn::Ident::new(&format!("arg_{}", i), Span::call_site());
+        quote! {
+          let #id = #value.clone()
+        }
+      })
+      .collect::<Vec<_>>(),
+  }
 }
 
 pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStream> {
@@ -228,7 +243,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
               .expect(format!("[Push Bind] {} is not a module", stringify!(#id)).as_str());
             let mut binds = std::collections::HashMap::new();
             #(#binds);*;
-            sys.create_bound_trigger(#id, binds);
+            sys.create_trigger_bound(#id, binds);
           }}
         }
       }

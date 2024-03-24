@@ -27,7 +27,7 @@ pub enum Opcode {
   FIFOPush,
   FIFOPop,
   Trigger,
-  // Level-2 syntax sugar, will be written by synthesizable operations
+  // Level-2 syntax sugar, will be re-written in synthesizable operations
   SpinTrigger,
   CallbackTrigger,
 }

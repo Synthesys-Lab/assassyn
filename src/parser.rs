@@ -1,8 +1,11 @@
-use syn::{braced, parse::Parse, Ident};
+use syn::{braced, parenthesized, parse::Parse, Ident};
 
-use crate::ast::{node, DType, Expr};
+use crate::ast::{
+  node::{self, FuncArgs},
+  DType, Expr,
+};
 
-impl Parse for node::Argument {
+impl Parse for node::PortDecl {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let id = input
       .parse::<syn::Ident>()
@@ -11,7 +14,7 @@ impl Parse for node::Argument {
       .parse::<syn::Token![:]>()
       .map_err(|e| syn::Error::new(e.span(), "Expected : to specify the type of the port"))?;
     let ty = input.parse::<DType>()?;
-    Ok(node::Argument { id, ty })
+    Ok(node::PortDecl { id, ty })
   }
 }
 
@@ -37,13 +40,26 @@ impl Parse for node::KVPair {
 impl Parse for node::FuncCall {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let func = input.parse::<syn::Ident>()?;
-    let content;
-    let _ = braced!(content in input);
-    let args = content.parse_terminated(node::KVPair::parse, syn::Token![,])?;
-    let args = args
-      .into_iter()
-      .map(|x| (x.key, x.value))
-      .collect::<Vec<_>>();
+    let args = if input.peek(syn::token::Brace) {
+      let content;
+      let _ = braced!(content in input);
+      let args = content.parse_terminated(node::KVPair::parse, syn::Token![,])?;
+      let args = args
+        .into_iter()
+        .map(|x| (x.key, x.value))
+        .collect::<Vec<_>>();
+      FuncArgs::Bound(args)
+    } else if input.peek(syn::token::Paren) {
+      let content;
+      let _ = parenthesized!(content in input);
+      let args = content.parse_terminated(Expr::parse, syn::Token![,])?;
+      FuncArgs::Plain(args.into_iter().collect::<Vec<_>>())
+    } else {
+      return Err(syn::Error::new(
+        input.span(),
+        "Expected a function call with arguments",
+      ));
+    };
     Ok(node::FuncCall { func, args })
   }
 }
@@ -63,7 +79,7 @@ impl Parse for node::Body {
           braced!(_placeholder in content);
           let func_call = node::FuncCall {
             func: Ident::new("self", content.span()),
-            args: vec![],
+            args: FuncArgs::Plain(vec![]),
           };
           stmts.push(node::Instruction::AsyncCall(func_call));
         } else {
