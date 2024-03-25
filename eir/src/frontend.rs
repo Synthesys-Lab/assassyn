@@ -1,4 +1,5 @@
 pub use crate::builder::system::*;
+pub use crate::ir::bind::*;
 pub use crate::ir::block::*;
 pub use crate::ir::data::*;
 pub use crate::ir::expr::*;

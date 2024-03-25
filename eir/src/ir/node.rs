@@ -202,7 +202,7 @@ macro_rules! register_elements {
   };
 }
 
-register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr);
+register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, Bind);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct BaseNode {
@@ -215,7 +215,6 @@ pub struct BaseNode {
 pub enum CacheKey {
   IntImm((DataType, u64)),
   ArrayPtr((BaseNode, BaseNode)),
-  Bind(Vec<BaseNode>),
 }
 
 impl BaseNode {
@@ -254,8 +253,7 @@ impl BaseNode {
         let expr = self.as_ref::<Expr>(sys).unwrap();
         expr.dtype().clone().into()
       }
-      NodeKind::Block => None,
-      NodeKind::ArrayPtr => None,
+      NodeKind::Block | NodeKind::ArrayPtr | NodeKind::Bind => None,
       NodeKind::Unknown => {
         panic!("Unknown reference")
       }
@@ -268,6 +266,7 @@ impl BaseNode {
       NodeKind::Array => None,
       NodeKind::IntImm => None,
       NodeKind::ArrayPtr => None,
+      NodeKind::Bind => None,
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
@@ -310,6 +309,9 @@ impl BaseNode {
       }
       NodeKind::Expr => {
         format!("_{}", self.get_key())
+      }
+      NodeKind::Bind => {
+        panic!("Bind should not be printed")
       }
     }
   }

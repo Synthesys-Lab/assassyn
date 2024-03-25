@@ -70,6 +70,7 @@ pub trait Visitor<T> {
       NodeKind::Array => self.visit_array(&node.as_ref::<Array>(sys).unwrap()),
       NodeKind::IntImm => self.visit_int_imm(&node.as_ref::<IntImm>(sys).unwrap()),
       NodeKind::ArrayPtr => self.visit_handle(&node.as_ref::<ArrayPtr>(sys).unwrap()),
+      NodeKind::Bind => None,
       NodeKind::Unknown => {
         panic!("Unknown node type")
       }

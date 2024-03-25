@@ -1,7 +1,7 @@
 use syn::{braced, parenthesized, parse::Parse, Ident};
 
 use crate::ast::{
-  node::{self, FuncArgs},
+  node::{self, FuncArgs, FuncCall},
   DType, Expr,
 };
 
@@ -122,22 +122,34 @@ impl Parse for node::Body {
                 if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
                   let aa = content.parse::<node::ArrayAccess>()?;
                   stmts.push(node::Instruction::ArrayRead((id, aa)));
-                } else if {
-                  // <id> = array(<ty>, <size>);
-                  if let Some((id, _)) = content.cursor().ident() {
-                    id.to_string() == "array"
-                  } else {
-                    false
+                  // parse special rules of assignment
+                } else if let Some((look, _)) = content.cursor().ident() {
+                  match look.to_string().as_str() {
+                    // <id> = array(<ty>, <size>); array decl
+                    "array" => {
+                      content.parse::<syn::Ident>()?; // array
+                      let args;
+                      syn::parenthesized!(args in content);
+                      let ty = args.parse::<DType>()?;
+                      args.parse::<syn::Token![,]>()?;
+                      let size = args.parse::<syn::LitInt>()?;
+                      stmts.push(node::Instruction::ArrayAlloc((id, ty, size)));
+                    }
+                    // <id> = bind <func-id> { <id>: <expr> }; a partial function call
+                    "bind" => {
+                      eprintln!("bind");
+                      content.parse::<syn::Ident>()?; // bind
+                      let bind = content.parse::<FuncCall>()?;
+                      stmts.push(node::Instruction::Bind((id, bind)));
+                    }
+                    _ => {
+                      // fall back to normal assignment
+                      let assign = content.parse::<syn::Expr>()?;
+                      stmts.push(node::Instruction::Assign((id, assign)));
+                    }
                   }
-                } {
-                  content.parse::<syn::Ident>()?; // array
-                  let args;
-                  syn::parenthesized!(args in content);
-                  let ty = args.parse::<DType>()?;
-                  args.parse::<syn::Token![,]>()?;
-                  let size = args.parse::<syn::LitInt>()?;
-                  stmts.push(node::Instruction::ArrayAlloc((id, ty, size)));
                 } else {
+                  // fall back to normal assignment
                   let assign = content.parse::<syn::Expr>()?;
                   stmts.push(node::Instruction::Assign((id, assign)));
                 }

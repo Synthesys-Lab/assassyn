@@ -266,6 +266,24 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           }
         }
       }
+      Instruction::Bind((id, call)) => {
+        let func = &call.func;
+        match &call.args {
+          FuncArgs::Bound(_) => {}
+          FuncArgs::Plain(_) => {
+            return Err(syn::Error::new(
+              func.span(),
+              "Plain args are not allowed in bind",
+            ))
+          }
+        }
+        let args = emit_args(&call.args);
+        quote! {
+          let mut binds = std::collections::HashMap::new();
+          #(#args);*;
+          let #id = sys.create_bind(#func, binds);
+        }
+      }
       Instruction::SpinCall((lock, call)) => {
         let func = &call.func;
         let binds = emit_args(&call.args);

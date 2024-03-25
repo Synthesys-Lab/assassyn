@@ -559,6 +559,10 @@ impl SysBuilder {
     res
   }
 
+  pub fn create_bind(&mut self, dst: BaseNode, bind: HashMap<String, BaseNode>) -> BaseNode {
+    BaseNode::unknown()
+  }
+
   /// Create a determined FIFO push operation.
   pub fn create_fifo_push(&mut self, fifo: BaseNode, value: BaseNode) -> BaseNode {
     let fifo = self.get::<FIFO>(&fifo).unwrap();
