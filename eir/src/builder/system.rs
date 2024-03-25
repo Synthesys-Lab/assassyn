@@ -371,132 +371,11 @@ impl SysBuilder {
     self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 
-  /// Create a bundled trigger. Let the current module invoke the given module (destination)
-  /// with all input data ready and pushed to the destination module's port FIFO.
-  ///
-  /// # Arguments
-  /// * `dst` - The destination module to be invoked.
-  /// * `data` - The data to be sent to the destination module.
-  /// * `cond` - The condition of triggering the destination. If None is given, the trigger is
-  /// unconditional.
-  pub fn create_trigger_bundled(&mut self, dst: BaseNode, data: Vec<BaseNode>) -> BaseNode {
-    let current_module = self.get_current_module().unwrap().upcast();
-    let mut args = vec![dst.clone()];
-
-    // Handle callback trigger
-    let res = match dst.get_kind() {
-      NodeKind::Module => {
-        let ports = dst
-          .as_ref::<Module>(self)
-          .unwrap()
-          .port_iter()
-          .map(|x| x.upcast())
-          .collect::<Vec<_>>();
-        assert_eq!(ports.len(), data.len(), "Data size mismatch!");
-        for (port, arg) in ports.iter().zip(data.iter()) {
-          {
-            let port = port.as_ref::<FIFO>(self).unwrap();
-            assert_eq!(port.scalar_ty(), arg.get_dtype(self).unwrap());
-          }
-          let push_handle = self.create_fifo_push(port.clone(), arg.clone());
-          args.push(push_handle);
-          self
-            .get_mut::<Module>(&current_module)
-            .unwrap()
-            .insert_external_interface(port.clone(), Opcode::FIFOPush);
-        }
-        self.create_expr(DataType::void(), Opcode::Trigger, args)
-      }
-      NodeKind::Expr => {
-        let expr = dst.as_ref::<Expr>(self).unwrap();
-        assert_eq!(expr.get_opcode(), Opcode::FIFOPop);
-        let ty = expr.dtype();
-        let types = if let DataType::Module(types) = ty {
-          types.iter().map(|x| x.as_ref().clone()).collect::<Vec<_>>()
-        } else {
-          panic!("Invalid destination, {:?}", dst);
-        };
-        assert_eq!(types.len(), data.len(), "Data size mismatch!");
-        for (idx, (ty, arg)) in types.iter().zip(data.iter()).enumerate() {
-          assert_eq!(ty, &arg.get_dtype(self).unwrap());
-          let push_handle = self.create_module_fifo_push(dst.clone(), idx, arg.clone());
-          args.push(push_handle);
-        }
-        self.create_expr(DataType::void(), Opcode::Trigger, args)
-      }
-      _ => panic!("Invalid destination"),
-    };
-
-    res
-  }
-
   /// Create a trigger invoke itself without checking the readiness
   /// of the data. This is something more like a state machine trigger.
   pub fn create_self_trigger(&mut self) -> BaseNode {
     let dst = self.get_current_module().unwrap().upcast();
     self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()])
-  }
-
-  /// Convert bind format to a vector of BaseNode corresponding to the original port order.
-  pub fn bind_to_vec(&mut self, dst: BaseNode, binds: HashMap<String, BaseNode>) -> Vec<BaseNode> {
-    let module = dst.as_ref::<Module>(self).unwrap();
-    assert_eq!(module.get_num_inputs(), binds.len());
-    let mut res = vec![BaseNode::unknown(); binds.len()];
-    for (k, v) in binds.iter() {
-      let pos = module.port_iter().position(|x| x.get_name() == k).unwrap();
-      let fifo = module.get_input(pos).unwrap().as_ref::<FIFO>(self).unwrap();
-      assert_eq!(fifo.scalar_ty(), v.get_dtype(self).unwrap());
-      res[pos] = v.clone();
-    }
-    res
-  }
-
-  /// Create a spin trigger with bound format of arguments given.
-  pub fn create_spin_trigger_bound(
-    &mut self,
-    handle: BaseNode,
-    dst: BaseNode,
-    binds: HashMap<String, BaseNode>,
-  ) {
-    let data = self.bind_to_vec(dst.clone(), binds);
-    self.create_spin_trigger(handle, dst, data);
-  }
-
-  /// Create a trigger. Push all the values to the corresponding named ports.
-  pub fn create_trigger_bound(
-    &mut self,
-    dst: BaseNode,
-    binds: HashMap<String, BaseNode>,
-  ) -> BaseNode {
-    let current_module = self.get_current_module().unwrap().upcast();
-    let mut bundle = vec![dst.clone()];
-    assert_eq!(
-      binds.len(),
-      dst.as_ref::<Module>(self).unwrap().get_num_inputs()
-    );
-    for (name, value) in binds {
-      let dst_ref = dst
-        .as_ref::<Module>(self)
-        .expect(format!("{:?} is NOT a module", dst).as_str());
-      let port = dst_ref.get_input_by_name(&name).expect(
-        format!(
-          "\"{}\" is NOT an input of Module \"{}\"",
-          name,
-          dst_ref.get_name()
-        )
-        .as_str(),
-      );
-      assert_eq!(
-        port.as_ref::<FIFO>(self).unwrap().scalar_ty(),
-        value.get_dtype(self).unwrap()
-      );
-      bundle.push(self.create_fifo_push(port.clone(), value));
-      self
-        .get_mut::<Module>(&current_module)
-        .unwrap()
-        .insert_external_interface(port, Opcode::FIFOPush);
-    }
-    self.create_expr(DataType::void(), Opcode::Trigger, bundle)
   }
 
   /// Create a spin trigger. A spin trigger repeats to test the condition
@@ -511,10 +390,22 @@ impl SysBuilder {
   /// * `array` - A pointer to the an array element, which serves as an handle to a "lock".
   /// * `dst` - The destination module to be invoked.
   /// * `data` - The data to be sent to the destination module.
-  pub fn create_spin_trigger(&mut self, handle: BaseNode, dst: BaseNode, mut data: Vec<BaseNode>) {
-    data.insert(0, handle.clone());
-    data.insert(1, dst.clone());
-    self.create_expr(DataType::void(), Opcode::SpinTrigger, data);
+  pub fn create_spin_trigger_bound(&mut self, handle: BaseNode, bind: BaseNode) {
+    let bind = self.get::<Bind>(&bind).unwrap();
+    let mut bundle = bind.to_args();
+    let callee = bind.get_callee();
+    bundle.insert(0, handle);
+    bundle.insert(1, callee);
+    self.create_expr(DataType::void(), Opcode::SpinTrigger, bundle);
+  }
+
+  /// Create a trigger. Push all the values to the corresponding named ports.
+  pub fn create_trigger_bound(&mut self, bind: BaseNode) -> BaseNode {
+    let bind = self.get::<Bind>(&bind).unwrap();
+    let callee = bind.get_callee();
+    let mut bundle = bind.to_args();
+    bundle.insert(0, callee);
+    self.create_expr(DataType::void(), Opcode::Trigger, bundle)
   }
 
   create_arith_op_impl!(binary, create_add, Opcode::Add);
@@ -547,41 +438,89 @@ impl SysBuilder {
     key
   }
 
-  fn create_module_fifo_push(&mut self, dst: BaseNode, idx: usize, value: BaseNode) -> BaseNode {
+  pub fn get_init_bind(&mut self, node: BaseNode) -> BaseNode {
+    match node.get_kind() {
+      // A module is an empty bind.
+      NodeKind::Module => self.insert_element(Bind::new(node, HashMap::new(), BindKind::Unknown)),
+      // A bind is a bind.
+      NodeKind::Bind => node,
+      // An expression should be a module type.
+      NodeKind::Expr => {
+        let expr = node.as_ref::<Expr>(self).unwrap();
+        let ty = expr.get_opcode();
+        assert_eq!(ty, Opcode::FIFOPop);
+        self.insert_element(Bind::new(node, HashMap::new(), BindKind::Sequential))
+      }
+      _ => panic!("Either a Module or a Bind is expected, but {:?} got!", node),
+    }
+  }
+
+  /// Add a bind to the current module.
+  pub fn add_bind(&mut self, bind: BaseNode, key: String, value: BaseNode) -> BaseNode {
+    let bind = bind.as_ref::<Bind>(self).unwrap();
+    assert!(bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::KVBind);
+    let mut bound = bind.get_bound().clone();
+    assert!(!bound.contains_key(&key));
+    let module = bind.get_callee().as_ref::<Module>(self).unwrap();
+    let port = module.get_input_by_name(&key).unwrap();
+    assert_eq!(port.scalar_ty(), value.get_dtype(self).unwrap());
+    let port_idx = port.idx();
+    let module = module.upcast();
+    let kind = BindKind::KVBind;
+    let fifo_push = self.create_fifo_push(module.clone(), port_idx, value);
+    bound.insert(key, fifo_push);
+    let instance = Bind::new(module, bound, kind);
+    let key = self.insert_element(instance);
+    key
+  }
+
+  /// Add a bind to the current module.
+  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode) -> BaseNode {
+    let bind = bind.as_ref::<Bind>(self).unwrap();
+    assert!(bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::Sequential);
+    let mut bound = bind.get_bound().clone();
+    let port_idx = bound.len();
+    let signature = bind.get_callee_signature();
+    match &signature {
+      DataType::Module(ports) => {
+        eprintln!("Checking {} value types", port_idx);
+        eprintln!("{:?}", value);
+        assert_eq!(
+          ports.get(bound.len()).unwrap().as_ref().clone(),
+          value.get_dtype(self).unwrap(),
+        );
+      }
+      _ => panic!("Invalid signature"),
+    }
+    let kind = BindKind::Sequential;
+    let callee = bind.get_callee();
+    let fifo_push = self.create_fifo_push(callee.clone(), port_idx, value);
+    bound.insert(port_idx.to_string(), fifo_push);
+    let instance = Bind::new(callee, bound, kind);
+    let key = self.insert_element(instance);
+    key
+  }
+
+  /// A helper function to create a FIFO push.
+  pub(crate) fn create_fifo_push(
+    &mut self,
+    module: BaseNode,
+    idx: usize,
+    value: BaseNode,
+  ) -> BaseNode {
+    match module.get_dtype(self) {
+      Some(DataType::Module(_)) => {}
+      _ => panic!("Invalid module type"),
+    }
     if value.get_kind() == NodeKind::Module {
-      let mut dst_mut = self.get_mut::<Module>(&dst).unwrap();
+      let mut dst_mut = self.get_mut::<Module>(&module).unwrap();
       dst_mut.insert_external_interface(value.clone(), Opcode::FIFOPush);
     } else if value.get_dtype(self).unwrap().is_module() {
       println!("[Warning] For now, only direct module reference supported.");
     }
     let idx = self.get_const_int(DataType::uint(32), idx as u64);
-    let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![dst, idx, value]);
+    let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![module, idx, value]);
     res
-  }
-
-  pub fn get_init_bind(&mut self, node: BaseNode) -> BaseNode {
-    match node.get_kind() {
-      // A module is an empty bind.
-      NodeKind::Module => self.create_bind(node, HashMap::new()),
-      // A bind is a bind.
-      NodeKind::Bind => node,
-      _ => panic!("Either a Module or a Bind is expected, but {:?} got!", node),
-    }
-  }
-
-  pub fn create_bind(&mut self, dst: BaseNode, bind: HashMap<String, BaseNode>) -> BaseNode {
-    let instance = Bind::new(dst.clone(), bind.clone());
-    let key = self.insert_element(instance);
-    key
-  }
-
-  /// Create a determined FIFO push operation.
-  pub fn create_fifo_push(&mut self, fifo: BaseNode, value: BaseNode) -> BaseNode {
-    let fifo = self.get::<FIFO>(&fifo).unwrap();
-    let module = fifo.get_parent();
-    assert_eq!(module.get_kind(), NodeKind::Module);
-    let idx = fifo.idx();
-    self.create_module_fifo_push(module, idx, value)
   }
 
   /// Create a read operation on an array.

@@ -57,12 +57,12 @@ impl<'sys> ModuleRef<'sys> {
   /// # Arguments
   ///
   /// * `name` - The name of the input.
-  pub fn get_input_by_name(&self, name: &str) -> Option<BaseNode> {
+  pub fn get_input_by_name(&self, name: &str) -> Option<FIFORef<'_>> {
     self
       .inputs
       .iter()
       .find(|x| x.as_ref::<FIFO>(self.sys).unwrap().get_name().eq(name))
-      .map(|x| x.clone())
+      .map(|x| x.clone().as_ref::<FIFO>(self.sys).unwrap())
   }
 
   /// Get the name of the module.

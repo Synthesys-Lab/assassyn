@@ -52,31 +52,31 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     let lock_handle = mutator.get().get_operand(0).unwrap().clone();
     // Destination module
     let dest_module = mutator.get().get_operand(1).unwrap().clone();
-    // data to new trigger
-    let data = mutator
-      .get()
-      .operand_iter()
-      .skip(2)
-      .map(|x| x.clone())
-      .collect::<Vec<_>>();
-    // mutator.sys.create_trigger(dst, data, cond)
-    let ports = data
-      .iter()
-      .enumerate()
-      .map(|(i, x)| {
-        PortInfo::new(
-          format!("arg.{}", i).as_str(),
-          x.get_dtype(&mutator.sys).unwrap().clone(),
-        )
-      })
-      .collect::<Vec<_>>();
+    let module_signature = dest_module.get_dtype(mutator.sys).unwrap();
+    let ports = match module_signature {
+      DataType::Module(ports) => ports
+        .into_iter()
+        .enumerate()
+        .map(|(i, x)| PortInfo::new(format!("arg.{}", i).as_str(), *x)),
+      _ => panic!("Destination module is not a module"),
+    }
+    .collect::<Vec<_>>();
+    // Find the data to this module
     let agent = mutator
       .sys
       .create_module(format!("{}.async.agent", parent_name).as_str(), ports);
     // Create trigger to the agent module.
     mutator.sys.set_current_module(parent);
     mutator.sys.set_insert_before(mutator.get().upcast());
-    mutator.sys.create_trigger_bundled(agent.clone(), data);
+    let bundle = mutator
+      .get()
+      .operand_iter()
+      .skip(1)
+      .cloned()
+      .collect::<Vec<_>>();
+    mutator
+      .sys
+      .create_expr(DataType::void(), Opcode::Trigger, bundle);
     // Create trigger to the destination module.
     mutator.sys.set_current_module(agent.clone());
     let agent_module = mutator.sys.get_current_module().unwrap();
@@ -87,11 +87,24 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     let cond = mutator.sys.create_array_read(lock_handle);
     let block = mutator.sys.create_block(Some(cond.clone()));
     mutator.sys.set_current_block(block.clone());
-    let data_to_dst = agent_ports
-      .iter()
-      .map(|x| mutator.sys.create_fifo_pop(x.clone(), None))
-      .collect::<Vec<_>>();
-    mutator.sys.create_trigger_bundled(dest_module, data_to_dst);
+    let mut bind = mutator.sys.get_init_bind(dest_module.clone());
+    for elem in agent_ports.iter() {
+      eprintln!(
+        "Value: {}",
+        crate::ir::ir_printer::IRPrinter::new(mutator.sys)
+          .dispatch(mutator.sys, &elem, vec![])
+          .unwrap()
+      );
+      let value = mutator.sys.create_fifo_pop(elem.clone(), None);
+      eprintln!(
+        "Value: {}",
+        crate::ir::ir_printer::IRPrinter::new(mutator.sys)
+          .dispatch(mutator.sys, &value, vec![])
+          .unwrap()
+      );
+      bind = mutator.sys.push_bind(bind, value);
+    }
+    mutator.sys.create_trigger_bound(bind);
     mutator.sys.set_insert_before(block);
     let flip_cond = mutator.sys.create_flip(cond);
     let block = mutator.sys.create_block(Some(flip_cond));
