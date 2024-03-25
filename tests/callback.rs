@@ -41,6 +41,7 @@ fn callback() {
   println!("{}", sys);
 
   let src_name = test_utils::temp_dir(&"callback.rs".to_string());
+  let exec_name = test_utils::temp_dir(&"callback".to_string());
   let config = sim::Config {
     fname: src_name,
     idle_threshold: 1000,
@@ -48,4 +49,6 @@ fn callback() {
   };
 
   sim::elaborate(&sys, &config).unwrap();
+  test_utils::compile(&config.fname, &exec_name);
+  let _ = test_utils::run(&exec_name);
 }
