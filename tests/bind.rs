@@ -23,6 +23,13 @@ fn adder() {
     }.expose[aa]
   );
 
+  module_builder!(
+    rhs[a:int<32>][aa] {
+      v = a.pop();
+      async aa { b: v };
+    }
+  );
+
   let mut sys = eir::frontend::SysBuilder::new("main");
   let adder = adder_builder(&mut sys);
   driver_builder(&mut sys, adder);

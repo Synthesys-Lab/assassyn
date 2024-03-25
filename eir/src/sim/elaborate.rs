@@ -354,6 +354,7 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       }
     };
     fd.write(cyclize.to_string().as_bytes())?;
+    fd.write("\n".as_bytes())?;
   }
 
   // Dump the event enum. Each event corresponds to a module.

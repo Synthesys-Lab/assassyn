@@ -1,6 +1,6 @@
 // TODO(@were): Remove all the predications and move to blocks.
 
-use std::{collections::HashMap, fmt::Display, ops::Add};
+use std::{collections::HashMap, fmt::Display, hash::Hash, ops::Add};
 
 use crate::{
   frontend::*,
@@ -144,7 +144,7 @@ impl SysBuilder {
   pub(crate) fn get<
     'elem,
     'sys: 'elem,
-    T: IsElement<'sys, 'elem> + Referencable<'sys, 'elem, T>,
+    T: IsElement<'elem, 'sys> + Referencable<'elem, 'sys, T>,
   >(
     &'sys self,
     key: &BaseNode,
@@ -157,7 +157,7 @@ impl SysBuilder {
 
   /// The helper function to get an element of the system and downcast it to its actual type's
   /// mutable reference.
-  pub(crate) fn get_mut<'elem, 'sys: 'elem, T: IsElement<'sys, 'elem> + Mutable<'sys, 'elem, T>>(
+  pub(crate) fn get_mut<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Mutable<'elem, 'sys, T>>(
     &'sys mut self,
     key: &BaseNode,
   ) -> Result<T::Mutator, String> {
@@ -559,8 +559,20 @@ impl SysBuilder {
     res
   }
 
+  pub fn get_init_bind(&mut self, node: BaseNode) -> BaseNode {
+    match node.get_kind() {
+      // A module is an empty bind.
+      NodeKind::Module => self.create_bind(node, HashMap::new()),
+      // A bind is a bind.
+      NodeKind::Bind => node,
+      _ => panic!("Either a Module or a Bind is expected, but {:?} got!", node),
+    }
+  }
+
   pub fn create_bind(&mut self, dst: BaseNode, bind: HashMap<String, BaseNode>) -> BaseNode {
-    BaseNode::unknown()
+    let instance = Bind::new(dst.clone(), bind.clone());
+    let key = self.insert_element(instance);
+    key
   }
 
   /// Create a determined FIFO push operation.

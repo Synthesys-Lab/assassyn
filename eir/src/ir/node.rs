@@ -282,6 +282,13 @@ impl BaseNode {
   ) -> Result<T::Reference, String> {
     T::reference(sys, self.clone())
   }
+
+  pub fn as_mut<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Mutable<'elem, 'sys, T>>(
+    &self,
+    sys: &'sys mut SysBuilder,
+  ) -> Result<T::Mutator, String> {
+    T::mutator(sys, self.clone())
+  }
 }
 
 impl BaseNode {
