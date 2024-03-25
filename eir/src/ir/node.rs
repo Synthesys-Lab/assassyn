@@ -5,6 +5,8 @@ use crate::frontend::*;
 use super::super::ir::visitor::Visitor;
 use super::ir_printer::IRPrinter;
 
+use paste::paste;
+
 pub trait IsElement<'elem, 'sys: 'elem> {
   fn upcast(&self) -> BaseNode;
   fn set_key(&mut self, key: usize);
@@ -32,164 +34,175 @@ pub trait Referencable<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys>> {
   fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Result<Self::Reference, String>;
 }
 
-macro_rules! register_element {
-  ($name:ident, $reference: ident, $mutator: ident) => {
-    impl Into<Element> for $name {
-      fn into(self) -> Element {
-        Element::$name(Box::new(self))
-      }
-    }
-
-    impl<'elem, 'sys: 'elem> IsElement<'elem, 'sys> for $name {
-      fn set_key(&mut self, key: usize) {
-        self.key = key;
-      }
-
-      fn get_key(&self) -> usize {
-        self.key
-      }
-
-      fn upcast(&self) -> BaseNode {
-        BaseNode::new(NodeKind::$name, self.key)
-      }
-
-      fn into_reference(key: usize) -> BaseNode {
-        BaseNode::new(NodeKind::$name, key)
-      }
-
-      fn downcast(
-        slab: &'sys slab::Slab<Element>,
-        node: &BaseNode,
-      ) -> Result<&'elem Box<$name>, String> {
-        if let NodeKind::$name = node.get_kind() {
-          if let Element::$name(res) = &slab[node.get_key()] {
-            return Ok(res);
-          }
+macro_rules! emit_elem_impl {
+  ($name:ident) => {
+    paste! {
+      impl Into<Element> for $name {
+        fn into(self) -> Element {
+          Element::$name(Box::new(self))
         }
-        Err(format!(
-          "IsElement::downcast: expecting {}, {:?}({})",
-          stringify!($name),
-          node.get_kind(),
-          node.get_key()
-        ))
       }
 
-      fn downcast_mut(
-        slab: &'sys mut slab::Slab<Element>,
-        node: &BaseNode,
-      ) -> Result<&'elem mut Box<$name>, String> {
-        if let NodeKind::$name = node.get_kind() {
-          if let Element::$name(res) = &mut slab[node.get_key()] {
-            return Ok(res);
-          }
+      impl<'elem, 'sys: 'elem> IsElement<'elem, 'sys> for $name {
+        fn set_key(&mut self, key: usize) {
+          self.key = key;
         }
-        Err(format!(
-          "IsElement::downcast: expecting {}, {:?}({})",
-          stringify!($name),
-          node.get_kind(),
-          node.get_key()
-        ))
-      }
-    }
 
-    pub struct $mutator<'a> {
-      pub(crate) sys: &'a mut SysBuilder,
-      pub(crate) elem: BaseNode,
-    }
+        fn get_key(&self) -> usize {
+          self.key
+        }
 
-    pub struct $reference<'sys> {
-      pub(crate) sys: &'sys SysBuilder,
-      elem: BaseNode,
-    }
+        fn upcast(&self) -> BaseNode {
+          BaseNode::new(NodeKind::$name, self.key)
+        }
 
-    impl<'sys> $reference<'sys> {
-      pub fn get<'borrow, 'res>(&'borrow self) -> &'res Box<$name>
-      where
-        'sys: 'borrow,
-        'sys: 'res,
-        'borrow: 'res,
-      {
-        <$name>::downcast(&self.sys.slab, &self.elem).unwrap()
-      }
-    }
+        fn into_reference(key: usize) -> BaseNode {
+          BaseNode::new(NodeKind::$name, key)
+        }
 
-    impl Deref for $reference<'_> {
-      type Target = Box<$name>;
-
-      fn deref(&self) -> &Self::Target {
-        self.get()
-      }
-    }
-
-    impl<'sys> $mutator<'sys> {
-      pub fn get_mut<'borrow>(&'borrow mut self) -> &'borrow mut Box<$name>
-      where
-        'sys: 'borrow,
-      {
-        <$name>::downcast_mut(&mut self.sys.slab, &self.elem).unwrap()
-      }
-
-      pub fn get<'borrow>(&'borrow self) -> &'borrow Box<$name>
-      where
-        'sys: 'borrow,
-      {
-        <$name>::downcast(&self.sys.slab, &self.elem).unwrap()
-      }
-    }
-
-    impl<'elem, 'sys: 'elem> Mutable<'elem, 'sys, $name> for $name {
-      type Mutator = $mutator<'sys>;
-
-      fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Result<Self::Mutator, String> {
-        if let NodeKind::$name = elem.get_kind() {
-          Ok($mutator { sys, elem })
-        } else {
+        fn downcast(
+          slab: &'sys slab::Slab<Element>,
+          node: &BaseNode,
+        ) -> Result<&'elem Box<$name>, String> {
+          if let NodeKind::$name = node.get_kind() {
+            if let Element::$name(res) = &slab[node.get_key()] {
+              return Ok(res);
+            }
+          }
           Err(format!(
-            "Expecting {}, but {:?} is given",
+            "IsElement::downcast: expecting {}, {:?}({})",
             stringify!($name),
-            elem
+            node.get_kind(),
+            node.get_key()
+          ))
+        }
+
+        fn downcast_mut(
+          slab: &'sys mut slab::Slab<Element>,
+          node: &BaseNode,
+        ) -> Result<&'elem mut Box<$name>, String> {
+          if let NodeKind::$name = node.get_kind() {
+            if let Element::$name(res) = &mut slab[node.get_key()] {
+              return Ok(res);
+            }
+          }
+          Err(format!(
+            "IsElement::downcast: expecting {}, {:?}({})",
+            stringify!($name),
+            node.get_kind(),
+            node.get_key()
           ))
         }
       }
-    }
 
-    impl<'elem, 'sys: 'elem> Referencable<'elem, 'sys, $name> for $name {
-      type Reference = $reference<'sys>;
+      pub struct [<$name Mut>] <'a> {
+        pub(crate) sys: &'a mut SysBuilder,
+        pub(crate) elem: BaseNode,
+      }
 
-      fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Result<Self::Reference, String> {
-        if let NodeKind::$name = elem.get_kind() {
-          Ok($reference { sys, elem })
-        } else {
-          Err(format!(
-            "Expecting {}, but {:?} is given",
-            stringify!($name),
-            elem
-          ))
+      pub struct [<$name Ref>] <'a> {
+        pub(crate) sys: &'a SysBuilder,
+        pub(crate) elem: BaseNode,
+      }
+
+      impl<'sys> [<$name Ref>] <'sys> {
+        pub fn get<'borrow, 'res>(&'borrow self) -> &'res Box<$name>
+        where
+          'sys: 'borrow,
+          'sys: 'res,
+          'borrow: 'res,
+        {
+          <$name>::downcast(&self.sys.slab, &self.elem).unwrap()
+        }
+      }
+
+      impl Deref for [<$name Ref>]<'_> {
+        type Target = Box<$name>;
+
+        fn deref(&self) -> &Self::Target {
+          self.get()
+        }
+      }
+
+      impl<'sys> [<$name Mut>]<'sys> {
+        pub fn get_mut<'borrow>(&'borrow mut self) -> &'borrow mut Box<$name>
+        where
+          'sys: 'borrow,
+        {
+          <$name>::downcast_mut(&mut self.sys.slab, &self.elem).unwrap()
+        }
+
+        pub fn get<'borrow>(&'borrow self) -> &'borrow Box<$name>
+        where
+          'sys: 'borrow,
+        {
+          <$name>::downcast(&self.sys.slab, &self.elem).unwrap()
+        }
+      }
+
+      impl<'elem, 'sys: 'elem> Mutable<'elem, 'sys, $name> for $name {
+        type Mutator = [<$name Mut>]<'sys>;
+
+        fn mutator(sys: &'sys mut SysBuilder, elem: BaseNode) -> Result<Self::Mutator, String> {
+          if let NodeKind::$name = elem.get_kind() {
+            Ok([<$name Mut>] { sys, elem })
+          } else {
+            Err(format!(
+              "Expecting {}, but {:?} is given",
+              stringify!($name),
+              elem
+            ))
+          }
+        }
+      }
+
+      impl<'elem, 'sys: 'elem> Referencable<'elem, 'sys, $name> for $name {
+        type Reference = [<$name Ref>]<'sys>;
+
+        fn reference(sys: &'sys SysBuilder, elem: BaseNode) -> Result<Self::Reference, String> {
+          if let NodeKind::$name = elem.get_kind() {
+            Ok([<$name Ref>] { sys, elem })
+          } else {
+            Err(format!(
+              "Expecting {}, but {:?} is given",
+              stringify!($name),
+              elem
+            ))
+          }
         }
       }
     }
   };
 }
 
-register_element!(Module, ModuleRef, ModuleMut);
-register_element!(FIFO, FIFORef, FIFOMut);
-register_element!(Expr, ExprRef, ExprMut);
-register_element!(Array, ArrayRef, ArrayMut);
-register_element!(IntImm, IntImmRef, IntImmMut);
-register_element!(Block, BlockRef, BlockMut);
-register_element!(ArrayPtr, ArrayPtrRef, ArrayPtrMut);
+macro_rules! register_elements {
+  (emit_impl $elem:ident, $($rest:ident),* $(,)?) => {
+    emit_elem_impl!($elem);
+    register_elements!(emit_impl $($rest),* );
+  };
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum NodeKind {
-  Module,
-  FIFO,
-  Expr,
-  Array,
-  IntImm,
-  Block,
-  ArrayPtr,
-  Unknown,
+  (emit_impl $elem:ident) => {
+    emit_elem_impl!($elem);
+  };
+
+
+  ($($to_register:ident),* $(,)?) => {
+    register_elements!(emit_impl $($to_register),* );
+
+    #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+    pub enum NodeKind {
+      $($to_register,)*
+      Unknown,
+    }
+
+    pub enum Element {
+      $($to_register(Box<$to_register>),)*
+    }
+
+  };
 }
+
+register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct BaseNode {
@@ -202,6 +215,7 @@ pub struct BaseNode {
 pub enum CacheKey {
   IntImm((DataType, u64)),
   ArrayPtr((BaseNode, BaseNode)),
+  Bind(Vec<BaseNode>),
 }
 
 impl BaseNode {
@@ -299,14 +313,4 @@ impl BaseNode {
       }
     }
   }
-}
-
-pub enum Element {
-  Module(Box<Module>),
-  FIFO(Box<FIFO>),
-  Expr(Box<Expr>),
-  Array(Box<Array>),
-  IntImm(Box<IntImm>),
-  Block(Box<Block>),
-  ArrayPtr(Box<ArrayPtr>),
 }

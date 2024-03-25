@@ -1,3 +1,4 @@
+pub mod bind;
 pub mod block;
 pub mod data;
 pub mod expr;
