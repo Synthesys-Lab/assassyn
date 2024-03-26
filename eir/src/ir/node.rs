@@ -191,7 +191,7 @@ macro_rules! register_elements {
   ($($to_register:ident),* $(,)?) => {
     register_elements!(emit_impl $($to_register),* );
 
-    #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+    #[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
     pub enum NodeKind {
       $($to_register,)*
       Unknown,
@@ -206,7 +206,7 @@ macro_rules! register_elements {
 
 register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, Bind);
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
 pub struct BaseNode {
   kind: NodeKind,
   key: usize,
