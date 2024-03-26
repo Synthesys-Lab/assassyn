@@ -613,6 +613,14 @@ impl SysBuilder {
     res
   }
 
+  /// Create a FIFO peek operation. This is similar to pop, but does not remove the value from the
+  /// FIFO.
+  pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
+    let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
+    let res = self.create_expr(ty, Opcode::FIFOPeek, vec![fifo]);
+    res
+  }
+
   /// The helper function to generate a unique identifier.
   ///
   /// # Arguments

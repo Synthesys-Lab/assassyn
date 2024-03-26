@@ -53,7 +53,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     // Destination module
     let dest_module = mutator.get().get_operand(1).unwrap().clone();
     let module_signature = dest_module.get_dtype(mutator.sys).unwrap();
-    let ports = match module_signature {
+    let mut ports = match module_signature {
       DataType::Module(ports) => ports
         .into_iter()
         .enumerate()
@@ -61,6 +61,20 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       _ => panic!("Destination module is not a module"),
     }
     .collect::<Vec<_>>();
+    let handle_tuple = {
+      let lock_handle = lock_handle.as_ref::<ArrayPtr>(mutator.sys).unwrap();
+      match lock_handle.get_idx().get_kind() {
+        NodeKind::IntImm => None,
+        _ => Some((
+          lock_handle.get_array().clone(),
+          lock_handle.get_idx().clone(),
+        )),
+      }
+    };
+    // If a[i]'s i is NOT a constant, we need to push it to the agent module.
+    if let Some((_, idx)) = &handle_tuple {
+      ports.insert(0, PortInfo::new("idx", idx.get_dtype(mutator.sys).unwrap()));
+    }
     // Find the data to this module
     let agent = mutator
       .sys
@@ -84,24 +98,22 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       .port_iter()
       .map(|x| x.upcast())
       .collect::<Vec<_>>();
-    let cond = mutator.sys.create_array_read(lock_handle);
+    let cond = if let Some((array, _)) = &handle_tuple {
+      let idx_port = agent_ports.get(0).unwrap().clone();
+      let new_idx = mutator.sys.create_fifo_peek(idx_port);
+      let new_handle = mutator.sys.create_array_ptr(array.clone(), new_idx);
+      mutator.sys.create_array_read(new_handle)
+    } else {
+      mutator.sys.create_array_read(lock_handle)
+    };
     let block = mutator.sys.create_block(Some(cond.clone()));
     mutator.sys.set_current_block(block.clone());
     let mut bind = mutator.sys.get_init_bind(dest_module.clone());
-    for elem in agent_ports.iter() {
-      eprintln!(
-        "Value: {}",
-        crate::ir::ir_printer::IRPrinter::new(mutator.sys)
-          .dispatch(mutator.sys, &elem, vec![])
-          .unwrap()
-      );
+    for (i, elem) in agent_ports.iter().enumerate() {
       let value = mutator.sys.create_fifo_pop(elem.clone(), None);
-      eprintln!(
-        "Value: {}",
-        crate::ir::ir_printer::IRPrinter::new(mutator.sys)
-          .dispatch(mutator.sys, &value, vec![])
-          .unwrap()
-      );
+      if i == 0 && handle_tuple.is_some() {
+        continue;
+      }
       bind = mutator.sys.push_bind(bind, value);
     }
     mutator.sys.create_trigger_bound(bind);

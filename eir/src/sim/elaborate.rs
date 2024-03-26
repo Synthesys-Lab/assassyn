@@ -225,6 +225,14 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap();
           format!("inputs.{}.pop_front().unwrap()", fifo.idx())
         }
+        Opcode::FIFOPeek => {
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          format!("inputs.{}.first().unwrap()", fifo.idx())
+        }
         Opcode::FIFOPush => {
           let value = dump_ref!(self.sys, expr.get_operand(2).unwrap());
           let fifo_idx = expr

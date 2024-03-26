@@ -230,6 +230,21 @@ impl Visitor<String> for IRPrinter<'_> {
           let fifo_name = fifo.get_name();
           format!("_{} = {}.{}.pop()", expr.get_key(), module_name, fifo_name)
         }
+        Opcode::FIFOPeek => {
+          // TODO(@were): Support multiple peek.
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          let module_name = {
+            let parent = fifo.get_parent();
+            let module = parent.as_ref::<Module>(self.sys).unwrap();
+            module.get_name().to_string()
+          };
+          let fifo_name = fifo.get_name();
+          format!("_{} = {}.{}.peek()", expr.get_key(), module_name, fifo_name)
+        }
         Opcode::FIFOPush => {
           let module_name = expr.get_operand(0).unwrap().to_string(self.sys);
           let fifo_idx = expr
