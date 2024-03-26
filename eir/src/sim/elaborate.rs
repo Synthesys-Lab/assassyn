@@ -231,7 +231,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
-          format!("inputs.{}.first().unwrap()", fifo.idx())
+          format!("*inputs.{}.front().unwrap()", fifo.idx())
         }
         Opcode::FIFOPush => {
           let value = dump_ref!(self.sys, expr.get_operand(2).unwrap());

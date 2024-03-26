@@ -161,7 +161,7 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   let idx: proc_macro2::TokenStream = emit_parsed_expr(&aa.idx)?.into();
   Ok(
     quote! {{
-      let idx = #idx;
+      let idx = #idx.clone();
       sys.create_array_ptr(#id.clone(), idx)
     }}
     .into(),
