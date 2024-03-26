@@ -46,7 +46,7 @@ fn testit(fname: &str, mut sys: SysBuilder) {
 }
 
 #[test]
-fn spin_trigger() {
+fn reg_handle() {
   let sugar_sys = syntactical_sugar();
   println!("{}", sugar_sys);
   testit("spin_sugar", sugar_sys);
