@@ -168,7 +168,11 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   )
 }
 
-pub(crate) fn emit_args(func: &syn::Ident, args: &FuncArgs) -> proc_macro2::TokenStream {
+pub(crate) fn emit_args(
+  func: &syn::Ident,
+  args: &FuncArgs,
+  eager: bool,
+) -> proc_macro2::TokenStream {
   let bind = match args {
     FuncArgs::Bound(binds) => binds
       .iter()
@@ -177,7 +181,7 @@ pub(crate) fn emit_args(func: &syn::Ident, args: &FuncArgs) -> proc_macro2::Toke
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
-          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value);
+          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, #eager);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -188,7 +192,7 @@ pub(crate) fn emit_args(func: &syn::Ident, args: &FuncArgs) -> proc_macro2::Toke
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
-          let bind = sys.push_bind(bind, value);
+          let bind = sys.push_bind(bind, value, #eager);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -239,17 +243,17 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
             sys.create_self_trigger();
           }}
         } else {
-          let args = emit_args(func, args);
+          let args = emit_args(func, args, false);
           quote! {{
             #args;
             sys.create_trigger_bound(bind);
           }}
         }
       }
-      Instruction::Bind((id, call)) => {
+      Instruction::Bind((id, call, eager)) => {
         let func = &call.func;
         let args = &call.args;
-        let args = emit_args(func, args);
+        let args = emit_args(func, args, eager);
         quote!(
           let #id = {
             #args;
@@ -259,7 +263,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
       }
       Instruction::SpinCall((lock, call)) => {
         let func = &call.func;
-        let args = emit_args(func, &call.args);
+        let args = emit_args(func, &call.args, false);
         let emitted_lock = emit_array_access(lock)?;
         quote! {{
           #args

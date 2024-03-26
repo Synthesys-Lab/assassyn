@@ -36,7 +36,7 @@ pub(crate) enum Instruction {
   ArrayAssign((ArrayAccess, syn::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
   AsyncCall(FuncCall),
-  Bind((syn::Ident, FuncCall)),
+  Bind((syn::Ident, FuncCall, bool)),
   SpinCall((ArrayAccess, FuncCall)),
   When((syn::Ident, Box<Body>)),
 }

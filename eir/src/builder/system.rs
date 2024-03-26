@@ -451,18 +451,29 @@ impl SysBuilder {
         assert_eq!(ty, Opcode::FIFOPop);
         self.insert_element(Bind::new(node, HashMap::new(), BindKind::Sequential))
       }
-      _ => panic!("Either a Module or a Bind is expected, but {:?} got!", node),
+      _ => panic!(
+        "[Bind Init] Either a Module or a Bind is expected, but {:?} got!",
+        node
+      ),
     }
   }
 
   /// Add a bind to the current module.
-  pub fn add_bind(&mut self, bind: BaseNode, key: String, value: BaseNode) -> BaseNode {
+  pub fn add_bind(
+    &mut self,
+    bind: BaseNode,
+    key: String,
+    value: BaseNode,
+    eager: bool,
+  ) -> BaseNode {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
     assert!(bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::KVBind);
     assert!(!bind.get_bound().contains_key(&key));
     let module = bind.get_callee().as_ref::<Module>(self).unwrap();
-    let port = module.get_input_by_name(&key).unwrap();
+    let port = module
+      .get_input_by_name(&key)
+      .expect(format!("{} is NOT a FIFO of {}", key, module.get_name()).as_str());
     assert_eq!(port.scalar_ty(), value.get_dtype(self).unwrap());
     let port_idx = port.idx();
     let module = module.upcast();
@@ -471,11 +482,15 @@ impl SysBuilder {
     bind.set_kind(BindKind::KVBind);
     let bound = bind.get_bound_mut();
     bound.insert(key, fifo_push);
-    res
+    if eager && res.as_ref::<Bind>(self).unwrap().full() {
+      self.create_trigger_bound(res)
+    } else {
+      res
+    }
   }
 
   /// Add a bind to the current module.
-  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode) -> BaseNode {
+  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: bool) -> BaseNode {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
     let signature = bind.get_callee_signature();
@@ -500,7 +515,11 @@ impl SysBuilder {
     bind_mut.set_kind(BindKind::Sequential);
     let bound = bind_mut.get_bound_mut();
     bound.insert(port_idx.to_string(), fifo_push);
-    res
+    if eager && res.as_ref::<Bind>(self).unwrap().full() {
+      self.create_trigger_bound(res)
+    } else {
+      res
+    }
   }
 
   /// A helper function to create a FIFO push.

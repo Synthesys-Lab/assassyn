@@ -136,11 +136,11 @@ impl Parse for node::Body {
                       stmts.push(node::Instruction::ArrayAlloc((id, ty, size)));
                     }
                     // <id> = bind <func-id> { <id>: <expr> }; a partial function call
-                    "bind" => {
-                      eprintln!("bind");
+                    "bind" | "eager_bind" => {
                       content.parse::<syn::Ident>()?; // bind
                       let bind = content.parse::<FuncCall>()?;
-                      stmts.push(node::Instruction::Bind((id, bind)));
+                      let eager = look.to_string().as_str().eq("eager_bind");
+                      stmts.push(node::Instruction::Bind((id, bind, eager)));
                     }
                     _ => {
                       // fall back to normal assignment
