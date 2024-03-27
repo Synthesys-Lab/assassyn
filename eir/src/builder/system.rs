@@ -493,6 +493,7 @@ impl SysBuilder {
   pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: bool) -> BaseNode {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
+    assert!(!bind.full());
     let signature = bind.get_callee_signature();
     let callee = bind.get_callee();
     assert!(

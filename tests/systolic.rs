@@ -81,15 +81,16 @@ fn systolic_array() {
   }.expose[bound]);
 
   // pripheral module to initialize the first row.
-  module_builder!(entry_controller[][pusher, next_lock] {
+  module_builder!(entry_controller[data: int<32>][pusher, next_lock] {
     lock = array(int<1>, 1);
     lv = lock[0];
-    when lv {
-      async self {};
-    }
     nlv = lv.flip();
     when nlv {
-      async pusher(0.int<32>);
+      async self {};
+    }
+    when lv {
+      data = data.pop();
+      async pusher(data);
       next_lock[0] = nlv;
     }
   }.expose[lock]);
@@ -103,20 +104,26 @@ fn systolic_array() {
       pe_array[i][j + 1].bound = feast;
       pe_array[i][j].accumulator = acc;
     }
-    let (pusher_pe, bound) = data_pusher_builder(&mut sys, pe_array[i][1].bound);
+    let (pusher_pe, bound) = data_pusher_builder(&mut sys, pe_array[i][1].pe);
     pe_array[i][0].pe = pusher_pe;
     pe_array[i][1].bound = bound;
+  }
+
+  for i in 1..=4 {
+    let (pusher_pe, bound) = data_pusher_builder(&mut sys, pe_array[1][i].pe);
+    pe_array[0][i].pe = pusher_pe;
+    pe_array[1][i].bound = bound;
   }
 
   let mut row_ctrls = [EntryController::new(BaseNode::unknown(), BaseNode::unknown()); 6];
   let mut col_ctrls = [EntryController::new(BaseNode::unknown(), BaseNode::unknown()); 6];
 
   row_ctrls[5].lock_reg = sys.create_array(eir::frontend::DataType::Int(1), "dummy.sentinel", 1);
-  col_ctrls[5].lock_reg = col_ctrls[5].lock_reg;
+  col_ctrls[5].lock_reg = row_ctrls[5].lock_reg;
 
   for i in (1..=4).rev() {
     let (controller, lock) =
-      entry_controller_builder(&mut sys, pe_array[0][i].pe, row_ctrls[i + 1].lock_reg);
+      entry_controller_builder(&mut sys, pe_array[i][0].pe, row_ctrls[i + 1].lock_reg);
     row_ctrls[i].controller = controller;
     row_ctrls[i].lock_reg = lock;
 
@@ -128,7 +135,7 @@ fn systolic_array() {
 
   // row [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
   // col [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]]
-  module_builder!(driver[][row1, row2, row3, row4, col1, col2, col3, col4] {
+  module_builder!(driver[][row1, row2, row3, row4, row_lock, col1, col2, col3, col4, col_lock] {
     cnt = array(int<32>, 1);
     v = cnt[0];
     new_v = v.add(1);
@@ -138,6 +145,8 @@ fn systolic_array() {
     // before 4, feed the data.
     when lt4 {
       async row1(v);
+      row_lock[0] = lt4;
+      col_lock[0] = lt4;
       v1 = v.add(1);
       async row2(v1);
       v2 = v1.add(1);
@@ -168,10 +177,12 @@ fn systolic_array() {
     row_ctrls[2].controller,
     row_ctrls[3].controller,
     row_ctrls[4].controller,
+    row_ctrls[1].lock_reg,
     col_ctrls[1].controller,
     col_ctrls[2].controller,
     col_ctrls[3].controller,
     col_ctrls[4].controller,
+    col_ctrls[1].lock_reg,
   );
 
   eprintln!("{}", sys);
