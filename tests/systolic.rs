@@ -1,5 +1,8 @@
 use eda4eda::module_builder;
-use eir::frontend::{BaseNode, SysBuilder};
+use eir::{
+  frontend::{BaseNode, SysBuilder},
+  test_utils,
+};
 
 #[derive(Debug, Clone, Copy)]
 struct ProcElem {
@@ -186,4 +189,16 @@ fn systolic_array() {
   );
 
   eprintln!("{}", sys);
+
+  let src_name = test_utils::temp_dir(&"systolic.rs".to_string());
+  let config = eir::sim::Config {
+    fname: src_name,
+    sim_threshold: 200,
+    idle_threshold: 200,
+  };
+
+  eir::sim::elaborate(&sys, &config).unwrap();
+
+  let exec_name = test_utils::temp_dir(&"systolic".to_string());
+  test_utils::compile(&config.fname, &exec_name);
 }
