@@ -1,6 +1,38 @@
 use eda4eda::module_builder;
 use eir::frontend::{BaseNode, SysBuilder};
 
+#[derive(Debug, Clone, Copy)]
+struct ProcElem {
+  pe: BaseNode,
+  bound: BaseNode,
+  accumulator: BaseNode,
+}
+
+impl ProcElem {
+  fn new(pe: BaseNode, bound: BaseNode, accumulator: BaseNode) -> Self {
+    Self {
+      pe,
+      bound,
+      accumulator,
+    }
+  }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EntryController {
+  lock_reg: BaseNode,
+  controller: BaseNode,
+}
+
+impl EntryController {
+  fn new(lock_reg: BaseNode, controller: BaseNode) -> Self {
+    Self {
+      lock_reg,
+      controller,
+    }
+  }
+}
+
 #[test]
 fn systolic_array() {
   module_builder!(
@@ -18,24 +50,38 @@ fn systolic_array() {
   );
 
   let mut sys = SysBuilder::new("systolic_array");
-  let mut pe_array = [[(
+  let mut pe_array = [[ProcElem::new(
     BaseNode::unknown(),
     BaseNode::unknown(),
     BaseNode::unknown(),
   ); 6]; 6];
 
+  // # PE Array (1 + 4 + 1) x (1 + 4 + 1)
+  //                [Data Pusher] [Data Pusher] [Data Pusher] [Data Pusher]
+  // [Data Pusher]  [Compute PE]  [Compute PE]  [Compute PE]  [Compute PE]  [Sink]
+  // [Data Pusher]  [Compute PE]  [Compute PE]  [Compute PE]  [Compute PE]  [Sink]
+  // [Data Pusher]  [Compute PE]  [Compute PE]  [Compute PE]  [Compute PE]  [Sink]
+  // [Data Pusher]  [Compute PE]  [Compute PE]  [Compute PE]  [Compute PE]  [Sink]
+  //                [Sink]        [Sink]        [Sink]        [Sink]
+
+  // Sink Sentinels
   module_builder!(sink[v:int<32>][] { _v = v.pop(); });
   (1..=4).for_each(|i| {
-    pe_array[i][5].0 = sink_builder(&mut sys);
-    pe_array[i][5].1 = pe_array[i][5].0;
+    pe_array[i][5].pe = sink_builder(&mut sys);
+    pe_array[i][5].bound = pe_array[i][5].pe;
   });
   (1..=4).for_each(|i| {
-    pe_array[5][i].0 = sink_builder(&mut sys);
-    pe_array[5][i].1 = pe_array[5][i].0;
+    pe_array[5][i].pe = sink_builder(&mut sys);
+    pe_array[5][i].bound = pe_array[5][i].pe;
   });
 
+  module_builder!(data_pusher[data: int<32>][dest] {
+    data = data.pop();
+    bound = eager_bind dest(data);
+  }.expose[bound]);
+
   // pripheral module to initialize the first row.
-  module_builder!(entry_controller[][pe, next_lock] {
+  module_builder!(entry_controller[][pusher, next_lock] {
     lock = array(int<1>, 1);
     lv = lock[0];
     when lv {
@@ -43,31 +89,41 @@ fn systolic_array() {
     }
     nlv = lv.flip();
     when nlv {
-      init = eager_bind pe(0.int<32>);
+      async pusher(0.int<32>);
       next_lock[0] = nlv;
     }
-  }.expose[init, lock]);
+  }.expose[lock]);
 
   for i in (1..=4).rev() {
     for j in (1..=4).rev() {
-      let (peeast, _feast, _array) = pe_array[i][j + 1];
-      let (_pesouth, fsouth, _array) = pe_array[i + 1][j];
+      let peeast = pe_array[i][j + 1].pe;
+      let fsouth = pe_array[i + 1][j].bound;
       let (pe, feast, acc) = pe_builder(&mut sys, peeast, fsouth);
-      pe_array[i][j] = (pe, pe_array[i][j].1, acc);
-      pe_array[i][j + 1].1 = feast;
+      pe_array[i][j].pe = pe;
+      pe_array[i][j + 1].bound = feast;
+      pe_array[i][j].accumulator = acc;
     }
-    let (init_pe, bound, lock) =
-      entry_controller_builder(&mut sys, pe_array[i][1].0, pe_array[i + 1][1].2);
-    pe_array[i][0].0 = init_pe;
-    pe_array[i][1].1 = bound;
-    pe_array[i][1].0 = init_pe;
+    let (pusher_pe, bound) = data_pusher_builder(&mut sys, pe_array[i][1].bound);
+    pe_array[i][0].pe = pusher_pe;
+    pe_array[i][1].bound = bound;
   }
 
+  let mut row_ctrls = [EntryController::new(BaseNode::unknown(), BaseNode::unknown()); 6];
+  let mut col_ctrls = [EntryController::new(BaseNode::unknown(), BaseNode::unknown()); 6];
+
+  row_ctrls[5].lock_reg = sys.create_array(eir::frontend::DataType::Int(1), "dummy.sentinel", 1);
+  col_ctrls[5].lock_reg = col_ctrls[5].lock_reg;
+
   for i in (1..=4).rev() {
-    let (init_pe, bound, lock) =
-      entry_controller_builder(&mut sys, pe_array[1][i].0, pe_array[1][i + 1].2);
-    pe_array[0][i].0 = init_pe;
-    pe_array[1][i].1 = bound;
+    let (controller, lock) =
+      entry_controller_builder(&mut sys, pe_array[0][i].pe, row_ctrls[i + 1].lock_reg);
+    row_ctrls[i].controller = controller;
+    row_ctrls[i].lock_reg = lock;
+
+    let (controller, lock) =
+      entry_controller_builder(&mut sys, pe_array[0][i].pe, col_ctrls[i + 1].lock_reg);
+    col_ctrls[i].controller = controller;
+    col_ctrls[i].lock_reg = lock;
   }
 
   // row [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
@@ -105,6 +161,18 @@ fn systolic_array() {
       async col4(0.int<32>);
     }
   });
+
+  driver_builder(
+    &mut sys,
+    row_ctrls[1].controller,
+    row_ctrls[2].controller,
+    row_ctrls[3].controller,
+    row_ctrls[4].controller,
+    col_ctrls[1].controller,
+    col_ctrls[2].controller,
+    col_ctrls[3].controller,
+    col_ctrls[4].controller,
+  );
 
   eprintln!("{}", sys);
 }
