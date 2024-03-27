@@ -114,7 +114,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       if i == 0 && handle_tuple.is_some() {
         continue;
       }
-      bind = mutator.sys.push_bind(bind, value);
+      bind = mutator.sys.push_bind(bind, value, false);
     }
     mutator.sys.create_trigger_bound(bind);
     mutator.sys.set_insert_before(block);

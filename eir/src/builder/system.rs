@@ -501,8 +501,6 @@ impl SysBuilder {
     let port_idx = bind.get_bound().len();
     match &signature {
       DataType::Module(ports) => {
-        eprintln!("Checking {} value types", port_idx);
-        eprintln!("{:?}", value);
         assert_eq!(
           ports.get(port_idx).unwrap().as_ref().clone(),
           value.get_dtype(self).unwrap(),

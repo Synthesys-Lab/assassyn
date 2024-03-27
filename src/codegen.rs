@@ -253,7 +253,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
       Instruction::Bind((id, call, eager)) => {
         let func = &call.func;
         let args = &call.args;
-        let args = emit_args(func, args, eager);
+        let args = emit_args(func, args, *eager);
         quote!(
           let #id = {
             #args;
