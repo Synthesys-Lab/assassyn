@@ -279,18 +279,6 @@ impl Visitor<String> for IRPrinter<'_> {
             fifo_name,
           )
         }
-        Opcode::CallbackTrigger => {
-          let mut res = format!(
-            "async call ({})(",
-            expr.get_operand(0).unwrap().to_string(self.sys),
-          );
-          for op in expr.operand_iter().skip(1) {
-            res.push_str(op.to_string(self.sys).as_str());
-            res.push_str(", ");
-          }
-          res.push(')');
-          res
-        }
         Opcode::Log => {
           let mut res = format!("log(");
           for op in expr.operand_iter() {
