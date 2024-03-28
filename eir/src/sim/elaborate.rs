@@ -255,7 +255,9 @@ impl Visitor<String> for ElaborateModule<'_> {
           }
         }
         Opcode::Log => {
-          let mut res = String::from("println!(");
+          let mut res = String::new();
+          res.push_str("print!(\"@line:{:<5} {}:   \", line!(), cyclize(stamp));");
+          res.push_str("println!(");
           for elem in expr.operand_iter() {
             res.push_str(format!("{}, ", dump_ref!(self.sys, elem)).as_str());
           }
@@ -563,14 +565,14 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
         )
         .as_bytes(),
       )?;
-      fd.write(
-        format!(
-          "        println!(\"@line:{{:<6}} {{}}: Commit FIFO {}.{} push {{:?}}\", line!(), cyclize(event.0.stamp), value);\n",
-          namify(module.get_name()),
-          namify(port.get_name())
-        )
-        .as_bytes(),
-      )?;
+      // fd.write(
+      //   format!(
+      //     "        println!(\"@line:{{:<6}} {{}}: Commit FIFO {}.{} push {{:?}}\", line!(), cyclize(event.0.stamp), value);\n",
+      //     namify(module.get_name()),
+      //     namify(port.get_name())
+      //   )
+      //   .as_bytes(),
+      // )?;
       fd.write(
         format!(
           "        {}_fifos.{}.push_back(value);\n",
@@ -590,13 +592,13 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )
       .as_bytes(),
     )?;
-    fd.write(
-      format!(
-        "        println!(\"@line:{{:<6}} {{}}: Commit array {} write {{}}\", line!(), cyclize(event.0.stamp), value);\n",
-        namify(array.get_name())
-      )
-      .as_bytes(),
-    )?;
+    // fd.write(
+    //   format!(
+    //     "        println!(\"@line:{{:<6}} {{}}: Commit array {} write {{}}\", line!(), cyclize(event.0.stamp), value);\n",
+    //     namify(array.get_name())
+    //   )
+    //   .as_bytes(),
+    // )?;
     fd.write(format!("        {}[idx] = value;\n", namify(array.get_name())).as_bytes())?;
     fd.write("      }\n".as_bytes())?;
   }
