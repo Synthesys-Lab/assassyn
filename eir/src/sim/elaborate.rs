@@ -133,13 +133,13 @@ impl Visitor<String> for ElaborateModule<'_> {
       res.push_str(format!("{} // external interface\n", array_str).as_str());
     }
     res.push_str(") {\n");
-    // res.push_str(
-    //   format!(
-    //     "  println!(\"@line:{{:<6}} {{}}: Simulating module {}\", line!(), cyclize(stamp));\n",
-    //     namify(module.get_name())
-    //   )
-    //   .as_str(),
-    // );
+    res.push_str(
+      format!(
+        "  println!(\"@line:{{:<6}} {{}}: Simulating module {}\", line!(), cyclize(stamp));\n",
+        namify(module.get_name())
+      )
+      .as_str(),
+    );
     self.indent += 2;
     for elem in module.get_body().iter() {
       match elem.get_kind() {

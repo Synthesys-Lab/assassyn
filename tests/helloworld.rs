@@ -27,6 +27,7 @@ fn helloworld() {
   let raw = String::from_utf8(output.stdout)
     .unwrap()
     .lines()
+    .skip(1)
     .next()
     .unwrap()
     .to_string();
