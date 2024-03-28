@@ -313,6 +313,12 @@ impl SysBuilder {
     key
   }
 
+  pub fn get_str_literal(&mut self, value: String) -> BaseNode {
+    let instance = StrImm::new(value);
+    let key = self.insert_element(instance);
+    key
+  }
+
   /// The helper function to create a handle to an array access.
   ///
   /// # Arguments
@@ -333,6 +339,12 @@ impl SysBuilder {
     let key = self.insert_element(instance);
     self.cached_nodes.insert(cached_key, key.clone());
     key
+  }
+
+  pub fn create_log(&mut self, fmt: BaseNode, mut args: Vec<BaseNode>) -> BaseNode {
+    assert_eq!(fmt.get_kind(), NodeKind::StrImm);
+    args.insert(0, fmt);
+    self.create_expr(DataType::void(), Opcode::Log, args)
   }
 
   /// The helper function to create an expression.

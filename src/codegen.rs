@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::{quote, ToTokens};
 use syn::{parse::Parse, spanned::Spanned};
 
@@ -62,7 +63,7 @@ impl Parse for EmitIDOrConst {
   }
 }
 
-pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<TokenStream> {
+pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
     syn::Expr::MethodCall(method) => {
       let receiver = method.receiver.clone();
@@ -131,6 +132,20 @@ pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<TokenStream> {
         }
       }
     }
+    syn::Expr::Lit(lit) => match &lit.lit {
+      syn::Lit::Str(str_lit) => {
+        let value = str_lit.value();
+        Ok(quote! {
+          sys.get_str_literal(#value.to_string())
+        })
+      }
+      _ => {
+        return Err(syn::Error::new(
+          lit.span(),
+          format!("[CG.Lit] Not supported: {}", quote!(#lit)),
+        ));
+      }
+    },
     syn::Expr::Path(path) => {
       let id = syn::parse::<syn::Ident>(path.to_token_stream().into())?;
       Ok(quote!(#id.clone()).into())
@@ -304,6 +319,29 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           let ip = sys.get_current_ip();
           let ip = ip.next(sys).expect("[When] No next ip");
           sys.set_current_ip(ip);
+        }}
+      }
+      Instruction::Log(args) => {
+        let args = args
+          .iter()
+          .map(|x| emit_expr_body(x))
+          .collect::<Result<Vec<_>, _>>()?;
+        let reassign = args
+          .iter()
+          .enumerate()
+          .map(|(i, x)| {
+            let id = syn::Ident::new(&format!("_{}", i), Span::call_site());
+            quote! { let #id = #x; }
+          })
+          .collect::<Vec<_>>();
+        let ids = (0..args.len())
+          .map(|i| syn::Ident::new(&format!("_{}", i), Span::call_site()))
+          .collect::<Vec<_>>();
+        let fmt = ids[0].clone();
+        let rest = ids[1..].iter().map(|x| x.clone()).collect::<Vec<_>>();
+        quote! {{
+          #(#reassign)*
+          sys.create_log(#fmt, vec![#(#rest),*]);
         }}
       }
     }

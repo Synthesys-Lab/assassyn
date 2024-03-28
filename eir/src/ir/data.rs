@@ -105,6 +105,21 @@ pub struct IntImm {
   value: u64,
 }
 
+pub struct StrImm {
+  pub(crate) key: usize,
+  value: String,
+}
+
+impl StrImm {
+  pub fn new(value: String) -> Self {
+    Self { key: 0, value }
+  }
+
+  pub fn get_value(&self) -> &str {
+    self.value.as_str()
+  }
+}
+
 impl Typed for IntImm {
   fn dtype(&self) -> DataType {
     self.dtype.clone()

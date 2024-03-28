@@ -139,6 +139,11 @@ impl Visitor<String> for IRPrinter<'_> {
     res.into()
   }
 
+  fn visit_string_imm(&mut self, str_imm: &StrImmRef<'_>) -> Option<String> {
+    let value = str_imm.get_value();
+    quote::quote!(#value).to_string().into()
+  }
+
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
     let mnem = expr.get_opcode().to_string();
     let res = if expr.get_opcode().is_binary() {
@@ -280,6 +285,15 @@ impl Visitor<String> for IRPrinter<'_> {
             expr.get_operand(0).unwrap().to_string(self.sys),
           );
           for op in expr.operand_iter().skip(1) {
+            res.push_str(op.to_string(self.sys).as_str());
+            res.push_str(", ");
+          }
+          res.push(')');
+          res
+        }
+        Opcode::Log => {
+          let mut res = format!("log(");
+          for op in expr.operand_iter() {
             res.push_str(op.to_string(self.sys).as_str());
             res.push_str(", ");
           }

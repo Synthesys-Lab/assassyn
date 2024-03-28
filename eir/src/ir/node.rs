@@ -204,7 +204,7 @@ macro_rules! register_elements {
   };
 }
 
-register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, Bind);
+register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, Bind, StrImm);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
 pub struct BaseNode {
@@ -242,7 +242,6 @@ impl BaseNode {
         let module = self.as_ref::<Module>(sys).unwrap();
         module.dtype().clone().into()
       }
-      NodeKind::Array => None,
       NodeKind::IntImm => {
         let int_imm = self.as_ref::<IntImm>(sys).unwrap();
         int_imm.dtype().clone().into()
@@ -256,6 +255,8 @@ impl BaseNode {
         expr.dtype().clone().into()
       }
       NodeKind::Block | NodeKind::ArrayPtr | NodeKind::Bind => None,
+      NodeKind::StrImm => None,
+      NodeKind::Array => None,
       NodeKind::Unknown => {
         panic!("Unknown reference")
       }
@@ -267,6 +268,7 @@ impl BaseNode {
       NodeKind::Module => None,
       NodeKind::Array => None,
       NodeKind::IntImm => None,
+      NodeKind::StrImm => None,
       NodeKind::ArrayPtr => None,
       NodeKind::Bind => None,
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
@@ -321,6 +323,10 @@ impl BaseNode {
       }
       NodeKind::Bind => {
         panic!("Bind should not be printed")
+      }
+      NodeKind::StrImm => {
+        let str_imm = self.as_ref::<StrImm>(sys).unwrap();
+        format!("\"{}\"", str_imm.get_value())
       }
     }
   }

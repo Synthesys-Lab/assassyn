@@ -105,6 +105,13 @@ impl Parse for node::Body {
             let call = content.parse::<node::FuncCall>()?;
             stmts.push(node::Instruction::SpinCall((lock, call)));
           }
+          "log" => {
+            content.parse::<syn::Ident>()?; // log
+            let args;
+            parenthesized!(args in content);
+            let args = args.parse_terminated(syn::Expr::parse, syn::Token![,])?;
+            stmts.push(node::Instruction::Log(args.into_iter().collect::<Vec<_>>()));
+          }
           _ => {
             // Parse non-keyword-leading statements
             if content.peek2(syn::token::Bracket) {
