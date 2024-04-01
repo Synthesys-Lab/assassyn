@@ -92,13 +92,12 @@ fn testit(fname: &str, mut sys: SysBuilder) {
     idle_threshold: 200,
   };
   eir::xform::basic(&mut sys);
-  println!("{}", sys);
+  // println!("{}", sys);
   eir::sim::elaborate(&sys, &config).unwrap();
   let exec_name = test_utils::temp_dir(&fname.to_string());
   test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
   let raw = test_utils::run(&exec_name);
-  println!("{}", String::from_utf8(raw.stdout.clone()).unwrap());
   String::from_utf8(raw.stdout)
     .unwrap()
     .lines()

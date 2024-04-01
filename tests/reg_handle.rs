@@ -4,7 +4,7 @@ use eir::test_utils;
 
 module_builder!(
   squarer[a:int<32>][] {
-    a  = a.pop();
+    a = a.pop();
     b = a.mul(a);
     log("squarer: {}", b);
   }
@@ -21,8 +21,8 @@ fn syntactical_sugar() -> SysBuilder {
       cnt[0] = v;
       spin lock[is_odd] sqr{ a: v };
       lv = lock[is_odd];
-      log("lock[{}] = {}", is_odd, lv);
       flipped = lv.flip();
+      log("lock[{}] = {}", is_odd, flipped);
       lock[is_odd] = flipped;
     }
   );
@@ -46,7 +46,24 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
   let output = test_utils::run(&exec_name);
-  println!("{}", String::from_utf8(output.stdout).unwrap());
+  String::from_utf8(output.stdout)
+    .unwrap()
+    .lines()
+    .for_each(|line| {
+      if line.contains("squarer") {
+        // Cycle:   0 1 2 3 4 5 6 7 8 9 10
+        // lock[0]: 0 1 1 0 0 1 1 0 0 1 1
+        // lock[1]: 0 0 1 1 0 0 1 1 0 0 1
+        // trigger: x 0 1 0 1 0 1 0 1 0 1
+        // if lock[trigger[cycle - 1]] = 1 then we should have a squarer
+        let toks = line.split_whitespace().collect::<Vec<_>>();
+        let len = toks[2].len();
+        let cycle = toks[2][1..len - 4].parse::<i32>().unwrap();
+        let lock = [cycle / 2 % 2, (cycle - 1) / 2 % 2];
+        let idx = cycle & 1;
+        assert!(lock[idx as usize] != 0);
+      }
+    });
 }
 
 #[test]

@@ -100,7 +100,12 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       bundle_mut.set_operand(0, agent);
     }
     if let Some((_, idx_value)) = &handle_tuple {
-      let port_idx = bundle.len();
+      let port_idx = agent
+        .as_ref::<Module>(mutator.sys)
+        .unwrap()
+        .get_num_inputs()
+        - 1;
+      assert_eq!(port_idx, bundle.len() - 1);
       let push_handle = mutator
         .sys
         .create_fifo_push(agent, port_idx, idx_value.clone());

@@ -262,7 +262,15 @@ impl Visitor<String> for IRPrinter<'_> {
           let fifo_name = if let Ok(module) = module.as_ref::<Module>(self.sys) {
             let fifo = module
               .get_input(idx as usize)
-              .unwrap()
+              .expect(
+                format!(
+                  "exceed the number of fifos {} > ({} - 1) of module {}",
+                  idx,
+                  module.get_num_inputs(),
+                  module.get_name(),
+                )
+                .as_str(),
+              )
               .as_ref::<FIFO>(self.sys)
               .unwrap();
             fifo.get_name().clone()
