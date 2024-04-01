@@ -5,7 +5,8 @@ use eir::test_utils;
 module_builder!(
   squarer[a:int<32>][] {
     a  = a.pop();
-    _b = a.mul(a);
+    b = a.mul(a);
+    log("squarer: {}", b);
   }
 );
 
@@ -20,6 +21,7 @@ fn syntactical_sugar() -> SysBuilder {
       cnt[0] = v;
       spin lock[is_odd] sqr{ a: v };
       lv = lock[is_odd];
+      log("lock[{}] = {}", is_odd, lv);
       flipped = lv.flip();
       lock[is_odd] = flipped;
     }
@@ -44,11 +46,12 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
   let output = test_utils::run(&exec_name);
+  println!("{}", String::from_utf8(output.stdout).unwrap());
 }
 
 #[test]
 fn reg_handle() {
   let sugar_sys = syntactical_sugar();
   println!("{}", sugar_sys);
-  testit("spin_sugar", sugar_sys);
+  testit("reg_handle", sugar_sys);
 }

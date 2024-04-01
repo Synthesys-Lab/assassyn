@@ -72,22 +72,40 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       }
     };
     // If a[i]'s i is NOT a constant, we need to push it to the agent module.
+    // Here we expose the interface in the module signature.
     if let Some((_, idx)) = &handle_tuple {
-      ports.insert(0, PortInfo::new("idx", idx.get_dtype(mutator.sys).unwrap()));
+      ports.push(PortInfo::new("idx", idx.get_dtype(mutator.sys).unwrap()));
     }
-    // Find the data to this module
+    // Create the agent module while leaving it blank.
     let agent = mutator
       .sys
       .create_module(format!("{}.async.agent", parent_name).as_str(), ports);
-    // Create trigger to the agent module.
+    // Create the trigger to the agent module.
     mutator.sys.set_current_module(parent);
     mutator.sys.set_insert_before(mutator.get().upcast());
-    let bundle = mutator
+    let mut bundle = mutator
       .get()
       .operand_iter()
       .skip(1)
       .cloned()
       .collect::<Vec<_>>();
+    // Instead of calling the original destination module, we call the agent module.
+    bundle[0] = agent;
+    for i in 1..bundle.len() {
+      // For each FIFO push in our system, it takes `module`, and `idx` as arguments.
+      // Since we no longer call the original module, we just replace the first argument with the
+      // agent module.
+      let mut bundle_mut = bundle[i].as_mut::<Expr>(mutator.sys).unwrap();
+      assert_eq!(bundle_mut.get().get_opcode(), Opcode::FIFOPush);
+      bundle_mut.set_operand(0, agent);
+    }
+    if let Some((_, idx_value)) = &handle_tuple {
+      let port_idx = bundle.len();
+      let push_handle = mutator
+        .sys
+        .create_fifo_push(agent, port_idx, idx_value.clone());
+      bundle.push(push_handle);
+    }
     mutator
       .sys
       .create_expr(DataType::void(), Opcode::Trigger, bundle);
@@ -99,7 +117,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       .map(|x| x.upcast())
       .collect::<Vec<_>>();
     let cond = if let Some((array, _)) = &handle_tuple {
-      let idx_port = agent_ports.get(0).unwrap().clone();
+      let idx_port = agent_ports.last().unwrap().clone();
       let new_idx = mutator.sys.create_fifo_peek(idx_port);
       let new_handle = mutator.sys.create_array_ptr(array.clone(), new_idx);
       mutator.sys.create_array_read(new_handle)
@@ -111,7 +129,7 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     let mut bind = mutator.sys.get_init_bind(dest_module.clone());
     for (i, elem) in agent_ports.iter().enumerate() {
       let value = mutator.sys.create_fifo_pop(elem.clone(), None);
-      if i == 0 && handle_tuple.is_some() {
+      if i == agent_ports.len() - 1 && handle_tuple.is_some() {
         continue;
       }
       bind = mutator.sys.push_bind(bind, value, false);

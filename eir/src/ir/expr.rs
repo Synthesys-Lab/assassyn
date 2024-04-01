@@ -175,4 +175,9 @@ impl ExprMut<'_> {
     let mut block_mut = self.sys.get_mut::<Block>(&parent).unwrap();
     block_mut.erase(&expr);
   }
+
+  pub fn set_operand(&mut self, i: usize, operand: BaseNode) {
+    // TODO(@were): maintain the redundancy.
+    self.get_mut().operands[i] = operand;
+  }
 }

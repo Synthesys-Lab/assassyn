@@ -6,7 +6,7 @@ module_builder!(
   squarer[a:int<32>][] {
     a  = a.pop();
     b = a.mul(a);
-    log("sqr: {}", b);
+    log("squarer: {}", b);
   }
 );
 
@@ -62,7 +62,8 @@ fn syntactical_sugar() -> SysBuilder {
       cnt = array(int<32>, 1);
       lock = array(int<1>, 1);
       v = cnt[0];
-      is_odd = v.bitwise_and(1);
+      and_1 = v.bitwise_and(1);
+      is_odd = and_1.eq(1);
       is_even = is_odd.flip();
       v = v.add(1);
       cnt[0] = v;
@@ -72,6 +73,7 @@ fn syntactical_sugar() -> SysBuilder {
       when is_even {
         lv = lock[0];
         flipped = lv.flip();
+        log("flip to {}", flipped);
         lock[0] = flipped;
       }
     }
@@ -90,11 +92,13 @@ fn testit(fname: &str, mut sys: SysBuilder) {
     idle_threshold: 200,
   };
   eir::xform::basic(&mut sys);
+  println!("{}", sys);
   eir::sim::elaborate(&sys, &config).unwrap();
   let exec_name = test_utils::temp_dir(&fname.to_string());
   test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
   let raw = test_utils::run(&exec_name);
+  println!("{}", String::from_utf8(raw.stdout.clone()).unwrap());
   String::from_utf8(raw.stdout)
     .unwrap()
     .lines()
@@ -103,13 +107,13 @@ fn testit(fname: &str, mut sys: SysBuilder) {
         let toks = l.split_whitespace().collect::<Vec<_>>();
         let len = toks[2].len();
         let cycle = toks[2][1..len - 4].parse::<i32>().unwrap();
-        assert!(cycle % 4 == 1 || cycle % 4 == 2);
+        assert!(cycle % 4 == 1 || cycle % 4 == 2, "agent move on");
       }
       if l.contains("squarer") {
         let toks = l.split_whitespace().collect::<Vec<_>>();
         let len = toks[2].len();
         let cycle = toks[2][1..len - 4].parse::<i32>().unwrap();
-        assert!(cycle % 4 == 2 || cycle % 4 == 3);
+        assert!(cycle % 4 == 2 || cycle % 4 == 3, "{}", l);
       }
     });
 }
@@ -120,6 +124,6 @@ fn spin_trigger() {
   testit("spin_trigger", raw_sys);
 
   let sugar_sys = syntactical_sugar();
-  println!("{}", sugar_sys);
+  // println!("{}", sugar_sys);
   testit("spin_sugar", sugar_sys);
 }
