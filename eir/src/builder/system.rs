@@ -430,6 +430,7 @@ impl SysBuilder {
   create_arith_op_impl!(binary, create_ige, Opcode::IGE);
   create_arith_op_impl!(binary, create_ilt, Opcode::ILT);
   create_arith_op_impl!(binary, create_ile, Opcode::ILE);
+  create_arith_op_impl!(binary, create_eq, Opcode::EQ);
 
   create_arith_op_impl!(unary, create_neg, Opcode::Neg);
   create_arith_op_impl!(unary, create_flip, Opcode::Flip);
@@ -620,7 +621,7 @@ impl SysBuilder {
           bty.to_string()
         ),
       },
-      Opcode::IGT | Opcode::IGE | Opcode::ILT | Opcode::ILE => DataType::uint(1),
+      Opcode::EQ | Opcode::IGT | Opcode::IGE | Opcode::ILT | Opcode::ILE => DataType::uint(1),
       _ => panic!("Unsupported opcode {:?}", op),
     }
   }

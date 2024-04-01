@@ -68,7 +68,7 @@ pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<proc_macro2::Token
     syn::Expr::MethodCall(method) => {
       let receiver = method.receiver.clone();
       match method.method.to_string().as_str() {
-        "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" => {
+        "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" => {
           let method_id = format!("create_{}", method.method.to_string());
           let method_id = syn::Ident::new(&method_id, method.method.span());
           let mut operands = method.args.iter();

@@ -46,6 +46,7 @@ impl Opcode {
       | Opcode::ILT
       | Opcode::IGE
       | Opcode::ILE
+      | Opcode::EQ
       | Opcode::BitwiseAnd
       | Opcode::BitwiseOr
       | Opcode::BitwiseXor => true,

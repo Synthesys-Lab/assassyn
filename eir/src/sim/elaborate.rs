@@ -73,7 +73,7 @@ impl Visitor<String> for NodeRefDumper {
       NodeKind::IntImm => {
         let int_imm = node.as_ref::<IntImm>(sys).unwrap();
         Some(format!(
-          "{} as {}",
+          "({} as {})",
           int_imm.get_value(),
           dtype_to_rust_type(&int_imm.dtype())
         ))

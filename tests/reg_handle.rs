@@ -43,7 +43,7 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   let exec_name = test_utils::temp_dir(&fname.to_string());
   test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
-  test_utils::run(&exec_name);
+  let output = test_utils::run(&exec_name);
 }
 
 #[test]

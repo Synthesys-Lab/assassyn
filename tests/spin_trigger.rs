@@ -5,7 +5,8 @@ use eir::test_utils;
 module_builder!(
   squarer[a:int<32>][] {
     a  = a.pop();
-    _b = a.mul(a);
+    b = a.mul(a);
+    log("sqr: {}", b);
   }
 );
 
@@ -17,9 +18,11 @@ fn manual() -> SysBuilder {
       when v {
         a = a.pop();
         async sqr {a: a};
+        log("agent move on {}", a);
       }
       nv = v.flip();
       when nv {
+        log("agent backpressure");
         async self {};
       }
     }.expose[lock]
@@ -29,7 +32,8 @@ fn manual() -> SysBuilder {
     driver[][spin_agent, lock] {
       cnt = array(int<32>, 1);
       v = cnt[0];
-      is_odd = v.bitwise_and(1);
+      and_1 = v.bitwise_and(1);
+      is_odd = and_1.eq(1);
       is_even = is_odd.flip();
       v = v.add(1);
       cnt[0] = v;
@@ -39,6 +43,7 @@ fn manual() -> SysBuilder {
       when is_even {
         lv = lock[0];
         flipped = lv.flip();
+        log("flip to {}", flipped);
         lock[0] = flipped;
       }
     }
@@ -89,7 +94,24 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   let exec_name = test_utils::temp_dir(&fname.to_string());
   test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
-  test_utils::run(&exec_name);
+  let raw = test_utils::run(&exec_name);
+  String::from_utf8(raw.stdout)
+    .unwrap()
+    .lines()
+    .for_each(|l| {
+      if l.contains("agent move on") {
+        let toks = l.split_whitespace().collect::<Vec<_>>();
+        let len = toks[2].len();
+        let cycle = toks[2][1..len - 4].parse::<i32>().unwrap();
+        assert!(cycle % 4 == 1 || cycle % 4 == 2);
+      }
+      if l.contains("squarer") {
+        let toks = l.split_whitespace().collect::<Vec<_>>();
+        let len = toks[2].len();
+        let cycle = toks[2][1..len - 4].parse::<i32>().unwrap();
+        assert!(cycle % 4 == 2 || cycle % 4 == 3);
+      }
+    });
 }
 
 #[test]
