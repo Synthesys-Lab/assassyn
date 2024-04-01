@@ -46,6 +46,7 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
   let output = test_utils::run(&exec_name);
+  let mut idx = false;
   String::from_utf8(output.stdout)
     .unwrap()
     .lines()
@@ -55,13 +56,26 @@ fn testit(fname: &str, mut sys: SysBuilder) {
         // lock[0]: 0 1 1 0 0 1 1 0 0 1 1
         // lock[1]: 0 0 1 1 0 0 1 1 0 0 1
         // trigger: x 0 1 0 1 0 1 0 1 0 1
-        // if lock[trigger[cycle - 1]] = 1 then we should have a squarer
+        // if lock[trigger[cycle - 2]] = 1 then we should have a squarer
         let toks = line.split_whitespace().collect::<Vec<_>>();
         let len = toks[2].len();
+        // Then for each cycle.
         let cycle = toks[2][1..len - 4].parse::<i32>().unwrap();
+        // then trigger is triggered the cycle before last cycle, (cycle - 2), since last cycle
+        // we were on the agent module. the lock is checked last cycle,
+        // so we are calculating the lock value of the last cycle.
+        // lock[0] is (cycle - 1 + 1) / 2 % 2
+        // lock[1] is (cycle - 1) / 2 % 2
         let lock = [cycle / 2 % 2, (cycle - 1) / 2 % 2];
-        let idx = cycle & 1;
-        assert!(lock[idx as usize] != 0);
+        // the lock should be true.
+        assert!(
+          lock[idx as usize] != 0,
+          "cycle: {}, idx: {}, lock: {:?}",
+          cycle,
+          idx,
+          lock
+        );
+        idx = !idx;
       }
     });
 }
