@@ -46,6 +46,7 @@ fn systolic_array() {
       acc = array(int<32>, 1);
       val = acc[0];
       mac = val.add(c);
+      log("MAC value: {}", mac);
       acc[0] = mac;
       feast = eager_bind east(west);
       async south(north);
@@ -80,6 +81,7 @@ fn systolic_array() {
 
   module_builder!(data_pusher[data: int<32>][dest] {
     data = data.pop();
+    log("pusher pushes {}", data);
     bound = eager_bind dest(data);
   }.expose[bound]);
 
@@ -89,12 +91,14 @@ fn systolic_array() {
     lv = lock[0];
     nlv = lv.flip();
     when nlv {
+      log("controller backpressure");
       async self {};
     }
     when lv {
       data = data.pop();
+      log("controller pushes {}", data);
       async pusher(data);
-      next_lock[0] = nlv;
+      next_lock[0] = lv;
     }
   }.expose[lock]);
 
@@ -142,11 +146,12 @@ fn systolic_array() {
     cnt = array(int<32>, 1);
     v = cnt[0];
     new_v = v.add(1);
-    lt4 = new_v.ilt(4);
+    lt4 = v.ilt(4);
     nlt4 = lt4.flip();
     cnt[0] = new_v;
     // before 4, feed the data.
     when lt4 {
+      log("driver lt4");
       async row1(v);
       row_lock[0] = lt4;
       col_lock[0] = lt4;
@@ -163,6 +168,7 @@ fn systolic_array() {
     }
     // after 4, feed zero paddings.
     when nlt4 {
+      log("driver nlt4");
       async row1(0.int<32>);
       async row2(0.int<32>);
       async row3(0.int<32>);
@@ -201,4 +207,6 @@ fn systolic_array() {
 
   let exec_name = test_utils::temp_dir(&"systolic".to_string());
   test_utils::compile(&config.fname, &exec_name);
+  let output = test_utils::run(&exec_name);
+  println!("{}", String::from_utf8(output.stdout).unwrap());
 }
