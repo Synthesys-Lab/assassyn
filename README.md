@@ -1,4 +1,4 @@
-# Event-driven Architectural for Electrical Design Automation
+# Event-driven Architecture for Electrical Design Automation
 
 This project is aimed at developing a new programming paradigm for describing hardware.
 The ultimate goal is to unify the hardware model (simulation), register-transfer-level (RTL)
@@ -17,7 +17,7 @@ TODO: Make test cases self-examplified and document some usages in the test case
 try some proof of concepts in test cases.
 
 ````sh
-cargo test --lib
+cargo test [case-name]
 ````
 
 Refer our [developer doc](./docs/developers.md.md) for more details.

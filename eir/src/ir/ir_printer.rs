@@ -288,6 +288,16 @@ impl Visitor<String> for IRPrinter<'_> {
           res.push(')');
           res
         }
+        Opcode::Slice => {
+          let res = format!(
+            "_{} = {}[{}:{}]",
+            expr.get_key(),
+            expr.get_operand(0).unwrap().to_string(self.sys),
+            expr.get_operand(1).unwrap().to_string(self.sys),
+            expr.get_operand(2).unwrap().to_string(self.sys),
+          );
+          res
+        }
         _ => {
           panic!("Unimplemented opcode: {:?}", expr.get_opcode());
         }

@@ -28,6 +28,8 @@ pub enum Opcode {
   FIFOPop,
   FIFOPeek,
   Trigger,
+  // Other synthesizable operations
+  Slice,
   // Level-2 syntax sugar, will be re-written in synthesizable operations
   SpinTrigger,
   // Non-synthesizable operations
@@ -82,6 +84,7 @@ impl ToString for Opcode {
       Opcode::FIFOPop => "pop".into(),
       Opcode::FIFOPeek => "peek".into(),
       Opcode::Log => "log".into(),
+      Opcode::Slice => "slice".into(),
     }
   }
 }
