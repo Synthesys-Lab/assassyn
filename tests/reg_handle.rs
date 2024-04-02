@@ -57,10 +57,8 @@ fn testit(fname: &str, mut sys: SysBuilder) {
         // lock[1]: 0 0 1 1 0 0 1 1 0 0 1
         // trigger: x 0 1 0 1 0 1 0 1 0 1
         // if lock[trigger[cycle - 2]] = 1 then we should have a squarer
-        let toks = line.split_whitespace().collect::<Vec<_>>();
-        let len = toks[3].len();
-        // Then for each cycle.
-        let cycle = toks[3][1..len - 4].parse::<i32>().unwrap();
+        // For each cycle.
+        let (cycle, _) = test_utils::parse_cycle(line);
         // then trigger is triggered the cycle before last cycle, (cycle - 2), since last cycle
         // we were on the agent module. the lock is checked last cycle,
         // so we are calculating the lock value of the last cycle.

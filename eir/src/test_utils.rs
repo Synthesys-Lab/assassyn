@@ -31,3 +31,11 @@ pub fn run(exe: &String) -> Output {
   assert!(output.status.success(), "Failed to run: {}", exe);
   output
 }
+
+pub fn parse_cycle(raw_line: &str) -> (usize, usize) {
+  let toks = raw_line.split_whitespace().collect::<Vec<_>>();
+  let len = toks[3].len();
+  let cycle = toks[3][1..len - 4].parse::<usize>().unwrap();
+  let half = toks[3][len - 3..len - 1].parse::<usize>().unwrap();
+  (cycle, half)
+}
