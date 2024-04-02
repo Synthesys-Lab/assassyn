@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
-use crate::frontend::*;
+use crate::builder::SysBuilder;
+use crate::ir::*;
 
 use super::super::ir::visitor::Visitor;
 use super::ir_printer::IRPrinter;

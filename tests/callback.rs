@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::{frontend::SysBuilder, sim, test_utils};
+use eir::{builder::SysBuilder, sim, test_utils};
 
 #[test]
 fn callback() {

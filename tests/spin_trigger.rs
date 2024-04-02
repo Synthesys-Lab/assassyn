@@ -1,6 +1,5 @@
 use eda4eda::module_builder;
-use eir::frontend::SysBuilder;
-use eir::test_utils;
+use eir::{builder::SysBuilder, test_utils};
 
 module_builder!(
   squarer[a:int<32>][] {
@@ -104,14 +103,14 @@ fn testit(fname: &str, mut sys: SysBuilder) {
     .for_each(|l| {
       if l.contains("agent move on") {
         let toks = l.split_whitespace().collect::<Vec<_>>();
-        let len = toks[2].len();
-        let cycle = toks[2][1..len - 4].parse::<i32>().unwrap();
+        let len = toks[3].len();
+        let cycle = toks[3][1..len - 4].parse::<i32>().unwrap();
         assert!(cycle % 4 == 1 || cycle % 4 == 2, "agent move on");
       }
       if l.contains("squarer") {
         let toks = l.split_whitespace().collect::<Vec<_>>();
-        let len = toks[2].len();
-        let cycle = toks[2][1..len - 4].parse::<i32>().unwrap();
+        let len = toks[3].len();
+        let cycle = toks[3][1..len - 4].parse::<i32>().unwrap();
         assert!(cycle % 4 == 2 || cycle % 4 == 3, "{}", l);
       }
     });

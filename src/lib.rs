@@ -95,7 +95,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         Err(e) => return e.to_compile_error().into(),
       };
       port_decls
-        .extend::<TokenStream>(quote! {eir::frontend::PortInfo::new(stringify!(#id), #ty),}.into());
+        .extend::<TokenStream>(quote! {eir::builder::PortInfo::new(stringify!(#id), #ty),}.into());
     }
     (port_ids.into(), port_decls.into(), port_peeks.into())
   };
@@ -115,7 +115,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     let ext_interf = &parsed_module.ext_interf;
     let mut res = TokenStream::new();
     for elem in ext_interf.iter() {
-      res.extend::<TokenStream>(quote! { #elem: eir::frontend::BaseNode, }.into());
+      res.extend::<TokenStream>(quote! { #elem: eir::ir::node::BaseNode, }.into());
     }
     res.into()
   };
@@ -124,26 +124,26 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   let (ret_tys, ret_vals): (proc_macro2::TokenStream, proc_macro2::TokenStream) =
     if let Some(exposes) = parsed_module.exposes {
       let mut vals: proc_macro::TokenStream = quote! { module, }.into();
-      let mut tys: proc_macro::TokenStream = quote! { eir::frontend::BaseNode, }.into();
+      let mut tys: proc_macro::TokenStream = quote! { eir::ir::node::BaseNode, }.into();
       for elem in exposes.iter() {
         vals.extend::<TokenStream>(quote! { #elem, }.into());
-        tys.extend::<TokenStream>(quote! { eir::frontend::BaseNode, }.into());
+        tys.extend::<TokenStream>(quote! { eir::ir::node::BaseNode, }.into());
       }
       let vals: proc_macro2::TokenStream = vals.into();
       let tys: proc_macro2::TokenStream = tys.into();
       (quote! { ( #tys ) }, quote! { ( #vals ) })
     } else {
-      (quote! { eir::frontend::BaseNode }, quote! { module })
+      (quote! { eir::ir::node::BaseNode }, quote! { module })
     };
 
   let res = quote! {
-    fn #builder_name (sys: &mut eir::frontend::SysBuilder, #ext_interf) -> #ret_tys {
-      use eir::frontend::IsElement;
+    fn #builder_name (sys: &mut eir::builder::SysBuilder, #ext_interf) -> #ret_tys {
+      use eir::ir::node::IsElement;
       let module = sys.create_module(stringify!(#module_name), vec![#port_decls]);
       sys.set_current_module(module.clone());
       let ( #port_ids ) = {
         let module = module
-          .as_ref::<eir::frontend::Module>(&sys)
+          .as_ref::<eir::ir::Module>(&sys)
           .expect("[Init Port] No current module!");
         #port_peeks
         ( #port_ids )

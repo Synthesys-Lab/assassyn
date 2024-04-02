@@ -8,12 +8,12 @@ use crate::ast::{
   node::{ArrayAccess, FuncArgs, Instruction},
 };
 
-use eir::frontend::DataType;
+use eir::ir::data::DataType;
 
 pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
   match &dtype.dtype {
-    DataType::Int(bits) => Ok(quote! { eir::frontend::DataType::int(#bits) }.into()),
-    DataType::UInt(bits) => Ok(quote! { eir::frontend::DataType::uint(#bits) }.into()),
+    DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int(#bits) }.into()),
+    DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint(#bits) }.into()),
     DataType::Module(args) => {
       let args = args
         .iter()
@@ -28,7 +28,7 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
         .into_iter()
         .map(|x| x.into())
         .collect::<Vec<proc_macro2::TokenStream>>();
-      Ok(quote! { eir::frontend::DataType::module(vec![#(#args.into()),*]) }.into())
+      Ok(quote! { eir::ir::data::DataType::module(vec![#(#args.into()),*]) }.into())
     }
     _ => Err(syn::Error::new(dtype.span.into(), "Unsupported type")),
   }
@@ -49,7 +49,7 @@ impl Parse for EmitIDOrConst {
         let dtype = input.parse::<DType>()?;
         emit_type(&dtype)?
       } else {
-        quote! { eir::frontend::DataType::int(32) }.into()
+        quote! { eir::ir::data::DataType::int(32) }.into()
       };
       let ty: proc_macro2::TokenStream = ty.into();
       let res = quote! { sys.get_const_int(#ty, #lit) };

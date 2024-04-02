@@ -1,8 +1,9 @@
 use crate::{
-  builder::system::{PortInfo, SysBuilder},
-  frontend::*,
-  ir::visitor::Visitor,
+  builder::{system::PortInfo, SysBuilder},
+  ir::{node::*, *},
 };
+
+use self::visitor::Visitor;
 
 struct SpinTriggerFinder {
   module_parent: BaseNode,

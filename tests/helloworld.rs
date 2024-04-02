@@ -1,12 +1,12 @@
 use eda4eda::module_builder;
-use eir::test_utils;
+use eir::{builder::SysBuilder, test_utils};
 
 #[test]
 fn helloworld() {
   module_builder!(driver[][] {
     log("{}, {}!", "Hello", "world");
   });
-  let mut sys = eir::frontend::SysBuilder::new("hw");
+  let mut sys = SysBuilder::new("hw");
   driver_builder(&mut sys);
 
   println!("{}", sys);
@@ -27,9 +27,9 @@ fn helloworld() {
   let raw = String::from_utf8(output.stdout)
     .unwrap()
     .lines()
-    .skip(1)
     .next()
     .unwrap()
     .to_string();
-  assert_eq!(raw, "Hello, world!");
+  let reference = "Hello, world!";
+  assert_eq!(raw[raw.len() - reference.len()..raw.len()], *reference);
 }

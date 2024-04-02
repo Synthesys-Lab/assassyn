@@ -1,8 +1,5 @@
 use eda4eda::module_builder;
-use eir::{
-  frontend::{BaseNode, Module, SysBuilder},
-  test_utils,
-};
+use eir::{builder::SysBuilder, ir::node::BaseNode, ir::Module, test_utils};
 
 #[derive(Debug, Clone, Copy)]
 struct ProcElem {

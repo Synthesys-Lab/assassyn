@@ -1,4 +1,4 @@
-use crate::frontend::{BaseNode, NodeKind};
+use crate::ir::node::*;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum DataType {

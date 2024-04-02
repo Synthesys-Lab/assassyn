@@ -3,7 +3,8 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use crate::{
-  frontend::*,
+  ir::node::*,
+  ir::*,
   ir::{ir_printer::IRPrinter, visitor::Visitor},
 };
 

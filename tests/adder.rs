@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::test_utils;
+use eir::{builder::SysBuilder, test_utils};
 
 #[test]
 fn adder() {
@@ -18,7 +18,7 @@ fn adder() {
     async adder { a: v, b: v };
   });
 
-  let mut sys = eir::frontend::SysBuilder::new("main");
+  let mut sys = SysBuilder::new("main");
   let adder = adder_builder(&mut sys);
   driver_builder(&mut sys, adder);
 

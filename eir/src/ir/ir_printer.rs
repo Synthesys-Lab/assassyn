@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
-use crate::frontend::*;
+use crate::builder::InsertPoint;
+use crate::ir::{node::*, *};
 
 use super::{block::Block, visitor::Visitor};
 

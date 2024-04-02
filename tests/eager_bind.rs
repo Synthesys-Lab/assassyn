@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::test_utils;
+use eir::{builder::SysBuilder, test_utils};
 
 #[test]
 fn eager_bind() {
@@ -34,7 +34,7 @@ fn eager_bind() {
     }
   );
 
-  let mut sys = eir::frontend::SysBuilder::new("main");
+  let mut sys = SysBuilder::new("main");
   let sub = sub_builder(&mut sys);
   let (lhs, aa) = lhs_builder(&mut sys, sub);
   let rhs = rhs_builder(&mut sys, aa);

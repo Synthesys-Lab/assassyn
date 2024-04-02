@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::frontend::Module;
+use crate::ir::Module;
 
 use super::{
   data::DataType,

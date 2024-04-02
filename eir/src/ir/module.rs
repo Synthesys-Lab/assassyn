@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::frontend::*;
+use crate::builder::system::PortInfo;
+use crate::builder::SysBuilder;
+use crate::ir::node::*;
+use crate::ir::*;
 
 /// The data structure for a module.
 pub struct Module {

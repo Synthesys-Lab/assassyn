@@ -1,6 +1,5 @@
 use eda4eda::module_builder;
-use eir::frontend::SysBuilder;
-use eir::test_utils;
+use eir::{builder::SysBuilder, test_utils};
 
 #[test]
 fn trigger() {

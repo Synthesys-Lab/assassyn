@@ -1,4 +1,4 @@
-use eir::frontend::DataType;
+use eir::ir::DataType;
 use syn::{parenthesized, parse::Parse};
 
 pub(crate) enum Expr {
@@ -35,7 +35,7 @@ impl Parse for Expr {
 #[derive(Clone)]
 pub(crate) struct DType {
   pub(crate) span: proc_macro2::Span,
-  pub(crate) dtype: eir::frontend::DataType,
+  pub(crate) dtype: DataType,
 }
 
 impl Parse for DType {
@@ -49,7 +49,7 @@ impl Parse for DType {
         input.parse::<syn::Token![>]>()?;
         Ok(DType {
           span,
-          dtype: eir::frontend::DataType::int(bits.base10_parse::<usize>().unwrap()),
+          dtype: DataType::int(bits.base10_parse::<usize>().unwrap()),
         })
       }
       "uint" => {
@@ -58,7 +58,7 @@ impl Parse for DType {
         input.parse::<syn::Token![>]>()?;
         Ok(DType {
           span,
-          dtype: eir::frontend::DataType::uint(bits.base10_parse::<usize>().unwrap()),
+          dtype: DataType::uint(bits.base10_parse::<usize>().unwrap()),
         })
       }
       "module" => {
@@ -67,9 +67,7 @@ impl Parse for DType {
         let parsed_args = args.parse_terminated(DType::parse, syn::Token![,])?;
         Ok(DType {
           span,
-          dtype: eir::frontend::DataType::module(
-            parsed_args.iter().map(|x| x.dtype.clone().into()).collect(),
-          ),
+          dtype: DataType::module(parsed_args.iter().map(|x| x.dtype.clone().into()).collect()),
         })
       }
       _ => {

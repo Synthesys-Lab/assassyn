@@ -1,7 +1,6 @@
-use crate::frontend::{
-  BaseNode, BlockMut, BlockRef, InsertPoint, IsElement, Module, ModuleRef, NodeKind, Parented,
-  SysBuilder,
-};
+use crate::builder::{InsertPoint, SysBuilder};
+use crate::ir::node::*;
+use crate::ir::*;
 
 pub struct Block {
   pub(crate) key: usize,
