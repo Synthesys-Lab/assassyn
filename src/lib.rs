@@ -157,3 +157,8 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
   res.into()
 }
+
+#[proc_macro]
+pub fn testbench_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+  input
+}
