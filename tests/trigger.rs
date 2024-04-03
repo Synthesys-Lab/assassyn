@@ -40,7 +40,7 @@ fn trigger() {
     idle_threshold: 200,
   };
 
-  eir::sim::elaborate(&sys, &config, vec![]).unwrap();
+  eir::sim::elaborate(&sys, &config).unwrap();
 
   let exec_name = test_utils::temp_dir(&"trigger".to_string());
   test_utils::compile(&config.fname, &exec_name);

@@ -48,7 +48,7 @@ fn bind() {
     idle_threshold: 100,
   };
 
-  eir::sim::elaborate(&sys, &config, vec![]).unwrap();
+  eir::sim::elaborate(&sys, &config).unwrap();
 
   let exec_name = test_utils::temp_dir(&"bind".to_string());
   test_utils::compile(&config.fname, &exec_name);

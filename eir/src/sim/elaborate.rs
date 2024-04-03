@@ -7,7 +7,6 @@ use std::{
 use crate::{
   builder::system::SysBuilder,
   ir::{node::*, visitor::Visitor, *},
-  testbench::Event,
 };
 
 use super::Config;
@@ -375,12 +374,7 @@ fn namify(name: &str) -> String {
   name.replace(".", "_")
 }
 
-fn dump_runtime(
-  sys: &SysBuilder,
-  fd: &mut File,
-  config: &Config,
-  testbench: Vec<Event>,
-) -> Result<(), std::io::Error> {
+fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), std::io::Error> {
   // Dump the helper function of cycles.
   fd.write("// Simulation runtime.\n".as_bytes())?;
   {
@@ -651,14 +645,10 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
   fd.write(src.to_string().as_bytes())
 }
 
-pub fn elaborate(
-  sys: &SysBuilder,
-  config: &Config,
-  testbench: Vec<Event>,
-) -> Result<(), std::io::Error> {
+pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
   println!("Writing simulator code to {}", config.fname);
   let mut fd = fs::File::create(config.fname.clone())?;
   dump_header(&mut fd)?;
   dump_module(sys, &mut fd)?;
-  dump_runtime(sys, &mut fd, config, testbench)
+  dump_runtime(sys, &mut fd, config)
 }

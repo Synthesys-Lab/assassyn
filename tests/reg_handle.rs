@@ -41,7 +41,7 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   };
   eir::xform::basic(&mut sys);
   println!("{}", sys);
-  eir::sim::elaborate(&sys, &config, vec![]).unwrap();
+  eir::sim::elaborate(&sys, &config).unwrap();
   let exec_name = test_utils::temp_dir(&fname.to_string());
   test_utils::compile(&config.fname, &exec_name);
   // TODO(@were): Make a time timeout here.
