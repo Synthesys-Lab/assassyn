@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::bracketed;
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
+use syn::{braced, bracketed};
 use syn::{parse_macro_input, Token};
 
 mod ast;
@@ -158,7 +158,32 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   res.into()
 }
 
+struct TestbenchParser {
+  func_name: syn::Ident,
+  args: Punctuated<syn::Ident, Token![,]>,
+}
+
+impl Parse for TestbenchParser {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let func_name = input.parse::<syn::Ident>()?;
+    let raw_args;
+    bracketed!(raw_args in input);
+    let args = raw_args.parse_terminated(syn::Ident::parse, Token![,])?;
+    let raw_body;
+    braced!(raw_body in input);
+    while !raw_body.is_empty() {
+      let cycle = raw_body.parse::<syn::LitInt>()?;
+      raw_body.parse::<Token![:]>()?;
+      raw_body.parse::<syn::Expr>()?;
+      raw_body.parse::<Token![;]>()?;
+      println!("Cycle: {}", cycle);
+    }
+    Ok(TestbenchParser { func_name, args })
+  }
+}
+
 #[proc_macro]
 pub fn testbench_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-  input
+  parse_macro_input!(input as TestbenchParser);
+  quote! {}.into()
 }

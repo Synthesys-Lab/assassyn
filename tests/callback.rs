@@ -44,7 +44,7 @@ fn callback() {
     sim_threshold: 100,
   };
 
-  sim::elaborate(&sys, &config).unwrap();
+  sim::elaborate(&sys, &config, vec![]).unwrap();
   test_utils::compile(&config.fname, &exec_name);
   let output = test_utils::run(&exec_name);
   let times_invoked = String::from_utf8(output.stdout)

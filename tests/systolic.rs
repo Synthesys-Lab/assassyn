@@ -1,4 +1,4 @@
-use eda4eda::module_builder;
+use eda4eda::{module_builder, testbench_builder};
 use eir::{builder::SysBuilder, ir::node::BaseNode, ir::Module, test_utils};
 
 #[derive(Debug, Clone, Copy)]
@@ -116,111 +116,76 @@ fn systolic_array() {
 
   // row [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
   // col [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]]
-  module_builder!(driver[][col1, col2, col3, col4, row1, row2, row3, row4] {
-    cnt = array(int<32>, 1);
-    v = cnt[0];
-    new_v = v.add(1);
-    cnt[0] = new_v;
-    iter0 = v.eq(0);
-    iter1 = v.eq(1);
-    iter2 = v.eq(2);
-    iter3 = v.eq(3);
-    iter4 = v.eq(4);
-    iter5 = v.eq(5);
-    iter6 = v.eq(6);
-    when iter0 {
+  testbench_builder!(
+    testbench[row1, row2, row3, row4, col1, col2, col3, col4] {
       // 0 0
       // 0 P P P  P
       //   P P P  P
       //   P P P  P
       //   P P P  P
-      _a = eager_bind col1(0);
-      _a = eager_bind row1(0);
-    }
-    when iter1 {
+      0: col1(0);
+      0: row1(0);
       // 1 1 4
       // 1 P P P  P
       // 4 P P P  P
       //   P P P  P
       //   P P P  P
-      _a = eager_bind row1(1);
-      _a = eager_bind col1(1);
-      _a = eager_bind col2(4);
-      _a = eager_bind row2(4);
-    }
-    when iter2 {
+      1: row1(1);
+      1: col1(1);
+      1: col2(4);
+      1: row2(4);
       // 2 2 5 8
       // 2 P P P  P
       // 5 P P P  P
       // 8 P P P  P
       //   P P P  P
-      _a = eager_bind row1(2);
-      _a = eager_bind col1(2);
-      _a = eager_bind col2(5);
-      _a = eager_bind row2(5);
-      _a = eager_bind row3(8);
-      _a = eager_bind col3(8);
-    }
-    when iter3 {
+      2: row1(2);
+      2: col1(2);
+      2: col2(5);
+      2: row2(5);
+      2: row3(8);
+      2: col3(8);
       // 3  3 6 9  12
       // 3  P P P  P
       // 6  P P P  P
       // 9  P P P  P
       // 12 P P P  P
-      _a = eager_bind row1(3);
-      _a = eager_bind col1(3);
-      _a = eager_bind col2(6);
-      _a = eager_bind row2(6);
-      _a = eager_bind row3(9);
-      _a = eager_bind col3(9);
-      _a = eager_bind row4(12);
-      _a = eager_bind col4(12);
-    }
-    when iter4 {
+      3: row1(3);
+      3: col1(3);
+      3: col2(6);
+      3: row2(6);
+      3: row3(9);
+      3: col3(9);
+      3: row4(12);
+      3: col4(12);
       // 4    7 10 13
       //    P P P  P
       // 7  P P P  P
       // 10 P P P  P
       // 13 P P P  P
-      _a = eager_bind row2(7);
-      _a = eager_bind col2(7);
-      _a = eager_bind row3(10);
-      _a = eager_bind col3(10);
-      _a = eager_bind row4(13);
-      _a = eager_bind col4(13);
-    }
-    when iter5 {
+      4: row2(7);
+      4: col2(7);
+      4: row3(10);
+      4: col3(10);
+      4: row4(13);
+      4: col4(13);
       //  5    11 14
       //    P P P  P
       //    P P P  P
       // 11 P P P  P
       // 14 P P P  P
-      _a = eager_bind row3(11);
-      _a = eager_bind col3(11);
-      _a = eager_bind row4(14);
-      _a = eager_bind col4(14);
-    }
-    when iter6 {
+      5: row3(11);
+      5: col3(11);
+      5: row4(14);
+      5: col4(14);
       //   6      15
       //    P P P  P
       //    P P P  P
       //    P P P  P
       // 15 P P P  P
-      _a = eager_bind row4(15);
-      _a = eager_bind col4(15);
+      6: row4(15);
+      6: col4(15);
     }
-  });
-
-  driver_builder(
-    &mut sys,
-    pe_array[0][1].pe,
-    pe_array[0][2].pe,
-    pe_array[0][3].pe,
-    pe_array[0][4].pe,
-    pe_array[1][0].pe,
-    pe_array[2][0].pe,
-    pe_array[3][0].pe,
-    pe_array[4][0].pe,
   );
 
   let src_name = test_utils::temp_dir(&"systolic.rs".to_string());
@@ -230,7 +195,7 @@ fn systolic_array() {
     idle_threshold: 100,
   };
 
-  eir::sim::elaborate(&sys, &config).unwrap();
+  eir::sim::elaborate(&sys, &config, vec![]).unwrap();
 
   let exec_name = test_utils::temp_dir(&"systolic".to_string());
   test_utils::compile(&config.fname, &exec_name);

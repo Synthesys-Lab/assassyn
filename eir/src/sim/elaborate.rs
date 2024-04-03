@@ -4,7 +4,11 @@ use std::{
   io::Write,
 };
 
-use crate::{builder::system::SysBuilder, ir::node::*, ir::visitor::Visitor, ir::*};
+use crate::{
+  builder::system::SysBuilder,
+  ir::{node::*, visitor::Visitor, *},
+  testbench::Event,
+};
 
 use super::Config;
 
@@ -371,7 +375,12 @@ fn namify(name: &str) -> String {
   name.replace(".", "_")
 }
 
-fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), std::io::Error> {
+fn dump_runtime(
+  sys: &SysBuilder,
+  fd: &mut File,
+  config: &Config,
+  testbench: Vec<Event>,
+) -> Result<(), std::io::Error> {
   // Dump the helper function of cycles.
   fd.write("// Simulation runtime.\n".as_bytes())?;
   {
@@ -514,24 +523,33 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   }
   fd.write("  // Define the event queue\n".as_bytes())?;
   fd.write("  let mut q = BinaryHeap::new();\n".as_bytes())?;
-  // Push the initial events.
-  fd.write(format!("  for i in 0..{} {{\n", config.sim_threshold).as_bytes())?;
-  fd.write(
-    "    q.push(Reverse(Event{stamp: i * 100, kind: EventKind::Module_driver}));\n".as_bytes(),
-  )?;
-  fd.write("  }\n".as_bytes())?;
+  let sim_threshold = config.sim_threshold;
+  if sys.has_driver() {
+    // Push the initial events.
+    fd.write(
+      quote::quote! {
+        for i in 0..#sim_threshold {
+          q.push(Reverse(Event{stamp: i * 100, kind: EventKind::Module_driver}));
+        }
+      }
+      .to_string()
+      .as_bytes(),
+    )?;
+  }
   // TODO(@were): Dump the time stamp of the simulation.
   fd.write("  while let Some(event) = q.pop() {\n".as_bytes())?;
-  fd.write(format!("    if event.0.stamp / 100 > {} {{", config.sim_threshold).as_bytes())?;
   fd.write(
-    format!(
-      "      println!(\"Exceed the simulation threshold {}, exit!\");\n",
-      config.sim_threshold
-    )
+    quote::quote! {
+      if event.0.stamp / 100 > #sim_threshold {
+        print!("Exceed the simulation threshold ");
+        print!("{}", #sim_threshold);
+        println!(", exit!");
+        break;
+      }
+    }
+    .to_string()
     .as_bytes(),
   )?;
-  fd.write("      break;\n".as_bytes())?;
-  fd.write("    }\n".as_bytes())?;
   fd.write("    match event.0.kind {\n".as_bytes())?;
   for module in sys.module_iter() {
     fd.write(
@@ -577,14 +595,6 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
         )
         .as_bytes(),
       )?;
-      // fd.write(
-      //   format!(
-      //     "        println!(\"@line:{{:<6}} {{}}: Commit FIFO {}.{} push {{:?}}\", line!(), cyclize(event.0.stamp), value);\n",
-      //     namify(module.get_name()),
-      //     namify(port.get_name())
-      //   )
-      //   .as_bytes(),
-      // )?;
       fd.write(
         format!(
           "        {}_fifos.{}.push_back(value);\n",
@@ -604,13 +614,6 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )
       .as_bytes(),
     )?;
-    // fd.write(
-    //   format!(
-    //     "        println!(\"@line:{{:<6}} {{}}: Commit array {} write {{}}\", line!(), cyclize(event.0.stamp), value);\n",
-    //     namify(array.get_name())
-    //   )
-    //   .as_bytes(),
-    // )?;
     fd.write(format!("        {}[idx] = value;\n", namify(array.get_name())).as_bytes())?;
     fd.write("      }\n".as_bytes())?;
   }
@@ -648,10 +651,14 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
   fd.write(src.to_string().as_bytes())
 }
 
-pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
+pub fn elaborate(
+  sys: &SysBuilder,
+  config: &Config,
+  testbench: Vec<Event>,
+) -> Result<(), std::io::Error> {
   println!("Writing simulator code to {}", config.fname);
   let mut fd = fs::File::create(config.fname.clone())?;
   dump_header(&mut fd)?;
   dump_module(sys, &mut fd)?;
-  dump_runtime(sys, &mut fd, config)
+  dump_runtime(sys, &mut fd, config, testbench)
 }

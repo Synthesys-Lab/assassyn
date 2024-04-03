@@ -140,6 +140,11 @@ impl SysBuilder {
     res
   }
 
+  /// If this system has a driver.
+  pub fn has_driver(&self) -> bool {
+    self.module_iter().any(|x| x.get_name().eq("driver"))
+  }
+
   /// The helper function to get an element of the system and downcast it to its actual
   /// type's immutable reference.
   pub(crate) fn get<
