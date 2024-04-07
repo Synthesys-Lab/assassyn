@@ -9,13 +9,13 @@ use crate::{
   ir::{node::*, visitor::Visitor, *},
 };
 
-use super::{fingerprint::FingerPrintCache, Config};
+use super::{common_module::CommonModuleCache, Config};
 
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   indent: usize,
   module_name: String,
-  fpc: FingerPrintCache,
+  fpc: CommonModuleCache,
 }
 
 impl<'a> ElaborateModule<'a> {
@@ -24,7 +24,7 @@ impl<'a> ElaborateModule<'a> {
       sys,
       indent: 0,
       module_name: String::new(),
-      fpc: FingerPrintCache::new(),
+      fpc: CommonModuleCache::new(),
     }
   }
 }
@@ -126,15 +126,13 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
 impl Visitor<String> for ElaborateModule<'_> {
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
     if let Some(fp) = module.get_builder_func_ptr() {
-      if self.fpc.get_master(fp).is_some() {
+      if self.fpc.get_master(&module.upcast()).is_some() {
         return format!(
           "// Module {} unified to its fingerprint {}\n",
           module.get_name(),
           fp
         )
         .into();
-      } else {
-        self.fpc.set_master(fp, module.upcast());
       }
     }
 
@@ -389,7 +387,7 @@ fn namify(name: &str) -> String {
 fn dump_runtime(
   sys: &SysBuilder,
   fd: &mut File,
-  fpc: &FingerPrintCache,
+  fpc: &CommonModuleCache,
   config: &Config,
 ) -> Result<(), std::io::Error> {
   // Dump the helper function of cycles.
@@ -571,7 +569,7 @@ fn dump_runtime(
       .as_bytes(),
     )?;
     let callee = if let Some(fp) = module.get_builder_func_ptr() {
-      let master = fpc.get_master(fp).unwrap();
+      let master = fpc.get_master(&module.upcast()).unwrap();
       let master = master.as_ref::<Module>(sys).unwrap();
       fd.write(
         format!(
@@ -661,7 +659,7 @@ fn dump_runtime(
   Ok(())
 }
 
-fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<FingerPrintCache, std::io::Error> {
+fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<CommonModuleCache, std::io::Error> {
   let mut em = ElaborateModule::new(sys);
   for module in em.sys.module_iter() {
     if let Some(buffer) = em.visit_module(&module) {
