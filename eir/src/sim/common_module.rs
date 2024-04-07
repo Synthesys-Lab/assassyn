@@ -169,17 +169,60 @@ pub(super) fn module_equal(lhs: &ModuleRef<'_>, rhs: &ModuleRef<'_>) -> bool {
 }
 
 pub(super) struct CommonModuleCache {
-  master_cache: HashMap<BaseNode, BaseNode>,
+  dsu: Vec<usize>, // Use a DSU to store the master of each module
+  node_to_idx: HashMap<BaseNode, usize>,
+  modules: Vec<BaseNode>,
 }
 
 impl CommonModuleCache {
-  pub(super) fn new() -> Self {
+  pub(super) fn new(sys: &SysBuilder) -> Self {
+    let node_to_idx = sys
+      .module_iter()
+      .enumerate()
+      .map(|(idx, node)| (node.upcast(), idx))
+      .collect::<HashMap<BaseNode, usize>>();
+    let modules = sys
+      .module_iter()
+      .map(|x| x.upcast())
+      .collect::<Vec<BaseNode>>();
+    let cnt = node_to_idx.len();
+    let mut dsu = (0..cnt).collect::<Vec<usize>>();
+
+    for i in 0..modules.len() {
+      for j in 0..i {
+        let lhs = &modules[i].as_ref::<Module>(sys).unwrap();
+        let rhs = &modules[j].as_ref::<Module>(sys).unwrap();
+        if module_equal(lhs, rhs) {
+          dsu[i] = j;
+          break;
+        }
+      }
+    }
+
     CommonModuleCache {
-      master_cache: HashMap::new(),
+      node_to_idx,
+      modules,
+      dsu,
     }
   }
 
-  pub(super) fn get_master(&self, node: &BaseNode) -> Option<&BaseNode> {
-    self.master_cache.get(node)
+  pub(super) fn get_master(&mut self, node: &BaseNode) -> Option<&BaseNode> {
+    let idx = self.node_to_idx.get(node)?;
+    let mut runner = self.dsu[*idx];
+    let mut to_merge = vec![];
+    while runner != self.dsu[runner] {
+      to_merge.push(runner);
+      runner = self.dsu[runner];
+    }
+    for idx in to_merge.into_iter() {
+      self.dsu[idx] = runner;
+    }
+    Some(&self.modules[runner])
+  }
+
+  fn set_master(&mut self, node: &BaseNode, master: &BaseNode) {
+    let idx = self.node_to_idx.get(node).unwrap();
+    let master_idx = self.node_to_idx.get(master).unwrap();
+    self.dsu[*idx] = *master_idx;
   }
 }

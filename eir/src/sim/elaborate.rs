@@ -24,7 +24,7 @@ impl<'a> ElaborateModule<'a> {
       sys,
       indent: 0,
       module_name: String::new(),
-      fpc: CommonModuleCache::new(),
+      fpc: CommonModuleCache::new(sys),
     }
   }
 }
@@ -387,7 +387,7 @@ fn namify(name: &str) -> String {
 fn dump_runtime(
   sys: &SysBuilder,
   fd: &mut File,
-  fpc: &CommonModuleCache,
+  fpc: &mut CommonModuleCache,
   config: &Config,
 ) -> Result<(), std::io::Error> {
   // Dump the helper function of cycles.
@@ -568,8 +568,7 @@ fn dump_runtime(
       )
       .as_bytes(),
     )?;
-    let callee = if let Some(fp) = module.get_builder_func_ptr() {
-      let master = fpc.get_master(&module.upcast()).unwrap();
+    let callee = if let Some(master) = fpc.get_master(&module.upcast()) {
       let master = master.as_ref::<Module>(sys).unwrap();
       fd.write(
         format!(
@@ -682,6 +681,6 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error
   println!("Writing simulator code to {}", config.fname);
   let mut fd = fs::File::create(config.fname.clone())?;
   dump_header(&mut fd)?;
-  let fpc = dump_module(sys, &mut fd)?;
-  dump_runtime(sys, &mut fd, &fpc, config)
+  let mut fpc = dump_module(sys, &mut fd)?;
+  dump_runtime(sys, &mut fd, &mut fpc, config)
 }
