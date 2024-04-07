@@ -1,3 +1,4 @@
+/// This module checks if two modules are homomorphic.
 use std::collections::{HashMap, HashSet};
 
 use crate::{
@@ -79,9 +80,18 @@ impl Visitor<bool> for ModuleEqual {
     let lhs_builder = lhs.get_builder_func_ptr();
     let rhs_builder = rhs.get_builder_func_ptr();
     if let (Some(lhs_builder), Some(rhs_builder)) = (lhs_builder, rhs_builder) {
+      // If two modules are not built by the same function, just skip it!
       if lhs_builder != rhs_builder {
         return Some(false);
       }
+      // Get all the parameterization of these two modules.
+      // Say we have two modules m1 and m2
+      // m1 is built by foo(a, b), and m2 is built by foo(c, d).
+      // Then for m1, [a, b] are parameterized, and for m2, [c, d] are parameterized.
+      // Then we say m1 and m2 are homomorphic by checking each component in this module.
+      //
+      // For component a each operand should either by identical or placed in the same position
+      // of the parameter list.
       let lhs_param = lhs.get_parameterizable();
       let rhs_param = rhs.get_parameterizable();
       if let (Some(lhs_param), Some(rhs_param)) = (lhs_param, rhs_param) {
