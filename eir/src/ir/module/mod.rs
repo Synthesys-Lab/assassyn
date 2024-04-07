@@ -1,5 +1,3 @@
-mod metadata;
-
 use std::collections::{HashMap, HashSet};
 
 use crate::builder::system::PortInfo;
@@ -54,7 +52,6 @@ impl Module {
   pub fn get_parameterizable(&self) -> Option<&Vec<BaseNode>> {
     self.parameterizable.as_ref()
   }
-
 }
 
 impl<'sys> ModuleRef<'sys> {
@@ -139,14 +136,18 @@ impl<'a> ModuleMut<'a> {
     operations.insert(opcode);
   }
 
+  /// Set the name of a module. Override the name given by the module builder.
   pub fn set_name(&mut self, name: String) {
     self.get_mut().name = name.to_string();
   }
 
+  /// Set the metadata, the function pointer to the module builder. As part of the fingerprint of
+  /// comparing the equality of the modules.
   pub fn set_builder_func_ptr(&mut self, key: usize) {
     self.get_mut().builder_func_ptr = key.into();
   }
 
+  /// Set the metadata, these base nodes are parameterized --- plugged in by the module builder.
   pub fn set_parameterizable(&mut self, param: Vec<BaseNode>) {
     self.get_mut().parameterizable = Some(param);
   }

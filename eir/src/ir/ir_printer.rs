@@ -96,6 +96,17 @@ impl Visitor<String> for IRPrinter {
         .as_str(),
       );
     }
+    if let Some(param) = module.get_parameterizable() {
+      if !param.is_empty() {
+        res.push_str(" ".repeat(self.indent).as_str());
+        res.push_str("//");
+        for (i, elem) in param.iter().enumerate() {
+          res.push_str(if i == 0 { " " } else { ", " });
+          res.push_str(format!("{}", elem.to_string(module.sys)).as_str());
+        }
+        res.push('\n');
+      }
+    }
     res.push_str(format!("{}module {}(", " ".repeat(self.indent), module.get_name()).as_str());
     module.get();
     for elem in module.port_iter() {

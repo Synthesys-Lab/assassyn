@@ -270,7 +270,6 @@ fn systolic_array() {
           }
         })
         .unwrap();
-      eprintln!("{}", actual);
       let actual = actual
         .split_whitespace()
         .last()

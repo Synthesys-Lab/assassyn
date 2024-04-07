@@ -323,7 +323,8 @@ impl BaseNode {
         format!("_{}", self.get_key())
       }
       NodeKind::Bind => {
-        panic!("Bind should not be printed")
+        let bind = self.as_ref::<Bind>(sys).unwrap();
+        IRPrinter::new().visit_bind(&bind).unwrap()
       }
       NodeKind::StrImm => {
         let str_imm = self.as_ref::<StrImm>(sys).unwrap();

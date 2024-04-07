@@ -125,16 +125,15 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
 
 impl Visitor<String> for ElaborateModule<'_> {
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
-    if let Some(fp) = module.get_builder_func_ptr() {
-      if self.fpc.get_master(&module.upcast()).is_some() {
-        return format!(
-          "// Module {} unified to its fingerprint {}\n",
-          module.get_name(),
-          fp
-        )
-        .into();
-      }
-    }
+    // let master = self.fpc.get_master(&module.upcast());
+    // if master != module.upcast() {
+    //   return format!(
+    //     "// Module {} unified to its master {}\n",
+    //     module.get_name(),
+    //     master.as_ref::<Module>(module.sys).unwrap().get_name()
+    //   )
+    //   .into();
+    // }
 
     self.module_name = module.get_name().to_string();
     let mut res = String::new();
@@ -279,9 +278,8 @@ impl Visitor<String> for ElaborateModule<'_> {
         }
         Opcode::Log => {
           let mut res = String::new();
-          res.push_str(
-            "print!(\"@line:{{:<5}} [{{}}] {{}}:   \", line!(), module_name, cyclize(stamp));",
-          );
+          res
+            .push_str("print!(\"@line:{:<5} [{}] {}:   \", line!(), module_name, cyclize(stamp));");
           res.push_str("println!(");
           for elem in expr.operand_iter() {
             res.push_str(format!("{}, ", dump_ref!(self.sys, elem)).as_str());
@@ -387,7 +385,7 @@ fn namify(name: &str) -> String {
 fn dump_runtime(
   sys: &SysBuilder,
   fd: &mut File,
-  fpc: &mut CommonModuleCache,
+  _: &mut CommonModuleCache,
   config: &Config,
 ) -> Result<(), std::io::Error> {
   // Dump the helper function of cycles.
@@ -568,20 +566,22 @@ fn dump_runtime(
       )
       .as_bytes(),
     )?;
-    let callee = if let Some(master) = fpc.get_master(&module.upcast()) {
-      let master = master.as_ref::<Module>(sys).unwrap();
-      fd.write(
-        format!(
-          "        // Calling {} merged to calling {}\n",
-          module.get_name(),
-          master.get_name()
-        )
-        .as_bytes(),
-      )?;
-      namify(master.get_name())
-    } else {
-      namify(module.get_name())
-    };
+    let callee = namify(module.get_name());
+    // if fpc.get_size(&module.upcast()) != 1{
+    //   let master = fpc.get_master(&module.upcast());
+    //   let master = master.as_ref::<Module>(sys).unwrap();
+    //   fd.write(
+    //     format!(
+    //       "        // Calling {} merged to calling {}\n",
+    //       module.get_name(),
+    //       master.get_name()
+    //     )
+    //     .as_bytes(),
+    //   )?;
+    //   namify(master.get_name())
+    // } else {
+    //   namify(module.get_name())
+    // };
     fd.write(
       format!(
         "        {}(event.0.stamp, \"{}\", &mut q, &mut {}_fifos",

@@ -12,35 +12,64 @@ struct ModuleEqual {
   eq_cache: HashSet<(BaseNode, BaseNode)>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum NodeCmp {
+  Eq,
+  Ne(String),
+}
+
 impl ModuleEqual {
-  fn shallow_equal(&mut self, lhs: &BaseNode, rhs: &BaseNode) -> bool {
+  fn shallow_equal(&mut self, lhs: &BaseNode, rhs: &BaseNode) -> NodeCmp {
     if self.eq_cache.contains(&(lhs.clone(), rhs.clone())) {
-      true
+      NodeCmp::Eq
     } else {
       if lhs.get_kind() != rhs.get_kind() {
-        return false;
+        return NodeCmp::Ne(format!(
+          "Kind not equal: {:?} {:?}",
+          lhs.get_kind(),
+          rhs.get_kind()
+        ));
       }
       if lhs == rhs {
-        return true;
+        return NodeCmp::Eq;
       }
       let lhs_pos = self.lhs_param.iter().position(|x| x == lhs);
       let rhs_pos = self.rhs_param.iter().position(|x| x == rhs);
       if let (Some(lhs_pos), Some(rhs_pos)) = (lhs_pos, rhs_pos) {
         if lhs_pos == rhs_pos {
           self.eq_cache.insert((lhs.clone(), rhs.clone()));
-          return true;
+          return NodeCmp::Eq;
         }
       }
-      false
+      NodeCmp::Ne(format!("Shallow not equal: {:?} {:?}", lhs, rhs))
     }
   }
 
   fn deep_equal(&mut self, sys: &SysBuilder, lhs: &BaseNode, rhs: &BaseNode) -> bool {
     let restore = self.rhs;
     self.rhs = rhs.clone();
-    let result = self.dispatch(sys, lhs, vec![NodeKind::Module]);
+    let result = self.dispatch(sys, lhs, vec![NodeKind::Module]).unwrap();
     self.rhs = restore;
-    result.unwrap()
+    result
+  }
+
+  fn expand_param(
+    &self,
+    sys: &SysBuilder,
+    param: &Vec<BaseNode>,
+    module: BaseNode,
+  ) -> Vec<BaseNode> {
+    let mut res = Vec::new();
+    param.iter().for_each(|x| {
+      if let Ok(bind) = x.as_ref::<Bind>(sys) {
+        res.push(bind.get_callee());
+        res.extend(bind.to_args());
+      } else {
+        res.push(x.clone());
+      }
+    });
+    res.push(module);
+    res
   }
 }
 
@@ -59,8 +88,8 @@ impl Visitor<bool> for ModuleEqual {
         if lhs_param.len() != rhs_param.len() {
           return Some(false);
         } else {
-          self.lhs_param = lhs_param.clone();
-          self.rhs_param = rhs_param.clone();
+          self.lhs_param = self.expand_param(lhs.sys, lhs_param, lhs.upcast());
+          self.rhs_param = self.expand_param(rhs.sys, rhs_param, rhs.upcast());
         }
       }
       let lhs_body = lhs.get_body().upcast();
@@ -78,9 +107,8 @@ impl Visitor<bool> for ModuleEqual {
     }
     for i in 0..lhs.get_num_exprs() {
       let lhs_expr = lhs.get().get(i).unwrap();
-      let rhs_expr = rhs.get().get(i).unwrap().clone();
-      self.rhs = rhs_expr;
-      if let Some(false) = self.visit_expr(&lhs_expr.as_ref::<Expr>(lhs.sys).unwrap()) {
+      let rhs_expr = rhs.get().get(i).unwrap();
+      if !self.deep_equal(lhs.sys, &lhs_expr, &rhs_expr) {
         return Some(false);
       }
     }
@@ -99,8 +127,9 @@ impl Visitor<bool> for ModuleEqual {
       let lhs_op = lhs.get_operand(i).unwrap();
       let rhs_op = rhs.get_operand(i).unwrap();
       match (lhs_op.get_kind(), rhs_op.get_kind()) {
-        (NodeKind::Module, NodeKind::Module) => {
-          if !self.shallow_equal(lhs_op, rhs_op) {
+        (NodeKind::Module, NodeKind::Module) | (NodeKind::Expr, NodeKind::Expr) => {
+          let res = self.shallow_equal(lhs_op, rhs_op);
+          if res != NodeCmp::Eq {
             return Some(false);
           }
         }
@@ -158,7 +187,7 @@ impl Visitor<bool> for ModuleEqual {
   }
 }
 
-pub(super) fn module_equal(lhs: &ModuleRef<'_>, rhs: &ModuleRef<'_>) -> bool {
+fn module_equal(lhs: &ModuleRef<'_>, rhs: &ModuleRef<'_>) -> bool {
   let mut visitor = ModuleEqual {
     rhs: rhs.upcast(),
     lhs_param: vec![],
@@ -170,6 +199,7 @@ pub(super) fn module_equal(lhs: &ModuleRef<'_>, rhs: &ModuleRef<'_>) -> bool {
 
 pub(super) struct CommonModuleCache {
   dsu: Vec<usize>, // Use a DSU to store the master of each module
+  union_size: Vec<usize>,
   node_to_idx: HashMap<BaseNode, usize>,
   modules: Vec<BaseNode>,
 }
@@ -187,13 +217,21 @@ impl CommonModuleCache {
       .collect::<Vec<BaseNode>>();
     let cnt = node_to_idx.len();
     let mut dsu = (0..cnt).collect::<Vec<usize>>();
+    let mut union_size = vec![1; cnt];
 
     for i in 0..modules.len() {
       for j in 0..i {
         let lhs = &modules[i].as_ref::<Module>(sys).unwrap();
         let rhs = &modules[j].as_ref::<Module>(sys).unwrap();
+        // eprintln!("[Common Module] Compare {} and {}", lhs.get_name(), rhs.get_name());
         if module_equal(lhs, rhs) {
+          eprintln!(
+            "[Common Module] Module {} and {} are equal",
+            lhs.get_name(),
+            rhs.get_name()
+          );
           dsu[i] = j;
+          union_size[j] += union_size[i];
           break;
         }
       }
@@ -203,11 +241,12 @@ impl CommonModuleCache {
       node_to_idx,
       modules,
       dsu,
+      union_size,
     }
   }
 
-  pub(super) fn get_master(&mut self, node: &BaseNode) -> Option<&BaseNode> {
-    let idx = self.node_to_idx.get(node)?;
+  pub(super) fn get_master(&mut self, node: &BaseNode) -> BaseNode {
+    let idx = self.node_to_idx.get(node).unwrap();
     let mut runner = self.dsu[*idx];
     let mut to_merge = vec![];
     while runner != self.dsu[runner] {
@@ -217,12 +256,11 @@ impl CommonModuleCache {
     for idx in to_merge.into_iter() {
       self.dsu[idx] = runner;
     }
-    Some(&self.modules[runner])
+    self.modules[runner].clone()
   }
 
-  fn set_master(&mut self, node: &BaseNode, master: &BaseNode) {
-    let idx = self.node_to_idx.get(node).unwrap();
-    let master_idx = self.node_to_idx.get(master).unwrap();
-    self.dsu[*idx] = *master_idx;
+  pub(super) fn get_size(&mut self, node: &BaseNode) -> usize {
+    let idx = self.get_master(node);
+    self.union_size[*self.node_to_idx.get(&idx).unwrap()]
   }
 }
