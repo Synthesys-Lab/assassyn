@@ -230,6 +230,7 @@ fn systolic_array() {
     idle_threshold: 100,
   };
 
+  println!("{}", sys);
   eir::sim::elaborate(&sys, &config).unwrap();
 
   let exec_name = test_utils::temp_dir(&"systolic".to_string());

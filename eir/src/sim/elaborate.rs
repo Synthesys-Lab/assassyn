@@ -9,12 +9,13 @@ use crate::{
   ir::{node::*, visitor::Visitor, *},
 };
 
-use super::Config;
+use super::{fingerprint::FingerPrintCache, Config};
 
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   indent: usize,
   module_name: String,
+  fpc: FingerPrintCache,
 }
 
 impl<'a> ElaborateModule<'a> {
@@ -23,6 +24,7 @@ impl<'a> ElaborateModule<'a> {
       sys,
       indent: 0,
       module_name: String::new(),
+      fpc: FingerPrintCache::new(),
     }
   }
 }
@@ -123,11 +125,25 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
 
 impl Visitor<String> for ElaborateModule<'_> {
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
+    if let Some(fp) = module.get_builder_func_ptr() {
+      if self.fpc.get_master(fp).is_some() {
+        return format!(
+          "// Module {} unified to its fingerprint {}\n",
+          module.get_name(),
+          fp
+        )
+        .into();
+      } else {
+        self.fpc.set_master(fp, module.upcast());
+      }
+    }
+
     self.module_name = module.get_name().to_string();
     let mut res = String::new();
     res.push_str(format!("// Elaborating module {}\n", namify(module.get_name())).as_str());
     res.push_str(format!("fn {}(\n", namify(module.get_name())).as_str());
     res.push_str("  stamp: usize,\n");
+    res.push_str("  module_name: &str,\n");
     res.push_str("  q: &mut BinaryHeap<Reverse<Event>>,\n");
     res.push_str("  inputs: &mut (");
     for port in module.port_iter() {
@@ -266,11 +282,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         Opcode::Log => {
           let mut res = String::new();
           res.push_str(
-            format!(
-              "print!(\"@line:{{:<5}} [{}] {{}}:   \", line!(), cyclize(stamp));",
-              self.module_name
-            )
-            .as_str(),
+            "print!(\"@line:{{:<5}} [{{}}] {{}}:   \", line!(), module_name, cyclize(stamp));",
           );
           res.push_str("println!(");
           for elem in expr.operand_iter() {
@@ -374,7 +386,12 @@ fn namify(name: &str) -> String {
   name.replace(".", "_")
 }
 
-fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), std::io::Error> {
+fn dump_runtime(
+  sys: &SysBuilder,
+  fd: &mut File,
+  fpc: &FingerPrintCache,
+  config: &Config,
+) -> Result<(), std::io::Error> {
   // Dump the helper function of cycles.
   fd.write("// Simulation runtime.\n".as_bytes())?;
   {
@@ -553,9 +570,25 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
       )
       .as_bytes(),
     )?;
+    let callee = if let Some(fp) = module.get_builder_func_ptr() {
+      let master = fpc.get_master(fp).unwrap();
+      let master = master.as_ref::<Module>(sys).unwrap();
+      fd.write(
+        format!(
+          "        // Calling {} merged to calling {}\n",
+          module.get_name(),
+          master.get_name()
+        )
+        .as_bytes(),
+      )?;
+      namify(master.get_name())
+    } else {
+      namify(module.get_name())
+    };
     fd.write(
       format!(
-        "        {}(event.0.stamp, &mut q, &mut {}_fifos",
+        "        {}(event.0.stamp, \"{}\", &mut q, &mut {}_fifos",
+        callee,
         namify(module.get_name()),
         namify(module.get_name()),
       )
@@ -628,12 +661,14 @@ fn dump_runtime(sys: &SysBuilder, fd: &mut File, config: &Config) -> Result<(), 
   Ok(())
 }
 
-fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
+fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<FingerPrintCache, std::io::Error> {
   let mut em = ElaborateModule::new(sys);
   for module in em.sys.module_iter() {
-    fd.write(em.visit_module(&module).unwrap().as_bytes())?;
+    if let Some(buffer) = em.visit_module(&module) {
+      fd.write(buffer.as_bytes())?;
+    }
   }
-  Ok(())
+  Ok(em.fpc)
 }
 
 fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
@@ -649,6 +684,6 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error
   println!("Writing simulator code to {}", config.fname);
   let mut fd = fs::File::create(config.fname.clone())?;
   dump_header(&mut fd)?;
-  dump_module(sys, &mut fd)?;
-  dump_runtime(sys, &mut fd, config)
+  let fpc = dump_module(sys, &mut fd)?;
+  dump_runtime(sys, &mut fd, &fpc, config)
 }

@@ -101,7 +101,11 @@ impl Visitor<String> for IRPrinter {
     for elem in module.port_iter() {
       res.push_str(self.visit_input(&elem).unwrap().as_str());
     }
-    res.push_str(") {\n");
+    res.push_str(format!(") {{ // key: {}", module.get_key()).as_str());
+    if let Some(finger_print) = module.get_builder_func_ptr() {
+      res.push_str(format!(", finger_print: {}", finger_print).as_str());
+    }
+    res.push('\n');
     self.indent += 2;
     if module.get_name().eq("driver") {
       res.push_str(format!("{}while true {{\n", " ".repeat(self.indent)).as_str());

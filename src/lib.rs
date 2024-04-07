@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
+use quote::quote;
+use syn::bracketed;
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
-use syn::{braced, bracketed};
 use syn::{parse_macro_input, Token};
 
 mod ast;
@@ -136,10 +136,18 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
       (quote! { eir::ir::node::BaseNode }, quote! { module })
     };
 
+  let parameterizable = parsed_module.ext_interf;
   let res = quote! {
     fn #builder_name (sys: &mut eir::builder::SysBuilder, #ext_interf) -> #ret_tys {
       use eir::ir::node::IsElement;
-      let module = sys.create_module(stringify!(#module_name), vec![#port_decls]);
+      let module = {
+        let res = sys.create_module(stringify!(#module_name), vec![#port_decls]);
+        let mut module_mut = res.as_mut::<eir::ir::Module>(sys).expect("[CG] No module found!");
+        let raw_ptr = #builder_name as *const ();
+        module_mut.set_builder_func_ptr(raw_ptr as usize);
+        module_mut.set_parameterizable(vec![#parameterizable]);
+        res
+      };
       sys.set_current_module(module.clone());
       let ( #port_ids ) = {
         let module = module
@@ -156,36 +164,4 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   // eprintln!("Raw Source Code:\n{}", res);
 
   res.into()
-}
-
-// TODO(@were): Refactor this to a separate module.
-struct TestbenchParser {
-  func_name: syn::Ident,
-  args: Punctuated<syn::Ident, Token![,]>,
-  body: Vec<(usize, syn::Expr)>,
-}
-
-impl Parse for TestbenchParser {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let func_name = input.parse::<syn::Ident>()?;
-    let raw_args;
-    bracketed!(raw_args in input);
-    let args = raw_args.parse_terminated(syn::Ident::parse, Token![,])?;
-    let raw_body;
-    braced!(raw_body in input);
-    let mut body = vec![];
-    while !raw_body.is_empty() {
-      let cycle = raw_body.parse::<syn::LitInt>()?;
-      let cycle = cycle.base10_parse().unwrap();
-      raw_body.parse::<Token![:]>()?;
-      let expr = raw_body.parse::<syn::Expr>()?;
-      raw_body.parse::<Token![;]>()?;
-      body.push((cycle, expr));
-    }
-    Ok(TestbenchParser {
-      func_name,
-      args,
-      body,
-    })
-  }
 }
