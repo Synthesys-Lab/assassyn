@@ -2,6 +2,7 @@ use std::{
   collections::HashSet,
   fs::{self, File},
   io::Write,
+  process::Command,
 };
 
 use crate::{
@@ -677,10 +678,29 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
   fd.write(src.to_string().as_bytes())
 }
 
-pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
+pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
   println!("Writing simulator code to {}", config.fname);
   let mut fd = fs::File::create(config.fname.clone())?;
   dump_header(&mut fd)?;
   let mut fpc = dump_module(sys, &mut fd)?;
-  dump_runtime(sys, &mut fd, &mut fpc, config)
+  dump_runtime(sys, &mut fd, &mut fpc, config)?;
+  fd.flush()
+}
+
+pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
+  match elaborate_impl(sys, config) {
+    Ok(_) => {}
+    Err(e) => {
+      eprintln!("Failed to write to file: {}", e);
+      std::process::exit(1);
+    }
+  }
+  let output = Command::new("rustfmt")
+    .arg(config.fname.as_str())
+    .arg("--config")
+    .arg("max_width=100,tab_spaces=2")
+    .output()
+    .expect("Failed to compile");
+  assert!(output.status.success());
+  Ok(())
 }

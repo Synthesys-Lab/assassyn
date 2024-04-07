@@ -161,6 +161,7 @@ impl Visitor<bool> for ModuleEqual {
 
   fn visit_input(&mut self, lhs: &FIFORef<'_>) -> Option<bool> {
     let rhs = self.rhs.as_ref::<FIFO>(lhs.sys).unwrap();
+    self.eq_cache.insert((lhs.upcast(), rhs.upcast()));
     return (lhs.idx() == rhs.idx()).into();
   }
 
@@ -182,6 +183,7 @@ impl Visitor<bool> for ModuleEqual {
     if !self.deep_equal(array_ptr.sys, array_ptr.get_idx(), rhs.get_idx()) {
       return Some(false);
     }
+    self.eq_cache.insert((array_ptr.upcast(), rhs.upcast()));
     return Some(true);
   }
 
@@ -193,18 +195,23 @@ impl Visitor<bool> for ModuleEqual {
     if array.get_size() != rhs.get_size() {
       return Some(false);
     }
+    self.eq_cache.insert((array.upcast(), rhs.upcast()));
     return Some(true);
   }
 }
 
-fn module_equal(lhs: &ModuleRef<'_>, rhs: &ModuleRef<'_>) -> bool {
+fn module_equal(lhs: &ModuleRef<'_>, rhs: &ModuleRef<'_>) -> Option<HashSet<(BaseNode, BaseNode)>> {
   let mut visitor = ModuleEqual {
     rhs: rhs.upcast(),
     lhs_param: vec![],
     rhs_param: vec![],
     eq_cache: HashSet::new(),
   };
-  visitor.visit_module(&lhs).unwrap()
+  if visitor.visit_module(&lhs).unwrap() {
+    Some(visitor.eq_cache)
+  } else {
+    None
+  }
 }
 
 pub(super) struct CommonModuleCache {
@@ -212,6 +219,7 @@ pub(super) struct CommonModuleCache {
   union_size: Vec<usize>,
   node_to_idx: HashMap<BaseNode, usize>,
   modules: Vec<BaseNode>,
+  placeholder: Vec<Option<Vec<BaseNode>>>,
 }
 
 impl CommonModuleCache {
@@ -226,33 +234,54 @@ impl CommonModuleCache {
       .map(|x| x.upcast())
       .collect::<Vec<BaseNode>>();
     let cnt = node_to_idx.len();
-    let mut dsu = (0..cnt).collect::<Vec<usize>>();
-    let mut union_size = vec![1; cnt];
+    let dsu = (0..cnt).collect::<Vec<usize>>();
+    let union_size = vec![1; cnt];
+    let mut res = CommonModuleCache {
+      node_to_idx,
+      modules,
+      dsu,
+      union_size,
+      placeholder: vec![None; cnt],
+    };
 
-    for i in 0..modules.len() {
+    for i in 0..res.modules.len() {
       for j in 0..i {
-        let lhs = &modules[i].as_ref::<Module>(sys).unwrap();
-        let rhs = &modules[j].as_ref::<Module>(sys).unwrap();
+        let master_j = res.get_master(&res.modules[j].clone());
+        let master_j = *res.node_to_idx.get(&master_j).unwrap();
+        let lhs = &res.modules[i].as_ref::<Module>(sys).unwrap();
+        let rhs = &res.modules[master_j].as_ref::<Module>(sys).unwrap();
         // eprintln!("[Common Module] Compare {} and {}", lhs.get_name(), rhs.get_name());
-        if module_equal(lhs, rhs) {
-          eprintln!(
-            "[Common Module] Module {} and {} are equal",
-            lhs.get_name(),
-            rhs.get_name()
-          );
-          dsu[i] = j;
-          union_size[j] += union_size[i];
+        if let Some(eq) = module_equal(lhs, rhs) {
+          // eprintln!(
+          //   "[Common Module] Module {} and {} are equal",
+          //   lhs.get_name(),
+          //   rhs.get_name()
+          // );
+          // print!("{{ ");
+          // for (k, v) in eq.iter() {
+          //   print!("_{}: _{}, ", k.get_key(), v.get_key());
+          // }
+          // println!("}}");
+          // println!("{}", crate::ir::ir_printer::IRPrinter::new().visit_module(lhs).unwrap());
+          let mut eq = eq.into_iter().collect::<Vec<_>>();
+          eq.sort_by_key(|x| x.1.get_key());
+          let (secondary_ph, maseter_ph): (Vec<_>, Vec<_>) = eq.into_iter().unzip();
+
+          res.placeholder[i] = Some(secondary_ph);
+          if res.placeholder[master_j].is_none() {
+            res.placeholder[master_j] = Some(maseter_ph);
+          } else {
+            assert_eq!(res.placeholder[master_j].as_ref().unwrap(), &maseter_ph);
+          }
+
+          res.dsu[i] = master_j;
+          res.union_size[master_j] += res.union_size[i];
           break;
         }
       }
     }
 
-    CommonModuleCache {
-      node_to_idx,
-      modules,
-      dsu,
-      union_size,
-    }
+    res
   }
 
   pub(super) fn get_master(&mut self, node: &BaseNode) -> BaseNode {
