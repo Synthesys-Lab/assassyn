@@ -10,7 +10,7 @@ use crate::{
   ir::{node::*, visitor::Visitor, *},
 };
 
-use super::{common_module::CommonModuleCache, Config};
+use super::{analysis::common_module::CommonModuleCache, Config};
 
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
@@ -460,39 +460,27 @@ fn dump_runtime(
   fd.write("  }\n".as_bytes())?;
   fd.write("}\n\n".as_bytes())?;
 
-  // Dump the event runtime.
-  // #[derive(Debug, Eq, PartialEq)]
-  // struct Event {
-  //   stamp: usize,
-  //   kind: EventKind,
-  // }
-  fd.write("#[derive(Debug, Eq, PartialEq)]\n".as_bytes())?;
-  fd.write("struct Event {\n".as_bytes())?;
-  fd.write("  stamp: usize,\n".as_bytes())?;
-  fd.write("  kind: EventKind,\n".as_bytes())?;
-  fd.write("}\n\n".as_bytes())?;
-
-  // Dump the event order comparison.
-  // impl std::cmp::Ord for Event {
-  //   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-  //     self.partial_cmp(other).unwrap()
-  //   }
-  // }
-  // impl std::cmp::Eq for Event {
-  //   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-  //     self.partial_cmp(other).unwrap()
-  //   }
-  // }
-  fd.write("impl Ord for Event {\n".as_bytes())?;
-  fd.write("  fn cmp(&self, other: &Self) -> Ordering {\n".as_bytes())?;
-  fd.write("    self.partial_cmp(other).unwrap()\n".as_bytes())?;
-  fd.write("  }\n".as_bytes())?;
-  fd.write("}\n\n".as_bytes())?;
-  fd.write("impl PartialOrd for Event {\n".as_bytes())?;
-  fd.write("  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {\n".as_bytes())?;
-  fd.write("    Some(self.stamp.cmp(&other.stamp))\n".as_bytes())?;
-  fd.write("  }\n".as_bytes())?;
-  fd.write("}\n\n".as_bytes())?;
+  fd.write(
+    quote::quote! {
+      #[derive(Debug, Eq, PartialEq)]
+      struct Event {
+        stamp: usize,
+        kind: EventKind,
+      }
+      impl std::cmp::Ord for Event {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+          self.stamp.cmp(&other.stamp)
+        }
+      }
+      impl std::cmp::Eq for Event {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+          Some(self.stamp.cmp(&other.stamp))
+        }
+      }
+    }
+    .to_string()
+    .as_bytes(),
+  )?;
 
   // TODO(@were): Make all arguments of the modules FIFO channels.
   // TODO(@were): Profile the maxium size of all the FIFO channels.

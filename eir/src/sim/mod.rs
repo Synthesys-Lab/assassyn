@@ -1,4 +1,4 @@
-mod common_module;
+mod analysis;
 pub mod config;
 pub mod elaborate;
 

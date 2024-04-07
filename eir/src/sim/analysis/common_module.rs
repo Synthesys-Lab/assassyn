@@ -6,7 +6,7 @@ use crate::{
   ir::{data::Typed, node::*, visitor::Visitor, *},
 };
 
-struct ModuleEqual {
+pub(super) struct ModuleEqual {
   lhs_param: Vec<BaseNode>,
   rhs_param: Vec<BaseNode>,
   rhs: BaseNode,
@@ -214,7 +214,7 @@ fn module_equal(lhs: &ModuleRef<'_>, rhs: &ModuleRef<'_>) -> Option<HashSet<(Bas
   }
 }
 
-pub(super) struct CommonModuleCache {
+pub(in crate::sim) struct CommonModuleCache {
   dsu: Vec<usize>, // Use a DSU to store the master of each module
   union_size: Vec<usize>,
   node_to_idx: HashMap<BaseNode, usize>,
@@ -223,7 +223,7 @@ pub(super) struct CommonModuleCache {
 }
 
 impl CommonModuleCache {
-  pub(super) fn new(sys: &SysBuilder) -> Self {
+  pub(in crate::sim) fn new(sys: &SysBuilder) -> Self {
     let node_to_idx = sys
       .module_iter()
       .enumerate()
@@ -284,7 +284,7 @@ impl CommonModuleCache {
     res
   }
 
-  pub(super) fn get_master(&mut self, node: &BaseNode) -> BaseNode {
+  pub(in crate::sim) fn get_master(&mut self, node: &BaseNode) -> BaseNode {
     let idx = self.node_to_idx.get(node).unwrap();
     let mut runner = self.dsu[*idx];
     let mut to_merge = vec![];
@@ -298,7 +298,7 @@ impl CommonModuleCache {
     self.modules[runner].clone()
   }
 
-  pub(super) fn get_size(&mut self, node: &BaseNode) -> usize {
+  pub(in crate::sim) fn get_size(&mut self, node: &BaseNode) -> usize {
     let idx = self.get_master(node);
     self.union_size[*self.node_to_idx.get(&idx).unwrap()]
   }
