@@ -7,6 +7,7 @@ pub enum DataType {
   UInt(usize),
   Fp32,
   Module(Vec<Box<DataType>>),
+  ArrayType(Box<DataType>, usize),
 }
 
 pub trait Typed {
@@ -14,6 +15,11 @@ pub trait Typed {
 }
 
 impl DataType {
+  pub fn array(scalar_ty: DataType, size: usize) -> Self {
+    assert!(scalar_ty.is_scalar());
+    DataType::ArrayType(Box::new(scalar_ty), size)
+  }
+
   pub fn void() -> Self {
     DataType::Void
   }
@@ -34,6 +40,13 @@ impl DataType {
     DataType::Fp32
   }
 
+  pub fn is_scalar(&self) -> bool {
+    match self {
+      DataType::Int(_) | DataType::UInt(_) | DataType::Fp32 => true,
+      _ => false,
+    }
+  }
+
   pub fn bits(&self) -> usize {
     match self {
       DataType::Void => 0,
@@ -41,6 +54,7 @@ impl DataType {
       DataType::UInt(bits) => *bits,
       DataType::Fp32 => 32,
       DataType::Module(_) => 0,
+      DataType::ArrayType(ty, size) => ty.bits() * size,
     }
   }
 
@@ -87,6 +101,7 @@ impl ToString for DataType {
       &DataType::UInt(_) => format!("u{}", self.bits()),
       &DataType::Fp32 => format!("f{}", self.bits()),
       &DataType::Void => String::from("()"),
+      &DataType::ArrayType(ty, size) => format!("array[{} x {}]", ty.to_string(), size),
       &DataType::Module(args) => format!(
         "module[{}]",
         args
@@ -177,7 +192,7 @@ pub struct Array {
 
 impl Typed for Array {
   fn dtype(&self) -> DataType {
-    DataType::void()
+    DataType::array(self.scalar_ty.clone(), self.size)
   }
 }
 

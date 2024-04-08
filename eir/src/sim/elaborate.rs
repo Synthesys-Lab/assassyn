@@ -1,5 +1,5 @@
 use std::{
-  collections::HashSet,
+  collections::{HashMap, HashSet},
   fs::{self, File},
   io::Write,
   process::Command,
@@ -10,7 +10,14 @@ use crate::{
   ir::{node::*, visitor::Visitor, *},
 };
 
-use super::{analysis::common_module::CommonModuleCache, Config};
+use super::utils::{array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty};
+
+use self::ir_printer::IRPrinter;
+
+use super::{
+  analysis::{self, common_module::CommonModuleCache},
+  Config,
+};
 
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
@@ -358,31 +365,6 @@ impl Visitor<String> for ElaborateModule<'_> {
   }
 }
 
-fn dtype_to_rust_type(dtype: &DataType) -> String {
-  if dtype.is_int() {
-    let bits = dtype.bits();
-    return if bits.is_power_of_two() && bits >= 8 && bits <= 64 {
-      format!("i{}", dtype.bits())
-    } else if bits == 1 {
-      "bool".to_string()
-    } else if bits.is_power_of_two() && bits < 8 {
-      "i8".to_string()
-    } else {
-      format!("i{}", dtype.bits().next_power_of_two())
-    };
-  }
-  match dtype {
-    DataType::Module(_) => {
-      format!("Box<EventKind>",)
-    }
-    _ => panic!("Not implemented yet!"),
-  }
-}
-
-fn namify(name: &str) -> String {
-  name.replace(".", "_")
-}
-
 fn dump_runtime(
   sys: &SysBuilder,
   fd: &mut File,
@@ -405,33 +387,61 @@ fn dump_runtime(
   // Each event instance looks like this:
   //
   // enum EventKind {
-  //   Module_{module.get_name()},
+  //   Module{camelize(module.get_name())},
   //   ...
-  //   FIFO_push_{module.get_name()}_{port.idx()}(value),
+  //   ArrayWrite{data_type}((ref_idx, array, array_idx, value)),
   //   ...
-  //   Array_commit_{array.get_name()}(idx, value),
+  //   FIFOPush{data_type}((ref_idx, fifo, value)),
   // }
   fd.write("#[derive(Clone, Debug, Eq, PartialEq)]\n".as_bytes())?;
   fd.write("enum EventKind {\n".as_bytes())?;
   for module in sys.module_iter() {
-    fd.write(format!("  Module_{},\n", namify(module.get_name())).as_bytes())?;
-    for port in module.port_iter() {
-      fd.write(
-        format!(
-          "  FIFO_push_{}({}),\n",
-          namify(fifo_name!(port).as_str()),
-          dtype_to_rust_type(&port.scalar_ty()),
-        )
-        .as_bytes(),
-      )?;
-    }
+    fd.write(format!("  Module{},\n", camelize(&namify(module.get_name()))).as_bytes())?;
   }
-  for array in sys.array_iter() {
+  let array_types = analysis::types::array_types_used(sys);
+  for aty in array_types.iter() {
+    let (scalar_ty, size) = unwrap_array_ty(aty);
+    let scalar_str = dtype_to_rust_type(&scalar_ty);
+    let array_str = format!("Array{}", array_ty_to_id(&scalar_ty, size));
+    let rust_aty = dtype_to_rust_type(&aty);
     fd.write(
       format!(
-        "  Array_commit_{}(usize, {}),\n",
-        namify(array.get_name()),
-        dtype_to_rust_type(&array.scalar_ty())
+        "  Array{}Write((usize, Box<{}>, usize, {})),\n",
+        array_str, rust_aty, scalar_str
+      )
+      .as_bytes(),
+    )?;
+  }
+  let fifo_types = analysis::types::fifo_types_used(sys);
+  for fty in fifo_types.iter() {
+    let ty = dtype_to_rust_type(&fty);
+    fd.write(
+      format!(
+        "  FIFO{}Push((usize, Box<VecDeque<{}>>, {})),\n",
+        ty, ty, ty
+      )
+      .as_bytes(),
+    )?;
+  }
+  fd.write("}\n\n".as_bytes())?;
+  fd.write("enum DataSlab {".as_bytes())?;
+  for array in array_types.iter() {
+    let (scalar_ty, size) = unwrap_array_ty(array);
+    fd.write(
+      format!(
+        "  Array{}(Box<{}>),\n",
+        array_ty_to_id(&scalar_ty, size),
+        dtype_to_rust_type(&array),
+      )
+      .as_bytes(),
+    )?;
+  }
+  for fifo in fifo_types.iter() {
+    fd.write(
+      format!(
+        "  FIFO{}(Box<VecDeque<{}>>),\n",
+        dtype_to_rust_type(&fifo),
+        dtype_to_rust_type(&fifo)
       )
       .as_bytes(),
     )?;
@@ -489,35 +499,46 @@ fn dump_runtime(
   fd.write("  let mut stamp: usize = 0;\n".as_bytes())?;
   fd.write("  // Count the consecutive cycles idled\n".as_bytes())?;
   fd.write("  let mut idled: usize = 0;\n".as_bytes())?;
+  fd.write("  let mut data_slab : Vec<Option<DataSlab>> = Vec::new();\n".as_bytes())?;
   fd.write("  // Define global arrays\n".as_bytes())?;
+  let mut slab_cache: HashMap<BaseNode, usize> = HashMap::new();
   for array in sys.array_iter() {
+    let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
+    let scalar_str = dtype_to_rust_type(&scalar_ty);
     fd.write(
       format!(
-        "  let mut {} = vec![{}; {}];\n",
-        namify(array.get_name()),
-        if array.scalar_ty().bits() == 1 {
+        "  data_slab.push(DataSlab::Array{}(Box::new([{}; {}])).into()); // {} -> {}\n",
+        array_ty_to_id(&scalar_ty, size),
+        if scalar_ty.bits() == 1 {
           "false".into()
         } else {
-          format!("0 as {}", dtype_to_rust_type(&array.scalar_ty()))
+          format!("0 as {}", scalar_str)
         },
-        array.get_size()
+        size,
+        slab_cache.len(),
+        IRPrinter::new().visit_array(&array).unwrap()
       )
       .as_bytes(),
     )?;
+    slab_cache.insert(array.upcast(), slab_cache.len());
   }
-  fd.write("  // Define the module FIFOs\n".as_bytes())?;
+  fd.write("\n\n  // Define the module FIFOs\n".as_bytes())?;
   for module in sys.module_iter() {
-    fd.write(format!("  let mut {}_fifos : (", namify(module.get_name())).as_bytes())?;
     for port in module.port_iter() {
-      fd.write(format!("VecDeque<{}>, ", dtype_to_rust_type(&port.scalar_ty())).as_bytes())?;
+      fd.write(
+        format!(
+          "  data_slab.push(DataSlab::FIFO{}(Box::new(VecDeque::new())).into()); // {} -> {}.{}\n",
+          dtype_to_rust_type(&port.scalar_ty()),
+          slab_cache.len(),
+          module.get_name(),
+          port.idx()
+        )
+        .as_bytes(),
+      )?;
+      slab_cache.insert(port.upcast(), slab_cache.len());
     }
-    fd.write(") = (".as_bytes())?;
-    for _ in module.port_iter() {
-      fd.write(format!("VecDeque::new(), ").as_bytes())?;
-    }
-    fd.write(");\n".as_bytes())?;
   }
-  fd.write("  // Define the event queue\n".as_bytes())?;
+  fd.write("\n\n  // Define the event queue\n".as_bytes())?;
   fd.write("  let mut q = BinaryHeap::new();\n".as_bytes())?;
   let sim_threshold = config.sim_threshold;
   if sys.has_driver() {
@@ -525,7 +546,7 @@ fn dump_runtime(
     fd.write(
       quote::quote! {
         for i in 0..#sim_threshold {
-          q.push(Reverse(Event{stamp: i * 100, kind: EventKind::Module_driver}));
+          q.push(Reverse(Event{stamp: i * 100, kind: EventKind::ModuleDriver}));
         }
       }
       .to_string()
@@ -550,8 +571,8 @@ fn dump_runtime(
   for module in sys.module_iter() {
     fd.write(
       format!(
-        "      EventKind::Module_{} => {{\n",
-        namify(module.get_name())
+        "      EventKind::Module{} => {{\n",
+        camelize(&namify(module.get_name()))
       )
       .as_bytes(),
     )?;
