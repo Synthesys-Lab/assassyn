@@ -1,5 +1,5 @@
 use std::{
-  collections::{HashMap, HashSet},
+  collections::HashMap,
   fs::{self, File},
   io::Write,
   process::Command,
@@ -14,30 +14,25 @@ use super::utils::{array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_
 
 use self::ir_printer::IRPrinter;
 
-use super::{
-  analysis::{self, common_module::CommonModuleCache},
-  Config,
-};
+use super::{analysis, Config};
 
-struct ElaborateModule<'a> {
+struct ElaborateModule<'a, 'b> {
   sys: &'a SysBuilder,
   indent: usize,
   module_name: String,
-  fpc: CommonModuleCache,
+  slab_cache: &'b HashMap<BaseNode, usize>,
 }
 
-impl<'a> ElaborateModule<'a> {
-  fn new(sys: &'a SysBuilder) -> Self {
+impl<'a, 'b> ElaborateModule<'a, 'b> {
+  fn new(sys: &'a SysBuilder, ri: &'b HashMap<BaseNode, usize>) -> Self {
     Self {
       sys,
       indent: 0,
       module_name: String::new(),
-      fpc: CommonModuleCache::new(sys),
+      slab_cache: ri,
     }
   }
 }
-
-struct InterfDecl<'a>(&'a HashSet<Opcode>);
 
 macro_rules! fifo_name {
   ($fifo:expr) => {{
@@ -52,37 +47,6 @@ macro_rules! dump_ref {
   };
 }
 
-impl<'a> Visitor<String> for InterfDecl<'a> {
-  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
-    format!(
-      "  {}: {}Box<{}>,",
-      namify(array.get_name()),
-      if self.0.contains(&Opcode::Store) {
-        ""
-      } else {
-        "&"
-      },
-      dtype_to_rust_type(&array.dtype())
-    )
-    .into()
-  }
-
-  fn visit_input(&mut self, fifo: &FIFORef<'_>) -> Option<String> {
-    format!(
-      "  {}: Box<VecDeque<{}>>,",
-      fifo_name!(fifo),
-      dtype_to_rust_type(&fifo.scalar_ty())
-    )
-    .into()
-  }
-
-  fn visit_module(&mut self, _: &ModuleRef<'_>) -> Option<String> {
-    String::from("").into()
-  }
-}
-
-struct InterfArgFeeder<'ops>(&'ops HashSet<Opcode>);
-
 struct NodeRefDumper;
 
 impl Visitor<String> for NodeRefDumper {
@@ -92,7 +56,7 @@ impl Visitor<String> for NodeRefDumper {
         let array = node.as_ref::<Array>(sys).unwrap();
         namify(array.get_name()).into()
       }
-      NodeKind::FIFO => namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into(),
+      NodeKind::FIFO => fifo_name!(node.as_ref::<FIFO>(sys).unwrap()).into(),
       NodeKind::IntImm => {
         let int_imm = node.as_ref::<IntImm>(sys).unwrap();
         Some(format!(
@@ -115,51 +79,41 @@ impl Visitor<String> for NodeRefDumper {
   }
 }
 
-impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
-  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
-    format!(
-      ", /*Ext.Intef.Array*/&{}{}",
-      if self.0.contains(&Opcode::Store) {
-        "mut "
-      } else {
-        ""
-      },
-      namify(array.get_name()),
-    )
-    .into()
-  }
-  fn visit_input(&mut self, _: &FIFORef<'_>) -> Option<String> {
-    format!("").into()
-  }
-  fn visit_module(&mut self, _: &ModuleRef<'_>) -> Option<String> {
-    format!("").into()
-  }
-}
-
-impl Visitor<String> for ElaborateModule<'_> {
+impl Visitor<String> for ElaborateModule<'_, '_> {
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
     self.module_name = module.get_name().to_string();
     let mut res = String::new();
     res.push_str(&format!(
-      "// Elaborating module {}\n",
+      "\n// Elaborating module {}\n",
       namify(module.get_name())
     ));
+    // Dump the function signature.
+    // First, some common function parameters are dumped.
     res.push_str(&format!("fn {}(\n", namify(module.get_name())));
     res.push_str("  stamp: usize,\n");
-    res.push_str("  module_name: &str,\n");
     res.push_str("  q: &mut BinaryHeap<Reverse<Event>>,\n");
     for port in module.port_iter() {
       res.push_str(&format!(
-        "  {}_{}: &mut VecDeque<{}>,\n",
-        module.get_name(),
-        port.idx(),
+        "  {}: &mut VecDeque<{}>,\n",
+        fifo_name!(port),
         dtype_to_rust_type(&port.scalar_ty())
       ));
     }
-    for (array, ops) in module.ext_interf_iter() {
-      let mut ie = InterfDecl(ops);
-      let array_str = ie.dispatch(module.sys, array, vec![]).unwrap();
-      res.push_str(&format!("{} // external interface\n", array_str));
+    // All the writes will be done in half a cycle later by events, so no need to feed them
+    // to the function signature.
+    for (interf, _) in module
+      .ext_interf_iter()
+      .filter(|(v, ops)| v.get_kind() == NodeKind::Array && ops.contains(&Opcode::Load))
+    {
+      let array = interf.as_ref::<Array>(module.sys).unwrap();
+      res.push_str(
+        format!(
+          "{}: &{}, // external array read\n",
+          dump_ref!(module.sys, interf),
+          dtype_to_rust_type(&array.dtype())
+        )
+        .as_str(),
+      )
     }
     res.push_str(") {\n");
     self.indent += 2;
@@ -221,17 +175,24 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap()
             .as_ref::<ArrayPtr>(expr.sys)
             .unwrap();
+          let array = handle.get_array();
+          let slab_idx = *self.slab_cache.get(&array).unwrap();
+          let array = array.as_ref::<Array>(expr.sys).unwrap();
+          let idx = dump_ref!(expr.sys, handle.get_idx());
+          let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
+          let aid = array_ty_to_id(&scalar_ty, size);
           format!(
-            "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::Array_commit_{}({} as usize, {}) }}))",
-            NodeRefDumper.dispatch(expr.sys, &handle.get_array(), vec![]).unwrap(),
-            NodeRefDumper.dispatch(expr.sys, &handle.get_idx(), vec![]).unwrap(),
+            "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::Array{}Write(({}, {} as usize, {})) }}))",
+            aid,
+            slab_idx,
+            idx,
             dump_ref!(expr.sys, expr.get_operand(1).unwrap()),
           )
         }
         Opcode::Trigger => {
           let to_trigger =
             if let Ok(module) = expr.get_operand(0).unwrap().as_ref::<Module>(self.sys) {
-              format!("EventKind::Module_{}", namify(module.get_name()))
+              format!("EventKind::Module{}", camelize(&namify(module.get_name())))
             } else {
               format!(
                 "{}.as_ref().clone()",
@@ -250,7 +211,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
-          format!("inputs.{}.pop_front().unwrap()", fifo.idx())
+          format!("{}.pop_front().unwrap()", fifo_name!(fifo))
         }
         Opcode::FIFOPeek => {
           let fifo = expr
@@ -258,35 +219,44 @@ impl Visitor<String> for ElaborateModule<'_> {
             .unwrap()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
-          format!("*inputs.{}.front().unwrap()", fifo.idx())
+          format!("{}.front().unwrap()", fifo_name!(fifo))
         }
         Opcode::FIFOPush => {
           let value = dump_ref!(self.sys, expr.get_operand(2).unwrap());
+          let module = expr
+            .get_operand(0)
+            .unwrap()
+            .as_ref::<Module>(self.sys)
+            .unwrap();
           let fifo_idx = expr
             .get_operand(1)
             .unwrap()
             .as_ref::<IntImm>(self.sys)
             .unwrap()
             .get_value();
-          if let Ok(module) = expr.get_operand(0).unwrap().as_ref::<Module>(self.sys) {
+          let port = module
+            .get_input(fifo_idx as usize)
+            .unwrap()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          if expr.get_operand(0).unwrap().get_kind() == NodeKind::Module {
             format!(
-              "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO_push_{}_{}({}) }}))",
-              namify(&module.get_name()),
-              fifo_idx,
+              "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO{}Push(({}, {})) }}))",
+              dtype_to_rust_type(&port.scalar_ty()),
+              *self.slab_cache.get(&port.upcast()).unwrap(),
               value
             )
           } else {
             let module = dump_ref!(self.sys, expr.get_operand(0).unwrap());
             format!(
-              "q.push(Reverse(Event{{ stamp: stamp + 50, kind: to_push({}.as_ref().clone(), {}, {} as u64) }}))",
+              "// q.push(Reverse(Event{{ stamp: stamp + 50, kind: to_push({}.as_ref().clone(), {}, {} as u64) }}))",
               module, fifo_idx, value
             )
           }
         }
         Opcode::Log => {
           let mut res = String::new();
-          res
-            .push_str("print!(\"@line:{:<5} [{}] {}:   \", line!(), module_name, cyclize(stamp));");
+          res.push_str("print!(\"@line:{:<5} {}:   \", line!(), cyclize(stamp));");
           res.push_str("println!(");
           for elem in expr.operand_iter() {
             res.push_str(&format!("{}, ", dump_ref!(self.sys, elem)));
@@ -361,23 +331,19 @@ impl Visitor<String> for ElaborateModule<'_> {
   }
 }
 
-fn dump_runtime(
-  sys: &SysBuilder,
-  fd: &mut File,
-  _: &mut CommonModuleCache,
-  config: &Config,
-) -> Result<(), std::io::Error> {
+fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode, usize>) {
+  let mut res = String::new();
   // Dump the helper function of cycles.
-  fd.write("// Simulation runtime.\n".as_bytes())?;
-  {
-    let cyclize = quote::quote! {
+  res.push_str("// Simulation runtime.\n");
+  res.push_str(
+    &quote::quote! {
       fn cyclize(stamp: usize) -> String {
         format!("Cycle @{}.{:02}", stamp / 100, stamp % 100)
       }
-    };
-    fd.write(cyclize.to_string().as_bytes())?;
-    fd.write("\n".as_bytes())?;
-  }
+    }
+    .to_string(),
+  );
+  res.push('\n');
 
   // Dump the event enum. Each event corresponds to a module.
   // Each event instance looks like this:
@@ -385,90 +351,98 @@ fn dump_runtime(
   // enum EventKind {
   //   Module{camelize(module.get_name())},
   //   ...
-  //   ArrayWrite{data_type}((ref_idx, array, array_idx, value)),
+  //   Array{data_type}Write((ref_idx, array, array_idx, value)),
   //   ...
   //   FIFOPush{data_type}((ref_idx, fifo, value)),
   // }
-  fd.write("#[derive(Clone, Debug, Eq, PartialEq)]\n".as_bytes())?;
-  fd.write("enum EventKind {\n".as_bytes())?;
+  res.push_str("#[derive(Clone, Debug, Eq, PartialEq)]\n");
+  res.push_str("enum EventKind {\n");
   for module in sys.module_iter() {
-    fd.write(format!("  Module{},\n", camelize(&namify(module.get_name()))).as_bytes())?;
+    res.push_str(&format!(
+      "  Module{},\n",
+      camelize(&namify(module.get_name()))
+    ));
   }
   let array_types = analysis::types::array_types_used(sys);
   for aty in array_types.iter() {
     let (scalar_ty, size) = unwrap_array_ty(aty);
     let scalar_str = dtype_to_rust_type(&scalar_ty);
-    let array_str = format!("Array{}", array_ty_to_id(&scalar_ty, size));
-    let rust_aty = dtype_to_rust_type(&aty);
-    fd.write(
-      format!(
-        "  Array{}Write((usize, Box<{}>, usize, {})),\n",
-        array_str, rust_aty, scalar_str
-      )
-      .as_bytes(),
-    )?;
+    let array_str = array_ty_to_id(&scalar_ty, size);
+    res.push_str(&format!(
+      "  Array{}Write((usize, usize, {})),\n",
+      array_str, scalar_str
+    ));
   }
   let fifo_types = analysis::types::fifo_types_used(sys);
   for fty in fifo_types.iter() {
     let ty = dtype_to_rust_type(&fty);
-    fd.write(
-      format!(
-        "  FIFO{}Push((usize, Box<VecDeque<{}>>, {})),\n",
-        ty, ty, ty
-      )
-      .as_bytes(),
-    )?;
+    res.push_str(&format!("  FIFO{}Push((usize, {})),\n", ty, ty));
   }
-  fd.write("}\n\n".as_bytes())?;
-  fd.write("enum DataSlab {".as_bytes())?;
+  res.push_str("}\n\n");
+
+  // Dump the universal set of data types used in this simulation.
+  res.push_str("enum DataSlab {");
   for array in array_types.iter() {
     let (scalar_ty, size) = unwrap_array_ty(array);
-    fd.write(
-      format!(
-        "  Array{}(Box<{}>),\n",
-        array_ty_to_id(&scalar_ty, size),
-        dtype_to_rust_type(&array),
-      )
-      .as_bytes(),
-    )?;
+    res.push_str(&format!(
+      "  Array{}(Box<{}>),\n",
+      array_ty_to_id(&scalar_ty, size),
+      dtype_to_rust_type(&array),
+    ));
   }
   for fifo in fifo_types.iter() {
-    fd.write(
-      format!(
-        "  FIFO{}(Box<VecDeque<{}>>),\n",
-        dtype_to_rust_type(&fifo),
-        dtype_to_rust_type(&fifo)
-      )
-      .as_bytes(),
-    )?;
+    res.push_str(&format!(
+      "  FIFO{}(Box<VecDeque<{}>>),\n",
+      dtype_to_rust_type(&fifo),
+      dtype_to_rust_type(&fifo)
+    ));
   }
-  fd.write("}\n\n".as_bytes())?;
-  fd.write("fn to_push(ek: EventKind, idx: usize, value: u64) -> EventKind {\n".as_bytes())?;
-  fd.write("  match (ek.clone(), idx) {\n".as_bytes())?;
-  for module in sys.module_iter() {
-    for (i, port) in module.port_iter().enumerate() {
-      if !port.scalar_ty().is_int() {
-        continue;
+  res.push_str("}\n\n");
+  // Dump the state of ownership of each register.
+  res.push_str(
+    &quote::quote! {
+      #[derive(Clone, Debug, PartialEq, Eq)]
+      enum Ownership {
+        None,
+        Writingby(EventKind),
       }
-      fd.write(
-        format!(
-          "    (EventKind::Module_{}, {}) => EventKind::FIFO_push_{}(value as {}),\n",
-          namify(module.get_name()),
-          i,
-          &fifo_name!(port),
-          dtype_to_rust_type(&port.scalar_ty())
-        )
-        .as_bytes(),
-      )?;
     }
-  }
-  fd.write("    _ => panic!(\"Unknown event to push, {:?}, {}\", ek, idx),\n".as_bytes())?;
-  fd.write("  }\n".as_bytes())?;
-  fd.write("}\n\n".as_bytes())?;
+    .to_string(),
+  );
+  // Dump the slab entry struct.
+  res.push_str(
+    &quote::quote! {
+      struct SlabEntry {
+        payload: DataSlab,
+        ownership: Ownership,
+      }
+    }
+    .to_string(),
+  );
 
-  fd.write(
-    quote::quote! {
-      #[derive(Debug, Eq, PartialEq)]
+  // res.push_str("fn to_push(ek: EventKind, idx: usize, value: u64) -> EventKind {\n");
+  // res.push_str("  match (ek.clone(), idx) {\n");
+  // for module in sys.module_iter() {
+  //   for (i, port) in module.port_iter().enumerate() {
+  //     if !port.scalar_ty().is_int() {
+  //       continue;
+  //     }
+  //     res.push_str(&format!(
+  //       "    (EventKind::Module_{}, {}) => EventKind::FIFO_push_{}(value as {}),\n",
+  //       namify(module.get_name()),
+  //       i,
+  //       &fifo_name!(port),
+  //       dtype_to_rust_type(&port.scalar_ty())
+  //     ));
+  //   }
+  // }
+  // res.push_str("    _ => panic!(\"Unknown event to push, {:?}, {}\", ek, idx),\n");
+  // res.push_str("  }\n");
+  // res.push_str("}\n\n");
+
+  res.push_str(
+    &quote::quote! {
+      #[derive(Debug, PartialEq, Eq)]
       struct Event {
         stamp: usize,
         kind: EventKind,
@@ -478,81 +452,74 @@ fn dump_runtime(
           self.stamp.cmp(&other.stamp)
         }
       }
-      impl std::cmp::Eq for Event {
+      impl std::cmp::PartialOrd for Event {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
           Some(self.stamp.cmp(&other.stamp))
         }
       }
     }
-    .to_string()
-    .as_bytes(),
-  )?;
+    .to_string(),
+  );
 
   // TODO(@were): Make all arguments of the modules FIFO channels.
   // TODO(@were): Profile the maxium size of all the FIFO channels.
-  fd.write("fn main() {\n".as_bytes())?;
-  fd.write("  // The global time stamp\n".as_bytes())?;
-  fd.write("  let mut stamp: usize = 0;\n".as_bytes())?;
-  fd.write("  // Count the consecutive cycles idled\n".as_bytes())?;
-  fd.write("  let mut idled: usize = 0;\n".as_bytes())?;
-  fd.write("  let mut data_slab : Vec<Option<DataSlab>> = Vec::new();\n".as_bytes())?;
-  fd.write("  // Define global arrays\n".as_bytes())?;
+  res.push_str("fn main() {\n");
+  res.push_str("  // The global time stamp\n");
+  res.push_str("  let mut stamp: usize = 0;\n");
+  res.push_str("  // Count the consecutive cycles idled\n");
+  res.push_str("  let mut idled: usize = 0;\n");
+  res.push_str("  let mut data_slab : Vec<Option<SlabEntry>> = vec![\n");
+  res.push_str("  // Define global arrays\n");
   let mut slab_cache: HashMap<BaseNode, usize> = HashMap::new();
   for array in sys.array_iter() {
     let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
     let scalar_str = dtype_to_rust_type(&scalar_ty);
-    fd.write(
-      format!(
-        "  data_slab.push(DataSlab::Array{}(Box::new([{}; {}])).into()); // {} -> {}\n",
-        array_ty_to_id(&scalar_ty, size),
-        if scalar_ty.bits() == 1 {
-          "false".into()
-        } else {
-          format!("0 as {}", scalar_str)
-        },
-        size,
-        slab_cache.len(),
-        IRPrinter::new().visit_array(&array).unwrap()
-      )
-      .as_bytes(),
-    )?;
+    res.push_str(&format!(
+      "Some(SlabEntry {{ payload: DataSlab::Array{}(Box::new([{}; {}])), ownership: Ownership::None }}), // {} -> {}\n",
+      array_ty_to_id(&scalar_ty, size),
+      if scalar_ty.bits() == 1 {
+        "false".into()
+      } else {
+        format!("0 as {}", scalar_str)
+      },
+      size,
+      slab_cache.len(),
+      IRPrinter::new().visit_array(&array).unwrap()
+    ));
     slab_cache.insert(array.upcast(), slab_cache.len());
   }
-  fd.write("\n\n  // Define the module FIFOs\n".as_bytes())?;
+  res.push_str("\n\n  // Define the module FIFOs\n");
   for module in sys.module_iter() {
     for port in module.port_iter() {
-      fd.write(
-        format!(
-          "  data_slab.push(DataSlab::FIFO{}(Box::new(VecDeque::new())).into()); // {} -> {}.{}\n",
-          dtype_to_rust_type(&port.scalar_ty()),
-          slab_cache.len(),
-          module.get_name(),
-          port.idx()
-        )
-        .as_bytes(),
-      )?;
+      res.push_str(&format!(
+        "Some(SlabEntry {{ payload: DataSlab::FIFO{}(Box::new(VecDeque::new())), ownership: Ownership::None }}), // {} -> {}.{}\n",
+        dtype_to_rust_type(&port.scalar_ty()),
+        slab_cache.len(),
+        module.get_name(),
+        port.idx()
+      ));
       slab_cache.insert(port.upcast(), slab_cache.len());
     }
   }
-  fd.write("\n\n  // Define the event queue\n".as_bytes())?;
-  fd.write("  let mut q = BinaryHeap::new();\n".as_bytes())?;
+  res.push_str("];\n\n");
+  res.push_str("  // Define the event queue\n");
+  res.push_str("  let mut q = BinaryHeap::new();\n");
   let sim_threshold = config.sim_threshold;
   if sys.has_driver() {
     // Push the initial events.
-    fd.write(
-      quote::quote! {
+    res.push_str(
+      &quote::quote! {
         for i in 0..#sim_threshold {
           q.push(Reverse(Event{stamp: i * 100, kind: EventKind::ModuleDriver}));
         }
       }
-      .to_string()
-      .as_bytes(),
-    )?;
+      .to_string(),
+    );
   }
   // TODO(@were): Dump the time stamp of the simulation.
-  fd.write("  while let Some(event) = q.pop() {\n".as_bytes())?;
-  fd.write(
-    quote::quote! {
+  res.push_str("  while let Some(event) = q.pop() {\n");
+  res.push_str(
+    &quote::quote! {
       if event.0.stamp / 100 > #sim_threshold {
         print!("Exceed the simulation threshold ");
         print!("{}", #sim_threshold);
@@ -560,135 +527,172 @@ fn dump_runtime(
         break;
       }
     }
-    .to_string()
-    .as_bytes(),
-  )?;
-  fd.write("    match event.0.kind {\n".as_bytes())?;
+    .to_string(),
+  );
+  res.push_str("    match event.0.kind {\n");
   for module in sys.module_iter() {
-    fd.write(
-      format!(
-        "      EventKind::Module{} => {{\n",
-        camelize(&namify(module.get_name()))
-      )
-      .as_bytes(),
-    )?;
+    res.push_str(&format!(
+      "      EventKind::Module{} => {{\n",
+      camelize(&namify(module.get_name()))
+    ));
+    // Unpacking the FIFO's from the slab.
+    for fifo in module.port_iter() {
+      let id = fifo_name!(fifo);
+      let slab_idx = *slab_cache.get(&fifo.upcast()).unwrap();
+      res.push_str(&format!(
+        "let mut {} = match std::mem::replace(&mut data_slab[{}], None) {{",
+        id, slab_idx,
+      ));
+      res.push_str(&format!(
+        "Some(SlabEntry {{ payload: DataSlab::FIFO{}(x), .. }}) => x,",
+        dtype_to_rust_type(&fifo.scalar_ty())
+      ));
+      res.push_str("_ => panic!(\"Unexpected slab type\"),");
+      res.push_str("};\n");
+    }
+    let ext_interf_args = module
+      .ext_interf_iter()
+      .filter(|(v, ops)| v.get_kind() == NodeKind::Array && ops.contains(&Opcode::Load))
+      .map(|(elem, _)| {
+        let id = dump_ref!(sys, elem);
+        let slab_idx = *slab_cache.get(&elem).unwrap();
+        res.push_str(&format!("let {} = match &data_slab[{}] {{", id, slab_idx,));
+        let aty = elem.as_ref::<Array>(sys).unwrap().dtype();
+        let aty = unwrap_array_ty(&aty);
+        res.push_str(&format!(
+          "Some(SlabEntry {{ payload: DataSlab::Array{}(x), .. }}) => x,",
+          array_ty_to_id(&aty.0, aty.1)
+        ));
+        res.push_str("_ => panic!(\"Unexpected slab type\"),");
+        res.push_str("};\n");
+        id
+      })
+      .collect::<Vec<_>>();
+    // Dump the function call.
     let callee = namify(module.get_name());
-    // if fpc.get_size(&module.upcast()) != 1{
-    //   let master = fpc.get_master(&module.upcast());
-    //   let master = master.as_ref::<Module>(sys).unwrap();
-    //   fd.write(
-    //     format!(
-    //       "        // Calling {} merged to calling {}\n",
-    //       module.get_name(),
-    //       master.get_name()
-    //     )
-    //     .as_bytes(),
-    //   )?;
-    //   namify(master.get_name())
-    // } else {
-    //   namify(module.get_name())
-    // };
-    fd.write(
-      format!(
-        "        {}(event.0.stamp, \"{}\", &mut q, &mut {}_fifos",
-        callee,
-        namify(module.get_name()),
-        namify(module.get_name()),
-      )
-      .as_bytes(),
-    )?;
-    for (array, ops) in module.ext_interf_iter() {
-      fd.write(
-        InterfArgFeeder(ops)
-          .dispatch(sys, array, vec![])
-          .unwrap()
-          .as_bytes(),
-      )?;
+    res.push_str(&format!("        {}(event.0.stamp, &mut q,", callee,));
+    for fifo in module.port_iter() {
+      res.push_str(&format!(" &mut {},", fifo_name!(fifo)));
     }
-    fd.write(");\n".as_bytes())?;
+    for elem in ext_interf_args {
+      res.push_str(&elem);
+      res.push(',');
+    }
+    res.push_str(");\n");
+    // Return the ownership.
+    for fifo in module.port_iter() {
+      let id = fifo_name!(fifo);
+      let idx = *slab_cache.get(&fifo.upcast()).unwrap();
+      res.push_str(format!("assert!(data_slab[{}].is_none());", idx).as_str());
+      res.push_str(&format!(
+        "data_slab[{}] = Some(SlabEntry{{ payload: DataSlab::FIFO{}({}), ownership: Ownership::None}});\n",
+        idx,
+        dtype_to_rust_type(&fifo.scalar_ty()),
+        id
+      ));
+    }
+    for (elem, op) in module.ext_interf_iter() {
+      let idx = *slab_cache.get(&elem).unwrap();
+      if op.contains(&Opcode::Store) || op.contains(&Opcode::FIFOPush) {
+        res.push_str(&format!("match &mut data_slab[{}] {{", idx));
+        res.push_str("  Some(SlabEntry { ownership: x, .. } ) => {");
+        res.push_str(&format!(
+          "assert_eq!(x, &Ownership::None); *x = Ownership::Writingby(EventKind::Module{});",
+          camelize(&callee)
+        ));
+        res.push_str("  }");
+        res.push_str("  _ => panic!(\"Unexpected slab type\"),");
+        res.push_str("}");
+      }
+    }
     if !module.get_name().eq("driver") {
-      fd.write("        idled = 0;\n".as_bytes())?;
-      fd.write("        continue;\n".as_bytes())?;
-      fd.write("      }\n".as_bytes())?;
+      res.push_str("idled = 0; continue; }\n");
     } else {
-      fd.write("        idled += 1;\n".as_bytes())?;
-      fd.write("        stamp = event.0.stamp;\n".as_bytes())?;
-      fd.write("      }\n".as_bytes())?;
+      res.push_str("idled += 1; stamp = event.0.stamp; }\n");
     }
   }
-  for module in sys.module_iter() {
-    for port in module.port_iter() {
-      fd.write(
-        format!(
-          "      EventKind::FIFO_push_{}(value) => {{\n",
-          &fifo_name!(port)
-        )
-        .as_bytes(),
-      )?;
-      fd.write(
-        format!(
-          "        {}_fifos.{}.push_back(value);\n",
-          namify(module.get_name()),
-          port.idx()
-        )
-        .as_bytes(),
-      )?;
-      fd.write("      }\n".as_bytes())?;
-    }
+  // match &mut data_slab[slab_idx] {
+  //   Some(SlabEntry { payload: DataSlab::Array{}(array), .. }) => {
+  //     array[idx] = value;
+  //   }
+  //   _ => panic!("Unexpected slab type"),
+  // }
+  for aty in array_types.iter() {
+    let (scalar_ty, size) = unwrap_array_ty(aty);
+    let aid = array_ty_to_id(&scalar_ty, size);
+    res.push_str(&format!(
+      "EventKind::Array{}Write((slab_idx, idx, value)) => {{\n",
+      aid
+    ));
+    res.push_str("match &mut data_slab[slab_idx] {\n");
+    res.push_str(&format!(
+      "Some(SlabEntry {{ payload: DataSlab::Array{}(array), ownership: o }}) => {{\n",
+      aid
+    ));
+    res.push_str("array[idx] = value; *o = Ownership::None; }\n");
+    res.push_str("_ => panic!(\"Unexpected slab type\"),\n");
+    res.push_str("}}\n");
   }
-  for array in sys.array_iter() {
-    fd.write(
-      format!(
-        "      EventKind::Array_commit_{}(idx, value) => {{\n",
-        namify(array.get_name())
-      )
-      .as_bytes(),
-    )?;
-    fd.write(format!("        {}[idx] = value;\n", namify(array.get_name())).as_bytes())?;
-    fd.write("      }\n".as_bytes())?;
+  for fifo_ty in fifo_types.iter() {
+    let ty = dtype_to_rust_type(fifo_ty);
+    res.push_str(&format!(
+      "EventKind::FIFO{}Push((slab_idx, value)) => {{\n",
+      ty
+    ));
+    res.push_str("match &mut data_slab[slab_idx] {\n");
+    res.push_str(&format!(
+      "Some(SlabEntry {{ payload: DataSlab::FIFO{}(fifo), ownership: o }}) => {{\n",
+      ty
+    ));
+    res.push_str("fifo.push_back(value); *o = Ownership::None; }\n");
+    res.push_str("_ => panic!(\"Unexpected slab type\"),\n");
+    res.push_str("}}\n");
   }
-  fd.write("    }\n".as_bytes())?;
-  fd.write(format!("    if idled > {} {{\n", config.idle_threshold).as_bytes())?;
-  fd.write(
-    format!(
-      "      println!(\"Idled more than {} cycles, exit @{{}}!\", cyclize(stamp));\n",
-      config.idle_threshold
-    )
-    .as_bytes(),
-  )?;
-  fd.write("      break;\n".as_bytes())?;
-  fd.write("    }\n".as_bytes())?;
-  fd.write("  }\n".as_bytes())?;
-  fd.write("  println!(\"Finish simulation: {}!\", cyclize(stamp));\n".as_bytes())?;
-  fd.write("}\n\n".as_bytes())?;
-  Ok(())
+  res.push_str("}\n");
+  res.push_str(&format!("    if idled > {} {{\n", config.idle_threshold));
+  res.push_str(&format!(
+    "      println!(\"Idled more than {} cycles, exit @{{}}!\", cyclize(stamp));\n",
+    config.idle_threshold
+  ));
+  res.push_str("      break;\n");
+  res.push_str("    }\n");
+  res.push_str("  }\n");
+  res.push_str("  println!(\"Finish simulation: {}!\", cyclize(stamp));\n");
+  res.push_str("}\n\n");
+  (res, slab_cache)
 }
 
-fn dump_module(sys: &SysBuilder, fd: &mut File) -> Result<CommonModuleCache, std::io::Error> {
-  let mut em = ElaborateModule::new(sys);
+fn dump_module(
+  sys: &SysBuilder,
+  fd: &mut File,
+  slab_cache: &HashMap<BaseNode, usize>,
+) -> Result<(), std::io::Error> {
+  let mut em = ElaborateModule::new(sys, slab_cache);
   for module in em.sys.module_iter() {
     if let Some(buffer) = em.visit_module(&module) {
       fd.write(buffer.as_bytes())?;
     }
   }
-  Ok(em.fpc)
+  Ok(())
 }
 
 fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
   let src = quote::quote! {
     use std::collections::VecDeque;
     use std::collections::BinaryHeap;
-    use std::cmp::{PartialOrd, Ord, Ordering, Reverse};
+    use std::cmp::{Ord, Reverse};
   };
-  fd.write(src.to_string().as_bytes())
+  fd.write(src.to_string().as_bytes())?;
+  fd.write("\n\n\n".as_bytes())
 }
 
 pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
   println!("Writing simulator code to {}", config.fname);
   let mut fd = fs::File::create(config.fname.clone())?;
   dump_header(&mut fd)?;
-  let mut fpc = dump_module(sys, &mut fd)?;
-  dump_runtime(sys, &mut fd, &mut fpc, config)?;
+  let (rt_src, ri) = dump_runtime(sys, config);
+  dump_module(sys, &mut fd, &ri)?;
+  fd.write(rt_src.as_bytes())?;
   fd.flush()
 }
 
