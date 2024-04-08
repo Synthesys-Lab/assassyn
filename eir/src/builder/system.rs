@@ -551,12 +551,24 @@ impl SysBuilder {
       Some(DataType::Module(_)) => {}
       _ => panic!("Invalid module type"),
     }
-    if value.get_kind() == NodeKind::Module {
-      let mut dst_mut = self.get_mut::<Module>(&module).unwrap();
-      dst_mut.insert_external_interface(value.clone(), Opcode::FIFOPush);
-    } else if value.get_dtype(self).unwrap().is_module() {
-      println!("[Warning] For now, only direct module reference supported.");
-    }
+
+    // TODO(@were): Fix indirect call back redundancy.
+    // if value.get_kind() == NodeKind::Module {
+    //   let dst = self.get::<Module>(&value).unwrap();
+    //   let port = dst.get_input(idx).unwrap();
+    //   let src = self.get_current_module().unwrap().upcast();
+    //   let mut src_mut = self.get_mut::<Module>(&src).unwrap();
+    //   src_mut.insert_external_interface(port, Opcode::FIFOPush);
+    // } else if value.get_dtype(self).unwrap().is_module() {
+    //   println!("[Warning] For now, only direct module reference supported.");
+    // }
+
+    let dst = self.get::<Module>(&module).unwrap();
+    let port = dst.get_input(idx).unwrap();
+    let src = self.get_current_module().unwrap().upcast();
+    let mut src_mut = self.get_mut::<Module>(&src).unwrap();
+    src_mut.insert_external_interface(port, Opcode::FIFOPush);
+
     let idx = self.get_const_int(DataType::uint(32), idx as u64);
     let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![module, idx, value]);
     res

@@ -42,7 +42,7 @@ struct InterfDecl<'a>(&'a HashSet<Opcode>);
 macro_rules! fifo_name {
   ($fifo:expr) => {{
     let module = $fifo.get_parent().as_ref::<Module>($fifo.sys).unwrap();
-    namify(&format!("{}.{}", namify(module.get_name()), $fifo.idx()))
+    format!("{}_{}", namify(module.get_name()), $fifo.idx())
   }};
 }
 
@@ -69,7 +69,7 @@ impl<'a> Visitor<String> for InterfDecl<'a> {
 
   fn visit_input(&mut self, fifo: &FIFORef<'_>) -> Option<String> {
     format!(
-      "  {}: VecDeque<{}>,",
+      "  {}: Box<VecDeque<{}>>,",
       fifo_name!(fifo),
       dtype_to_rust_type(&fifo.scalar_ty())
     )
@@ -455,7 +455,7 @@ fn dump_runtime(
           "    (EventKind::Module_{}, {}) => EventKind::FIFO_push_{}(value as {}),\n",
           namify(module.get_name()),
           i,
-          namify(&fifo_name!(port)),
+          &fifo_name!(port),
           dtype_to_rust_type(&port.scalar_ty())
         )
         .as_bytes(),
@@ -621,7 +621,7 @@ fn dump_runtime(
       fd.write(
         format!(
           "      EventKind::FIFO_push_{}(value) => {{\n",
-          namify(&fifo_name!(port))
+          &fifo_name!(port)
         )
         .as_bytes(),
       )?;
