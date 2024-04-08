@@ -42,7 +42,7 @@ struct InterfDecl<'a>(&'a HashSet<Opcode>);
 macro_rules! fifo_name {
   ($fifo:expr) => {{
     let module = $fifo.get_parent().as_ref::<Module>($fifo.sys).unwrap();
-    format!("{}.{}", namify(module.get_name()), $fifo.idx())
+    namify(&format!("{}.{}", namify(module.get_name()), $fifo.idx()))
   }};
 }
 
@@ -55,20 +55,25 @@ macro_rules! dump_ref {
 impl<'a> Visitor<String> for InterfDecl<'a> {
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     format!(
-      "  {}: &{}Vec<{}>,",
+      "  {}: {}Box<{}>,",
       namify(array.get_name()),
       if self.0.contains(&Opcode::Store) {
-        "mut "
-      } else {
         ""
+      } else {
+        "&"
       },
-      dtype_to_rust_type(&array.scalar_ty())
+      dtype_to_rust_type(&array.dtype())
     )
     .into()
   }
 
-  fn visit_input(&mut self, _: &FIFORef<'_>) -> Option<String> {
-    String::from("").into()
+  fn visit_input(&mut self, fifo: &FIFORef<'_>) -> Option<String> {
+    format!(
+      "  {}: VecDeque<{}>,",
+      fifo_name!(fifo),
+      dtype_to_rust_type(&fifo.scalar_ty())
+    )
+    .into()
   }
 
   fn visit_module(&mut self, _: &ModuleRef<'_>) -> Option<String> {
@@ -133,34 +138,28 @@ impl<'ops> Visitor<String> for InterfArgFeeder<'ops> {
 
 impl Visitor<String> for ElaborateModule<'_> {
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
-    // let master = self.fpc.get_master(&module.upcast());
-    // if master != module.upcast() {
-    //   return format!(
-    //     "// Module {} unified to its master {}\n",
-    //     module.get_name(),
-    //     master.as_ref::<Module>(module.sys).unwrap().get_name()
-    //   )
-    //   .into();
-    // }
-
     self.module_name = module.get_name().to_string();
     let mut res = String::new();
-    res.push_str(format!("// Elaborating module {}\n", namify(module.get_name())).as_str());
-    res.push_str(format!("fn {}(\n", namify(module.get_name())).as_str());
+    res.push_str(&format!(
+      "// Elaborating module {}\n",
+      namify(module.get_name())
+    ));
+    res.push_str(&format!("fn {}(\n", namify(module.get_name())));
     res.push_str("  stamp: usize,\n");
     res.push_str("  module_name: &str,\n");
     res.push_str("  q: &mut BinaryHeap<Reverse<Event>>,\n");
-    res.push_str("  inputs: &mut (");
     for port in module.port_iter() {
-      res.push_str("VecDeque<");
-      res.push_str(dtype_to_rust_type(&port.scalar_ty()).as_str());
-      res.push_str(">, ");
+      res.push_str(&format!(
+        "  {}_{}: &mut VecDeque<{}>,\n",
+        module.get_name(),
+        port.idx(),
+        dtype_to_rust_type(&port.scalar_ty())
+      ));
     }
-    res.push_str("),\n");
     for (array, ops) in module.ext_interf_iter() {
       let mut ie = InterfDecl(ops);
       let array_str = ie.dispatch(module.sys, array, vec![]).unwrap();
-      res.push_str(format!("{} // external interface\n", array_str).as_str());
+      res.push_str(&format!("{} // external interface\n", array_str));
     }
     res.push_str(") {\n");
     self.indent += 2;
@@ -168,11 +167,11 @@ impl Visitor<String> for ElaborateModule<'_> {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(&expr).unwrap().as_str());
+          res.push_str(&self.visit_expr(&expr).unwrap());
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(&block).unwrap().as_str());
+          res.push_str(&self.visit_block(&block).unwrap());
         }
         _ => {
           panic!("Unexpected reference type: {:?}", elem);
@@ -290,7 +289,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             .push_str("print!(\"@line:{:<5} [{}] {}:   \", line!(), module_name, cyclize(stamp));");
           res.push_str("println!(");
           for elem in expr.operand_iter() {
-            res.push_str(format!("{}, ", dump_ref!(self.sys, elem)).as_str());
+            res.push_str(&format!("{}, ", dump_ref!(self.sys, elem)));
           }
           res.push(')');
           res
@@ -328,29 +327,26 @@ impl Visitor<String> for ElaborateModule<'_> {
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
     if let Some(cond) = block.get_pred() {
-      res.push_str(
-        format!(
-          "  if {}{} {{\n",
-          dump_ref!(self.sys, &cond),
-          if cond.get_dtype(block.sys).unwrap().bits() == 1 {
-            "".into()
-          } else {
-            format!(" != 0")
-          }
-        )
-        .as_str(),
-      );
+      res.push_str(&format!(
+        "  if {}{} {{\n",
+        dump_ref!(self.sys, &cond),
+        if cond.get_dtype(block.sys).unwrap().bits() == 1 {
+          "".into()
+        } else {
+          format!(" != 0")
+        }
+      ));
     }
     self.indent += 2;
     for elem in block.iter() {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(&expr).unwrap().as_str());
+          res.push_str(&self.visit_expr(&expr).unwrap());
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(&block).unwrap().as_str());
+          res.push_str(&self.visit_block(&block).unwrap());
         }
         _ => {
           panic!("Unexpected reference type: {:?}", elem);
@@ -359,7 +355,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     }
     self.indent -= 2;
     if block.get_pred().is_some() {
-      res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
+      res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
     }
     res.into()
   }
@@ -459,7 +455,7 @@ fn dump_runtime(
           "    (EventKind::Module_{}, {}) => EventKind::FIFO_push_{}(value as {}),\n",
           namify(module.get_name()),
           i,
-          namify(fifo_name!(port).as_str()),
+          namify(&fifo_name!(port)),
           dtype_to_rust_type(&port.scalar_ty())
         )
         .as_bytes(),
@@ -625,7 +621,7 @@ fn dump_runtime(
       fd.write(
         format!(
           "      EventKind::FIFO_push_{}(value) => {{\n",
-          namify(fifo_name!(port).as_str())
+          namify(&fifo_name!(port))
         )
         .as_bytes(),
       )?;
@@ -705,7 +701,7 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error
     }
   }
   let output = Command::new("rustfmt")
-    .arg(config.fname.as_str())
+    .arg(&config.fname)
     .arg("--config")
     .arg("max_width=100,tab_spaces=2")
     .output()
