@@ -20,7 +20,7 @@ fn manual() -> SysBuilder {
       when v {
         a = a.pop();
         async sqr {a: a};
-        log("agent move on {}", a);
+        log("agent move on, {}", a);
       }
       nv = v.flip();
       when nv {
@@ -106,7 +106,12 @@ fn testit(fname: &str, mut sys: SysBuilder) {
     .for_each(|l| {
       if l.contains("agent move on") {
         let (cycle, _) = parse_cycle(l);
-        assert!(cycle % 4 == 1 || cycle % 4 == 2, "agent move on");
+        assert!(
+          cycle % 4 == 1 || cycle % 4 == 2,
+          "agent move on {} % 4 = {}",
+          cycle,
+          cycle % 4
+        );
       }
       if l.contains("squarer") {
         let (cycle, _) = parse_cycle(l);

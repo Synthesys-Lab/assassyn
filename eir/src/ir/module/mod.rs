@@ -5,6 +5,8 @@ use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
+use self::expr::OperandOf;
+
 /// The data structure for a module.
 pub struct Module {
   pub(crate) key: usize,
@@ -12,7 +14,7 @@ pub struct Module {
   inputs: Vec<BaseNode>,
   body: BaseNode,
   /// The set of external interfaces used by the module.
-  pub(crate) external_interfaces: HashMap<BaseNode, HashSet<Opcode>>,
+  pub(crate) external_interfaces: HashMap<BaseNode, HashSet<OperandOf>>,
   builder_func_ptr: Option<usize>,
   parameterizable: Option<Vec<BaseNode>>,
 }
@@ -102,7 +104,7 @@ impl<'sys> ModuleRef<'sys> {
 
   pub(crate) fn ext_interf_iter<'borrow, 'res>(
     &'borrow self,
-  ) -> impl Iterator<Item = (&BaseNode, &HashSet<Opcode>)>
+  ) -> impl Iterator<Item = (&BaseNode, &HashSet<OperandOf>)>
   where
     'sys: 'borrow,
     'sys: 'res,
@@ -121,19 +123,70 @@ impl<'sys> ModuleRef<'sys> {
       .iter()
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
+
+  pub(crate) fn gather_related_externals(
+    &self,
+    user: BaseNode,
+    idx: Option<usize>,
+  ) -> Vec<(BaseNode, OperandOf)> {
+    // Remove all the external interfaces related to this instruction.
+    let tmp = self
+      .get()
+      .external_interfaces
+      .iter()
+      .map(|(ext, users)| {
+        (
+          ext.clone(),
+          users
+            .iter()
+            .filter(|x| x.user == user && idx.map_or(true, |i| x.idx == i))
+            .cloned()
+            .collect::<Vec<_>>(),
+        )
+      })
+      .filter(|(_, users)| !users.is_empty())
+      .collect::<Vec<_>>();
+    tmp
+      .iter()
+      .map(|(ext, users)| users.iter().map(|x| (ext.clone(), x.clone())))
+      .flatten()
+      .collect()
+  }
 }
 
 impl<'a> ModuleMut<'a> {
   /// Maintain the redundant information, array used in the module.
-  pub(crate) fn insert_external_interface(&mut self, array: BaseNode, opcode: Opcode) {
-    if !self.get().external_interfaces.contains_key(&array) {
+  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, user: OperandOf) {
+    if !self.get().external_interfaces.contains_key(&ext_node) {
       self
         .get_mut()
         .external_interfaces
-        .insert(array.clone(), HashSet::new());
+        .insert(ext_node.clone(), HashSet::new());
     }
-    let operations = self.get_mut().external_interfaces.get_mut(&array).unwrap();
-    operations.insert(opcode);
+    let users = self
+      .get_mut()
+      .external_interfaces
+      .get_mut(&ext_node)
+      .unwrap();
+    users.insert(user);
+  }
+
+  /// Remove a specific external interface.
+  pub(crate) fn remove_external_interface(&mut self, ext_node: BaseNode, user: OperandOf) {
+    if let Some(operations) = self.get_mut().external_interfaces.get_mut(&ext_node) {
+      operations.remove(&user);
+      if operations.is_empty() {
+        self.get_mut().external_interfaces.remove(&ext_node);
+      }
+    }
+  }
+
+  /// Remove all the related external interfaces with the given condition.
+  pub(crate) fn remove_related_externals(&mut self, user: BaseNode, idx: Option<usize>) {
+    let to_remove = self.get().gather_related_externals(user, idx);
+    to_remove.into_iter().for_each(|(ext, user)| {
+      self.remove_external_interface(ext, user);
+    });
   }
 
   /// Set the name of a module. Override the name given by the module builder.

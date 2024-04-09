@@ -34,8 +34,11 @@ pub fn run(exe: &String) -> Output {
 
 pub fn parse_cycle(raw_line: &str) -> (usize, usize) {
   let toks = raw_line.split_whitespace().collect::<Vec<_>>();
-  let len = toks[3].len();
-  let cycle = toks[3][1..len - 4].parse::<usize>().unwrap();
-  let half = toks[3][len - 3..len - 1].parse::<usize>().unwrap();
+  let cycle_tok_idx = 2;
+  let len = toks[cycle_tok_idx].len();
+  let cycle = toks[cycle_tok_idx][1..len - 4].parse::<usize>().unwrap();
+  let half = toks[cycle_tok_idx][len - 3..len - 1]
+    .parse::<usize>()
+    .unwrap();
   (cycle, half)
 }

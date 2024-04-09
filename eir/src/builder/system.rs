@@ -8,6 +8,8 @@ use crate::{
   ir::{ir_printer::IRPrinter, visitor::Visitor},
 };
 
+use self::expr::OperandOf;
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
 
@@ -563,14 +565,19 @@ impl SysBuilder {
     //   println!("[Warning] For now, only direct module reference supported.");
     // }
 
+    // Prepare to insert the external interface.
     let dst = self.get::<Module>(&module).unwrap();
     let port = dst.get_input(idx).unwrap();
     let src = self.get_current_module().unwrap().upcast();
-    let mut src_mut = self.get_mut::<Module>(&src).unwrap();
-    src_mut.insert_external_interface(port, Opcode::FIFOPush);
 
+    // Create the expression.
     let idx = self.get_const_int(DataType::uint(32), idx as u64);
     let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![module, idx, value]);
+
+    // Maintain the external interface redundancy.
+    let mut src_mut = self.get_mut::<Module>(&src).unwrap();
+    src_mut.insert_external_interface(port, OperandOf::new(res, 0));
+
     res
   }
 
@@ -587,7 +594,7 @@ impl SysBuilder {
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
-      .insert_external_interface(array.clone(), Opcode::Load);
+      .insert_external_interface(array.clone(), OperandOf::new(res, 0));
     res
   }
 
@@ -605,7 +612,7 @@ impl SysBuilder {
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
-      .insert_external_interface(array.clone(), Opcode::Store);
+      .insert_external_interface(array.clone(), OperandOf::new(res, 0));
     res
   }
 

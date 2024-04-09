@@ -74,7 +74,7 @@ impl DataType {
 
   pub fn is_int(&self) -> bool {
     match self {
-      DataType::Int(_) => true,
+      DataType::Int(_) | DataType::UInt(_) => true,
       _ => false,
     }
   }

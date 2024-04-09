@@ -10,7 +10,9 @@ use crate::{
   ir::{node::*, visitor::Visitor, *},
 };
 
-use super::utils::{array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty};
+use super::utils::{
+  array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty, user_contains_opcode,
+};
 
 use self::ir_printer::IRPrinter;
 
@@ -101,10 +103,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     }
     // All the writes will be done in half a cycle later by events, so no need to feed them
     // to the function signature.
-    for (interf, _) in module
-      .ext_interf_iter()
-      .filter(|(v, ops)| v.get_kind() == NodeKind::Array && ops.contains(&Opcode::Load))
-    {
+    for (interf, _) in module.ext_interf_iter().filter(|(v, ops)| {
+      v.get_kind() == NodeKind::Array && user_contains_opcode(module.sys, ops, vec![Opcode::Load])
+    }) {
       let array = interf.as_ref::<Array>(module.sys).unwrap();
       res.push_str(
         format!(
@@ -115,7 +116,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         .as_str(),
       )
     }
-    res.push_str(") {\n");
+    res.push_str(") -> HashSet<usize> { let mut reg_write = HashSet::new();\n");
     self.indent += 2;
     for elem in module.get_body().iter() {
       match elem.get_kind() {
@@ -133,7 +134,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
     }
     self.indent -= 2;
-    res.push_str("}\n");
+    res.push_str(" reg_write }\n");
     res.into()
   }
 
@@ -182,7 +183,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
           let aid = array_ty_to_id(&scalar_ty, size);
           format!(
-            "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::Array{}Write(({}, {} as usize, {})) }}))",
+            "reg_write.insert({}); q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::Array{}Write(({}, {} as usize, {})) }}))",
+            slab_idx,
             aid,
             slab_idx,
             idx,
@@ -239,11 +241,13 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             .unwrap()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
+          let slab_idx = *self.slab_cache.get(&port.upcast()).unwrap();
           if expr.get_operand(0).unwrap().get_kind() == NodeKind::Module {
             format!(
-              "q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO{}Push(({}, {})) }}))",
+              "reg_write.insert({}); q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO{}Push(({}, {})) }}))",
+              slab_idx,
               dtype_to_rust_type(&port.scalar_ty()),
-              *self.slab_cache.get(&port.upcast()).unwrap(),
+              slab_idx,
               value
             )
           } else {
@@ -256,7 +260,10 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
         Opcode::Log => {
           let mut res = String::new();
-          res.push_str("print!(\"@line:{:<5} {}:   \", line!(), cyclize(stamp));");
+          res.push_str(&format!(
+            "print!(\"@line:{{:<5}} {{}}: [{}]\t\", line!(), cyclize(stamp));",
+            self.module_name
+          ));
           res.push_str("println!(");
           for elem in expr.operand_iter() {
             res.push_str(&format!("{}, ", dump_ref!(self.sys, elem)));
@@ -552,7 +559,9 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     }
     let ext_interf_args = module
       .ext_interf_iter()
-      .filter(|(v, ops)| v.get_kind() == NodeKind::Array && ops.contains(&Opcode::Load))
+      .filter(|(v, ops)| {
+        v.get_kind() == NodeKind::Array && user_contains_opcode(module.sys, ops, vec![Opcode::Load])
+      })
       .map(|(elem, _)| {
         let id = dump_ref!(sys, elem);
         let slab_idx = *slab_cache.get(&elem).unwrap();
@@ -570,7 +579,10 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       .collect::<Vec<_>>();
     // Dump the function call.
     let callee = namify(module.get_name());
-    res.push_str(&format!("        {}(event.0.stamp, &mut q,", callee,));
+    res.push_str(&format!(
+      "        let reg_write = {}(event.0.stamp, &mut q,",
+      callee,
+    ));
     for fifo in module.port_iter() {
       res.push_str(&format!(" &mut {},", fifo_name!(fifo)));
     }
@@ -593,9 +605,10 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     }
     for (elem, op) in module.ext_interf_iter() {
       let idx = *slab_cache.get(&elem).unwrap();
-      if op.contains(&Opcode::Store) || op.contains(&Opcode::FIFOPush) {
+      if user_contains_opcode(module.sys, op, vec![Opcode::Store, Opcode::FIFOPush]) {
         res.push_str(&format!(
-          "match &mut data_slab[{}] {{ // {}\n",
+          "if reg_write.contains(&{}) {{ match &mut data_slab[{}] {{ // {}\n",
+          idx,
           idx,
           dump_ref!(sys, elem)
         ));
@@ -606,7 +619,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
         ));
         res.push_str("  }\n");
         res.push_str("  _ => panic!(\"Unexpected slab type\"),\n");
-        res.push_str("}\n");
+        res.push_str("}}\n");
       }
     }
     if !module.get_name().eq("driver") {
@@ -684,6 +697,7 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
   let src = quote::quote! {
     use std::collections::VecDeque;
     use std::collections::BinaryHeap;
+    use std::collections::HashSet;
     use std::cmp::{Ord, Reverse};
   };
   fd.write(src.to_string().as_bytes())?;

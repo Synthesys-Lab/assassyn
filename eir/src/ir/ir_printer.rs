@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use crate::builder::InsertPoint;
 use crate::ir::{node::*, *};
 
+use self::expr::OperandOf;
+
 use super::{block::Block, visitor::Visitor};
 
 pub struct IRPrinter {
@@ -21,35 +23,42 @@ impl IRPrinter {
   }
 }
 
-struct ExtInterDumper<'a>(&'a HashSet<Opcode>);
+struct ExtInterDumper<'a>(&'a HashSet<OperandOf>, usize);
 
+// TODO(@were): Fix this, dump the actual value of the operand_of one a line.
 impl Visitor<String> for ExtInterDumper<'_> {
   fn visit_input(&mut self, input: &FIFORef<'_>) -> Option<String> {
     let module = input.get_parent().as_ref::<Module>(input.sys).unwrap();
     let mut res = format!(
-      "{}.{}: fifo<{}>, {{ ",
+      "{}.{}: fifo<{}> {{\n",
       module.get_name(),
       input.get_name(),
       input.scalar_ty().to_string()
     );
     for op in self.0.iter() {
-      res.push_str(format!("{:?}, ", op).as_str());
+      let expr = IRPrinter::new()
+        .visit_expr(&op.user.as_ref::<Expr>(input.sys).unwrap())
+        .unwrap();
+      res.push_str(&format!("{}//   {}\n", " ".repeat(self.1), expr));
     }
-    res.push_str("}");
+    res.push_str(&format!("{}// }}", " ".repeat(self.1)));
     res.into()
   }
 
   fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
     let mut res = format!(
-      "Array: {}[{} x {}], {{ ",
+      "Array: {}[{} x {}] {{\n",
       array.get_name(),
       array.get_size(),
       array.scalar_ty().to_string(),
     );
     for op in self.0.iter() {
-      res.push_str(format!("{:?}, ", op).as_str());
+      let expr = IRPrinter::new()
+        .visit_expr(&op.user.as_ref::<Expr>(array.sys).unwrap())
+        .unwrap();
+      res.push_str(&format!("{}//   {}\n", " ".repeat(self.1), expr));
     }
-    res.push_str("}");
+    res.push_str(&format!("{}// }}", " ".repeat(self.1)));
     res.into()
   }
 
@@ -85,56 +94,60 @@ impl Visitor<String> for IRPrinter {
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
     let mut res = String::new();
     for (elem, ops) in module.ext_interf_iter() {
-      res.push_str(
-        format!(
-          "{}// {}\n",
-          " ".repeat(self.indent),
-          ExtInterDumper(ops)
-            .dispatch(module.sys, elem, vec![])
-            .unwrap()
-        )
-        .as_str(),
-      );
+      res.push_str(&format!(
+        "{}// {}\n",
+        " ".repeat(self.indent),
+        ExtInterDumper(ops, self.indent)
+          .dispatch(module.sys, elem, vec![])
+          .unwrap()
+      ));
     }
     if let Some(param) = module.get_parameterizable() {
       if !param.is_empty() {
-        res.push_str(" ".repeat(self.indent).as_str());
-        res.push_str("//");
+        res.push_str(&" ".repeat(self.indent));
+        res.push_str("// Parameters: ");
         for (i, elem) in param.iter().enumerate() {
           res.push_str(if i == 0 { " " } else { ", " });
-          res.push_str(format!("{}", elem.to_string(module.sys)).as_str());
+          res.push_str(&format!("{}", elem.to_string(module.sys)));
         }
         res.push('\n');
       }
     }
-    res.push_str(format!("{}module {}(", " ".repeat(self.indent), module.get_name()).as_str());
+    res.push_str(&format!(
+      "{}module {}(",
+      " ".repeat(self.indent),
+      module.get_name()
+    ));
     module.get();
     for elem in module.port_iter() {
-      res.push_str(self.visit_input(&elem).unwrap().as_str());
+      res.push_str(&self.visit_input(&elem).unwrap());
     }
-    res.push_str(format!(") {{ // key: {}", module.get_key()).as_str());
+    res.push_str(&format!(") {{ // key: {}", module.get_key()));
     if let Some(builder_ptr) = module.get_builder_func_ptr() {
-      res.push_str(format!(", builder-func: 0x{:x}", builder_ptr).as_str());
+      res.push_str(&format!(", builder-func: 0x{:x}", builder_ptr));
     }
     res.push('\n');
     self.indent += 2;
     if module.get_name().eq("driver") {
-      res.push_str(format!("{}while true {{\n", " ".repeat(self.indent)).as_str());
+      res.push_str(&format!("{}while true {{\n", " ".repeat(self.indent)));
       self.indent += 2;
     }
     let InsertPoint(cur_mod, _, at) = module.sys.get_insert_point();
     for (i, elem) in module.get_body().iter().enumerate() {
       if cur_mod == module.upcast() && at.unwrap_or_else(|| module.get_num_exprs()) == i {
-        res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
+        res.push_str(&format!(
+          "{}-----{{Insert Here}}-----\n",
+          " ".repeat(self.indent)
+        ));
       }
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(module.sys).unwrap();
-          res.push_str(format!("{}\n", self.visit_expr(&expr).unwrap()).as_str());
+          res.push_str(&format!("{}\n", self.visit_expr(&expr).unwrap()));
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(module.sys).unwrap();
-          res.push_str(format!("{}\n", self.visit_block(&block).unwrap()).as_str());
+          res.push_str(&format!("{}\n", self.visit_block(&block).unwrap()));
         }
         _ => {
           panic!("Not an block-able element: {:?}", elem);
@@ -142,14 +155,17 @@ impl Visitor<String> for IRPrinter {
       }
     }
     if at.is_none() && cur_mod == module.upcast() {
-      res.push_str(format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)).as_str());
+      res.push_str(&format!(
+        "{}-----{{Insert Here}}-----\n",
+        " ".repeat(self.indent)
+      ));
     }
     if module.get_name().eq("driver") {
       self.indent -= 2;
-      res.push_str(format!("{}}}\n", " ".repeat(self.indent)).as_str());
+      res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
     }
     self.indent -= 2;
-    res.push_str(" ".repeat(self.indent).as_str());
+    res.push_str(&" ".repeat(self.indent));
     res.push_str("}\n");
     res.into()
   }
@@ -200,7 +216,7 @@ impl Visitor<String> for IRPrinter {
           );
           for op in expr.operand_iter().skip(1) {
             res.push('_');
-            res.push_str(op.get_key().to_string().as_str());
+            res.push_str(&op.get_key().to_string());
             res.push(',');
             res.push(' ');
           }
@@ -210,29 +226,23 @@ impl Visitor<String> for IRPrinter {
         Opcode::SpinTrigger => {
           let mut res = String::new();
           self.indent += 2;
-          res.push_str(
-            format!(
-              "async {{\n{}while !{} {{ }} // DO NOT move on until this is true\n",
-              " ".repeat(self.indent),
-              expr.get_operand(0).unwrap().to_string(expr.sys),
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "{}call {}(",
-              " ".repeat(self.indent),
-              expr.get_operand(1).unwrap().to_string(expr.sys)
-            )
-            .as_str(),
-          );
+          res.push_str(&format!(
+            "async {{\n{}while !{} {{ }} // DO NOT move on until this is true\n",
+            " ".repeat(self.indent),
+            expr.get_operand(0).unwrap().to_string(expr.sys),
+          ));
+          res.push_str(&format!(
+            "{}call {}(",
+            " ".repeat(self.indent),
+            expr.get_operand(1).unwrap().to_string(expr.sys)
+          ));
           for op in expr.operand_iter().skip(2) {
-            res.push_str(op.to_string(expr.sys).as_str());
+            res.push_str(&op.to_string(expr.sys));
             res.push_str(", ");
           }
           res.push_str(")\n");
           self.indent -= 2;
-          res.push_str(format!("{}}}", " ".repeat(self.indent)).as_str());
+          res.push_str(&format!("{}}}", " ".repeat(self.indent)));
           res
         }
         Opcode::FIFOPop => {
@@ -277,15 +287,12 @@ impl Visitor<String> for IRPrinter {
           let fifo_name = if let Ok(module) = module.as_ref::<Module>(expr.sys) {
             let fifo = module
               .get_input(idx as usize)
-              .expect(
-                format!(
-                  "exceed the number of fifos {} > ({} - 1) of module {}",
-                  idx,
-                  module.get_num_inputs(),
-                  module.get_name(),
-                )
-                .as_str(),
-              )
+              .expect(&format!(
+                "exceed the number of fifos {} > ({} - 1) of module {}",
+                idx,
+                module.get_num_inputs(),
+                module.get_name(),
+              ))
               .as_ref::<FIFO>(expr.sys)
               .unwrap();
             fifo.get_name().clone()
@@ -305,7 +312,7 @@ impl Visitor<String> for IRPrinter {
         Opcode::Log => {
           let mut res = format!("log(");
           for op in expr.operand_iter() {
-            res.push_str(op.to_string(expr.sys).as_str());
+            res.push_str(&op.to_string(expr.sys));
             res.push_str(", ");
           }
           res.push(')');
@@ -340,27 +347,24 @@ impl Visitor<String> for IRPrinter {
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
     if let Some(cond) = block.get_pred() {
-      res.push_str(
-        format!(
-          "{}if {} {{\n",
-          " ".repeat(self.indent),
-          cond.to_string(block.sys)
-        )
-        .as_str(),
-      );
+      res.push_str(&format!(
+        "{}if {} {{\n",
+        " ".repeat(self.indent),
+        cond.to_string(block.sys)
+      ));
       self.inc_indent();
     } else {
-      res.push_str(format!("{}\n", block.get_key()).as_str());
+      res.push_str(&format!("{}\n", block.get_key()));
     }
     for elem in block.iter() {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(block.sys).unwrap();
-          res.push_str(format!("{}\n", self.visit_expr(&expr).unwrap()).as_str());
+          res.push_str(&format!("{}\n", self.visit_expr(&expr).unwrap()));
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(block.sys).unwrap();
-          res.push_str(format!("{}\n", self.visit_block(&block).unwrap()).as_str());
+          res.push_str(&format!("{}\n", self.visit_block(&block).unwrap()));
         }
         _ => {
           panic!("Not an block-able element: {:?}", elem);
@@ -369,7 +373,7 @@ impl Visitor<String> for IRPrinter {
     }
     if block.get_pred().is_some() {
       self.dec_indent();
-      res.push_str(format!("{}}}", " ".repeat(self.indent)).as_str());
+      res.push_str(&format!("{}}}", " ".repeat(self.indent)));
     }
     res.into()
   }
