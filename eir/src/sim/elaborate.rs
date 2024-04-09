@@ -219,7 +219,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             .unwrap()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
-          format!("{}.front().unwrap()", fifo_name!(fifo))
+          format!("{}.front().unwrap().clone()", fifo_name!(fifo))
         }
         Opcode::FIFOPush => {
           let value = dump_ref!(self.sys, expr.get_operand(2).unwrap());
@@ -594,15 +594,19 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     for (elem, op) in module.ext_interf_iter() {
       let idx = *slab_cache.get(&elem).unwrap();
       if op.contains(&Opcode::Store) || op.contains(&Opcode::FIFOPush) {
-        res.push_str(&format!("match &mut data_slab[{}] {{", idx));
-        res.push_str("  Some(SlabEntry { ownership: x, .. } ) => {");
         res.push_str(&format!(
-          "assert_eq!(x, &Ownership::None); *x = Ownership::Writingby(EventKind::Module{});",
+          "match &mut data_slab[{}] {{ // {}\n",
+          idx,
+          dump_ref!(sys, elem)
+        ));
+        res.push_str("  Some(SlabEntry { ownership: x, .. } ) => {\n");
+        res.push_str(&format!(
+          "assert_eq!(x, &Ownership::None); *x = Ownership::Writingby(EventKind::Module{});\n",
           camelize(&callee)
         ));
-        res.push_str("  }");
-        res.push_str("  _ => panic!(\"Unexpected slab type\"),");
-        res.push_str("}");
+        res.push_str("  }\n");
+        res.push_str("  _ => panic!(\"Unexpected slab type\"),\n");
+        res.push_str("}\n");
       }
     }
     if !module.get_name().eq("driver") {
