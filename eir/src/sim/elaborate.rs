@@ -225,28 +225,17 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
         Opcode::FIFOPush => {
           let value = dump_ref!(self.sys, expr.get_operand(2).unwrap());
-          let module = expr
+          let fifo = expr
             .get_operand(0)
-            .unwrap()
-            .as_ref::<Module>(self.sys)
-            .unwrap();
-          let fifo_idx = expr
-            .get_operand(1)
-            .unwrap()
-            .as_ref::<IntImm>(self.sys)
-            .unwrap()
-            .get_value();
-          let port = module
-            .get_input(fifo_idx as usize)
             .unwrap()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
-          let slab_idx = *self.slab_cache.get(&port.upcast()).unwrap();
+          let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
           if expr.get_operand(0).unwrap().get_kind() == NodeKind::Module {
             format!(
               "reg_write.insert({}); q.push(Reverse(Event{{ stamp: stamp + 50, kind: EventKind::FIFO{}Push(({}, {})) }}))",
               slab_idx,
-              dtype_to_rust_type(&port.scalar_ty()),
+              dtype_to_rust_type(&fifo.scalar_ty()),
               slab_idx,
               value
             )
@@ -254,7 +243,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             let module = dump_ref!(self.sys, expr.get_operand(0).unwrap());
             format!(
               "// q.push(Reverse(Event{{ stamp: stamp + 50, kind: to_push({}.as_ref().clone(), {}, {} as u64) }}))",
-              module, fifo_idx, value
+              module, fifo.idx(), value
             )
           }
         }

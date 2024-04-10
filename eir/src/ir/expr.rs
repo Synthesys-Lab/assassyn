@@ -222,27 +222,6 @@ impl ExprMut<'_> {
         let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
         module_mut.insert_external_interface(operand, OperandOf::new(expr, i));
       }
-      // TODO(@were): This is a BIG hack for callback. Remove this after callback rewriting is done.
-      NodeKind::Module => {
-        if self.get().get_opcode() == Opcode::FIFOPush {
-          assert_eq!(i, 0);
-          let idx = self
-            .get()
-            .get_operand(1)
-            .unwrap()
-            .as_ref::<IntImm>(self.sys)
-            .unwrap()
-            .get_value();
-          let dest_fifo = operand
-            .as_ref::<Module>(self.sys)
-            .unwrap()
-            .get_input(idx as usize)
-            .unwrap()
-            .clone();
-          let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
-          module_mut.insert_external_interface(dest_fifo, OperandOf::new(expr, i));
-        }
-      }
       _ => {}
     }
 

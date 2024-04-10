@@ -40,7 +40,7 @@ impl Visitor<(BaseNode, BaseNode)> for SpinTriggerFinder {
   }
 }
 
-pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
+pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
   let mut finder = SpinTriggerFinder::new();
 
   if let Some((parent, spin_trigger)) = finder.enter(sys) {
@@ -93,12 +93,14 @@ pub fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     // Instead of calling the original destination module, we call the agent module.
     bundle[0] = agent;
     for i in 1..bundle.len() {
+      let dst_module = agent.as_ref::<Module>(&mutator.sys).unwrap();
+      let port = dst_module.get_input(i - 1).unwrap().clone();
       // For each FIFO push in our system, it takes `module`, and `idx` as arguments.
       // Since we no longer call the original module, we just replace the first argument with the
       // agent module.
       let mut bundle_mut = bundle[i].as_mut::<Expr>(mutator.sys).unwrap();
       assert_eq!(bundle_mut.get().get_opcode(), Opcode::FIFOPush);
-      bundle_mut.set_operand(0, agent);
+      bundle_mut.set_operand(0, port);
     }
     if let Some((_, idx_value)) = &handle_tuple {
       let port_idx = agent
