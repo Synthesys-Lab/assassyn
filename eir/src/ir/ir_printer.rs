@@ -297,7 +297,7 @@ impl Visitor<String> for IRPrinter {
           let fifo_name = FIFODumper
             .dispatch(expr.sys, expr.get_operand(0).unwrap(), vec![])
             .unwrap();
-          let value = expr.get_operand(2).unwrap().to_string(expr.sys);
+          let value = expr.get_operand(1).unwrap().to_string(expr.sys);
           format!(
             "{}.push({}) // handle: _{}",
             fifo_name,
