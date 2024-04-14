@@ -40,6 +40,7 @@ fn eager_bind() {
   let rhs = rhs_builder(&mut sys, aa);
   driver_builder(&mut sys, lhs, rhs);
   println!("{}", sys);
+  eir::builder::verify(&sys);
 
   let src_name = test_utils::temp_dir(&"bind.rs".to_string());
   let config = eir::sim::Config {

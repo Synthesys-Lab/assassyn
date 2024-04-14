@@ -231,6 +231,7 @@ fn systolic_array() {
   };
 
   println!("{}", sys);
+  eir::builder::verify(&sys);
   eir::sim::elaborate(&sys, &config).unwrap();
 
   let exec_name = test_utils::temp_dir(&"systolic".to_string());

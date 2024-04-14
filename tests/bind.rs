@@ -39,6 +39,7 @@ fn bind() {
   let (lhs, aa) = lhs_builder(&mut sys, adder);
   let rhs = rhs_builder(&mut sys, aa);
   driver_builder(&mut sys, lhs, rhs);
+  eir::builder::verify(&sys);
   println!("{}", sys);
 
   let src_name = test_utils::temp_dir(&"bind.rs".to_string());

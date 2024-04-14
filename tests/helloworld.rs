@@ -18,6 +18,7 @@ fn helloworld() {
     idle_threshold: 1,
   };
 
+  eir::builder::verify(&sys);
   eir::sim::elaborate(&sys, &config).unwrap();
 
   let exec_name = test_utils::temp_dir(&"helloworld".to_string());

@@ -40,9 +40,7 @@ impl Visitor<()> for Verifier {
           let module = operand.as_ref::<Module>(expr.sys).unwrap();
           module.users().contains(&OperandOf::new(node, i));
         }
-        _ => {
-          panic!("Invalid operand");
-        }
+        _ => {}
       }
     }
     None

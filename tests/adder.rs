@@ -19,6 +19,7 @@ fn adder() {
   });
 
   let mut sys = SysBuilder::new("main");
+  eir::builder::verify(&sys);
   let adder = adder_builder(&mut sys);
   driver_builder(&mut sys, adder);
 

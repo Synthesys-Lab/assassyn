@@ -40,6 +40,7 @@ fn trigger() {
     idle_threshold: 200,
   };
 
+  eir::builder::verify(&sys);
   eir::sim::elaborate(&sys, &config).unwrap();
 
   let exec_name = test_utils::temp_dir(&"trigger".to_string());
