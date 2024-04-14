@@ -24,7 +24,7 @@ pub struct Module {
   /// The metadata of this module. The nodes that are parameterized by the module builder.
   parameterizable: Option<Vec<BaseNode>>,
   /// The redundant data of this module. The set of users that use this module.
-  pub(crate) users: HashSet<OperandOf>,
+  pub(crate) user_set: HashSet<OperandOf>,
 }
 
 impl Module {
@@ -50,7 +50,7 @@ impl Module {
       external_interfaces: HashMap::new(),
       builder_func_ptr: None,
       parameterizable: None,
-      users: HashSet::new(),
+      user_set: HashSet::new(),
     }
   }
 

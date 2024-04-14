@@ -1,9 +1,6 @@
-use crate::ir::{
-  expr::OperandOf,
-  node::{BaseNode, ExprRef, IsElement},
-  visitor::Visitor,
-  Expr,
-};
+use crate::ir::{expr::OperandOf, node::*, visitor::Visitor};
+
+use crate::ir::*;
 
 /// NOTE: This module is to verify the soundness of an system IR. Not a RTL verification generator.
 use super::SysBuilder;
@@ -28,6 +25,25 @@ impl Visitor<()> for Verifier {
     let node = expr.upcast();
     for user in expr.users().iter() {
       user.verify(expr.sys, &node);
+    }
+    for (i, operand) in expr.operand_iter().enumerate() {
+      match operand.get_kind() {
+        NodeKind::FIFO => {
+          let fifo = operand.as_ref::<FIFO>(expr.sys).unwrap();
+          fifo.users().contains(&OperandOf::new(node, i));
+        }
+        NodeKind::Expr => {
+          let expr = operand.as_ref::<Expr>(expr.sys).unwrap();
+          expr.users().contains(&OperandOf::new(node, i));
+        }
+        NodeKind::Module => {
+          let module = operand.as_ref::<Module>(expr.sys).unwrap();
+          module.users().contains(&OperandOf::new(node, i));
+        }
+        _ => {
+          panic!("Invalid operand");
+        }
+      }
     }
     None
   }

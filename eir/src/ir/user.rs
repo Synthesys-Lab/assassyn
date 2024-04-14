@@ -9,17 +9,17 @@ macro_rules! impl_user_methods {
     paste::paste! {
       impl [< $class Mut >] <'_> {
         pub(crate) fn add_user(&mut self, user: OperandOf) {
-          assert!(!self.get().users.contains(&user));
-          self.get_mut().users.insert(user);
+          assert!(!self.get().users().contains(&user));
+          self.get_mut().user_set.insert(user);
         }
         pub(crate) fn remove_user(&mut self, user: &OperandOf) {
-          assert!(self.get().users.contains(&user));
-          self.get_mut().users.remove(user);
+          assert!(self.get().users().contains(&user));
+          self.get_mut().user_set.remove(user);
         }
       }
       impl [<$class Ref>] <'_> {
         pub fn users(&self) -> &HashSet<OperandOf> {
-          &self.get().users
+          &self.get().user_set
         }
       }
     }

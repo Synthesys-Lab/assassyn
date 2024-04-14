@@ -16,7 +16,7 @@ pub struct FIFO {
   /// The index of this FIFO in the parent module.
   idx: usize,
   /// The redundant data structure to store the users of this FIFO.
-  pub(crate) users: HashSet<OperandOf>,
+  pub(crate) user_set: HashSet<OperandOf>,
 }
 
 impl FIFO {
@@ -31,7 +31,7 @@ impl FIFO {
       dtype: dtype.clone(),
       // Similar to the parent field.
       idx: usize::MAX,
-      users: HashSet::new(),
+      user_set: HashSet::new(),
     }
   }
 
@@ -45,7 +45,7 @@ impl FIFO {
       name: idx.to_string(),
       dtype,
       idx,
-      users: HashSet::new(),
+      user_set: HashSet::new(),
     }
   }
 

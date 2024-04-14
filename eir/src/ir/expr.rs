@@ -101,7 +101,7 @@ pub struct Expr {
   dtype: DataType,
   opcode: Opcode,
   operands: Vec<BaseNode>,
-  pub(crate) users: HashSet<OperandOf>,
+  pub(crate) user_set: HashSet<OperandOf>,
 }
 
 /// This struct indicates this a certain node is an operand of the user expr's idx-th operand.
@@ -130,7 +130,7 @@ impl Expr {
       dtype,
       opcode,
       operands,
-      users: HashSet::new(),
+      user_set: HashSet::new(),
     }
   }
 
