@@ -492,7 +492,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       },
       size,
       slab_cache.len(),
-      IRPrinter::new().visit_array(&array).unwrap()
+      IRPrinter::new(false).visit_array(&array).unwrap()
     ));
     slab_cache.insert(array.upcast(), slab_cache.len());
   }

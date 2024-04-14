@@ -735,7 +735,7 @@ impl SysBuilder {
 
 impl Display for SysBuilder {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let mut printer = IRPrinter::new();
+    let mut printer = IRPrinter::new(false);
     write!(f, "system {} {{\n", self.name)?;
     for elem in self.array_iter() {
       write!(f, "  {};\n", printer.visit_array(&elem).unwrap())?;

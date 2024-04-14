@@ -8,12 +8,16 @@ use self::expr::OperandOf;
 use super::{block::Block, visitor::Visitor};
 
 pub struct IRPrinter {
+  redundancy: bool,
   indent: usize,
 }
 
 impl IRPrinter {
-  pub fn new() -> IRPrinter {
-    IRPrinter { indent: 0 }
+  pub fn new(redundancy: bool) -> IRPrinter {
+    IRPrinter {
+      indent: 0,
+      redundancy,
+    }
   }
   pub fn inc_indent(&mut self) {
     self.indent += 2;
@@ -23,7 +27,11 @@ impl IRPrinter {
   }
 }
 
-struct ExtInterDumper<'a>(&'a HashSet<OperandOf>, usize);
+struct ExtInterDumper<'a> {
+  redundancy: bool,
+  ident: usize,
+  users: &'a HashSet<OperandOf>,
+}
 
 // TODO(@were): Fix this, dump the actual value of the operand_of one a line.
 impl Visitor<String> for ExtInterDumper<'_> {
@@ -35,13 +43,13 @@ impl Visitor<String> for ExtInterDumper<'_> {
       input.get_name(),
       input.scalar_ty().to_string()
     );
-    for op in self.0.iter() {
-      let expr = IRPrinter::new()
+    for op in self.users.iter() {
+      let expr = IRPrinter::new(self.redundancy)
         .visit_expr(&op.user.as_ref::<Expr>(input.sys).unwrap())
         .unwrap();
-      res.push_str(&format!("{}//   {}\n", " ".repeat(self.1), expr));
+      res.push_str(&format!("{}//   {}\n", " ".repeat(self.ident), expr));
     }
-    res.push_str(&format!("{}// }}", " ".repeat(self.1)));
+    res.push_str(&format!("{}// }}", " ".repeat(self.ident)));
     res.into()
   }
 
@@ -52,13 +60,13 @@ impl Visitor<String> for ExtInterDumper<'_> {
       array.get_size(),
       array.scalar_ty().to_string(),
     );
-    for op in self.0.iter() {
-      let expr = IRPrinter::new()
+    for op in self.users.iter() {
+      let expr = IRPrinter::new(self.redundancy)
         .visit_expr(&op.user.as_ref::<Expr>(array.sys).unwrap())
         .unwrap();
-      res.push_str(&format!("{}//   {}\n", " ".repeat(self.1), expr));
+      res.push_str(&format!("{}//   {}\n", " ".repeat(self.ident), expr));
     }
-    res.push_str(&format!("{}// }}", " ".repeat(self.1)));
+    res.push_str(&format!("{}// }}", " ".repeat(self.ident)));
     res.into()
   }
 
@@ -114,9 +122,13 @@ impl Visitor<String> for IRPrinter {
       res.push_str(&format!(
         "{}// {}\n",
         " ".repeat(self.indent),
-        ExtInterDumper(ops, self.indent)
-          .dispatch(module.sys, elem, vec![])
-          .unwrap()
+        ExtInterDumper {
+          users: ops,
+          ident: self.indent,
+          redundancy: self.redundancy
+        }
+        .dispatch(module.sys, elem, vec![])
+        .unwrap()
       ));
     }
     if let Some(param) = module.get_parameterizable() {
