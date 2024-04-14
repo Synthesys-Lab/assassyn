@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 use crate::ir::node::IsElement;
 use crate::ir::*;
 
-use self::node::{ExprMut, ExprRef, NodeKind, Parented};
+use self::node::{ExprMut, ExprRef, Parented};
 
 use super::{block::Block, node::BaseNode};
 
@@ -99,6 +101,7 @@ pub struct Expr {
   dtype: DataType,
   opcode: Opcode,
   operands: Vec<BaseNode>,
+  pub(crate) users: HashSet<OperandOf>,
 }
 
 /// This struct indicates this a certain node is an operand of the user expr's idx-th operand.
@@ -127,6 +130,7 @@ impl Expr {
       dtype,
       opcode,
       operands,
+      users: HashSet::new(),
     }
   }
 
@@ -206,24 +210,11 @@ impl ExprMut<'_> {
     // Remove all the external interfaces related to this instruction.
     let module = module.upcast();
     let expr = self.get().upcast();
+    let old = self.get().get_operand(i).unwrap().clone();
+    self.sys.remove_user(old, OperandOf::new(expr, i));
     let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
     module_mut.remove_related_externals(expr, Some(i));
-
-    // Reconnect the external interfaces if applicable.
-    // TODO(@were): Maybe later unify a common interface for this.
-    match operand.get_kind() {
-      NodeKind::ArrayPtr => {
-        let aptr = operand.as_ref::<ArrayPtr>(self.sys).unwrap();
-        let array = aptr.get_array().clone();
-        let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
-        module_mut.insert_external_interface(array, OperandOf::new(expr, i));
-      }
-      NodeKind::FIFO => {
-        let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
-        module_mut.insert_external_interface(operand, OperandOf::new(expr, i));
-      }
-      _ => {}
-    }
+    module_mut.add_related_externals(operand, OperandOf::new(expr, i));
 
     self.get_mut().operands[i] = operand;
   }

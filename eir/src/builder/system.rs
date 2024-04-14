@@ -430,21 +430,6 @@ impl SysBuilder {
     res
   }
 
-  fn add_user(&mut self, node: BaseNode, user: OperandOf) {
-    match node.get_kind() {
-      NodeKind::Module => {
-        let mut module_mut = self.get_mut::<Module>(&node).unwrap();
-        module_mut.add_user(user);
-      }
-      NodeKind::FIFO => {
-        let mut fifo_mut = self.get_mut::<FIFO>(&node).unwrap();
-        fifo_mut.add_user(user);
-      }
-      NodeKind::Expr => {}
-      _ => {}
-    }
-  }
-
   create_arith_op_impl!(binary, create_add, Opcode::Add);
   create_arith_op_impl!(binary, create_sub, Opcode::Sub);
   create_arith_op_impl!(binary, create_bitwise_and, Opcode::BitwiseAnd);

@@ -6,6 +6,7 @@ pub mod ir_printer;
 pub mod module;
 pub mod node;
 pub mod port;
+pub mod user;
 pub mod visitor;
 
 pub use bind::{Bind, BindKind};

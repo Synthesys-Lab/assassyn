@@ -24,7 +24,7 @@ pub struct Module {
   /// The metadata of this module. The nodes that are parameterized by the module builder.
   parameterizable: Option<Vec<BaseNode>>,
   /// The redundant data of this module. The set of users that use this module.
-  users: HashSet<OperandOf>,
+  pub(crate) users: HashSet<OperandOf>,
 }
 
 impl Module {
@@ -180,10 +180,6 @@ impl<'a> ModuleMut<'a> {
     users.insert(user);
   }
 
-  pub(crate) fn add_user(&mut self, user: OperandOf) {
-    self.get_mut().users.insert(user);
-  }
-
   /// Remove a specific external interface.
   pub(crate) fn remove_external_interface(&mut self, ext_node: BaseNode, user: OperandOf) {
     if let Some(operations) = self.get_mut().external_interfaces.get_mut(&ext_node) {
@@ -200,6 +196,23 @@ impl<'a> ModuleMut<'a> {
     to_remove.into_iter().for_each(|(ext, user)| {
       self.remove_external_interface(ext, user);
     });
+  }
+
+  /// Add related external interfaces to the module.
+  pub(crate) fn add_related_externals(&mut self, operand: BaseNode, operand_of: OperandOf) {
+    // Reconnect the external interfaces if applicable.
+    // TODO(@were): Maybe later unify a common interface for this.
+    match operand.get_kind() {
+      NodeKind::ArrayPtr => {
+        let aptr = operand.as_ref::<ArrayPtr>(self.sys).unwrap();
+        let array = aptr.get_array().clone();
+        self.insert_external_interface(array, operand_of);
+      }
+      NodeKind::FIFO => {
+        self.insert_external_interface(operand, operand_of);
+      }
+      _ => {}
+    }
   }
 
   /// Set the name of a module. Override the name given by the module builder.

@@ -16,7 +16,7 @@ pub struct FIFO {
   /// The index of this FIFO in the parent module.
   idx: usize,
   /// The redundant data structure to store the users of this FIFO.
-  users: HashSet<OperandOf>,
+  pub(crate) users: HashSet<OperandOf>,
 }
 
 impl FIFO {
@@ -72,12 +72,6 @@ impl FIFO {
 
   pub fn scalar_ty(&self) -> DataType {
     self.dtype.clone()
-  }
-}
-
-impl FIFOMut<'_> {
-  pub(crate) fn add_user(&mut self, user: OperandOf) {
-    self.get_mut().users.insert(user);
   }
 }
 
