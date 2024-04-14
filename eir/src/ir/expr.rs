@@ -106,7 +106,7 @@ pub struct Expr {
 
 /// This struct indicates this a certain node is an operand of the user expr's idx-th operand.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct OperandOf {
+pub struct OperandOf {
   pub(crate) user: BaseNode,
   pub(crate) idx: usize,
 }

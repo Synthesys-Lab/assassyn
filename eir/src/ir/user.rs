@@ -1,29 +1,34 @@
+use std::collections::HashSet;
+
 use crate::builder::SysBuilder;
 
-use super::{
-  expr::OperandOf,
-  node::{BaseNode, ExprMut, FIFOMut, ModuleMut, NodeKind},
-  Expr, Module, FIFO,
-};
+use super::{expr::OperandOf, node::*, Expr, Module, FIFO};
 
 macro_rules! impl_user_methods {
   ($class:ident) => {
-    impl $class<'_> {
-      pub(crate) fn add_user(&mut self, user: OperandOf) {
-        assert!(!self.get().users.contains(&user));
-        self.get_mut().users.insert(user);
+    paste::paste! {
+      impl [< $class Mut >] <'_> {
+        pub(crate) fn add_user(&mut self, user: OperandOf) {
+          assert!(!self.get().users.contains(&user));
+          self.get_mut().users.insert(user);
+        }
+        pub(crate) fn remove_user(&mut self, user: &OperandOf) {
+          assert!(self.get().users.contains(&user));
+          self.get_mut().users.remove(user);
+        }
       }
-      pub(crate) fn remove_user(&mut self, user: &OperandOf) {
-        assert!(self.get().users.contains(&user));
-        self.get_mut().users.remove(user);
+      impl [<$class Ref>] <'_> {
+        pub fn users(&self) -> &HashSet<OperandOf> {
+          &self.get().users
+        }
       }
     }
   };
 }
 
-impl_user_methods!(ModuleMut);
-impl_user_methods!(ExprMut);
-impl_user_methods!(FIFOMut);
+impl_user_methods!(Module);
+impl_user_methods!(Expr);
+impl_user_methods!(FIFO);
 
 impl SysBuilder {
   pub(crate) fn remove_user(&mut self, node: BaseNode, user: OperandOf) {
