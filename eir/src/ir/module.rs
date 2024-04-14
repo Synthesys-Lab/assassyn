@@ -9,14 +9,22 @@ use self::expr::OperandOf;
 
 /// The data structure for a module.
 pub struct Module {
+  /// The index key of this module in the slab buffer.
   pub(crate) key: usize,
+  /// The name of this module, can be overridden by `set_name`.
   name: String,
+  /// The input ports of this module.
   inputs: Vec<BaseNode>,
+  /// The body of the module.
   body: BaseNode,
   /// The set of external interfaces used by the module.
   pub(crate) external_interfaces: HashMap<BaseNode, HashSet<OperandOf>>,
+  /// The metadata of this module. The pointer to the module builder.
   builder_func_ptr: Option<usize>,
+  /// The metadata of this module. The nodes that are parameterized by the module builder.
   parameterizable: Option<Vec<BaseNode>>,
+  /// The redundant data of this module. The set of users that use this module.
+  users: HashSet<OperandOf>,
 }
 
 impl Module {
@@ -42,6 +50,7 @@ impl Module {
       external_interfaces: HashMap::new(),
       builder_func_ptr: None,
       parameterizable: None,
+      users: HashSet::new(),
     }
   }
 
@@ -169,6 +178,10 @@ impl<'a> ModuleMut<'a> {
       .get_mut(&ext_node)
       .unwrap();
     users.insert(user);
+  }
+
+  pub(crate) fn add_user(&mut self, user: OperandOf) {
+    self.get_mut().users.insert(user);
   }
 
   /// Remove a specific external interface.

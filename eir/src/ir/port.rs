@@ -1,11 +1,22 @@
+use std::collections::HashSet;
+
 use crate::ir::{node::*, *};
 
+use self::expr::OperandOf;
+
 pub struct FIFO {
+  /// A unique key of this instance in the slab buffer.
   pub(crate) key: usize,
+  /// The parent module of this FIFO.
   pub(super) parent: BaseNode,
+  /// The name of this FIFO.
   name: String,
+  /// The data type of this FIFO.
   dtype: DataType,
+  /// The index of this FIFO in the parent module.
   idx: usize,
+  /// The redundant data structure to store the users of this FIFO.
+  users: HashSet<OperandOf>,
 }
 
 impl FIFO {
@@ -20,6 +31,7 @@ impl FIFO {
       dtype: dtype.clone(),
       // Similar to the parent field.
       idx: usize::MAX,
+      users: HashSet::new(),
     }
   }
 
@@ -33,6 +45,7 @@ impl FIFO {
       name: idx.to_string(),
       dtype,
       idx,
+      users: HashSet::new(),
     }
   }
 
@@ -59,6 +72,12 @@ impl FIFO {
 
   pub fn scalar_ty(&self) -> DataType {
     self.dtype.clone()
+  }
+}
+
+impl FIFOMut<'_> {
+  pub(crate) fn add_user(&mut self, user: OperandOf) {
+    self.get_mut().users.insert(user);
   }
 }
 
