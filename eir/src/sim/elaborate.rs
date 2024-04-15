@@ -444,6 +444,32 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
         payload: DataSlab,
         last_written: (Box<EventKind>, usize),
       }
+      fn ok(x: &mut (Box<EventKind>, usize), writer: Box<EventKind>, stamp: usize) {
+        match x.0.as_ref() {
+          EventKind::None => {
+            *x = (writer, stamp);
+          }
+          _ => {
+            if x.1 == stamp {
+              panic!("{}: Write confliction, last written by {:?}", cyclize(stamp), x.0);
+            } else {
+              *x = (writer, stamp);
+            }
+          }
+        }
+      }
+      trait UnwrapSlab {
+        fn unwrap(entry: &SlabEntry) -> &Self;
+        fn unwrap_mut(entry: &mut SlabEntry) -> &mut Self;
+      }
+      impl <'a> SlabEntry {
+        fn unwrap_payload<T: UnwrapSlab>(&'a self) -> &'a T {
+          T::unwrap(self)
+        }
+        fn unwrap_payload_mut<T: UnwrapSlab>(&'a mut self) -> &'a mut T {
+          T::unwrap_mut(self)
+        }
+      }
     }
     .to_string(),
   );
@@ -468,6 +494,52 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     }
     .to_string(),
   );
+
+  res.push_str(
+    "
+macro_rules! impl_unwrap_slab {
+  ($ty: ty, $tyid: ident) => {
+    impl UnwrapSlab for $ty {
+      fn unwrap(entry: &SlabEntry) -> &Self {
+        match entry {
+          SlabEntry {
+            payload: DataSlab::$tyid(data),
+            ..
+          } => data.as_ref(),
+          _ => panic!(\"Invalid slab entry\"),
+        }
+      }
+      fn unwrap_mut(entry: &mut SlabEntry) -> &mut Self {
+        match entry {
+          SlabEntry {
+            payload: DataSlab::$tyid(data),
+            ..
+          } => data,
+          _ => panic!(\"Invalid slab entry\"),
+        }
+      }
+    }
+  };
+}",
+  );
+
+  for array in array_types.iter() {
+    let (scalar_ty, size) = unwrap_array_ty(array);
+    let aid = array_ty_to_id(&scalar_ty, size);
+    let scalar_ty = dtype_to_rust_type(&scalar_ty);
+    res.push_str(&format!(
+      "impl_unwrap_slab!([{}; {}], Array{});\n",
+      scalar_ty, size, aid
+    ));
+  }
+
+  for fifo in fifo_types.iter() {
+    let ty = dtype_to_rust_type(fifo);
+    res.push_str(&format!(
+      "impl_unwrap_slab!(VecDeque<{}>, FIFO{});\n",
+      ty, ty
+    ));
+  }
 
   // TODO(@were): Make all arguments of the modules FIFO channels.
   // TODO(@were): Profile the maxium size of all the FIFO channels.
@@ -572,13 +644,10 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     for fifo in module.port_iter() {
       let id = fifo_name!(fifo);
       let slab_idx = *slab_cache.get(&fifo.upcast()).unwrap();
-      res.push_str(&format!("let {} = match &data_slab[{}] {{", id, slab_idx,));
       res.push_str(&format!(
-        "SlabEntry {{ payload: DataSlab::FIFO{}(x), .. }} => x.as_ref(),",
-        dtype_to_rust_type(&fifo.scalar_ty())
+        "let {} = data_slab[{}].unwrap_payload();",
+        id, slab_idx,
       ));
-      res.push_str("_ => panic!(\"Unexpected slab type\"),");
-      res.push_str("};\n");
     }
     let ext_interf_args = module
       .ext_interf_iter()
@@ -588,15 +657,10 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       .map(|(elem, _)| {
         let id = dump_ref!(sys, elem);
         let slab_idx = *slab_cache.get(&elem).unwrap();
-        res.push_str(&format!("let {} = match &data_slab[{}] {{", id, slab_idx,));
-        let aty = elem.as_ref::<Array>(sys).unwrap().dtype();
-        let aty = unwrap_array_ty(&aty);
         res.push_str(&format!(
-          "SlabEntry {{ payload: DataSlab::Array{}(x), .. }} => x.as_ref(),",
-          array_ty_to_id(&aty.0, aty.1)
+          "let {} = data_slab[{}].unwrap_payload();",
+          id, slab_idx,
         ));
-        res.push_str("_ => panic!(\"Unexpected slab type\"),");
-        res.push_str("};\n");
         id
       })
       .collect::<Vec<_>>();
@@ -617,69 +681,39 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       res.push_str("idled += 1; stamp = event.0.stamp; }\n");
     }
   }
-  // match &mut data_slab[slab_idx] {
-  //   Some(SlabEntry { payload: DataSlab::Array{}(array), .. }) => {
-  //     array[idx] = value;
-  //   }
-  //   _ => panic!("Unexpected slab type"),
-  // }
   for aty in array_types.iter() {
     let (scalar_ty, size) = unwrap_array_ty(aty);
     let aid = array_ty_to_id(&scalar_ty, size);
     let array_write = syn::Ident::new(&format!("Array{}Write", aid), Span::call_site());
-    let arry_slab = syn::Ident::new(&format!("Array{}", aid), Span::call_site());
-    let scalar_ty = dtype_to_rust_type(&scalar_ty);
+    let scalar_ty = dtype_to_rust_type(&scalar_ty)
+      .parse::<proc_macro2::TokenStream>()
+      .unwrap();
     res.push_str(
       &quote::quote! {
         EventKind::#array_write((writer, slab_idx, idx, value)) => {
-          match &mut data_slab[slab_idx] {
-            SlabEntry {
-              payload: DataSlab::#arry_slab(array),
-              last_written: (last_writer, last_stamp)
-            } => {
-              array[idx] = value;
-              *last_writer = writer;
-              *last_stamp = event.0.stamp;
-            }
-            _ => panic!("Expecting a [{}; {}] array", #scalar_ty, #size),
-          }
+          ok(&mut data_slab[slab_idx].last_written, writer, event.0.stamp);
+          data_slab[slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>()[idx] = value;
         }
       }
       .to_string(),
     );
   }
-  for fifo_ty in fifo_types.iter() {
-    let ty = dtype_to_rust_type(fifo_ty);
+  for fifo_scalar_ty in fifo_types.iter() {
+    let ty = dtype_to_rust_type(fifo_scalar_ty);
     let fifo_push_event = syn::Ident::new(&format!("FIFO{}Push", ty), Span::call_site());
     let fifo_pop_event = syn::Ident::new(&format!("FIFO{}Pop", ty), Span::call_site());
-    let fifo_ty = syn::Ident::new(&format!("FIFO{}", ty), Span::call_site());
+    let ty = dtype_to_rust_type(fifo_scalar_ty)
+      .parse::<proc_macro2::TokenStream>()
+      .unwrap();
     res.push_str(
       &quote::quote! {
         EventKind::#fifo_push_event((writer, slab_idx, value)) => {
-          match &mut data_slab[slab_idx] {
-            SlabEntry {
-              payload: DataSlab::#fifo_ty(fifo),
-              last_written: (last_writer, last_stamp)
-            } => {
-              fifo.push_back(value);
-              *last_writer = writer;
-              *last_stamp = event.0.stamp;
-            }
-            _ => panic!("Expect {} to be a fifo<{}>", slab_idx, #ty),
-          }
+          ok(&mut data_slab[slab_idx].last_written, writer, event.0.stamp);
+          data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().push_back(value);
         }
         EventKind::#fifo_pop_event((writer, slab_idx)) => {
-          match &mut data_slab[slab_idx] {
-            SlabEntry {
-              payload: DataSlab::#fifo_ty(fifo),
-              last_written: (last_writer, last_stamp)
-            } => {
-              fifo.pop_front();
-              *last_writer = writer;
-              *last_stamp = event.0.stamp;
-            }
-            _ => panic!("Expect {} to be a fifo<{}>", slab_idx, #ty),
-          }
+          ok(&mut data_slab[slab_idx].last_written, writer, event.0.stamp);
+          data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().pop_front();
         }
       }
       .to_string(),
