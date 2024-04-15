@@ -241,7 +241,7 @@ impl Visitor<String> for IRPrinter {
         }
         Opcode::Trigger => {
           let mut res = format!(
-            "async call {}, timing [",
+            "async call {}, bundle [",
             expr.get_operand(0).unwrap().to_string(expr.sys)
           );
           for op in expr.operand_iter().skip(1) {

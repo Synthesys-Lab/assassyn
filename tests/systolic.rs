@@ -28,7 +28,7 @@ fn systolic_array() {
       acc = array(int<32>, 1);
       val = acc[0];
       mac = val.add(c);
-      log("MAC value: {}", mac);
+      log("MAC value: {} * {} + {} = {}", west, north, val, mac);
       acc[0] = mac;
       feast = eager_bind east(west);
       fsouth = eager_bind south(north);
@@ -63,7 +63,7 @@ fn systolic_array() {
 
   module_builder!(data_pusher[data: int<32>][dest] {
     data = data.pop();
-    log("pusher pushes {}", data);
+    log("pushes {}", data);
     bound = eager_bind dest(data);
   }.expose[bound]);
 
@@ -238,6 +238,8 @@ fn systolic_array() {
   test_utils::compile(&config.fname, &exec_name);
   let output = test_utils::run(&exec_name);
   let output = String::from_utf8(output.stdout).unwrap();
+
+  println!("{}", output);
 
   let mut a = [[0; 4]; 4];
   let mut b = [[0; 4]; 4];
