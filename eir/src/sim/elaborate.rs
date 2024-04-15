@@ -419,6 +419,32 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   }
   res.push_str("None, }\n\n");
 
+  res.push_str("impl EventKind {\n");
+  res.push_str(
+    &quote::quote! {
+      fn is_none(&self) -> bool {
+        match self {
+          EventKind::None => true,
+          _ => false,
+        }
+      }
+    }
+    .to_string(),
+  );
+  res.push_str("\n\nfn is_push(&self) -> bool { match self {\n");
+  for fty in fifo_types.iter() {
+    let ty = dtype_to_rust_type(&fty);
+    res.push_str(&format!("  EventKind::FIFO{}Push(_) => true,\n", ty,));
+  }
+  res.push_str("_ => false, }}\n\n");
+  res.push_str("fn is_pop(&self) -> bool { match self {\n");
+  for fty in fifo_types.iter() {
+    let ty = dtype_to_rust_type(&fty);
+    res.push_str(&format!("  EventKind::FIFO{}Pop(_) => true,\n", ty,));
+  }
+  res.push_str("_ => false, }}\n");
+  res.push('}');
+
   // Dump the universal set of data types used in this simulation.
   res.push_str("enum DataSlab {");
   for array in array_types.iter() {
@@ -440,21 +466,32 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   // Dump the slab entry struct.
   res.push_str(
     &quote::quote! {
+      struct LastOperation {
+        operation: Box<EventKind>,
+        stamp: usize,
+      }
       struct SlabEntry {
         payload: DataSlab,
-        last_written: (Box<EventKind>, usize),
+        last_written: LastOperation,
       }
-      fn ok(x: &mut (Box<EventKind>, usize), writer: Box<EventKind>, stamp: usize) {
-        match x.0.as_ref() {
-          EventKind::None => {
-            *x = (writer, stamp);
-          }
-          _ => {
-            if x.1 == stamp {
-              panic!("{}: Write confliction, last written by {:?}", cyclize(stamp), x.0);
+      impl LastOperation {
+        fn update(&mut self, operation: Box<EventKind>, stamp: usize) {
+          self.operation = operation;
+          self.stamp = stamp;
+        }
+        fn ok(&mut self, operation: Box<EventKind>, stamp: usize) {
+          if self.stamp == stamp {
+            if (self.operation.is_none() && self.operation.is_none()) ||
+               (self.operation.is_push() && operation.as_ref().is_pop()) ||
+               (self.operation.is_pop() && operation.as_ref().is_push()) {
+              self.update(operation, stamp);
             } else {
-              *x = (writer, stamp);
+              panic!(
+                "{}: Conflict, performing {:?}, but last written by {:?}",
+                cyclize(stamp), operation, self.operation);
             }
+          } else {
+            self.update(operation, stamp);
           }
         }
       }
@@ -574,7 +611,10 @@ macro_rules! impl_unwrap_slab {
       &quote::quote! {
         SlabEntry {
           payload: DataSlab::#aty_id(Box::new([#init_scalar; #size])),
-          last_written: (Box::new(EventKind::None), 0)
+          last_written: LastOperation {
+            operation: EventKind::None.into(),
+            stamp: 0
+          }
         },
       }
       .to_string(),
@@ -597,7 +637,10 @@ macro_rules! impl_unwrap_slab {
         &quote::quote! {
           SlabEntry {
             payload: DataSlab::#fifo_ty(Box::new(VecDeque::new())),
-            last_written: (Box::new(EventKind::None), 0)
+            last_written: LastOperation {
+              operation: EventKind::None.into(),
+              stamp: 0
+            }
           },
         }
         .to_string(),
@@ -690,8 +733,8 @@ macro_rules! impl_unwrap_slab {
       .unwrap();
     res.push_str(
       &quote::quote! {
-        EventKind::#array_write((writer, slab_idx, idx, value)) => {
-          ok(&mut data_slab[slab_idx].last_written, writer, event.0.stamp);
+        EventKind::#array_write((_, slab_idx, idx, value)) => {
+          data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
           data_slab[slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>()[idx] = value;
         }
       }
@@ -707,12 +750,12 @@ macro_rules! impl_unwrap_slab {
       .unwrap();
     res.push_str(
       &quote::quote! {
-        EventKind::#fifo_push_event((writer, slab_idx, value)) => {
-          ok(&mut data_slab[slab_idx].last_written, writer, event.0.stamp);
+        EventKind::#fifo_push_event((_, slab_idx, value)) => {
+          data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
           data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().push_back(value);
         }
-        EventKind::#fifo_pop_event((writer, slab_idx)) => {
-          ok(&mut data_slab[slab_idx].last_written, writer, event.0.stamp);
+        EventKind::#fifo_pop_event((_, slab_idx)) => {
+          data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
           data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().pop_front();
         }
       }
