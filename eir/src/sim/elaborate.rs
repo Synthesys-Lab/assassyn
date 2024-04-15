@@ -516,9 +516,10 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       let fifo_ty = dtype_to_rust_type(&port.scalar_ty());
       let fifo_ty = Ident::new(&format!("FIFO{}", fifo_ty), Span::call_site());
       res.push_str(&format!(
-        "  // {} -> {}\n",
+        "  // {} -> {}.{}\n",
         slab_cache.len(),
-        IRPrinter::new(false).visit_input(&port).unwrap(),
+        module.get_name(),
+        port.get_name()
       ));
       res.push_str(
         &quote::quote! {
@@ -638,7 +639,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
             } => {
               array[idx] = value;
               *last_writer = writer;
-              *last_stamp = stamp;
+              *last_stamp = event.0.stamp;
             }
             _ => panic!("Expecting a [{}; {}] array", #scalar_ty, #size),
           }
@@ -662,7 +663,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
             } => {
               fifo.push_back(value);
               *last_writer = writer;
-              *last_stamp = stamp;
+              *last_stamp = event.0.stamp;
             }
             _ => panic!("Expect {} to be a fifo<{}>", slab_idx, #ty),
           }
@@ -673,9 +674,9 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
               payload: DataSlab::#fifo_ty(fifo),
               last_written: (last_writer, last_stamp)
             } => {
-              fifo.pop_back();
+              fifo.pop_front();
               *last_writer = writer;
-              *last_stamp = stamp;
+              *last_stamp = event.0.stamp;
             }
             _ => panic!("Expect {} to be a fifo<{}>", slab_idx, #ty),
           }
