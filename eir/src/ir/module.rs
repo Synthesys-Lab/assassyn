@@ -169,6 +169,11 @@ impl<'sys> ModuleRef<'sys> {
 impl<'a> ModuleMut<'a> {
   /// Maintain the redundant information, array used in the module.
   pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
+    assert!(
+      ext_node.get_kind() == NodeKind::Array || ext_node.get_kind() == NodeKind::FIFO,
+      "Expecting Array or FIFO but got {:?}",
+      ext_node
+    );
     assert!(operand.get_kind() == NodeKind::Operand);
     if !self.get().external_interfaces.contains_key(&ext_node) {
       self
@@ -215,7 +220,7 @@ impl<'a> ModuleMut<'a> {
         self.insert_external_interface(array, operand);
       }
       NodeKind::FIFO => {
-        self.insert_external_interface(operand, operand);
+        self.insert_external_interface(value.clone(), operand);
       }
       _ => {}
     }

@@ -142,7 +142,7 @@ impl Visitor<String> for IRPrinter {
           redundancy: self.redundancy
         }
         .dispatch(module.sys, elem, vec![])
-        .unwrap()
+        .expect(&format!("Failed to dump: {:?}", elem).as_str())
       ));
     }
     if let Some(param) = module.get_parameterizable() {
