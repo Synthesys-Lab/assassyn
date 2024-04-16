@@ -147,7 +147,7 @@ impl<'sys> ModuleRef<'sys> {
             .filter(|x| {
               (*x).eq(&operand)
                 || if let Ok(x) = (*x).as_ref::<Operand>(self.sys) {
-                  x.get_value() == operand
+                  x.get_value().eq(&operand)
                 } else {
                   false
                 }

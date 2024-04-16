@@ -17,11 +17,7 @@ pub trait Visitor<T> {
 
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<T> {
     for elem in expr.operand_iter() {
-      if let Some(x) = self.dispatch(
-        expr.sys,
-        elem,
-        vec![NodeKind::Module, NodeKind::Array, NodeKind::FIFO],
-      ) {
+      if let Some(x) = self.visit_operand(&elem) {
         return x.into();
       }
     }

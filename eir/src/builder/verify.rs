@@ -13,7 +13,9 @@ impl Operand {
       .get_user()
       .as_ref::<Expr>(sys)
       .expect("User should be an expression!");
-    let operand = expr.operand_iter().position(|op| self.upcast().eq(op));
+    let operand = expr
+      .operand_iter()
+      .position(|op| self.upcast().eq(&op.upcast()));
     assert!(operand.is_some());
   }
 }
@@ -31,6 +33,7 @@ impl Visitor<()> for Verifier {
         .verify(expr.sys);
     }
     for operand in expr.operand_iter() {
+      let operand = operand.get_value();
       match operand.get_kind() {
         NodeKind::FIFO => {
           let fifo = operand.as_ref::<FIFO>(expr.sys).unwrap();

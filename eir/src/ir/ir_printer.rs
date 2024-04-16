@@ -281,7 +281,7 @@ impl Visitor<String> for IRPrinter {
             expr.get_operand(1).unwrap().to_string(expr.sys)
           ));
           for op in expr.operand_iter().skip(2) {
-            res.push_str(&op.to_string(expr.sys));
+            res.push_str(&op.get_value().to_string(expr.sys));
             res.push_str(", ");
           }
           res.push_str(")\n");
@@ -334,7 +334,7 @@ impl Visitor<String> for IRPrinter {
         Opcode::Log => {
           let mut res = format!("log(");
           for op in expr.operand_iter() {
-            res.push_str(&op.to_string(expr.sys));
+            res.push_str(&op.get_value().to_string(expr.sys));
             res.push_str(", ");
           }
           res.push(')');

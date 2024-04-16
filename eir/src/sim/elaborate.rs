@@ -291,7 +291,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           ));
           res.push_str("println!(");
           for elem in expr.operand_iter() {
-            res.push_str(&format!("{}, ", dump_ref!(self.sys, elem)));
+            res.push_str(&format!("{}, ", dump_ref!(self.sys, elem.get_value())));
           }
           res.push(')');
           res

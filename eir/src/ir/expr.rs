@@ -4,7 +4,7 @@ use crate::ir::node::IsElement;
 use crate::ir::*;
 
 use self::{
-  node::{ExprMut, ExprRef, Parented},
+  node::{ExprMut, ExprRef, OperandRef, Parented},
   user::Operand,
 };
 
@@ -135,10 +135,6 @@ impl Expr {
   pub fn get_num_operands(&self) -> usize {
     self.operands.len()
   }
-
-  pub fn operand_iter(&self) -> impl Iterator<Item = &BaseNode> {
-    self.operands.iter()
-  }
 }
 
 impl Typed for Expr {
@@ -158,6 +154,12 @@ impl Parented for Expr {
 }
 
 impl ExprRef<'_> {
+  pub fn operand_iter(&self) -> impl Iterator<Item = OperandRef<'_>> {
+    self
+      .operands
+      .iter()
+      .map(|x| x.as_ref::<Operand>(self.sys).unwrap())
+  }
   // Get the next expression in the block
   pub fn next(&self) -> Option<BaseNode> {
     let parent = self.get().get_parent();

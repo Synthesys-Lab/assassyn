@@ -88,7 +88,7 @@ pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       .get()
       .operand_iter()
       .skip(1)
-      .cloned()
+      .map(|x| x.get_value().clone())
       .collect::<Vec<_>>();
     // Instead of calling the original destination module, we call the agent module.
     bundle[0] = agent;

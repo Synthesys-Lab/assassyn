@@ -281,7 +281,12 @@ impl BaseNode {
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
-      NodeKind::Operand => self.as_ref::<Operand>(sys).unwrap().get_user().into(),
+      NodeKind::Operand => self
+        .as_ref::<Operand>(sys)
+        .unwrap()
+        .get_user()
+        .clone()
+        .into(),
       NodeKind::Unknown => {
         panic!("Unknown reference")
       }

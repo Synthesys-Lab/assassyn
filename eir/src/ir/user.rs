@@ -30,11 +30,11 @@ impl Operand {
       def: value,
     }
   }
-  pub fn get_value(&self) -> BaseNode {
-    self.def
+  pub fn get_value(&self) -> &BaseNode {
+    &self.def
   }
-  pub fn get_user(&self) -> BaseNode {
-    self.user
+  pub fn get_user(&self) -> &BaseNode {
+    &self.user
   }
   pub(crate) fn set_user(&mut self, user: BaseNode) {
     self.user = user;
@@ -71,7 +71,7 @@ impl_user_methods!(FIFO);
 impl SysBuilder {
   pub(crate) fn remove_user(&mut self, operand: BaseNode) {
     let operand_ref = operand.as_ref::<Operand>(self).unwrap();
-    let def_value = operand_ref.get_value();
+    let def_value = operand_ref.get_value().clone();
     match def_value.get_kind() {
       NodeKind::Module => {
         let mut module_mut = self.get_mut::<Module>(&def_value).unwrap();
@@ -91,7 +91,7 @@ impl SysBuilder {
 
   pub(crate) fn add_user(&mut self, operand: BaseNode) {
     let operand_ref = operand.as_ref::<Operand>(self).unwrap();
-    let value = operand_ref.get_value();
+    let value = operand_ref.get_value().clone();
     match value.get_kind() {
       NodeKind::Module => {
         let mut module_mut = self.get_mut::<Module>(&value).unwrap();

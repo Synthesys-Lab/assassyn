@@ -391,7 +391,7 @@ impl SysBuilder {
       .as_ref::<Expr>(self)
       .unwrap()
       .operand_iter()
-      .cloned()
+      .map(|x| x.upcast())
       .collect::<Vec<_>>();
     operands.into_iter().for_each(|x| {
       let mut operand = x.as_mut::<Operand>(self).unwrap();
