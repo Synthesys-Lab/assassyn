@@ -66,6 +66,10 @@ pub trait Visitor<T> {
     None
   }
 
+  fn visit_operand(&mut self, _: &OperandRef<'_>) -> Option<T> {
+    None
+  }
+
   fn dispatch(&mut self, sys: &SysBuilder, node: &BaseNode, non_recur: Vec<NodeKind>) -> Option<T> {
     if non_recur.contains(&node.get_kind()) {
       return None;
@@ -80,6 +84,7 @@ pub trait Visitor<T> {
       NodeKind::ArrayPtr => self.visit_handle(&node.as_ref::<ArrayPtr>(sys).unwrap()),
       NodeKind::StrImm => self.visit_string_imm(&node.as_ref::<StrImm>(sys).unwrap()),
       NodeKind::Bind => self.visit_bind(&node.as_ref::<Bind>(sys).unwrap()),
+      NodeKind::Operand => self.visit_operand(&node.as_ref::<Operand>(sys).unwrap()),
       NodeKind::Unknown => {
         panic!("Unknown node type")
       }

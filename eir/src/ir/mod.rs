@@ -15,3 +15,4 @@ pub use data::{Array, ArrayPtr, DataType, IntImm, StrImm, Typed};
 pub use expr::{Expr, Opcode};
 pub use module::Module;
 pub use port::FIFO;
+pub use user::Operand;

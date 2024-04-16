@@ -3,6 +3,8 @@ use std::ops::Deref;
 use crate::builder::SysBuilder;
 use crate::ir::*;
 
+use self::user::Operand;
+
 use super::super::ir::visitor::Visitor;
 use super::ir_printer::IRPrinter;
 
@@ -205,7 +207,7 @@ macro_rules! register_elements {
   };
 }
 
-register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, Bind, StrImm);
+register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, Bind, StrImm, Operand);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
 pub struct BaseNode {
@@ -258,6 +260,10 @@ impl BaseNode {
       NodeKind::Block | NodeKind::ArrayPtr | NodeKind::Bind => None,
       NodeKind::StrImm => None,
       NodeKind::Array => None,
+      NodeKind::Operand => {
+        let operand = self.as_ref::<Operand>(sys).unwrap();
+        operand.get_value().get_dtype(sys)
+      }
       NodeKind::Unknown => {
         panic!("Unknown reference")
       }
@@ -275,6 +281,7 @@ impl BaseNode {
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
+      NodeKind::Operand => self.as_ref::<Operand>(sys).unwrap().get_user().into(),
       NodeKind::Unknown => {
         panic!("Unknown reference")
       }
@@ -329,6 +336,10 @@ impl BaseNode {
       NodeKind::StrImm => {
         let str_imm = self.as_ref::<StrImm>(sys).unwrap();
         format!("\"{}\"", str_imm.get_value())
+      }
+      NodeKind::Operand => {
+        let operand = self.as_ref::<Operand>(sys).unwrap();
+        format!("{}", operand.get_value().to_string(sys))
       }
     }
   }

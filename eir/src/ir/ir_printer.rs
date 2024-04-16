@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use crate::builder::InsertPoint;
 use crate::ir::{node::*, *};
 
-use self::expr::OperandOf;
+use self::user::Operand;
 
 use super::{block::Block, visitor::Visitor};
 
@@ -30,7 +30,7 @@ impl IRPrinter {
 struct ExtInterDumper<'a> {
   redundancy: bool,
   ident: usize,
-  users: &'a HashSet<OperandOf>,
+  users: &'a HashSet<BaseNode>,
 }
 
 // TODO(@were): Fix this, dump the actual value of the operand_of one a line.
@@ -45,7 +45,14 @@ impl Visitor<String> for ExtInterDumper<'_> {
     );
     for op in self.users.iter() {
       let expr = IRPrinter::new(self.redundancy)
-        .visit_expr(&op.user.as_ref::<Expr>(input.sys).unwrap())
+        .visit_expr(
+          &op
+            .as_ref::<Operand>(input.sys)
+            .unwrap()
+            .get_user()
+            .as_ref::<Expr>(input.sys)
+            .unwrap(),
+        )
         .unwrap();
       res.push_str(&format!("{}//   {}\n", " ".repeat(self.ident), expr));
     }
@@ -62,7 +69,14 @@ impl Visitor<String> for ExtInterDumper<'_> {
     );
     for op in self.users.iter() {
       let expr = IRPrinter::new(self.redundancy)
-        .visit_expr(&op.user.as_ref::<Expr>(array.sys).unwrap())
+        .visit_expr(
+          &op
+            .as_ref::<Operand>(array.sys)
+            .unwrap()
+            .get_user()
+            .as_ref::<Expr>(array.sys)
+            .unwrap(),
+        )
         .unwrap();
       res.push_str(&format!("{}//   {}\n", " ".repeat(self.ident), expr));
     }

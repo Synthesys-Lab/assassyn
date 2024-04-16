@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
   builder::SysBuilder,
-  ir::{expr::OperandOf, DataType, Expr, Opcode},
+  ir::{node::BaseNode, user::Operand, DataType, Expr, Opcode},
 };
 
 pub(super) fn namify(name: &str) -> String {
@@ -63,10 +63,17 @@ pub(super) fn array_ty_to_id(scalar_ty: &DataType, size: usize) -> String {
 
 pub(super) fn user_contains_opcode(
   sys: &SysBuilder,
-  users: &HashSet<OperandOf>,
+  users: &HashSet<BaseNode>,
   ops: Vec<Opcode>,
 ) -> bool {
-  users
-    .iter()
-    .any(|operand_of| ops.contains(&operand_of.user.as_ref::<Expr>(sys).unwrap().get_opcode()))
+  users.iter().any(|operand| {
+    let opcode = operand
+      .as_ref::<Operand>(sys)
+      .unwrap()
+      .get_user()
+      .as_ref::<Expr>(sys)
+      .unwrap()
+      .get_opcode();
+    ops.contains(&opcode)
+  })
 }

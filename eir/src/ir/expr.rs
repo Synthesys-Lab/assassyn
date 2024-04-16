@@ -3,7 +3,10 @@ use std::collections::HashSet;
 use crate::ir::node::IsElement;
 use crate::ir::*;
 
-use self::node::{ExprMut, ExprRef, Parented};
+use self::{
+  node::{ExprMut, ExprRef, Parented},
+  user::Operand,
+};
 
 use super::{block::Block, node::BaseNode};
 
@@ -101,20 +104,7 @@ pub struct Expr {
   dtype: DataType,
   opcode: Opcode,
   operands: Vec<BaseNode>,
-  pub(crate) user_set: HashSet<OperandOf>,
-}
-
-/// This struct indicates this a certain node is an operand of the user expr's idx-th operand.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct OperandOf {
-  pub(crate) user: BaseNode,
-  pub(crate) idx: usize,
-}
-
-impl OperandOf {
-  pub(crate) fn new(user: BaseNode, idx: usize) -> Self {
-    OperandOf { user, idx }
-  }
+  pub(crate) user_set: HashSet<BaseNode>,
 }
 
 impl Expr {
@@ -197,13 +187,13 @@ impl ExprMut<'_> {
     // Remove all the external interfaces related to this instruction.
     let module = block.get_module().upcast();
     let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
-    module_mut.remove_related_externals(expr, None);
+    module_mut.remove_related_externals(expr);
 
     let mut block_mut = self.sys.get_mut::<Block>(&parent).unwrap();
     block_mut.erase(&expr);
   }
 
-  pub fn set_operand(&mut self, i: usize, operand: BaseNode) {
+  pub fn set_operand(&mut self, i: usize, value: BaseNode) {
     let block = self.sys.get::<Block>(&self.get().get_parent()).unwrap();
     let module = block.get_module();
 
@@ -211,11 +201,18 @@ impl ExprMut<'_> {
     let module = module.upcast();
     let expr = self.get().upcast();
     let old = self.get().get_operand(i).unwrap().clone();
-    self.sys.remove_user(old, OperandOf::new(expr, i));
+    let operand = self.sys.insert_element(Operand::new(value));
+    self.sys.remove_user(old);
     let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
-    module_mut.remove_related_externals(expr, Some(i));
-    module_mut.add_related_externals(operand, OperandOf::new(expr, i));
+    module_mut.remove_related_externals(expr);
+    module_mut.add_related_externals(operand);
 
     self.get_mut().operands[i] = operand;
+    operand
+      .as_mut::<Operand>(self.sys)
+      .unwrap()
+      .get_mut()
+      .set_user(expr);
+    self.sys.add_user(operand);
   }
 }

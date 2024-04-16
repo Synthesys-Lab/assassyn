@@ -2,8 +2,6 @@ use std::collections::HashSet;
 
 use crate::ir::{node::*, *};
 
-use self::expr::OperandOf;
-
 pub struct FIFO {
   /// A unique key of this instance in the slab buffer.
   pub(crate) key: usize,
@@ -16,7 +14,7 @@ pub struct FIFO {
   /// The index of this FIFO in the parent module.
   idx: usize,
   /// The redundant data structure to store the users of this FIFO.
-  pub(crate) user_set: HashSet<OperandOf>,
+  pub(crate) user_set: HashSet<BaseNode>,
 }
 
 impl FIFO {

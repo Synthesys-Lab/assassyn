@@ -8,7 +8,7 @@ use crate::{
   ir::{ir_printer::IRPrinter, visitor::Visitor},
 };
 
-use self::expr::OperandOf;
+use self::user::Operand;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
@@ -374,6 +374,11 @@ impl SysBuilder {
     operands: Vec<BaseNode>,
   ) -> BaseNode {
     self.get_current_module().unwrap();
+    // Wrap all the operands into Operand instances.
+    let operands = operands
+      .into_iter()
+      .map(|x| self.insert_element(Operand::new(x)))
+      .collect();
     let instance = Expr::new(
       dtype.clone(),
       opcode,
@@ -381,7 +386,19 @@ impl SysBuilder {
       self.inesert_point.1.clone(),
     );
     let value = self.insert_element(instance);
-    self.insert_at_ip(value)
+    let res = self.insert_at_ip(value);
+    let operands = res
+      .as_ref::<Expr>(self)
+      .unwrap()
+      .operand_iter()
+      .cloned()
+      .collect::<Vec<_>>();
+    operands.into_iter().for_each(|x| {
+      let mut operand = x.as_mut::<Operand>(self).unwrap();
+      operand.get_mut().set_user(res);
+      self.add_user(x.clone());
+    });
+    res
   }
 
   /// The helper function to insert an element into the current insert point.
@@ -426,7 +443,6 @@ impl SysBuilder {
     let mut bundle = bind.to_args();
     bundle.insert(0, callee);
     let res = self.create_expr(DataType::void(), Opcode::Trigger, bundle);
-    self.add_user(callee, OperandOf::new(res, 0));
     res
   }
 
@@ -576,10 +592,15 @@ impl SysBuilder {
     // Maintain the external interface redundancy when it is determined.
     if !port.as_ref::<FIFO>(self).unwrap().is_placeholder() {
       let src = self.get_current_module().unwrap().upcast();
+      let callee_operand = res
+        .as_ref::<Expr>(self)
+        .unwrap()
+        .get_operand(0)
+        .unwrap()
+        .clone();
       let mut src_mut = self.get_mut::<Module>(&src).unwrap();
-      src_mut.insert_external_interface(port, OperandOf::new(res, 0));
+      src_mut.insert_external_interface(port, callee_operand);
     }
-    self.add_user(port, OperandOf::new(res, 0));
 
     res
   }
@@ -594,10 +615,16 @@ impl SysBuilder {
     let dtype = self.get::<Array>(&array).unwrap().scalar_ty().clone();
     let res = self.create_expr(dtype, Opcode::Load, vec![ptr.clone()]);
     let cur_mod = self.inesert_point.0.clone();
+    let array_operand = res
+      .as_ref::<Expr>(self)
+      .unwrap()
+      .get_operand(0)
+      .unwrap()
+      .clone();
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
-      .insert_external_interface(array.clone(), OperandOf::new(res, 0));
+      .insert_external_interface(array.clone(), array_operand);
     res
   }
 
@@ -612,10 +639,16 @@ impl SysBuilder {
     let operands = vec![ptr.clone(), value.clone()];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands);
     let cur_mod = self.inesert_point.0.clone();
+    let array_operand = res
+      .as_ref::<Expr>(self)
+      .unwrap()
+      .get_operand(0)
+      .unwrap()
+      .clone();
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
-      .insert_external_interface(array.clone(), OperandOf::new(res, 0));
+      .insert_external_interface(array.clone(), array_operand);
     res
   }
 

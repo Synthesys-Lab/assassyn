@@ -5,7 +5,7 @@ use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
-use self::expr::OperandOf;
+use self::user::Operand;
 
 /// The data structure for a module.
 pub struct Module {
@@ -18,13 +18,13 @@ pub struct Module {
   /// The body of the module.
   body: BaseNode,
   /// The set of external interfaces used by the module.
-  pub(crate) external_interfaces: HashMap<BaseNode, HashSet<OperandOf>>,
+  pub(crate) external_interfaces: HashMap<BaseNode, HashSet<BaseNode>>,
   /// The metadata of this module. The pointer to the module builder.
   builder_func_ptr: Option<usize>,
   /// The metadata of this module. The nodes that are parameterized by the module builder.
   parameterizable: Option<Vec<BaseNode>>,
   /// The redundant data of this module. The set of users that use this module.
-  pub(crate) user_set: HashSet<OperandOf>,
+  pub(crate) user_set: HashSet<BaseNode>,
 }
 
 impl Module {
@@ -113,7 +113,7 @@ impl<'sys> ModuleRef<'sys> {
 
   pub(crate) fn ext_interf_iter<'borrow, 'res>(
     &'borrow self,
-  ) -> impl Iterator<Item = (&BaseNode, &HashSet<OperandOf>)>
+  ) -> impl Iterator<Item = (&BaseNode, &HashSet<BaseNode>)>
   where
     'sys: 'borrow,
     'sys: 'res,
@@ -133,11 +133,7 @@ impl<'sys> ModuleRef<'sys> {
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
 
-  pub(crate) fn gather_related_externals(
-    &self,
-    user: BaseNode,
-    idx: Option<usize>,
-  ) -> Vec<(BaseNode, OperandOf)> {
+  pub(crate) fn gather_related_externals(&self, operand: BaseNode) -> Vec<(BaseNode, BaseNode)> {
     // Remove all the external interfaces related to this instruction.
     let tmp = self
       .get()
@@ -148,7 +144,14 @@ impl<'sys> ModuleRef<'sys> {
           ext.clone(),
           users
             .iter()
-            .filter(|x| x.user == user && idx.map_or(true, |i| x.idx == i))
+            .filter(|x| {
+              (*x).eq(&operand)
+                || if let Ok(x) = (*x).as_ref::<Operand>(self.sys) {
+                  x.get_value() == operand
+                } else {
+                  false
+                }
+            })
             .cloned()
             .collect::<Vec<_>>(),
         )
@@ -165,7 +168,7 @@ impl<'sys> ModuleRef<'sys> {
 
 impl<'a> ModuleMut<'a> {
   /// Maintain the redundant information, array used in the module.
-  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, user: OperandOf) {
+  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
     if !self.get().external_interfaces.contains_key(&ext_node) {
       self
         .get_mut()
@@ -177,13 +180,13 @@ impl<'a> ModuleMut<'a> {
       .external_interfaces
       .get_mut(&ext_node)
       .unwrap();
-    users.insert(user);
+    users.insert(operand);
   }
 
   /// Remove a specific external interface.
-  pub(crate) fn remove_external_interface(&mut self, ext_node: BaseNode, user: OperandOf) {
+  pub(crate) fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
     if let Some(operations) = self.get_mut().external_interfaces.get_mut(&ext_node) {
-      operations.remove(&user);
+      operations.remove(&operand);
       if operations.is_empty() {
         self.get_mut().external_interfaces.remove(&ext_node);
       }
@@ -191,25 +194,27 @@ impl<'a> ModuleMut<'a> {
   }
 
   /// Remove all the related external interfaces with the given condition.
-  pub(crate) fn remove_related_externals(&mut self, user: BaseNode, idx: Option<usize>) {
-    let to_remove = self.get().gather_related_externals(user, idx);
-    to_remove.into_iter().for_each(|(ext, user)| {
-      self.remove_external_interface(ext, user);
+  pub(crate) fn remove_related_externals(&mut self, operand: BaseNode) {
+    let to_remove = self.get().gather_related_externals(operand);
+    to_remove.into_iter().for_each(|(ext, operand)| {
+      self.remove_external_interface(ext, operand);
     });
   }
 
   /// Add related external interfaces to the module.
-  pub(crate) fn add_related_externals(&mut self, operand: BaseNode, operand_of: OperandOf) {
+  pub(crate) fn add_related_externals(&mut self, operand: BaseNode) {
     // Reconnect the external interfaces if applicable.
     // TODO(@were): Maybe later unify a common interface for this.
-    match operand.get_kind() {
+    let operand_ref = operand.as_ref::<Operand>(self.sys).unwrap();
+    let value = operand_ref.get_value();
+    match value.get_kind() {
       NodeKind::ArrayPtr => {
         let aptr = operand.as_ref::<ArrayPtr>(self.sys).unwrap();
         let array = aptr.get_array().clone();
-        self.insert_external_interface(array, operand_of);
+        self.insert_external_interface(array, operand);
       }
       NodeKind::FIFO => {
-        self.insert_external_interface(operand, operand_of);
+        self.insert_external_interface(operand, operand);
       }
       _ => {}
     }
