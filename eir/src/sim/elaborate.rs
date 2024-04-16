@@ -286,7 +286,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         Opcode::Log => {
           let mut res = String::new();
           res.push_str(&format!(
-            "print!(\"@line:{{:<5}} {{}}: [{}]\t\", line!(), cyclize(stamp));",
+            "print!(\"@line:{{:<5}}\t{{}}:\t[{}]\t\", line!(), cyclize(stamp));",
             self.module_name
           ));
           res.push_str("println!(");
