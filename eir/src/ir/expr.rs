@@ -128,10 +128,6 @@ impl Expr {
     self.opcode.clone()
   }
 
-  pub fn get_operand(&self, i: usize) -> Option<&BaseNode> {
-    self.operands.get(i)
-  }
-
   pub fn get_num_operands(&self) -> usize {
     self.operands.len()
   }
@@ -154,6 +150,13 @@ impl Parented for Expr {
 }
 
 impl ExprRef<'_> {
+  pub fn get_operand(&self, i: usize) -> Option<OperandRef<'_>> {
+    self
+      .operands
+      .get(i)
+      .map(|x| x.as_ref::<Operand>(self.sys).unwrap())
+  }
+
   pub fn operand_iter(&self) -> impl Iterator<Item = OperandRef<'_>> {
     self
       .operands
@@ -202,7 +205,7 @@ impl ExprMut<'_> {
     // Remove all the external interfaces related to this instruction.
     let module = module.upcast();
     let expr = self.get().upcast();
-    let old = self.get().get_operand(i).unwrap().clone();
+    let old = self.get().get_operand(i).unwrap().upcast();
     let operand = self.sys.insert_element(Operand::new(value));
     self.sys.remove_user(old);
     let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();

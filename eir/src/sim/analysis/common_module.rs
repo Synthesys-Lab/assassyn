@@ -134,11 +134,11 @@ impl Visitor<bool> for ModuleEqual {
       return Some(false);
     }
     for i in 0..lhs.get_num_operands() {
-      let lhs_op = lhs.get_operand(i).unwrap();
-      let rhs_op = rhs.get_operand(i).unwrap();
+      let lhs_op = lhs.get_operand(i).unwrap().get_value().clone();
+      let rhs_op = rhs.get_operand(i).unwrap().get_value().clone();
       match (lhs_op.get_kind(), rhs_op.get_kind()) {
         (NodeKind::Module, NodeKind::Module) | (NodeKind::Expr, NodeKind::Expr) => {
-          let res = self.shallow_equal(lhs_op, rhs_op);
+          let res = self.shallow_equal(&lhs_op, &rhs_op);
           if res != NodeCmp::Eq {
             return Some(false);
           }
@@ -148,7 +148,7 @@ impl Visitor<bool> for ModuleEqual {
         | (NodeKind::ArrayPtr, NodeKind::ArrayPtr)
         | (NodeKind::IntImm, NodeKind::IntImm)
         | (NodeKind::StrImm, NodeKind::StrImm) => {
-          if !self.deep_equal(lhs.sys, lhs_op, rhs_op) {
+          if !self.deep_equal(lhs.sys, &lhs_op, &rhs_op) {
             return Some(false);
           }
         }

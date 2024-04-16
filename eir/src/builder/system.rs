@@ -597,7 +597,7 @@ impl SysBuilder {
         .unwrap()
         .get_operand(0)
         .unwrap()
-        .clone();
+        .upcast();
       let mut src_mut = self.get_mut::<Module>(&src).unwrap();
       src_mut.insert_external_interface(port, callee_operand);
     }
@@ -620,7 +620,7 @@ impl SysBuilder {
       .unwrap()
       .get_operand(0)
       .unwrap()
-      .clone();
+      .upcast();
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()
@@ -644,7 +644,7 @@ impl SysBuilder {
       .unwrap()
       .get_operand(0)
       .unwrap()
-      .clone();
+      .upcast();
     self
       .get_mut::<Module>(&cur_mod)
       .unwrap()

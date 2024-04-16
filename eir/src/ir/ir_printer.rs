@@ -225,16 +225,16 @@ impl Visitor<String> for IRPrinter {
       format!(
         "_{} = {} {} {}",
         expr.get_key(),
-        expr.get_operand(0).unwrap().to_string(expr.sys),
+        expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
         mnem,
-        expr.get_operand(1).unwrap().to_string(expr.sys)
+        expr.get_operand(1).unwrap().get_value().to_string(expr.sys)
       )
     } else if expr.get_opcode().is_unary() {
       format!(
         "_{} = {} {}",
         expr.get_key(),
         mnem,
-        expr.get_operand(0).unwrap().to_string(expr.sys)
+        expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
       )
     } else {
       match expr.get_opcode() {
@@ -242,21 +242,21 @@ impl Visitor<String> for IRPrinter {
           format!(
             "_{} = {}",
             expr.get_key(),
-            expr.get_operand(0).unwrap().to_string(expr.sys),
+            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
           )
         }
         Opcode::Store => {
           format!(
             "{} = {} // handle: _{}",
-            expr.get_operand(0).unwrap().to_string(expr.sys),
-            expr.get_operand(1).unwrap().to_string(expr.sys),
+            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+            expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
             expr.get_key()
           )
         }
         Opcode::Trigger => {
           let mut res = format!(
             "async call {}, bundle [",
-            expr.get_operand(0).unwrap().to_string(expr.sys)
+            expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
           );
           for op in expr.operand_iter().skip(1) {
             res.push('_');
@@ -273,12 +273,12 @@ impl Visitor<String> for IRPrinter {
           res.push_str(&format!(
             "async {{\n{}while !{} {{ }} // DO NOT move on until this is true\n",
             " ".repeat(self.indent),
-            expr.get_operand(0).unwrap().to_string(expr.sys),
+            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
           ));
           res.push_str(&format!(
             "{}call {}(",
             " ".repeat(self.indent),
-            expr.get_operand(1).unwrap().to_string(expr.sys)
+            expr.get_operand(1).unwrap().get_value().to_string(expr.sys)
           ));
           for op in expr.operand_iter().skip(2) {
             res.push_str(&op.get_value().to_string(expr.sys));
@@ -294,6 +294,7 @@ impl Visitor<String> for IRPrinter {
           let fifo = expr
             .get_operand(0)
             .unwrap()
+            .get_value()
             .as_ref::<FIFO>(expr.sys)
             .unwrap();
           let module_name = {
@@ -309,6 +310,7 @@ impl Visitor<String> for IRPrinter {
           let fifo = expr
             .get_operand(0)
             .unwrap()
+            .get_value()
             .as_ref::<FIFO>(expr.sys)
             .unwrap();
           let module_name = {
@@ -321,9 +323,9 @@ impl Visitor<String> for IRPrinter {
         }
         Opcode::FIFOPush => {
           let fifo_name = FIFODumper
-            .dispatch(expr.sys, expr.get_operand(0).unwrap(), vec![])
+            .dispatch(expr.sys, expr.get_operand(0).unwrap().get_value(), vec![])
             .unwrap();
-          let value = expr.get_operand(1).unwrap().to_string(expr.sys);
+          let value = expr.get_operand(1).unwrap().get_value().to_string(expr.sys);
           format!(
             "{}.push({}) // handle: _{}",
             fifo_name,
@@ -344,9 +346,9 @@ impl Visitor<String> for IRPrinter {
           let res = format!(
             "_{} = {}[{}:{}]",
             expr.get_key(),
-            expr.get_operand(0).unwrap().to_string(expr.sys),
-            expr.get_operand(1).unwrap().to_string(expr.sys),
-            expr.get_operand(2).unwrap().to_string(expr.sys),
+            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+            expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
+            expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
           );
           res
         }

@@ -19,7 +19,7 @@ impl Visitor<()> for GatherIndirectTriggers {
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
     match expr.get_opcode() {
       Opcode::Trigger => {
-        if expr.get_operand(0).unwrap().get_kind() == NodeKind::Expr {
+        if expr.get_operand(0).unwrap().get_value().get_kind() == NodeKind::Expr {
           self.0.push(expr.upcast());
         }
       }
@@ -51,6 +51,7 @@ impl Visitor<()> for GatherIndirectHandles {
         let fifo = expr
           .get_operand(0)
           .unwrap()
+          .get_value()
           .as_ref::<FIFO>(expr.sys)
           .unwrap();
         match fifo.scalar_ty() {
@@ -63,7 +64,7 @@ impl Visitor<()> for GatherIndirectHandles {
               .0
               .get_mut(&key)
               .unwrap()
-              .insert(expr.get_operand(1).unwrap().clone());
+              .insert(expr.get_operand(1).unwrap().get_value().clone());
           }
           _ => {}
         }
@@ -92,6 +93,7 @@ pub fn gather_indirect_handles(sys: &SysBuilder) -> HashMap<BaseNode, HashSet<Ba
           let fifo = expr
             .get_operand(0)
             .unwrap()
+            .get_value()
             .as_ref::<FIFO>(sys)
             .unwrap()
             .upcast();

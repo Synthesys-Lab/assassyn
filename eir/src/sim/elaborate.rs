@@ -152,15 +152,15 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     let res = if expr.get_opcode().is_binary() {
       format!(
         "{} {} {}",
-        dump_ref!(self.sys, expr.get_operand(0).unwrap()),
+        dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value()),
         expr.get_opcode().to_string(),
-        dump_ref!(self.sys, expr.get_operand(1).unwrap()),
+        dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value()),
       )
     } else if expr.get_opcode().is_unary() {
       format!(
         "{}{}",
         expr.get_opcode().to_string(),
-        dump_ref!(self.sys, expr.get_operand(0).unwrap())
+        dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value())
       )
     } else {
       match expr.get_opcode() {
@@ -168,6 +168,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           let handle = expr
             .get_operand(0)
             .unwrap()
+            .get_value()
             .as_ref::<ArrayPtr>(expr.sys)
             .unwrap();
           format!(
@@ -184,6 +185,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           let handle = expr
             .get_operand(0)
             .unwrap()
+            .get_value()
             .as_ref::<ArrayPtr>(expr.sys)
             .unwrap();
           let array = handle.get_array();
@@ -194,7 +196,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
           let aid = array_ty_to_id(&scalar_ty, size);
           let id = syn::Ident::new(&format!("Array{}Write", aid), Span::call_site());
-          let value = dump_ref!(self.sys, expr.get_operand(1).unwrap());
+          let value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
           let value = value.parse::<proc_macro2::TokenStream>().unwrap();
           let module_writer = self.current_module_id();
           quote::quote! {
@@ -207,15 +209,19 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           .to_string()
         }
         Opcode::Trigger => {
-          let to_trigger =
-            if let Ok(module) = expr.get_operand(0).unwrap().as_ref::<Module>(self.sys) {
-              format!("EventKind::Module{}", camelize(&namify(module.get_name())))
-            } else {
-              format!(
-                "{}.as_ref().clone()",
-                dump_ref!(self.sys, expr.get_operand(0).unwrap())
-              )
-            };
+          let to_trigger = if let Ok(module) = expr
+            .get_operand(0)
+            .unwrap()
+            .get_value()
+            .as_ref::<Module>(self.sys)
+          {
+            format!("EventKind::Module{}", camelize(&namify(module.get_name())))
+          } else {
+            format!(
+              "{}.as_ref().clone()",
+              dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value())
+            )
+          };
           format!(
             "q.push(Reverse(Event{{ stamp: stamp + 100, kind: {} }}))",
             to_trigger
@@ -226,6 +232,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           let fifo = expr
             .get_operand(0)
             .unwrap()
+            .get_value()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
           let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
@@ -249,6 +256,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           let fifo = expr
             .get_operand(0)
             .unwrap()
+            .get_value()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
           format!("{}.front().unwrap().clone()", fifo_name!(fifo))
@@ -257,6 +265,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           let fifo = expr
             .get_operand(0)
             .unwrap()
+            .get_value()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
           let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
@@ -264,7 +273,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             &format!("FIFO{}Push", dtype_to_rust_type(&fifo.scalar_ty())),
             Span::call_site(),
           );
-          let value = dump_ref!(self.sys, expr.get_operand(1).unwrap());
+          let value = dump_ref!(self.sys, expr.get_operand(1).unwrap().get_value());
           let value = value.parse::<proc_macro2::TokenStream>().unwrap();
           let module_writer = self.current_module_id();
           if !fifo.is_placeholder() {
@@ -276,7 +285,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             }
             .to_string()
           } else {
-            let module = dump_ref!(self.sys, expr.get_operand(0).unwrap());
+            let module = dump_ref!(self.sys, expr.get_operand(0).unwrap().get_value());
             format!(
               "// q.push(Reverse(Event{{ stamp: stamp + 50, kind: to_push({}.as_ref().clone(), {}, {} as u64) }}))",
               module, fifo.idx(), value
