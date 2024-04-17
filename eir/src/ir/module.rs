@@ -98,12 +98,12 @@ impl<'sys> ModuleRef<'sys> {
     self.name.as_str()
   }
 
-  /// Get the number of expressions in the module.
+  /// Get the number of expressions in body of the module.
   pub fn get_num_exprs(&self) -> usize {
     self.get_body().get_num_exprs()
   }
 
-  /// Get the number of expressions in the module.
+  /// Get the body of this module.
   pub fn get_body<'elem>(&self) -> BlockRef<'elem>
   where
     'sys: 'elem,
@@ -111,6 +111,9 @@ impl<'sys> ModuleRef<'sys> {
     self.body.as_ref::<Block>(self.sys).unwrap()
   }
 
+  /// Iterate over the external interfaces. External interfaces under the context of this project
+  /// typically refers to the arrays (both read and write) and FIFOs (typically push)
+  /// that are used by the module.
   pub(crate) fn ext_interf_iter<'borrow, 'res>(
     &'borrow self,
   ) -> impl Iterator<Item = (&BaseNode, &HashSet<BaseNode>)>
@@ -121,6 +124,7 @@ impl<'sys> ModuleRef<'sys> {
     self.external_interfaces.iter()
   }
 
+  /// Iterate over the ports of the module.
   pub fn port_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = FIFORef<'res>> + 'res
   where
     'sys: 'borrow,
@@ -133,6 +137,15 @@ impl<'sys> ModuleRef<'sys> {
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
 
+  /// Gather all the related external interfaces with the given operand. This is typically used to
+  /// maintain the redundant information when modifying this IR.
+  /// If the given operand is an operand, gather just this specific operand.
+  /// If the given operand is a value reference, gather all the operands that `get_value == this
+  /// operand`.
+  ///
+  /// # Arguments
+  ///
+  /// * `operand` - The operand to gather the related external interfaces.
   pub(crate) fn gather_related_externals(&self, operand: BaseNode) -> Vec<(BaseNode, BaseNode)> {
     // Remove all the external interfaces related to this instruction.
     let tmp = self
@@ -168,6 +181,10 @@ impl<'sys> ModuleRef<'sys> {
 
 impl<'a> ModuleMut<'a> {
   /// Maintain the redundant information, array used in the module.
+  ///
+  /// # Arguments
+  /// * `ext_node` - The external interface node.
+  /// * `operand` - The operand node that uses this external interface.
   pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
     assert!(
       ext_node.get_kind() == NodeKind::Array || ext_node.get_kind() == NodeKind::FIFO,
@@ -189,9 +206,16 @@ impl<'a> ModuleMut<'a> {
     users.insert(operand);
   }
 
-  /// Remove a specific external interface.
+  /// Remove a specific external interface's usage. If this usage set is empty after the removal,
+  /// remove the external interface from the module, too.
+  ///
+  /// # Arguments
+  ///
+  /// * `ext_node` - The external interface node.
+  /// * `operand` - The operand node that uses this external interface.
   pub(crate) fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
     if let Some(operations) = self.get_mut().external_interfaces.get_mut(&ext_node) {
+      assert!(operations.contains(&operand));
       operations.remove(&operand);
       if operations.is_empty() {
         self.get_mut().external_interfaces.remove(&ext_node);
