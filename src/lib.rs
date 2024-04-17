@@ -15,7 +15,7 @@ struct ModuleParser {
   module_name: syn::Ident,
   builder_name: syn::Ident,
   ports: Punctuated<node::PortDecl, Token![,]>,
-  ext_interf: Punctuated<syn::Ident, Token![,]>,
+  parameters: Punctuated<syn::Ident, Token![,]>,
   body: node::Body,
   exposes: Option<Punctuated<syn::Ident, Token![,]>>,
 }
@@ -30,9 +30,9 @@ impl Parse for ModuleParser {
     let raw_ports;
     bracketed!(raw_ports in input);
     let ports = raw_ports.parse_terminated(node::PortDecl::parse, Token![,])?;
-    let raw_ext_interf;
-    bracketed!(raw_ext_interf in input);
-    let ext_interf = raw_ext_interf.parse_terminated(syn::Ident::parse, Token![,])?;
+    let raw_params;
+    bracketed!(raw_params in input);
+    let params = raw_params.parse_terminated(syn::Ident::parse, Token![,])?;
     let body = input.parse::<node::Body>()?;
     // .expose(<var-id>) is optional
     let exposes = if input.peek(Token![.]) {
@@ -51,7 +51,7 @@ impl Parse for ModuleParser {
       module_name,
       builder_name,
       ports,
-      ext_interf,
+      parameters: params,
       body,
       exposes,
     });
@@ -61,7 +61,7 @@ impl Parse for ModuleParser {
 }
 
 /// Parse a module builder macro.
-/// <id> [ <args> ] [ <external-interfaces> ] {
+/// <id> [ <args> ] [ <parameterizables> ] {
 ///    <body>
 /// }
 #[proc_macro]
@@ -110,11 +110,11 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   let body: proc_macro2::TokenStream = body.into();
   eprintln!("[Parser] node::Body successfully parsed!");
 
-  // codegen external interfaces
-  let ext_interf: proc_macro2::TokenStream = {
-    let ext_interf = &parsed_module.ext_interf;
+  // codegen parameterizations
+  let parameterization: proc_macro2::TokenStream = {
+    let parameters = &parsed_module.parameters;
     let mut res = TokenStream::new();
-    for elem in ext_interf.iter() {
+    for elem in parameters.iter() {
       res.extend::<TokenStream>(quote! { #elem: eir::ir::node::BaseNode, }.into());
     }
     res.into()
@@ -136,9 +136,9 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
       (quote! { eir::ir::node::BaseNode }, quote! { module })
     };
 
-  let parameterizable = parsed_module.ext_interf;
+  let parameterizable = parsed_module.parameters;
   let res = quote! {
-    fn #builder_name (sys: &mut eir::builder::SysBuilder, #ext_interf) -> #ret_tys {
+    fn #builder_name (sys: &mut eir::builder::SysBuilder, #parameterization) -> #ret_tys {
       use eir::ir::node::IsElement;
       let module = {
         let res = sys.create_module(stringify!(#module_name), vec![#port_decls]);
