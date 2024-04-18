@@ -748,6 +748,10 @@ impl SysBuilder {
     self.unique_ids.insert(id.into(), 0);
     id.into()
   }
+
+  pub(crate) fn dispose(&mut self, node: BaseNode) {
+    self.slab.remove(node.get_key());
+  }
 }
 
 impl Display for SysBuilder {

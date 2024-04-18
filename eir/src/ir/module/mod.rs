@@ -267,6 +267,12 @@ impl<'a> ModuleMut<'a> {
   pub fn set_parameterizable(&mut self, param: Vec<BaseNode>) {
     self.get_mut().parameterizable = Some(param);
   }
+
+  /// Remove a given port of the module.
+  /// TODO: Stricter check for the port usage.
+  pub fn remove_port(&mut self, idx: usize) {
+    self.get_mut().ports.remove(idx);
+  }
 }
 
 impl Typed for ModuleRef<'_> {

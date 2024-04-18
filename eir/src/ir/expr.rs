@@ -185,6 +185,7 @@ impl ExprMut<'_> {
 
   /// Erase the expression from its parent block
   pub fn erase_from_parent(&mut self) {
+    assert!(self.get().users().is_empty());
     let parent = self.get().get_parent();
     let expr = self.get().upcast();
     let block = self.sys.get::<Block>(&parent).unwrap();
@@ -196,28 +197,42 @@ impl ExprMut<'_> {
 
     let mut block_mut = self.sys.get_mut::<Block>(&parent).unwrap();
     block_mut.erase(&expr);
+
+    // Recycle the memory.
+    self.sys.dispose(expr);
   }
 
-  pub fn set_operand(&mut self, i: usize, value: BaseNode) {
+  /// Unify the implementation of setting and removing an operand.
+  fn set_operand_impl(&mut self, i: usize, value: Option<BaseNode>) {
     let block = self.sys.get::<Block>(&self.get().get_parent()).unwrap();
     let module = block.get_module();
-
     // Remove all the external interfaces related to this instruction.
     let module = module.upcast();
     let expr = self.get().upcast();
     let old = self.get().get_operand(i).unwrap().upcast();
-    let operand = self.sys.insert_element(Operand::new(value));
+    let operand = value.map(|x| self.sys.insert_element(Operand::new(x)));
     self.sys.remove_user(old);
     let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
     module_mut.remove_related_externals(expr);
-    module_mut.add_related_externals(operand);
+    if let Some(operand) = operand {
+      module_mut.add_related_externals(operand);
+      self.get_mut().operands[i] = operand;
+      operand
+        .as_mut::<Operand>(self.sys)
+        .unwrap()
+        .get_mut()
+        .set_user(expr);
+      self.sys.add_user(operand);
+    } else {
+      self.get_mut().operands.remove(i);
+    }
+  }
 
-    self.get_mut().operands[i] = operand;
-    operand
-      .as_mut::<Operand>(self.sys)
-      .unwrap()
-      .get_mut()
-      .set_user(expr);
-    self.sys.add_user(operand);
+  pub fn set_operand(&mut self, i: usize, value: BaseNode) {
+    self.set_operand_impl(i, Some(value));
+  }
+
+  pub fn remove_operand(&mut self, i: usize) {
+    self.set_operand_impl(i, None);
   }
 }

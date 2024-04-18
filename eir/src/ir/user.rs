@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::builder::SysBuilder;
 
-use super::{node::*, Expr, Module, FIFO};
+use super::{node::*, visitor::Visitor, Expr, Module, FIFO};
 
 /// This node defines a def-use relation between the expression nodes.
 /// This is necessary because a node can be used by multiple in other user.
@@ -41,6 +41,28 @@ impl Operand {
   }
 }
 
+impl OperandRef<'_> {
+  pub fn get_idx(&self) -> usize {
+    let user = self.user.as_ref::<Expr>(self.sys).unwrap();
+    let mut iter = user.operand_iter();
+    iter.position(|x| x.get_key() == self.get_key()).unwrap()
+  }
+}
+
+impl OperandMut<'_> {
+  pub fn erase_from_expr(&mut self) {
+    let idx = self.get().get_idx();
+    let mut user = self
+      .get()
+      .get_user()
+      .clone()
+      .as_mut::<Expr>(self.sys)
+      .unwrap();
+    user.remove_operand(idx);
+    self.sys.dispose(self.get().upcast());
+  }
+}
+
 macro_rules! impl_user_methods {
   ($class:ident) => {
     paste::paste! {
@@ -67,6 +89,31 @@ macro_rules! impl_user_methods {
 impl_user_methods!(Module);
 impl_user_methods!(Expr);
 impl_user_methods!(FIFO);
+
+struct GatherAllUses {
+  src: BaseNode,
+  uses: HashSet<(BaseNode, usize)>,
+}
+
+impl GatherAllUses {
+  fn new(src: BaseNode) -> Self {
+    Self {
+      src,
+      uses: HashSet::new(),
+    }
+  }
+}
+
+impl Visitor<()> for GatherAllUses {
+  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
+    for (i, operand) in expr.operand_iter().enumerate() {
+      if operand.get_value().eq(&self.src) {
+        self.uses.insert((expr.upcast(), i));
+      }
+    }
+    None
+  }
+}
 
 impl SysBuilder {
   pub(crate) fn remove_user(&mut self, operand: BaseNode) {
@@ -106,6 +153,18 @@ impl SysBuilder {
         expr_mut.add_user(operand);
       }
       _ => {}
+    }
+  }
+
+  // TODO(@were): I strongly believe we can have a BFS based gatherer to have better performance.
+  pub fn replace_all_uses_with(&mut self, src: BaseNode, dst: BaseNode) {
+    let mut gather = GatherAllUses::new(src);
+    for m in self.module_iter() {
+      gather.visit_module(&m);
+    }
+    for (expr, i) in gather.uses {
+      let mut expr_mut = expr.as_mut::<Expr>(self).unwrap();
+      expr_mut.set_operand(i, dst);
     }
   }
 }
