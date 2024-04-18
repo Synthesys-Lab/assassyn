@@ -160,12 +160,10 @@ impl<'sys> ModuleRef<'sys> {
           users
             .iter()
             .filter(|x| {
-              (*x).eq(&operand)
-                || if let Ok(x) = (*x).as_ref::<Operand>(self.sys) {
-                  x.get_value().eq(&operand)
-                } else {
-                  false
-                }
+              (*x).eq(&operand) || {
+                let user = (*x).as_ref::<Operand>(self.sys).unwrap();
+                user.get_value().eq(&operand)
+              }
             })
             .cloned()
             .collect::<Vec<_>>(),

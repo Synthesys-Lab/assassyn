@@ -33,9 +33,9 @@ impl FIFO {
     }
   }
 
-  /// When instantiating a port whose module is not deterministically known, we use a placeholder
-  /// FIFO to represent the port. The parent is the module's expression, not the module reference,
-  /// which will typically be a FIFOPop expression from the parent module.
+  /// When instantiating a port whose module is not deterministically known when building the IR,
+  /// we use a placeholder FIFO to represent the port. The parent is the module's expression,
+  /// not the module reference, which will typically be a FIFOPop expression from the parent module.
   pub fn placeholder(dtype: DataType, parent: BaseNode, idx: usize) -> Self {
     Self {
       key: 0,

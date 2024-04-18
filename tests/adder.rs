@@ -19,9 +19,11 @@ fn adder() {
   });
 
   let mut sys = SysBuilder::new("main");
-  eir::builder::verify(&sys);
   let adder = adder_builder(&mut sys);
   driver_builder(&mut sys, adder);
+  eir::builder::verify(&sys);
+
+  eprintln!("{}", sys);
 
   let src_name = test_utils::temp_dir(&"adder.rs".to_string());
   let config = eir::sim::Config {

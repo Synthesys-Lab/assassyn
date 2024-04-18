@@ -150,7 +150,5 @@ pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     // Send the data from agent to the actual inokee.
     mutator.sys.create_self_trigger();
     mutator.erase_from_parent();
-  } else {
-    println!("No spin triggers found");
   }
 }

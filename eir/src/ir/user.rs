@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::builder::SysBuilder;
+use crate::{builder::SysBuilder, ir::ir_printer::IRPrinter};
 
 use super::{node::*, visitor::Visitor, Expr, Module, FIFO};
 
@@ -92,13 +92,15 @@ impl_user_methods!(FIFO);
 
 struct GatherAllUses {
   src: BaseNode,
-  uses: HashSet<(BaseNode, usize)>,
+  dst: BaseNode,
+  uses: HashSet<(BaseNode, usize, Option<BaseNode>)>,
 }
 
 impl GatherAllUses {
-  fn new(src: BaseNode) -> Self {
+  fn new(src: BaseNode, dst: BaseNode) -> Self {
     Self {
       src,
+      dst,
       uses: HashSet::new(),
     }
   }
@@ -107,8 +109,21 @@ impl GatherAllUses {
 impl Visitor<()> for GatherAllUses {
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
     for (i, operand) in expr.operand_iter().enumerate() {
-      if operand.get_value().eq(&self.src) {
-        self.uses.insert((expr.upcast(), i));
+      match operand.get_value().get_kind() {
+        NodeKind::FIFO => {
+          let fifo = operand.get_value().as_ref::<FIFO>(expr.sys).unwrap();
+          if fifo.is_placeholder() && fifo.get_parent().eq(&self.src) {
+            if let Ok(module) = self.dst.as_ref::<Module>(expr.sys) {
+              let new_value = module.get_port(fifo.idx()).unwrap();
+              self.uses.insert((expr.upcast(), i, Some(new_value)));
+            }
+          }
+        }
+        _ => {
+          if operand.get_value().eq(&self.src) {
+            self.uses.insert((expr.upcast(), i, None));
+          }
+        }
       }
     }
     None
@@ -158,13 +173,14 @@ impl SysBuilder {
 
   // TODO(@were): I strongly believe we can have a BFS based gatherer to have better performance.
   pub fn replace_all_uses_with(&mut self, src: BaseNode, dst: BaseNode) {
-    let mut gather = GatherAllUses::new(src);
+    let mut gather = GatherAllUses::new(src, dst);
     for m in self.module_iter() {
       gather.visit_module(&m);
     }
-    for (expr, i) in gather.uses {
+    for (expr, i, new_value) in gather.uses {
+      let new_value = new_value.map_or(dst.clone(), |x| x);
       let mut expr_mut = expr.as_mut::<Expr>(self).unwrap();
-      expr_mut.set_operand(i, dst);
+      expr_mut.set_operand(i, new_value);
     }
   }
 }

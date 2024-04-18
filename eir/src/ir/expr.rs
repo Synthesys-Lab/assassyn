@@ -189,11 +189,15 @@ impl ExprMut<'_> {
     let parent = self.get().get_parent();
     let expr = self.get().upcast();
     let block = self.sys.get::<Block>(&parent).unwrap();
+    let operands = self.get().operands.clone();
 
     // Remove all the external interfaces related to this instruction.
     let module = block.get_module().upcast();
     let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
     module_mut.remove_related_externals(expr);
+    for operand in operands {
+      module_mut.remove_related_externals(operand);
+    }
 
     let mut block_mut = self.sys.get_mut::<Block>(&parent).unwrap();
     block_mut.erase(&expr);

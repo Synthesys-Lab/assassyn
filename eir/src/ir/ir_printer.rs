@@ -130,6 +130,17 @@ impl Visitor<String> for IRPrinter {
     format!("({}:{})", int_imm.get_value(), int_imm.dtype().to_string()).into()
   }
 
+  fn visit_operand(&mut self, operand: &OperandRef<'_>) -> Option<String> {
+    let expr = operand.get_user().as_ref::<Expr>(operand.sys).unwrap();
+    let expr = self.visit_expr(&expr).unwrap();
+    format!(
+      "{} // in {}",
+      operand.get_value().to_string(operand.sys),
+      expr
+    )
+    .into()
+  }
+
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
     let mut res = String::new();
     for (elem, ops) in module.ext_interf_iter() {
@@ -259,10 +270,7 @@ impl Visitor<String> for IRPrinter {
             expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
           );
           for op in expr.operand_iter().skip(1) {
-            res.push('_');
-            res.push_str(&op.get_key().to_string());
-            res.push(',');
-            res.push(' ');
+            res.push_str(&format!("_{}, ", op.get_value().get_key()));
           }
           res.push(']');
           res

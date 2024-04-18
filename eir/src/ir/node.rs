@@ -68,7 +68,11 @@ macro_rules! emit_elem_impl {
           node: &BaseNode,
         ) -> Result<&'elem Box<$name>, String> {
           if let NodeKind::$name = node.get_kind() {
-            if let Element::$name(res) = &slab[node.get_key()] {
+            let key = node.get_key();
+            let x = slab.get(key);
+            if let Element::$name(res) = x.expect(
+              &format!("Invalid slab entry @{}, did you access a disposed value?", key)
+            ) {
               return Ok(res);
             }
           }
@@ -85,7 +89,11 @@ macro_rules! emit_elem_impl {
           node: &BaseNode,
         ) -> Result<&'elem mut Box<$name>, String> {
           if let NodeKind::$name = node.get_kind() {
-            if let Element::$name(res) = &mut slab[node.get_key()] {
+            let key = node.get_key();
+            let x = slab.get_mut(key);
+            if let Element::$name(res) = x.expect(
+              &format!("Invalid slab entry @{}, did you access a disposed value?", key)
+            ) {
               return Ok(res);
             }
           }

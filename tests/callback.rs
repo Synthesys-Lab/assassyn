@@ -33,7 +33,6 @@ fn callback() {
   let agent = agent_builder(&mut sys);
   let sqr = sqr_builder(&mut sys);
   let _ = driver_builder(&mut sys, sqr, agent);
-
   println!("{}", sys);
 
   let src_name = test_utils::temp_dir(&"callback.rs".to_string());
@@ -45,6 +44,7 @@ fn callback() {
   };
 
   xform::basic(&mut sys);
+  println!("{}", sys);
   sim::elaborate(&sys, &config).unwrap();
   test_utils::compile(&config.fname, &exec_name);
   let output = test_utils::run(&exec_name);
