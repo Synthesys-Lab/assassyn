@@ -195,8 +195,11 @@ impl ExprMut<'_> {
     let module = block.get_module().upcast();
     let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
     module_mut.remove_related_externals(expr);
-    for operand in operands {
-      module_mut.remove_related_externals(operand);
+    for operand in operands.iter() {
+      module_mut.remove_related_externals(operand.clone());
+    }
+    for operand in operands.iter() {
+      self.sys.remove_user(operand.clone());
     }
 
     let mut block_mut = self.sys.get_mut::<Block>(&parent).unwrap();

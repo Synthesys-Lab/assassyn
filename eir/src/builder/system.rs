@@ -752,6 +752,10 @@ impl SysBuilder {
   pub(crate) fn dispose(&mut self, node: BaseNode) {
     self.slab.remove(node.get_key());
   }
+
+  pub(crate) fn contains(&self, node: &BaseNode) -> bool {
+    self.slab.contains(node.get_key())
+  }
 }
 
 impl Display for SysBuilder {

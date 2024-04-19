@@ -71,7 +71,11 @@ macro_rules! emit_elem_impl {
             let key = node.get_key();
             let x = slab.get(key);
             if let Element::$name(res) = x.expect(
-              &format!("Invalid slab entry @{}, did you access a disposed value?", key)
+              &format!(
+                "Invalid slab entry @{} for {}, did you access a disposed value?",
+                key,
+                stringify!($name)
+              )
             ) {
               return Ok(res);
             }

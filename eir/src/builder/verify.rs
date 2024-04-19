@@ -9,6 +9,7 @@ use super::SysBuilder;
 
 impl Operand {
   fn verify(&self, sys: &SysBuilder) {
+    assert!(sys.contains(&self.upcast()));
     let expr = self
       .get_user()
       .as_ref::<Expr>(sys)
@@ -24,13 +25,10 @@ struct Verifier;
 
 impl Visitor<()> for Verifier {
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
-    let node = expr.upcast();
     for user in expr.users().iter() {
-      user
-        .as_ref::<Operand>(expr.sys)
-        .unwrap()
-        .get()
-        .verify(expr.sys);
+      let operand = user.as_ref::<Operand>(expr.sys).unwrap();
+      assert!(operand.get_value().eq(&expr.upcast()));
+      operand.verify(expr.sys);
     }
     for operand in expr.operand_iter() {
       let operand = operand.get_value();
@@ -56,7 +54,6 @@ impl Visitor<()> for Verifier {
 
 pub fn verify(sys: &SysBuilder) {
   for m in sys.module_iter() {
-    let node = m.upcast();
     for user in m.users().iter() {
       user.as_ref::<Operand>(sys).unwrap().verify(sys);
     }
