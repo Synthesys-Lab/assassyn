@@ -179,14 +179,21 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           namify(array_ref.get_name())
         ).as_str());
         res.push_str(format!(
-          "{}input logic [{}:0] array_{}_q,\n",
+          "{}input logic [{}:0] array_{}_q[0:{}],\n",
           " ".repeat(self.indent),
           array_ref.scalar_ty().bits() - 1,
-          namify(array_ref.get_name())
+          namify(array_ref.get_name()),
+          array_ref.get_size() - 1
         ).as_str());
         res.push_str(format!(
           "{}output logic array_{}_w,\n",
           " ".repeat(self.indent),
+          namify(array_ref.get_name())
+        ).as_str());
+        res.push_str(format!(
+          "{}output logic [{}:0] array_{}_widx,\n",
+          " ".repeat(self.indent),
+          (array_ref.get_size() + 1).ilog2() - 1,
           namify(array_ref.get_name())
         ).as_str());
         res.push_str(format!(
@@ -422,40 +429,45 @@ assign trigger_pop_ready = 1'b1;\n\n");
         }
 
         Opcode::Load => {
-          let array_ref = &(expr
+          let array_ptr = expr
             .get_operand(0)
             .unwrap()
             .get_value()
             .as_ref::<ArrayPtr>(self.sys)
-            .unwrap())
+            .unwrap();
+          let array_ref = &array_ptr
             .get_array()
             .as_ref::<Array>(self.sys)
             .unwrap();
           Some(format!(
-            "logic [{}:0] _{};\nassign _{} = array_{}_q;\n\n",
+            "logic [{}:0] _{};\nassign _{} = array_{}_q[{}];\n\n",
             expr.dtype().bits() - 1,
             expr.get_key(),
             expr.get_key(),
-            namify(array_ref.get_name())
+            namify(array_ref.get_name()),
+            dump_ref!(self.sys, array_ptr.get_idx())
           ))
         }
 
         Opcode::Store => {
-          let array_ref = &(expr
+          let array_ptr = expr
             .get_operand(0)
             .unwrap()
             .get_value()
             .as_ref::<ArrayPtr>(self.sys)
-            .unwrap())
+            .unwrap();
+          let array_ref = &array_ptr
             .get_array()
             .as_ref::<Array>(self.sys)
             .unwrap();
           Some(format!(
-            "assign array_{}_w = trigger{};\nassign array_{}_d = {};\n\n",
+            "assign array_{}_w = trigger{};\nassign array_{}_d = {};\nassign array_{}_widx = {};\n\n",
             namify(array_ref.get_name()),
             (self.pred.clone().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string()),
             namify(array_ref.get_name()),
-            dump_ref!(expr.sys, expr.get_operand(1).unwrap().get_value())
+            dump_ref!(self.sys, expr.get_operand(1).unwrap().get_value()),
+            namify(array_ref.get_name()),
+            dump_ref!(self.sys, array_ptr.get_idx())
           ))
         }
 
@@ -552,13 +564,15 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error
   for array in sys.array_iter() {
     let array_name = namify(array.get_name());
     res.push_str(format!(
-      "// array: {}\n",
-      array_name
+      "// array: {}[{}]\n",
+      array_name,
+      array.get_size()
     ).as_str());
     res.push_str(format!(
-      "logic [{}:0] array_{}_q;\n",
+      "logic [{}:0] array_{}_q[0:{}];\n",
       array.scalar_ty().bits() - 1,
-      array_name
+      array_name,
+      array.get_size() - 1
     ).as_str());
     res.push_str(format!(
       "logic [{}:0] array_{}_d;\n",
@@ -566,11 +580,17 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error
       array_name
     ).as_str());
     res.push_str(format!(
+      "logic [{}:0] array_{}_widx;\n",
+      (array.get_size() + 1).ilog2() - 1,
+      array_name
+    ).as_str());
+    res.push_str(format!(
       "logic array_{}_w;\n",
       array_name
     ).as_str());
     res.push_str(format!(
-      "always_ff @(posedge clk or negedge rst_n) if (!rst_n) array_{}_q <= '0; else if (array_{}_w) array_{}_q <= array_{}_d;\n\n",
+      "always_ff @(posedge clk or negedge rst_n) if (!rst_n) array_{}_q <= '{{default : 4'h0}}; else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n\n",
+      array_name,
       array_name,
       array_name,
       array_name,
@@ -656,6 +676,7 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error
         let array_ref = interf.as_ref::<Array>(sys).unwrap();
           res.push_str(format!("  .array_{}_q(array_{}_q),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
           res.push_str(format!("  .array_{}_w(array_{}_w),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
+          res.push_str(format!("  .array_{}_widx(array_{}_widx),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
           res.push_str(format!("  .array_{}_d(array_{}_d),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
       } else {
         panic!("Unknown interf kind {:?}", interf.get_kind());
