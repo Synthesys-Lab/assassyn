@@ -1,8 +1,18 @@
-use std::{any::Any, collections::HashMap, fs::File, io::Write};
+use std::{collections::{HashMap, HashSet}, fs::File, io::{Error, Write}};
 
 use crate::{builder::system::SysBuilder, ir::node::*, ir::visitor::Visitor, ir::*};
 
 use super::Config;
+
+fn namify(name: &str) -> String {
+  name.replace(".", "_")
+}
+
+macro_rules! fifo_name {
+  ($fifo:expr) => {{
+    format!("{}", namify($fifo.get_name()))
+  }};
+}
 
 struct VerilogDumper<'a> {
   sys: &'a SysBuilder,
@@ -10,6 +20,10 @@ struct VerilogDumper<'a> {
   pred: Option<String>,
   fifo_pushes: HashMap<String, Vec<(String, String)>>, // fifo_name -> [(pred, value)]
   triggers: HashMap<String, Vec<String>>, // module_name -> [pred]
+  current_module: String,
+  trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
+  array_drivers: HashMap<String, HashSet<String>>, // array -> {driver module}
+  fifo_drivers: HashMap<String, HashSet<String>>, // fifo -> {driver module}
 }
 
 impl<'a> VerilogDumper<'a> {
@@ -20,18 +34,349 @@ impl<'a> VerilogDumper<'a> {
       pred: None,
       fifo_pushes: HashMap::new(),
       triggers: HashMap::new(),
+      current_module: String::new(),
+      trigger_drivers: HashMap::new(),
+      array_drivers: HashMap::new(),
+      fifo_drivers: HashMap::new(),
     }
   }
-}
+  
+  fn dump_runtime(self: VerilogDumper<'a>, mut fd: File, sim_threshold: usize) -> Result<(), Error> {
+    // runtime
+    let mut res = String::new();
+    res.push_str("module top (\n");
+    res.push_str("  input logic clk,\n");
+    res.push_str("  input logic rst_n\n");
+    res.push_str(");\n\n");
+    for array in self.sys.array_iter() {
+      let array_name = namify(array.get_name());
+      res.push_str(format!(
+        "// array: {}[{}]\n",
+        array_name,
+        array.get_size()
+      ).as_str());
+      res.push_str(format!(
+        "logic [{}:0] array_{}_q[0:{}];\n",
+        array.scalar_ty().bits() - 1,
+        array_name,
+        array.get_size() - 1
+      ).as_str());
 
-fn namify(name: &str) -> String {
-  name.replace(".", "_")
-}
+      for driver in self.array_drivers.get(&array_name).unwrap().into_iter() {
+        res.push_str(format!(
+          "logic [{}:0] array_{}_driver_{}_d;\n",
+          array.scalar_ty().bits() - 1,
+          array_name,
+          driver
+        ).as_str());
+        res.push_str(format!(
+          "logic [{}:0] array_{}_driver_{}_widx;\n",
+          (array.get_size() + 1).ilog2() - 1,
+          array_name,
+          driver
+        ).as_str());
+        res.push_str(format!(
+          "logic array_{}_driver_{}_w;\n",
+          array_name,
+          driver
+        ).as_str());
+      }
 
-macro_rules! fifo_name {
-  ($fifo:expr) => {{
-    format!("{}", namify($fifo.get_name()))
-  }};
+      res.push_str(format!(
+        "logic [{}:0] array_{}_d;\n",
+        array.scalar_ty().bits() - 1,
+        array_name
+      ).as_str());
+      res.push_str(format!(
+        "assign array_{}_d = \n{};\n",
+        array_name,
+        self.array_drivers.get(&array_name).unwrap().into_iter().map(|driver|
+          format!(
+            "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_d)",
+            array.scalar_ty().bits(),
+            array_name,
+            driver,
+            array_name,
+            driver
+          )
+        ).collect::<Vec<String>>().join(" |\n")).as_str()
+      );
+      res.push_str(format!(
+        "logic [{}:0] array_{}_widx;\n",
+        (array.get_size() + 1).ilog2() - 1,
+        array_name
+      ).as_str());
+      res.push_str(format!(
+        "assign array_{}_widx = \n{};\n",
+        array_name,
+        self.array_drivers.get(&array_name).unwrap().into_iter().map(|driver|
+          format!(
+            "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_widx)",
+            (array.get_size() + 1).ilog2(),
+            array_name,
+            driver,
+            array_name,
+            driver
+          )
+        ).collect::<Vec<String>>().join(" |\n")).as_str()
+      );
+      res.push_str(format!(
+        "logic array_{}_w;\n",
+        array_name
+      ).as_str());
+      res.push_str(format!(
+        "assign array_{}_w = {};\n",
+        array_name,
+        self.array_drivers.get(&array_name).unwrap().into_iter().map(|driver|
+          format!("array_{}_driver_{}_w", array_name, driver)
+        ).collect::<Vec<String>>().join(" | ")).as_str()
+      );
+      res.push_str(format!(
+        "always_ff @(posedge clk or negedge rst_n) if (!rst_n) array_{}_q <= '{{default : 4'h0}}; else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n\n",
+        array_name,
+        array_name,
+        array_name,
+        array_name,
+        array_name
+      ).as_str());
+    }
+    for module in self.sys.module_iter() {
+      for port in module.port_iter() {
+        let fifo_name = namify(format!(
+          "{}_{}",
+          port.get_parent().as_ref::<Module>(self.sys).unwrap().get_name(),
+          fifo_name!(port)
+        ).as_str());
+        let fifo_width = port.scalar_ty().bits();
+        res.push_str(format!("// fifo: {}\n", fifo_name).as_str());
+        for driver in self.fifo_drivers.get(&fifo_name).unwrap().into_iter() {
+          res.push_str(format!("logic fifo_{}_driver_{}_push_valid;\n", fifo_name, driver).as_str());
+          res.push_str(format!("logic [{}:0] fifo_{}_driver_{}_push_data;\n", fifo_width - 1, fifo_name, driver).as_str());
+          res.push_str(format!("logic fifo_{}_driver_{}_push_ready;\n", fifo_name, driver).as_str());
+        }
+        res.push_str(format!("logic fifo_{}_push_valid;\n", fifo_name).as_str());
+        res.push_str(format!(
+          "assign fifo_{}_push_valid = {};\n",
+          fifo_name,
+          self.fifo_drivers.get(&fifo_name).unwrap().into_iter().map(|driver|
+            format!("fifo_{}_driver_{}_push_valid", fifo_name, driver)
+          ).collect::<Vec<String>>().join(" | ")).as_str()
+        );
+        res.push_str(format!("logic [{}:0] fifo_{}_push_data;\n", fifo_width - 1, fifo_name).as_str());
+        res.push_str(format!(
+          "assign fifo_{}_push_data = \n{};\n",
+          fifo_name,
+          self.fifo_drivers.get(&fifo_name).unwrap().into_iter().map(|driver|
+            format!(
+              "  ({{{}{{fifo_{}_driver_{}_push_valid}}}} & fifo_{}_driver_{}_push_data)",
+              fifo_width,
+              fifo_name,
+              driver,
+              fifo_name,
+              driver
+            )
+          ).collect::<Vec<String>>().join(" |\n")).as_str()
+        );
+        res.push_str(format!("logic fifo_{}_push_ready;\n", fifo_name).as_str());
+        for driver in self.fifo_drivers.get(&fifo_name).unwrap().into_iter() {
+          res.push_str(format!("assign fifo_{}_driver_{}_push_ready = fifo_{}_push_ready;\n", fifo_name, driver, fifo_name).as_str());
+        }
+        res.push_str(format!("logic fifo_{}_pop_valid;\n", fifo_name).as_str());
+        res.push_str(format!("logic [{}:0] fifo_{}_pop_data;\n", fifo_width - 1, fifo_name).as_str());
+        res.push_str(format!("logic fifo_{}_pop_ready;\n", fifo_name).as_str());
+        res.push_str(format!("fifo #({}) fifo_{}_i (\n", fifo_width, fifo_name).as_str());
+        res.push_str(format!("  .clk(clk),\n").as_str());
+        res.push_str(format!("  .rst_n(rst_n),\n").as_str());
+        res.push_str(format!("  .push_valid(fifo_{}_push_valid),\n", fifo_name).as_str());
+        res.push_str(format!("  .push_data(fifo_{}_push_data),\n", fifo_name).as_str());
+        res.push_str(format!("  .push_ready(fifo_{}_push_ready),\n", fifo_name).as_str());
+        res.push_str(format!("  .pop_valid(fifo_{}_pop_valid),\n", fifo_name).as_str());
+        res.push_str(format!("  .pop_data(fifo_{}_pop_data),\n", fifo_name).as_str());
+        res.push_str(format!("  .pop_ready(fifo_{}_pop_ready)\n", fifo_name).as_str());
+        res.push_str(format!(");\n\n").as_str());
+      }
+    }
+    // triggers
+    for module in self.sys.module_iter() {
+      let module_name = namify(module.get_name());
+      res.push_str(format!("// {} trigger\n", module_name).as_str());
+      if module_name != "driver" {
+        for driver in self.trigger_drivers.get(&module_name).unwrap().into_iter() {
+          res.push_str(format!("logic {}_driver_{}_trigger_push_valid;\n", module_name, driver).as_str());
+          res.push_str(format!("logic {}_driver_{}_trigger_push_ready;\n", module_name, driver).as_str());
+        }
+      }
+      res.push_str(format!("logic {}_trigger_push_valid;\n", module_name).as_str());
+      if module_name != "driver" {
+        res.push_str(format!(
+          "assign {}_trigger_push_valid = \n{};\n",
+          module_name,
+          self.trigger_drivers.get(&module_name).unwrap().into_iter().map(|driver|
+            format!(
+              "  {}_driver_{}_trigger_push_valid",
+              module_name,
+              driver
+            )
+          ).collect::<Vec<String>>().join(" |\n").as_str()
+        ).as_str());
+      }
+      res.push_str(format!("logic {}_trigger_push_ready;\n", module_name).as_str());
+      if module_name != "driver" {
+        for driver in self.trigger_drivers.get(&module_name).unwrap().into_iter() {
+          res.push_str(format!("assign {}_driver_{}_trigger_push_ready = {}_trigger_push_ready;\n", module_name, driver, module_name).as_str());
+        }
+      }
+      res.push_str(format!("logic {}_trigger_pop_valid;\n", module_name).as_str());
+      res.push_str(format!("logic {}_trigger_pop_ready;\n", module_name).as_str());
+      res.push_str(format!("fifo #(1) {}_trigger_i (\n", module_name).as_str());
+      res.push_str(format!("  .clk(clk),\n").as_str());
+      res.push_str(format!("  .rst_n(rst_n),\n").as_str());
+      res.push_str(format!("  .push_valid({}_trigger_push_valid),\n", module_name).as_str());
+      res.push_str(format!("  .push_data(1'b1),\n").as_str());
+      res.push_str(format!("  .push_ready({}_trigger_push_ready),\n", module_name).as_str());
+      res.push_str(format!("  .pop_valid({}_trigger_pop_valid),\n", module_name).as_str());
+      res.push_str(format!("  .pop_data(),\n").as_str());
+      res.push_str(format!("  .pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
+      res.push_str(format!(");\n\n").as_str());
+    }
+    res.push_str("assign driver_trigger_push_valid = 1'b1;\n\n");
+    // module insts
+    for module in self.sys.module_iter() {
+      let module_name = namify(module.get_name());
+      res.push_str(format!("// {}\n", module_name).as_str());
+      res.push_str(format!("{} {}_i (\n", module_name, module_name).as_str());
+      res.push_str(format!("  .clk(clk),\n").as_str());
+      res.push_str(format!("  .rst_n(rst_n),\n").as_str());
+      for port in module.port_iter() {
+        let fifo_name = namify(format!(
+          "{}_{}",
+          port.get_parent().as_ref::<Module>(self.sys).unwrap().get_name(),
+          fifo_name!(port)
+        ).as_str());
+        res.push_str(format!("  .fifo_{}_pop_valid(fifo_{}_pop_valid),\n", namify(port.get_name().as_str()), fifo_name).as_str());
+        res.push_str(format!("  .fifo_{}_pop_data(fifo_{}_pop_data),\n", namify(port.get_name().as_str()), fifo_name).as_str());
+        res.push_str(format!("  .fifo_{}_pop_ready(fifo_{}_pop_ready),\n", namify(port.get_name().as_str()), fifo_name).as_str());
+      }
+      for (interf, _) in module.ext_interf_iter() {
+        if interf.get_kind() == NodeKind::FIFO {
+          let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
+          let fifo_name = namify(format!(
+            "{}_{}",
+            fifo.get_parent().as_ref::<Module>(self.sys).unwrap().get_name(),
+            fifo_name!(fifo)
+          ).as_str());
+          res.push_str(format!("  .fifo_{}_push_valid(fifo_{}_driver_{}_push_valid),\n", fifo_name, fifo_name, module_name).as_str());
+          res.push_str(format!("  .fifo_{}_push_data(fifo_{}_driver_{}_push_data),\n", fifo_name, fifo_name, module_name).as_str());
+          res.push_str(format!("  .fifo_{}_push_ready(fifo_{}_driver_{}_push_ready),\n", fifo_name, fifo_name, module_name).as_str());
+        } else if interf.get_kind() == NodeKind::Array {
+          let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
+            res.push_str(format!("  .array_{}_q(array_{}_q),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
+            res.push_str(format!("  .array_{}_w(array_{}_driver_{}_w),\n", namify(array_ref.get_name()), namify(array_ref.get_name()), module_name).as_str());
+            res.push_str(format!("  .array_{}_widx(array_{}_driver_{}_widx),\n", namify(array_ref.get_name()), namify(array_ref.get_name()), module_name).as_str());
+            res.push_str(format!("  .array_{}_d(array_{}_driver_{}_d),\n", namify(array_ref.get_name()), namify(array_ref.get_name()), module_name).as_str());
+        } else {
+          panic!("Unknown interf kind {:?}", interf.get_kind());
+        }
+      }
+
+      let mut trigger_modules = get_triggered_modules(&module.upcast(), self.sys);
+      trigger_modules.sort_unstable();
+      trigger_modules.dedup();
+      for trigger_module in trigger_modules {
+        res.push_str(format!(
+          "  .{}_trigger_push_valid({}_driver_{}_trigger_push_valid),\n",
+          trigger_module,
+          trigger_module,
+          module_name
+        ).as_str());
+        res.push_str(format!(
+          "  .{}_trigger_push_ready({}_driver_{}_trigger_push_ready),\n",
+          trigger_module,
+          trigger_module,
+          module_name
+        ).as_str());
+      }
+      res.push_str(format!("  .trigger_pop_valid({}_trigger_pop_valid),\n", module_name).as_str());
+      res.push_str(format!("  .trigger_pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
+      res.push_str(format!(");\n\n").as_str());
+    }
+    res.push_str("endmodule // top\n\n");
+
+    fd.write(res.as_bytes()).unwrap();
+
+    fd.write(format!("
+module fifo #(
+    parameter WIDTH = 8
+) (
+  input logic clk,
+  input logic rst_n,
+
+  input  logic               push_valid,
+  input  logic [WIDTH - 1:0] push_data,
+  output logic               push_ready,
+
+  output logic               pop_valid,
+  output logic [WIDTH - 1:0] pop_data,
+  input  logic               pop_ready
+);
+
+logic [WIDTH - 1:0] q[$];
+
+always @(posedge clk or negedge rst_n) begin
+  if (!rst_n) begin
+    pop_valid <= 1'b0;
+    pop_data <= 'x;
+  end else begin
+    if (pop_ready) q.pop_front();
+
+    if (push_valid) q.push_back(push_data);
+
+    if (q.size() == 0) begin
+      pop_valid <= 1'b0;
+      pop_data <= 'x;
+    end else begin
+      pop_valid <= 1'b1;
+      pop_data <= q[0];
+    end
+  end
+end
+
+assign push_ready = 1'b1;
+
+endmodule
+
+
+module tb;
+
+logic clk;
+logic rst_n;
+
+initial begin
+  $fsdbDumpfile(\"wave.fsdb\");
+  $fsdbDumpvars();
+end
+
+initial begin
+  clk = 1'b1;
+  rst_n = 1'b0;
+  #1;
+  rst_n = 1'b1;
+  #{}00;
+  $finish();
+end
+
+always #50 clk <= !clk;
+
+top top_i (
+  .clk(clk),
+  .rst_n(rst_n)
+);
+
+endmodule
+", sim_threshold).as_bytes())?;
+
+  Ok(())
+  }
 }
 
 fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
@@ -460,13 +805,22 @@ assign trigger_pop_ready = 1'b1;\n\n");
             .get_array()
             .as_ref::<Array>(self.sys)
             .unwrap();
+          let array_name = namify(array_ref.get_name());
+          match self.array_drivers.get_mut(&array_name) {
+            Some(ads) => {
+              ads.insert(self.current_module.clone());
+            }
+            None => {
+              self.array_drivers.insert(array_name.clone(), HashSet::from([self.current_module.clone()]));
+            }
+          }
           Some(format!(
             "assign array_{}_w = trigger{};\nassign array_{}_d = {};\nassign array_{}_widx = {};\n\n",
-            namify(array_ref.get_name()),
+            array_name,
             (self.pred.clone().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string()),
-            namify(array_ref.get_name()),
+            array_name,
             dump_ref!(self.sys, expr.get_operand(1).unwrap().get_value()),
-            namify(array_ref.get_name()),
+            array_name,
             dump_ref!(self.sys, array_ptr.get_idx())
           ))
         }
@@ -478,6 +832,14 @@ assign trigger_pop_ready = 1'b1;\n\n");
             fifo.get_parent().as_ref::<Module>(self.sys).unwrap().get_name(),
             fifo_name!(fifo)
           ).as_str());
+          match self.fifo_drivers.get_mut(&fifo_name) {
+            Some(fds) => {
+              fds.insert(self.current_module.clone());
+            }
+            None => {
+              self.fifo_drivers.insert(fifo_name.clone(), HashSet::from([self.current_module.clone()]));
+            }
+          }
           match self.fifo_pushes.get_mut(&fifo_name) {
             Some(fps) => {
               fps.push((
@@ -522,6 +884,14 @@ assign trigger_pop_ready = 1'b1;\n\n");
             .as_ref::<Module>(self.sys)
             .unwrap();
           let module_name = namify(module.get_name());
+          match self.trigger_drivers.get_mut(&module_name) {
+            Some(tds) => {
+              tds.insert(self.current_module.clone());
+            }
+            None => {
+              self.trigger_drivers.insert(module_name.clone(), HashSet::from([self.current_module.clone()]));
+            }
+          }
           match self.triggers.get_mut(&module_name) {
             Some(trgs) => {
               trgs.push(self.pred.clone().unwrap_or("".to_string()))
@@ -544,7 +914,7 @@ assign trigger_pop_ready = 1'b1;\n\n");
   }
 }
 
-pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
+pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
   println!("Writing verilog rtl to {}", config.fname);
 
   let mut vd = VerilogDumper::new(sys);
@@ -552,230 +922,11 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error
   let mut fd = File::create(config.fname.clone())?;
 
   for module in vd.sys.module_iter() {
+    vd.current_module = namify(module.get_name()).to_string();
     fd.write(vd.visit_module(&module).unwrap().as_bytes())?;
   }
 
-  // runtime
-  let mut res = String::new();
-  res.push_str("module top (\n");
-  res.push_str("  input logic clk,\n");
-  res.push_str("  input logic rst_n\n");
-  res.push_str(");\n\n");
-  for array in sys.array_iter() {
-    let array_name = namify(array.get_name());
-    res.push_str(format!(
-      "// array: {}[{}]\n",
-      array_name,
-      array.get_size()
-    ).as_str());
-    res.push_str(format!(
-      "logic [{}:0] array_{}_q[0:{}];\n",
-      array.scalar_ty().bits() - 1,
-      array_name,
-      array.get_size() - 1
-    ).as_str());
-    res.push_str(format!(
-      "logic [{}:0] array_{}_d;\n",
-      array.scalar_ty().bits() - 1,
-      array_name
-    ).as_str());
-    res.push_str(format!(
-      "logic [{}:0] array_{}_widx;\n",
-      (array.get_size() + 1).ilog2() - 1,
-      array_name
-    ).as_str());
-    res.push_str(format!(
-      "logic array_{}_w;\n",
-      array_name
-    ).as_str());
-    res.push_str(format!(
-      "always_ff @(posedge clk or negedge rst_n) if (!rst_n) array_{}_q <= '{{default : 4'h0}}; else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n\n",
-      array_name,
-      array_name,
-      array_name,
-      array_name,
-      array_name
-    ).as_str());
-  }
-  for module in sys.module_iter() {
-    for port in module.port_iter() {
-      let fifo_name = namify(format!(
-        "{}_{}",
-        port.get_parent().as_ref::<Module>(sys).unwrap().get_name(),
-        fifo_name!(port)
-      ).as_str());
-      let fifo_width = port.scalar_ty().bits();
-      res.push_str(format!("// fifo: {}\n", fifo_name).as_str());
-      res.push_str(format!("logic fifo_{}_push_valid;\n", fifo_name).as_str());
-      res.push_str(format!("logic [{}:0] fifo_{}_push_data;\n", fifo_width - 1, fifo_name).as_str());
-      res.push_str(format!("logic fifo_{}_push_ready;\n", fifo_name).as_str());
-      res.push_str(format!("logic fifo_{}_pop_valid;\n", fifo_name).as_str());
-      res.push_str(format!("logic [{}:0] fifo_{}_pop_data;\n", fifo_width - 1, fifo_name).as_str());
-      res.push_str(format!("logic fifo_{}_pop_ready;\n", fifo_name).as_str());
-      res.push_str(format!("fifo #({}) fifo_{}_i (\n", fifo_width, fifo_name).as_str());
-      res.push_str(format!("  .clk(clk),\n").as_str());
-      res.push_str(format!("  .rst_n(rst_n),\n").as_str());
-      res.push_str(format!("  .push_valid(fifo_{}_push_valid),\n", fifo_name).as_str());
-      res.push_str(format!("  .push_data(fifo_{}_push_data),\n", fifo_name).as_str());
-      res.push_str(format!("  .push_ready(fifo_{}_push_ready),\n", fifo_name).as_str());
-      res.push_str(format!("  .pop_valid(fifo_{}_pop_valid),\n", fifo_name).as_str());
-      res.push_str(format!("  .pop_data(fifo_{}_pop_data),\n", fifo_name).as_str());
-      res.push_str(format!("  .pop_ready(fifo_{}_pop_ready)\n", fifo_name).as_str());
-      res.push_str(format!(");\n\n").as_str());
-    }
-  }
-  // triggers
-  for module in sys.module_iter() {
-    let module_name = namify(module.get_name());
-    res.push_str(format!("// {} trigger\n", module_name).as_str());
-    res.push_str(format!("logic {}_trigger_push_valid;\n", module_name).as_str());
-    res.push_str(format!("logic {}_trigger_push_ready;\n", module_name).as_str());
-    res.push_str(format!("logic {}_trigger_pop_valid;\n", module_name).as_str());
-    res.push_str(format!("logic {}_trigger_pop_ready;\n", module_name).as_str());
-    res.push_str(format!("fifo #(1) {}_trigger_i (\n", module_name).as_str());
-    res.push_str(format!("  .clk(clk),\n").as_str());
-    res.push_str(format!("  .rst_n(rst_n),\n").as_str());
-    res.push_str(format!("  .push_valid({}_trigger_push_valid),\n", module_name).as_str());
-    res.push_str(format!("  .push_data(1'b1),\n").as_str());
-    res.push_str(format!("  .push_ready({}_trigger_push_ready),\n", module_name).as_str());
-    res.push_str(format!("  .pop_valid({}_trigger_pop_valid),\n", module_name).as_str());
-    res.push_str(format!("  .pop_data(),\n").as_str());
-    res.push_str(format!("  .pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
-    res.push_str(format!(");\n\n").as_str());
-  }
-  res.push_str("assign driver_trigger_push_valid = 1'b1;\n\n");
-  // module insts
-  for module in sys.module_iter() {
-    let module_name = namify(module.get_name());
-    res.push_str(format!("// {}\n", module_name).as_str());
-    res.push_str(format!("{} {}_i (\n", module_name, module_name).as_str());
-    res.push_str(format!("  .clk(clk),\n").as_str());
-    res.push_str(format!("  .rst_n(rst_n),\n").as_str());
-    for port in module.port_iter() {
-      let fifo_name = namify(format!(
-        "{}_{}",
-        port.get_parent().as_ref::<Module>(sys).unwrap().get_name(),
-        fifo_name!(port)
-      ).as_str());
-      res.push_str(format!("  .fifo_{}_pop_valid(fifo_{}_pop_valid),\n", namify(port.get_name().as_str()), fifo_name).as_str());
-      res.push_str(format!("  .fifo_{}_pop_data(fifo_{}_pop_data),\n", namify(port.get_name().as_str()), fifo_name).as_str());
-      res.push_str(format!("  .fifo_{}_pop_ready(fifo_{}_pop_ready),\n", namify(port.get_name().as_str()), fifo_name).as_str());
-    }
-    for (interf, _) in module.ext_interf_iter() {
-      if interf.get_kind() == NodeKind::FIFO {
-        let fifo = interf.as_ref::<FIFO>(sys).unwrap();
-        let fifo_name = namify(format!(
-          "{}_{}",
-          fifo.get_parent().as_ref::<Module>(sys).unwrap().get_name(),
-          fifo_name!(fifo)
-        ).as_str());
-        res.push_str(format!("  .fifo_{}_push_valid(fifo_{}_push_valid),\n", fifo_name, fifo_name).as_str());
-        res.push_str(format!("  .fifo_{}_push_data(fifo_{}_push_data),\n", fifo_name, fifo_name).as_str());
-        res.push_str(format!("  .fifo_{}_push_ready(fifo_{}_push_ready),\n", fifo_name, fifo_name).as_str());
-      } else if interf.get_kind() == NodeKind::Array {
-        let array_ref = interf.as_ref::<Array>(sys).unwrap();
-          res.push_str(format!("  .array_{}_q(array_{}_q),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
-          res.push_str(format!("  .array_{}_w(array_{}_w),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
-          res.push_str(format!("  .array_{}_widx(array_{}_widx),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
-          res.push_str(format!("  .array_{}_d(array_{}_d),\n", namify(array_ref.get_name()), namify(array_ref.get_name())).as_str());
-      } else {
-        panic!("Unknown interf kind {:?}", interf.get_kind());
-      }
-    }
-
-    let mut trigger_modules = get_triggered_modules(&module.upcast(), sys);
-    trigger_modules.sort_unstable();
-    trigger_modules.dedup();
-    for trigger_module in trigger_modules {
-      res.push_str(format!(
-        "  .{}_trigger_push_valid({}_trigger_push_valid),\n",
-        trigger_module,
-        trigger_module
-      ).as_str());
-      res.push_str(format!(
-        "  .{}_trigger_push_ready({}_trigger_push_ready),\n",
-        trigger_module,
-        trigger_module
-      ).as_str());
-    }
-    res.push_str(format!("  .trigger_pop_valid({}_trigger_pop_valid),\n", module_name).as_str());
-    res.push_str(format!("  .trigger_pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
-    res.push_str(format!(");\n\n").as_str());
-  }
-  res.push_str("endmodule // top\n\n");
-
-  fd.write(res.as_bytes()).unwrap();
-
-  fd.write(format!("
-module fifo #(
-    parameter WIDTH = 8
-) (
-  input logic clk,
-  input logic rst_n,
-
-  input  logic               push_valid,
-  input  logic [WIDTH - 1:0] push_data,
-  output logic               push_ready,
-
-  output logic               pop_valid,
-  output logic [WIDTH - 1:0] pop_data,
-  input  logic               pop_ready
-);
-
-logic [WIDTH - 1:0] q[$];
-
-always @(posedge clk or negedge rst_n) begin
-  if (!rst_n) begin
-    pop_valid <= 1'b0;
-    pop_data <= 'x;
-  end else begin
-    if (pop_ready) q.pop_front();
-
-    if (push_valid) q.push_back(push_data);
-
-    if (q.size() == 0) begin
-      pop_valid <= 1'b0;
-      pop_data <= 'x;
-    end else begin
-      pop_valid <= 1'b1;
-      pop_data <= q[0];
-    end
-  end
-end
-
-assign push_ready = 1'b1;
-
-endmodule
-
-
-module tb;
-
-logic clk;
-logic rst_n;
-
-initial begin
-  $fsdbDumpfile(\"wave.fsdb\");
-  $fsdbDumpvars();
-end
-
-initial begin
-  clk = 1'b1;
-  rst_n = 1'b0;
-  #1;
-  rst_n = 1'b1;
-  #{}00;
-  $finish();
-end
-
-always #50 clk <= !clk;
-
-top top_i (
-  .clk(clk),
-  .rst_n(rst_n)
-);
-
-endmodule
-", config.sim_threshold).as_bytes())?;
+  vd.dump_runtime(fd, config.sim_threshold)?;
 
   Ok(())
 }
