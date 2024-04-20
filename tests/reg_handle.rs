@@ -50,6 +50,12 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   eir::xform::basic(&mut sys);
   println!("{}", sys);
   eir::builder::verify(&sys);
+  let verilog_name = test_utils::temp_dir(&format!("{}.sv", fname));
+  let verilog_config = eir::verilog::Config {
+    fname: verilog_name,
+    sim_threshold: 100,
+  };
+  eir::verilog::elaborate(&sys, &verilog_config).unwrap();
   eir::sim::elaborate(&sys, &config).unwrap();
   let exec_name = test_utils::temp_dir(&fname.to_string());
   test_utils::compile(&config.fname, &exec_name);

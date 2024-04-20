@@ -45,6 +45,12 @@ fn callback() {
 
   xform::basic(&mut sys);
   println!("{}", sys);
+  let verilog_name = test_utils::temp_dir(&"callback.sv".to_string());
+  let verilog_config = eir::verilog::Config {
+    fname: verilog_name,
+    sim_threshold: 100,
+  };
+  eir::verilog::elaborate(&sys, &verilog_config).unwrap();
   sim::elaborate(&sys, &config).unwrap();
   test_utils::compile(&config.fname, &exec_name);
   let output = test_utils::run(&exec_name);

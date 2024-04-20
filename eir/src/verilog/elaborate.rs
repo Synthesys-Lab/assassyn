@@ -862,11 +862,7 @@ assign trigger_pop_ready = 1'b1;\n\n");
 
         Opcode::FIFOPeek => {
           let fifo = expr.get_operand(0).unwrap().get_value().as_ref::<FIFO>(self.sys).unwrap();
-          let fifo_name = namify(format!(
-            "{}_{}",
-            fifo.get_parent().as_ref::<Module>(self.sys).unwrap().get_name(),
-            fifo_name!(fifo)
-          ).as_str());
+          let fifo_name = fifo_name!(fifo);
           Some(format!(
             "logic [{}:0] _{};\nassign _{} = fifo_{}_pop_data;\n\n",
             fifo.scalar_ty().bits() - 1,
