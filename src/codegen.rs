@@ -276,21 +276,11 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
     Instruction::AsyncCall(call) => {
       let func = &call.func;
       let args = &call.args;
-      if func.to_string() == "self" {
-        quote! {{
-          let module = sys
-            .get_current_module()
-            .expect("[Push Bind] No current module to self.trigger")
-            .upcast();
-          sys.create_self_trigger();
-        }}
-      } else {
-        let args = emit_args(func, args, false);
-        quote! {{
-          #args;
-          sys.create_trigger_bound(bind);
-        }}
-      }
+      let args = emit_args(func, args, false);
+      quote! {{
+        #args;
+        sys.create_trigger_bound(bind);
+      }}
     }
     Instruction::Bind((id, call, eager)) => {
       let func = &call.func;
@@ -336,7 +326,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
       }
       quote! {{
         let cond = #cond.clone();
-        let block = sys.create_block(Some(cond));
+        let block = sys.create_block(eir::ir::block::BlockPred::Condition(cond));
         sys.set_current_block(block.clone());
         #(#unwraped_body)*;
         let cur_module = sys

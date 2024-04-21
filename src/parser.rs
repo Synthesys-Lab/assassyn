@@ -1,7 +1,7 @@
 use syn::{braced, parenthesized, parse::Parse, Ident};
 
 use crate::ast::{
-  node::{self, FuncArgs, FuncCall},
+  node::{self, BodyPred, FuncArgs, FuncCall},
   DType, Expr,
 };
 
@@ -88,14 +88,22 @@ impl Parse for node::Body {
           stmts.push(node::Instruction::AsyncCall(call));
         }
       } else if content.peek(syn::Ident) {
-        match content.cursor().ident().unwrap().0.to_string().as_str() {
+        let tok_lit = content.cursor().ident().unwrap().0.to_string().as_str();
+        match tok_lit {
           // when <cond> { ... }
-          "when" => {
-            content.parse::<syn::Ident>()?;
-            // TODO(@were): To keep it simple, for now, only a ident is allowed.
-            let cond = content.parse::<syn::Ident>()?;
+          // wait_until <array-ptr> { ... }
+          // cycle <lit-int> { ... }
+          "when" | "wait_until" | "cycle" => {
+            content.parse::<syn::Ident>()?; // when
+                                            // TODO(@were): To keep it simple, for now, only a ident is allowed.
+            let pred = match tok_lit {
+              "when" => BodyPred::Condition(content.parse::<syn::Ident>()?),
+              "wait_until" => BodyPred::Lock(content.parse::<node::ArrayAccess>()?),
+              "cycle" => BodyPred::Cycle(content.parse::<syn::LitInt>()?),
+              _ => unreachable!(),
+            };
             let body = content.parse::<node::Body>()?;
-            stmts.push(node::Instruction::When((cond, Box::new(body))));
+            stmts.push(node::Instruction::BodyScope((pred, Box::new(body))));
             continue; // NO ;
           }
           // spin <array-ptr> <func-id> { <id>: <expr> }

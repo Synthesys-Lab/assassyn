@@ -132,7 +132,7 @@ pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     } else {
       mutator.sys.create_array_read(lock_handle)
     };
-    let block = mutator.sys.create_block(Some(cond.clone()));
+    let block = mutator.sys.create_block(BlockPred::WaitUntil(cond.clone()));
     mutator.sys.set_current_block(block.clone());
     let mut bind = mutator.sys.get_init_bind(dest_module.clone());
     for (i, elem) in agent_ports.iter().enumerate() {
@@ -143,12 +143,6 @@ pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       bind = mutator.sys.push_bind(bind, value, false);
     }
     mutator.sys.create_trigger_bound(bind);
-    mutator.sys.set_insert_before(block);
-    let flip_cond = mutator.sys.create_flip(cond);
-    let block = mutator.sys.create_block(Some(flip_cond));
-    mutator.sys.set_current_block(block.clone());
-    // Send the data from agent to the actual inokee.
-    mutator.sys.create_self_trigger();
     mutator.erase_from_parent();
   }
 }

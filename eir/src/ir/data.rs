@@ -131,7 +131,11 @@ pub struct StrImm {
 
 impl StrImm {
   pub fn new(value: String) -> Self {
-    Self { key: 0, dtype: DataType::Str, value }
+    Self {
+      key: 0,
+      dtype: DataType::Str,
+      value,
+    }
   }
 
   pub fn get_value(&self) -> &str {

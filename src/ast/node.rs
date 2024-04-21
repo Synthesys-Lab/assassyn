@@ -36,6 +36,13 @@ pub(crate) struct Body {
   pub(crate) stmts: Vec<Instruction>,
 }
 
+pub(crate) enum BodyPred {
+  Lock(ArrayAccess),
+  Condition(syn::Ident),
+  Cycle(syn::LitInt),
+  None,
+}
+
 pub(crate) enum Instruction {
   Assign((syn::Ident, syn::Expr)),
   ArrayAlloc((syn::Ident, DType, syn::LitInt)),
@@ -44,6 +51,6 @@ pub(crate) enum Instruction {
   AsyncCall(FuncCall),
   Bind((syn::Ident, FuncCall, bool)),
   SpinCall((ArrayAccess, FuncCall)),
-  When((syn::Ident, Box<Body>)),
+  BodyScope((BodyPred, Box<Body>)),
   Log(Vec<syn::Expr>),
 }

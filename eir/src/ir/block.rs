@@ -2,15 +2,22 @@ use crate::builder::{InsertPoint, SysBuilder};
 use crate::ir::node::*;
 use crate::ir::*;
 
+pub enum BlockPred {
+  Condition(BaseNode),
+  Cycle(usize),
+  WaitUntil(BaseNode),
+  None,
+}
+
 pub struct Block {
   pub(crate) key: usize,
-  pred: Option<BaseNode>,
+  pred: BlockPred,
   body: Vec<BaseNode>,
   parent: BaseNode,
 }
 
 impl Block {
-  pub(crate) fn new(pred: Option<BaseNode>, parent: BaseNode) -> Block {
+  pub(crate) fn new(pred: BlockPred, parent: BaseNode) -> Block {
     Block {
       key: 0,
       pred,
@@ -19,8 +26,8 @@ impl Block {
     }
   }
 
-  pub fn get_pred(&self) -> Option<BaseNode> {
-    self.pred.clone()
+  pub fn get_pred(&self) -> &BlockPred {
+    &self.pred
   }
 
   pub fn get_num_exprs(&self) -> usize {
@@ -117,9 +124,9 @@ impl BlockMut<'_> {
 
 impl SysBuilder {
   /// Create a block.
-  pub fn create_block(&mut self, cond: Option<BaseNode>) -> BaseNode {
+  pub fn create_block(&mut self, pred: BlockPred) -> BaseNode {
     let parent = self.get_current_block().unwrap().upcast();
-    let instance = Block::new(cond, parent);
+    let instance = Block::new(pred, parent);
     let block = self.insert_element(instance);
     let InsertPoint(_, insert_block, at) = &self.get_insert_point();
     let (block, new_at) = self

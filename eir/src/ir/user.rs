@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{builder::SysBuilder, ir::ir_printer::IRPrinter};
+use crate::builder::SysBuilder;
 
 use super::{node::*, visitor::Visitor, Expr, Module, FIFO};
 

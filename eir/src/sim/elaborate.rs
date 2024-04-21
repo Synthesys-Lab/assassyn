@@ -335,7 +335,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
 
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    if let Some(cond) = block.get_pred() {
+    if let BlockPred::Condition(cond) = block.get_pred() {
       res.push_str(&format!(
         "  if {}{} {{\n",
         dump_ref!(self.sys, &cond),
@@ -363,7 +363,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
     }
     self.indent -= 2;
-    if block.get_pred().is_some() {
+    if let BlockPred::Condition(_) = block.get_pred() {
       res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
     }
     res.into()

@@ -420,13 +420,6 @@ impl SysBuilder {
     self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 
-  /// Create a trigger invoke itself without checking the readiness
-  /// of the data. This is something more like a state machine trigger.
-  pub fn create_self_trigger(&mut self) -> BaseNode {
-    let dst = self.get_current_module().unwrap().upcast();
-    self.create_expr(DataType::void(), Opcode::Trigger, vec![dst.clone()])
-  }
-
   /// Create a spin trigger. A spin trigger repeats to test the condition
   /// until it is true, and send a signal to invoke the given module module.
   /// The source module is the current module, and the destination is given.

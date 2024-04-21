@@ -108,7 +108,6 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     }
   }
   let body: proc_macro2::TokenStream = body.into();
-  eprintln!("[Parser] node::Body successfully parsed!");
 
   // codegen parameterizations
   let parameterization: proc_macro2::TokenStream = {
@@ -119,7 +118,6 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     }
     res.into()
   };
-  eprintln!("[CodeGen] External interaces successfully generated!");
 
   let (ret_tys, ret_vals): (proc_macro2::TokenStream, proc_macro2::TokenStream) =
     if let Some(exposes) = parsed_module.exposes {
@@ -160,8 +158,6 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
       #ret_vals
     }
   };
-
-  // eprintln!("Raw Source Code:\n{}", res);
 
   res.into()
 }

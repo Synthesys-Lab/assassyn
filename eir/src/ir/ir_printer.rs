@@ -378,7 +378,7 @@ impl Visitor<String> for IRPrinter {
   }
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    if let Some(cond) = block.get_pred() {
+    if let BlockPred::Condition(cond) = block.get_pred() {
       res.push_str(&format!(
         "{}if {} {{\n",
         " ".repeat(self.indent),
@@ -403,7 +403,7 @@ impl Visitor<String> for IRPrinter {
         }
       }
     }
-    if block.get_pred().is_some() {
+    if let BlockPred::Condition(_) = block.get_pred() {
       self.dec_indent();
       res.push_str(&format!("{}}}", " ".repeat(self.indent)));
     }
