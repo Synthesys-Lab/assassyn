@@ -5,7 +5,7 @@ use syn::{parse::Parse, spanned::Spanned};
 
 use crate::ast::{
   expr::{DType, Expr},
-  node::{ArrayAccess, FuncArgs, Instruction},
+  node::{ArrayAccess, BodyPred, FuncArgs, Instruction},
 };
 
 use eir::ir::data::DataType;
@@ -40,7 +40,7 @@ pub(crate) struct EmitIDOrConst(pub(crate) TokenStream);
 impl Parse for EmitIDOrConst {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     if let Some(_) = input.cursor().ident() {
-      let id = input.clone().parse::<syn::Ident>()?;
+      let id = input.parse::<syn::Ident>()?;
       Ok(EmitIDOrConst(id.into_token_stream().into()))
     } else if let Some(_) = input.cursor().literal() {
       let lit = input.parse::<syn::LitInt>()?;
@@ -311,7 +311,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         let #id = sys.create_array(#ty, stringify!(#id), #size);
       }
     }
-    Instruction::When((cond, body)) => {
+    Instruction::BodyScope((pred, body)) => {
       let body = body
         .stmts
         .iter()
@@ -324,9 +324,27 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           Err(e) => return Err(e.clone()),
         }
       }
+
+      let block_pred = match pred {
+        BodyPred::Condition(cond) => {
+          quote!{
+            let cond = #cond.clone();
+            let block_pred = eir::ir::block::BlockPred::Condition(cond);
+          }
+        }
+        BodyPred::Lock(lock) => {
+          let lock_arr_prt = emit_array_access(lock).unwrap();
+          quote! {
+            let lock_arr_prt = #lock_arr_prt.clone();
+            let block_pred = eir::ir::block::BlockPred::WaitUntil(lock_arr_prt);
+          }
+        }
+        BodyPred::Cycle(_) => todo!(),
+        BodyPred::None => todo!(),
+      };
       quote! {{
-        let cond = #cond.clone();
-        let block = sys.create_block(eir::ir::block::BlockPred::Condition(cond));
+        #block_pred;
+        let block = sys.create_block(block_pred);
         sys.set_current_block(block.clone());
         #(#unwraped_body)*;
         let cur_module = sys

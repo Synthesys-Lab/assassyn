@@ -88,15 +88,15 @@ impl Parse for node::Body {
           stmts.push(node::Instruction::AsyncCall(call));
         }
       } else if content.peek(syn::Ident) {
-        let tok_lit = content.cursor().ident().unwrap().0.to_string().as_str();
-        match tok_lit {
+        let tok_lit = content.cursor().ident().unwrap().0.to_string();
+        match tok_lit.as_str() {
           // when <cond> { ... }
           // wait_until <array-ptr> { ... }
           // cycle <lit-int> { ... }
           "when" | "wait_until" | "cycle" => {
             content.parse::<syn::Ident>()?; // when
                                             // TODO(@were): To keep it simple, for now, only a ident is allowed.
-            let pred = match tok_lit {
+            let pred = match tok_lit.as_str() {
               "when" => BodyPred::Condition(content.parse::<syn::Ident>()?),
               "wait_until" => BodyPred::Lock(content.parse::<node::ArrayAccess>()?),
               "cycle" => BodyPred::Cycle(content.parse::<syn::LitInt>()?),

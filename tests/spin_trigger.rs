@@ -20,7 +20,7 @@ fn manual() -> SysBuilder {
         async sqr { a: a };
         log("agent move on, {}", a);
       }
-    }.expose[lock]
+    }
   );
 
   module_builder!(
@@ -46,8 +46,8 @@ fn manual() -> SysBuilder {
 
   let mut res = SysBuilder::new("raw");
   let sqr = squarer_builder(&mut res);
-  let spin_agent = spin_agent_builder(&mut res, sqr);
   let lock = res.create_array(eir::ir::DataType::Int(1), "lock", 1);
+  let spin_agent = spin_agent_builder(&mut res, sqr, lock);
   let _driver = driver_builder(&mut res, spin_agent, lock);
   res
 }
@@ -90,7 +90,7 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   eir::builder::verify(&sys);
   eir::xform::basic(&mut sys);
   eir::builder::verify(&sys);
-  // println!("{}", sys);
+  println!("{}", sys);
   let verilog_name = test_utils::temp_dir(&format!("{}.sv", fname));
   let verilog_config = eir::verilog::Config {
     fname: verilog_name,

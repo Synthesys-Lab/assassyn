@@ -677,7 +677,7 @@ assign trigger_pop_ready = 1'b1;\n\n");
 
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    if let Some(cond) = block.get_pred() {
+    if let BlockPred::Condition(cond) = block.get_pred() {
       self.pred =
         Some(format!(
           "({}{})",
