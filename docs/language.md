@@ -1,38 +1,95 @@
-### Programming Primitives
+# Language Manual
+
+## Abstract
+
+This document severs as a language manual of (EDA)^2. A language for hardware design,
+implementation, and verification. It is designed to be a relatively high-level language,
+so that developers can focus on the behavior of the system, rather than timing, state machine,
+and other rules.
+
+## Introduction
+
+Below, is a text representation of our language IR. In the rest of this document, each component
+of this example will explained in both sides, the programming frontend, and the IR representation.
+For specific examples, refer the `tests` directory, which is made to be self-examplatory.
 
 ````
 // Listing 1: Pseudo-code of the programming paradigms.
 
-system {
-  // array declarations
-  // all the arrays are considered global.
-  array: i32 a[1]
+system main {
+  // Array declarations
+  // All the arrays are considered global.
+  array: a[int<32>; 1]
 
+  // Implicitly driver is executed every cycle.
   module driver() {
-    _1 = read a[0]
-    self.trigger foo [ i0=_1, i1=_1 ]
-    _2 = _1 + 1 // NOTE: This is increase variable "_1" by "one"
-    write a[0], _2
-    self.trigger driver [ ]
+    v = read a[0];
+    async adder { a = v, b = v };
+    new_v = v + 1; // NOTE: This is increase variable "_1" by "one"
+    a[0] = v
   }
 
-  module foo(i0: i32, i1: i32) {
-    _1 = i0.pop()
-    _2 = i1.pop()
-    _3 = _1 + _2;
+  module foo(a: int<32>, b: int<32>) {
+    a = a.pop();
+    b = b.pop();
+    c = a + b;
   }
 }
 
 ````
 
-NOTE: For simplificity, we currently assume each module can be executed in one cycle.
-Later, the compiler will try to partition the modules to balance the timing among these
-operations.
+## Language Components
 
-0. System: A whole system is comprised by several modules (see above).
-A system always has a "driver" module, which is initially invoked,
-and then invoke itself each cycle after. This "driver" serves like a "main"
+In this section, each component of the language will be explained in detail, both the frontend
+programming interfaces, and the IR representations.
+
+### System
+
+A whole system is comprised by several modules (see above). A system may have a `driver` module
+(see more details in the next paragraph to explain the module),
+which is invoked every cycle to drive the whole system. This "driver" serves like a `main`
 function, which is both the entrance and drives the system execution.
+
+
+To build a system, `SysBuilder` should be used:
+```` Rust
+use eir::builder::SysBuilder;
+// ...
+let mut sys = SysBuilder::new("system");
+````
+
+The `SysBuilder` not only serves as the system itself, but also works as an IR builder to grow
+the hardware description.
+
+### Module
+
+Module is a basic build block block of the system, but it is also slightly different from
+the modules we have in both software and hardware programming.
+
+To make an analogy to existing concepts in software programming, a module is like both a function,
+and a basic block.
+In case you do not know what is basic block, it is a region of code starts with a label which
+can be the destination of a jump, ends with a jump operation, which means within a basic block,
+you can only move the operations forward --- just like what you have on circuits, you can only
+move on in combinational logics.
+
+    * NOTE: For simplicity, we currently regard all the operations within a module is combinational,
+    which means everything is done within one cycle. It is our future goal to  *
+
+To build a module, `module_builder` macro should be used:
+````Rust
+use eda4eda::module_builder;
+// ...
+module_builder!(foo[/*inputs*/][/*parameterizations*/] {
+  // The body of the module
+});
+foo_builder(&mut sys);
+````
+
+    * NOTE: `module_builder` is a procedural macro, which essentially does source-to-source
+    transformation to translate the module definition in the macro scope to IR builder API calls.
+    For more details, refer the developer document.
+
 
 1. Module: Each module is just like a function, which exposes several interfaces for external
 callers.  As it is shown in Listing 1, module `foo` can be invoked by feeding `i0` and `i1`.
