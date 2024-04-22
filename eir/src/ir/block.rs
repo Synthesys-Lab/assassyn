@@ -125,6 +125,13 @@ impl BlockMut<'_> {
 impl SysBuilder {
   /// Create a block.
   pub fn create_block(&mut self, pred: BlockPred) -> BaseNode {
+    let pred = match pred {
+      BlockPred::WaitUntil(arr_ptr) => {
+        let arr_read = self.create_array_read(arr_ptr);
+        BlockPred::WaitUntil(arr_read)
+      }
+      x => x
+    };
     let parent = self.get_current_block().unwrap().upcast();
     let instance = Block::new(pred, parent);
     let block = self.insert_element(instance);

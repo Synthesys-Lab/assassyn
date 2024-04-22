@@ -556,7 +556,9 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     let mut trigger_modules = get_triggered_modules(&module.upcast(), self.sys);
     trigger_modules.sort_unstable();
     trigger_modules.dedup();
+    let mut has_trigger_modules = false;
     for trigger_module in trigger_modules {
+      has_trigger_modules = true;
       res.push_str(format!(
         "{}output logic {}_trigger_push_valid,\n",
         " ".repeat(self.indent),
@@ -569,8 +571,12 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
       ).as_str());
     }
 
+    if has_trigger_modules {
+      res.push_str("\n");
+    }
+
     res.push_str(format!(
-      "\n{}// trigger\n",
+      "{}// trigger\n",
       " ".repeat(self.indent)
     ).as_str());
     res.push_str(format!(
@@ -584,9 +590,43 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     self.indent -= 2;
     res.push_str(");\n\n");
 
-    res.push_str("logic trigger;
-assign trigger = trigger_pop_valid;
-assign trigger_pop_ready = 1'b1;\n\n");
+    let mut body_waituntil_cnt = 0;
+    let mut wait_until: Option<String> = None;
+
+    for elem in module.get_body().iter().skip(1) {
+      match elem.get_kind() {
+        NodeKind::Expr => break,
+        NodeKind::Block => {
+          let block = elem.as_ref::<Block>(self.sys).unwrap();
+          if let BlockPred::WaitUntil(cond) = block.get_pred() {
+            body_waituntil_cnt += 1;
+            let cond = cond
+              .as_ref::<Expr>(self.sys)
+              .unwrap();
+            wait_until =
+              Some(format!(
+                " && (_{}{})",
+                cond.get_key(),
+                if cond.dtype().bits() == 1 {
+                  "".into()
+                } else {
+                  format!(" != 0")
+                }
+              ));
+          }
+        }
+        _ => {
+          panic!("Unexpected reference type: {:?}", elem);
+        }
+      }
+    }
+
+    if body_waituntil_cnt > 1 {
+      panic!("multiple wait_until blocks in {}", module.get_name());
+    }
+
+    res.push_str(format!("logic trigger;\n").as_str());
+    res.push_str(format!("assign trigger_pop_ready = trigger;\n\n").as_str());
 
     self.fifo_pushes.clear();
     self.triggers.clear();
@@ -668,6 +708,8 @@ assign trigger_pop_ready = 1'b1;\n\n");
       }
       res.push_str(format!("assign fifo_{}_push_data = {};\n\n", f, data_str).as_str());
     }
+
+    res.push_str(format!("assign trigger = trigger_pop_valid{};\n", wait_until.unwrap_or("".to_string())).as_str());
 
     res.push_str(format!("endmodule // {}\n\n\n", namify(module.get_name())).as_str());
 
