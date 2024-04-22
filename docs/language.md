@@ -73,8 +73,9 @@ can be the destination of a jump, ends with a jump operation, which means within
 you can only move the operations forward --- just like what you have on circuits, you can only
 move on in combinational logics.
 
-    * NOTE: For simplicity, we currently regard all the operations within a module is combinational,
-    which means everything is done within one cycle. It is our future goal to  *
+NOTE: For simplicity, we currently regard all the operations within a module is combinational,
+which means everything is done within one cycle. It is our future goal to automatically partition
+the pipeline stages.
 
 To build a module, `module_builder` macro should be used:
 ````Rust
@@ -86,19 +87,22 @@ module_builder!(foo[/*inputs*/][/*parameterizations*/] {
 foo_builder(&mut sys);
 ````
 
-    * NOTE: `module_builder` is a procedural macro, which essentially does source-to-source
-    transformation to translate the module definition in the macro scope to IR builder API calls.
-    For more details, refer the developer document.
+The first braket is for the input ports of this module, and the second bracket is for the
+parameterizations of this module. The parameters will be the function argument of the `*_builder`
+function. Refer `tests` for more examples.
+
+NOTE: `module_builder` is a procedural macro, which essentially does source-to-source
+transformation to translate the module definition in the macro scope to IR builder API calls.
+For more details, refer the developer document.
 
 
-1. Module: Each module is just like a function, which exposes several interfaces for external
-callers.  As it is shown in Listing 1, module `foo` can be invoked by feeding `i0` and `i1`.
+### Value and Expressions
 
-NOTE 0: Each module has no explicit outputs. Exposing data to external modules are done by
-triggering other modules (see trigger below for more details).
 
-NOTE 1: I finally decide to explicitly expose FIFOs to users, because it is clearer for both
-partial invocation and back pressure (also see trigger below for more details).
+
+````
+````
+
 
 2. Logics & Predication: Within each module, logics are operators among operands for computations,
 including but not limited to arithmetic operations (e.g. +-*/),
