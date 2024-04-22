@@ -333,10 +333,10 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           }
         }
         BodyPred::Lock(lock) => {
-          let lock_arr_prt = emit_array_access(lock).unwrap();
+          let lock_arr_ptr = emit_array_access(lock).unwrap();
           quote! {
-            let lock_arr_prt = #lock_arr_prt.clone();
-            let block_pred = eir::ir::block::BlockPred::WaitUntil(lock_arr_prt);
+            let lock_arr_ptr = #lock_arr_ptr.clone();
+            let block_pred = eir::ir::block::BlockPred::WaitUntil(lock_arr_ptr);
           }
         }
         BodyPred::Cycle(_) => todo!(),
