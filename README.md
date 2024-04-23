@@ -1,6 +1,7 @@
-# Event-driven Architecture for Electrical Design Automation
+# Assassyn: **As**ynchronous **S**emantics for **A**rchitectural **S**imulation & **Syn**thesis
 
-This project is aimed at developing a new programming paradigm for describing hardware.
+
+Assassyn is aimed at developing a new programming paradigm for describing hardware.
 The ultimate goal is to unify the hardware model (simulation), register-transfer-level (RTL)
 language, and verfication.
 

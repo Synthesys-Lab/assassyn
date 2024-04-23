@@ -96,114 +96,154 @@ transformation to translate the module definition in the macro scope to IR build
 For more details, refer the developer document.
 
 
-### Value and Expressions
+### Values and Expressions
 
+In each module, we have several operations to describe the behaviors, including arithmetics,
+read/write to arrays, and asynchronous module invocations.
 
+1. Values: A first-order value can either be a constant or a variable. Because Rust does not
+support type-based overloading, but sometimes we do need to write code like both `a + b` and
+`a + 1`. Therefore, my parser will implicitly hide this from users (Of course refer the developer
+docs for more details). A variable can either be from the declared port or parameterizations,
+or from an assigned expression (refer next expression bullet for more details).
 
-````
-````
+A constant is an immediate value. You can use `.` to specify its type, e.g. `1.int<32>`.
 
+2. Expressions: To keep the simplicity of our frontend, for now, we have several constraints
+on our expressions' expression: a) All the operands should be a first order value; b) All the
+expressions should have have one operator, and all the operators should be described by a method
+call; d) All the valued expression should be assigned to a variable.
 
-2. Logics & Predication: Within each module, logics are operators among operands for computations,
-including but not limited to arithmetic operations (e.g. +-*/),
-bitwise operations (e.g. &|^~), and trinary selection (:?).
+To explain, `a + b` is a simple expression, while `a + b * c` is not for
+it two operators (* & +). Also, instead of using `a + b`, we should use `a.add(b)`.
+See the example below:
 
-In the example above, a counter is added every cycle, and push it to module "foo" for
-computation.
-
-2.1. Unlike branches in imperative execution, instructions can be skipped by fetching from
-different program counters. Since it is impssible to "remove" the circuits taped
-out/resources allocated, they can only be gated.
-Therefore, for each logic operator, there will optionally be one predicate associated, where
-each logic operator will only be executed while its predication is true.
-
-NOTE 0: Predications will be propagated implicitly. Consider the example below:
-
-````
-c = (a + b).when(x == 1) // c will only be executed when x is 1
-d = c + 1 // c's predication will be propagated. If c is not executed, d is not either.
-````
-
-NOTE 1: There will be a rewriting pass to propagate the predications. Gather all the operations
-into their predicated blocks. However, unlike imperative conditional blocks, there is NO
-else-block. "Else" will be done by flipping the condition.
-
-NOTE 2: Though each operator appears in a sequence, they are not necessarily executed sequentially.
-Only partial order among them are gauranteed. Consider the example below:
-
-````
-_1 = a + b
-_2 = a - b
-// No dependences between _1 and _2, so by default they are scheduled to execute together.
-_3 = _1 * _2
+```` Rust
+// TODO(@were): Fully deprecate the explicit FIFO pop later.
+module_builder!(foo[a:int<32>, b:int<32>][/*parameterizations*/] {
+  // The body of the module
+  a = a.pop();
+  b = b.pop();
+  c = a.add(b);
+});
 ````
 
-Question: Is it possible to have an abstraction to develop a time-multiplex adder to share between
-_1 and _2?
+3. Module Invocation: To invoke a module, we use the `async` keyword to indicate that this is an
+external module invocation, and all the module invocations are non-valued.
+Now two kinds of parameter feedings are supported: positional and named. The positional surrounded
+by a pair of parentheses feeds the parameters in the order of the module definition,
+while the named surrounded by a pair of curly braces feeds the parameters by the
+name of the module definition.
 
-Answer: Possible, but we need to use "external call"/"trigger" for that.
-
-3. Trigger: trigger is something like an async function call or a pulse signal
-to invoke a module in verilog.
-As it is shown in Listing 1, module `driver` unconditionally invokes `foo` each cycle.
-
-Trigger is a syntactical sugar, for calling the destination.
-
-````
-foo.i0.push(_1)
-foo.i1.push(_1)
-call foo
-````
-
-By exposing FIFOs to users, partial trigger can be done. Considering if we do not have
-both arguments for foo, then we have one module just push without invoking it, and the other
-module serves as a "master" to push and invoke.
-
-Consider an example below:
-
-````
-module a() {
-  // ...
-  add.lhs.push(some value)
-  // push without triggering
-}
-
-module b() {
-  add.rhs.push(some value)
-  trigger add
-}
-
-// ... module add
-module add(lhs, rhs) {
-  _1 = lhs.pop()
-  _2 = rhs.pop()
-  _1 + _2
-}
+```` Rust
+module_builder!(foo[/*ports*/][adder] {
+  // named
+  async adder { b : 1, a : 2 };
+  // positional
+  async adder(1, 2);
+});
 ````
 
-4. Array Operations: Though arrays are declared globally, they can be localized by further
-compiler analysis and transformations once recognizing an array's use pattern. Arrays are used
-to describe any stateful execution like local state machine, register file, and locks between
-modules (using array-read as a predication).
+4. Bind/Partial Function: Sometimes values are not from a single module. To support this program
+behavior we support bind/partial function. We first use Python's `functools.partial` as an analogy.
 
-Array + Trigger: Spin Trigger
-
+```` Python
+import functools
+def add(a, b):
+  return a + b
+add5 = functools.partial(add, 5)
+add5(3) # equivalent to add(5, 3)
 ````
-// master module
-spin_trigger other [a, b], lock
 
-// agent module
-if !lock {
-  trigger myself
-}
-if lock {
-  a.pop()
-  b.pop()
-  trigger other
-}
+To use this language feature in our language, see below:
 
-// other module
-a.pop()
-b.pop()
-....
+```` Rust
+module_builder!(add[a:int<32>, b:int<32>][] {
+  // The body of the module
+  a = a.pop();
+  b = b.pop();
+  a + b
+});
+module_builder!(add5[][] {
+  // bind
+  add5 = bind add(5);
+});
+module_builder!(driver[/*ports*/][add5] {
+  // The body of the module
+  v = read a[0];
+  async add5 { a = v, b = v };
+  new_v = v + 1;
+  a[0] = new_v;
+});
+````
+
+See `tests/bind.rs` a runnable example.
+
+5. Scopes and Contional Execution: Unlike what we have in software programming, we do not have
+an instruction pointer to move around. Instead, we have a set of combinational logics which can only
+move forward. Therefore, here we only have three kinds of scopes: a) conditional execution;
+b) self-spin execution; c) cycled execution.
+
+```` Rust
+// For conditional execution, we do NOT have a `else` branch.
+module_builder!(foo[/*ports*/][/*parameterizations*/] {
+  // The body of the module
+  cond = a > b;
+  when cond {
+    a = a.add(b);
+  }
+  // If you really need an `else` branch, you can use `cond.flip()`
+  ncond = cond.flip();
+  when ncond {
+    c = a.add(b);
+  }
+});
+````
+
+```` Rust
+module_builder!(foo[/*ports*/][/*parameterizations*/] {
+  // A spin lock always accepts a array value, because an array value is side-effected, which
+  // can give different results when invoked multiple times. Wait until will wait the value in
+  // the given array to be true to execute the body.
+  //
+  // NOTE: A spin lock can only appear in the main body of a module.
+  wait_until lock[0] {
+    a = a.add(b);
+  }
+});
+````
+
+```` Rust
+// NOTE: A cycled execution will only be available in the testbench module.
+module_builder!(testbench[/*ports*/][/*parameterizations*/] {
+  // This body will only be executed on cycle 1.
+  cycle 1 {
+    a = a.add(b);
+  }
+  cycle 2 {
+    a = a.add(b);
+  }
+  // The compiler will implicitly tick cycle 3 and 4.
+  cycle 5 {
+    a = a.add(b);
+  }
+  // This is ILLEGAL, because the cycle number should be monotonically increasing.
+  // Compiler will cast an error.
+  cycle 4 {
+    a = a.add(b);
+  }
+});
+````
+
+6. Array Operations: All the arrays are declared globally. Arrays are used
+to describe any stateful execution like local state machine, register file,
+and locks between modules (see 5.).
+
+```` Rust
+a = array(int<32>, 1);
+a[0] = 1; // write the array, value will be seen next cycle.
+          // each array can only be written once in a cycle.
+          // TODO: The compiler will try to analyze this.
+          // DONE: The simulator will give an error if the array is written more than once.
+v = a[0]; // read the array, not necessarily 1, should be the value in last cycle.
 ````
