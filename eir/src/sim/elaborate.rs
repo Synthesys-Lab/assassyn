@@ -520,7 +520,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
 
   res.push_str(
     &quote::quote! {
-      #[derive(Debug, PartialEq, Eq)]
+      #[derive(Clone, Debug, PartialEq, Eq)]
       struct Event {
         stamp: usize,
         kind: EventKind,
@@ -671,6 +671,18 @@ macro_rules! impl_unwrap_slab {
       .to_string(),
     );
   }
+
+  // generate cycle gatekeeper
+  for module in sys.module_iter() {
+    let module_gatekeeper = syn::Ident::new(&format!("{}_triggered", namify(module.get_name())), Span::call_site());
+    res.push_str(
+      &quote::quote! {
+        let mut #module_gatekeeper = false;
+      }
+      .to_string(),
+    );
+  }
+
   // TODO(@were): Dump the time stamp of the simulation.
   res.push_str("  while let Some(event) = q.pop() {\n");
   res.push_str(
@@ -684,12 +696,33 @@ macro_rules! impl_unwrap_slab {
     }
     .to_string(),
   );
+  res.push_str("let last_stamp = stamp;\n");
   res.push_str("    match event.0.kind {\n");
   for module in sys.module_iter() {
-    res.push_str(&format!(
-      "      EventKind::Module{} => {{\n",
+    let module_eventkind = &format!(
+      "Module{}",
       camelize(&namify(module.get_name()))
+    );
+    res.push_str(&format!(
+      "      EventKind::{} => {{\n",
+      module_eventkind
     ));
+    let module_gatekeeper = syn::Ident::new(&format!("{}_triggered", namify(module.get_name())), Span::call_site());
+    let module_eventkind_id = syn::Ident::new(&module_eventkind, Span::call_site());
+    res.push_str(
+      &quote::quote! {
+        if #module_gatekeeper {
+          // retry at next cycle
+          q.push(Reverse(Event {
+            stamp: event.0.stamp + 100,
+            kind: EventKind::#module_eventkind_id,
+          }));
+          continue;
+        }
+        #module_gatekeeper = true;
+      }
+      .to_string(),
+    );
     // Unpacking the FIFO's from the slab.
     for fifo in module.port_iter() {
       let id = fifo_name!(fifo);
@@ -726,7 +759,7 @@ macro_rules! impl_unwrap_slab {
     }
     res.push_str(");\n");
     if !module.get_name().eq("driver") {
-      res.push_str("idled = 0; stamp = event.0.stamp; continue; }\n");
+      res.push_str("idled = 0; stamp = event.0.stamp; }\n");
     } else {
       res.push_str("idled += 1; stamp = event.0.stamp; }\n");
     }
@@ -743,6 +776,7 @@ macro_rules! impl_unwrap_slab {
         EventKind::#array_write((_, slab_idx, idx, value)) => {
           data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
           data_slab[slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>()[idx] = value;
+          stamp = event.0.stamp;
         }
       }
       .to_string(),
@@ -760,16 +794,30 @@ macro_rules! impl_unwrap_slab {
         EventKind::#fifo_push_event((_, slab_idx, value)) => {
           data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
           data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().push_back(value);
+          stamp = event.0.stamp;
         }
         EventKind::#fifo_pop_event((_, slab_idx)) => {
           data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
           data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().pop_front();
+          stamp = event.0.stamp;
         }
       }
       .to_string(),
     );
   }
   res.push_str("EventKind::None => panic!(\"Unexpected event kind, None\"),\n");
+  res.push_str("}\n");
+  res.push_str("if stamp != last_stamp {\n");
+  // reset cycle gatekeepers
+  for module in sys.module_iter() {
+    let module_gatekeeper = syn::Ident::new(&format!("{}_triggered", namify(module.get_name())), Span::call_site());
+    res.push_str(
+      &quote::quote! {
+        #module_gatekeeper = false;
+      }
+      .to_string(),
+    );
+  }
   res.push_str("}\n");
   let threshold = config.idle_threshold;
   res.push_str(
