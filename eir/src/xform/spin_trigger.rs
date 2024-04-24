@@ -128,9 +128,9 @@ pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       let idx_port = agent_ports.last().unwrap().clone();
       let new_idx = mutator.sys.create_fifo_peek(idx_port);
       let new_handle = mutator.sys.create_array_ptr(array.clone(), new_idx);
-      mutator.sys.create_array_read(new_handle)
+      new_handle
     } else {
-      mutator.sys.create_array_read(lock_handle)
+      lock_handle
     };
     let block = mutator.sys.create_block(BlockPred::WaitUntil(cond.clone()));
     mutator.sys.set_current_block(block.clone());
