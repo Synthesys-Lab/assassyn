@@ -1,5 +1,6 @@
+use super::expr;
 use super::DType;
-use super::Expr;
+use super::ExprTerm;
 
 /// A port declaration is something like `a: int<32>`.
 pub(crate) struct PortDecl {
@@ -10,7 +11,7 @@ pub(crate) struct PortDecl {
 /// An array access is something like `a[<expr>]`
 pub(crate) struct ArrayAccess {
   pub(crate) id: syn::Ident,
-  pub(crate) idx: Expr,
+  pub(crate) idx: ExprTerm,
 }
 
 /// A function call is something like `foo((<expr>,)*)`.
@@ -21,14 +22,14 @@ pub(crate) struct FuncCall {
 
 /// Function arguments can either be {a: v0, b: v1}, or (v0, v1).
 pub(crate) enum FuncArgs {
-  Bound(Vec<(syn::Ident, Expr)>),
-  Plain(Vec<Expr>),
+  Bound(Vec<(syn::Ident, ExprTerm)>),
+  Plain(Vec<ExprTerm>),
 }
 
 /// Key value pair is a component of FuncArgs::Bound.
 pub(crate) struct KVPair {
   pub(crate) key: syn::Ident,
-  pub(crate) value: Expr,
+  pub(crate) value: ExprTerm,
 }
 
 /// A body is a sequence of instructions.
@@ -44,13 +45,13 @@ pub(crate) enum BodyPred {
 }
 
 pub(crate) enum Instruction {
-  Assign((syn::Ident, syn::Expr)),
+  Assign((syn::Ident, expr::Expr)),
   ArrayAlloc((syn::Ident, DType, syn::LitInt)),
-  ArrayAssign((ArrayAccess, syn::Expr)),
+  ArrayAssign((ArrayAccess, expr::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
   AsyncCall(FuncCall),
   Bind((syn::Ident, FuncCall, bool)),
   SpinCall((ArrayAccess, FuncCall)),
   BodyScope((BodyPred, Box<Body>)),
-  Log(Vec<syn::Expr>),
+  Log(Vec<expr::Expr>),
 }

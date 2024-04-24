@@ -1,8 +1,9 @@
 use syn::{braced, parenthesized, parse::Parse, Ident};
 
 use crate::ast::{
-  node::{self, BodyPred, FuncArgs, FuncCall},
-  DType, Expr,
+  self,
+  node::{self, FuncArgs, FuncCall},
+  DType, ExprTerm,
 };
 
 impl Parse for node::PortDecl {
@@ -23,7 +24,7 @@ impl Parse for node::ArrayAccess {
     let id = input.parse::<syn::Ident>()?;
     let idx;
     syn::bracketed!(idx in input);
-    let idx = idx.parse::<Expr>()?;
+    let idx = idx.parse::<ExprTerm>()?;
     Ok(node::ArrayAccess { id, idx })
   }
 }
@@ -32,7 +33,7 @@ impl Parse for node::KVPair {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let key = input.parse::<syn::Ident>()?;
     let _ = input.parse::<syn::Token![:]>()?;
-    let value = input.parse::<Expr>()?;
+    let value = input.parse::<ExprTerm>()?;
     Ok(node::KVPair { key, value })
   }
 }
@@ -52,7 +53,7 @@ impl Parse for node::FuncCall {
     } else if input.peek(syn::token::Paren) {
       let content;
       let _ = parenthesized!(content in input);
-      let args = content.parse_terminated(Expr::parse, syn::Token![,])?;
+      let args = content.parse_terminated(ExprTerm::parse, syn::Token![,])?;
       FuncArgs::Plain(args.into_iter().collect::<Vec<_>>())
     } else {
       return Err(syn::Error::new(
@@ -97,9 +98,9 @@ impl Parse for node::Body {
             content.parse::<syn::Ident>()?; // when
                                             // TODO(@were): To keep it simple, for now, only a ident is allowed.
             let pred = match tok_lit.as_str() {
-              "when" => BodyPred::Condition(content.parse::<syn::Ident>()?),
-              "wait_until" => BodyPred::Lock(content.parse::<node::ArrayAccess>()?),
-              "cycle" => BodyPred::Cycle(content.parse::<syn::LitInt>()?),
+              "when" => node::BodyPred::Condition(content.parse::<syn::Ident>()?),
+              "wait_until" => node::BodyPred::Lock(content.parse::<node::ArrayAccess>()?),
+              "cycle" => node::BodyPred::Cycle(content.parse::<syn::LitInt>()?),
               _ => unreachable!(),
             };
             let body = content.parse::<node::Body>()?;
@@ -117,7 +118,7 @@ impl Parse for node::Body {
             content.parse::<syn::Ident>()?; // log
             let args;
             parenthesized!(args in content);
-            let args = args.parse_terminated(syn::Expr::parse, syn::Token![,])?;
+            let args = args.parse_terminated(ast::expr::Expr::parse, syn::Token![,])?;
             stmts.push(node::Instruction::Log(args.into_iter().collect::<Vec<_>>()));
           }
           _ => {
@@ -126,7 +127,7 @@ impl Parse for node::Body {
               // <id>[<expr>] = <expr>
               let aa = content.parse::<node::ArrayAccess>()?;
               content.parse::<syn::Token![=]>()?;
-              let right = content.parse::<syn::Expr>()?;
+              let right = content.parse::<ast::expr::Expr>()?;
               stmts.push(node::Instruction::ArrayAssign((aa, right)));
             } else {
               // <id> = <expr>
@@ -159,13 +160,13 @@ impl Parse for node::Body {
                     }
                     _ => {
                       // fall back to normal assignment
-                      let assign = content.parse::<syn::Expr>()?;
+                      let assign = content.parse::<ast::expr::Expr>()?;
                       stmts.push(node::Instruction::Assign((id, assign)));
                     }
                   }
                 } else {
                   // fall back to normal assignment
-                  let assign = content.parse::<syn::Expr>()?;
+                  let assign = content.parse::<ast::expr::Expr>()?;
                   stmts.push(node::Instruction::Assign((id, assign)));
                 }
               } else {

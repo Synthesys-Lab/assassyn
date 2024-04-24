@@ -1,11 +1,12 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
-use syn::{parse::Parse, spanned::Spanned};
+use syn::parse::Parse;
 
 use crate::ast::{
-  expr::{DType, Expr},
-  node::{ArrayAccess, BodyPred, FuncArgs, Instruction},
+  self,
+  expr::{self, DType, ExprTerm},
+  node::{ArrayAccess, FuncArgs, Instruction},
 };
 
 use eir::ir::data::DataType;
@@ -63,138 +64,89 @@ impl Parse for EmitIDOrConst {
   }
 }
 
-pub(crate) fn emit_expr_body(expr: &syn::Expr) -> syn::Result<proc_macro2::TokenStream> {
+pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
-    syn::Expr::MethodCall(method) => {
-      let receiver = method.receiver.clone();
-      match method.method.to_string().as_str() {
-        "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" => {
-          let method_id = format!("create_{}", method.method.to_string());
-          let method_id = syn::Ident::new(&method_id, method.method.span());
-          let mut operands = method.args.iter();
-          let a = &method.receiver;
-          let b = operands.next().unwrap();
-          let b = syn::parse::<EmitIDOrConst>(b.into_token_stream().into())?.0;
-          let b: proc_macro2::TokenStream = b.into();
-          if !operands.next().is_none() {
-            return Err(syn::Error::new(
-              method.span(),
-              "[CG.BinOP] Like \"a.add(b)\" should have only 1 operand in the argument list",
-            ));
-          }
-          Ok(
-            quote! {{
-              let lhs = #a.clone();
-              let rhs = #b.clone();
-              let res = sys.#method_id(None, lhs, rhs);
-              res
-            }}
-            .into(),
-          )
-        }
-        "slice" => {
-          let method_id = format!("create_{}", method.method.to_string());
-          let method_id = syn::Ident::new(&method_id, method.method.span());
-          let mut operands = method.args.iter();
-          let a = &method.receiver;
-          let start = operands.next().unwrap();
-          let start = syn::parse::<EmitIDOrConst>(start.into_token_stream().into())?.0;
-          let start: proc_macro2::TokenStream = start.into();
-          let end = operands.next().unwrap();
-          let end = syn::parse::<EmitIDOrConst>(end.into_token_stream().into())?.0;
-          let end: proc_macro2::TokenStream = end.into();
-          if !operands.next().is_none() {
-            return Err(syn::Error::new(
-              method.span(),
-              "[CG.Slice] Like \"a.slice(start, end)\" should have only 2 operands in the argument list",
-            ));
-          }
-          Ok(
-            quote! {{
-              let src = #a.clone();
-              let start = #start;
-              let end = #end;
-              let res = sys.#method_id(None, src, start, end);
-              res
-            }}
-            .into(),
-          )
-        }
-        "flip" => {
-          let method_id = format!("create_{}", method.method.to_string());
-          let method_id = syn::Ident::new(&method_id, method.method.span());
-          let mut operands = method.args.iter();
-          let a = &method.receiver;
-          if !operands.next().is_none() {
-            return Err(syn::Error::new(
-              method.span(),
-              "[CG.Unary] Like \"a.flip()\" should have no operand in the argument list",
-            ));
-          }
-          Ok(
-            quote! {{
-              let res = sys.#method_id(#a.clone());
-              res
-            }}
-            .into(),
-          )
-        }
-        "pop" => {
-          let method_id = syn::Ident::new("create_fifo_pop", method.method.span());
-          Ok(quote!(sys.#method_id(#receiver.clone(), None);).into())
-        }
-        _ => Err(syn::Error::new(
-          method.span(),
-          format!("Not supported method {}", method.method),
-        )),
+    expr::Expr::Binary((a, op, b)) => match op.to_string().as_str() {
+      "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" => {
+        let method_id = format!("create_{}", op.to_string());
+        let method_id = syn::Ident::new(&method_id, op.span());
+        let a: proc_macro2::TokenStream = emit_parsed_expr(&a)?.into();
+        let b: proc_macro2::TokenStream = emit_parsed_expr(&b)?.into();
+        Ok(
+          quote! {{
+            let lhs = #a.clone();
+            let rhs = #b.clone();
+            let res = sys.#method_id(None, lhs, rhs);
+            res
+          }}
+          .into(),
+        )
       }
-    }
-    syn::Expr::Call(call) => {
-      let id = syn::parse::<syn::Ident>(call.func.to_token_stream().into())?;
-      match id.to_string().as_str() {
-        _ => {
-          return Err(syn::Error::new(
-            call.span(),
-            format!("[CG.FuncCall] Not supported: {}", quote!(#call)),
-          ));
-        }
-      }
-    }
-    syn::Expr::Lit(lit) => match &lit.lit {
-      syn::Lit::Str(str_lit) => {
-        let value = str_lit.value();
-        Ok(quote! {
-          sys.get_str_literal(#value.to_string())
-        })
-      }
-      _ => {
-        return Err(syn::Error::new(
-          lit.span(),
-          format!("[CG.Lit] Not supported: {}", quote!(#lit)),
-        ));
-      }
+      _ => Err(syn::Error::new(
+        op.span(),
+        format!("Not supported method {}", op),
+      )),
     },
-    syn::Expr::Path(path) => {
-      let id = syn::parse::<syn::Ident>(path.to_token_stream().into())?;
-      Ok(quote!(#id.clone()).into())
+    expr::Expr::Unary((a, op)) => match op.to_string().as_str() {
+      "flip" => {
+        let a: proc_macro2::TokenStream = emit_parsed_expr(&a)?.into();
+        let method_id = syn::Ident::new(&format!("create_{}", op.to_string()), op.span());
+        Ok(
+          quote! {{
+            let res = sys.#method_id(#a.clone());
+            res
+          }}
+          .into(),
+        )
+      }
+      "pop" => {
+        let method_id = syn::Ident::new("create_fifo_pop", op.span());
+        let a: proc_macro2::TokenStream = emit_parsed_expr(&a)?.into();
+        Ok(quote!(sys.#method_id(#a.clone(), None);).into())
+      }
+      _ => Err(syn::Error::new(
+        op.span(),
+        format!("Not supported method {}", op),
+      )),
+    },
+    expr::Expr::Slice((a, l, r)) => {
+      let method_id = syn::Ident::new("create_slice", Span::call_site() /*FIXME*/);
+      let a: proc_macro2::TokenStream = emit_parsed_expr(&a)?.into();
+      let l: proc_macro2::TokenStream = emit_parsed_expr(&l)?.into();
+      let r: proc_macro2::TokenStream = emit_parsed_expr(&r)?.into();
+      Ok(
+        quote! {{
+          let src = #a.clone();
+          let start = #l;
+          let end = #r;
+          let res = sys.#method_id(None, src, start, end);
+          res
+        }}
+        .into(),
+      )
     }
-    _ => {
-      return Err(syn::Error::new(
-        expr.span(),
-        format!("[CG.Expr] Not supported: {}", quote!(#expr)),
-      ));
+    expr::Expr::Term(term) => {
+      let res = emit_parsed_expr(&term)?;
+      Ok(res.into())
+    }
+    &expr::Expr::Select(_) => {
+      todo!()
     }
   }
 }
 
-fn emit_parsed_expr(expr: &Expr) -> syn::Result<TokenStream> {
+fn emit_parsed_expr(expr: &ExprTerm) -> syn::Result<TokenStream> {
   match expr {
-    Expr::Ident(id) => Ok(id.into_token_stream().into()),
-    Expr::Const((ty, lit)) => {
+    ExprTerm::Ident(id) => Ok(id.into_token_stream().into()),
+    ExprTerm::Const((ty, lit)) => {
       let ty = emit_type(ty)?;
       let ty: proc_macro2::TokenStream = ty.into();
       let res = quote! { sys.get_const_int(#ty, #lit) };
       Ok(res.into())
+    }
+    ExprTerm::StrLit(lit) => {
+      let value = lit.value();
+      Ok(quote! { sys.get_str_literal(#value.to_string()) }.into())
     }
   }
 }
