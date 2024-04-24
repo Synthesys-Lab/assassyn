@@ -335,16 +335,31 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
 
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    if let BlockPred::Condition(cond) = block.get_pred() {
-      res.push_str(&format!(
-        "  if {}{} {{\n",
-        dump_ref!(self.sys, &cond),
-        if cond.get_dtype(block.sys).unwrap().bits() == 1 {
-          "".into()
-        } else {
-          format!(" != 0")
-        }
-      ));
+    match block.get_pred() {
+      BlockPred::Condition(cond) => {
+        res.push_str(&format!(
+          "  if {}{} {{\n",
+          dump_ref!(self.sys, &cond),
+          if cond.get_dtype(block.sys).unwrap().bits() == 1 {
+            "".into()
+          } else {
+            format!(" != 0")
+          }
+        ));
+      }
+      BlockPred::Cycle(_) => todo!(),
+      BlockPred::WaitUntil(wait) => {
+        res.push_str(&format!(
+          "  if {}{} {{\n",
+          dump_ref!(self.sys, &wait),
+          if wait.get_dtype(block.sys).unwrap().bits() == 1 {
+            "".into()
+          } else {
+            format!(" != 0")
+          }
+        ));
+      }
+      BlockPred::None => (),
     }
     self.indent += 2;
     for elem in block.iter() {
@@ -364,7 +379,28 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     }
     self.indent -= 2;
     if let BlockPred::Condition(_) = block.get_pred() {
-      res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
+    }
+    match block.get_pred() {
+        BlockPred::Condition(_) => {
+          res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
+        }
+        BlockPred::Cycle(_) => todo!(),
+        BlockPred::WaitUntil(_) => {
+          res.push_str(&format!("{}}} else {{\n", " ".repeat(self.indent)));
+          let module_eventkind_id = self.current_module_id();
+          res.push_str(
+            &quote::quote! {
+              // retry at next cycle
+              q.push(Reverse(Event {
+                stamp: stamp + 100,
+                kind: EventKind::#module_eventkind_id,
+              }));
+            }
+            .to_string(),
+          );
+          res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
+        }
+        BlockPred::None => (),
     }
     res.into()
   }
