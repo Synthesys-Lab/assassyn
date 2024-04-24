@@ -6,7 +6,7 @@ use syn::parse::Parse;
 use crate::ast::{
   self,
   expr::{self, DType, ExprTerm},
-  node::{ArrayAccess, FuncArgs, Instruction},
+  node::{ArrayAccess, BodyPred, FuncArgs, Instruction},
 };
 
 use eir::ir::data::DataType;
