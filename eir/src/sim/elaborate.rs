@@ -378,29 +378,28 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
     }
     self.indent -= 2;
-    if let BlockPred::Condition(_) = block.get_pred() {
-    }
+    if let BlockPred::Condition(_) = block.get_pred() {}
     match block.get_pred() {
-        BlockPred::Condition(_) => {
-          res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
-        }
-        BlockPred::Cycle(_) => todo!(),
-        BlockPred::WaitUntil(_) => {
-          res.push_str(&format!("{}}} else {{\n", " ".repeat(self.indent)));
-          let module_eventkind_id = self.current_module_id();
-          res.push_str(
-            &quote::quote! {
-              // retry at next cycle
-              q.push(Reverse(Event {
-                stamp: stamp + 100,
-                kind: EventKind::#module_eventkind_id,
-              }));
-            }
-            .to_string(),
-          );
-          res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
-        }
-        BlockPred::None => (),
+      BlockPred::Condition(_) => {
+        res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
+      }
+      BlockPred::Cycle(_) => todo!(),
+      BlockPred::WaitUntil(_) => {
+        res.push_str(&format!("{}}} else {{\n", " ".repeat(self.indent)));
+        let module_eventkind_id = self.current_module_id();
+        res.push_str(
+          &quote::quote! {
+            // retry at next cycle
+            q.push(Reverse(Event {
+              stamp: stamp + 100,
+              kind: EventKind::#module_eventkind_id,
+            }));
+          }
+          .to_string(),
+        );
+        res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
+      }
+      BlockPred::None => (),
     }
     res.into()
   }
@@ -710,10 +709,13 @@ macro_rules! impl_unwrap_slab {
 
   // generate cycle gatekeeper
   for module in sys.module_iter() {
-    let module_gatekeeper = syn::Ident::new(&format!("{}_triggered", namify(module.get_name())), Span::call_site());
+    let module_gatekeeper = syn::Ident::new(
+      &format!("{}_triggered", namify(module.get_name())),
+      Span::call_site(),
+    );
     res.push_str(
       &quote::quote! {
-        let mut #module_gatekeeper = false;
+        let mut #module_gatekeeper = None;
       }
       .to_string(),
     );
@@ -735,19 +737,16 @@ macro_rules! impl_unwrap_slab {
   res.push_str("let last_stamp = stamp;\n");
   res.push_str("    match event.0.kind {\n");
   for module in sys.module_iter() {
-    let module_eventkind = &format!(
-      "Module{}",
-      camelize(&namify(module.get_name()))
+    let module_eventkind = &format!("Module{}", camelize(&namify(module.get_name())));
+    res.push_str(&format!("      EventKind::{} => {{\n", module_eventkind));
+    let module_gatekeeper = syn::Ident::new(
+      &format!("{}_triggered", namify(module.get_name())),
+      Span::call_site(),
     );
-    res.push_str(&format!(
-      "      EventKind::{} => {{\n",
-      module_eventkind
-    ));
-    let module_gatekeeper = syn::Ident::new(&format!("{}_triggered", namify(module.get_name())), Span::call_site());
     let module_eventkind_id = syn::Ident::new(&module_eventkind, Span::call_site());
     res.push_str(
       &quote::quote! {
-        if #module_gatekeeper {
+        if #module_gatekeeper.map_or(false, |v| v == event.0.stamp) {
           // retry at next cycle
           q.push(Reverse(Event {
             stamp: event.0.stamp + 100,
@@ -755,7 +754,7 @@ macro_rules! impl_unwrap_slab {
           }));
           continue;
         }
-        #module_gatekeeper = true;
+        #module_gatekeeper = event.0.stamp.into();
       }
       .to_string(),
     );
@@ -843,18 +842,18 @@ macro_rules! impl_unwrap_slab {
   }
   res.push_str("EventKind::None => panic!(\"Unexpected event kind, None\"),\n");
   res.push_str("}\n");
-  res.push_str("if stamp != last_stamp {\n");
-  // reset cycle gatekeepers
-  for module in sys.module_iter() {
-    let module_gatekeeper = syn::Ident::new(&format!("{}_triggered", namify(module.get_name())), Span::call_site());
-    res.push_str(
-      &quote::quote! {
-        #module_gatekeeper = false;
-      }
-      .to_string(),
-    );
-  }
-  res.push_str("}\n");
+  // res.push_str("if stamp != last_stamp {\n");
+  // // reset cycle gatekeepers
+  // for module in sys.module_iter() {
+  //   let module_gatekeeper = syn::Ident::new(&format!("{}_triggered", namify(module.get_name())), Span::call_site());
+  //   res.push_str(
+  //     &quote::quote! {
+  //       #module_gatekeeper = false;
+  //     }
+  //     .to_string(),
+  //   );
+  // }
+  // res.push_str("}\n");
   let threshold = config.idle_threshold;
   res.push_str(
     &quote::quote! {
