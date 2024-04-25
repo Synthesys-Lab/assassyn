@@ -232,7 +232,7 @@ impl Visitor<String> for IRPrinter {
 
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
     let mnem = expr.get_opcode().to_string();
-    let res = if expr.get_opcode().is_binary() {
+    let res = if expr.get_opcode().is_binary() || expr.get_opcode().is_cmp() {
       format!(
         "_{} = {} {} {}",
         expr.get_key(),

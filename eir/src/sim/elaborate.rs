@@ -150,17 +150,28 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
 
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
     let res = if expr.get_opcode().is_binary() {
+      let ty = expr.dtype();
+      let ty = dtype_to_rust_type(&ty);
       format!(
-        "{} {} {}",
+        "({} as {}) {} ({} as {})",
         dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value()),
+        ty,
         expr.get_opcode().to_string(),
         dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value()),
+        ty,
       )
     } else if expr.get_opcode().is_unary() {
       format!(
         "{}{}",
         expr.get_opcode().to_string(),
         dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value())
+      )
+    } else if expr.get_opcode().is_cmp() {
+      format!(
+        "{} {} {}",
+        dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value()),
+        expr.get_opcode().to_string(),
+        dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value()),
       )
     } else {
       match expr.get_opcode() {
@@ -303,8 +314,49 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           res.push(')');
           res
         }
+        Opcode::Slice => {
+          let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
+          let l = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
+          let r = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
+          let bits = {
+            let dtype = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .get_dtype(self.sys)
+              .unwrap();
+            dtype.bits()
+          };
+          format!(
+            "{{
+            let a = {} as u64;
+            let l = {} as usize;
+            let r = {} as usize;
+            let len = r - l + 1;
+            let mask = !0 >> ({} - len);
+            ((a >> l) & mask) as {}
+          }}",
+            a,
+            l,
+            r,
+            bits,
+            dtype_to_rust_type(&expr.dtype())
+          )
+        }
+        Opcode::Select => {
+          let cond = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
+          let true_value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
+          let false_value = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
+          format!(
+            "if {} {{ {} }} else {{ {} }}",
+            cond, true_value, false_value
+          )
+        }
         _ => {
-          if !(expr.get_opcode().is_unary() || expr.get_opcode().is_binary()) {
+          if !expr.get_opcode().is_unary()
+            && !expr.get_opcode().is_binary()
+            && !expr.get_opcode().is_cmp()
+          {
             panic!("Unknown opcode: {:?}", expr.get_opcode());
           }
           format!("// TODO: opcode: {}\n", expr.get_opcode().to_string())

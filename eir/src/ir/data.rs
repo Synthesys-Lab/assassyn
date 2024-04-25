@@ -5,6 +5,7 @@ pub enum DataType {
   Void,
   Int(usize),
   UInt(usize),
+  Bits(usize),
   Fp32,
   Str,
   Module(Vec<Box<DataType>>),
@@ -56,6 +57,7 @@ impl DataType {
       DataType::Fp32 => 32,
       DataType::Str => 0,
       DataType::Module(_) => 0,
+      DataType::Bits(bits) => *bits,
       DataType::ArrayType(ty, size) => ty.bits() * size,
     }
   }
@@ -101,6 +103,7 @@ impl ToString for DataType {
     match &self {
       &DataType::Int(_) => format!("i{}", self.bits()),
       &DataType::UInt(_) => format!("u{}", self.bits()),
+      &DataType::Bits(bits) => format!("b{}", bits),
       &DataType::Fp32 => format!("f{}", self.bits()),
       &DataType::Str => "Str".to_string(),
       &DataType::Void => String::from("()"),
