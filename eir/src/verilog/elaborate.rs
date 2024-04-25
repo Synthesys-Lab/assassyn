@@ -25,6 +25,8 @@ struct VerilogDumper<'a> {
   fifo_pushes: HashMap<String, Vec<(String, String)>>, // fifo_name -> [(pred, value)]
   triggers: HashMap<String, Vec<String>>,              // module_name -> [pred]
   current_module: String,
+  has_testbench: bool,
+  has_driver: bool,
   trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
   array_drivers: HashMap<String, HashSet<String>>,   // array -> {driver module}
   fifo_drivers: HashMap<String, HashSet<String>>,    // fifo -> {driver module}
@@ -39,6 +41,8 @@ impl<'a> VerilogDumper<'a> {
       fifo_pushes: HashMap::new(),
       triggers: HashMap::new(),
       current_module: String::new(),
+      has_testbench: false,
+      has_driver: false,
       trigger_drivers: HashMap::new(),
       array_drivers: HashMap::new(),
       fifo_drivers: HashMap::new(),
@@ -285,7 +289,7 @@ impl<'a> VerilogDumper<'a> {
     for module in self.sys.module_iter() {
       let module_name = namify(module.get_name());
       res.push_str(format!("// {} trigger\n", module_name).as_str());
-      if module_name != "driver" {
+      if module_name != "driver" && module_name != "testbench" {
         for driver in self.trigger_drivers.get(&module_name).unwrap().into_iter() {
           res.push_str(
             format!(
@@ -304,7 +308,7 @@ impl<'a> VerilogDumper<'a> {
         }
       }
       res.push_str(format!("logic {}_trigger_push_valid;\n", module_name).as_str());
-      if module_name != "driver" {
+      if module_name != "driver" && module_name != "testbench" {
         res.push_str(
           format!(
             "assign {}_trigger_push_valid = \n{};\n",
@@ -323,7 +327,7 @@ impl<'a> VerilogDumper<'a> {
         );
       }
       res.push_str(format!("logic {}_trigger_push_ready;\n", module_name).as_str());
-      if module_name != "driver" {
+      if module_name != "driver" && module_name != "testbench" {
         for driver in self.trigger_drivers.get(&module_name).unwrap().into_iter() {
           res.push_str(
             format!(
@@ -347,7 +351,12 @@ impl<'a> VerilogDumper<'a> {
       res.push_str(format!("  .pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
       res.push_str(format!(");\n\n").as_str());
     }
-    res.push_str("assign driver_trigger_push_valid = 1'b1;\n\n");
+    if self.has_testbench {
+      res.push_str("assign testbench_trigger_push_valid = 1'b1;\n\n");
+    }
+    if self.has_driver {
+      res.push_str("assign driver_trigger_push_valid = 1'b1;\n\n");
+    }
     // module insts
     for module in self.sys.module_iter() {
       let module_name = namify(module.get_name());
@@ -651,6 +660,14 @@ macro_rules! dump_ref {
 
 impl<'a> Visitor<String> for VerilogDumper<'a> {
   fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
+    if module.get_name() == "testbench" {
+      self.has_testbench = true;
+    }
+
+    if module.get_name() == "driver" {
+      self.has_driver = true;
+    }
+
     let mut res = String::new();
 
     res.push_str(format!("module {} (\n", namify(module.get_name())).as_str());
@@ -862,6 +879,12 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     res.push_str(format!("logic trigger;\n").as_str());
     res.push_str(format!("assign trigger_pop_ready = trigger;\n\n").as_str());
 
+    if module.get_name() == "testbench" {
+      res.push_str("int cycle_cnt;\n");
+      res.push_str("always_ff @(posedge clk or negedge rst_n) if (!rst_n) cycle_cnt <= 0; ");
+      res.push_str("else if (trigger) cycle_cnt <= cycle_cnt + 1;\n\n");
+    }
+
     self.fifo_pushes.clear();
     self.triggers.clear();
     for elem in module.get_body().iter() {
@@ -984,16 +1007,22 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
 
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    if let BlockPred::Condition(cond) = block.get_pred() {
-      self.pred = Some(format!(
-        "({}{})",
-        dump_ref!(self.sys, &cond),
-        if cond.get_dtype(block.sys).unwrap().bits() == 1 {
-          "".into()
-        } else {
-          format!(" != 0")
-        }
-      ));
+    match block.get_pred() {
+      BlockPred::Condition(cond) => {
+        self.pred = Some(format!(
+          "({}{})",
+          dump_ref!(self.sys, &cond),
+          if cond.get_dtype(block.sys).unwrap().bits() == 1 {
+            "".into()
+          } else {
+            format!(" != 0")
+          }
+        ));
+      }
+      BlockPred::Cycle(cycle) => {
+        self.pred = Some(format!("(cycle_cnt == {})", cycle));
+      }
+      BlockPred::WaitUntil(_) | BlockPred::None => (),
     }
     for elem in block.iter() {
       match elem.get_kind() {
