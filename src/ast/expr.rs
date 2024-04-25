@@ -13,7 +13,7 @@ impl Parse for ExprTerm {
       let lit = input.parse::<syn::LitStr>()?;
       Ok(ExprTerm::StrLit(lit))
     } else if let Some(_) = input.cursor().ident() {
-      let id = input.clone().parse::<syn::Ident>()?;
+      let id = input.parse::<syn::Ident>()?;
       Ok(ExprTerm::Ident(id))
     } else if let Some(_) = input.cursor().literal() {
       let lit = input.parse::<syn::LitInt>()?;
@@ -88,8 +88,9 @@ impl Parse for Expr {
         let r = content.parse::<ExprTerm>()?;
         Ok(Expr::Slice((a, l, r)))
       }
-      "flip" => Ok(Expr::Unary((a, operator))),
-      "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" => {
+      // TODO(@were): Deprecate pop, make it opaque to users.
+      "flip" | "pop" => Ok(Expr::Unary((a, operator))),
+      "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "bitwise_and" => {
         let b = content.parse::<ExprTerm>()?;
         Ok(Expr::Binary((a, operator, b)))
       }

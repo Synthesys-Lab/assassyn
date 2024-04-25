@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
-use syn::parse::Parse;
 
 use crate::ast::{
   self,
@@ -32,35 +31,6 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
       Ok(quote! { eir::ir::data::DataType::module(vec![#(#args.into()),*]) }.into())
     }
     _ => Err(syn::Error::new(dtype.span.into(), "Unsupported type")),
-  }
-}
-
-// TODO(@were): Fully deprecate this later.
-pub(crate) struct EmitIDOrConst(pub(crate) TokenStream);
-
-impl Parse for EmitIDOrConst {
-  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    if let Some(_) = input.cursor().ident() {
-      let id = input.parse::<syn::Ident>()?;
-      Ok(EmitIDOrConst(id.into_token_stream().into()))
-    } else if let Some(_) = input.cursor().literal() {
-      let lit = input.parse::<syn::LitInt>()?;
-      let ty = if input.peek(syn::Token![.]) {
-        input.parse::<syn::Token![.]>()?;
-        let dtype = input.parse::<DType>()?;
-        emit_type(&dtype)?
-      } else {
-        quote! { eir::ir::data::DataType::int(32) }.into()
-      };
-      let ty: proc_macro2::TokenStream = ty.into();
-      let res = quote! { sys.get_const_int(#ty, #lit) };
-      Ok(EmitIDOrConst(res.into()))
-    } else {
-      Err(syn::Error::new(
-        input.span(),
-        "Expected identifier or literal",
-      ))
-    }
   }
 }
 
@@ -143,7 +113,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           let carry = #res;
           let cond = #cond.clone();
           let value = #value.clone();
-          sys.create_select(cond, value, carry);
+          sys.create_select(cond, value, carry)
         }};
       }
       Ok(res.into())
