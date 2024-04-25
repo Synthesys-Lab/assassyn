@@ -7,6 +7,16 @@ pub(crate) enum ExprTerm {
   StrLit(syn::LitStr),
 }
 
+impl ExprTerm {
+  pub(crate) fn span(&self) -> proc_macro2::Span {
+    match self {
+      ExprTerm::Ident(id) => id.span(),
+      ExprTerm::Const((_, lit)) => lit.span(),
+      ExprTerm::StrLit(lit) => lit.span(),
+    }
+  }
+}
+
 impl Parse for ExprTerm {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     if input.peek(syn::LitStr) {

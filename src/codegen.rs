@@ -85,7 +85,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       )),
     },
     expr::Expr::Slice((a, l, r)) => {
-      let method_id = syn::Ident::new("create_slice", Span::call_site() /*FIXME*/);
+      let method_id = syn::Ident::new("create_slice", a.span());
       let a: proc_macro2::TokenStream = emit_parsed_expr(&a)?.into();
       let l: proc_macro2::TokenStream = emit_parsed_expr(&l)?.into();
       let r: proc_macro2::TokenStream = emit_parsed_expr(&r)?.into();
