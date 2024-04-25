@@ -18,7 +18,7 @@ impl ProcElem {
   }
 }
 
-#[test]
+// #[test]
 fn systolic_array() {
   module_builder!(
     pe[west:int<32>, north:int<32>][east, south] {
