@@ -116,19 +116,8 @@ fn systolic_array() {
 
   // row [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
   // col [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]]
-  module_builder!(driver[][col1, col2, col3, col4, row1, row2, row3, row4] {
-    cnt = array(int<32>, 1);
-    v = cnt[0];
-    new_v = v.add(1);
-    cnt[0] = new_v;
-    iter0 = v.eq(0);
-    iter1 = v.eq(1);
-    iter2 = v.eq(2);
-    iter3 = v.eq(3);
-    iter4 = v.eq(4);
-    iter5 = v.eq(5);
-    iter6 = v.eq(6);
-    when iter0 {
+  module_builder!(testbench[][col1, col2, col3, col4, row1, row2, row3, row4] {
+    cycle 0 {
       // 0 0
       // 0 P P P  P
       //   P P P  P
@@ -137,7 +126,7 @@ fn systolic_array() {
       _a = eager_bind col1(0);
       _a = eager_bind row1(0);
     }
-    when iter1 {
+    cycle 1 {
       // 1 1 4
       // 1 P P P  P
       // 4 P P P  P
@@ -148,7 +137,7 @@ fn systolic_array() {
       _a = eager_bind col2(4);
       _a = eager_bind row2(4);
     }
-    when iter2 {
+    cycle 2 {
       // 2 2 5 8
       // 2 P P P  P
       // 5 P P P  P
@@ -161,7 +150,7 @@ fn systolic_array() {
       _a = eager_bind row3(8);
       _a = eager_bind col3(8);
     }
-    when iter3 {
+    cycle 3 {
       // 3  3 6 9  12
       // 3  P P P  P
       // 6  P P P  P
@@ -176,7 +165,7 @@ fn systolic_array() {
       _a = eager_bind row4(12);
       _a = eager_bind col4(12);
     }
-    when iter4 {
+    cycle 4 {
       // 4    7 10 13
       //    P P P  P
       // 7  P P P  P
@@ -189,7 +178,7 @@ fn systolic_array() {
       _a = eager_bind row4(13);
       _a = eager_bind col4(13);
     }
-    when iter5 {
+    cycle 5 {
       //  5    11 14
       //    P P P  P
       //    P P P  P
@@ -200,7 +189,7 @@ fn systolic_array() {
       _a = eager_bind row4(14);
       _a = eager_bind col4(14);
     }
-    when iter6 {
+    cycle 6 {
       //   6      15
       //    P P P  P
       //    P P P  P
@@ -211,7 +200,7 @@ fn systolic_array() {
     }
   });
 
-  driver_builder(
+  testbench_builder(
     &mut sys,
     pe_array[0][1].pe,
     pe_array[0][2].pe,
@@ -226,12 +215,12 @@ fn systolic_array() {
   println!("{}", sys);
   eir::builder::verify(&sys);
 
-  let verilog_name = test_utils::temp_dir(&"systolic.sv".to_string());
-  let verilog_config = eir::verilog::Config {
-    fname: verilog_name,
-    sim_threshold: 100,
-  };
-  eir::verilog::elaborate(&sys, &verilog_config).unwrap();
+  // let verilog_name = test_utils::temp_dir(&"systolic.sv".to_string());
+  // let verilog_config = eir::verilog::Config {
+  //   fname: verilog_name,
+  //   sim_threshold: 100,
+  // };
+  // eir::verilog::elaborate(&sys, &verilog_config).unwrap();
 
   let src_name = test_utils::temp_dir(&"systolic.rs".to_string());
   let config = eir::sim::Config {

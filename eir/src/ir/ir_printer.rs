@@ -395,7 +395,10 @@ impl Visitor<String> for IRPrinter {
         ));
         self.inc_indent();
       }
-      BlockPred::Cycle(_) => todo!(),
+      BlockPred::Cycle(cycle) => {
+        res.push_str(&format!("{}cycle {} {{\n", " ".repeat(self.indent), cycle));
+        self.inc_indent();
+      }
       BlockPred::None => todo!(),
     }
     for elem in block.iter() {
@@ -414,11 +417,10 @@ impl Visitor<String> for IRPrinter {
       }
     }
     match block.get_pred() {
-      BlockPred::Condition(_) | BlockPred::WaitUntil(_) => {
+      BlockPred::Condition(_) | BlockPred::WaitUntil(_) | BlockPred::Cycle(_) => {
         self.dec_indent();
         res.push_str(&format!("{}}}", " ".repeat(self.indent)));
       }
-      BlockPred::Cycle(_) => todo!(),
       BlockPred::None => todo!(),
     }
     res.into()

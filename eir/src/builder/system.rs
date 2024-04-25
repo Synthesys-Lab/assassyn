@@ -147,6 +147,11 @@ impl SysBuilder {
     self.module_iter().any(|x| x.get_name().eq("driver"))
   }
 
+  /// If this system has a testbench.
+  pub fn has_testbench(&self) -> bool {
+    self.module_iter().any(|x| x.get_name().eq("testbench"))
+  }
+
   /// The helper function to get an element of the system and downcast it to its actual
   /// type's immutable reference.
   pub(crate) fn get<

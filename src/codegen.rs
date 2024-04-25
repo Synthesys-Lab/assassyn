@@ -339,7 +339,12 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
             let block_pred = eir::ir::block::BlockPred::WaitUntil(lock_arr_ptr);
           }
         }
-        BodyPred::Cycle(_) => todo!(),
+        BodyPred::Cycle(cycle) => {
+          quote! {
+            let cycle = #cycle.clone();
+            let block_pred = eir::ir::block::BlockPred::Cycle(cycle);
+          }
+        }
         BodyPred::None => todo!(),
       };
       quote! {{

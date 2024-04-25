@@ -347,7 +347,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           }
         ));
       }
-      BlockPred::Cycle(_) => todo!(),
+      BlockPred::Cycle(cycle) => {
+        res.push_str(&format!("  if stamp / 100 == {} {{\n", cycle));
+      }
       BlockPred::WaitUntil(wait) => {
         res.push_str(&format!(
           "  if {}{} {{\n",
@@ -380,10 +382,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     self.indent -= 2;
     if let BlockPred::Condition(_) = block.get_pred() {}
     match block.get_pred() {
-      BlockPred::Condition(_) => {
+      BlockPred::Condition(_) | BlockPred::Cycle(_) => {
         res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
       }
-      BlockPred::Cycle(_) => todo!(),
       BlockPred::WaitUntil(_) => {
         res.push_str(&format!("{}}} else {{\n", " ".repeat(self.indent)));
         let module_eventkind_id = self.current_module_id();
@@ -693,7 +694,7 @@ macro_rules! impl_unwrap_slab {
   }
   res.push_str("];\n\n");
   res.push_str("  // Define the event queue\n");
-  res.push_str("  let mut q = BinaryHeap::new();\n");
+  res.push_str("  let mut q: BinaryHeap<Reverse<Event>> = BinaryHeap::new();\n");
   let sim_threshold = config.sim_threshold;
   if sys.has_driver() {
     // Push the initial events.
@@ -701,6 +702,37 @@ macro_rules! impl_unwrap_slab {
       &quote::quote! {
         for i in 0..#sim_threshold {
           q.push(Reverse(Event{stamp: i * 100, kind: EventKind::ModuleDriver}));
+        }
+      }
+      .to_string(),
+    );
+  }
+  if sys.has_testbench() {
+    let testbench_vec = sys
+      .module_iter()
+      .filter(|m| m.get_name() == "testbench")
+      .collect::<Vec<ModuleRef>>();
+    let cycles = testbench_vec[0]
+      .get_body()
+      .iter()
+      .filter_map(|n| -> Option<usize> {
+        if n.get_kind() == NodeKind::Block {
+          let block = n.as_ref::<Block>(sys).unwrap();
+          match block.get_pred() {
+            BlockPred::Cycle(cycle) => Some(*cycle),
+            _ => None,
+          }
+        } else {
+          None
+        }
+      })
+      .collect::<Vec<usize>>();
+    // Push the initial events.
+    res.push_str(
+      &quote::quote! {
+        let tb_cycles = vec![#(#cycles, )*];
+        for cycle in tb_cycles {
+          q.push(Reverse(Event{stamp: cycle * 100, kind: EventKind::ModuleTestbench}));
         }
       }
       .to_string(),
