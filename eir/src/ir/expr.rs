@@ -31,6 +31,8 @@ pub enum Opcode {
   // Unary operations
   Neg,
   Flip,
+  // Triary operations
+  Select,
   // Eventual operations
   FIFOPush,
   FIFOPop,
@@ -94,6 +96,7 @@ impl ToString for Opcode {
       Opcode::FIFOPeek => "peek".into(),
       Opcode::Log => "log".into(),
       Opcode::Slice => "slice".into(),
+      Opcode::Select => "select".into(),
     }
   }
 }

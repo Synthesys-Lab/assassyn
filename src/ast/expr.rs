@@ -61,22 +61,14 @@ impl Parse for Expr {
           while !input.peek(syn::Token![;]) {
             input.parse::<syn::Token![.]>()?; // Consume "."
             input.parse::<syn::Ident>()?; // Consume "case"
-            let cond = input.parse::<ExprTerm>()?;
-            input.parse::<syn::Token![,]>()?; // Consume ","
-            let value = input.parse::<ExprTerm>()?;
+            let content;
+            parenthesized!(content in input);
+            let cond = content.parse::<ExprTerm>()?;
+            content.parse::<syn::Token![,]>().expect("Expect a \",\""); // Consume ","
+            let value = content.parse::<ExprTerm>()?;
             cases.push((cond, value));
           }
           return Ok(Expr::Select((default_value, cases)));
-        }
-        "slice" => {
-          input.parse::<syn::Token![.]>()?; // Consume "."
-          input.parse::<syn::Ident>()?; // Consume "slice"
-          let content;
-          parenthesized!(content in input);
-          let l = content.parse::<ExprTerm>()?;
-          content.parse::<syn::Token![,]>()?; // Consume ","
-          let r = content.parse::<ExprTerm>()?;
-          return Ok(Expr::Slice((tok, l, r)));
         }
         _ => {}
       }
@@ -89,11 +81,27 @@ impl Parse for Expr {
     let operator = input.parse::<syn::Ident>()?;
     let content;
     parenthesized!(content in input);
-    if content.is_empty() {
-      Ok(Expr::Unary((a, operator)))
-    } else {
-      let b = content.parse::<ExprTerm>()?;
-      Ok(Expr::Binary((a, operator, b)))
+    match operator.to_string().as_str() {
+      "slice" => {
+        let l = content.parse::<ExprTerm>()?;
+        content.parse::<syn::Token![,]>()?; // Consume ","
+        let r = content.parse::<ExprTerm>()?;
+        Ok(Expr::Slice((a, l, r)))
+      }
+      "flip" => Ok(Expr::Unary((a, operator))),
+      "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" => {
+        let b = content.parse::<ExprTerm>()?;
+        Ok(Expr::Binary((a, operator, b)))
+      }
+      _ => Err(syn::Error::new(
+        operator.span(),
+        format!(
+          "{}:{}: Unsupported operator: \"{}\"",
+          file!(),
+          line!(),
+          operator.to_string()
+        ),
+      )),
     }
   }
 }

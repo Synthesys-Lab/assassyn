@@ -355,6 +355,17 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::Log, args)
   }
 
+  pub fn create_select(
+    &mut self,
+    cond: BaseNode,
+    true_val: BaseNode,
+    false_val: BaseNode,
+  ) -> BaseNode {
+    let ty = true_val.get_dtype(self).unwrap();
+    assert_eq!(ty, false_val.get_dtype(self).unwrap());
+    self.create_expr(ty, Opcode::Select, vec![cond, true_val, false_val])
+  }
+
   /// The helper function to create an expression.
   /// An expression is the basic building block of a module.
   ///

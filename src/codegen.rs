@@ -67,7 +67,7 @@ impl Parse for EmitIDOrConst {
 pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
     expr::Expr::Binary((a, op, b)) => match op.to_string().as_str() {
-      "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" => {
+      "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" | "igt" => {
         let method_id = format!("create_{}", op.to_string());
         let method_id = syn::Ident::new(&method_id, op.span());
         let a: proc_macro2::TokenStream = emit_parsed_expr(&a)?.into();
@@ -84,7 +84,12 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       }
       _ => Err(syn::Error::new(
         op.span(),
-        format!("Not supported method {}", op),
+        format!(
+          "{}:{}: Unsupported method in codegen \"{}\"",
+          file!(),
+          line!(),
+          op
+        ),
       )),
     },
     expr::Expr::Unary((a, op)) => match op.to_string().as_str() {
@@ -129,8 +134,19 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       let res = emit_parsed_expr(&term)?;
       Ok(res.into())
     }
-    &expr::Expr::Select(_) => {
-      todo!()
+    expr::Expr::Select((default, cases)) => {
+      let mut res: proc_macro2::TokenStream = emit_parsed_expr(&default)?.into();
+      for (cond, value) in cases.iter() {
+        let cond: proc_macro2::TokenStream = emit_parsed_expr(cond)?.into();
+        let value: proc_macro2::TokenStream = emit_parsed_expr(value)?.into();
+        res = quote! {{
+          let carry = #res;
+          let cond = #cond.clone();
+          let value = #value.clone();
+          sys.create_select(cond, value, carry);
+        }};
+      }
+      Ok(res.into())
     }
   }
 }
