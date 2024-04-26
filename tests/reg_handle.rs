@@ -74,10 +74,10 @@ fn testit(fname: &str, mut sys: SysBuilder) {
           cycle % 4
         );
       }
-      // if l.contains("squarer") {
-      //   let (cycle, _) = parse_cycle(l);
-      //   assert!(cycle % 4 == 2 || cycle % 4 == 3, "{}", l);
-      // }
+      if l.contains("squarer") {
+        let (cycle, _) = parse_cycle(l);
+        assert!(cycle % 4 == 2 || cycle % 4 == 3, "{}", l);
+      }
     });
 }
 

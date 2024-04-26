@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::{builder::SysBuilder, test_utils};
+use eir::{builder::SysBuilder, test_utils::{self, parse_cycle}};
 
 #[test]
 fn testbench() {
@@ -34,6 +34,18 @@ fn testbench() {
   let exec_name = test_utils::temp_dir(&"testbench".to_string());
   test_utils::compile(&config.fname, &exec_name);
 
-  let output = test_utils::run(&exec_name);
-
+  let raw = test_utils::run(&exec_name);
+  String::from_utf8(raw.stdout)
+    .unwrap()
+    .lines()
+    .for_each(|l| {
+      if l.contains("testbench") {
+        let (cycle, _) = parse_cycle(l);
+        assert!(
+          cycle == 0 || cycle == 2 || cycle == 80,
+          "testbench triggered on {}",
+          cycle
+        );
+      }
+    });
 }
