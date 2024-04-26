@@ -234,7 +234,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             )
           };
           format!(
-            "q.push(Reverse(Event{{ stamp: stamp + 200, kind: {} }}))",
+            "q.push(Reverse(Event{{ stamp: stamp + 100, kind: {} }}))",
             to_trigger
           )
         }
@@ -290,7 +290,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           if !fifo.is_placeholder() {
             quote::quote! {
               q.push(Reverse(Event{
-                stamp: stamp + 150,
+                stamp: stamp + 50,
                 kind: EventKind::#fifo_push((EventKind::#module_writer.into(), #slab_idx, #value))
               }))
             }
