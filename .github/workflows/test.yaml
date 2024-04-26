@@ -12,8 +12,8 @@ jobs:
     env:
       PROJECT_NAME_UNDERSCORE: eda4eda
       CARGO_INCREMENTAL: 0
-      RUSTFLAGS: -Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort
-      RUSTDOCFLAGS: -Cpanic=abort
+      RUSTFLAGS: -Zprofile
+      CARGO_OPTIONS: --profile coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
