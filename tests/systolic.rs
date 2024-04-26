@@ -25,7 +25,7 @@ fn systolic_array() {
       west = west.pop();
       north = north.pop();
       c = west.mul(north);
-      acc = array(int<32>, 1);
+      acc = array(int<64>, 1);
       val = acc[0];
       mac = val.add(c);
       log("MAC value: {} * {} + {} = {}", west, north, val, mac);
