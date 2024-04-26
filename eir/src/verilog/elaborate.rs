@@ -1044,7 +1044,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
   }
 
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
-    if expr.get_opcode().is_binary() {
+    if expr.get_opcode().is_binary() || expr.get_opcode().is_cmp() {
       Some(format!(
         "logic [{}:0] _{};\nassign _{} = {} {} {};\n\n",
         expr.dtype().bits() - 1,
@@ -1272,7 +1272,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           Some("".to_string())
         }
 
-        _ => Some(format!("{:?}\n\n", expr.get_opcode())),
+        _ => panic!("Unknown OP: {:?}", expr.get_opcode()),
       }
     }
   }

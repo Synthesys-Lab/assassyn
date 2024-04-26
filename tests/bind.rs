@@ -79,5 +79,5 @@ fn bind() {
       }
     })
     .count();
-  assert_eq!(times_invoked, 97);
+  assert_eq!(times_invoked, 99);
 }

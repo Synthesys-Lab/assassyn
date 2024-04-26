@@ -35,7 +35,7 @@ fn adder() {
   let src_name = test_utils::temp_dir(&"adder.rs".to_string());
   let config = eir::sim::Config {
     fname: src_name,
-    sim_threshold: 101,
+    sim_threshold: 100,
     idle_threshold: 100,
   };
 

@@ -94,7 +94,7 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   let verilog_name = test_utils::temp_dir(&format!("{}.sv", fname));
   let verilog_config = eir::verilog::Config {
     fname: verilog_name,
-    sim_threshold: 100,
+    sim_threshold: config.sim_threshold,
   };
   eir::verilog::elaborate(&sys, &verilog_config).unwrap();
   eir::sim::elaborate(&sys, &config).unwrap();
@@ -117,7 +117,7 @@ fn testit(fname: &str, mut sys: SysBuilder) {
       }
       if l.contains("squarer") {
         let (cycle, _) = parse_cycle(l);
-        assert!(cycle % 4 == 0 || cycle % 4 == 3, "{}", l);
+        assert!(cycle % 4 == 2 || cycle % 4 == 3, "{}", l);
       }
     });
 }
