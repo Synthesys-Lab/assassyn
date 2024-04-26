@@ -1,5 +1,8 @@
 use eda4eda::module_builder;
-use eir::{builder::SysBuilder, test_utils::{self, parse_cycle}};
+use eir::{
+  builder::SysBuilder,
+  test_utils::{self, parse_cycle},
+};
 
 #[test]
 fn testbench() {
