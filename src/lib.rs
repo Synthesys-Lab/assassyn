@@ -26,7 +26,7 @@ impl Parse for ModuleParser {
       .parse::<syn::Ident>()
       .map_err(|e| syn::Error::new(e.span(), "Expected module name"))?;
     let module_name = tok.clone();
-    let builder_name = syn::Ident::new(&format!("{}_builder", module_name.to_string()), tok.span());
+    let builder_name = syn::Ident::new(&format!("{}_builder", module_name), tok.span());
     let raw_ports;
     bracketed!(raw_ports in input);
     let ports = raw_ports.parse_terminated(node::PortDecl::parse, Token![,])?;
@@ -47,16 +47,14 @@ impl Parse for ModuleParser {
       None
     };
 
-    let res = Ok(ModuleParser {
+    Ok(ModuleParser {
       module_name,
       builder_name,
       ports,
       parameters: params,
       body,
       exposes,
-    });
-
-    res
+    })
   }
 }
 

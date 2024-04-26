@@ -22,10 +22,10 @@ impl Parse for ExprTerm {
     if input.peek(syn::LitStr) {
       let lit = input.parse::<syn::LitStr>()?;
       Ok(ExprTerm::StrLit(lit))
-    } else if let Some(_) = input.cursor().ident() {
+    } else if input.cursor().ident().is_some() {
       let id = input.parse::<syn::Ident>()?;
       Ok(ExprTerm::Ident(id))
-    } else if let Some(_) = input.cursor().literal() {
+    } else if input.cursor().literal().is_some() {
       let lit = input.parse::<syn::LitInt>()?;
       let ty = if input.peek(syn::Token![.]) {
         input.parse::<syn::Token![.]>()?;
@@ -64,23 +64,20 @@ impl Parse for Expr {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let tok = input.parse::<ExprTerm>()?;
     if let ExprTerm::Ident(id) = &tok {
-      match id.to_string().as_str() {
-        "default" => {
-          let default_value = input.parse::<ExprTerm>()?;
-          let mut cases = Vec::new();
-          while !input.peek(syn::Token![;]) {
-            input.parse::<syn::Token![.]>()?; // Consume "."
-            input.parse::<syn::Ident>()?; // Consume "case"
-            let content;
-            parenthesized!(content in input);
-            let cond = content.parse::<ExprTerm>()?;
-            content.parse::<syn::Token![,]>().expect("Expect a \",\""); // Consume ","
-            let value = content.parse::<ExprTerm>()?;
-            cases.push((cond, value));
-          }
-          return Ok(Expr::Select((default_value, cases)));
+      if *id == "default" {
+        let default_value = input.parse::<ExprTerm>()?;
+        let mut cases = Vec::new();
+        while !input.peek(syn::Token![;]) {
+          input.parse::<syn::Token![.]>()?; // Consume "."
+          input.parse::<syn::Ident>()?; // Consume "case"
+          let content;
+          parenthesized!(content in input);
+          let cond = content.parse::<ExprTerm>()?;
+          content.parse::<syn::Token![,]>().expect("Expect a \",\""); // Consume ","
+          let value = content.parse::<ExprTerm>()?;
+          cases.push((cond, value));
         }
-        _ => {}
+        return Ok(Expr::Select((default_value, cases)));
       }
     }
     if !input.peek(syn::Token![.]) {
@@ -110,7 +107,7 @@ impl Parse for Expr {
           "{}:{}: Unsupported operator: \"{}\"",
           file!(),
           line!(),
-          operator.to_string()
+          operator
         ),
       )),
     }
@@ -125,7 +122,7 @@ pub(crate) struct DType {
 
 impl Parse for DType {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    let span = input.cursor().span().clone();
+    let span = input.cursor().span();
     let tyid = input.parse::<syn::Ident>()?;
     match tyid.to_string().as_str() {
       "int" => {
@@ -152,15 +149,13 @@ impl Parse for DType {
         let parsed_args = args.parse_terminated(DType::parse, syn::Token![,])?;
         Ok(DType {
           span,
-          dtype: DataType::module(parsed_args.iter().map(|x| x.dtype.clone().into()).collect()),
+          dtype: DataType::module(parsed_args.iter().map(|x| x.dtype.clone()).collect()),
         })
       }
-      _ => {
-        return Err(syn::Error::new(
-          tyid.span(),
-          format!("[CG.Type] Unsupported type: {}", tyid.to_string()),
-        ));
-      }
+      _ => Err(syn::Error::new(
+        tyid.span(),
+        format!("[CG.Type] Unsupported type: {}", tyid),
+      ))
     }
   }
 }
