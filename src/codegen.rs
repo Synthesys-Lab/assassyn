@@ -42,14 +42,12 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         let method_id = syn::Ident::new(&method_id, op.span());
         let a: proc_macro2::TokenStream = emit_parsed_expr(a)?.into();
         let b: proc_macro2::TokenStream = emit_parsed_expr(b)?.into();
-        Ok(
-          quote! {{
-            let lhs = #a.clone();
-            let rhs = #b.clone();
-            let res = sys.#method_id(None, lhs, rhs);
-            res
-          }},
-        )
+        Ok(quote! {{
+          let lhs = #a.clone();
+          let rhs = #b.clone();
+          let res = sys.#method_id(None, lhs, rhs);
+          res
+        }})
       }
       _ => Err(syn::Error::new(
         op.span(),
@@ -65,12 +63,10 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       "flip" => {
         let a: proc_macro2::TokenStream = emit_parsed_expr(a)?.into();
         let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
-        Ok(
-          quote! {{
-            let res = sys.#method_id(#a.clone());
-            res
-          }},
-        )
+        Ok(quote! {{
+          let res = sys.#method_id(#a.clone());
+          res
+        }})
       }
       "pop" => {
         let method_id = syn::Ident::new("create_fifo_pop", op.span());
@@ -87,15 +83,13 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       let a: proc_macro2::TokenStream = emit_parsed_expr(a)?.into();
       let l: proc_macro2::TokenStream = emit_parsed_expr(l)?.into();
       let r: proc_macro2::TokenStream = emit_parsed_expr(r)?.into();
-      Ok(
-        quote! {{
-          let src = #a.clone();
-          let start = #l;
-          let end = #r;
-          let res = sys.#method_id(None, src, start, end);
-          res
-        }},
-      )
+      Ok(quote! {{
+        let src = #a.clone();
+        let start = #l;
+        let end = #r;
+        let res = sys.#method_id(None, src, start, end);
+        res
+      }})
     }
     expr::Expr::Term(term) => {
       let res = emit_parsed_expr(term)?;
@@ -137,12 +131,10 @@ fn emit_parsed_expr(expr: &ExprTerm) -> syn::Result<TokenStream> {
 fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> {
   let id = aa.id.clone();
   let idx: proc_macro2::TokenStream = emit_parsed_expr(&aa.idx)?.into();
-  Ok(
-    quote! {{
-      let idx = #idx.clone();
-      sys.create_array_ptr(#id.clone(), idx)
-    }},
-  )
+  Ok(quote! {{
+    let idx = #idx.clone();
+    sys.create_array_ptr(#id.clone(), idx)
+  }})
 }
 
 pub(crate) fn emit_args(

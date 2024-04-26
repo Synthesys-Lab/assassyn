@@ -155,7 +155,7 @@ impl Parse for DType {
       _ => Err(syn::Error::new(
         tyid.span(),
         format!("[CG.Type] Unsupported type: {}", tyid),
-      ))
+      )),
     }
   }
 }
