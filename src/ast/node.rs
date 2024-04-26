@@ -41,7 +41,6 @@ pub(crate) enum BodyPred {
   Lock(ArrayAccess),
   Condition(syn::Ident),
   Cycle(syn::LitInt),
-  None,
 }
 
 pub(crate) enum Instruction {
