@@ -15,7 +15,7 @@ module_builder!(
 fn manual() -> SysBuilder {
   module_builder!(
     spin_agent[a:int<32>][sqr, lock] {
-      wait_until lock[0] {
+      wait_until { v = lock[0]; v } {
         a = a.pop();
         async sqr { a: a };
         log("agent move on, {}", a);

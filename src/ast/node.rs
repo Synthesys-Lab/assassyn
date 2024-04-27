@@ -34,16 +34,17 @@ pub(crate) struct KVPair {
 
 /// A body is a sequence of instructions.
 pub(crate) struct Body {
-  pub(crate) stmts: Vec<Instruction>,
+  pub(crate) stmts: Vec<Statement>,
+  pub(crate) valued: bool,
 }
 
 pub(crate) enum BodyPred {
-  Lock(ArrayAccess),
+  Lock(Box<Body>),
   Condition(syn::Ident),
   Cycle(syn::LitInt),
 }
 
-pub(crate) enum Instruction {
+pub(crate) enum Statement {
   Assign((syn::Ident, expr::Expr)),
   ArrayAlloc((syn::Ident, DType, syn::LitInt)),
   ArrayAssign((ArrayAccess, expr::Expr)),
@@ -53,4 +54,5 @@ pub(crate) enum Instruction {
   SpinCall((ArrayAccess, FuncCall)),
   BodyScope((BodyPred, Box<Body>)),
   Log(Vec<expr::Expr>),
+  ExprTerm(expr::ExprTerm),
 }

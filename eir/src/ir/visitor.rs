@@ -33,7 +33,7 @@ pub trait Visitor<T> {
   }
 
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<T> {
-    if let BlockPred::Condition(cond) = block.get_pred() {
+    if let BlockKind::Condition(cond) = block.get_kind() {
       self.dispatch(block.sys, cond, vec![]);
     }
     for elem in block.iter() {

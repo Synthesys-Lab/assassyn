@@ -1,3 +1,4 @@
+use codegen::emit_body;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::bracketed;
@@ -98,16 +99,12 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     (port_ids.into(), port_decls.into(), port_peeks.into())
   };
 
-  let mut body = TokenStream::new();
-  for stmt in parsed_module.body.stmts.iter() {
-    match codegen::emit_parse_instruction(stmt) {
-      Ok(x) => body.extend::<TokenStream>(x),
-      Err(e) => return e.to_compile_error().into(),
-    }
-  }
-  let body: proc_macro2::TokenStream = body.into();
+  let body = match emit_body(&parsed_module.body) {
+    Ok(x) => x,
+    Err(e) => return e.to_compile_error().into(),
+  };
 
-  // codegen parameterizations
+  // Generating parameterized argument list.
   let parameterization: proc_macro2::TokenStream = {
     let parameters = &parsed_module.parameters;
     let mut res = TokenStream::new();

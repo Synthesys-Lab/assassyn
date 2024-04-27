@@ -2,7 +2,7 @@ use syn::{braced, parenthesized, parse::Parse, Ident};
 
 use crate::ast::{
   self,
-  node::{self, FuncArgs, FuncCall},
+  node::{self, FuncArgs, FuncCall, Statement},
   DType, ExprTerm,
 };
 
@@ -65,122 +65,138 @@ impl Parse for node::FuncCall {
   }
 }
 
+impl Parse for Statement {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    if input.peek(syn::token::Async) {
+      input.parse::<syn::token::Async>()?;
+      // async <func-id> { <id>: <expr>, ... }
+      let call = input.parse::<node::FuncCall>()?;
+      Ok(node::Statement::AsyncCall(call))
+    } else if input.peek(syn::Ident) {
+      let tok_lit = input.cursor().ident().unwrap().0.to_string();
+      match tok_lit.as_str() {
+        // when <cond> { ... }
+        // wait_until <array-ptr> { ... }
+        // cycle <lit-int> { ... }
+        "when" | "wait_until" | "cycle" => {
+          // TODO(@were): To keep it simple, for now, only a ident is allowed.
+          input.parse::<syn::Ident>()?; // when
+          let pred = match tok_lit.as_str() {
+            "when" => node::BodyPred::Condition(input.parse::<syn::Ident>()?),
+            "wait_until" => {
+              let pred = input.parse::<node::Body>()?;
+              assert!(pred.valued);
+              node::BodyPred::Lock(Box::new(pred))
+            }
+            "cycle" => node::BodyPred::Cycle(input.parse::<syn::LitInt>()?),
+            _ => unreachable!(),
+          };
+          let body = input.parse::<node::Body>()?;
+          Ok(node::Statement::BodyScope((pred, Box::new(body))))
+        }
+        // spin <array-ptr> <func-id> { <id>: <expr> }
+        "spin" => {
+          input.parse::<syn::Ident>()?; // spin
+          let lock = input.parse::<node::ArrayAccess>()?;
+          let call = input.parse::<node::FuncCall>()?;
+          Ok(node::Statement::SpinCall((lock, call)))
+        }
+        "log" => {
+          input.parse::<syn::Ident>()?; // log
+          let args;
+          parenthesized!(args in input);
+          let args = args.parse_terminated(ast::expr::Expr::parse, syn::Token![,])?;
+          Ok(node::Statement::Log(args.into_iter().collect::<Vec<_>>()))
+        }
+        _ => {
+          // Parse non-keyword-leading statements
+          if input.peek2(syn::token::Bracket) {
+            // <id>[<expr>] = <expr>
+            let aa = input.parse::<node::ArrayAccess>()?;
+            input.parse::<syn::Token![=]>()?;
+            let right = input.parse::<ast::expr::Expr>()?;
+            Ok(node::Statement::ArrayAssign((aa, right)))
+          } else {
+            // <id> = <expr>
+            let id = input.parse::<Ident>()?;
+            if input.peek(syn::Token![=]) {
+              input.parse::<syn::Token![=]>()?;
+              // to handle the expression in k = a[0.int::<32>]
+              if input.peek(syn::Ident) && input.peek2(syn::token::Bracket) {
+                let aa = input.parse::<node::ArrayAccess>()?;
+                Ok(node::Statement::ArrayRead((id, aa)))
+                // parse special rules of assignment
+              } else if let Some((look, _)) = input.cursor().ident() {
+                match look.to_string().as_str() {
+                  // <id> = array(<ty>, <size>); array decl
+                  "array" => {
+                    input.parse::<syn::Ident>()?; // array
+                    let args;
+                    syn::parenthesized!(args in input);
+                    let ty = args.parse::<DType>()?;
+                    args.parse::<syn::Token![,]>()?;
+                    let size = args.parse::<syn::LitInt>()?;
+                    Ok(node::Statement::ArrayAlloc((id, ty, size)))
+                  }
+                  // <id> = bind <func-id> { <id>: <expr> }; a partial function call
+                  "bind" | "eager_bind" => {
+                    input.parse::<syn::Ident>()?; // bind
+                    let bind = input.parse::<FuncCall>()?;
+                    let eager = look.to_string().as_str().eq("eager_bind");
+                    Ok(node::Statement::Bind((id, bind, eager)))
+                  }
+                  _ => {
+                    // fall back to normal assignment
+                    let assign = input.parse::<ast::expr::Expr>()?;
+                    Ok(node::Statement::Assign((id, assign)))
+                  }
+                }
+              } else {
+                // fall back to normal assignment
+                let assign = input.parse::<ast::expr::Expr>()?;
+                Ok(node::Statement::Assign((id, assign)))
+              }
+            } else if input.is_empty() {
+              Ok(node::Statement::ExprTerm(ExprTerm::Ident(id)))
+            } else {
+              Err(syn::Error::new(
+                input.span(),
+                "Expected an assignment or an expression",
+              ))
+            }
+          }
+        }
+      }
+    } else {
+      Err(syn::Error::new(
+        input.span(),
+        "Expected an assignment or an expression",
+      ))
+    }
+  }
+}
+
 impl Parse for node::Body {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let content;
     let _ = braced!(content in input);
     let mut stmts = Vec::new();
+    let mut valued = false;
     while !content.is_empty() {
-      if content.peek(syn::token::Async) {
-        content.parse::<syn::token::Async>()?;
-        // async self {}
-        if content.peek(syn::token::SelfValue) {
-          content.parse::<syn::token::SelfValue>()?;
-          let _placeholder;
-          braced!(_placeholder in content);
-          let func_call = node::FuncCall {
-            func: Ident::new("self", content.span()),
-            args: FuncArgs::Plain(vec![]),
-          };
-          stmts.push(node::Instruction::AsyncCall(func_call));
-        } else {
-          // async <func-id> { <id>: <expr>, ... }
-          let call = content.parse::<node::FuncCall>()?;
-          stmts.push(node::Instruction::AsyncCall(call));
+      stmts.push(content.parse::<Statement>()?);
+      match stmts.last() {
+        Some(Statement::BodyScope(_)) => {}
+        Some(Statement::ExprTerm(_)) => {
+          if content.is_empty() {
+            valued = true;
+            break;
+          }
         }
-      } else if content.peek(syn::Ident) {
-        let tok_lit = content.cursor().ident().unwrap().0.to_string();
-        match tok_lit.as_str() {
-          // when <cond> { ... }
-          // wait_until <array-ptr> { ... }
-          // cycle <lit-int> { ... }
-          "when" | "wait_until" | "cycle" => {
-            content.parse::<syn::Ident>()?; // when
-                                            // TODO(@were): To keep it simple, for now, only a ident is allowed.
-            let pred = match tok_lit.as_str() {
-              "when" => node::BodyPred::Condition(content.parse::<syn::Ident>()?),
-              "wait_until" => node::BodyPred::Lock(content.parse::<node::ArrayAccess>()?),
-              "cycle" => node::BodyPred::Cycle(content.parse::<syn::LitInt>()?),
-              _ => unreachable!(),
-            };
-            let body = content.parse::<node::Body>()?;
-            stmts.push(node::Instruction::BodyScope((pred, Box::new(body))));
-            continue; // NO ;
-          }
-          // spin <array-ptr> <func-id> { <id>: <expr> }
-          "spin" => {
-            content.parse::<syn::Ident>()?; // spin
-            let lock = content.parse::<node::ArrayAccess>()?;
-            let call = content.parse::<node::FuncCall>()?;
-            stmts.push(node::Instruction::SpinCall((lock, call)));
-          }
-          "log" => {
-            content.parse::<syn::Ident>()?; // log
-            let args;
-            parenthesized!(args in content);
-            let args = args.parse_terminated(ast::expr::Expr::parse, syn::Token![,])?;
-            stmts.push(node::Instruction::Log(args.into_iter().collect::<Vec<_>>()));
-          }
-          _ => {
-            // Parse non-keyword-leading statements
-            if content.peek2(syn::token::Bracket) {
-              // <id>[<expr>] = <expr>
-              let aa = content.parse::<node::ArrayAccess>()?;
-              content.parse::<syn::Token![=]>()?;
-              let right = content.parse::<ast::expr::Expr>()?;
-              stmts.push(node::Instruction::ArrayAssign((aa, right)));
-            } else {
-              // <id> = <expr>
-              let id = content.parse::<Ident>()?;
-              if content.peek(syn::Token![=]) {
-                content.parse::<syn::Token![=]>()?;
-                // to handle the expression in k = a[0.int::<32>]
-                if content.peek(syn::Ident) && content.peek2(syn::token::Bracket) {
-                  let aa = content.parse::<node::ArrayAccess>()?;
-                  stmts.push(node::Instruction::ArrayRead((id, aa)));
-                  // parse special rules of assignment
-                } else if let Some((look, _)) = content.cursor().ident() {
-                  match look.to_string().as_str() {
-                    // <id> = array(<ty>, <size>); array decl
-                    "array" => {
-                      content.parse::<syn::Ident>()?; // array
-                      let args;
-                      syn::parenthesized!(args in content);
-                      let ty = args.parse::<DType>()?;
-                      args.parse::<syn::Token![,]>()?;
-                      let size = args.parse::<syn::LitInt>()?;
-                      stmts.push(node::Instruction::ArrayAlloc((id, ty, size)));
-                    }
-                    // <id> = bind <func-id> { <id>: <expr> }; a partial function call
-                    "bind" | "eager_bind" => {
-                      content.parse::<syn::Ident>()?; // bind
-                      let bind = content.parse::<FuncCall>()?;
-                      let eager = look.to_string().as_str().eq("eager_bind");
-                      stmts.push(node::Instruction::Bind((id, bind, eager)));
-                    }
-                    _ => {
-                      // fall back to normal assignment
-                      let assign = content.parse::<ast::expr::Expr>()?;
-                      stmts.push(node::Instruction::Assign((id, assign)));
-                    }
-                  }
-                } else {
-                  // fall back to normal assignment
-                  let assign = content.parse::<ast::expr::Expr>()?;
-                  stmts.push(node::Instruction::Assign((id, assign)));
-                }
-              } else {
-                return Err(syn::Error::new(
-                  content.span(),
-                  "Expected an assignment or an expression",
-                ));
-              }
-            }
-          }
+        _ => {
+          content.parse::<syn::Token![;]>()?;
         }
       }
-      content.parse::<syn::Token![;]>()?;
     }
-    Ok(node::Body { stmts })
+    Ok(node::Body { stmts, valued })
   }
 }

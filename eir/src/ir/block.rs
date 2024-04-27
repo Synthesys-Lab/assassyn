@@ -2,32 +2,33 @@ use crate::builder::{InsertPoint, SysBuilder};
 use crate::ir::node::*;
 use crate::ir::*;
 
-pub enum BlockPred {
+pub enum BlockKind {
   Condition(BaseNode),
   Cycle(usize),
   WaitUntil(BaseNode),
+  Valued(BaseNode),
   None,
 }
 
 pub struct Block {
   pub(crate) key: usize,
-  pred: BlockPred,
+  kind: BlockKind,
   body: Vec<BaseNode>,
   parent: BaseNode,
 }
 
 impl Block {
-  pub(crate) fn new(pred: BlockPred, parent: BaseNode) -> Block {
+  pub(crate) fn new(pred: BlockKind, parent: BaseNode) -> Block {
     Block {
       key: 0,
-      pred,
+      kind: pred,
       body: Vec::new(),
       parent,
     }
   }
 
-  pub fn get_pred(&self) -> &BlockPred {
-    &self.pred
+  pub fn get_kind(&self) -> &BlockKind {
+    &self.kind
   }
 
   pub fn get_num_exprs(&self) -> usize {
@@ -36,6 +37,13 @@ impl Block {
 
   pub fn get(&self, idx: usize) -> Option<&BaseNode> {
     self.body.get(idx)
+  }
+
+  pub fn get_value(&self) -> Option<&BaseNode> {
+    match &self.kind {
+      BlockKind::Valued(x) => Some(x),
+      _ => None,
+    }
   }
 
   pub fn iter<'a>(&'a self) -> impl Iterator<Item = &BaseNode> + 'a {
@@ -124,11 +132,11 @@ impl BlockMut<'_> {
 
 impl SysBuilder {
   /// Create a block.
-  pub fn create_block(&mut self, pred: BlockPred) -> BaseNode {
+  pub fn create_block(&mut self, pred: BlockKind) -> BaseNode {
     let pred = match pred {
-      BlockPred::WaitUntil(arr_ptr) => {
+      BlockKind::WaitUntil(arr_ptr) => {
         let arr_read = self.create_array_read(arr_ptr);
-        BlockPred::WaitUntil(arr_read)
+        BlockKind::WaitUntil(arr_read)
       }
       x => x,
     };

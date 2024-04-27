@@ -171,14 +171,18 @@ impl<'a> VerilogDumper<'a> {
         )
         .as_str(),
       );
-      res.push_str(format!(
-        "always_ff @(posedge clk or negedge rst_n) if (!rst_n) array_{}_q <= '{{default : 4'h0}}; else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n\n",
-        array_name,
-        array_name,
-        array_name,
-        array_name,
-        array_name
-      ).as_str());
+      res.push_str("always_ff @(posedge clk or negedge rst_n)");
+      res.push_str(
+        format!(
+          "if (!rst_n) array_{}_q <= '{{default : 4'h0}};\n",
+          array_name,
+        )
+        .as_str(),
+      );
+      res.push_str(&format!(
+        " else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
+        array_name, array_name, array_name, array_name
+      ));
     }
     for module in self.sys.module_iter() {
       for port in module.port_iter() {
@@ -852,7 +856,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         NodeKind::Expr => break,
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          if let BlockPred::WaitUntil(cond) = block.get_pred() {
+          if let BlockKind::WaitUntil(cond) = block.get_kind() {
             body_waituntil_cnt += 1;
             let cond = cond.as_ref::<Expr>(self.sys).unwrap();
             wait_until = Some(format!(
@@ -1007,8 +1011,8 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
 
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    match block.get_pred() {
-      BlockPred::Condition(cond) => {
+    match block.get_kind() {
+      BlockKind::Condition(cond) => {
         self.pred = Some(format!(
           "({}{})",
           dump_ref!(self.sys, &cond),
@@ -1019,10 +1023,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           }
         ));
       }
-      BlockPred::Cycle(cycle) => {
+      BlockKind::Cycle(cycle) => {
         self.pred = Some(format!("(cycle_cnt == {})", cycle));
       }
-      BlockPred::WaitUntil(_) | BlockPred::None => (),
+      BlockKind::WaitUntil(_) | BlockKind::Valued(_) | BlockKind::None => (),
     }
     for elem in block.iter() {
       match elem.get_kind() {

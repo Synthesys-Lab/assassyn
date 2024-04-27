@@ -132,7 +132,7 @@ pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
     } else {
       lock_handle
     };
-    let block = mutator.sys.create_block(BlockPred::WaitUntil(cond.clone()));
+    let block = mutator.sys.create_block(BlockKind::WaitUntil(cond.clone()));
     mutator.sys.set_current_block(block.clone());
     let mut bind = mutator.sys.get_init_bind(dest_module.clone());
     for (i, elem) in agent_ports.iter().enumerate() {

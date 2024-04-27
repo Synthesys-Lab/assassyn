@@ -5,7 +5,7 @@ use quote::{quote, ToTokens};
 use crate::ast::{
   self,
   expr::{self, DType, ExprTerm},
-  node::{ArrayAccess, BodyPred, FuncArgs, Instruction},
+  node::{ArrayAccess, BodyPred, FuncArgs, Statement},
 };
 
 use eir::ir::data::DataType;
@@ -40,14 +40,17 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" | "igt" => {
         let method_id = format!("create_{}", op);
         let method_id = syn::Ident::new(&method_id, op.span());
-        let a: proc_macro2::TokenStream = emit_parsed_expr(a)?.into();
-        let b: proc_macro2::TokenStream = emit_parsed_expr(b)?.into();
-        Ok(quote! {{
-          let lhs = #a.clone();
-          let rhs = #b.clone();
-          let res = sys.#method_id(None, lhs, rhs);
-          res
-        }})
+        let a: proc_macro2::TokenStream = emit_expr_term(&a)?.into();
+        let b: proc_macro2::TokenStream = emit_expr_term(&b)?.into();
+        Ok(
+          quote! {{
+            let lhs = #a.clone();
+            let rhs = #b.clone();
+            let res = sys.#method_id(None, lhs, rhs);
+            res
+          }}
+          .into(),
+        )
       }
       _ => Err(syn::Error::new(
         op.span(),
@@ -61,17 +64,20 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     },
     expr::Expr::Unary((a, op)) => match op.to_string().as_str() {
       "flip" => {
-        let a: proc_macro2::TokenStream = emit_parsed_expr(a)?.into();
-        let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
-        Ok(quote! {{
-          let res = sys.#method_id(#a.clone());
-          res
-        }})
+        let a: proc_macro2::TokenStream = emit_expr_term(&a)?.into();
+        let method_id = syn::Ident::new(&format!("create_{}", op.to_string()), op.span());
+        Ok(
+          quote! {{
+            let res = sys.#method_id(#a.clone());
+            res
+          }}
+          .into(),
+        )
       }
       "pop" => {
         let method_id = syn::Ident::new("create_fifo_pop", op.span());
-        let a: proc_macro2::TokenStream = emit_parsed_expr(a)?.into();
-        Ok(quote!(sys.#method_id(#a.clone(), None);))
+        let a: proc_macro2::TokenStream = emit_expr_term(&a)?.into();
+        Ok(quote!(sys.#method_id(#a.clone(), None);).into())
       }
       _ => Err(syn::Error::new(
         op.span(),
@@ -80,26 +86,29 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     },
     expr::Expr::Slice((a, l, r)) => {
       let method_id = syn::Ident::new("create_slice", a.span());
-      let a: proc_macro2::TokenStream = emit_parsed_expr(a)?.into();
-      let l: proc_macro2::TokenStream = emit_parsed_expr(l)?.into();
-      let r: proc_macro2::TokenStream = emit_parsed_expr(r)?.into();
-      Ok(quote! {{
-        let src = #a.clone();
-        let start = #l;
-        let end = #r;
-        let res = sys.#method_id(None, src, start, end);
-        res
-      }})
+      let a: proc_macro2::TokenStream = emit_expr_term(&a)?.into();
+      let l: proc_macro2::TokenStream = emit_expr_term(&l)?.into();
+      let r: proc_macro2::TokenStream = emit_expr_term(&r)?.into();
+      Ok(
+        quote! {{
+          let src = #a.clone();
+          let start = #l;
+          let end = #r;
+          let res = sys.#method_id(None, src, start, end);
+          res
+        }}
+        .into(),
+      )
     }
     expr::Expr::Term(term) => {
-      let res = emit_parsed_expr(term)?;
+      let res = emit_expr_term(&term)?;
       Ok(res.into())
     }
     expr::Expr::Select((default, cases)) => {
-      let mut res: proc_macro2::TokenStream = emit_parsed_expr(default)?.into();
+      let mut res: proc_macro2::TokenStream = emit_expr_term(&default)?.into();
       for (cond, value) in cases.iter() {
-        let cond: proc_macro2::TokenStream = emit_parsed_expr(cond)?.into();
-        let value: proc_macro2::TokenStream = emit_parsed_expr(value)?.into();
+        let cond: proc_macro2::TokenStream = emit_expr_term(cond)?.into();
+        let value: proc_macro2::TokenStream = emit_expr_term(value)?.into();
         res = quote! {{
           let carry = #res;
           let cond = #cond.clone();
@@ -112,7 +121,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
   }
 }
 
-fn emit_parsed_expr(expr: &ExprTerm) -> syn::Result<TokenStream> {
+fn emit_expr_term(expr: &ExprTerm) -> syn::Result<TokenStream> {
   match expr {
     ExprTerm::Ident(id) => Ok(id.into_token_stream().into()),
     ExprTerm::Const((ty, lit)) => {
@@ -130,11 +139,14 @@ fn emit_parsed_expr(expr: &ExprTerm) -> syn::Result<TokenStream> {
 
 fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> {
   let id = aa.id.clone();
-  let idx: proc_macro2::TokenStream = emit_parsed_expr(&aa.idx)?.into();
-  Ok(quote! {{
-    let idx = #idx.clone();
-    sys.create_array_ptr(#id.clone(), idx)
-  }})
+  let idx: proc_macro2::TokenStream = emit_expr_term(&aa.idx)?.into();
+  Ok(
+    quote! {{
+      let idx = #idx.clone();
+      sys.create_array_ptr(#id.clone(), idx)
+    }}
+    .into(),
+  )
 }
 
 pub(crate) fn emit_args(
@@ -146,7 +158,7 @@ pub(crate) fn emit_args(
     FuncArgs::Bound(binds) => binds
       .iter()
       .map(|(k, v)| {
-        let value = emit_parsed_expr(v).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {v}));
+        let value = emit_expr_term(v).expect(format!("Failed to emit {}", quote! {v}).as_str());
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
@@ -157,7 +169,7 @@ pub(crate) fn emit_args(
     FuncArgs::Plain(vec) => vec
       .iter()
       .map(|x| {
-        let value = emit_parsed_expr(x).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {x}));
+        let value = emit_expr_term(x).expect(format!("Failed to emit {}", quote! {x}).as_str());
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
@@ -172,16 +184,16 @@ pub(crate) fn emit_args(
   }
 }
 
-pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStream> {
+pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStream> {
   let res: proc_macro2::TokenStream = match inst {
-    Instruction::Assign((left, right)) => {
-      let right: proc_macro2::TokenStream = emit_expr_body(right)?;
+    Statement::Assign((left, right)) => {
+      let right: proc_macro2::TokenStream = emit_expr_body(right)?.into();
       quote! {
         let #left = #right;
       }
     }
-    Instruction::ArrayAssign((aa, right)) => {
-      let right: proc_macro2::TokenStream = emit_expr_body(right)?;
+    Statement::ArrayAssign((aa, right)) => {
+      let right: proc_macro2::TokenStream = emit_expr_body(right)?.into();
       let array_ptr = emit_array_access(aa)?;
       quote! {{
         let ptr = #array_ptr;
@@ -189,7 +201,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         sys.create_array_write(ptr, value);
       }}
     }
-    Instruction::ArrayRead((id, aa)) => {
+    Statement::ArrayRead((id, aa)) => {
       let array_ptr = emit_array_access(aa)?;
       quote! {
         let #id = {
@@ -198,7 +210,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         };
       }
     }
-    Instruction::AsyncCall(call) => {
+    Statement::AsyncCall(call) => {
       let func = &call.func;
       let args = &call.args;
       let args = emit_args(func, args, false);
@@ -207,7 +219,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         sys.create_trigger_bound(bind);
       }}
     }
-    Instruction::Bind((id, call, eager)) => {
+    Statement::Bind((id, call, eager)) => {
       let func = &call.func;
       let args = &call.args;
       let args = emit_args(func, args, *eager);
@@ -218,7 +230,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         };
       )
     }
-    Instruction::SpinCall((lock, call)) => {
+    Statement::SpinCall((lock, call)) => {
       let func = &call.func;
       let args = emit_args(func, &call.args, false);
       let emitted_lock = emit_array_access(lock)?;
@@ -228,18 +240,18 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         sys.create_spin_trigger_bound(lock, bind);
       }}
     }
-    Instruction::ArrayAlloc((id, ty, size)) => {
+    Statement::ArrayAlloc((id, ty, size)) => {
       let ty = emit_type(ty)?;
       let ty: proc_macro2::TokenStream = ty.into();
       quote! {
         let #id = sys.create_array(#ty, stringify!(#id), #size);
       }
     }
-    Instruction::BodyScope((pred, body)) => {
+    Statement::BodyScope((pred, body)) => {
       let body = body
         .stmts
         .iter()
-        .map(emit_parse_instruction)
+        .map(|x| emit_parsed_instruction(x))
         .collect::<Vec<_>>();
       let mut unwraped_body: Vec<proc_macro2::TokenStream> = vec![];
       for elem in body.into_iter() {
@@ -257,7 +269,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
           }
         }
         BodyPred::Lock(lock) => {
-          let lock_arr_ptr = emit_array_access(lock).unwrap();
+          let lock_arr_ptr = emit_body(lock).unwrap();
           quote! {
             let lock_arr_ptr = #lock_arr_ptr.clone();
             let block_pred = eir::ir::block::BlockPred::WaitUntil(lock_arr_ptr);
@@ -284,7 +296,7 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         sys.set_current_ip(ip);
       }}
     }
-    Instruction::Log(args) => {
+    Statement::Log(args) => {
       let args = args
         .iter()
         .map(emit_expr_body)
@@ -307,6 +319,49 @@ pub(crate) fn emit_parse_instruction(inst: &Instruction) -> syn::Result<TokenStr
         sys.create_log(#fmt, vec![#(#rest),*]);
       }}
     }
+    Statement::ExprTerm(_) => {
+      return Err(syn::Error::new(
+        Span::call_site(),
+        &format!(
+          "{}: {}: ExprTerm should not be emitted here",
+          file!(),
+          line!()
+        ),
+      ))
+    }
   };
+  Ok(res.into())
+}
+
+/// Emit a braced block of instructions.
+pub(crate) fn emit_body(body: &ast::node::Body) -> syn::Result<proc_macro2::TokenStream> {
+  let mut res = TokenStream::new();
+  let (n, value) = if body.valued {
+    let mut value = None;
+    assert!(match body.stmts.last() {
+      Some(ast::node::Statement::ExprTerm(ExprTerm::Ident(id))) => {
+        value = id.clone().into();
+        true
+      }
+      _ => false,
+    });
+    (body.stmts.len() - 1, value)
+  } else {
+    (body.stmts.len(), None)
+  };
+  for stmt in body.stmts.iter().take(n) {
+    let segment = emit_parsed_instruction(stmt)?;
+    res.extend::<TokenStream>(segment);
+  }
+  if let Some(value) = value {
+    let res: proc_macro2::TokenStream = res.into();
+    return Ok(
+      quote! {{
+        #res;
+        #value
+      }}
+      .into(),
+    );
+  }
   Ok(res.into())
 }

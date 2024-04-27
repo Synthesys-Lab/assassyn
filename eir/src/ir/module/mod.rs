@@ -313,7 +313,7 @@ impl SysBuilder {
       fifo_mut.get_mut().set_idx(i);
     }
     self.sym_tab.insert(module_name, module.clone());
-    let body = Block::new(BlockPred::None, module.clone());
+    let body = Block::new(BlockKind::None, module.clone());
     let body = self.insert_element(body);
     self.get_mut::<Module>(&module).unwrap().get_mut().body = body.clone();
     module

@@ -378,8 +378,8 @@ impl Visitor<String> for IRPrinter {
   }
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    match block.get_pred() {
-      BlockPred::Condition(cond) => {
+    match block.get_kind() {
+      BlockKind::Condition(cond) => {
         res.push_str(&format!(
           "{}if {} {{\n",
           " ".repeat(self.indent),
@@ -387,7 +387,7 @@ impl Visitor<String> for IRPrinter {
         ));
         self.inc_indent();
       }
-      BlockPred::WaitUntil(cond) => {
+      BlockKind::WaitUntil(cond) => {
         res.push_str(&format!(
           "{}wait_until {} {{\n",
           " ".repeat(self.indent),
@@ -395,11 +395,11 @@ impl Visitor<String> for IRPrinter {
         ));
         self.inc_indent();
       }
-      BlockPred::Cycle(cycle) => {
+      BlockKind::Cycle(cycle) => {
         res.push_str(&format!("{}cycle {} {{\n", " ".repeat(self.indent), cycle));
         self.inc_indent();
       }
-      BlockPred::None => todo!(),
+      BlockKind::Valued(_) | BlockKind::None => todo!(),
     }
     for elem in block.iter() {
       match elem.get_kind() {
@@ -416,12 +416,12 @@ impl Visitor<String> for IRPrinter {
         }
       }
     }
-    match block.get_pred() {
-      BlockPred::Condition(_) | BlockPred::WaitUntil(_) | BlockPred::Cycle(_) => {
+    match block.get_kind() {
+      BlockKind::Condition(_) | BlockKind::WaitUntil(_) | BlockKind::Cycle(_) => {
         self.dec_indent();
         res.push_str(&format!("{}}}", " ".repeat(self.indent)));
       }
-      BlockPred::None => todo!(),
+      BlockKind::Valued(_) | BlockKind::None => todo!(),
     }
     res.into()
   }
