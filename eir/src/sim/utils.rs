@@ -35,15 +35,15 @@ pub(super) fn unwrap_array_ty(dty: &DataType) -> (DataType, usize) {
 pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
   if dtype.is_int() {
     let prefix = if dtype.is_signed() { "i" } else { "u" };
-    let bits = dtype.bits();
+    let bits = dtype.get_bits();
     return if bits.is_power_of_two() && bits >= 8 && bits <= 64 {
-      format!("{}{}", prefix, dtype.bits())
+      format!("{}{}", prefix, dtype.get_bits())
     } else if bits == 1 {
       "bool".to_string()
     } else if bits.is_power_of_two() && bits < 8 {
       format!("{}8", prefix)
     } else {
-      format!("{}{}", prefix, dtype.bits().next_power_of_two())
+      format!("{}{}", prefix, dtype.get_bits().next_power_of_two())
     };
   }
   match dtype {

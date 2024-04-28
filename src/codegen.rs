@@ -12,8 +12,8 @@ use eir::ir::data::DataType;
 
 pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
   match &dtype.dtype {
-    DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int(#bits) }.into()),
-    DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint(#bits) }.into()),
+    DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int_ty(#bits) }.into()),
+    DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint_ty(#bits) }.into()),
     DataType::Module(args) => {
       let args = args
         .iter()
@@ -68,8 +68,8 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           res
         }})
       }
-      "pop" => {
-        let method_id = syn::Ident::new("create_fifo_pop", op.span());
+      "pop" | "valid" | "peek" => {
+        let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
         let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
         Ok(quote!(sys.#method_id(#a.clone(), None);))
       }

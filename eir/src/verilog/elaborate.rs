@@ -66,7 +66,7 @@ impl<'a> VerilogDumper<'a> {
       res.push_str(
         format!(
           "logic [{}:0] array_{}_q[0:{}];\n",
-          array.scalar_ty().bits() - 1,
+          array.scalar_ty().get_bits() - 1,
           array_name,
           array.get_size() - 1
         )
@@ -77,7 +77,7 @@ impl<'a> VerilogDumper<'a> {
         res.push_str(
           format!(
             "logic [{}:0] array_{}_driver_{}_d;\n",
-            array.scalar_ty().bits() - 1,
+            array.scalar_ty().get_bits() - 1,
             array_name,
             driver
           )
@@ -98,7 +98,7 @@ impl<'a> VerilogDumper<'a> {
       res.push_str(
         format!(
           "logic [{}:0] array_{}_d;\n",
-          array.scalar_ty().bits() - 1,
+          array.scalar_ty().get_bits() - 1,
           array_name
         )
         .as_str(),
@@ -114,7 +114,7 @@ impl<'a> VerilogDumper<'a> {
             .into_iter()
             .map(|driver| format!(
               "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_d)",
-              array.scalar_ty().bits(),
+              array.scalar_ty().get_bits(),
               array_name,
               driver,
               array_name,
@@ -198,7 +198,7 @@ impl<'a> VerilogDumper<'a> {
           )
           .as_str(),
         );
-        let fifo_width = port.scalar_ty().bits();
+        let fifo_width = port.scalar_ty().get_bits();
         res.push_str(format!("// fifo: {}\n", fifo_name).as_str());
         for driver in self.fifo_drivers.get(&fifo_name).unwrap().into_iter() {
           res
@@ -694,7 +694,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         format!(
           "{}input logic [{}:0] fifo_{}_pop_data,\n",
           " ".repeat(self.indent),
-          port.scalar_ty().bits() - 1,
+          port.scalar_ty().get_bits() - 1,
           fifo_name!(port)
         )
         .as_str(),
@@ -737,7 +737,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           format!(
             "{}output logic [{}:0] fifo_{}_push_data,\n",
             " ".repeat(self.indent),
-            fifo.scalar_ty().bits() - 1,
+            fifo.scalar_ty().get_bits() - 1,
             fifo_name
           )
           .as_str(),
@@ -764,7 +764,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           format!(
             "{}input logic [{}:0] array_{}_q[0:{}],\n",
             " ".repeat(self.indent),
-            array_ref.scalar_ty().bits() - 1,
+            array_ref.scalar_ty().get_bits() - 1,
             namify(array_ref.get_name()),
             array_ref.get_size() - 1
           )
@@ -791,7 +791,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           format!(
             "{}output logic [{}:0] array_{}_d,\n",
             " ".repeat(self.indent),
-            array_ref.scalar_ty().bits() - 1,
+            array_ref.scalar_ty().get_bits() - 1,
             namify(array_ref.get_name())
           )
           .as_str(),
@@ -862,7 +862,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             wait_until = Some(format!(
               " && (_{}{})",
               cond.get_key(),
-              if cond.dtype().bits() == 1 {
+              if cond.dtype().get_bits() == 1 {
                 "".into()
               } else {
                 format!(" != 0")
@@ -1016,7 +1016,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         self.pred = Some(format!(
           "({}{})",
           dump_ref!(self.sys, &cond),
-          if cond.get_dtype(block.sys).unwrap().bits() == 1 {
+          if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
             "".into()
           } else {
             format!(" != 0")
@@ -1051,7 +1051,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     if expr.get_opcode().is_binary() || expr.get_opcode().is_cmp() {
       Some(format!(
         "logic [{}:0] _{};\nassign _{} = {} {} {};\n\n",
-        expr.dtype().bits() - 1,
+        expr.dtype().get_bits() - 1,
         expr.get_key(),
         expr.get_key(),
         dump_ref!(self.sys, expr.get_operand(0).unwrap().get_value()),
@@ -1061,7 +1061,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     } else if expr.get_opcode().is_unary() {
       Some(format!(
         "logic [{}:0] _{};\nassign _{} = {}{};\n\n",
-        expr.dtype().bits() - 1,
+        expr.dtype().get_bits() - 1,
         expr.get_key(),
         expr.get_key(),
         expr.get_opcode().to_string(),
@@ -1078,7 +1078,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             .unwrap();
           Some(format!(
             "logic [{}:0] _{};\nassign _{} = fifo_{}_pop_data;\nassign fifo_{}_pop_ready = trigger{};\n\n",
-            fifo.scalar_ty().bits() - 1,
+            fifo.scalar_ty().get_bits() - 1,
             expr.get_key(),
             expr.get_key(),
             fifo_name!(fifo),
@@ -1141,7 +1141,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           let array_ref = &array_ptr.get_array().as_ref::<Array>(self.sys).unwrap();
           Some(format!(
             "logic [{}:0] _{};\nassign _{} = array_{}_q[{}];\n\n",
-            expr.dtype().bits() - 1,
+            expr.dtype().get_bits() - 1,
             expr.get_key(),
             expr.get_key(),
             namify(array_ref.get_name()),
@@ -1238,7 +1238,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           let fifo_name = fifo_name!(fifo);
           Some(format!(
             "logic [{}:0] _{};\nassign _{} = fifo_{}_pop_data;\n\n",
-            fifo.scalar_ty().bits() - 1,
+            fifo.scalar_ty().get_bits() - 1,
             expr.get_key(),
             expr.get_key(),
             fifo_name

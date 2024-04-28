@@ -30,16 +30,20 @@ impl DataType {
     DataType::Module(inputs.into_iter().map(|x| Box::new(x)).collect())
   }
 
-  pub fn int(bits: usize) -> Self {
+  pub fn int_ty(bits: usize) -> Self {
     DataType::Int(bits)
   }
 
-  pub fn uint(bits: usize) -> Self {
+  pub fn uint_ty(bits: usize) -> Self {
     DataType::UInt(bits)
   }
 
-  pub fn fp32() -> Self {
+  pub fn fp32_ty() -> Self {
     DataType::Fp32
+  }
+
+  pub fn raw_ty(bits: usize) -> Self {
+    DataType::Bits(bits)
   }
 
   pub fn is_scalar(&self) -> bool {
@@ -49,7 +53,7 @@ impl DataType {
     }
   }
 
-  pub fn bits(&self) -> usize {
+  pub fn get_bits(&self) -> usize {
     match self {
       DataType::Void => 0,
       DataType::Int(bits) => *bits,
@@ -58,7 +62,7 @@ impl DataType {
       DataType::Str => 0,
       DataType::Module(_) => 0,
       DataType::Bits(bits) => *bits,
-      DataType::ArrayType(ty, size) => ty.bits() * size,
+      DataType::ArrayType(ty, size) => ty.get_bits() * size,
     }
   }
 
@@ -101,10 +105,10 @@ impl DataType {
 impl ToString for DataType {
   fn to_string(&self) -> String {
     match &self {
-      &DataType::Int(_) => format!("i{}", self.bits()),
-      &DataType::UInt(_) => format!("u{}", self.bits()),
+      &DataType::Int(_) => format!("i{}", self.get_bits()),
+      &DataType::UInt(_) => format!("u{}", self.get_bits()),
       &DataType::Bits(bits) => format!("b{}", bits),
-      &DataType::Fp32 => format!("f{}", self.bits()),
+      &DataType::Fp32 => format!("f{}", self.get_bits()),
       &DataType::Str => "Str".to_string(),
       &DataType::Void => String::from("()"),
       &DataType::ArrayType(ty, size) => format!("array[{} x {}]", ty.to_string(), size),

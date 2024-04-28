@@ -37,6 +37,7 @@ pub enum Opcode {
   FIFOPush,
   FIFOPop,
   FIFOPeek,
+  FIFOValid,
   Trigger,
   // Other synthesizable operations
   Slice,
@@ -95,6 +96,7 @@ impl ToString for Opcode {
       Opcode::FIFOPush => "push".into(),
       Opcode::FIFOPop => "pop".into(),
       Opcode::FIFOPeek => "peek".into(),
+      Opcode::FIFOValid => "valid".into(),
       Opcode::Log => "log".into(),
       Opcode::Slice => "slice".into(),
       Opcode::Select => "select".into(),

@@ -33,7 +33,7 @@ impl Parse for ExprTerm {
       } else {
         DType {
           span: lit.span(),
-          dtype: DataType::int(32),
+          dtype: DataType::int_ty(32),
         }
       };
       Ok(ExprTerm::Const((ty, lit)))
@@ -96,7 +96,7 @@ impl Parse for Expr {
         Ok(Expr::Slice((a, l, r)))
       }
       // TODO(@were): Deprecate pop, make it opaque to users.
-      "flip" | "pop" => Ok(Expr::Unary((a, operator))),
+      "flip" | "pop" | "valid" | "peek" => Ok(Expr::Unary((a, operator))),
       "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "bitwise_and" => {
         let b = content.parse::<ExprTerm>()?;
         Ok(Expr::Binary((a, operator, b)))
@@ -131,7 +131,7 @@ impl Parse for DType {
         input.parse::<syn::Token![>]>()?;
         Ok(DType {
           span,
-          dtype: DataType::int(bits.base10_parse::<usize>().unwrap()),
+          dtype: DataType::int_ty(bits.base10_parse::<usize>().unwrap()),
         })
       }
       "uint" => {
@@ -140,7 +140,7 @@ impl Parse for DType {
         input.parse::<syn::Token![>]>()?;
         Ok(DType {
           span,
-          dtype: DataType::uint(bits.base10_parse::<usize>().unwrap()),
+          dtype: DataType::uint_ty(bits.base10_parse::<usize>().unwrap()),
         })
       }
       "module" => {
