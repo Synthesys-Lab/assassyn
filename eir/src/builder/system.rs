@@ -529,7 +529,11 @@ impl SysBuilder {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
     assert!(bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::KVBind);
-    assert!(!bind.get_bound().contains_key(&key));
+    assert!(
+      !bind.get_bound().contains_key(&key),
+      "Argument \"{}\" bound twice",
+      key
+    );
     let module = bind.get_callee().as_ref::<Module>(self).unwrap();
     let port = module
       .get_port_by_name(&key)
@@ -707,7 +711,7 @@ impl SysBuilder {
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
-    let res = self.create_expr(DataType::raw_ty(1), Opcode::FIFOValid, vec![fifo]);
+    let res = self.create_expr(DataType::int_ty(1), Opcode::FIFOValid, vec![fifo]);
     res
   }
 

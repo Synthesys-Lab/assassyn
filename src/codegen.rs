@@ -68,10 +68,15 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           res
         }})
       }
-      "pop" | "valid" | "peek" => {
+      "pop" => {
         let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
         let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
         Ok(quote!(sys.#method_id(#a.clone(), None);))
+      }
+      "valid" | "peek" => {
+        let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
+        let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
+        Ok(quote!(sys.#method_id(#a.clone());))
       }
       _ => Err(syn::Error::new(
         op.span(),

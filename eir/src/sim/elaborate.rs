@@ -272,6 +272,15 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             .unwrap();
           format!("{}.front().unwrap().clone()", fifo_name!(fifo))
         }
+        Opcode::FIFOValid => {
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .get_value()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          format!("!{}.is_empty()", fifo_name!(fifo))
+        }
         Opcode::FIFOPush => {
           let fifo = expr
             .get_operand(0)
