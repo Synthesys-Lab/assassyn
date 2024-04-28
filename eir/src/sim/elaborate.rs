@@ -128,21 +128,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     }
     res.push_str(") {\n");
     self.indent += 2;
-    for elem in module.get_body().iter() {
-      match elem.get_kind() {
-        NodeKind::Expr => {
-          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(&self.visit_expr(&expr).unwrap());
-        }
-        NodeKind::Block => {
-          let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(&self.visit_block(&block).unwrap());
-        }
-        _ => {
-          panic!("Unexpected reference type: {:?}", elem);
-        }
-      }
-    }
+    res.push_str(&self.visit_block(&module.get_body()).unwrap());
     self.indent -= 2;
     res.push_str("}\n");
     res.into()

@@ -153,6 +153,12 @@ impl SysBuilder {
 
   /// Create a block and insert it to the current module.
   pub fn create_block(&mut self, kind: BlockKind) -> BaseNode {
+    match kind {
+      BlockKind::WaitUntil(_) => {
+        panic!("Use `set_current_block_wait_until` to have a wait-until block!");
+      }
+      _ => {}
+    }
     self.create_block_impl(kind, true)
   }
 
@@ -161,15 +167,25 @@ impl SysBuilder {
     self.create_block_impl(BlockKind::None, false)
   }
 
-  /// Create a wait-until block and insert it to the current module.
-  pub fn create_wait_until_block(&mut self) -> BaseNode {
+  /// Make the current block a wait-until block.
+  /// This method maintains the assumption that a wait-until block should only be the root block of
+  /// a module.
+  pub fn set_current_block_wait_until(&mut self) {
     let cond = self.create_none_block();
-    let res = self.create_block_impl(BlockKind::WaitUntil(cond), true);
+    let cur_block = {
+      let block = self.get_current_block().expect("No current block");
+      assert_eq!(
+        block.get_parent().get_kind(),
+        NodeKind::Module,
+        "Only root block can be set to wait-until!"
+      );
+      block.upcast()
+    };
+    cur_block.as_mut::<Block>(self).unwrap().get_mut().kind = BlockKind::WaitUntil(cond.clone());
     cond
       .as_mut::<Block>(self)
       .unwrap()
       .get_mut()
-      .set_parent(res);
-    res
+      .set_parent(cur_block);
   }
 }

@@ -248,20 +248,21 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
           quote! {{
             let cond = #cond.clone();
             let block_pred = eir::ir::block::BlockKind::Condition(cond);
-            sys.create_block(block_pred)
+            (sys.create_block(block_pred), true)
           }}
         }
         BodyPred::Cycle(cycle) => {
           quote! {{
             let cycle = #cycle.clone();
             let block_pred = eir::ir::block::BlockKind::Cycle(cycle);
-            sys.create_block(block_pred)
+            (sys.create_block(block_pred), true)
           }}
         }
         BodyPred::WaitUntil(lock) => {
           let lock_emission = emit_body(lock).unwrap();
           quote! {{
-            let master = sys.create_wait_until_block();
+            sys.set_current_block_wait_until();
+            let master = sys.get_current_block().unwrap().upcast();
             {
               let master = master.as_ref::<eir::ir::block::Block>(sys).unwrap();
               if let eir::ir::block::BlockKind::WaitUntil(valued_block) = master.get_kind() {
@@ -271,21 +272,23 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
                 block.as_mut::<eir::ir::block::Block>(sys).unwrap().set_value(cond_value);
               }
             }
-            master
+            (master, false)
           }}
         }
       };
       quote! {{
-        let block = #block_init;
+        let (block, tick_ip) = #block_init;
         sys.set_current_block(block.clone());
         #unwraped_body
         let cur_module = sys
           .get_current_module()
           .expect("[When] No current module")
           .upcast();
-        let ip = sys.get_current_ip();
-        let ip = ip.next(sys).expect("[When] No next ip");
-        sys.set_current_ip(ip);
+        if tick_ip {
+          let ip = sys.get_current_ip();
+          let ip = ip.next(sys).expect("[When] No next ip");
+          sys.set_current_ip(ip);
+        }
       }}
     }
     Statement::Log(args) => {
