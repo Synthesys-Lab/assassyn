@@ -119,21 +119,33 @@ pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       .create_expr(DataType::void(), Opcode::Trigger, bundle);
     // Create trigger to the destination module.
     mutator.sys.set_current_module(agent.clone());
+    let wait_until = mutator.sys.create_wait_until_block();
     let agent_module = mutator.sys.get_current_module().unwrap();
     let agent_ports = agent_module
       .port_iter()
       .map(|x| x.upcast())
       .collect::<Vec<_>>();
-    let cond = if let Some((array, _)) = &handle_tuple {
-      let idx_port = agent_ports.last().unwrap().clone();
-      let new_idx = mutator.sys.create_fifo_peek(idx_port);
-      let new_handle = mutator.sys.create_array_ptr(array.clone(), new_idx);
-      new_handle
+    if let BlockKind::WaitUntil(cond) = wait_until.as_ref::<Block>(mutator.sys).unwrap().get_kind()
+    {
+      mutator.sys.set_current_block(cond.clone());
+      let cond_handle = if let Some((array, _)) = &handle_tuple {
+        let idx_port = agent_ports.last().unwrap().clone();
+        let new_idx = mutator.sys.create_fifo_peek(idx_port);
+        let new_handle = mutator.sys.create_array_ptr(array.clone(), new_idx);
+        new_handle
+      } else {
+        lock_handle
+      };
+      let value = mutator.sys.create_array_read(cond_handle);
+      let cond_block = mutator.sys.get_current_block().unwrap().upcast();
+      cond_block
+        .as_mut::<Block>(mutator.sys)
+        .unwrap()
+        .set_value(value);
     } else {
-      lock_handle
-    };
-    let block = mutator.sys.create_block(BlockKind::WaitUntil(cond.clone()));
-    mutator.sys.set_current_block(block.clone());
+      panic!("Invalid block kind for a wait_until block");
+    }
+    mutator.sys.set_current_block(wait_until);
     let mut bind = mutator.sys.get_init_bind(dest_module.clone());
     for (i, elem) in agent_ports.iter().enumerate() {
       let value = mutator.sys.create_fifo_pop(elem.clone(), None);

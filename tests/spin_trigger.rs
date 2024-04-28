@@ -91,7 +91,7 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   eir::xform::basic(&mut sys);
   eir::builder::verify(&sys);
 
-  println!("{}", sys);
+  // println!("{}", sys);
 
   let verilog_name = test_utils::temp_dir(&format!("{}.sv", fname));
   let verilog_config = eir::verilog::Config {
@@ -129,7 +129,7 @@ fn spin_trigger() {
   let raw_sys = manual();
   testit("spin_trigger", raw_sys);
 
-  // let sugar_sys = syntactical_sugar();
-  // // println!("{}", sugar_sys);
-  // testit("spin_sugar", sugar_sys);
+  let sugar_sys = syntactical_sugar();
+  // println!("{}", sugar_sys);
+  testit("spin_sugar", sugar_sys);
 }
