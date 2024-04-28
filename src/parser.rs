@@ -86,7 +86,7 @@ impl Parse for Statement {
             "wait_until" => {
               let pred = input.parse::<node::Body>()?;
               assert!(pred.valued);
-              node::BodyPred::Lock(Box::new(pred))
+              node::BodyPred::WaitUntil(Box::new(pred))
             }
             "cycle" => node::BodyPred::Cycle(input.parse::<syn::LitInt>()?),
             _ => unreachable!(),

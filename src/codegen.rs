@@ -248,45 +248,44 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
       }
     }
     Statement::BodyScope((pred, body)) => {
-      let body = body
-        .stmts
-        .iter()
-        .map(|x| emit_parsed_instruction(x))
-        .collect::<Vec<_>>();
-      let mut unwraped_body: Vec<proc_macro2::TokenStream> = vec![];
-      for elem in body.into_iter() {
-        match elem {
-          Ok(x) => unwraped_body.push(x.into()),
-          Err(e) => return Err(e.clone()),
-        }
-      }
+      let unwraped_body = emit_body(body)?;
 
-      let block_pred = match pred {
+      let block_init = match pred {
         BodyPred::Condition(cond) => {
-          quote! {
+          quote! {{
             let cond = #cond.clone();
-            let block_pred = eir::ir::block::BlockPred::Condition(cond);
-          }
-        }
-        BodyPred::Lock(lock) => {
-          let lock_arr_ptr = emit_body(lock).unwrap();
-          quote! {
-            let lock_arr_ptr = #lock_arr_ptr.clone();
-            let block_pred = eir::ir::block::BlockPred::WaitUntil(lock_arr_ptr);
-          }
+            let block_pred = eir::ir::block::BlockKind::Condition(cond);
+            sys.create_block(block_pred)
+          }}
         }
         BodyPred::Cycle(cycle) => {
-          quote! {
+          quote! {{
             let cycle = #cycle.clone();
-            let block_pred = eir::ir::block::BlockPred::Cycle(cycle);
-          }
+            let block_pred = eir::ir::block::BlockKind::Cycle(cycle);
+            sys.create_block(block_pred)
+          }}
+        }
+        BodyPred::WaitUntil(lock) => {
+          let lock_emission = emit_body(lock).unwrap();
+          quote! {{
+            let master = sys.create_wait_until_block();
+            {
+              let master = master.as_ref::<eir::ir::block::Block>(sys).unwrap();
+              if let eir::ir::block::BlockKind::WaitUntil(valued_block) = master.get_kind() {
+                sys.set_current_block(valued_block.clone());
+                let cond_value = #lock_emission;
+                let block = sys.get_current_block().unwrap().upcast();
+                block.as_mut::<eir::ir::block::Block>(sys).unwrap().set_value(cond_value);
+              }
+            }
+            master
+          }}
         }
       };
       quote! {{
-        #block_pred;
-        let block = sys.create_block(block_pred);
+        let block = #block_init;
         sys.set_current_block(block.clone());
-        #(#unwraped_body)*;
+        #unwraped_body
         let cur_module = sys
           .get_current_module()
           .expect("[When] No current module")

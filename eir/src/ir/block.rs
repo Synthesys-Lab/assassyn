@@ -96,11 +96,7 @@ impl BlockMut<'_> {
   /// # Returns
   /// * The reference to the inserted expression.
   /// * The new position to insert the next expression.
-  pub(crate) fn insert_at(
-    &mut self,
-    at: Option<usize>,
-    expr: BaseNode,
-  ) -> (BaseNode, Option<usize>) {
+  pub fn insert_at(&mut self, at: Option<usize>, expr: BaseNode) -> (BaseNode, Option<usize>) {
     let idx = at.unwrap_or_else(|| self.elem.as_ref::<Block>(self.sys).unwrap().get_num_exprs());
     self.get_mut().body.insert(idx, expr.clone());
     (expr, at.map(|x| x + 1))
@@ -111,14 +107,15 @@ impl BlockMut<'_> {
   ///
   /// # Arguments
   /// * `expr` - The expression to insert.
-  pub(crate) fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
+  pub fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
     let InsertPoint(_, _, at) = self.sys.inesert_point;
     let (expr, new_at) = self.insert_at(at.clone(), expr.clone());
     self.sys.inesert_point.2 = new_at;
     expr
   }
 
-  pub(crate) fn erase(&mut self, expr: &BaseNode) {
+  /// Erase the given instruction from the block.
+  pub fn erase(&mut self, expr: &BaseNode) {
     let idx = self
       .elem
       .as_ref::<Block>(self.sys)
@@ -128,27 +125,51 @@ impl BlockMut<'_> {
       .expect("Element not found");
     self.get_mut().body.remove(idx);
   }
+
+  /// Set the return value of the block.
+  pub fn set_value(&mut self, value: BaseNode) {
+    self.get_mut().kind = BlockKind::Valued(value);
+  }
 }
 
 impl SysBuilder {
-  /// Create a block.
-  pub fn create_block(&mut self, pred: BlockKind) -> BaseNode {
-    let pred = match pred {
-      BlockKind::WaitUntil(arr_ptr) => {
-        let arr_read = self.create_array_read(arr_ptr);
-        BlockKind::WaitUntil(arr_read)
-      }
-      x => x,
-    };
+  /// The implementation of the `create_block` method.
+  pub fn create_block_impl(&mut self, kind: BlockKind, insert: bool) -> BaseNode {
     let parent = self.get_current_block().unwrap().upcast();
-    let instance = Block::new(pred, parent);
+    let instance = Block::new(kind, parent);
     let block = self.insert_element(instance);
-    let InsertPoint(_, insert_block, at) = &self.get_insert_point();
-    let (block, new_at) = self
-      .get_mut::<Block>(insert_block)
+    if !insert {
+      block
+    } else {
+      let InsertPoint(_, insert_block, at) = &self.get_insert_point();
+      let (block, new_at) = self
+        .get_mut::<Block>(insert_block)
+        .unwrap()
+        .insert_at(at.clone(), block.clone());
+      self.inesert_point.2 = new_at;
+      block
+    }
+  }
+
+  /// Create a block and insert it to the current module.
+  pub fn create_block(&mut self, kind: BlockKind) -> BaseNode {
+    self.create_block_impl(kind, true)
+  }
+
+  /// Create a block and DO NOT insert it to the current module.
+  pub fn create_none_block(&mut self) -> BaseNode {
+    self.create_block_impl(BlockKind::None, false)
+  }
+
+  /// Create a wait-until block and insert it to the current module.
+  pub fn create_wait_until_block(&mut self) -> BaseNode {
+    let cond = self.create_none_block();
+    let res = self.create_block_impl(BlockKind::WaitUntil(cond), true);
+    cond
+      .as_mut::<Block>(self)
       .unwrap()
-      .insert_at(at.clone(), block.clone());
-    self.inesert_point.2 = new_at;
-    block
+      .get_mut()
+      .set_parent(res);
+    res
   }
 }
