@@ -33,7 +33,9 @@ fn fifo_valid() {
   driver_builder(&mut sys, lhs, rhs);
   eir::builder::verify(&sys);
   println!("{}", sys);
-  let o1 = eir::xform::Config { rewrite_wait_until: true };
+  let o1 = eir::xform::Config {
+    rewrite_wait_until: true,
+  };
   eir::xform::basic(&mut sys, &o1);
 
   let verilog_name = test_utils::temp_dir(&"back_pressure.sv".to_string());
