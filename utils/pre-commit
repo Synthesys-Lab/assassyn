@@ -5,4 +5,16 @@ set -euxo pipefail
 
 cargo check --all-targets
 cargo fmt --all --check
+
+# Before checking the style, automatically format the code first.
+for i in `git status --porcelain | awk '{ if (($1 == "M" || $1 == "A") && substr($2, length($2) - 2) == ".rs") print $2 }'`
+do
+  echo "Formatting: $i"
+  rustfmt $i --config max_width=100,tab_spaces=2
+  if [ $? != 0 ]; then
+    echo "Failed to format: $i"
+    exit 1
+  fi
+done
+
 cargo clippy -- -Dclippy::all
