@@ -47,7 +47,11 @@ fn testit(fname: &str, mut sys: SysBuilder) {
     idle_threshold: 200,
   };
   eir::builder::verify(&sys);
-  eir::xform::basic(&mut sys);
+
+  let o0 = eir::xform::Config {
+    rewrite_wait_until: false,
+  };
+  eir::xform::basic(&mut sys, &o0);
   println!("{}", sys);
   eir::builder::verify(&sys);
   let verilog_name = test_utils::temp_dir(&format!("{}.sv", fname));

@@ -2,6 +2,7 @@ use eda4eda::module_builder;
 use eir::{
   builder::SysBuilder,
   test_utils::{self, parse_cycle},
+  xform,
 };
 
 module_builder!(
@@ -88,7 +89,11 @@ fn testit(fname: &str, mut sys: SysBuilder) {
     idle_threshold: 200,
   };
   eir::builder::verify(&sys);
-  eir::xform::basic(&mut sys);
+
+  let o0 = xform::Config {
+    rewrite_wait_until: false,
+  };
+  eir::xform::basic(&mut sys, &o0);
   eir::builder::verify(&sys);
 
   // println!("{}", sys);

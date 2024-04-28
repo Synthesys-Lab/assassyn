@@ -43,7 +43,10 @@ fn callback() {
     sim_threshold: 100,
   };
 
-  xform::basic(&mut sys);
+  let o0 = xform::Config {
+    rewrite_wait_until: false,
+  };
+  eir::xform::basic(&mut sys, &o0);
   println!("{}", sys);
   let verilog_name = test_utils::temp_dir(&"callback.sv".to_string());
   let verilog_config = eir::verilog::Config {

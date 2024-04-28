@@ -35,7 +35,10 @@ fn select() {
 
   let mut sys = SysBuilder::new("select");
   driver_builder(&mut sys);
-  xform::basic(&mut sys);
+  let o0 = xform::Config {
+    rewrite_wait_until: false,
+  };
+  xform::basic(&mut sys, &o0);
   eir::builder::verify(&sys);
 
   let fname = temp_dir(&"select.rs".to_string());
