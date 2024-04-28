@@ -402,18 +402,25 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       BlockKind::Cycle(cycle) => {
         res.push_str(&format!("  if stamp / 100 == {} {{\n", cycle));
       }
-      BlockKind::WaitUntil(wait) => {
+      BlockKind::WaitUntil(cond) => {
+        let dtype = {
+          let cond = cond.as_ref::<Block>(block.sys).unwrap();
+          cond.get_value().unwrap().get_dtype(block.sys).unwrap()
+        };
+        let cond = self.dispatch(block.sys, &cond, vec![]).unwrap();
         res.push_str(&format!(
           "  if {}{} {{\n",
-          dump_ref!(self.sys, &wait),
-          if wait.get_dtype(block.sys).unwrap().bits() == 1 {
+          cond,
+          if dtype.bits() == 1 {
             "".into()
           } else {
             format!(" != 0")
           }
         ));
       }
-      BlockKind::Valued(_) | BlockKind::None => (),
+      BlockKind::Valued(_) | BlockKind::None => {
+        res.push('{');
+      }
     }
     self.indent += 2;
     for elem in block.iter() {
@@ -452,7 +459,13 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         );
         res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
       }
-      BlockKind::Valued(_) | BlockKind::None => (),
+      BlockKind::Valued(value) => {
+        res.push_str(&dump_ref!(self.sys, value));
+        res.push('}');
+      }
+      BlockKind::None => {
+        res.push('}');
+      }
     }
     res.into()
   }
