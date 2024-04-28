@@ -4,17 +4,10 @@ use eir::{builder::SysBuilder, test_utils};
 #[test]
 fn fifo_valid() {
   module_builder!(sub[a:int<32>, b:int<32>][] {
-    wait_until {
-      a_valid = a.valid();
-      b_valid = b.valid();
-      both_valid = a_valid.bitwise_and(b_valid);
-      both_valid
-    } {
-      a = a.pop();
-      b = b.pop();
-      c = a.sub(b);
-      log("sub: {} - {} = {}", a, b, c);
-    }
+    a = a.pop();
+    b = b.pop();
+    c = a.sub(b);
+    log("sub: {} - {} = {}", a, b, c);
   });
 
   module_builder!(driver[][lhs, rhs] {
@@ -40,15 +33,17 @@ fn fifo_valid() {
   driver_builder(&mut sys, lhs, rhs);
   eir::builder::verify(&sys);
   println!("{}", sys);
+  let o1 = eir::xform::Config { rewrite_wait_until: true };
+  eir::xform::basic(&mut sys, &o1);
 
-  let verilog_name = test_utils::temp_dir(&"fifo_valid.sv".to_string());
+  let verilog_name = test_utils::temp_dir(&"back_pressure.sv".to_string());
   let verilog_config = eir::verilog::Config {
     fname: verilog_name,
     sim_threshold: 100,
   };
   eir::verilog::elaborate(&sys, &verilog_config).unwrap();
 
-  let src_name = test_utils::temp_dir(&"fifo_valid.rs".to_string());
+  let src_name = test_utils::temp_dir(&"back_pressure.rs".to_string());
   let config = eir::sim::Config {
     fname: src_name,
     sim_threshold: 100,
