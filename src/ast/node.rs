@@ -38,19 +38,6 @@ pub(crate) struct Body {
   pub(crate) valued: bool,
 }
 
-impl Body {
-  pub(crate) fn get_value(&self) -> Option<&ExprTerm> {
-    if self.valued {
-      match self.stmts.last() {
-        Some(Statement::ExprTerm(x)) => Some(x),
-        _ => panic!("{}:{}: Expected a valued body", file!(), line!()),
-      }
-    } else {
-      None
-    }
-  }
-}
-
 pub(crate) enum BodyPred {
   WaitUntil(Box<Body>),
   Condition(syn::Ident),
