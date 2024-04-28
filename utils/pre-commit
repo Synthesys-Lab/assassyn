@@ -1,10 +1,4 @@
 #!/bin/sh
-set -euxo pipefail
-# It is highly recommended to put this to your git pre-commit hook, to format your code
-# before checking anything in.
-
-cargo check --all-targets
-cargo fmt --all --check
 
 # Before checking the style, automatically format the code first.
 for i in `git status --porcelain | awk '{ if (($1 == "M" || $1 == "A") && substr($2, length($2) - 2) == ".rs") print $2 }'`
@@ -17,4 +11,10 @@ do
   fi
 done
 
+set -euxo pipefail
+# It is highly recommended to put this to your git pre-commit hook, to format your code
+# before checking anything in.
+
+cargo check --all-targets
+cargo fmt --all --check
 cargo clippy -- -Dclippy::all
