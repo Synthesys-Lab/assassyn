@@ -3,7 +3,7 @@ use crate::{
   ir::{Block, BlockKind},
 };
 
-pub(super) fn hoist_wait_until(sys: &mut SysBuilder) {
+pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
   for elem in sys.module_iter() {
     let body = elem.get_body();
     match body.get_kind() {
