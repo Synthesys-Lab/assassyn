@@ -2,7 +2,7 @@ use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils};
 
 #[test]
-fn fifo_valid() {
+fn back_pressure() {
   module_builder!(sub[a:int<32>, b:int<32>][] {
     a = a.pop();
     b = b.pop();
@@ -37,6 +37,7 @@ fn fifo_valid() {
     rewrite_wait_until: true,
   };
   eir::xform::basic(&mut sys, &o1);
+  println!("{}", sys);
 
   let verilog_name = test_utils::temp_dir(&"back_pressure.sv".to_string());
   let verilog_config = eir::verilog::Config {
