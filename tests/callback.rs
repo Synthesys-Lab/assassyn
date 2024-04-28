@@ -55,7 +55,7 @@ fn callback() {
   test_utils::compile(&config.fname, &exec_name);
   let output = test_utils::run(&exec_name);
   let raw_output = String::from_utf8(output.stdout).unwrap();
-  let _ = raw_output
+  let times_invoked = raw_output
     .lines()
     .filter(|x| {
       if x.contains("sqr: ") {
@@ -71,5 +71,5 @@ fn callback() {
       }
     })
     .count();
-  // assert_eq!(times_invoked, 97);
+  assert_eq!(times_invoked, 99);
 }
