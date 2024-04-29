@@ -71,10 +71,10 @@ impl Parse for Statement {
             "inline" => {
               let call = input.parse::<node::FuncCall>()?;
               if let FuncArgs::Bound(_) = call.args {
-                  return Err(syn::Error::new(
-                    call.func.span(),
-                    "Expected an inline call with plain arguments",
-                  ));
+                return Err(syn::Error::new(
+                  call.func.span(),
+                  "Expected an inline call with plain arguments",
+                ));
               }
               let empty;
               parenthesized!(empty in input);
