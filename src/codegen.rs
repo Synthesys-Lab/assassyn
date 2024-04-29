@@ -1,12 +1,12 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
-use syn::{punctuated::Punctuated, Token};
+use syn::{punctuated::Punctuated, spanned::Spanned, Token};
 
 use crate::ast::{
   self,
   expr::{self, DType, ExprTerm},
-  node::{ArrayAccess, BodyPred, FuncArgs, PortDecl, Statement},
+  node::{ArrayAccess, BodyPred, CallKind, FuncArgs, PortDecl, Statement},
 };
 
 use eir::ir::data::DataType;
@@ -170,7 +170,7 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   }})
 }
 
-pub(crate) fn emit_args(
+pub(crate) fn emit_arg_binds(
   func: &syn::Ident,
   args: &FuncArgs,
   eager: bool,
@@ -231,19 +231,10 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         };
       }
     }
-    Statement::AsyncCall(call) => {
-      let func = &call.func;
-      let args = &call.args;
-      let args = emit_args(func, args, false);
-      quote! {{
-        #args;
-        sys.create_trigger_bound(bind);
-      }}
-    }
     Statement::Bind((id, call, eager)) => {
       let func = &call.func;
       let args = &call.args;
-      let args = emit_args(func, args, *eager);
+      let args = emit_arg_binds(func, args, *eager);
       quote!(
         let #id = {
           #args;
@@ -251,16 +242,56 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         };
       )
     }
-    Statement::SpinCall((lock, call)) => {
-      let func = &call.func;
-      let args = emit_args(func, &call.args, false);
-      let emitted_lock = emit_array_access(lock)?;
-      quote! {{
-        #args
-        let lock = #emitted_lock;
-        sys.create_spin_trigger_bound(lock, bind);
-      }}
-    }
+    Statement::Call((kind, call)) => match kind {
+      CallKind::Spin(lock) => {
+        let args = emit_arg_binds(&call.func, &call.args, false);
+        let emitted_lock = emit_array_access(lock)?;
+        quote! {{
+          #args;
+          let lock = #emitted_lock;
+          sys.create_spin_trigger_bound(lock, bind);
+        }}
+      }
+      CallKind::Async => {
+        let args = emit_arg_binds(&call.func, &call.args, false);
+        quote! {{
+          #args;
+          sys.create_trigger_bound(bind);
+        }}
+      }
+      CallKind::Inline(lval) => match &call.args {
+        FuncArgs::Plain(args) => {
+          let impl_id = syn::Ident::new(&format!("{}_impl", call.func), call.func.span());
+          let mut emit_args: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
+          let mut arg_ids: Punctuated<syn::Ident, Token![,]> = Punctuated::new();
+          for (i, elem) in args.iter().enumerate() {
+            let elem: proc_macro2::TokenStream = emit_expr_term(elem)?.into();
+            let id = syn::Ident::new(&format!("_{}", i), elem.span());
+            emit_args.push(quote! { let #id = #elem; });
+            emit_args.push_punct(Token![;](elem.span()));
+            arg_ids.push(id);
+            arg_ids.push_punct(Token![,](elem.span()));
+          }
+          let lval = if lval.is_empty() {
+            quote! {}
+          } else {
+            quote! { let (_, #lval) = }
+          };
+          quote! {
+            #lval {
+              #emit_args
+              #impl_id(sys, module, #arg_ids)
+            };
+          }
+        }
+        FuncArgs::Bound(bound) => {
+          return Err(syn::Error::new(
+            bound.first().map_or(Span::call_site(), |x| x.0.span()),
+            "Inline call does not support bound arguments",
+          ))
+        }
+      },
+    },
     Statement::ArrayAlloc((id, ty, size)) => {
       let ty = emit_type(ty)?;
       let ty: proc_macro2::TokenStream = ty.into();

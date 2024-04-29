@@ -1,3 +1,6 @@
+use syn::parse::Parse;
+use syn::punctuated::Punctuated;
+
 use super::expr;
 use super::DType;
 use super::ExprTerm;
@@ -12,6 +15,16 @@ pub(crate) struct PortDecl {
 pub(crate) struct ArrayAccess {
   pub(crate) id: syn::Ident,
   pub(crate) idx: ExprTerm,
+}
+
+impl Parse for ArrayAccess {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let id = input.parse::<syn::Ident>()?;
+    let idx;
+    syn::bracketed!(idx in input);
+    let idx = idx.parse::<ExprTerm>()?;
+    Ok(Self { id, idx })
+  }
 }
 
 /// A function call is something like `foo((<expr>,)*)`.
@@ -44,14 +57,19 @@ pub(crate) enum BodyPred {
   Cycle(syn::LitInt),
 }
 
+pub(crate) enum CallKind {
+  Inline(Punctuated<syn::Ident, syn::Token![,]>),
+  Async,
+  Spin(ArrayAccess),
+}
+
 pub(crate) enum Statement {
   Assign((syn::Ident, expr::Expr)),
   ArrayAlloc((syn::Ident, DType, syn::LitInt)),
   ArrayAssign((ArrayAccess, expr::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
-  AsyncCall(FuncCall),
+  Call((CallKind, FuncCall)),
   Bind((syn::Ident, FuncCall, bool)),
-  SpinCall((ArrayAccess, FuncCall)),
   BodyScope((BodyPred, Box<Body>)),
   Log(Vec<expr::Expr>),
   ExprTerm(expr::ExprTerm),

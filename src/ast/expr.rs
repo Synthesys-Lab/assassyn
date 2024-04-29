@@ -1,5 +1,7 @@
 use eir::ir::DataType;
-use syn::{parenthesized, parse::Parse};
+use syn::{parenthesized, parse::Parse, punctuated::Punctuated, Token};
+
+use super::node::ArrayAccess;
 
 pub(crate) enum ExprTerm {
   Ident(syn::Ident),
@@ -23,7 +25,13 @@ impl Parse for ExprTerm {
       let lit = input.parse::<syn::LitStr>()?;
       Ok(ExprTerm::StrLit(lit))
     } else if input.cursor().ident().is_some() {
-      let id = input.parse::<syn::Ident>()?;
+      let id = input.parse::<syn::Ident>().unwrap_or_else(|_| {
+        panic!(
+          "{}:{}: Failed to parse identifier in ExprTerm",
+          file!(),
+          line!()
+        )
+      });
       Ok(ExprTerm::Ident(id))
     } else if input.cursor().literal().is_some() {
       let lit = input.parse::<syn::LitInt>()?;
@@ -42,6 +50,49 @@ impl Parse for ExprTerm {
         input.span(),
         "Expected identifier or literal",
       ))
+    }
+  }
+}
+
+/// The left value of an assignment.
+pub(crate) enum LValue {
+  IdentList(Punctuated<syn::Ident, Token![,]>),
+  Ident(syn::Ident),
+  ArrayAccess(ArrayAccess),
+}
+
+impl Parse for LValue {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    if input.peek(syn::Ident) {
+      if input.peek2(syn::token::Bracket) {
+        let aa = input
+          .parse::<ArrayAccess>()
+          .unwrap_or_else(|_| panic!("{}:{}: Failed to parse array access", file!(), line!()));
+        Ok(LValue::ArrayAccess(aa))
+      } else {
+        let mut idents = Punctuated::new();
+        loop {
+          idents.push_value(
+            input
+              .parse::<syn::Ident>()
+              .unwrap_or_else(|_| panic!("{}:{}: Failed to parse identifier", file!(), line!())),
+          );
+          if !input.peek(syn::Token![,]) {
+            break;
+          }
+          idents.push_punct(input.parse::<syn::Token![,]>()?);
+          if !input.peek(syn::Ident) {
+            break;
+          }
+        }
+        if idents.len() == 1 && !idents.trailing_punct() {
+          Ok(LValue::Ident(idents.first().unwrap().clone()))
+        } else {
+          Ok(LValue::IdentList(idents))
+        }
+      }
+    } else {
+      Err(syn::Error::new(input.span(), "Expected an identifier"))
     }
   }
 }
