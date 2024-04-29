@@ -1,7 +1,7 @@
 use codegen::{emit_body, emit_ports, emit_rets};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::bracketed;
+use syn::parenthesized;
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, Token};
@@ -28,12 +28,15 @@ impl Parse for ModuleParser {
       .map_err(|e| syn::Error::new(e.span(), "Expected module name"))?;
     let module_name = tok.clone();
     let builder_name = syn::Ident::new(&format!("{}_builder", module_name), tok.span());
-    let raw_ports;
-    bracketed!(raw_ports in input);
-    let ports = raw_ports.parse_terminated(node::PortDecl::parse, Token![,])?;
+    // parse the parameters
     let raw_params;
-    bracketed!(raw_params in input);
-    let params = raw_params.parse_terminated(syn::Ident::parse, Token![,])?;
+    parenthesized!(raw_params in input);
+    let parameters = raw_params.parse_terminated(syn::Ident::parse, Token![,])?;
+    // parse the ports
+    let raw_ports;
+    parenthesized!(raw_ports in input);
+    let ports = raw_ports.parse_terminated(node::PortDecl::parse, Token![,])?;
+    // parse the body
     let body = input.parse::<node::Body>()?;
     // .expose(<var-id>) is optional
     let exposes = if input.peek(Token![.]) {
@@ -41,7 +44,7 @@ impl Parse for ModuleParser {
       let expose_kw = input.parse::<syn::Ident>()?;
       assert_eq!(expose_kw.to_string(), "expose");
       let exposes;
-      bracketed!(exposes in input);
+      parenthesized!(exposes in input);
       let exposes = exposes.parse_terminated(syn::Ident::parse, Token![,])?;
       Some(exposes)
     } else {
@@ -52,7 +55,7 @@ impl Parse for ModuleParser {
       module_name,
       builder_name,
       ports,
-      parameters: params,
+      parameters,
       body,
       exposes,
     })
@@ -99,7 +102,9 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
       use eir::ir::node::IsElement;
       let module = {
         let res = sys.create_module(stringify!(#module_name), vec![#port_decls]);
-        let mut module_mut = res.as_mut::<eir::ir::Module>(sys).expect("[CG] No module found!");
+        let mut module_mut = res
+          .as_mut::<eir::ir::Module>(sys)
+          .expect("[CodeGen] No module found!");
         let raw_ptr = #builder_name as *const ();
         module_mut.set_builder_func_ptr(raw_ptr as usize);
         module_mut.set_parameterizable(vec![#parameterizable]);

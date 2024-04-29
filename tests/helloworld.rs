@@ -3,7 +3,7 @@ use eir::{builder::SysBuilder, test_utils};
 
 #[test]
 fn helloworld() {
-  module_builder!(driver[][] {
+  module_builder!(driver()() {
     log("{}, {}!", "Hello", "world");
   });
   let mut sys = SysBuilder::new("hw");

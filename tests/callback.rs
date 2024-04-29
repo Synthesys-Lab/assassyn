@@ -4,7 +4,7 @@ use eir::{builder::SysBuilder, sim, test_utils, xform};
 #[test]
 fn callback() {
   module_builder!(
-    driver[][sqr, memory_read] {
+    driver(sqr, memory_read)() {
       cnt = array(int<32>, 1);
       v = cnt[0];
       async memory_read { v: v, func: sqr };
@@ -14,7 +14,7 @@ fn callback() {
   );
 
   module_builder!(
-    sqr[a:int<32>][] {
+    sqr()(a:int<32>) {
       a = a.pop();
       b = a.mul(a);
       log("sqr: {}^2 = {}", a, b);
@@ -22,7 +22,7 @@ fn callback() {
   );
 
   module_builder!(
-    agent[v:int<32>, func: module(int<32>)][] {
+    agent()(v:int<32>, func: module(int<32>)) {
       v = v.pop();
       func = func.pop();
       async func(v);

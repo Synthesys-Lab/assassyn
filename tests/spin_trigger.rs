@@ -6,7 +6,7 @@ use eir::{
 };
 
 module_builder!(
-  squarer[a:int<32>][] {
+  squarer()(a:int<32>) {
     a  = a.pop();
     b = a.mul(a);
     log("squarer: {}", b);
@@ -15,7 +15,7 @@ module_builder!(
 
 fn manual() -> SysBuilder {
   module_builder!(
-    spin_agent[a:int<32>][sqr, lock] {
+    spin_agent(sqr, lock)(a:int<32>) {
       wait_until { v = lock[0]; v } {
         a = a.pop();
         async sqr { a: a };
@@ -25,7 +25,7 @@ fn manual() -> SysBuilder {
   );
 
   module_builder!(
-    driver[][spin_agent, lock] {
+    driver(spin_agent, lock)() {
       cnt = array(int<32>, 1);
       v = cnt[0];
       and_1 = v.bitwise_and(1);
@@ -55,7 +55,7 @@ fn manual() -> SysBuilder {
 
 fn syntactical_sugar() -> SysBuilder {
   module_builder!(
-    driver[][sqr] {
+    driver(sqr)() {
       cnt = array(int<32>, 1);
       lock = array(int<1>, 1);
       v = cnt[0];

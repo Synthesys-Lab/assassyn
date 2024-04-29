@@ -3,7 +3,7 @@ use eir::builder::SysBuilder;
 use eir::test_utils::{self, parse_cycle};
 
 module_builder!(
-  squarer[a:int<32>][] {
+  squarer()(a:int<32>) {
     a = a.pop();
     b = a.mul(a);
     log("squarer: {}", b);
@@ -12,7 +12,7 @@ module_builder!(
 
 fn syntactical_sugar() -> SysBuilder {
   module_builder!(
-    driver[][sqr] {
+    driver(sqr)() {
       cnt = array(int<32>, 1);
       lock = array(int<1>, 1);
       v = cnt[0];

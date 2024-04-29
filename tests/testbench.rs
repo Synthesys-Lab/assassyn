@@ -6,7 +6,7 @@ use eir::{
 
 #[test]
 fn testbench() {
-  module_builder!(testbench[][] {
+  module_builder!(testbench()() {
     cycle 0 { log("cycle 0"); }
     cycle 2 { log("cycle 2"); }
     cycle 80 { log("cycle 80"); }

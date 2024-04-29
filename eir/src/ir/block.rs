@@ -5,7 +5,7 @@ use crate::ir::*;
 pub enum BlockKind {
   Condition(BaseNode),
   Cycle(usize),
-  WaitUntil(BaseNode),
+  WaitUntil(BaseNode), // The base node is a valued-block as condition.
   Valued(BaseNode),
   None,
 }

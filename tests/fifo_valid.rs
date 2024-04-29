@@ -3,7 +3,7 @@ use eir::{builder::SysBuilder, test_utils};
 
 #[test]
 fn fifo_valid() {
-  module_builder!(sub[a:int<32>, b:int<32>][] {
+  module_builder!(sub()(a:int<32>, b:int<32>) {
     wait_until {
       a_valid = a.valid();
       b_valid = b.valid();
@@ -17,7 +17,7 @@ fn fifo_valid() {
     }
   });
 
-  module_builder!(driver[][lhs, rhs] {
+  module_builder!(driver(lhs, rhs)() {
     cnt = array(int<32>, 1);
     k = cnt[0.int<32>];
     v = k.add(1);
@@ -28,10 +28,10 @@ fn fifo_valid() {
   });
 
   module_builder!(
-    lhs[a:int<32>][suber] {
+    lhs(suber)(a:int<32>) {
       v = a.pop();
       rhs = bind suber { a: v };
-    }.expose[rhs]
+    }.expose(rhs)
   );
 
   let mut sys = SysBuilder::new("main");
