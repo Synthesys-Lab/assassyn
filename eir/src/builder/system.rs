@@ -711,6 +711,7 @@ impl SysBuilder {
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
+    assert_eq!(fifo.get_kind(), NodeKind::FIFO);
     let res = self.create_expr(DataType::int_ty(1), Opcode::FIFOValid, vec![fifo]);
     res
   }

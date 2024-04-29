@@ -74,7 +74,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   let builder_name = parsed_module.builder_name;
 
   // codegen ports
-  let (port_ids, port_decls, port_peeks) = match emit_ports(&parsed_module.ports) {
+  let (port_ids, port_decls, port_peeks, port_pops) = match emit_ports(&parsed_module.ports) {
     Ok(x) => x,
     Err(e) => return e.to_compile_error().into(),
   };
@@ -116,6 +116,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
           .as_ref::<eir::ir::Module>(&sys)
           .expect("[Init Port] No current module!");
         #port_peeks
+        #port_pops
         ( #port_ids )
       };
       #body

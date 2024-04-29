@@ -4,8 +4,6 @@ use eir::{builder::SysBuilder, test_utils};
 #[test]
 fn adder() {
   module_builder!(adder()(a:int<32>, b:int<32>) {
-    a = a.pop();
-    b = b.pop();
     c = a.add(b);
     log("adder: {} + {} = {}", a, b, c);
   });

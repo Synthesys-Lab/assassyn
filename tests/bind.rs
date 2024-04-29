@@ -4,8 +4,6 @@ use eir::{builder::SysBuilder, test_utils};
 #[test]
 fn bind() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
-    a  = a.pop();
-    b  = b.pop();
     c = a.sub(b);
     log("sub: {} - {} = {}", a, b, c);
   });
@@ -22,15 +20,13 @@ fn bind() {
 
   module_builder!(
     lhs(sub)(a:int<32>) {
-      v = a.pop();
-      aa = eager_bind sub { a: v };
+      aa = eager_bind sub { a: a };
     }.expose(aa)
   );
 
   module_builder!(
     rhs(sub)(a:int<32>) {
-      v = a.pop();
-      async sub { b: v };
+      async sub { b: a };
     }
   );
 

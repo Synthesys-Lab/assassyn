@@ -4,8 +4,6 @@ use eir::{builder::SysBuilder, test_utils};
 #[test]
 fn back_pressure() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
-    a = a.pop();
-    b = b.pop();
     c = a.sub(b);
     log("sub: {} - {} = {}", a, b, c);
   });
@@ -22,8 +20,7 @@ fn back_pressure() {
 
   module_builder!(
     lhs(suber)(a:int<32>) {
-      v = a.pop();
-      rhs = bind suber { a: v };
+      rhs = bind suber { a: a };
     }.expose(rhs)
   );
 

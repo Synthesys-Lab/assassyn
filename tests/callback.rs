@@ -15,7 +15,6 @@ fn callback() {
 
   module_builder!(
     sqr()(a:int<32>) {
-      a = a.pop();
       b = a.mul(a);
       log("sqr: {}^2 = {}", a, b);
     }
@@ -23,8 +22,6 @@ fn callback() {
 
   module_builder!(
     agent()(v:int<32>, func: module(int<32>)) {
-      v = v.pop();
-      func = func.pop();
       async func(v);
     }
   );

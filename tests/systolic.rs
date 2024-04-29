@@ -22,8 +22,6 @@ impl ProcElem {
 fn systolic_array() {
   module_builder!(
     pe(east, south)(west:int<32>, north:int<32>) {
-      west = west.pop();
-      north = north.pop();
       c = west.mul(north);
       acc = array(int<64>, 1);
       val = acc[0];
@@ -51,7 +49,7 @@ fn systolic_array() {
   //          [Sink]        [Sink]        [Sink]        [Sink]
 
   // Sink Sentinels
-  module_builder!(sink()(v:int<32>) { _v = v.pop(); });
+  module_builder!(sink()(_v:int<32>) { });
   (1..=4).for_each(|i| {
     pe_array[i][5].pe = sink_builder(&mut sys);
     pe_array[i][5].bound = pe_array[i][5].pe;
@@ -62,7 +60,6 @@ fn systolic_array() {
   });
 
   module_builder!(data_pusher(dest)(data: int<32>) {
-    data = data.pop();
     log("pushes {}", data);
     bound = eager_bind dest(data);
   }.expose(bound));

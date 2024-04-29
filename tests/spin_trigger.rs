@@ -7,7 +7,6 @@ use eir::{
 
 module_builder!(
   squarer()(a:int<32>) {
-    a  = a.pop();
     b = a.mul(a);
     log("squarer: {}", b);
   }
@@ -17,7 +16,6 @@ fn manual() -> SysBuilder {
   module_builder!(
     spin_agent(sqr, lock)(a:int<32>) {
       wait_until { v = lock[0]; v } {
-        a = a.pop();
         async sqr { a: a };
         log("agent move on, {}", a);
       }

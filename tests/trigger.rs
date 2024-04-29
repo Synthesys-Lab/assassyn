@@ -6,8 +6,6 @@ fn trigger() {
   module_builder!(
     adder()(a:int<32>, b:int<32>) {
       log("Simulating module adder");
-      a  = a.pop();
-      b  = b.pop();
       _c = a.add(b);
     }
   );

@@ -10,8 +10,6 @@ fn fifo_valid() {
       both_valid = a_valid.bitwise_and(b_valid);
       both_valid
     } {
-      a = a.pop();
-      b = b.pop();
       c = a.sub(b);
       log("sub: {} - {} = {}", a, b, c);
     }
@@ -23,14 +21,13 @@ fn fifo_valid() {
     v = k.add(1);
     cnt[0] = v;
     add = v.add(v);
-    async lhs { a: add };
+    async lhs { v: add };
     async rhs { b: v };
   });
 
   module_builder!(
-    lhs(suber)(a:int<32>) {
-      v = a.pop();
-      rhs = bind suber { a: v };
+    lhs(sub)(v:int<32>) {
+      rhs = bind sub { a: v };
     }.expose(rhs)
   );
 

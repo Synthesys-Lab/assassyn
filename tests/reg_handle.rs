@@ -4,7 +4,6 @@ use eir::test_utils::{self, parse_cycle};
 
 module_builder!(
   squarer()(a:int<32>) {
-    a = a.pop();
     b = a.mul(a);
     log("squarer: {}", b);
   }
