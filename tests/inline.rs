@@ -85,14 +85,14 @@ fn inline1() {
 
   eprintln!("{}", sys);
 
-  let verilog_name = test_utils::temp_dir(&"inline0.sv".to_string());
+  let verilog_name = test_utils::temp_dir(&"inline1.sv".to_string());
   let verilog_config = eir::verilog::Config {
     fname: verilog_name,
     sim_threshold: 101,
   };
   eir::verilog::elaborate(&sys, &verilog_config).unwrap();
 
-  let src_name = test_utils::temp_dir(&"inline0.rs".to_string());
+  let src_name = test_utils::temp_dir(&"inline1.rs".to_string());
   let config = eir::sim::Config {
     fname: src_name,
     sim_threshold: 100,
@@ -101,7 +101,7 @@ fn inline1() {
 
   eir::sim::elaborate(&sys, &config).unwrap();
 
-  let exec_name = test_utils::temp_dir(&"inline0".to_string());
+  let exec_name = test_utils::temp_dir(&"inline1".to_string());
   test_utils::compile(&config.fname, &exec_name);
 
   let output = test_utils::run(&exec_name);
