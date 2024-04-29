@@ -389,3 +389,29 @@ pub(crate) fn emit_ports(
     quote! {#port_peeks},
   ))
 }
+
+pub(crate) fn emit_rets(
+  x: &Option<Punctuated<syn::Ident, Token![,]>>,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+  if let Some(exposes) = x {
+    // Types: BaseNode(module), BaseNode, BaseNode, ...
+    let mut tys: Punctuated<proc_macro2::TokenStream, Token![,]> = Punctuated::new();
+    tys.push(quote! { eir::ir::node::BaseNode });
+    tys.push_punct(Token![,](Span::call_site()));
+    // Values: module, <id>, <id>, ...
+    let mut vals: Punctuated<syn::Ident, Token![,]> = Punctuated::new();
+    vals.push(syn::Ident::new("module", Span::call_site()));
+    vals.push_punct(Default::default());
+    for elem in exposes.iter() {
+      // Pushing values
+      vals.push(elem.clone());
+      vals.push_punct(Token![,](elem.span()));
+      // Pushing types
+      tys.push(quote! { eir::ir::node::BaseNode });
+      tys.push_punct(Token![,](elem.span()));
+    }
+    (quote! { ( #tys ) }, quote! { ( #vals ) })
+  } else {
+    (quote! { eir::ir::node::BaseNode }, quote! { module })
+  }
+}

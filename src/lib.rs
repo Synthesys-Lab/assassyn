@@ -1,4 +1,4 @@
-use codegen::{emit_body, emit_ports};
+use codegen::{emit_body, emit_ports, emit_rets};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::bracketed;
@@ -91,20 +91,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
     res.into()
   };
 
-  let (ret_tys, ret_vals): (proc_macro2::TokenStream, proc_macro2::TokenStream) =
-    if let Some(exposes) = parsed_module.exposes {
-      let mut vals: proc_macro::TokenStream = quote! { module, }.into();
-      let mut tys: proc_macro::TokenStream = quote! { eir::ir::node::BaseNode, }.into();
-      for elem in exposes.iter() {
-        vals.extend::<TokenStream>(quote! { #elem, }.into());
-        tys.extend::<TokenStream>(quote! { eir::ir::node::BaseNode, }.into());
-      }
-      let vals: proc_macro2::TokenStream = vals.into();
-      let tys: proc_macro2::TokenStream = tys.into();
-      (quote! { ( #tys ) }, quote! { ( #vals ) })
-    } else {
-      (quote! { eir::ir::node::BaseNode }, quote! { module })
-    };
+  let (ret_tys, ret_vals) = emit_rets(&parsed_module.exposes);
 
   let parameterizable = parsed_module.parameters;
   let res = quote! {
