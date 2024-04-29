@@ -1,4 +1,4 @@
-use codegen::emit_body;
+use codegen::{emit_body, emit_ports};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::bracketed;
@@ -71,32 +71,9 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   let builder_name = parsed_module.builder_name;
 
   // codegen ports
-  let (port_ids, port_decls, port_peeks): (
-    proc_macro2::TokenStream,
-    proc_macro2::TokenStream,
-    proc_macro2::TokenStream,
-  ) = {
-    let ports = &parsed_module.ports;
-    let mut port_ids = TokenStream::new();
-    let mut port_decls = TokenStream::new();
-    let mut port_peeks = TokenStream::new();
-    for (i, elem) in ports.iter().enumerate() {
-      let (id, ty) = (elem.id.clone(), elem.ty.clone());
-      port_ids.extend::<TokenStream>(quote! { #id, }.into());
-      port_peeks.extend::<TokenStream>(
-        quote! {
-          let #id = module.get_port(#i).expect(format!("Index {} exceed!", #i).as_str()).clone();
-        }
-        .into(),
-      );
-      let ty: proc_macro2::TokenStream = match codegen::emit_type(&ty) {
-        Ok(x) => x.into(),
-        Err(e) => return e.to_compile_error().into(),
-      };
-      port_decls
-        .extend::<TokenStream>(quote! {eir::builder::PortInfo::new(stringify!(#id), #ty),}.into());
-    }
-    (port_ids.into(), port_decls.into(), port_peeks.into())
+  let (port_ids, port_decls, port_peeks) = match emit_ports(&parsed_module.ports) {
+    Ok(x) => x,
+    Err(e) => return e.to_compile_error().into(),
   };
 
   let body = match emit_body(&parsed_module.body) {

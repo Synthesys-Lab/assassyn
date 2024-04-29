@@ -1,11 +1,12 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
+use syn::{punctuated::Punctuated, Token};
 
 use crate::ast::{
   self,
   expr::{self, DType, ExprTerm},
-  node::{ArrayAccess, BodyPred, FuncArgs, Statement},
+  node::{ArrayAccess, BodyPred, FuncArgs, PortDecl, Statement},
 };
 
 use eir::ir::data::DataType;
@@ -356,4 +357,35 @@ pub(crate) fn emit_body(body: &ast::node::Body) -> syn::Result<proc_macro2::Toke
     }});
   }
   Ok(res.into())
+}
+
+pub(crate) fn emit_ports(
+  ports: &Punctuated<PortDecl, Token![,]>,
+) -> syn::Result<(
+  proc_macro2::TokenStream,
+  proc_macro2::TokenStream,
+  proc_macro2::TokenStream,
+)> {
+  let mut port_ids: Punctuated<syn::Ident, Token![,]> = Punctuated::new();
+  let mut port_peeks: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
+  let mut port_decls: Punctuated<proc_macro2::TokenStream, Token![,]> = Punctuated::new();
+  for (i, elem) in ports.iter().enumerate() {
+    let (id, ty) = (elem.id.clone(), elem.ty.clone());
+    // IDs: <id>, <id>, ...
+    port_ids.push(id.clone());
+    port_ids.push_punct(Token![,](id.span()));
+    let err_log = syn::LitStr::new(&format!("Index {} exceed!", i), id.span());
+    // Peek the port instances
+    port_peeks.push(quote! { let #id = module.get_port(#i).expect(#err_log).clone() });
+    port_peeks.push_punct(Token![;](id.span()));
+    // Declarations: <id>: <ty>,
+    let ty: proc_macro2::TokenStream = emit_type(&ty)?.into();
+    port_decls.push(quote! { eir::builder::PortInfo::new(stringify!(#id), #ty) });
+    port_decls.push_punct(Token![,](id.span()));
+  }
+  Ok((
+    quote! {#port_ids},
+    quote! {#port_decls},
+    quote! {#port_peeks},
+  ))
 }
