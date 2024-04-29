@@ -7,7 +7,7 @@ fn callback() {
     driver(sqr, memory_read)() {
       cnt = array(int<32>, 1);
       v = cnt[0];
-      async memory_read { v: v, func: sqr };
+      async_call memory_read { v: v, func: sqr };
       plused = v.add(1);
       cnt[0] = plused;
     }
@@ -22,7 +22,7 @@ fn callback() {
 
   module_builder!(
     agent()(v:int<32>, func: module(int<32>)) {
-      async func(v);
+      async_call func(v);
     }
   );
 

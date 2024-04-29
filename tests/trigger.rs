@@ -18,7 +18,7 @@ fn trigger() {
       cnt[0] = plus;
       cond   = read.ilt(100);
       when cond {
-        async adder { a: read, b: read };
+        async_call adder { a: read, b: read };
       }
     }
   );

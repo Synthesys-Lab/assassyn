@@ -67,14 +67,15 @@ impl Parse for node::FuncCall {
 
 impl Parse for Statement {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    if input.peek(syn::token::Async) {
-      input.parse::<syn::token::Async>()?;
-      // async <func-id> { <id>: <expr>, ... }
-      let call = input.parse::<node::FuncCall>()?;
-      Ok(node::Statement::AsyncCall(call))
-    } else if input.peek(syn::Ident) {
+    if input.peek(syn::Ident) {
       let tok_lit = input.cursor().ident().unwrap().0.to_string();
       match tok_lit.as_str() {
+        "async_call" => {
+          input.parse::<syn::Ident>()?;
+          // async_call <func-id> { <id>: <expr>, ... }
+          let call = input.parse::<node::FuncCall>()?;
+          Ok(node::Statement::AsyncCall(call))
+        }
         // when <cond> { ... }
         // wait_until <array-ptr> { ... }
         // cycle <lit-int> { ... }

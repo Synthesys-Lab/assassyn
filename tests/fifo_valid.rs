@@ -21,8 +21,8 @@ fn fifo_valid() {
     v = k.add(1);
     cnt[0] = v;
     add = v.add(v);
-    async lhs { v: add };
-    async rhs { b: v };
+    async_call lhs { v: add };
+    async_call rhs { b: v };
   });
 
   module_builder!(

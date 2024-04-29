@@ -16,7 +16,7 @@ fn manual() -> SysBuilder {
   module_builder!(
     spin_agent(sqr, lock)(a:int<32>) {
       wait_until { v = lock[0]; v } {
-        async sqr { a: a };
+        async_call sqr { a: a };
         log("agent move on, {}", a);
       }
     }
@@ -32,7 +32,7 @@ fn manual() -> SysBuilder {
       v = v.add(1);
       cnt[0] = v;
       when is_odd {
-        async spin_agent { a: v };
+        async_call spin_agent { a: v };
       }
       when is_even {
         lv = lock[0];

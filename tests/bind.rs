@@ -14,8 +14,8 @@ fn bind() {
     v = k.add(1);
     cnt[0] = v;
     mul = v.add(v);
-    async lhs { a: mul };
-    async rhs { a: v };
+    async_call lhs { a: mul };
+    async_call rhs { a: v };
   });
 
   module_builder!(
@@ -26,7 +26,7 @@ fn bind() {
 
   module_builder!(
     rhs(sub)(a:int<32>) {
-      async sub { b: a };
+      async_call sub { b: a };
     }
   );
 

@@ -13,7 +13,7 @@ fn adder() {
     k = cnt[0.int<32>];
     v = k.add(1);
     cnt[0] = v;
-    async adder { a: v, b: v };
+    async_call adder { a: v, b: v };
   });
 
   let mut sys = SysBuilder::new("main");

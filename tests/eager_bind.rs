@@ -14,8 +14,8 @@ fn eager_bind() {
     v = k.add(1);
     cnt[0] = v;
     mul = v.add(v);
-    async lhs { v: mul };
-    async rhs { v: v };
+    async_call lhs { v: mul };
+    async_call rhs { v: v };
   });
 
   module_builder!(
