@@ -267,13 +267,13 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
           for (i, elem) in args.iter().enumerate() {
             let elem: proc_macro2::TokenStream = emit_expr_term(elem)?.into();
             let id = syn::Ident::new(&format!("_{}", i), elem.span());
-            emit_args.push(quote! { let #id = #elem; });
+            emit_args.push(quote! { let #id = #elem });
             emit_args.push_punct(Token![;](elem.span()));
             arg_ids.push(id);
             arg_ids.push_punct(Token![,](elem.span()));
           }
           let lval = if lval.is_empty() {
-            quote! {}
+            quote! {let _ = }
           } else {
             quote! { let (_, #lval) = }
           };
