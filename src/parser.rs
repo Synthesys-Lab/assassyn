@@ -56,6 +56,22 @@ impl Parse for node::FuncCall {
   }
 }
 
+struct EmptyParen;
+
+impl Parse for EmptyParen {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let empty;
+    parenthesized!(empty in input);
+    if !empty.is_empty() {
+      return Err(syn::Error::new(
+        empty.span(),
+        "Expected an inline call followed by a pair of empty \"()\"",
+      ));
+    }
+    Ok(EmptyParen)
+  }
+}
+
 impl Parse for Statement {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     if input.peek(syn::Ident) {
@@ -76,14 +92,7 @@ impl Parse for Statement {
                   "Expected an inline call with plain arguments",
                 ));
               }
-              let empty;
-              parenthesized!(empty in input);
-              if !empty.is_empty() {
-                return Err(syn::Error::new(
-                  empty.span(),
-                  "Expected an inline call followed by a pair of empty \"()\"",
-                ));
-              }
+              input.parse::<EmptyParen>()?;
               Ok(node::Statement::Call((
                 CallKind::Inline(Punctuated::new()),
                 call,
@@ -136,6 +145,7 @@ impl Parse for Statement {
                 "inline" => {
                   input.parse::<syn::Ident>()?; // inline
                   let expr = input.parse::<FuncCall>()?;
+                  input.parse::<EmptyParen>()?;
                   Ok(node::Statement::Call((CallKind::Inline(ids), expr)))
                 }
                 _ => Err(syn::Error::new(
