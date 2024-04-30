@@ -4,9 +4,11 @@ use std::{
   io::{Error, Write},
 };
 
-use crate::{builder::system::SysBuilder, ir::node::*, ir::visitor::Visitor, ir::*};
-
-use super::Config;
+use crate::{
+  backend::common::Config,
+  builder::system::SysBuilder,
+  ir::{node::*, visitor::Visitor, *},
+};
 
 fn namify(name: &str) -> String {
   name.replace(".", "_")
@@ -1283,11 +1285,12 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
 }
 
 pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
-  println!("Writing verilog rtl to {}", config.fname);
+  let fname = config.fname(sys, ".sv");
+  println!("Writing verilog rtl to {}", fname);
 
   let mut vd = VerilogDumper::new(sys);
 
-  let mut fd = File::create(config.fname.clone())?;
+  let mut fd = File::create(fname)?;
 
   for module in vd.sys.module_iter() {
     vd.current_module = namify(module.get_name()).to_string();

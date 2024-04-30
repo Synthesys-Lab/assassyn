@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::{builder::SysBuilder, sim, test_utils, xform};
+use eir::{backend, builder::SysBuilder, xform};
 
 #[test]
 fn callback() {
@@ -30,46 +30,39 @@ fn callback() {
   let agent = agent_builder(&mut sys);
   let sqr = sqr_builder(&mut sys);
   let _ = driver_builder(&mut sys, sqr, agent);
-  println!("{}", sys);
-
-  let src_name = test_utils::temp_dir(&"callback.rs".to_string());
-  let exec_name = test_utils::temp_dir(&"callback".to_string());
-  let config = sim::Config {
-    fname: src_name,
-    idle_threshold: 100,
-    sim_threshold: 100,
-  };
-
+  println!("Before:\n{}", sys);
   let o0 = xform::Config {
     rewrite_wait_until: false,
   };
   eir::xform::basic(&mut sys, &o0);
-  println!("{}", sys);
-  let verilog_name = test_utils::temp_dir(&"callback.sv".to_string());
-  let verilog_config = eir::verilog::Config {
-    fname: verilog_name,
+  println!("After:\n{}", sys);
+
+  let config = backend::common::Config {
+    temp_dir: true,
+    idle_threshold: 100,
     sim_threshold: 100,
   };
-  eir::verilog::elaborate(&sys, &verilog_config).unwrap();
-  sim::elaborate(&sys, &config).unwrap();
-  test_utils::compile(&config.fname, &exec_name);
-  let output = test_utils::run(&exec_name);
-  let raw_output = String::from_utf8(output.stdout).unwrap();
-  let times_invoked = raw_output
-    .lines()
-    .filter(|x| {
-      if x.contains("sqr: ") {
-        let raw = x.split(" ").collect::<Vec<&str>>();
-        let len = raw.len();
-        let raw_len = raw[len - 3].len();
-        let a = raw[len - 3][0..(raw_len - 2)].parse::<i32>().unwrap();
-        let b = raw[len - 1].parse::<i32>().unwrap();
-        assert_eq!(b, a * a);
-        true
-      } else {
-        false
-      }
-    })
-    .count();
-  assert_eq!(times_invoked, 99);
+
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+
+  eir::test_utils::run_simulator(
+    &sys,
+    &config,
+    Some((
+      |x| {
+        if x.contains("sqr: ") {
+          let raw = x.split(" ").collect::<Vec<&str>>();
+          let len = raw.len();
+          let raw_len = raw[len - 3].len();
+          let a = raw[len - 3][0..(raw_len - 2)].parse::<i32>().unwrap();
+          let b = raw[len - 1].parse::<i32>().unwrap();
+          assert_eq!(b, a * a);
+          true
+        } else {
+          false
+        }
+      },
+      Some(99),
+    )),
+  );
 }

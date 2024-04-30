@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::{builder::SysBuilder, test_utils};
+use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 #[test]
 fn back_pressure() {
@@ -24,7 +24,7 @@ fn back_pressure() {
     }.expose(rhs)
   );
 
-  let mut sys = SysBuilder::new("main");
+  let mut sys = SysBuilder::new("back_pressure");
   let suber = sub_builder(&mut sys);
   let (lhs, rhs) = lhs_builder(&mut sys, suber);
   driver_builder(&mut sys, lhs, rhs);
@@ -36,42 +36,32 @@ fn back_pressure() {
   eir::xform::basic(&mut sys, &o1);
   println!("{}", sys);
 
-  let verilog_name = test_utils::temp_dir(&"back_pressure.sv".to_string());
-  let verilog_config = eir::verilog::Config {
-    fname: verilog_name,
-    sim_threshold: 100,
-  };
-  eir::verilog::elaborate(&sys, &verilog_config).unwrap();
-
-  let src_name = test_utils::temp_dir(&"back_pressure.rs".to_string());
-  let config = eir::sim::Config {
-    fname: src_name,
+  let config = eir::backend::common::Config {
+    temp_dir: true,
     sim_threshold: 100,
     idle_threshold: 100,
   };
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  eir::sim::elaborate(&sys, &config).unwrap();
-
-  let exec_name = test_utils::temp_dir(&"fifo_valid".to_string());
-  test_utils::compile(&config.fname, &exec_name);
-
-  let output = test_utils::run(&exec_name);
-  let times_invoked = String::from_utf8(output.stdout)
-    .unwrap()
-    .lines()
-    .filter(|x| {
-      if x.contains("sub") {
-        let raw = x.split(" ").collect::<Vec<&str>>();
-        let len = raw.len();
-        let a = raw[len - 5].parse::<i32>().unwrap();
-        let b = raw[len - 3].parse::<i32>().unwrap();
-        let c = raw[len - 1].parse::<i32>().unwrap();
-        assert_eq!(c, a - b);
-        true
-      } else {
-        false
-      }
-    })
-    .count();
-  assert_eq!(times_invoked, 99);
+  run_simulator(
+    &sys,
+    &config,
+    Some((
+      /*Condition Assertion*/
+      |x| {
+        if x.contains("sub") {
+          let raw = x.split(" ").collect::<Vec<&str>>();
+          let len = raw.len();
+          let a = raw[len - 5].parse::<i32>().unwrap();
+          let b = raw[len - 3].parse::<i32>().unwrap();
+          let c = raw[len - 1].parse::<i32>().unwrap();
+          assert_eq!(c, a - b);
+          true
+        } else {
+          false
+        }
+      },
+      /*Expected Lines*/ Some(99),
+    )),
+  );
 }

@@ -142,6 +142,10 @@ impl SysBuilder {
     res
   }
 
+  pub fn get_name(&self) -> &str {
+    &self.name
+  }
+
   /// If this system has a driver.
   pub fn has_driver(&self) -> bool {
     self.module_iter().any(|x| x.get_name().eq("driver"))

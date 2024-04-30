@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::{builder::SysBuilder, test_utils};
+use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 #[test]
 fn trigger() {
@@ -29,33 +29,21 @@ fn trigger() {
   // Build the driver module.
   driver_builder(&mut sys, adder);
 
+  eir::builder::verify(&sys);
   println!("{}", sys);
 
-  let verilog_name = test_utils::temp_dir(&"trigger.sv".to_string());
-  let verilog_config = eir::verilog::Config {
-    fname: verilog_name,
-    sim_threshold: 200,
-  };
-  eir::verilog::elaborate(&sys, &verilog_config).unwrap();
-
-  let src_name = test_utils::temp_dir(&"trigger.rs".to_string());
-  let config = eir::sim::Config {
-    fname: src_name,
+  let config = eir::backend::common::Config {
+    temp_dir: true,
     sim_threshold: 200,
     idle_threshold: 200,
   };
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  eir::builder::verify(&sys);
-  eir::sim::elaborate(&sys, &config).unwrap();
+  eir::backend::simulator::elaborate(&sys, &config).unwrap();
 
-  let exec_name = test_utils::temp_dir(&"trigger".to_string());
-  test_utils::compile(&config.fname, &exec_name);
-
-  let output = test_utils::run(&exec_name);
-  let times_invoked = String::from_utf8(output.stdout)
-    .unwrap()
-    .lines()
-    .filter(|x| x.contains("Simulating module adder"))
-    .count();
-  assert_eq!(times_invoked, 100);
+  run_simulator(
+    &sys,
+    &config,
+    Some((|x| x.contains("Simulating module adder"), Some(100))),
+  );
 }

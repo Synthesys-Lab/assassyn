@@ -9,6 +9,7 @@ use proc_macro2::Span;
 use syn::Ident;
 
 use crate::{
+  backend::common::Config,
   builder::system::SysBuilder,
   ir::{node::*, visitor::Visitor, *},
 };
@@ -19,7 +20,7 @@ use super::utils::{
 
 use self::ir_printer::IRPrinter;
 
-use super::{analysis, Config};
+use super::analysis;
 
 struct ElaborateModule<'a, 'b> {
   sys: &'a SysBuilder,
@@ -973,30 +974,26 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
   fd.write("\n\n\n".as_bytes())
 }
 
-pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
-  println!("Writing simulator code to {}", config.fname);
-  let mut fd = fs::File::create(config.fname.clone())?;
+pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
+  let fname = config.fname(sys, ".rs");
+  println!("Writing simulator code to {}", fname);
+  let mut fd = fs::File::create(fname.clone())?;
   dump_header(&mut fd)?;
   let (rt_src, ri) = dump_runtime(sys, config);
   dump_module(sys, &mut fd, &ri)?;
   fd.write(rt_src.as_bytes())?;
-  fd.flush()
+  fd.flush()?;
+  Ok(fname)
 }
 
-pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
-  match elaborate_impl(sys, config) {
-    Ok(_) => {}
-    Err(e) => {
-      eprintln!("Failed to write to file: {}", e);
-      std::process::exit(1);
-    }
-  }
+pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
+  let fname = elaborate_impl(sys, config)?;
   let output = Command::new("rustfmt")
-    .arg(&config.fname)
+    .arg(&fname)
     .arg("--config")
     .arg("max_width=100,tab_spaces=2")
     .output()
     .expect("Failed to format");
   assert!(output.status.success());
-  Ok(())
+  Ok(fname)
 }

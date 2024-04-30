@@ -1,7 +1,7 @@
 use eda4eda::module_builder;
 use eir::{
   builder::SysBuilder,
-  test_utils::{self, parse_cycle},
+  test_utils::{parse_cycle, run_simulator},
   xform,
 };
 
@@ -43,7 +43,7 @@ fn manual() -> SysBuilder {
     }
   );
 
-  let mut res = SysBuilder::new("raw");
+  let mut res = SysBuilder::new("spin_trigger");
   let sqr = squarer_builder(&mut res);
   let lock = res.create_array(eir::ir::DataType::Int(1), "lock", 1);
   let spin_agent = spin_agent_builder(&mut res, sqr, lock);
@@ -74,15 +74,15 @@ fn syntactical_sugar() -> SysBuilder {
     }
   );
 
-  let mut res = SysBuilder::new("raw");
+  let mut res = SysBuilder::new("spin_sugar");
   let sqr = squarer_builder(&mut res);
   let _driver = driver_builder(&mut res, sqr);
   res
 }
 
-fn testit(fname: &str, mut sys: SysBuilder) {
-  let config = eir::sim::Config {
-    fname: test_utils::temp_dir(&format!("{}.rs", fname)),
+fn testit(mut sys: SysBuilder) {
+  let config = eir::backend::common::Config {
+    temp_dir: true,
     sim_threshold: 200,
     idle_threshold: 200,
   };
@@ -95,44 +95,38 @@ fn testit(fname: &str, mut sys: SysBuilder) {
   eir::builder::verify(&sys);
 
   // println!("{}", sys);
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  let verilog_name = test_utils::temp_dir(&format!("{}.sv", fname));
-  let verilog_config = eir::verilog::Config {
-    fname: verilog_name,
-    sim_threshold: config.sim_threshold,
-  };
-  eir::verilog::elaborate(&sys, &verilog_config).unwrap();
-  eir::sim::elaborate(&sys, &config).unwrap();
-  let exec_name = test_utils::temp_dir(&fname.to_string());
-  test_utils::compile(&config.fname, &exec_name);
-  // TODO(@were): Make a time timeout here.
-  let raw = test_utils::run(&exec_name);
-  String::from_utf8(raw.stdout)
-    .unwrap()
-    .lines()
-    .for_each(|l| {
-      if l.contains("agent move on") {
-        let (cycle, _) = parse_cycle(l);
-        assert!(
-          cycle % 4 == 1 || cycle % 4 == 2,
-          "agent move on {} % 4 = {}",
-          cycle,
-          cycle % 4
-        );
-      }
-      if l.contains("squarer") {
-        let (cycle, _) = parse_cycle(l);
-        assert!(cycle % 4 == 2 || cycle % 4 == 3, "{}", l);
-      }
-    });
+  run_simulator(
+    &sys,
+    &config,
+    Some((
+      |l| {
+        if l.contains("agent move on") {
+          let (cycle, _) = parse_cycle(l);
+          assert!(
+            cycle % 4 == 1 || cycle % 4 == 2,
+            "agent move on {} % 4 = {}",
+            cycle,
+            cycle % 4
+          );
+        }
+        if l.contains("squarer") {
+          let (cycle, _) = parse_cycle(l);
+          assert!(cycle % 4 == 2 || cycle % 4 == 3, "{}", l);
+        }
+        false
+      },
+      None,
+    )),
+  );
 }
 
 #[test]
 fn spin_trigger() {
   let raw_sys = manual();
-  testit("spin_trigger", raw_sys);
+  testit(raw_sys);
 
   let sugar_sys = syntactical_sugar();
-  // println!("{}", sugar_sys);
-  testit("spin_sugar", sugar_sys);
+  testit(sugar_sys);
 }

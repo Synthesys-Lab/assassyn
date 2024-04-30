@@ -1,5 +1,9 @@
 use eda4eda::module_builder;
-use eir::{builder::SysBuilder, ir::node::BaseNode, ir::Module, test_utils};
+use eir::{
+  builder::SysBuilder,
+  ir::{node::BaseNode, Module},
+  test_utils::run_simulator,
+};
 
 #[derive(Debug, Clone, Copy)]
 struct ProcElem {
@@ -212,27 +216,14 @@ fn systolic_array() {
   println!("{}", sys);
   eir::builder::verify(&sys);
 
-  let verilog_name = test_utils::temp_dir(&"systolic.sv".to_string());
-  let verilog_config = eir::verilog::Config {
-    fname: verilog_name,
-    sim_threshold: 100,
-  };
-  eir::verilog::elaborate(&sys, &verilog_config).unwrap();
-
-  let src_name = test_utils::temp_dir(&"systolic.rs".to_string());
-  let config = eir::sim::Config {
-    fname: src_name,
+  let config = eir::backend::common::Config {
+    temp_dir: true,
     sim_threshold: 100,
     idle_threshold: 100,
   };
-  eir::sim::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  let exec_name = test_utils::temp_dir(&"systolic".to_string());
-  test_utils::compile(&config.fname, &exec_name);
-  let output = test_utils::run(&exec_name);
-  let output = String::from_utf8(output.stdout).unwrap();
-
-  println!("{}", output);
+  let output = run_simulator(&sys, &config, None);
 
   let mut a = [[0; 4]; 4];
   let mut b = [[0; 4]; 4];

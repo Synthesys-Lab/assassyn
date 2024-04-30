@@ -1,10 +1,5 @@
 use eda4eda::module_builder;
-use eir::{
-  builder::SysBuilder,
-  sim::elaborate,
-  test_utils::{self, temp_dir},
-  xform,
-};
+use eir::{builder::SysBuilder, test_utils::run_simulator, xform};
 
 #[test]
 fn select() {
@@ -41,24 +36,26 @@ fn select() {
   xform::basic(&mut sys, &o0);
   eir::builder::verify(&sys);
 
-  let fname = temp_dir(&"select.rs".to_string());
-  let config = eir::sim::Config {
-    fname,
+  let config = eir::backend::common::Config {
+    temp_dir: true,
     sim_threshold: 101,
     idle_threshold: 100,
   };
-  elaborate(&sys, &config).unwrap();
-  let exec_name = test_utils::temp_dir(&"select".to_string());
-  test_utils::compile(&config.fname, &exec_name);
-  let output = test_utils::run(&exec_name);
-  let output = String::from_utf8(output.stdout).unwrap();
-  output.lines().for_each(|line| {
-    if line.contains(">?") {
-      let toks = line.split_whitespace().collect::<Vec<&str>>();
-      let a = toks[toks.len() - 5].parse::<i32>().unwrap();
-      let b = toks[toks.len() - 3].parse::<i32>().unwrap();
-      let c = toks[toks.len() - 1].parse::<i32>().unwrap();
-      assert_eq!(c, if a > b { a } else { b });
-    }
-  });
+  run_simulator(
+    &sys,
+    &config,
+    Some((
+      |line| {
+        if line.contains(">?") {
+          let toks = line.split_whitespace().collect::<Vec<&str>>();
+          let a = toks[toks.len() - 5].parse::<i32>().unwrap();
+          let b = toks[toks.len() - 3].parse::<i32>().unwrap();
+          let c = toks[toks.len() - 1].parse::<i32>().unwrap();
+          assert_eq!(c, if a > b { a } else { b });
+        }
+        false
+      },
+      None,
+    )),
+  );
 }
