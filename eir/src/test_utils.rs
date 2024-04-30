@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub fn compile(src: &String, exe: Option<&String>) -> String {
-  let obj = exe.map_or_else(|| src[..src.len() - 3].to_string(), { |x| x.clone() });
+  let obj = exe.map_or_else(|| src[..src.len() - 3].to_string(), |x| x.clone());
   let output = Command::new("rustc")
     .arg(src)
     .arg("-o")

@@ -975,7 +975,7 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
 }
 
 pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
-  let fname = config.fname(sys, ".rs");
+  let fname = config.fname(sys, "rs");
   println!("Writing simulator code to {}", fname);
   let mut fd = fs::File::create(fname.clone())?;
   dump_header(&mut fd)?;

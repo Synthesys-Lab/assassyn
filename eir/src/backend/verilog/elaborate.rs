@@ -1285,7 +1285,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
 }
 
 pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
-  let fname = config.fname(sys, ".sv");
+  let fname = config.fname(sys, "sv");
   println!("Writing verilog rtl to {}", fname);
 
   let mut vd = VerilogDumper::new(sys);
