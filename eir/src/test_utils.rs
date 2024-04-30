@@ -34,7 +34,14 @@ pub fn temp_dir(fname: &String) -> String {
 }
 
 pub fn run_exec(exe: &String) -> Output {
-  let output = Command::new(exe).output().expect("Failed to run");
+  let exe = if !exe.contains("/") {
+    format!("./{}", exe)
+  } else {
+    exe.clone()
+  };
+  let output = Command::new(&exe)
+    .output()
+    .unwrap_or_else(|_| panic!("Failed to run \"{}\"", exe));
   assert!(output.status.success(), "Failed to run: {}", exe);
   output
 }

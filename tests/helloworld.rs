@@ -26,12 +26,10 @@ fn helloworld() {
       |x| {
         if x.contains("driver") {
           assert!(x.contains("Hello, world!"));
-          true
-        } else {
-          false
         }
+        false
       },
-      Some(1),
+      None,
     )),
   );
 }

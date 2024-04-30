@@ -19,7 +19,7 @@ fn testbench() {
   eprintln!("{}", sys);
 
   let config = eir::backend::common::Config {
-    temp_dir: false,
+    temp_dir: true,
     sim_threshold: 101,
     idle_threshold: 100,
   };
