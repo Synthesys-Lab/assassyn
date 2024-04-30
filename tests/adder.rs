@@ -1,5 +1,5 @@
 use eda4eda::module_builder;
-use eir::builder::SysBuilder;
+use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 #[test]
 fn adder() {
@@ -32,7 +32,7 @@ fn adder() {
   // TODO(@boyang): Should we also test the verilog backend?
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  eir::test_utils::run_simulator(
+  run_simulator(
     &sys,
     &config,
     Some((
