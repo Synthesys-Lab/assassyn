@@ -615,7 +615,7 @@ fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
     }
     NodeKind::Expr => {
       let expr = node.as_ref::<Expr>(sys).unwrap();
-      if expr.get_opcode() == Opcode::Trigger {
+      if expr.get_opcode() == Opcode::AsyncCall {
         let triggered_module = expr
           .get_operand(0)
           .unwrap()
@@ -1327,7 +1327,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           ))
         }
 
-        Opcode::Trigger => {
+        Opcode::AsyncCall => {
           let module = expr
             .get_operand(0)
             .unwrap()

@@ -310,19 +310,19 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           }
           .to_string()
         }
-        Opcode::Trigger => {
+        Opcode::AsyncCall => {
           let to_trigger = if let Ok(module) = expr
             .get_operand(0)
             .unwrap()
             .get_value()
+            .as_ref::<Bind>(self.sys)
+            .unwrap()
+            .get_callee()
             .as_ref::<Module>(self.sys)
           {
             format!("EventKind::Module{}", camelize(&namify(module.get_name())))
           } else {
-            format!(
-              "{}.as_ref().clone()",
-              dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value())
-            )
+            panic!("AsyncCall target is not a module, did you rewrite the callback?");
           };
           format!(
             "q.push(Reverse(Event{{ stamp: stamp + 100, kind: {} }}))",

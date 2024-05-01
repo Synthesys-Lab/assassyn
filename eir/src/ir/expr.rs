@@ -38,7 +38,7 @@ pub enum Opcode {
   FIFOPop,
   FIFOPeek,
   FIFOValid,
-  Trigger,
+  AsyncCall,
   // Other synthesizable operations
   Slice,
   // Level-2 syntax sugar, will be re-written in synthesizable operations
@@ -91,7 +91,7 @@ impl ToString for Opcode {
       Opcode::Flip => "!".into(),
       Opcode::Load => "load".into(),
       Opcode::Store => "store".into(),
-      Opcode::Trigger => "trigger".into(),
+      Opcode::AsyncCall => "trigger".into(),
       Opcode::SpinTrigger => "wait_until".into(),
       Opcode::FIFOPush => "push".into(),
       Opcode::FIFOPop => "pop".into(),

@@ -243,16 +243,13 @@ impl Visitor<String> for IRPrinter {
             expr.get_key()
           )
         }
-        Opcode::Trigger => {
-          let mut res = format!(
-            "async call {}, bundle [",
-            expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
-          );
-          for op in expr.operand_iter().skip(1) {
-            res.push_str(&format!("_{}, ", op.get_value().get_key()));
-          }
-          res.push(']');
-          res
+        Opcode::AsyncCall => {
+          format!(
+            "async call {}",
+            self
+              .dispatch(expr.sys, expr.get_operand(0).unwrap().get_value(), vec![])
+              .unwrap()
+          )
         }
         Opcode::SpinTrigger => {
           let mut res = String::new();
@@ -359,17 +356,38 @@ impl Visitor<String> for IRPrinter {
   }
   fn visit_bind(&mut self, bind: &BindRef<'_>) -> Option<String> {
     let module = bind.get_callee();
-    let bound = bind
+    let arg_list = bind
       .get_args()
       .iter()
       .enumerate()
       .map(|(i, v)| {
         let v = v.map_or("None".to_string(), |x| x.to_string(bind.sys));
-        format!("{}: {}", module.get_port(i).unwrap().get_name(), v)
+        let arg = match module.get_kind() {
+          NodeKind::Module => {
+            let name = module
+              .as_ref::<Module>(bind.sys)
+              .unwrap()
+              .get_port(i)
+              .unwrap()
+              .get_name()
+              .to_string();
+            format!("{}: ", name)
+          }
+          _ => format!("arg{}", i),
+        };
+        format!("{} {}", arg, v)
       })
       .collect::<Vec<String>>()
       .join(", ");
-    format!("{} {{ {} }}", bind.get_callee().get_name(), bound).into()
+    let module_name = match module.get_kind() {
+      NodeKind::Module => module
+        .as_ref::<Module>(bind.sys)
+        .unwrap()
+        .get_name()
+        .to_string(),
+      _ => module.to_string(bind.sys),
+    };
+    format!("{} {{ {} }}", module_name, arg_list).into()
   }
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();

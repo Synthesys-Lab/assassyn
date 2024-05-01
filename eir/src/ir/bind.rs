@@ -1,7 +1,6 @@
 use super::{
   data::DataType,
-  node::{BaseNode, BindMut, BindRef, ModuleRef},
-  Module,
+  node::{BaseNode, BindMut, BindRef},
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,8 +54,8 @@ impl BindRef<'_> {
     self.args.iter().all(|x| x.is_some())
   }
 
-  pub fn get_callee(&self) -> ModuleRef<'_> {
-    self.module.as_ref::<Module>(self.sys).unwrap()
+  pub fn get_callee(&self) -> BaseNode {
+    self.module
   }
 
   pub fn get_callee_signature(&self) -> DataType {

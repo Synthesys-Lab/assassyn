@@ -440,31 +440,11 @@ impl SysBuilder {
     self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 
-  /// Create a spin trigger. A spin trigger repeats to test the condition
-  /// until it is true, and send a signal to invoke the given module module.
-  /// The source module is the current module, and the destination is given.
-  ///
-  /// NOTE: This created expression is more like a syntax sugar. It is equivalent create another
-  /// midman module, which trigers the destination module when the condition is true, and triggers
-  /// itself when the condition is false.
-  ///
-  /// # Arguments
-  /// * `array` - A pointer to the an array element, which serves as an handle to a "lock".
-  /// * `dst` - The destination module to be invoked.
-  /// * `data` - The data to be sent to the destination module.
-  pub fn create_spin_trigger_bound(&mut self, handle: BaseNode, bind: BaseNode) {
-    let bind = self.get::<Bind>(&bind).unwrap();
-    let callee = bind.get_callee().upcast();
-    let args = vec![handle.clone(), callee.clone(), bind.upcast()];
-    self.create_expr(DataType::void(), Opcode::SpinTrigger, args);
-  }
-
   /// Create a trigger. Push all the values to the corresponding named ports.
-  pub fn create_trigger_bound(&mut self, bind: BaseNode) -> BaseNode {
+  pub fn create_async_call(&mut self, bind: BaseNode) -> BaseNode {
     let bind = self.get::<Bind>(&bind).unwrap();
-    let callee = bind.get_callee().upcast();
-    let args = vec![callee.clone(), bind.upcast()];
-    let res = self.create_expr(DataType::void(), Opcode::Trigger, args);
+    let args = vec![bind.upcast()];
+    let res = self.create_expr(DataType::void(), Opcode::AsyncCall, args);
     res
   }
 
@@ -534,7 +514,7 @@ impl SysBuilder {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
     assert!(bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::KVBind);
-    let module = bind.get_callee();
+    let module = bind.get_callee().as_ref::<Module>(self).unwrap();
     let port = module
       .get_port_by_name(&key)
       .expect(format!("{} is NOT a FIFO of {}", key, module.get_name()).as_str());
@@ -551,11 +531,7 @@ impl SysBuilder {
     bind.set_kind(BindKind::KVBind);
     let bound = bind.get_args_mut();
     bound[port_idx] = Some(fifo_push);
-    if res.as_ref::<Bind>(self).unwrap().full() {
-      self.create_trigger_bound(res)
-    } else {
-      res
-    }
+    res
   }
 
   /// Add a bind to the current module.
@@ -583,16 +559,12 @@ impl SysBuilder {
       }
       _ => panic!("Invalid signature"),
     }
-    let fifo_push = self.create_fifo_push(callee.upcast(), port_idx, value);
+    let fifo_push = self.create_fifo_push(callee, port_idx, value);
     let mut bind_mut = res.as_mut::<Bind>(self).unwrap();
     bind_mut.set_kind(BindKind::Sequential);
     let args = bind_mut.get_args_mut();
     args[port_idx] = Some(fifo_push);
-    if res.as_ref::<Bind>(self).unwrap().full() {
-      self.create_trigger_bound(res)
-    } else {
-      res
-    }
+    res
   }
 
   /// A helper function to create a FIFO push.
