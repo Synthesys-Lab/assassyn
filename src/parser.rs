@@ -120,13 +120,6 @@ impl Parse for Statement {
           let body = input.parse::<node::Body>()?;
           Ok(node::Statement::BodyScope((pred, Box::new(body))))
         }
-        // spin <array-ptr> <func-id> { <id>: <expr> }
-        "spin" => {
-          input.parse::<syn::Ident>()?; // spin
-          let lock = input.parse::<node::ArrayAccess>()?;
-          let call = input.parse::<node::FuncCall>()?;
-          Ok(node::Statement::Call((CallKind::Spin(lock), call)))
-        }
         "log" => {
           input.parse::<syn::Ident>()?; // log
           let args;
@@ -179,11 +172,10 @@ impl Parse for Statement {
                       Ok(node::Statement::ArrayAlloc((id, ty, size)))
                     }
                     // <id> = bind <func-id> { <id>: <expr> }; a partial function call
-                    "bind" | "eager_bind" => {
+                    "bind" => {
                       input.parse::<syn::Ident>()?; // bind
                       let bind = input.parse::<FuncCall>()?;
-                      let eager = look.to_string().as_str().eq("eager_bind");
-                      Ok(node::Statement::Bind((id, bind, eager)))
+                      Ok(node::Statement::Bind((id, bind)))
                     }
                     _ => {
                       // fall back to normal assignment

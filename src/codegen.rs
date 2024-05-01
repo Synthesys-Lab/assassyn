@@ -170,11 +170,7 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   }})
 }
 
-pub(crate) fn emit_arg_binds(
-  func: &syn::Ident,
-  args: &FuncArgs,
-  eager: bool,
-) -> proc_macro2::TokenStream {
+pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2::TokenStream {
   let bind = match args {
     FuncArgs::Bound(binds) => binds
       .iter()
@@ -183,7 +179,7 @@ pub(crate) fn emit_arg_binds(
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
-          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, #eager);
+          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -194,7 +190,7 @@ pub(crate) fn emit_arg_binds(
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
-          let bind = sys.push_bind(bind, value, #eager);
+          let bind = sys.push_bind(bind, value);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -231,10 +227,10 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         };
       }
     }
-    Statement::Bind((id, call, eager)) => {
+    Statement::Bind((id, call)) => {
       let func = &call.func;
       let args = &call.args;
-      let args = emit_arg_binds(func, args, *eager);
+      let args = emit_arg_binds(func, args);
       quote!(
         let #id = {
           #args;
@@ -243,20 +239,10 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
       )
     }
     Statement::Call((kind, call)) => match kind {
-      CallKind::Spin(lock) => {
-        let args = emit_arg_binds(&call.func, &call.args, false);
-        let emitted_lock = emit_array_access(lock)?;
-        quote! {{
-          #args;
-          let lock = #emitted_lock;
-          sys.create_spin_trigger_bound(lock, bind);
-        }}
-      }
       CallKind::Async => {
-        let args = emit_arg_binds(&call.func, &call.args, false);
+        let args = emit_arg_binds(&call.func, &call.args);
         quote! {{
           #args;
-          sys.create_trigger_bound(bind);
         }}
       }
       CallKind::Inline(lval) => match &call.args {
@@ -436,7 +422,7 @@ pub(crate) fn emit_ports(
     port_ids.push_punct(Token![,](id.span()));
     let err_log = syn::LitStr::new(&format!("Index {} exceed!", i), id.span());
     // Peek the port instances
-    port_peeks.push(quote! { let #id = module.get_port(#i).expect(#err_log).clone() });
+    port_peeks.push(quote! { let #id = module.get_port(#i).expect(#err_log).upcast() });
     port_peeks.push_punct(Token![;](id.span()));
     // Declarations: <id>: <ty>,
     let ty: proc_macro2::TokenStream = emit_type(&ty)?.into();

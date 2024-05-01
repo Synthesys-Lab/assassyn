@@ -79,8 +79,11 @@ impl<'sys> ModuleRef<'sys> {
   /// # Arguments
   ///
   /// * `i` - The index of the input.
-  pub fn get_port(&self, i: usize) -> Option<BaseNode> {
-    self.ports.get(i).map(|x| x.clone())
+  pub fn get_port(&self, i: usize) -> Option<FIFORef<'_>> {
+    self
+      .ports
+      .get(i)
+      .map(|x| x.as_ref::<FIFO>(&self.sys).unwrap())
   }
 
   /// Get the input by name.
@@ -308,7 +311,7 @@ impl SysBuilder {
         .unwrap()
         .get_port(i)
         .unwrap()
-        .clone();
+        .upcast();
       let mut fifo_mut = self.get_mut::<FIFO>(&input).unwrap();
       fifo_mut.get_mut().set_parent(module.clone());
       fifo_mut.get_mut().set_idx(i);

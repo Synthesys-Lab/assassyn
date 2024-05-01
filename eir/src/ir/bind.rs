@@ -1,10 +1,7 @@
-use std::collections::HashMap;
-
-use crate::ir::Module;
-
 use super::{
   data::DataType,
-  node::{BaseNode, BindMut, BindRef},
+  node::{BaseNode, BindMut, BindRef, ModuleRef},
+  Module,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -21,21 +18,21 @@ pub struct Bind {
   pub(crate) key: usize,
   kind: BindKind,
   module: BaseNode,
-  bound: HashMap<String, BaseNode>,
+  args: Vec<Option<BaseNode>>,
 }
 
 impl Bind {
-  pub(crate) fn new(module: BaseNode, bound: HashMap<String, BaseNode>, kind: BindKind) -> Self {
+  pub(crate) fn new(module: BaseNode, kind: BindKind, n: usize) -> Self {
     Self {
       key: 0,
       kind,
       module,
-      bound,
+      args: vec![None; n],
     }
   }
 
-  pub fn get_bound(&self) -> &HashMap<String, BaseNode> {
-    &self.bound
+  pub fn get_args(&self) -> &Vec<Option<BaseNode>> {
+    &self.args
   }
 
   pub fn get_kind(&self) -> BindKind {
@@ -44,8 +41,8 @@ impl Bind {
 }
 
 impl BindMut<'_> {
-  pub fn get_bound_mut(&mut self) -> &mut HashMap<String, BaseNode> {
-    &mut self.get_mut().bound
+  pub fn get_args_mut(&mut self) -> &mut Vec<Option<BaseNode>> {
+    &mut self.get_mut().args
   }
 
   pub fn set_kind(&mut self, kind: BindKind) {
@@ -55,39 +52,11 @@ impl BindMut<'_> {
 
 impl BindRef<'_> {
   pub fn full(&self) -> bool {
-    let module_ty = self.module.get_dtype(self.sys);
-    match &module_ty {
-      Some(DataType::Module(types)) => types.len() == self.bound.len(),
-      _ => panic!("A module type excepted, but got {:?}", module_ty),
-    }
+    self.args.iter().all(|x| x.is_some())
   }
 
-  pub fn to_args(&self) -> Vec<BaseNode> {
-    assert!(
-      self.full(),
-      "Not all arguments are bound, callee: {:?}",
-      self.module
-    );
-    match self.get_kind() {
-      BindKind::KVBind => {
-        let module = self.module.as_ref::<Module>(self.sys).unwrap();
-        module
-          .port_iter()
-          .map(|x| self.bound.get(x.get_name()).unwrap().clone())
-          .collect()
-      }
-      BindKind::Sequential => (0..self.bound.len())
-        .map(|x| self.bound.get(&x.to_string()).unwrap().clone())
-        .collect(),
-      BindKind::Unknown => {
-        assert!(self.get_bound().is_empty());
-        vec![]
-      }
-    }
-  }
-
-  pub fn get_callee(&self) -> BaseNode {
-    self.module.clone()
+  pub fn get_callee(&self) -> ModuleRef<'_> {
+    self.module.as_ref::<Module>(self.sys).unwrap()
   }
 
   pub fn get_callee_signature(&self) -> DataType {

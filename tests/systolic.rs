@@ -32,8 +32,8 @@ fn systolic_array() {
       mac = val.add(c);
       log("MAC value: {} * {} + {} = {}", west, north, val, mac);
       acc[0] = mac;
-      feast = eager_bind east(west);
-      fsouth = eager_bind south(north);
+      feast = bind east(west);
+      fsouth = bind south(north);
     }.expose(feast, fsouth, acc)
   );
 
@@ -65,7 +65,7 @@ fn systolic_array() {
 
   module_builder!(data_pusher(dest)(data: int<32>) {
     log("pushes {}", data);
-    bound = eager_bind dest(data);
+    bound = bind dest(data);
   }.expose(bound));
 
   for i in (1..=4).rev() {
@@ -124,8 +124,8 @@ fn systolic_array() {
       //   P P P  P
       //   P P P  P
       //   P P P  P
-      _a = eager_bind col1(0);
-      _a = eager_bind row1(0);
+      _a = bind col1(0);
+      _a = bind row1(0);
     }
     cycle 1 {
       // 1 1 4
@@ -133,10 +133,10 @@ fn systolic_array() {
       // 4 P P P  P
       //   P P P  P
       //   P P P  P
-      _a = eager_bind row1(1);
-      _a = eager_bind col1(1);
-      _a = eager_bind col2(4);
-      _a = eager_bind row2(4);
+      _a = bind row1(1);
+      _a = bind col1(1);
+      _a = bind col2(4);
+      _a = bind row2(4);
     }
     cycle 2 {
       // 2 2 5 8
@@ -144,12 +144,12 @@ fn systolic_array() {
       // 5 P P P  P
       // 8 P P P  P
       //   P P P  P
-      _a = eager_bind row1(2);
-      _a = eager_bind col1(2);
-      _a = eager_bind col2(5);
-      _a = eager_bind row2(5);
-      _a = eager_bind row3(8);
-      _a = eager_bind col3(8);
+      _a = bind row1(2);
+      _a = bind col1(2);
+      _a = bind col2(5);
+      _a = bind row2(5);
+      _a = bind row3(8);
+      _a = bind col3(8);
     }
     cycle 3 {
       // 3  3 6 9  12
@@ -157,14 +157,14 @@ fn systolic_array() {
       // 6  P P P  P
       // 9  P P P  P
       // 12 P P P  P
-      _a = eager_bind row1(3);
-      _a = eager_bind col1(3);
-      _a = eager_bind col2(6);
-      _a = eager_bind row2(6);
-      _a = eager_bind row3(9);
-      _a = eager_bind col3(9);
-      _a = eager_bind row4(12);
-      _a = eager_bind col4(12);
+      _a = bind row1(3);
+      _a = bind col1(3);
+      _a = bind col2(6);
+      _a = bind row2(6);
+      _a = bind row3(9);
+      _a = bind col3(9);
+      _a = bind row4(12);
+      _a = bind col4(12);
     }
     cycle 4 {
       // 4    7 10 13
@@ -172,12 +172,12 @@ fn systolic_array() {
       // 7  P P P  P
       // 10 P P P  P
       // 13 P P P  P
-      _a = eager_bind row2(7);
-      _a = eager_bind col2(7);
-      _a = eager_bind row3(10);
-      _a = eager_bind col3(10);
-      _a = eager_bind row4(13);
-      _a = eager_bind col4(13);
+      _a = bind row2(7);
+      _a = bind col2(7);
+      _a = bind row3(10);
+      _a = bind col3(10);
+      _a = bind row4(13);
+      _a = bind col4(13);
     }
     cycle 5 {
       //  5    11 14
@@ -185,10 +185,10 @@ fn systolic_array() {
       //    P P P  P
       // 11 P P P  P
       // 14 P P P  P
-      _a = eager_bind row3(11);
-      _a = eager_bind col3(11);
-      _a = eager_bind row4(14);
-      _a = eager_bind col4(14);
+      _a = bind row3(11);
+      _a = bind col3(11);
+      _a = bind row4(14);
+      _a = bind col4(14);
     }
     cycle 6 {
       //   6      15
@@ -196,8 +196,8 @@ fn systolic_array() {
       //    P P P  P
       //    P P P  P
       // 15 P P P  P
-      _a = eager_bind row4(15);
-      _a = eager_bind col4(15);
+      _a = bind row4(15);
+      _a = bind col4(15);
     }
   });
 

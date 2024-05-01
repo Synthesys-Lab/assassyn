@@ -5,14 +5,15 @@ use eir::{
   xform,
 };
 
-module_builder!(
-  squarer()(a:int<32>) {
-    b = a.mul(a);
-    log("squarer: {}", b);
-  }
-);
+#[test]
+fn spin_trigger() {
+  module_builder!(
+    squarer()(a:int<32>) {
+      b = a.mul(a);
+      log("squarer: {}", b);
+    }
+  );
 
-fn manual() -> SysBuilder {
   module_builder!(
     spin_agent(sqr, lock)(a:int<32>) {
       wait_until { v = lock[0]; v } {
@@ -43,44 +44,12 @@ fn manual() -> SysBuilder {
     }
   );
 
-  let mut res = SysBuilder::new("spin_trigger");
-  let sqr = squarer_builder(&mut res);
-  let lock = res.create_array(eir::ir::DataType::Int(1), "lock", 1);
-  let spin_agent = spin_agent_builder(&mut res, sqr, lock);
-  let _driver = driver_builder(&mut res, spin_agent, lock);
-  res
-}
+  let mut sys = SysBuilder::new("spin_trigger");
+  let sqr = squarer_builder(&mut sys);
+  let lock = sys.create_array(eir::ir::DataType::Int(1), "lock", 1);
+  let spin_agent = spin_agent_builder(&mut sys, sqr, lock);
+  let _driver = driver_builder(&mut sys, spin_agent, lock);
 
-fn syntactical_sugar() -> SysBuilder {
-  module_builder!(
-    driver(sqr)() {
-      cnt = array(int<32>, 1);
-      lock = array(int<1>, 1);
-      v = cnt[0];
-      and_1 = v.bitwise_and(1);
-      is_odd = and_1.eq(1);
-      is_even = is_odd.flip();
-      v = v.add(1);
-      cnt[0] = v;
-      when is_odd {
-        spin lock[0] sqr{ a: v };
-      }
-      when is_even {
-        lv = lock[0];
-        flipped = lv.flip();
-        log("flip to {}", flipped);
-        lock[0] = flipped;
-      }
-    }
-  );
-
-  let mut res = SysBuilder::new("spin_sugar");
-  let sqr = squarer_builder(&mut res);
-  let _driver = driver_builder(&mut res, sqr);
-  res
-}
-
-fn testit(mut sys: SysBuilder) {
   let config = eir::backend::common::Config {
     temp_dir: true,
     sim_threshold: 200,
@@ -120,13 +89,4 @@ fn testit(mut sys: SysBuilder) {
       None,
     )),
   );
-}
-
-#[test]
-fn spin_trigger() {
-  let raw_sys = manual();
-  testit(raw_sys);
-
-  let sugar_sys = syntactical_sugar();
-  testit(sugar_sys);
 }

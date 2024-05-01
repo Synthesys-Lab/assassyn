@@ -115,7 +115,9 @@ impl Visitor<()> for GatherAllUses {
           if fifo.is_placeholder() && fifo.get_parent().eq(&self.src) {
             if let Ok(module) = self.dst.as_ref::<Module>(expr.sys) {
               let new_value = module.get_port(fifo.idx()).unwrap();
-              self.uses.insert((expr.upcast(), i, Some(new_value)));
+              self
+                .uses
+                .insert((expr.upcast(), i, Some(new_value.upcast())));
             }
           }
         }

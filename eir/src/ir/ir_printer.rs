@@ -358,13 +358,18 @@ impl Visitor<String> for IRPrinter {
     format!("{}{}", " ".repeat(self.indent), res).into()
   }
   fn visit_bind(&mut self, bind: &BindRef<'_>) -> Option<String> {
+    let module = bind.get_callee();
     let bound = bind
-      .get_bound()
+      .get_args()
       .iter()
-      .map(|(k, v)| format!("{}: {}", k, v.to_string(bind.sys)))
+      .enumerate()
+      .map(|(i, v)| {
+        let v = v.map_or("None".to_string(), |x| x.to_string(bind.sys));
+        format!("{}: {}", module.get_port(i).unwrap().get_name(), v)
+      })
       .collect::<Vec<String>>()
       .join(", ");
-    format!("{} {{ {} }}", bind.get_callee().to_string(bind.sys), bound).into()
+    format!("{} {{ {} }}", bind.get_callee().get_name(), bound).into()
   }
   fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
     let mut res = String::new();

@@ -20,7 +20,7 @@ fn bind() {
 
   module_builder!(
     lhs(sub)(a:int<32>) {
-      aa = eager_bind sub { a: a };
+      aa = bind sub { a: a };
     }.expose(aa)
   );
 

@@ -60,7 +60,6 @@ pub(crate) enum BodyPred {
 pub(crate) enum CallKind {
   Inline(Punctuated<syn::Ident, syn::Token![,]>),
   Async,
-  Spin(ArrayAccess),
 }
 
 pub(crate) enum Statement {
@@ -69,7 +68,7 @@ pub(crate) enum Statement {
   ArrayAssign((ArrayAccess, expr::Expr)),
   ArrayRead((syn::Ident, ArrayAccess)),
   Call((CallKind, FuncCall)),
-  Bind((syn::Ident, FuncCall, bool)),
+  Bind((syn::Ident, FuncCall)),
   BodyScope((BodyPred, Box<Body>)),
   Log(Vec<expr::Expr>),
   ExprTerm(expr::ExprTerm),
