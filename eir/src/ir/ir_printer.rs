@@ -357,11 +357,10 @@ impl Visitor<String> for IRPrinter {
   fn visit_bind(&mut self, bind: &BindRef<'_>) -> Option<String> {
     let module = bind.get_callee();
     let arg_list = bind
-      .get_args()
-      .iter()
+      .arg_iter()
       .enumerate()
       .map(|(i, v)| {
-        let v = v.map_or("None".to_string(), |x| x.to_string(bind.sys));
+        let v = v.map_or("None".to_string(), |x| x.get_value().to_string(bind.sys));
         let arg = match module.get_kind() {
           NodeKind::Module => {
             let name = module

@@ -519,10 +519,6 @@ impl SysBuilder {
   ) -> BaseNode {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
-    assert!(
-      bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::KVBind,
-      "Sequential and named binds cannot be mixed!"
-    );
     let module = bind
       .get_callee()
       .as_ref::<Module>(self)
@@ -537,17 +533,10 @@ impl SysBuilder {
       .expect(format!("{} is NOT a FIFO of {}", key, module.get_name()).as_str());
     assert_eq!(port.scalar_ty(), value.get_dtype(self).unwrap());
     let port_idx = port.idx();
-    assert!(
-      bind.get_args().get(port_idx).unwrap().is_none(),
-      "Port {} is already bound",
-      key
-    );
     let module = module.upcast();
     let fifo_push = self.create_fifo_push(module.clone(), port_idx, value);
     let mut bind = res.as_mut::<Bind>(self).unwrap();
-    bind.set_kind(BindKind::KVBind);
-    let bound = bind.get_args_mut();
-    bound[port_idx] = Some(fifo_push);
+    bind.set_named_arg(&key, fifo_push);
     if eager && bind.get().full() {
       self.create_async_call(res)
     } else {
@@ -562,14 +551,10 @@ impl SysBuilder {
     assert!(!bind.full());
     let signature = bind.get_callee_signature();
     let callee = bind.get_callee();
-    assert!(
-      bind.get().get_kind() == BindKind::Unknown || bind.get().get_kind() == BindKind::Sequential,
-      "Sequential and named binds cannot be mixed!"
-    );
     let port_idx = {
-      let first = bind.get_args().iter().position(|x| x.is_none()).unwrap();
-      let cnt = bind.get_args().iter().filter(|x| x.is_some()).count();
-      assert_eq!(cnt, first, "Invalid sequential bind! {:?}", bind.get_args());
+      let first = bind.arg_iter().position(|x| x.is_none()).unwrap();
+      let cnt = bind.arg_iter().filter(|x| x.is_some()).count();
+      assert_eq!(cnt, first, "Invalid sequential bind!");
       first
     };
     match &signature {
@@ -583,9 +568,7 @@ impl SysBuilder {
     }
     let fifo_push = self.create_fifo_push(callee, port_idx, value);
     let mut bind_mut = res.as_mut::<Bind>(self).unwrap();
-    bind_mut.set_kind(BindKind::Sequential);
-    let args = bind_mut.get_args_mut();
-    args[port_idx] = Some(fifo_push);
+    bind_mut.set_ith_arg(port_idx, fifo_push);
     if eager && bind_mut.get().full() {
       self.create_async_call(res)
     } else {
