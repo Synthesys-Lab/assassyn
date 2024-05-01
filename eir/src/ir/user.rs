@@ -11,8 +11,8 @@ use super::{node::*, visitor::Visitor, Expr, Module, FIFO};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Operand {
   pub(crate) key: usize,
-  user: BaseNode,
   def: BaseNode,
+  user: BaseNode,
 }
 
 impl Parented for Operand {
@@ -43,22 +43,18 @@ impl Operand {
 
 impl OperandRef<'_> {
   pub fn get_idx(&self) -> usize {
-    let user = self.user.as_ref::<Expr>(self.sys).unwrap();
-    let mut iter = user.operand_iter();
+    let expr = self.user.as_ref::<Expr>(self.sys).unwrap();
+    let mut iter = expr.operand_iter();
     iter.position(|x| x.get_key() == self.get_key()).unwrap()
   }
 }
 
 impl OperandMut<'_> {
-  pub fn erase_from_expr(&mut self) {
+  pub fn erase_self(&mut self) {
     let idx = self.get().get_idx();
-    let mut user = self
-      .get()
-      .get_user()
-      .clone()
-      .as_mut::<Expr>(self.sys)
-      .unwrap();
-    user.remove_operand(idx);
+    let user = self.get().user;
+    let mut expr = user.as_mut::<Expr>(self.sys).unwrap();
+    expr.remove_operand(idx);
     self.sys.dispose(self.get().upcast());
   }
 }
@@ -134,6 +130,9 @@ impl Visitor<()> for GatherAllUses {
 
 impl SysBuilder {
   pub(crate) fn remove_user(&mut self, operand: BaseNode) {
+    if operand.is_unknown() {
+      return;
+    }
     let operand_ref = operand.as_ref::<Operand>(self).unwrap();
     let def_value = operand_ref.get_value().clone();
     match def_value.get_kind() {
@@ -154,6 +153,9 @@ impl SysBuilder {
   }
 
   pub(crate) fn add_user(&mut self, operand: BaseNode) {
+    if operand.is_unknown() {
+      return;
+    }
     let operand_ref = operand.as_ref::<Operand>(self).unwrap();
     let value = operand_ref.get_value().clone();
     match value.get_kind() {

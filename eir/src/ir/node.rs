@@ -219,7 +219,7 @@ macro_rules! register_elements {
   };
 }
 
-register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, Bind, StrImm, Operand);
+register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, StrImm, Operand);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
 pub struct BaseNode {
@@ -251,6 +251,10 @@ impl BaseNode {
     self.kind.clone()
   }
 
+  pub fn is_unknown(&self) -> bool {
+    self.kind == NodeKind::Unknown
+  }
+
   pub fn get_dtype(&self, sys: &SysBuilder) -> Option<DataType> {
     match self.kind {
       NodeKind::Module => {
@@ -269,7 +273,7 @@ impl BaseNode {
         let expr = self.as_ref::<Expr>(sys).unwrap();
         expr.dtype().clone().into()
       }
-      NodeKind::Block | NodeKind::ArrayPtr | NodeKind::Bind => None,
+      NodeKind::Block | NodeKind::ArrayPtr => None,
       NodeKind::StrImm => {
         let str_imm = self.as_ref::<StrImm>(sys).unwrap();
         str_imm.dtype().clone().into()
@@ -292,7 +296,6 @@ impl BaseNode {
       NodeKind::IntImm => None,
       NodeKind::StrImm => None,
       NodeKind::ArrayPtr => None,
-      NodeKind::Bind => None,
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
@@ -348,10 +351,6 @@ impl BaseNode {
       }
       NodeKind::Expr => {
         format!("_{}", self.get_key())
-      }
-      NodeKind::Bind => {
-        let bind = self.as_ref::<Bind>(sys).unwrap();
-        IRPrinter::new(false).visit_bind(&bind).unwrap()
       }
       NodeKind::StrImm => {
         let str_imm = self.as_ref::<StrImm>(sys).unwrap();

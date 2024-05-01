@@ -10,6 +10,13 @@ use self::{
 
 use super::{block::Block, node::BaseNode};
 
+#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
+pub enum BindKind {
+  KVBind,
+  Sequential,
+  Unknown,
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Opcode {
   // Side-effect operations
@@ -34,6 +41,7 @@ pub enum Opcode {
   // Triary operations
   Select,
   // Eventual operations
+  Bind(BindKind),
   FIFOPush,
   FIFOPop,
   FIFOPeek,
@@ -100,6 +108,7 @@ impl ToString for Opcode {
       Opcode::Log => "log".into(),
       Opcode::Slice => "slice".into(),
       Opcode::Select => "select".into(),
+      Opcode::Bind(_) => "".into(),
     }
   }
 }
@@ -109,7 +118,7 @@ pub struct Expr {
   parent: BaseNode,
   dtype: DataType,
   opcode: Opcode,
-  operands: Vec<BaseNode>,
+  pub(crate) operands: Vec<BaseNode>,
   pub(crate) user_set: HashSet<BaseNode>,
 }
 
@@ -241,6 +250,8 @@ impl ExprMut<'_> {
     }
   }
 
+  /// Set the i-th operand to the given value.
+  /// NOTE: Just the raw value is given, not the operand wrapper.
   pub fn set_operand(&mut self, i: usize, value: BaseNode) {
     self.set_operand_impl(i, Some(value));
   }

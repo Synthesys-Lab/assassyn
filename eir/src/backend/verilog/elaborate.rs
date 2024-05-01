@@ -625,9 +625,6 @@ fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
           .get_operand(0)
           .unwrap()
           .get_value()
-          .as_ref::<Bind>(sys)
-          .unwrap()
-          .get_callee()
           .as_ref::<Module>(sys)
           .unwrap();
         triggered_modules.push(namify(triggered_module.get_name()));
@@ -1340,9 +1337,6 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             .get_operand(0)
             .unwrap()
             .get_value()
-            .as_ref::<Bind>(self.sys)
-            .unwrap()
-            .get_callee()
             .as_ref::<Module>(self.sys)
             .unwrap();
           let module_name = namify(module.get_name());

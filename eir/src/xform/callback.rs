@@ -3,7 +3,6 @@ use std::collections::HashSet;
 use crate::{
   builder::SysBuilder,
   ir::{node::*, Operand, FIFO, *},
-  xform::callback::visitor::Visitor,
 };
 
 pub(super) fn gather_single_callback_fifos(sys: &SysBuilder) -> Vec<(BaseNode, BaseNode)> {
@@ -88,12 +87,6 @@ pub(super) fn rewrite_single_callbacks(
     // Replace all the pops with the designated module
     for operand in pops {
       let operand = operand.as_ref::<Operand>(sys).unwrap();
-      // eprintln!(
-      //   "to replace operand: {}",
-      //   crate::ir::ir_printer::IRPrinter::new(true)
-      //     .visit_operand(&operand)
-      //     .unwrap()
-      // );
       let pop_expr = operand.get_user().as_ref::<Expr>(sys).unwrap();
       let pop_expr = pop_expr.upcast();
       // Doing 1.
@@ -114,12 +107,9 @@ pub(super) fn rewrite_single_callbacks(
         (call_operand.upcast(), call_operand.get_user().clone())
       };
       // Doing 3.
-      call_operand
-        .as_mut::<Operand>(sys)
-        .unwrap()
-        .erase_from_expr();
+      call_operand.as_mut::<Operand>(sys).unwrap().erase_self();
       // Doing 4.
-      let (mut push_expr, caller) = {
+      let (mut push_expr, _) = {
         let operand = operand.as_ref::<Operand>(sys).unwrap();
         let expr = operand.get_user().clone().as_ref::<Expr>(sys).unwrap();
         let block = expr.get_parent();
@@ -131,12 +121,6 @@ pub(super) fn rewrite_single_callbacks(
         )
       };
       push_expr.erase_from_parent();
-      eprintln!(
-        "after caller module:\n{}",
-        crate::ir::ir_printer::IRPrinter::new(true)
-          .dispatch(sys, &caller, vec![])
-          .unwrap()
-      );
     }
     // Doing 5.
     let (mut parent_module, idx) = {

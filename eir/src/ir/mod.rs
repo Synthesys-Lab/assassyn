@@ -9,7 +9,6 @@ pub mod port;
 pub mod user;
 pub mod visitor;
 
-pub use bind::{Bind, BindKind};
 pub use block::{Block, BlockKind};
 pub use data::{Array, ArrayPtr, DataType, IntImm, StrImm, Typed};
 pub use expr::{Expr, Opcode};

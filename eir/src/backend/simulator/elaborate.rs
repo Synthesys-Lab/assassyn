@@ -315,9 +315,6 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             .get_operand(0)
             .unwrap()
             .get_value()
-            .as_ref::<Bind>(self.sys)
-            .unwrap()
-            .get_callee()
             .as_ref::<Module>(self.sys)
           {
             format!("EventKind::Module{}", camelize(&namify(module.get_name())))

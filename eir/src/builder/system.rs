@@ -2,13 +2,15 @@
 
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
-use crate::{
-  ir::node::*,
-  ir::*,
-  ir::{ir_printer::IRPrinter, visitor::Visitor},
+use crate::ir::{
+  bind::{as_bind_expr, is_full},
+  ir_printer::IRPrinter,
+  node::*,
+  visitor::Visitor,
+  *,
 };
 
-use self::user::Operand;
+use self::{expr::BindKind, user::Operand};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
@@ -442,8 +444,14 @@ impl SysBuilder {
 
   /// Create a trigger. Push all the values to the corresponding named ports.
   pub fn create_async_call(&mut self, bind: BaseNode) -> BaseNode {
-    let bind = self.get::<Bind>(&bind).unwrap();
-    let args = vec![bind.upcast()];
+    assert!({
+      let expr = self.get::<Expr>(&bind).unwrap();
+      match expr.get_opcode() {
+        Opcode::Bind(_) => true,
+        _ => false,
+      }
+    });
+    let args = vec![bind];
     let res = self.create_expr(DataType::void(), Opcode::AsyncCall, args);
     res
   }
@@ -480,32 +488,45 @@ impl SysBuilder {
   }
 
   pub fn get_init_bind(&mut self, node: BaseNode) -> BaseNode {
+    let failure = || {
+      panic!(
+        "[Bind Init] Either a Module or a Bind is expected, but {:?} got!",
+        node
+      )
+    };
     match node.get_kind() {
       // A module is an empty bind.
       NodeKind::Module => {
         let module = node.as_ref::<Module>(self).unwrap();
-        self.insert_element(Bind::new(node, BindKind::Unknown, module.get_num_inputs()))
+        let mut args = vec![module.upcast()];
+        args.extend(vec![BaseNode::unknown(); module.get_num_inputs()]);
+        self.create_expr(DataType::void(), Opcode::Bind(BindKind::Unknown), args)
       }
-      // A bind is a bind.
-      NodeKind::Bind => node,
       // An expression should be a module type.
       NodeKind::Expr => {
         let expr = node.as_ref::<Expr>(self).unwrap();
-        let n = {
-          let dtype = expr.dtype();
-          match dtype {
-            DataType::Module(ports) => ports.len(),
-            _ => panic!("Invalid data type"),
+        match expr.get_opcode() {
+          Opcode::FIFOPop => {
+            let n = {
+              let dtype = expr.dtype();
+              match dtype {
+                DataType::Module(ports) => ports.len(),
+                _ => panic!("Invalid data type"),
+              }
+            };
+            let mut args = vec![node];
+            args.extend(vec![BaseNode::unknown(); n]);
+            self.create_expr(
+              DataType::void(),
+              Opcode::Bind(BindKind::Sequential),
+              vec![node],
+            )
           }
-        };
-        let opcode = expr.get_opcode();
-        assert_eq!(opcode, Opcode::FIFOPop);
-        self.insert_element(Bind::new(node, BindKind::Sequential, n))
+          Opcode::Bind(_) => node,
+          _ => failure(),
+        }
       }
-      _ => panic!(
-        "[Bind Init] Either a Module or a Bind is expected, but {:?} got!",
-        node
-      ),
+      _ => failure(),
     }
   }
 
@@ -518,16 +539,20 @@ impl SysBuilder {
     eager: bool,
   ) -> BaseNode {
     let res = bind.clone();
-    let bind = bind.as_ref::<Bind>(self).unwrap();
-    let module = bind
-      .get_callee()
-      .as_ref::<Module>(self)
-      .unwrap_or_else(|_| {
-        panic!(
-          "Only module callee can be used for bind, but {:?} got!",
-          bind.get_callee()
-        )
-      });
+    let module = {
+      let bind = as_bind_expr(self, bind).unwrap();
+      bind
+        .get_operand(0)
+        .unwrap()
+        .get_value()
+        .as_ref::<Module>(self)
+        .unwrap_or_else(|_| {
+          panic!(
+            "Only module callee can be used for bind, but {:?} got!",
+            bind.get_operand(0).unwrap().get_value()
+          )
+        })
+    };
     let port = module
       .get_port_by_name(&key)
       .expect(format!("{} is NOT a FIFO of {}", key, module.get_name()).as_str());
@@ -535,9 +560,10 @@ impl SysBuilder {
     let port_idx = port.idx();
     let module = module.upcast();
     let fifo_push = self.create_fifo_push(module.clone(), port_idx, value);
-    let mut bind = res.as_mut::<Bind>(self).unwrap();
-    bind.set_named_arg(&key, fifo_push);
-    if eager && bind.get().full() {
+    let mut bind_mut = res.as_mut::<Expr>(self).unwrap();
+    assert!(bind_mut.get().operands[port_idx].is_unknown());
+    bind_mut.set_operand(port_idx, fifo_push);
+    if eager && is_full(self, bind) {
       self.create_async_call(res)
     } else {
       res
@@ -546,16 +572,22 @@ impl SysBuilder {
 
   /// Add a bind to the current module.
   pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: bool) -> BaseNode {
-    let res = bind.clone();
-    let bind = bind.as_ref::<Bind>(self).unwrap();
-    assert!(!bind.full());
-    let signature = bind.get_callee_signature();
-    let callee = bind.get_callee();
-    let port_idx = {
-      let first = bind.arg_iter().position(|x| x.is_none()).unwrap();
-      let cnt = bind.arg_iter().filter(|x| x.is_some()).count();
-      assert_eq!(cnt, first, "Invalid sequential bind!");
-      first
+    let (callee, signature, port_idx) = {
+      let bind = as_bind_expr(self, bind).unwrap();
+      let callee = bind.get_operand(0).unwrap().get_value().clone();
+      let signature = callee.get_dtype(self).unwrap();
+      let port_idx = {
+        let mut idx = None;
+        for i in 1..bind.get_num_operands() {
+          if bind.get().operands[i].is_unknown() && idx.is_none() {
+            idx = Some(i);
+          } else if idx.is_some() {
+            assert!(bind.get().operands[i].is_unknown());
+          }
+        }
+        idx.unwrap()
+      };
+      (callee, signature, port_idx)
     };
     match &signature {
       DataType::Module(ports) => {
@@ -566,13 +598,13 @@ impl SysBuilder {
       }
       _ => panic!("Invalid signature"),
     }
-    let fifo_push = self.create_fifo_push(callee, port_idx, value);
-    let mut bind_mut = res.as_mut::<Bind>(self).unwrap();
-    bind_mut.set_ith_arg(port_idx, fifo_push);
-    if eager && bind_mut.get().full() {
-      self.create_async_call(res)
+    let fifo_push = self.create_fifo_push(callee, port_idx - 1, value);
+    let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
+    bind_mut.set_operand(port_idx, fifo_push);
+    if eager && is_full(self, bind) {
+      self.create_async_call(bind)
     } else {
-      res
+      bind
     }
   }
 
