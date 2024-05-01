@@ -1,19 +1,20 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
+use syn::{punctuated::Punctuated, spanned::Spanned, Token};
 
 use crate::ast::{
   self,
   expr::{self, DType, ExprTerm},
-  node::{ArrayAccess, BodyPred, FuncArgs, Statement},
+  node::{ArrayAccess, BodyPred, CallKind, FuncArgs, PortDecl, Statement},
 };
 
 use eir::ir::data::DataType;
 
 pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
   match &dtype.dtype {
-    DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int(#bits) }.into()),
-    DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint(#bits) }.into()),
+    DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int_ty(#bits) }.into()),
+    DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint_ty(#bits) }.into()),
     DataType::Module(args) => {
       let args = args
         .iter()
@@ -69,9 +70,41 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         }})
       }
       "pop" => {
-        let method_id = syn::Ident::new("create_fifo_pop", op.span());
+        let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
         let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
         Ok(quote!(sys.#method_id(#a.clone(), None);))
+      }
+      "valid" | "peek" => {
+        let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
+        // @were: I am not sure  if this is a temporary hack or a long-term solution
+        // to get compatible with the current implicit FIFO pop.
+        // Before, the ID of the ExprTerm directly refers to the FIFO instance, but now
+        // after the implicit FIFO pop, it refers to a value from the FIFO.
+        // However, when generating a valid, it will typically be used in the wait_until
+        // block before the pop, so we do not worry about "popping before validation".
+        //
+        // This is kinda back-and-forth in the code generator.
+        let fifo_self = match a {
+          ExprTerm::Ident(id) => {
+            let name = id.to_string();
+            quote! {{
+              let module = module.as_ref::<eir::ir::Module>(sys).unwrap();
+              module.get_port_by_name(#name).unwrap_or_else(|| {
+                panic!("Module {} has no port named {}", module.get_name(), #name)
+              }).upcast()
+            }}
+          }
+          _ => {
+            return Err(syn::Error::new(
+              op.span(),
+              "Expected an identifier for valid/peek!",
+            ))
+          }
+        };
+        Ok(quote! {{
+          let fifo = #fifo_self;
+          sys.#method_id(fifo)
+        }})
       }
       _ => Err(syn::Error::new(
         op.span(),
@@ -137,7 +170,7 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   }})
 }
 
-pub(crate) fn emit_args(
+pub(crate) fn emit_arg_binds(
   func: &syn::Ident,
   args: &FuncArgs,
   eager: bool,
@@ -198,19 +231,10 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         };
       }
     }
-    Statement::AsyncCall(call) => {
-      let func = &call.func;
-      let args = &call.args;
-      let args = emit_args(func, args, false);
-      quote! {{
-        #args;
-        sys.create_trigger_bound(bind);
-      }}
-    }
     Statement::Bind((id, call, eager)) => {
       let func = &call.func;
       let args = &call.args;
-      let args = emit_args(func, args, *eager);
+      let args = emit_arg_binds(func, args, *eager);
       quote!(
         let #id = {
           #args;
@@ -218,16 +242,56 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         };
       )
     }
-    Statement::SpinCall((lock, call)) => {
-      let func = &call.func;
-      let args = emit_args(func, &call.args, false);
-      let emitted_lock = emit_array_access(lock)?;
-      quote! {{
-        #args
-        let lock = #emitted_lock;
-        sys.create_spin_trigger_bound(lock, bind);
-      }}
-    }
+    Statement::Call((kind, call)) => match kind {
+      CallKind::Spin(lock) => {
+        let args = emit_arg_binds(&call.func, &call.args, false);
+        let emitted_lock = emit_array_access(lock)?;
+        quote! {{
+          #args;
+          let lock = #emitted_lock;
+          sys.create_spin_trigger_bound(lock, bind);
+        }}
+      }
+      CallKind::Async => {
+        let args = emit_arg_binds(&call.func, &call.args, false);
+        quote! {{
+          #args;
+          sys.create_trigger_bound(bind);
+        }}
+      }
+      CallKind::Inline(lval) => match &call.args {
+        FuncArgs::Plain(args) => {
+          let impl_id = syn::Ident::new(&format!("{}_impl", call.func), call.func.span());
+          let mut emit_args: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
+          let mut arg_ids: Punctuated<syn::Ident, Token![,]> = Punctuated::new();
+          for (i, elem) in args.iter().enumerate() {
+            let elem: proc_macro2::TokenStream = emit_expr_term(elem)?.into();
+            let id = syn::Ident::new(&format!("_{}", i), elem.span());
+            emit_args.push(quote! { let #id = #elem });
+            emit_args.push_punct(Token![;](elem.span()));
+            arg_ids.push(id);
+            arg_ids.push_punct(Token![,](elem.span()));
+          }
+          let lval = if lval.is_empty() {
+            quote! {let _ = }
+          } else {
+            quote! { let (_, #lval) = }
+          };
+          quote! {
+            #lval {
+              #emit_args
+              #impl_id(sys, module, #arg_ids)
+            };
+          }
+        }
+        FuncArgs::Bound(bound) => {
+          return Err(syn::Error::new(
+            bound.first().map_or(Span::call_site(), |x| x.0.span()),
+            "Inline call does not support bound arguments",
+          ))
+        }
+      },
+    },
     Statement::ArrayAlloc((id, ty, size)) => {
       let ty = emit_type(ty)?;
       let ty: proc_macro2::TokenStream = ty.into();
@@ -243,20 +307,21 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
           quote! {{
             let cond = #cond.clone();
             let block_pred = eir::ir::block::BlockKind::Condition(cond);
-            sys.create_block(block_pred)
+            (sys.create_block(block_pred), true)
           }}
         }
         BodyPred::Cycle(cycle) => {
           quote! {{
             let cycle = #cycle.clone();
             let block_pred = eir::ir::block::BlockKind::Cycle(cycle);
-            sys.create_block(block_pred)
+            (sys.create_block(block_pred), true)
           }}
         }
         BodyPred::WaitUntil(lock) => {
           let lock_emission = emit_body(lock).unwrap();
           quote! {{
-            let master = sys.create_wait_until_block();
+            sys.set_current_block_wait_until();
+            let master = sys.get_current_block().unwrap().upcast();
             {
               let master = master.as_ref::<eir::ir::block::Block>(sys).unwrap();
               if let eir::ir::block::BlockKind::WaitUntil(valued_block) = master.get_kind() {
@@ -266,21 +331,23 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
                 block.as_mut::<eir::ir::block::Block>(sys).unwrap().set_value(cond_value);
               }
             }
-            master
+            (master, false)
           }}
         }
       };
       quote! {{
-        let block = #block_init;
+        let (block, tick_ip) = #block_init;
         sys.set_current_block(block.clone());
         #unwraped_body
         let cur_module = sys
           .get_current_module()
           .expect("[When] No current module")
           .upcast();
-        let ip = sys.get_current_ip();
-        let ip = ip.next(sys).expect("[When] No next ip");
-        sys.set_current_ip(ip);
+        if tick_ip {
+          let ip = sys.get_current_ip();
+          let ip = ip.next(sys).expect("[When] No next ip");
+          sys.set_current_ip(ip);
+        }
       }}
     }
     Statement::Log(args) => {
@@ -348,4 +415,67 @@ pub(crate) fn emit_body(body: &ast::node::Body) -> syn::Result<proc_macro2::Toke
     }});
   }
   Ok(res.into())
+}
+
+pub(crate) fn emit_ports(
+  ports: &Punctuated<PortDecl, Token![,]>,
+) -> syn::Result<(
+  proc_macro2::TokenStream,
+  proc_macro2::TokenStream,
+  proc_macro2::TokenStream,
+  proc_macro2::TokenStream,
+)> {
+  let mut port_ids: Punctuated<syn::Ident, Token![,]> = Punctuated::new();
+  let mut port_decls: Punctuated<proc_macro2::TokenStream, Token![,]> = Punctuated::new();
+  let mut port_peeks: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
+  let mut port_pops: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
+  for (i, elem) in ports.iter().enumerate() {
+    let (id, ty) = (elem.id.clone(), elem.ty.clone());
+    // IDs: <id>, <id>, ...
+    port_ids.push(id.clone());
+    port_ids.push_punct(Token![,](id.span()));
+    let err_log = syn::LitStr::new(&format!("Index {} exceed!", i), id.span());
+    // Peek the port instances
+    port_peeks.push(quote! { let #id = module.get_port(#i).expect(#err_log).clone() });
+    port_peeks.push_punct(Token![;](id.span()));
+    // Declarations: <id>: <ty>,
+    let ty: proc_macro2::TokenStream = emit_type(&ty)?.into();
+    port_decls.push(quote! { eir::builder::PortInfo::new(stringify!(#id), #ty) });
+    port_decls.push_punct(Token![,](id.span()));
+    // Pop the port instances
+    port_pops.push(quote! { let #id = sys.create_fifo_pop(#id.clone(), None) });
+    port_pops.push_punct(Token![;](id.span()));
+  }
+  Ok((
+    quote! {#port_ids},
+    quote! {#port_decls},
+    quote! {#port_peeks},
+    quote! {#port_pops},
+  ))
+}
+
+pub(crate) fn emit_rets(
+  x: &Option<Punctuated<syn::Ident, Token![,]>>,
+) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
+  if let Some(exposes) = x {
+    // Types: BaseNode(module), BaseNode, BaseNode, ...
+    let mut tys: Punctuated<proc_macro2::TokenStream, Token![,]> = Punctuated::new();
+    tys.push(quote! { eir::ir::node::BaseNode });
+    tys.push_punct(Token![,](Span::call_site()));
+    // Values: module, <id>, <id>, ...
+    let mut vals: Punctuated<syn::Ident, Token![,]> = Punctuated::new();
+    vals.push(syn::Ident::new("module", Span::call_site()));
+    vals.push_punct(Default::default());
+    for elem in exposes.iter() {
+      // Pushing values
+      vals.push(elem.clone());
+      vals.push_punct(Token![,](elem.span()));
+      // Pushing types
+      tys.push(quote! { eir::ir::node::BaseNode });
+      tys.push_punct(Token![,](elem.span()));
+    }
+    (quote! { ( #tys ) }, quote! { ( #vals ) })
+  } else {
+    (quote! { eir::ir::node::BaseNode }, quote! { module })
+  }
 }

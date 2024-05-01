@@ -5,7 +5,7 @@ use crate::ir::{DataType, Typed};
 
 // TODO(@were): Is it possible to unify both arrays and fifos?
 
-pub(in crate::sim) fn array_types_used(sys: &SysBuilder) -> HashSet<DataType> {
+pub(in crate::backend::simulator) fn array_types_used(sys: &SysBuilder) -> HashSet<DataType> {
   let mut res = HashSet::new();
   for array in sys.array_iter() {
     res.insert(array.dtype());
@@ -13,7 +13,7 @@ pub(in crate::sim) fn array_types_used(sys: &SysBuilder) -> HashSet<DataType> {
   return res;
 }
 
-pub(in crate::sim) fn fifo_types_used(sys: &SysBuilder) -> HashSet<DataType> {
+pub(in crate::backend::simulator) fn fifo_types_used(sys: &SysBuilder) -> HashSet<DataType> {
   let mut res = HashSet::new();
   for array in sys.module_iter() {
     for fifo in array.port_iter() {

@@ -169,10 +169,10 @@ impl Visitor<String> for IRPrinter {
     }
     if let Some(builder_ptr) = module.get_builder_func_ptr() {
       res.push_str(&" ".repeat(self.indent));
-      res.push_str(&format!("// Builder Function: 0x{:x}", builder_ptr));
+      res.push_str(&format!("// Builder Function: 0x{:x}\n", builder_ptr));
     }
     res.push_str(&" ".repeat(self.indent));
-    res.push_str(&format!("// Key: {}", module.get_key()));
+    res.push_str(&format!("// Key: {}\n", module.get_key()));
     res.push_str(&format!(
       "{}module {}(",
       " ".repeat(self.indent),
@@ -191,7 +191,8 @@ impl Visitor<String> for IRPrinter {
     }
 
     let body = self.visit_block(&module.get_body()).unwrap();
-    res.push_str(&body[self.indent..].to_string());
+    res.push_str(&body);
+    res.push('\n');
 
     if module.get_name().eq("driver") {
       self.dec_indent();
@@ -291,7 +292,7 @@ impl Visitor<String> for IRPrinter {
           let fifo_name = fifo.get_name();
           format!("_{} = {}.{}.pop()", expr.get_key(), module_name, fifo_name)
         }
-        Opcode::FIFOPeek => {
+        Opcode::FIFOPeek | Opcode::FIFOValid => {
           // TODO(@were): Support multiple peek.
           let fifo = expr
             .get_operand(0)
@@ -305,7 +306,18 @@ impl Visitor<String> for IRPrinter {
             module.get_name().to_string()
           };
           let fifo_name = fifo.get_name();
-          format!("_{} = {}.{}.peek()", expr.get_key(), module_name, fifo_name)
+          let method = match expr.get_opcode() {
+            Opcode::FIFOPeek => "peek",
+            Opcode::FIFOValid => "valid",
+            _ => unreachable!(),
+          };
+          format!(
+            "_{} = {}.{}.{}()",
+            expr.get_key(),
+            module_name,
+            fifo_name,
+            method
+          )
         }
         Opcode::FIFOPush => {
           let fifo_name = FIFODumper

@@ -9,6 +9,7 @@ use proc_macro2::Span;
 use syn::Ident;
 
 use crate::{
+  backend::common::Config,
   builder::system::SysBuilder,
   ir::{node::*, visitor::Visitor, *},
 };
@@ -22,7 +23,7 @@ use self::{
   module::memory::{module_is_memory, parse_memory_module_name},
 };
 
-use super::{analysis, Config};
+use super::analysis;
 
 struct ElaborateModule<'a, 'b> {
   sys: &'a SysBuilder,
@@ -230,21 +231,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       res.push_str(rdata_fifo.unwrap().as_str());
       res.push_str(rdata_module.unwrap().as_str());
     } else {
-      for elem in module.get_body().iter() {
-        match elem.get_kind() {
-          NodeKind::Expr => {
-            let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-            res.push_str(&self.visit_expr(&expr).unwrap());
-          }
-          NodeKind::Block => {
-            let block = elem.as_ref::<Block>(self.sys).unwrap();
-            res.push_str(&self.visit_block(&block).unwrap());
-          }
-          _ => {
-            panic!("Unexpected reference type: {:?}", elem);
-          }
-        }
-      }
+      res.push_str(&self.visit_block(&module.get_body()).unwrap());
     }
 
     self.indent -= 2;
@@ -376,6 +363,15 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             .unwrap();
           format!("{}.front().unwrap().clone()", fifo_name!(fifo))
         }
+        Opcode::FIFOValid => {
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .get_value()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          format!("!{}.is_empty()", fifo_name!(fifo))
+        }
         Opcode::FIFOPush => {
           let fifo = expr
             .get_operand(0)
@@ -429,7 +425,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
               .get_value()
               .get_dtype(self.sys)
               .unwrap();
-            dtype.bits()
+            dtype.get_bits()
           };
           format!(
             "{{
@@ -496,7 +492,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         res.push_str(&format!(
           "  if {}{} {{\n",
           dump_ref!(self.sys, &cond),
-          if cond.get_dtype(block.sys).unwrap().bits() == 1 {
+          if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
             "".into()
           } else {
             format!(" != 0")
@@ -515,7 +511,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         res.push_str(&format!(
           "  if {}{} {{\n",
           cond,
-          if dtype.bits() == 1 {
+          if dtype.get_bits() == 1 {
             "".into()
           } else {
             format!(" != 0")
@@ -807,7 +803,7 @@ macro_rules! impl_unwrap_slab {
       &format!("Array{}", array_ty_to_id(&scalar_ty, size)),
       Span::call_site(),
     );
-    let init_scalar = if scalar_ty.bits() == 1 {
+    let init_scalar = if scalar_ty.get_bits() == 1 {
       "false".into()
     } else {
       format!("0 as {}", scalar_str)
@@ -1098,30 +1094,26 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
   fd.write("\n\n\n".as_bytes())
 }
 
-pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
-  println!("Writing simulator code to {}", config.fname);
-  let mut fd = fs::File::create(config.fname.clone())?;
+pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
+  let fname = config.fname(sys, "rs");
+  println!("Writing simulator code to {}", fname);
+  let mut fd = fs::File::create(fname.clone())?;
   dump_header(&mut fd)?;
   let (rt_src, ri) = dump_runtime(sys, config);
   dump_module(sys, &mut fd, &ri)?;
   fd.write(rt_src.as_bytes())?;
-  fd.flush()
+  fd.flush()?;
+  Ok(fname)
 }
 
-pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), std::io::Error> {
-  match elaborate_impl(sys, config) {
-    Ok(_) => {}
-    Err(e) => {
-      eprintln!("Failed to write to file: {}", e);
-      std::process::exit(1);
-    }
-  }
+pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
+  let fname = elaborate_impl(sys, config)?;
   let output = Command::new("rustfmt")
-    .arg(&config.fname)
+    .arg(&fname)
     .arg("--config")
     .arg("max_width=100,tab_spaces=2")
     .output()
     .expect("Failed to format");
   assert!(output.status.success());
-  Ok(())
+  Ok(fname)
 }

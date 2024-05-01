@@ -119,7 +119,8 @@ pub(super) fn rewrite_spin_triggers(sys: &mut SysBuilder) {
       .create_expr(DataType::void(), Opcode::Trigger, bundle);
     // Create trigger to the destination module.
     mutator.sys.set_current_module(agent.clone());
-    let wait_until = mutator.sys.create_wait_until_block();
+    mutator.sys.set_current_block_wait_until();
+    let wait_until = mutator.sys.get_current_block().unwrap().upcast();
     let agent_module = mutator.sys.get_current_module().unwrap();
     let agent_ports = agent_module
       .port_iter()

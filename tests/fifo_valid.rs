@@ -1,11 +1,18 @@
 use eda4eda::module_builder;
-use eir::{builder::SysBuilder, test_utils::run_simulator};
+use eir::builder::SysBuilder;
 
 #[test]
-fn bind() {
+fn fifo_valid() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
-    c = a.sub(b);
-    log("sub: {} - {} = {}", a, b, c);
+    wait_until {
+      a_valid = a.valid();
+      b_valid = b.valid();
+      both_valid = a_valid.bitwise_and(b_valid);
+      both_valid
+    } {
+      c = a.sub(b);
+      log("sub: {} - {} = {}", a, b, c);
+    }
   });
 
   module_builder!(driver(lhs, rhs)() {
@@ -13,27 +20,20 @@ fn bind() {
     k = cnt[0.int<32>];
     v = k.add(1);
     cnt[0] = v;
-    mul = v.add(v);
-    async_call lhs { a: mul };
-    async_call rhs { a: v };
+    add = v.add(v);
+    async_call lhs { v: add };
+    async_call rhs { b: v };
   });
 
   module_builder!(
-    lhs(sub)(a:int<32>) {
-      aa = eager_bind sub { a: a };
-    }.expose(aa)
+    lhs(sub)(v:int<32>) {
+      rhs = bind sub { a: v };
+    }.expose(rhs)
   );
 
-  module_builder!(
-    rhs(sub)(a:int<32>) {
-      async_call sub { b: a };
-    }
-  );
-
-  let mut sys = SysBuilder::new("bind");
-  let adder = sub_builder(&mut sys);
-  let (lhs, aa) = lhs_builder(&mut sys, adder);
-  let rhs = rhs_builder(&mut sys, aa);
+  let mut sys = SysBuilder::new("main");
+  let suber = sub_builder(&mut sys);
+  let (lhs, rhs) = lhs_builder(&mut sys, suber);
   driver_builder(&mut sys, lhs, rhs);
   eir::builder::verify(&sys);
   println!("{}", sys);
@@ -45,7 +45,7 @@ fn bind() {
   };
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  run_simulator(
+  eir::test_utils::run_simulator(
     &sys,
     &config,
     Some((

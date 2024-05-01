@@ -142,6 +142,10 @@ impl SysBuilder {
     res
   }
 
+  pub fn get_name(&self) -> &str {
+    &self.name
+  }
+
   /// If this system has a driver.
   pub fn has_driver(&self) -> bool {
     self.module_iter().any(|x| x.get_name().eq("driver"))
@@ -529,7 +533,11 @@ impl SysBuilder {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
     assert!(bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::KVBind);
-    assert!(!bind.get_bound().contains_key(&key));
+    assert!(
+      !bind.get_bound().contains_key(&key),
+      "Argument \"{}\" bound twice",
+      key
+    );
     let module = bind.get_callee().as_ref::<Module>(self).unwrap();
     let port = module
       .get_port_by_name(&key)
@@ -675,7 +683,7 @@ impl SysBuilder {
           bty.to_string()
         ),
       },
-      Opcode::EQ | Opcode::IGT | Opcode::IGE | Opcode::ILT | Opcode::ILE => DataType::uint(1),
+      Opcode::EQ | Opcode::IGT | Opcode::IGE | Opcode::ILT | Opcode::ILE => DataType::uint_ty(1),
       _ => panic!("Unsupported opcode {:?}", op),
     }
   }
@@ -691,7 +699,7 @@ impl SysBuilder {
     let num_elems = if let Some(num_elems) = num_elems {
       num_elems
     } else {
-      self.get_const_int(DataType::uint(32), 1)
+      self.get_const_int(DataType::uint_ty(32), 1)
     };
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
     let res = self.create_expr(ty, Opcode::FIFOPop, vec![fifo.clone(), num_elems]);
@@ -703,6 +711,12 @@ impl SysBuilder {
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
     let res = self.create_expr(ty, Opcode::FIFOPeek, vec![fifo]);
+    res
+  }
+
+  pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
+    assert_eq!(fifo.get_kind(), NodeKind::FIFO);
+    let res = self.create_expr(DataType::int_ty(1), Opcode::FIFOValid, vec![fifo]);
     res
   }
 
@@ -723,7 +737,7 @@ impl SysBuilder {
       if let Ok(end) = end.as_ref::<IntImm>(self) {
         assert!(start.get_value() <= end.get_value());
         let bits = end.get_value() - start.get_value() + 1;
-        DataType::int(bits as usize)
+        DataType::int_ty(bits as usize)
       } else {
         src.get_dtype(self).unwrap()
       }

@@ -67,7 +67,7 @@ impl SysBuilder {
     let name = name.replace("_", "");
     let module_name = self.identifier(&format!(
       "__builtin_memory_w{}_d{}_l{}_{}_{}{}{}",
-      ty.bits(),
+      ty.get_bits(),
       depth,
       lat_min,
       lat_max,
