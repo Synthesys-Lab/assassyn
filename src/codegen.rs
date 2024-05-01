@@ -179,7 +179,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
-          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value);
+          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, true);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -190,7 +190,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
-          let bind = sys.push_bind(bind, value);
+          let bind = sys.push_bind(bind, value, true);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -243,7 +243,7 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         let args = emit_arg_binds(&call.func, &call.args);
         quote! {{
           #args;
-          sys.create_async_call(bind);
+          // sys.create_async_call(bind);
         }}
       }
       CallKind::Inline(lval) => match &call.args {

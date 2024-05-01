@@ -510,7 +510,13 @@ impl SysBuilder {
   }
 
   /// Add a bind to the current module.
-  pub fn add_bind(&mut self, bind: BaseNode, key: String, value: BaseNode) -> BaseNode {
+  pub fn add_bind(
+    &mut self,
+    bind: BaseNode,
+    key: String,
+    value: BaseNode,
+    eager: bool,
+  ) -> BaseNode {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
     assert!(
@@ -542,11 +548,15 @@ impl SysBuilder {
     bind.set_kind(BindKind::KVBind);
     let bound = bind.get_args_mut();
     bound[port_idx] = Some(fifo_push);
-    res
+    if eager && bind.get().full() {
+      self.create_async_call(res)
+    } else {
+      res
+    }
   }
 
   /// Add a bind to the current module.
-  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode) -> BaseNode {
+  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: bool) -> BaseNode {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
     assert!(!bind.full());
@@ -576,7 +586,11 @@ impl SysBuilder {
     bind_mut.set_kind(BindKind::Sequential);
     let args = bind_mut.get_args_mut();
     args[port_idx] = Some(fifo_push);
-    res
+    if eager && bind_mut.get().full() {
+      self.create_async_call(res)
+    } else {
+      res
+    }
   }
 
   /// A helper function to create a FIFO push.

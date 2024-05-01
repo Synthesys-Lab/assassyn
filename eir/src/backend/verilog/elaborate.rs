@@ -296,7 +296,12 @@ impl<'a> VerilogDumper<'a> {
       let module_name = namify(module.get_name());
       res.push_str(format!("// {} trigger\n", module_name).as_str());
       if module_name != "driver" && module_name != "testbench" {
-        for driver in self.trigger_drivers.get(&module_name).unwrap().into_iter() {
+        for driver in self
+          .trigger_drivers
+          .get(&module_name)
+          .unwrap_or_else(|| panic!("{} not found!", module_name))
+          .into_iter()
+        {
           res.push_str(
             format!(
               "logic {}_driver_{}_trigger_push_valid;\n",
@@ -620,6 +625,9 @@ fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
           .get_operand(0)
           .unwrap()
           .get_value()
+          .as_ref::<Bind>(sys)
+          .unwrap()
+          .get_callee()
           .as_ref::<Module>(sys)
           .unwrap();
         triggered_modules.push(namify(triggered_module.get_name()));
@@ -1332,6 +1340,9 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             .get_operand(0)
             .unwrap()
             .get_value()
+            .as_ref::<Bind>(self.sys)
+            .unwrap()
+            .get_callee()
             .as_ref::<Module>(self.sys)
             .unwrap();
           let module_name = namify(module.get_name());

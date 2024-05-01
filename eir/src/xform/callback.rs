@@ -103,12 +103,6 @@ pub(super) fn rewrite_single_callbacks(
     }
     // Remove all the pushes
     for operand in pushes {
-      // eprintln!(
-      //   "pusher operand: {}",
-      //   crate::ir::ir_printer::IRPrinter::new(true)
-      //     .dispatch(sys, &operand, vec![])
-      //     .unwrap()
-      // );
       let (call_operand, _) = {
         let operand = operand.as_ref::<Operand>(sys).unwrap();
         let push_expr = operand.get_user().as_ref::<Expr>(sys).unwrap();
@@ -117,12 +111,6 @@ pub(super) fn rewrite_single_callbacks(
         let res = iter.next().unwrap().clone();
         assert!(iter.next().is_none());
         let call_operand = res.as_ref::<Operand>(sys).unwrap();
-        // eprintln!(
-        //   "call operand: {}",
-        //   crate::ir::ir_printer::IRPrinter::new(true)
-        //     .visit_operand(&call_operand)
-        //     .unwrap()
-        // );
         (call_operand.upcast(), call_operand.get_user().clone())
       };
       // Doing 3.
@@ -130,12 +118,6 @@ pub(super) fn rewrite_single_callbacks(
         .as_mut::<Operand>(sys)
         .unwrap()
         .erase_from_expr();
-      // eprintln!(
-      //   "call expr after erasing: {}",
-      //   crate::ir::ir_printer::IRPrinter::new(true)
-      //     .dispatch(sys, &call_expr, vec![])
-      //     .unwrap()
-      // );
       // Doing 4.
       let (mut push_expr, caller) = {
         let operand = operand.as_ref::<Operand>(sys).unwrap();

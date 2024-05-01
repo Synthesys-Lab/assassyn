@@ -30,7 +30,7 @@ fn adder() {
   };
 
   // TODO(@boyang): Should we also test the verilog backend?
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   run_simulator(
     &sys,
