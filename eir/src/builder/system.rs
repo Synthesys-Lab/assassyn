@@ -513,8 +513,19 @@ impl SysBuilder {
   pub fn add_bind(&mut self, bind: BaseNode, key: String, value: BaseNode) -> BaseNode {
     let res = bind.clone();
     let bind = bind.as_ref::<Bind>(self).unwrap();
-    assert!(bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::KVBind);
-    let module = bind.get_callee().as_ref::<Module>(self).unwrap();
+    assert!(
+      bind.get_kind() == BindKind::Unknown || bind.get_kind() == BindKind::KVBind,
+      "Sequential and named binds cannot be mixed!"
+    );
+    let module = bind
+      .get_callee()
+      .as_ref::<Module>(self)
+      .unwrap_or_else(|_| {
+        panic!(
+          "Only module callee can be used for bind, but {:?} got!",
+          bind.get_callee()
+        )
+      });
     let port = module
       .get_port_by_name(&key)
       .expect(format!("{} is NOT a FIFO of {}", key, module.get_name()).as_str());
@@ -542,7 +553,8 @@ impl SysBuilder {
     let signature = bind.get_callee_signature();
     let callee = bind.get_callee();
     assert!(
-      bind.get().get_kind() == BindKind::Unknown || bind.get().get_kind() == BindKind::Sequential
+      bind.get().get_kind() == BindKind::Unknown || bind.get().get_kind() == BindKind::Sequential,
+      "Sequential and named binds cannot be mixed!"
     );
     let port_idx = {
       let first = bind.get_args().iter().position(|x| x.is_none()).unwrap();
