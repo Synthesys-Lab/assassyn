@@ -527,7 +527,7 @@ impl SysBuilder {
             self.create_expr(
               DataType::void(),
               Opcode::Bind(BindKind::Sequential),
-              vec![node],
+              args,
               false,
             )
           }
@@ -601,7 +601,7 @@ impl SysBuilder {
             assert!(operand.get_value().is_unknown());
           }
         }
-        idx.unwrap()
+        idx.expect("All arguments bound!")
       };
       (callee, signature, port_idx)
     };
@@ -614,7 +614,7 @@ impl SysBuilder {
       }
       _ => panic!("Invalid signature"),
     }
-    let fifo_push = self.create_fifo_push(callee, port_idx - 1, value);
+    let fifo_push = self.create_fifo_push(callee, port_idx, value);
     let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
     bind_mut.set_operand(port_idx, fifo_push);
     if eager && is_fully_bound(self, bind) {
