@@ -243,6 +243,7 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         let args = emit_arg_binds(&call.func, &call.args);
         quote! {{
           #args;
+          sys.create_async_call(bind);
         }}
       }
       CallKind::Inline(lval) => match &call.args {

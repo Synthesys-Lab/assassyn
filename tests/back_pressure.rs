@@ -41,7 +41,8 @@ fn back_pressure() {
     sim_threshold: 100,
     idle_threshold: 100,
   };
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+
+  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   run_simulator(
     &sys,

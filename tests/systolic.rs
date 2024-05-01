@@ -33,8 +33,8 @@ fn systolic_array() {
       log("MAC value: {} * {} + {} = {}", west, north, val, mac);
       acc[0] = mac;
       feast = bind east(west);
-      fsouth = bind south(north);
-    }.expose(feast, fsouth, acc)
+      async_call south(north);
+    }.expose(feast, acc)
   );
 
   let mut sys = SysBuilder::new("systolic_array");
@@ -63,7 +63,7 @@ fn systolic_array() {
     pe_array[5][i].bound = pe_array[5][i].pe;
   });
 
-  module_builder!(data_pusher(dest)(data: int<32>) {
+  module_builder!(row_pusher(dest)(data: int<32>) {
     log("pushes {}", data);
     bound = bind dest(data);
   }.expose(bound));
@@ -72,7 +72,7 @@ fn systolic_array() {
     for j in (1..=4).rev() {
       let peeast = pe_array[i][j + 1].pe;
       let fsouth = pe_array[i + 1][j].bound;
-      let (pe, feast, fsouth, acc) = pe_builder(&mut sys, peeast, fsouth);
+      let (pe, feast, acc) = pe_builder(&mut sys, peeast, fsouth);
       pe.as_mut::<Module>(&mut sys)
         .unwrap()
         .set_name(format!("pe_{}_{}", i, j));
@@ -82,7 +82,7 @@ fn systolic_array() {
       pe_array[i][j].accumulator = acc;
       pe_array[i + 1][j].bound = fsouth;
     }
-    let (pusher_pe, bound) = data_pusher_builder(&mut sys, pe_array[i][1].bound);
+    let (pusher_pe, bound) = row_pusher_builder(&mut sys, pe_array[i][1].bound);
     pusher_pe
       .as_mut::<Module>(&mut sys)
       .unwrap()
@@ -91,14 +91,17 @@ fn systolic_array() {
     pe_array[i][1].bound = bound;
   }
 
+  module_builder!(col_pusher(dest)(data: int<32>) {
+    log("pushes {}", data);
+    async_call dest(data);
+  });
   for i in 1..=4 {
-    let (pusher_pe, bound) = data_pusher_builder(&mut sys, pe_array[1][i].bound);
+    let pusher_pe = col_pusher_builder(&mut sys, pe_array[1][i].bound);
     pusher_pe
       .as_mut::<Module>(&mut sys)
       .unwrap()
       .set_name(format!("col_pusher_{}", i));
     pe_array[0][i].pe = pusher_pe;
-    pe_array[1][i].bound = bound;
   }
 
   // what if i do this?
@@ -124,8 +127,8 @@ fn systolic_array() {
       //   P P P  P
       //   P P P  P
       //   P P P  P
-      _a = bind col1(0);
-      _a = bind row1(0);
+      async_call col1(0);
+      async_call row1(0);
     }
     cycle 1 {
       // 1 1 4
@@ -133,10 +136,10 @@ fn systolic_array() {
       // 4 P P P  P
       //   P P P  P
       //   P P P  P
-      _a = bind row1(1);
-      _a = bind col1(1);
-      _a = bind col2(4);
-      _a = bind row2(4);
+      async_call row1(1);
+      async_call col1(1);
+      async_call col2(4);
+      async_call row2(4);
     }
     cycle 2 {
       // 2 2 5 8
@@ -144,12 +147,12 @@ fn systolic_array() {
       // 5 P P P  P
       // 8 P P P  P
       //   P P P  P
-      _a = bind row1(2);
-      _a = bind col1(2);
-      _a = bind col2(5);
-      _a = bind row2(5);
-      _a = bind row3(8);
-      _a = bind col3(8);
+      async_call row1(2);
+      async_call col1(2);
+      async_call col2(5);
+      async_call row2(5);
+      async_call row3(8);
+      async_call col3(8);
     }
     cycle 3 {
       // 3  3 6 9  12
@@ -157,14 +160,14 @@ fn systolic_array() {
       // 6  P P P  P
       // 9  P P P  P
       // 12 P P P  P
-      _a = bind row1(3);
-      _a = bind col1(3);
-      _a = bind col2(6);
-      _a = bind row2(6);
-      _a = bind row3(9);
-      _a = bind col3(9);
-      _a = bind row4(12);
-      _a = bind col4(12);
+      async_call row1(3);
+      async_call col1(3);
+      async_call col2(6);
+      async_call row2(6);
+      async_call row3(9);
+      async_call col3(9);
+      async_call row4(12);
+      async_call col4(12);
     }
     cycle 4 {
       // 4    7 10 13
@@ -172,12 +175,12 @@ fn systolic_array() {
       // 7  P P P  P
       // 10 P P P  P
       // 13 P P P  P
-      _a = bind row2(7);
-      _a = bind col2(7);
-      _a = bind row3(10);
-      _a = bind col3(10);
-      _a = bind row4(13);
-      _a = bind col4(13);
+      async_call row2(7);
+      async_call col2(7);
+      async_call row3(10);
+      async_call col3(10);
+      async_call row4(13);
+      async_call col4(13);
     }
     cycle 5 {
       //  5    11 14
@@ -185,10 +188,10 @@ fn systolic_array() {
       //    P P P  P
       // 11 P P P  P
       // 14 P P P  P
-      _a = bind row3(11);
-      _a = bind col3(11);
-      _a = bind row4(14);
-      _a = bind col4(14);
+      async_call row3(11);
+      async_call col3(11);
+      async_call row4(14);
+      async_call col4(14);
     }
     cycle 6 {
       //   6      15
@@ -196,8 +199,8 @@ fn systolic_array() {
       //    P P P  P
       //    P P P  P
       // 15 P P P  P
-      _a = bind row4(15);
-      _a = bind col4(15);
+      async_call row4(15);
+      async_call col4(15);
     }
   });
 
