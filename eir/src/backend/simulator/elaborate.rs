@@ -11,7 +11,7 @@ use syn::Ident;
 use crate::{
   backend::common::Config,
   builder::system::SysBuilder,
-  ir::{node::*, visitor::Visitor, *},
+  ir::{bind::get_bind_callee, node::*, visitor::Visitor, *},
 };
 
 use super::utils::{
@@ -311,12 +311,11 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           .to_string()
         }
         Opcode::AsyncCall => {
-          let to_trigger = if let Ok(module) = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<Module>(self.sys)
-          {
+          let to_trigger = if let Ok(module) = {
+            let callee =
+              get_bind_callee(self.sys, expr.get_operand(0).unwrap().get_value().clone());
+            callee.as_ref::<Module>(self.sys)
+          } {
             format!("EventKind::Module{}", camelize(&namify(module.get_name())))
           } else {
             panic!("AsyncCall target is not a module, did you rewrite the callback?");
