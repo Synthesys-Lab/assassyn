@@ -18,12 +18,9 @@ pub fn module_is_memory(module_name: &String) -> bool {
 pub fn parse_memory_module_name(module_name: &String) -> Option<MemoryParams> {
   if module_is_memory(module_name) {
     let mem_name = module_name.replace("__builtin_memory_", "");
-    let mem_params = mem_name
-      .split(".")
-      .next()
-      .unwrap()
-      .split("_")
-      .collect::<Vec<_>>();
+    let mem_name = mem_name.replace(".", "_");
+    let mut mem_params = mem_name.split("_").collect::<Vec<_>>();
+    mem_params.remove(mem_params.len() - 1);
     let mem_width = mem_params[0][1..].parse::<usize>().unwrap();
     let mem_depth = mem_params[1][1..].parse::<usize>().unwrap();
     let mem_lat_min = mem_params[2][1..].parse::<usize>().unwrap();
