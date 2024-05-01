@@ -44,11 +44,6 @@ pub(super) fn rewrite_single_callbacks(
   for (port, module) in to_rewrite {
     let (pushes, pops): (Vec<_>, Vec<_>) = {
       let port_fifo = port.as_ref::<FIFO>(sys).unwrap();
-      eprintln!(
-        "module fifo: {}, replace by: {}",
-        port_fifo.get_name(),
-        module.as_ref::<Module>(sys).unwrap().get_name()
-      );
       port_fifo
         .users()
         .iter()

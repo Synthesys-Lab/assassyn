@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
-use crate::builder::SysBuilder;
+use crate::{builder::SysBuilder, ir::ir_printer::IRPrinter};
 
-use super::{node::*, visitor::Visitor, Expr, Module, FIFO};
+use super::{node::*, visitor::Visitor, Expr, Module, Opcode, FIFO};
 
 /// This node defines a def-use relation between the expression nodes.
 /// This is necessary because a node can be used by multiple in other user.
@@ -104,6 +104,10 @@ impl GatherAllUses {
 
 impl Visitor<()> for GatherAllUses {
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
+    if let Opcode::AsyncCall = expr.get_opcode() {
+      let bind = expr.get_operand(0).unwrap().get_value().clone();
+      self.dispatch(expr.sys, &bind, vec![]);
+    }
     for (i, operand) in expr.operand_iter().enumerate() {
       match operand.get_value().get_kind() {
         NodeKind::FIFO => {
@@ -178,11 +182,20 @@ impl SysBuilder {
   // TODO(@were): I strongly believe we can have a BFS based gatherer to have better performance.
   pub fn replace_all_uses_with(&mut self, src: BaseNode, dst: BaseNode) {
     let mut gather = GatherAllUses::new(src, dst);
+    eprintln!(
+      "replace {}",
+      IRPrinter::new(false).dispatch(self, &src, vec![]).unwrap()
+    );
+    // eprintln!("by {}", dst.to_string(self));
     for m in self.module_iter() {
       gather.visit_module(&m);
     }
     for (expr, i, new_value) in gather.uses {
       let new_value = new_value.map_or(dst.clone(), |x| x);
+      eprintln!(
+        "use: {}",
+        IRPrinter::new(false).dispatch(self, &expr, vec![]).unwrap()
+      );
       let mut expr_mut = expr.as_mut::<Expr>(self).unwrap();
       expr_mut.set_operand(i, new_value);
     }
