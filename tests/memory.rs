@@ -33,7 +33,7 @@ fn sram_sys() -> SysBuilder {
   sys
 }
 
-// #[test]
+#[test]
 fn sram() {
   let mut sys = sram_sys();
 

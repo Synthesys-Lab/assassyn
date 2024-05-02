@@ -179,24 +179,25 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             );
           }
           Opcode::AsyncCall => {
-            let to_trigger = if let Ok(module) = expr
+            let bind = expr
               .get_operand(0)
               .unwrap()
               .get_value()
+              .as_ref::<Expr>(self.sys)
+              .unwrap();
+            let module = bind
+              .get_operand(bind.get_num_operands() - 1)
+              .unwrap()
+              .get_value()
               .as_ref::<Module>(self.sys)
-            {
-              format!("EventKind::Module{}", camelize(&namify(module.get_name())))
-            } else {
-              format!(
-                "{}.as_ref().clone()",
-                dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value())
-              )
-            };
+              .unwrap();
+            let to_trigger = format!("EventKind::Module{}", camelize(&namify(module.get_name())));
             rdata_module = Some(format!(
               "q.push(Reverse(Event{{ stamp: stamp + read_latency * 100, kind: {} }}))",
               to_trigger
             ));
           }
+          Opcode::Bind(_) => { /* don't care, processed in corresponding AsyncCall` */ }
           _ => panic!("Unexpected expr of {:?} in memory body", expr.get_opcode()),
         }
       }
