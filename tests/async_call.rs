@@ -2,7 +2,7 @@ use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 #[test]
-fn trigger() {
+fn async_call() {
   module_builder!(
     adder()(a:int<32>, b:int<32>) {
       log("Simulating module adder");

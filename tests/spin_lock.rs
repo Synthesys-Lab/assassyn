@@ -6,7 +6,7 @@ use eir::{
 };
 
 #[test]
-fn spin_trigger() {
+fn spin_lock() {
   module_builder!(
     squarer()(a:int<32>) {
       b = a.mul(a);
