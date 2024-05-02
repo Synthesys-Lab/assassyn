@@ -892,13 +892,13 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             let fifo_name = namify(fifo.get_name());
             rdata_fifo = Some(format!("{}_{}", fifo_module, fifo_name));
           }
-          Opcode::Trigger => {
-            let module = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_ref::<Module>(self.sys)
-              .unwrap();
+          Opcode::AsyncCall => {
+            let module = {
+              let operand = expr.get_operand(0).unwrap();
+              let bind = operand.get_value();
+              let module = get_bind_callee(expr.sys, bind.clone());
+              module.as_ref::<Module>(expr.sys).unwrap()
+            };
             rdata_module = Some(namify(module.get_name()));
           }
           _ => panic!("Unexpected expr of {:?} in memory body", expr.get_opcode()),

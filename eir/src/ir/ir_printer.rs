@@ -245,11 +245,8 @@ impl Visitor<String> for IRPrinter {
         }
         Opcode::AsyncCall => {
           format!(
-            "async call {}",
-            self
-              .dispatch(expr.sys, expr.get_operand(0).unwrap().get_value(), vec![])
-              .unwrap()[self.indent..]
-              .to_string()
+            "async_call {}",
+            expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
           )
         }
         Opcode::SpinTrigger => {
@@ -388,7 +385,13 @@ impl Visitor<String> for IRPrinter {
               .to_string(),
             _ => callee.to_string(expr.sys),
           };
-          format!("{} {{ {} }}", module_name, arg_list).into()
+          format!(
+            "_{} = bind {} {{ {} }}",
+            expr.get_key(),
+            module_name,
+            arg_list
+          )
+          .into()
         }
         _ => {
           panic!("Unimplemented opcode: {:?}", expr.get_opcode());

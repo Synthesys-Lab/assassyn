@@ -386,6 +386,7 @@ impl SysBuilder {
   /// * `operands` - The operands of the expression.
   /// * `cond` - The condition of executing this expression. If the condition is not `None`, the is
   /// always executed.
+  /// * `insert` - If this created node is inserted into the current insert point.
   // TODO(@were): Should I rearrange the insert point based on the predication?
   // If the predication is deeper than the current insert point, the inserted point should be
   // inserted to the deepest predication block.
@@ -445,7 +446,7 @@ impl SysBuilder {
     self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 
-  /// Create a trigger. Push all the values to the corresponding named ports.
+  /// Create an async call to the given bind. Push all the values to the corresponding named ports.
   pub fn create_async_call(&mut self, bind: BaseNode) -> BaseNode {
     assert!({
       let expr = self.get::<Expr>(&bind).unwrap();
@@ -455,6 +456,7 @@ impl SysBuilder {
       }
     });
     let args = vec![bind];
+    self.insert_at_ip(bind);
     let res = self.create_expr(DataType::void(), Opcode::AsyncCall, args, true);
     res
   }

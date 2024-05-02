@@ -178,7 +178,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
               .to_string(),
             );
           }
-          Opcode::Trigger => {
+          Opcode::AsyncCall => {
             let to_trigger = if let Ok(module) = expr
               .get_operand(0)
               .unwrap()
@@ -447,6 +447,15 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             "if {} {{ {} }} else {{ {} }}",
             cond, true_value, false_value
           )
+        }
+        Opcode::Bind(_) => {
+          let callee = {
+            let n = expr.get_num_operands();
+            let callee = expr.get_operand(n - 1).unwrap().get_value().clone();
+            let module = callee.as_ref::<Module>(expr.sys).unwrap();
+            format!("EventKind::Module{}", camelize(&namify(module.get_name())))
+          };
+          format!("let {} = {}", dump_ref!(self.sys, &expr.upcast()), callee)
         }
         _ => {
           if !expr.get_opcode().is_unary()

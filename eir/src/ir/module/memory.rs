@@ -37,7 +37,7 @@ pub fn parse_memory_module_name(module_name: &String) -> Option<MemoryParams> {
       depth: mem_depth,
       lat_min: mem_lat_min,
       lat_max: mem_lat_max,
-      init_file: init_file,
+      init_file,
     })
   } else {
     None
@@ -83,7 +83,7 @@ impl SysBuilder {
     let bind = self.get_init_bind(r_module);
     let const_zero = self.get_const_int(ty.clone(), 0);
     let bind = self.push_bind(bind, const_zero, false);
-    self.create_trigger_bound(bind);
+    self.create_async_call(bind);
     module_node
   }
 }
