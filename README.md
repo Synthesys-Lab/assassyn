@@ -31,7 +31,7 @@ to designate a set of simple and synthesizable primitives and repropose a progra
 that is close to programming a highly concurrent system, e.g. a multi-threading or distributed
 system, so that many programming experiences could be borrowed.
 
-Refer [our design doc](./designs/design-doc.md) for more details.
+Refer [language manual](./docs/language.md) for more details.
 
 ## A Demonstrative Example
 

@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This document severs as a language manual of (EDA)^2. A language for hardware design,
+This document severs as a language manual of Assasyn[^1], a language that unifies hardware design,
 implementation, and verification. It is designed to be a relatively high-level language,
 so that developers can focus on the behavior of the system, rather than timing, state machine,
 and other rules.
@@ -24,19 +24,38 @@ system main {
   // Implicitly driver is executed every cycle.
   module driver() {
     v = read a[0];
-    async adder { a = v, b = v };
+    func = bind = adder { a = v, b = v };
+    async_call func();
     new_v = v + 1; // NOTE: This is increase variable "_1" by "one"
     a[0] = v
   }
 
   module foo(a: int<32>, b: int<32>) {
-    a = a.pop();
-    b = b.pop();
     c = a + b;
   }
 }
-
 ````
+
+### Hardware Design
+
+Hardware design is unique to software programming in many ways. Here we characterize several major
+differences:
+
+1. Excessive concurrency: Transistors that builds different hardware modules can be concurrently
+busy, which is also the source of high performance. However, this also makes the hardware design
+hard to debug. Though we do have parallel programming in software, they are managed in a relatively
+heavy-weighted way, like threads, processes, and tasks. Therefore, a clear way that manages the
+concurrency in a light-weighted way is highly desirable.
+
+2. Data write: In software programming, a variable write is visible to users immediately. However,
+in hardware design, a variable can only be written once, and will be only visible in the next cycle.
+In this language, the "write-once" rule will be double-enforced by both the compiler[^2] and the
+generated simulator runtime.
+
+3. Resource Constraint: In software programming, different functions can share the same computing
+resources the ISA. However, hardware design is to allocate the resources themselves.
+In this language, the time-multiplexed resource sharing, and the dedicated allocation should be
+well abstracted.
 
 ## Language Components
 
@@ -67,34 +86,39 @@ Module is a basic build block block of the system, but it is also slightly diffe
 the modules we have in both software and hardware programming.
 
 To make an analogy to existing concepts in software programming, a module is like both a function,
-and a basic block.
-In case you do not know what is basic block, it is a region of code starts with a label which
-can be the destination of a jump, ends with a jump operation, which means within a basic block,
-you can only move the operations forward --- just like what you have on circuits, you can only
-move on in combinational logics.
+and a basic block. Basic block is a very common concept in compiler design, which indicates a
+region of code starts with a label which can be the destination of a jump,
+ends with a jump operation. This is used to support control flows (if-then-else, loops, etc.).
+However, in a physical circuit, no operations can move backward --- you can only have a cyclic
+graphs in combinational logics.
 
 NOTE: For simplicity, we currently regard all the operations within a module is combinational,
-which means everything is done within one cycle. It is our future goal to automatically partition
-the pipeline stages.
+which means everything is done within one cycle. Our future goal will automatically partition
+the pipeline stages to improve the clock frequency.
 
 To build a module, `module_builder` macro should be used:
 ````Rust
 use eda4eda::module_builder;
 // ...
-module_builder!(foo[/*inputs*/][/*parameterizations*/] {
+module_builder!(adder(/*parameterizations*/)(/*inputs*/a: int<32>, b: int<32>) {
   // The body of the module
+  c = a.add(b);
 });
-foo_builder(&mut sys);
+let adder_module = adder_builder(&mut sys);
 ````
 
-The first braket is for the input ports of this module, and the second bracket is for the
-parameterizations of this module. The parameters will be the function argument of the `*_builder`
-function. Refer `tests` for more examples.
+The first parenthesis is for the parameterization of this module, and the 2nd pranthesis is for
+the input ports of this module. This design makes the whole programming model feels like
+we first call a function `goo = foo(/*params*/)` to return a function, whose signature is
+`goo(/*inputs*/)`. TODO(@were): Write a document to discuss our design decisions on dynamic
+and static bindings.
 
 NOTE: `module_builder` is a procedural macro, which essentially does source-to-source
 transformation to translate the module definition in the macro scope to IR builder API calls.
 For more details, refer the developer document.
 
+`module_builder` will declared a `foo_builder` function, and this function will be called to
+construct a dedicated module of `foo` in the system.
 
 ### Values and Expressions
 
@@ -104,39 +128,40 @@ read/write to arrays, and asynchronous module invocations.
 1. Values: A first-order value can either be a constant or a variable. Because Rust does not
 support type-based overloading, but sometimes we do need to write code like both `a + b` and
 `a + 1`. Therefore, my parser will implicitly hide this from users (Of course refer the developer
-docs for more details). A variable can either be from the declared port or parameterizations,
+docs for more details). A variable can be from the declared port, parameterizations,
 or from an assigned expression (refer next expression bullet for more details).
 
-A constant is an immediate value. You can use `.` to specify its type, e.g. `1.int<32>`.
+A constant is an immediate value, and by defaulty it is typed `i32`.
+`.` can be used to specify its type, e.g. `1.uint<32>`.
 
-2. Expressions: To keep the simplicity of our frontend, for now, we have several constraints
-on our expressions' expression: a) All the operands should be a first order value; b) All the
-expressions should have have one operator, and all the operators should be described by a method
-call; d) All the valued expression should be assigned to a variable.
+2. Expressions: To keep the simplicity of our frontend parser, for now, several constraints
+are imposed  on our expressions' expression: a) All the operands should be a first order value;
+b) All the expressions should have have one operator, and all the operators should be described by
+a method call; d) All the valued expression should be assigned to a variable.
 
-To explain, `a + b` is a simple expression, while `a + b * c` is not for
-it two operators (* & +). Also, instead of using `a + b`, we should use `a.add(b)`.
-See the example below:
+To explain, if we want to write a mac unit, we should write like this:
 
 ```` Rust
-// TODO(@were): Fully deprecate the explicit FIFO pop later.
-module_builder!(foo[a:int<32>, b:int<32>][/*parameterizations*/] {
+module_builder!(mac()(a: int<32>, b: int<32>, c: int<32>) {
   // The body of the module
-  a = a.pop();
-  b = b.pop();
-  c = a.add(b);
+  mul = a.mul(b);
+  add = mul.add(c);
+
+  // TODO: Support these.
+  // v = a.mul(b).add(c); // Only one operator is allowed.
+  // v = c.add(a.mul(b)); // Only simple first-order operands supported.
 });
 ````
 
-3. Module Invocation: To invoke a module, we use the `async` keyword to indicate that this is an
-external module invocation, and all the module invocations are non-valued.
+3. Module Invocation: To invoke a module, we use the `async_call` keyword to indicate that this is
+an inter-module invocation, and all the module invocations are non-valued.
 Now two kinds of parameter feedings are supported: positional and named. The positional surrounded
 by a pair of parentheses feeds the parameters in the order of the module definition,
 while the named surrounded by a pair of curly braces feeds the parameters by the
 name of the module definition.
 
 ```` Rust
-module_builder!(foo[/*ports*/][adder] {
+module_builder!(driver()() {
   // named
   async adder { b : 1, a : 2 };
   // positional
@@ -144,8 +169,21 @@ module_builder!(foo[/*ports*/][adder] {
 });
 ````
 
-4. Bind/Partial Function: Sometimes values are not from a single module. To support this program
-behavior we support bind/partial function. We first use Python's `functools.partial` as an analogy.
+Stick on this example, we have several important concepts to explain bind and multi-caller. If
+an example in `tests` is run, this will be noticed:
+
+````
+  _1 = bind adder { a : 1, b : 2 };
+  async_call _1();
+````
+
+Essentially, all the module invocations will be done by pushing data to the callee's FIFO channels.
+Then, in the next cycle, the callee will pop the data from the FIFO channels, and execute the
+combination logic. For more details on multi-caller case, refer `4.`.
+
+4. Bind/Partial Function: Bind is introduced to handle the condition that the values for an
+`async_call` are not from a single same module. To explain, We first use Python's
+`functools.partial` as an analogy:
 
 ```` Python
 import functools
@@ -155,29 +193,43 @@ add5 = functools.partial(add, 5)
 add5(3) # equivalent to add(5, 3)
 ````
 
-To use this language feature in our language, see below:
+Therefore, if we want to call a module with values from different modules, we can do below:
 
 ```` Rust
-module_builder!(add[a:int<32>, b:int<32>][] {
+module_builder!(adder()(a: int<32>, b: int<32>) {
   // The body of the module
-  a = a.pop();
-  b = b.pop();
-  a + b
+  c = a.add(b);
 });
-module_builder!(add5[][] {
+
+let adder = adder_builder(&mut sys);
+
+module_builder!(add5(adder)() {
   // bind
-  add5 = bind add(5);
-});
-module_builder!(driver[/*ports*/][add5] {
+  bound_add = bind adder(5);
+}.expose(bound_add));
+
+let (add5, bound_add) = add5_builder(&mut sys, adder);
+
+module_builder!(driver(bound_add)() {
   // The body of the module
   v = read a[0];
-  async add5 { a = v, b = v };
+  async_call bound_add(v);
   new_v = v + 1;
   a[0] = new_v;
 });
+
+let driver = driver_builder(&mut sys, bound_add);
+
 ````
 
-See `tests/bind.rs` a runnable example.
+See `tests/bind.rs` for a runnable example.
+
+Moreover, as discussed above in 2 in Hardware Design and 3 in this section, multi-caller in a
+same cycle will be an issue: A FIFO push is essentially a register write, and a multi-caller
+implies a multi-write in a same cycle. To hide the implementation details from users, we will
+instantiate different bundles of FIFOs for each caller. Since each caller actually calls the
+`bind`, the FIFOs will be instantiated by the binds.
+
 
 5. Scopes and Contional Execution: Unlike what we have in software programming, we do not have
 an instruction pointer to move around. Instead, we have a set of combinational logics which can only
@@ -186,28 +238,32 @@ b) self-spin execution; c) cycled execution.
 
 ```` Rust
 // For conditional execution, we do NOT have a `else` branch.
-module_builder!(foo[/*ports*/][/*parameterizations*/] {
+module_builder!(foo()(a: int<32>, b: int<32>) {
   // The body of the module
-  cond = a > b;
+  cond = a.igt(b);
   when cond {
     a = a.add(b);
-  }
-  // If you really need an `else` branch, you can use `cond.flip()`
-  ncond = cond.flip();
-  when ncond {
-    c = a.add(b);
+    // do something
   }
 });
 ````
 
 ```` Rust
-module_builder!(foo[/*ports*/][/*parameterizations*/] {
+module_builder!(foo()(a: int<32>, b: int<32>) {
   // A spin lock always accepts a array value, because an array value is side-effected, which
   // can give different results when invoked multiple times. Wait until will wait the value in
   // the given array to be true to execute the body.
   //
   // NOTE: A spin lock can only appear in the main body of a module.
-  wait_until lock[0] {
+  wait_until {
+    a_valid = a.valid();
+    b_valid = b.valid();
+    valid = a_valid.bitwise_and(b_valid);
+    valid
+  } {
+    // implicitly pops the FIFOs
+    // a = a.pop();
+    // b = b.pop();
     a = a.add(b);
   }
 });
@@ -247,3 +303,9 @@ a[0] = 1; // write the array, value will be seen next cycle.
           // DONE: The simulator will give an error if the array is written more than once.
 v = a[0]; // read the array, not necessarily 1, should be the value in last cycle.
 ````
+
+[^1]: The name "Assasyn" stands for "**As**ynchronous **S**emantics for **A**rchitectural
+**S**imulation and **Syn**thesis".
+
+[^2]: TODO: The compiler will use the condition caluses to detect if two writes will
+happen in the same cycle. If so, a error will be casted.
