@@ -54,7 +54,7 @@ fn sram() {
     idle_threshold: 200,
   };
 
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   eir::test_utils::run_simulator(&sys, &config, None);
 }

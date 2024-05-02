@@ -27,7 +27,7 @@ fn inline0() {
     sim_threshold: 100,
     idle_threshold: 100,
   };
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   run_simulator(
     &sys,
@@ -79,7 +79,7 @@ fn inline1() {
     sim_threshold: 100,
     idle_threshold: 100,
   };
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   run_simulator(
     &sys,

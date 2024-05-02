@@ -37,7 +37,7 @@ fn trigger() {
     sim_threshold: 200,
     idle_threshold: 200,
   };
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   eir::backend::simulator::elaborate(&sys, &config).unwrap();
 

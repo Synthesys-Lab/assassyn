@@ -934,6 +934,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             };
             rdata_module = Some(namify(module.get_name()));
           }
+          Opcode::Bind(_) => { /* don't care, currently processed in corresponding AsyncCall` */ }
           _ => panic!("Unexpected expr of {:?} in memory body", expr.get_opcode()),
         }
       }
@@ -1404,6 +1405,11 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             r,
             l
           ))
+        }
+
+        Opcode::Bind(_) => {
+          // currently handled in AsyncCall
+          Some("".to_string())
         }
 
         _ => panic!("Unknown OP: {:?}", expr.get_opcode()),

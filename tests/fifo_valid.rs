@@ -44,7 +44,7 @@ fn fifo_valid() {
     idle_threshold: 100,
   };
 
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   eir::test_utils::run_simulator(
     &sys,

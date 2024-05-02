@@ -64,7 +64,7 @@ fn spin_trigger() {
   eir::builder::verify(&sys);
 
   // println!("{}", sys);
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   run_simulator(
     &sys,

@@ -224,7 +224,7 @@ fn systolic_array() {
     sim_threshold: 100,
     idle_threshold: 100,
   };
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   let output = run_simulator(&sys, &config, None);
 
