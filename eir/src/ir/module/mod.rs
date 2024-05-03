@@ -10,6 +10,12 @@ use crate::ir::*;
 
 use self::user::Operand;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Attribute {
+  ExplicitPop,
+  OptNone,
+}
+
 /// The data structure for a module.
 pub struct Module {
   /// The index key of this module in the slab buffer.
@@ -28,6 +34,8 @@ pub struct Module {
   parameterizable: Option<Vec<BaseNode>>,
   /// The redundant data of this module. The set of users that use this module.
   pub(crate) user_set: HashSet<BaseNode>,
+  /// The attributes of this module.
+  pub(crate) attr: HashSet<Attribute>,
 }
 
 impl Module {
@@ -54,7 +62,12 @@ impl Module {
       builder_func_ptr: None,
       parameterizable: None,
       user_set: HashSet::new(),
+      attr: HashSet::new(),
     }
+  }
+
+  pub fn get_attrs(&self) -> &HashSet<Attribute> {
+    &self.attr
   }
 
   /// Get the finger print of the module.
@@ -208,6 +221,14 @@ impl<'a> ModuleMut<'a> {
       .get_mut(&ext_node)
       .unwrap();
     users.insert(operand);
+  }
+
+  pub fn add_attr(&mut self, attr: Attribute) {
+    self.get_mut().attr.insert(attr);
+  }
+
+  pub fn set_attrs(&mut self, attr: HashSet<Attribute>) {
+    self.get_mut().attr = attr;
   }
 
   /// Remove a specific external interface's usage. If this usage set is empty after the removal,

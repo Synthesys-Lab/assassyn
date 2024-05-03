@@ -1,4 +1,4 @@
-use codegen::{emit_body, emit_ports, emit_rets};
+use codegen::{emit_attrs, emit_body, emit_ports, emit_rets};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parenthesized;
@@ -12,10 +12,13 @@ mod parser;
 
 use ast::node;
 
+use crate::ast::expr::ModuleAttrs;
+
 struct ModuleParser {
   module_name: syn::Ident,
   ports: Punctuated<node::PortDecl, Token![,]>,
   parameters: Punctuated<syn::Ident, Token![,]>,
+  attrs: Punctuated<syn::Ident, Token![,]>,
   body: node::Body,
   exposes: Option<Punctuated<syn::Ident, Token![,]>>,
 }
@@ -34,6 +37,8 @@ impl Parse for ModuleParser {
     let raw_ports;
     parenthesized!(raw_ports in input);
     let ports = raw_ports.parse_terminated(node::PortDecl::parse, Token![,])?;
+    // parse the attributes
+    let attrs = input.parse::<ModuleAttrs>()?.attrs;
     // parse the body
     let body = input.parse::<node::Body>()?;
     // .expose(<var-id>) is optional
@@ -53,6 +58,7 @@ impl Parse for ModuleParser {
       module_name,
       ports,
       parameters,
+      attrs,
       body,
       exposes,
     })
@@ -73,10 +79,11 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   let impl_name = syn::Ident::new(&format!("{}_impl", module_name), module_name.span());
 
   // codegen ports
-  let (port_ids, port_decls, port_peeks, port_pops) = match emit_ports(&parsed_module.ports) {
-    Ok(x) => x,
-    Err(e) => return e.to_compile_error().into(),
-  };
+  let (port_ids, port_decls, port_peeks, port_pops) =
+    match emit_ports(&parsed_module.ports, &parsed_module.attrs) {
+      Ok(x) => x,
+      Err(e) => return e.to_compile_error().into(),
+    };
 
   let body = match emit_body(&parsed_module.body) {
     Ok(x) => x,
@@ -96,6 +103,11 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   let (ret_tys, ret_vals) = emit_rets(&parsed_module.exposes);
 
   let parameterizable = parsed_module.parameters;
+  let attrs = match emit_attrs(&parsed_module.attrs) {
+    Ok(x) => x,
+    Err(e) => return e.to_compile_error().into(),
+  };
+
   let res = quote! {
 
     fn #decl_name (sys: &mut eir::builder::SysBuilder) -> eir::ir::node::BaseNode {
@@ -115,6 +127,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         let raw_ptr = #builder_name as *const ();
         module_mut.set_builder_func_ptr(raw_ptr as usize);
         module_mut.set_parameterizable(vec![#parameterizable]);
+        module_mut.set_attrs(std::collections::HashSet::from([#attrs]));
       }
       sys.set_current_module(module.clone());
       let ( #port_ids ) = {

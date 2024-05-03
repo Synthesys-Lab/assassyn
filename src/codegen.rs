@@ -406,6 +406,7 @@ pub(crate) fn emit_body(body: &ast::node::Body) -> syn::Result<proc_macro2::Toke
 
 pub(crate) fn emit_ports(
   ports: &Punctuated<PortDecl, Token![,]>,
+  module_attrs: &Punctuated<syn::Ident, Token![,]>,
 ) -> syn::Result<(
   proc_macro2::TokenStream,
   proc_macro2::TokenStream,
@@ -416,6 +417,7 @@ pub(crate) fn emit_ports(
   let mut port_decls: Punctuated<proc_macro2::TokenStream, Token![,]> = Punctuated::new();
   let mut port_peeks: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
   let mut port_pops: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
+  let explicit_pop = module_attrs.iter().any(|x| x.eq("explicit_pop"));
   for (i, elem) in ports.iter().enumerate() {
     let (id, ty) = (elem.id.clone(), elem.ty.clone());
     // IDs: <id>, <id>, ...
@@ -430,8 +432,10 @@ pub(crate) fn emit_ports(
     port_decls.push(quote! { eir::builder::PortInfo::new(stringify!(#id), #ty) });
     port_decls.push_punct(Token![,](id.span()));
     // Pop the port instances
-    port_pops.push(quote! { let #id = sys.create_fifo_pop(#id.clone(), None) });
-    port_pops.push_punct(Token![;](id.span()));
+    if !explicit_pop {
+      port_pops.push(quote! { let #id = sys.create_fifo_pop(#id.clone(), None) });
+      port_pops.push_punct(Token![;](id.span()));
+    }
   }
   Ok((
     quote! {#port_ids},
@@ -439,6 +443,33 @@ pub(crate) fn emit_ports(
     quote! {#port_peeks},
     quote! {#port_pops},
   ))
+}
+
+pub(crate) fn emit_attrs(
+  attrs: &Punctuated<syn::Ident, Token![,]>,
+) -> syn::Result<Punctuated<proc_macro2::TokenStream, Token![,]>> {
+  let mut res = Punctuated::new();
+  for attr in attrs.iter() {
+    let camelized = match attr.to_string().as_str() {
+      "optnone" => "OptNone",
+      "explicit_pop" => "ExplicitPop",
+      _ => {
+        return Err(syn::Error::new(
+          attr.span(),
+          format!(
+            "{}:{}: Unsupported attribute: \"{}\"",
+            file!(),
+            line!(),
+            attr
+          ),
+        ))
+      }
+    };
+    let attr = syn::Ident::new(camelized, attr.span());
+    res.push_value(quote! { eir::ir::module::Attribute::#attr });
+    res.push_punct(Token![,](attr.span()));
+  }
+  Ok(res)
 }
 
 pub(crate) fn emit_rets(

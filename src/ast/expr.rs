@@ -9,6 +9,42 @@ pub(crate) enum ExprTerm {
   StrLit(syn::LitStr),
 }
 
+pub(crate) struct ModuleAttrs {
+  pub(crate) attrs: Punctuated<syn::Ident, Token![,]>,
+}
+
+impl Parse for ModuleAttrs {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let mut attrs = Punctuated::new();
+    loop {
+      if !input.peek(Token![#]) {
+        break;
+      }
+      input.parse::<Token![#]>()?;
+      let raw_attr = input.parse::<syn::Ident>()?;
+      attrs.push_value(match raw_attr.to_string().as_str() {
+        "optnone" | "explicit_pop" => raw_attr.clone(),
+        _ => {
+          return Err(syn::Error::new(
+            raw_attr.span(),
+            format!(
+              "{}:{}: Unsupported attribute: \"{}\"",
+              file!(),
+              line!(),
+              raw_attr
+            ),
+          ))
+        }
+      });
+      if !input.peek(Token![,]) {
+        break;
+      }
+      attrs.push_punct(input.parse::<Token![,]>()?);
+    }
+    Ok(ModuleAttrs { attrs })
+  }
+}
+
 impl ExprTerm {
   pub(crate) fn span(&self) -> proc_macro2::Span {
     match self {

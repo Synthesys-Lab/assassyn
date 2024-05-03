@@ -173,6 +173,11 @@ impl Visitor<String> for IRPrinter {
     }
     res.push_str(&" ".repeat(self.indent));
     res.push_str(&format!("// Key: {}\n", module.get_key()));
+    res.push_str(&" ".repeat(self.indent));
+    res.push_str(&format!(
+      "#{:?}\n",
+      module.get_attrs().into_iter().collect::<Vec<_>>()
+    ));
     res.push_str(&format!(
       "{}module {}(",
       " ".repeat(self.indent),
