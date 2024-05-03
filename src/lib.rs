@@ -111,7 +111,12 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   let res = quote! {
 
     fn #decl_name (sys: &mut eir::builder::SysBuilder) -> eir::ir::node::BaseNode {
-      sys.create_module(stringify!(#module_name), vec![#port_decls])
+      let res = sys.create_module(stringify!(#module_name), vec![#port_decls]);
+      let mut module_mut = res
+        .as_mut::<eir::ir::Module>(sys)
+        .expect("[CodeGen] No module found!");
+      module_mut.set_attrs(std::collections::HashSet::from([#attrs]));
+      res
     }
 
     fn #impl_name (
@@ -127,7 +132,6 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
         let raw_ptr = #builder_name as *const ();
         module_mut.set_builder_func_ptr(raw_ptr as usize);
         module_mut.set_parameterizable(vec![#parameterizable]);
-        module_mut.set_attrs(std::collections::HashSet::from([#attrs]));
       }
       sys.set_current_module(module.clone());
       let ( #port_ids ) = {

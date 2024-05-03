@@ -14,6 +14,7 @@ use self::user::Operand;
 pub enum Attribute {
   ExplicitPop,
   OptNone,
+  EagerBind,
 }
 
 /// The data structure for a module.

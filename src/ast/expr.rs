@@ -23,7 +23,7 @@ impl Parse for ModuleAttrs {
       input.parse::<Token![#]>()?;
       let raw_attr = input.parse::<syn::Ident>()?;
       attrs.push_value(match raw_attr.to_string().as_str() {
-        "optnone" | "explicit_pop" => raw_attr.clone(),
+        "optnone" | "explicit_pop" | "eager_bind" => raw_attr.clone(),
         _ => {
           return Err(syn::Error::new(
             raw_attr.span(),

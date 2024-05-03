@@ -82,7 +82,7 @@ impl SysBuilder {
     let r_module = self.create_fifo_pop(r_module_fifo.upcast().clone(), None);
     let bind = self.get_init_bind(r_module);
     let const_zero = self.get_const_int(ty.clone(), 0);
-    let bind = self.push_bind(bind, const_zero, false);
+    let bind = self.push_bind(bind, const_zero, Some(false));
     self.create_async_call(bind);
     module_node
   }

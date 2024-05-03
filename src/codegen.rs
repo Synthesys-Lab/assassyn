@@ -179,7 +179,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
-          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, true);
+          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, None);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -190,7 +190,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
         let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
-          let bind = sys.push_bind(bind, value, true);
+          let bind = sys.push_bind(bind, value, None);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -243,7 +243,15 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         let args = emit_arg_binds(&call.func, &call.args);
         quote! {{
           #args;
-          // sys.create_async_call(bind);
+          if {
+            !sys
+              .get_current_module()
+              .unwrap()
+              .get_attrs()
+              .contains(&eir::ir::module::Attribute::EagerBind)
+          } {
+            sys.create_async_call(bind);
+          }
         }}
       }
       CallKind::Inline(lval) => match &call.args {
@@ -445,27 +453,29 @@ pub(crate) fn emit_ports(
   ))
 }
 
+fn camelize(s: &str) -> String {
+  let mut res = String::new();
+  let mut capitalize = true;
+  for c in s.chars() {
+    if c == '_' {
+      capitalize = true;
+    } else if capitalize {
+      res.push(c.to_ascii_uppercase());
+      capitalize = false;
+    } else {
+      res.push(c);
+    }
+  }
+  res
+}
+
 pub(crate) fn emit_attrs(
   attrs: &Punctuated<syn::Ident, Token![,]>,
 ) -> syn::Result<Punctuated<proc_macro2::TokenStream, Token![,]>> {
   let mut res = Punctuated::new();
   for attr in attrs.iter() {
-    let camelized = match attr.to_string().as_str() {
-      "optnone" => "OptNone",
-      "explicit_pop" => "ExplicitPop",
-      _ => {
-        return Err(syn::Error::new(
-          attr.span(),
-          format!(
-            "{}:{}: Unsupported attribute: \"{}\"",
-            file!(),
-            line!(),
-            attr
-          ),
-        ))
-      }
-    };
-    let attr = syn::Ident::new(camelized, attr.span());
+    let camelized = camelize(&attr.to_string());
+    let attr = syn::Ident::new(&camelized, attr.span());
     res.push_value(quote! { eir::ir::module::Attribute::#attr });
     res.push_punct(Token![,](attr.span()));
   }

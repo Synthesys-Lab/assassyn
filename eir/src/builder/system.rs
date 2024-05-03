@@ -5,6 +5,7 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 use crate::ir::{
   bind::{as_bind_expr, get_bind_callee, is_fully_bound},
   ir_printer::IRPrinter,
+  module::Attribute,
   node::*,
   visitor::Visitor,
   *,
@@ -547,7 +548,7 @@ impl SysBuilder {
     bind: BaseNode,
     key: String,
     value: BaseNode,
-    eager: bool,
+    eager: Option<bool>,
   ) -> BaseNode {
     let module = {
       let callee = get_bind_callee(self, bind);
@@ -580,6 +581,13 @@ impl SysBuilder {
       module_name
     );
     bind_mut.set_operand(port_idx, fifo_push);
+    let eager = eager.unwrap_or(
+      self
+        .get_current_module()
+        .unwrap()
+        .get_attrs()
+        .contains(&Attribute::EagerBind),
+    );
     if eager && is_fully_bound(self, bind) {
       self.create_async_call(bind)
     } else {
@@ -588,7 +596,7 @@ impl SysBuilder {
   }
 
   /// Add a bind to the current module.
-  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: bool) -> BaseNode {
+  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
     let (callee, signature, port_idx) = {
       let callee = get_bind_callee(self, bind);
       let bind = as_bind_expr(self, bind).unwrap();
@@ -619,6 +627,13 @@ impl SysBuilder {
     let fifo_push = self.create_fifo_push(callee, port_idx, value);
     let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
     bind_mut.set_operand(port_idx, fifo_push);
+    let eager = eager.unwrap_or(
+      self
+        .get_current_module()
+        .unwrap()
+        .get_attrs()
+        .contains(&Attribute::EagerBind),
+    );
     if eager && is_fully_bound(self, bind) {
       self.create_async_call(bind)
     } else {

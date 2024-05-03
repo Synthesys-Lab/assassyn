@@ -25,7 +25,7 @@ fn eager_bind() {
   );
 
   module_builder!(
-    rhs(bound)(v:int<32>) {
+    rhs(bound)(v:int<32>) #eager_bind {
       _bound = bind bound { b: v };
     }
   );
