@@ -18,7 +18,7 @@ fn explicit_pop() {
     async_call adder { a: v, b: v };
   });
 
-  let mut sys = SysBuilder::new("adder");
+  let mut sys = SysBuilder::new("explicit_pop");
   let adder = adder_builder(&mut sys);
   driver_builder(&mut sys, adder);
   eir::builder::verify(&sys);
