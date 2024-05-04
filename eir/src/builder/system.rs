@@ -806,6 +806,12 @@ impl SysBuilder {
     res
   }
 
+  /// Create a cast operation.
+  pub fn create_cast(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
+    let res = self.create_expr(dest_ty, Opcode::Cast, vec![src], true);
+    res
+  }
+
   /// The helper function to generate a unique identifier.
   ///
   /// # Arguments

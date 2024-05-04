@@ -450,6 +450,10 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             cond, true_value, false_value
           )
         }
+        Opcode::Cast => {
+          let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
+          format!("{} as {}", a, dtype_to_rust_type(&expr.dtype()))
+        }
         Opcode::Bind(_) => {
           let callee = {
             let n = expr.get_num_operands();

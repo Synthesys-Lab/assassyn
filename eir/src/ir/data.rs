@@ -91,6 +91,13 @@ impl DataType {
     }
   }
 
+  pub fn is_raw(&self) -> bool {
+    match self {
+      DataType::Bits(_) => true,
+      _ => false,
+    }
+  }
+
   pub fn is_void(&self) -> bool {
     match self {
       DataType::Void => true,

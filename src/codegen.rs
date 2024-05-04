@@ -15,6 +15,7 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
   match &dtype.dtype {
     DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int_ty(#bits) }.into()),
     DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint_ty(#bits) }.into()),
+    DataType::Bits(bits) => Ok(quote! { eir::ir::data::DataType::raw_ty(#bits) }.into()),
     DataType::Module(args) => {
       let args = args
         .iter()
@@ -121,6 +122,15 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         let start = #l;
         let end = #r;
         let res = sys.#method_id(None, src, start, end);
+        res
+      }})
+    }
+    expr::Expr::Cast((a, ty)) => {
+      let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
+      let ty: proc_macro2::TokenStream = emit_type(ty)?.into();
+      Ok(quote! {{
+        let src = #a.clone();
+        let res = sys.create_cast(src, #ty);
         res
       }})
     }

@@ -145,6 +145,8 @@ pub(crate) enum Expr {
   Select((ExprTerm, Vec<(ExprTerm, ExprTerm)>)),
   // ExprTerm . slice ( ExprTerm, ExprTerm )
   Slice((ExprTerm, ExprTerm, ExprTerm)),
+  // ExprTerm . cast ( DType )
+  Cast((ExprTerm, DType)),
   // ExprTerm
   Term(ExprTerm),
 }
@@ -191,6 +193,10 @@ impl Parse for Expr {
         let b = content.parse::<ExprTerm>()?;
         Ok(Expr::Binary((a, operator, b)))
       }
+      "cast" => {
+        let t = content.parse::<DType>()?;
+        Ok(Expr::Cast((a, t)))
+      }
       _ => Err(syn::Error::new(
         operator.span(),
         format!(
@@ -231,6 +237,15 @@ impl Parse for DType {
         Ok(DType {
           span,
           dtype: DataType::uint_ty(bits.base10_parse::<usize>().unwrap()),
+        })
+      }
+      "bits" => {
+        input.parse::<syn::Token![<]>()?;
+        let bits = input.parse::<syn::LitInt>()?;
+        input.parse::<syn::Token![>]>()?;
+        Ok(DType {
+          span,
+          dtype: DataType::raw_ty(bits.base10_parse::<usize>().unwrap()),
         })
       }
       "module" => {

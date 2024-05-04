@@ -1407,6 +1407,17 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           ))
         }
 
+        Opcode::Cast => {
+          let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
+          Some(format!(
+            "logic [{}:0] _{};\nassign _{} = {};\n\n",
+            expr.dtype().get_bits() - 1,
+            expr.get_key(),
+            expr.get_key(),
+            a
+          ))
+        }
+
         Opcode::Bind(_) => {
           // currently handled in AsyncCall
           Some("".to_string())
