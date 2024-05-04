@@ -37,11 +37,7 @@ fn callback() {
   eir::xform::basic(&mut sys, &o0);
   println!("After:\n{}", sys);
 
-  let config = backend::common::Config {
-    temp_dir: true,
-    idle_threshold: 100,
-    sim_threshold: 100,
-  };
+  let config = backend::common::Config::default();
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 

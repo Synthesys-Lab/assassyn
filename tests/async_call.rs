@@ -32,11 +32,10 @@ fn async_call() {
   eir::builder::verify(&sys);
   println!("{}", sys);
 
-  let config = eir::backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 200,
-    idle_threshold: 200,
-  };
+  let mut config = eir::backend::common::Config::default();
+  config.sim_threshold = 200;
+  config.idle_threshold = 200;
+
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   eir::backend::simulator::elaborate(&sys, &config).unwrap();

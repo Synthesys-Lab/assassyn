@@ -18,11 +18,9 @@ fn testbench() {
 
   eprintln!("{}", sys);
 
-  let config = eir::backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 101,
-    idle_threshold: 100,
-  };
+  let mut config = eir::backend::common::Config::default();
+  config.sim_threshold = 101;
+
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   run_simulator(

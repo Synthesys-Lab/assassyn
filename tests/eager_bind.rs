@@ -38,11 +38,7 @@ fn eager_bind() {
   println!("{}", sys);
   eir::builder::verify(&sys);
 
-  let config = eir::backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 100,
-    idle_threshold: 100,
-  };
+  let config = eir::backend::common::Config::default();
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   eir::test_utils::run_simulator(

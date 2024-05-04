@@ -23,11 +23,7 @@ fn adder() {
 
   println!("{}", sys);
 
-  let config = eir::backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 100,
-    idle_threshold: 100,
-  };
+  let config = eir::backend::common::Config::default();
 
   // TODO(@boyang): Should we also test the verilog backend?
   // eir::backend::verilog::elaborate(&sys, &config).unwrap();

@@ -36,11 +36,7 @@ fn back_pressure() {
   eir::xform::basic(&mut sys, &o1);
   println!("{}", sys);
 
-  let config = eir::backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 100,
-    idle_threshold: 100,
-  };
+  let config = eir::backend::common::Config::default();
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 

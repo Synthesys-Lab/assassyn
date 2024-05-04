@@ -36,11 +36,9 @@ fn select() {
   xform::basic(&mut sys, &o0);
   eir::builder::verify(&sys);
 
-  let config = eir::backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 101,
-    idle_threshold: 100,
-  };
+  let mut config = eir::backend::common::Config::default();
+  config.sim_threshold = 101;
+
   run_simulator(
     &sys,
     &config,

@@ -1,27 +1,9 @@
-use std::process::{Command, Output};
+use std::process::Command;
 
 use crate::{
   backend::{self, common::Config},
   builder::SysBuilder,
 };
-
-pub fn compile(src: &String, exe: Option<&String>) -> String {
-  let obj = exe.map_or_else(|| src[..src.len() - 3].to_string(), |x| x.clone());
-  let output = Command::new("rustc")
-    .arg(src)
-    .arg("-o")
-    .arg(&obj)
-    .output()
-    .expect("Failed to compile");
-  assert!(
-    output.status.success(),
-    "Failed to compile: {} to {}",
-    src,
-    obj
-  );
-  println!("Successfully compiled to {}", obj);
-  return obj;
-}
 
 /// Put the given file into a temporary directory and return the path.
 ///
@@ -31,19 +13,6 @@ pub fn temp_dir(fname: &String) -> String {
   let dir = std::env::temp_dir();
   let fname = dir.join(fname);
   fname.to_str().unwrap().to_string()
-}
-
-pub fn run_exec(exe: &String) -> Output {
-  let exe = if !exe.contains("/") {
-    format!("./{}", exe)
-  } else {
-    exe.clone()
-  };
-  let output = Command::new(&exe)
-    .output()
-    .unwrap_or_else(|_| panic!("Failed to run \"{}\"", exe));
-  assert!(output.status.success(), "Failed to run: {}", exe);
-  output
 }
 
 pub fn parse_cycle(raw_line: &str) -> (usize, usize) {
@@ -62,10 +31,28 @@ pub fn run_simulator(
   config: &Config,
   cond: Option<(fn(&&str) -> bool, Option<usize>)>,
 ) -> String {
-  let simulator_rs = backend::simulator::elaborate(&sys, &config).unwrap();
-  let simulator_bin = compile(&simulator_rs, None);
-  let output = run_exec(&simulator_bin);
+  backend::simulator::elaborate(&sys, &config).unwrap();
+  let dir_name = config.dir_name(sys);
+  let manifest = format!("{}/Cargo.toml", dir_name);
+  let output = Command::new("cargo")
+    .arg("build")
+    .arg("--manifest-path")
+    .arg(&manifest)
+    .output()
+    .expect("Failed to compile");
+  assert!(
+    output.status.success(),
+    "Failed to compile {}",
+    config.dir_name(sys)
+  );
+  let output = Command::new("cargo")
+    .arg("run")
+    .arg("--manifest-path")
+    .arg(&manifest)
+    .output()
+    .unwrap_or_else(|_| panic!("Failed to run \"{}\"", config.dir_name(sys)));
   let raw_output = String::from_utf8(output.stdout).unwrap();
+  println!("{}", raw_output);
   if let Some((func, cond_cnt)) = cond {
     let actual = raw_output.lines().filter(func).count();
     if let Some(expected) = cond_cnt {

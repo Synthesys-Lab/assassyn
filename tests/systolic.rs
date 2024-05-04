@@ -219,11 +219,7 @@ fn systolic_array() {
   println!("{}", sys);
   eir::builder::verify(&sys);
 
-  let config = eir::backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 100,
-    idle_threshold: 100,
-  };
+  let config = eir::backend::common::Config::default();
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   let output = run_simulator(&sys, &config, None);

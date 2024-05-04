@@ -49,6 +49,7 @@ fn sram() {
   println!("{}", sys);
 
   let config = backend::common::Config {
+    override_dump: true,
     temp_dir: true,
     sim_threshold: 200,
     idle_threshold: 200,

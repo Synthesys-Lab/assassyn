@@ -11,11 +11,7 @@ fn helloworld() {
 
   println!("{}", sys);
 
-  let config = eir::backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 2,
-    idle_threshold: 2,
-  };
+  let config = eir::backend::common::Config::default();
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   eir::builder::verify(&sys);

@@ -2,6 +2,7 @@ use std::{
   collections::HashMap,
   fs::{self, File},
   io::Write,
+  path::Path,
   process::Command,
 };
 
@@ -1101,14 +1102,35 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
 }
 
 pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
-  let fname = config.fname(sys, "rs");
-  println!("Writing simulator code to {}", fname);
-  let mut fd = fs::File::create(fname.clone())?;
-  dump_header(&mut fd)?;
+  let dir_name = config.dir_name(sys);
+  if Path::new(&dir_name).exists() {
+    if config.override_dump {
+      fs::remove_dir_all(&dir_name)?;
+      fs::create_dir_all(&dir_name)?;
+    } else {
+      eprintln!(
+        "Directory {} already exists, may possibly lead to dump failure.",
+        dir_name
+      );
+    }
+  } else {
+    fs::create_dir_all(&dir_name)?;
+  }
+  eprintln!("Writing simulator code to rust project: {}", dir_name);
+  let output = Command::new("cargo")
+    .arg("init")
+    .arg(&dir_name)
+    .output()
+    .expect("Failed to init cargo project");
+  assert!(output.status.success());
+  let fname = format!("{}/src/main.rs", dir_name);
+  eprintln!("Writing simulator source to file: {}", fname);
+  let mut fd = fs::File::create(fname.clone()).expect("Open failure");
+  dump_header(&mut fd).expect("Dump head failure");
   let (rt_src, ri) = dump_runtime(sys, config);
-  dump_module(sys, &mut fd, &ri)?;
-  fd.write(rt_src.as_bytes())?;
-  fd.flush()?;
+  dump_module(sys, &mut fd, &ri).expect("Dump module failure");
+  fd.write(rt_src.as_bytes()).expect("Dump runtime failure");
+  fd.flush().expect("Flush failure");
   Ok(fname)
 }
 
@@ -1120,6 +1142,6 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<String, std::io::E
     .arg("max_width=100,tab_spaces=2")
     .output()
     .expect("Failed to format");
-  assert!(output.status.success());
+  assert!(output.status.success(), "Failed to format: {:?}", output);
   Ok(fname)
 }
