@@ -16,6 +16,8 @@ pub enum Attribute {
   OptNone,          // Avoid optimization on this module.
   EagerBind,        // All the binds in this module will be called after arguments are fully bound.
   AllowPartialCall, // Allow some arguments are not given to call this module.
+  NoArbiter,        // The compiler will skip to generate an arbiter for this module,
+                    // even if it has multiple callers.
 }
 
 /// The data structure for a module.

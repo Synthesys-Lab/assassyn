@@ -2,14 +2,15 @@ use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 // #[test]
-fn adder() {
+fn multi_call() {
   module_builder!(adder()(a:int<32>, b:int<32>) {
     c = a.add(b);
     log("adder: {} + {} = {}", a, b, c);
   });
 
   module_builder!(
-    arbiter(adder)(a0:int<32>, b0:int<32>, a1:int<32>, b1:int<32>) #explicit_pop, #allow_partial_call {
+    arbiter(adder)(a0:int<32>, b0:int<32>, a1:int<32>, b1:int<32>)
+      #explicit_pop, #allow_partial_call, #no_arbiter {
       wait_until {
         a0_valid = a0.valid();
         b0_valid = b0.valid();
@@ -20,7 +21,32 @@ fn adder() {
         valid = valid0.bitwise_or(valid1);
         valid
       } {
-        valid = valid0.concat(valid1);
+        hot_valid = valid0.concat(valid1);
+        // grant is a one-hot vector
+        last_grant = array(int<1>, 1);
+        gv = last_grant[0];
+        // gv_1h = lut[0b10, 0b01][gv];
+        gv_zero = gv.eq(0);
+        gv_1h = default 2.int<32>.case(gv_zero, 1);
+        gv_1h_flip = gv.flip();
+        hi = gv_1h_flip.bitwise_and(hot_valid);
+        lo = gv_1h.bitwise_and(hot_valid);
+        hi_flip = hi.flip();
+        new_grant = default hi.case(hi_flip, lo);
+        grant0 = new_grant.eq(1);
+        grant1 = new_grant.eq(2);
+        when grant0 {
+          a0 = a0.pop();
+          b0 = b0.pop();
+          async_call adder { a: a0, b: b0 };
+          last_grant[0] = 0;
+        }
+        when grant1 {
+          a1 = a1.pop();
+          b1 = b1.pop();
+          async_call adder { a: a1, b: b1 };
+          last_grant[0] = 1;
+        }
       }
     }
   );
@@ -37,7 +63,7 @@ fn adder() {
     }
   });
 
-  let mut sys = SysBuilder::new("adder");
+  let mut sys = SysBuilder::new("multi_call");
   let adder = adder_builder(&mut sys);
   driver_builder(&mut sys, adder);
   eir::builder::verify(&sys);
