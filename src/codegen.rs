@@ -38,7 +38,7 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
 pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
     expr::Expr::Binary((a, op, b)) => match op.to_string().as_str() {
-      "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" | "igt" => {
+      "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" | "igt" | "concat" => {
         let method_id = format!("create_{}", op);
         let method_id = syn::Ident::new(&method_id, op.span());
         let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
@@ -296,42 +296,50 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
     }
     Statement::BodyScope((pred, body)) => {
       let unwraped_body = emit_body(body)?;
-
-      let block_init = match pred {
-        BodyPred::Condition(cond) => {
-          quote! {{
+      let (block_init, scoped) = match pred {
+        BodyPred::Condition(ref cond) => (
+          quote! {
             let cond = #cond.clone();
             let block_pred = eir::ir::block::BlockKind::Condition(cond);
-            (sys.create_block(block_pred), true)
-          }}
-        }
-        BodyPred::Cycle(cycle) => {
-          quote! {{
+            let (block, tick_ip) = (sys.create_block(block_pred), true);
+          },
+          true,
+        ),
+        BodyPred::Cycle(cycle) => (
+          quote! {
             let cycle = #cycle.clone();
             let block_pred = eir::ir::block::BlockKind::Cycle(cycle);
-            (sys.create_block(block_pred), true)
-          }}
-        }
+            let (block, tick_ip) = (sys.create_block(block_pred), true);
+          },
+          true,
+        ),
         BodyPred::WaitUntil(lock) => {
           let lock_emission = emit_body(lock).unwrap();
-          quote! {{
-            sys.set_current_block_wait_until();
-            let master = sys.get_current_block().unwrap().upcast();
-            {
-              let master = master.as_ref::<eir::ir::block::Block>(sys).unwrap();
-              if let eir::ir::block::BlockKind::WaitUntil(valued_block) = master.get_kind() {
-                sys.set_current_block(valued_block.clone());
-                let cond_value = #lock_emission;
-                let block = sys.get_current_block().unwrap().upcast();
-                block.as_mut::<eir::ir::block::Block>(sys).unwrap().set_value(cond_value);
-              }
-            }
-            (master, false)
-          }}
+          let value_id = block_value_id(lock);
+          assert!(lock.valued);
+          (
+            quote! {
+              sys.set_current_block_wait_until();
+              let block_restored = sys.get_current_block().unwrap().upcast();
+              let valued_block = {
+                let master = sys.get_current_block().unwrap().upcast();
+                let master = master.as_ref::<eir::ir::block::Block>(sys).unwrap();
+                match master.get_kind() {
+                  eir::ir::block::BlockKind::WaitUntil(valued_block) => valued_block.clone(),
+                  _ => unreachable!(),
+                }
+              };
+              sys.set_current_block(valued_block.clone());
+              #lock_emission
+              valued_block.as_mut::<eir::ir::block::Block>(sys).unwrap().set_value(#value_id);
+              let (block, tick_ip) = (block_restored, false)
+            },
+            false,
+          )
         }
       };
-      quote! {{
-        let (block, tick_ip) = #block_init;
+      let emission = quote! {
+        #block_init;
         sys.set_current_block(block.clone());
         #unwraped_body
         let cur_module = sys
@@ -343,7 +351,14 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
           let ip = ip.next(sys).expect("[When] No next ip");
           sys.set_current_ip(ip);
         }
-      }}
+      };
+      if scoped {
+        quote! {{
+          #emission
+        }}
+      } else {
+        emission
+      }
     }
     Statement::Log(args) => {
       let args = args
@@ -382,6 +397,11 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
   Ok(res.into())
 }
 
+fn block_value_id(body: &ast::node::Body) -> syn::Ident {
+  let ptr = body as *const _ as usize;
+  syn::Ident::new(&format!("valued_of_{}", ptr), Span::call_site())
+}
+
 /// Emit a braced block of instructions.
 pub(crate) fn emit_body(body: &ast::node::Body) -> syn::Result<proc_macro2::TokenStream> {
   let mut res = TokenStream::new();
@@ -404,10 +424,11 @@ pub(crate) fn emit_body(body: &ast::node::Body) -> syn::Result<proc_macro2::Toke
   }
   if let Some(value) = value {
     let res: proc_macro2::TokenStream = res.into();
-    return Ok(quote! {{
+    let value_id = block_value_id(body);
+    return Ok(quote! {
       #res;
-      #value
-    }});
+      let #value_id = #value;
+    });
   }
   Ok(res.into())
 }

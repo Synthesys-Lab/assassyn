@@ -34,6 +34,10 @@ impl DataType {
     DataType::Int(bits)
   }
 
+  pub fn bits_ty(bits: usize) -> Self {
+    DataType::Bits(bits)
+  }
+
   pub fn uint_ty(bits: usize) -> Self {
     DataType::UInt(bits)
   }

@@ -31,7 +31,7 @@ fn fifo_valid() {
     }.expose(rhs)
   );
 
-  let mut sys = SysBuilder::new("main");
+  let mut sys = SysBuilder::new("fifo_valid");
   let suber = sub_builder(&mut sys);
   let (lhs, rhs) = lhs_builder(&mut sys, suber);
   driver_builder(&mut sys, lhs, rhs);

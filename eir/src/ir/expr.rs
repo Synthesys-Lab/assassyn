@@ -31,6 +31,7 @@ pub enum Opcode {
   BitwiseAnd,
   BitwiseOr,
   BitwiseXor,
+  Concat,
   // Comparison operations
   IGT,
   ILT,
@@ -111,6 +112,7 @@ impl ToString for Opcode {
       Opcode::Slice => "slice".into(),
       Opcode::Select => "select".into(),
       Opcode::Bind(_) => "".into(),
+      Opcode::Concat => "<->".into(),
     }
   }
 }

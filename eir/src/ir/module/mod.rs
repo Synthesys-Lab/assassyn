@@ -12,9 +12,10 @@ use self::user::Operand;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Attribute {
-  ExplicitPop,
-  OptNone,
-  EagerBind,
+  ExplicitPop,      // In this module, FIFO pops are explicitly defined.
+  OptNone,          // Avoid optimization on this module.
+  EagerBind,        // All the binds in this module will be called after arguments are fully bound.
+  AllowPartialCall, // Allow some arguments are not given to call this module.
 }
 
 /// The data structure for a module.

@@ -23,7 +23,7 @@ impl Parse for ModuleAttrs {
       input.parse::<Token![#]>()?;
       let raw_attr = input.parse::<syn::Ident>()?;
       attrs.push_value(match raw_attr.to_string().as_str() {
-        "optnone" | "explicit_pop" | "eager_bind" => raw_attr.clone(),
+        "allow_partial_call" | "optnone" | "explicit_pop" | "eager_bind" => raw_attr.clone(),
         _ => {
           return Err(syn::Error::new(
             raw_attr.span(),
@@ -184,7 +184,8 @@ impl Parse for Expr {
       }
       // TODO(@were): Deprecate pop, make it opaque to users.
       "flip" | "pop" | "valid" | "peek" => Ok(Expr::Unary((a, operator))),
-      "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "bitwise_and" => {
+      "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "bitwise_and"
+      | "bitwise_or" | "concat" => {
         let b = content.parse::<ExprTerm>()?;
         Ok(Expr::Binary((a, operator, b)))
       }
