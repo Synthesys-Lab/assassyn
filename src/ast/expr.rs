@@ -145,8 +145,8 @@ pub(crate) enum Expr {
   Select((ExprTerm, Vec<(ExprTerm, ExprTerm)>)),
   // ExprTerm . slice ( ExprTerm, ExprTerm )
   Slice((ExprTerm, ExprTerm, ExprTerm)),
-  // ExprTerm . cast ( DType )
-  Cast((ExprTerm, DType)),
+  // ExprTerm . [cast | sext] ( DType )
+  DTConv((syn::Ident, ExprTerm, DType)),
   // ExprTerm
   Term(ExprTerm),
 }
@@ -193,9 +193,9 @@ impl Parse for Expr {
         let b = content.parse::<ExprTerm>()?;
         Ok(Expr::Binary((a, operator, b)))
       }
-      "cast" => {
+      "cast" | "sext" => {
         let t = content.parse::<DType>()?;
-        Ok(Expr::Cast((a, t)))
+        Ok(Expr::DTConv((operator, a, t)))
       }
       _ => Err(syn::Error::new(
         operator.span(),

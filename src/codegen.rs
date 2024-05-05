@@ -125,12 +125,13 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         res
       }})
     }
-    expr::Expr::Cast((a, ty)) => {
+    expr::Expr::DTConv((op, a, ty)) => {
+      let method_id = syn::Ident::new(format!("create_{}", op).as_str(), a.span());
       let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
       let ty: proc_macro2::TokenStream = emit_type(ty)?.into();
       Ok(quote! {{
         let src = #a.clone();
-        let res = sys.create_cast(src, #ty);
+        let res = sys.#method_id(src, #ty);
         res
       }})
     }

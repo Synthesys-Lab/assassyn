@@ -53,6 +53,7 @@ pub enum Opcode {
   // Other synthesizable operations
   Slice,
   Cast,
+  Sext,
   // Level-2 syntax sugar, will be re-written in synthesizable operations
   SpinTrigger,
   // Non-synthesizable operations
@@ -112,6 +113,7 @@ impl ToString for Opcode {
       Opcode::Log => "log".into(),
       Opcode::Slice => "slice".into(),
       Opcode::Cast => "cast".into(),
+      Opcode::Sext => "sext".into(),
       Opcode::Select => "select".into(),
       Opcode::Bind(_) => "".into(),
       Opcode::Concat => "<->".into(),

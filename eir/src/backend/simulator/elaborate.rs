@@ -472,6 +472,13 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             format!("{} as {}", a, dtype_to_rust_type(&dest_dtype))
           }
         }
+        Opcode::Sext => {
+          let src_ref = expr.get_operand(0).unwrap();
+          let src = src_ref.get_value();
+          let dest_dtype = expr.dtype();
+          let a = dump_ref!(self.sys, src);
+          format!("{} as {}", a, dtype_to_rust_type(&dest_dtype))
+        }
         Opcode::Bind(_) => {
           let callee = {
             let n = expr.get_num_operands();

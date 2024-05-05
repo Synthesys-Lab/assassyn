@@ -359,6 +359,15 @@ impl Visitor<String> for IRPrinter {
           );
           res
         }
+        Opcode::Sext => {
+          let res = format!(
+            "_{} = {}.sext({})",
+            expr.get_key(),
+            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+            expr.dtype().to_string()
+          );
+          res
+        }
         Opcode::Bind(_) => {
           let (callee, arg_n) = {
             let n = expr.get_num_operands() - 1;

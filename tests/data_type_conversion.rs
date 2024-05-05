@@ -1,22 +1,24 @@
 use eda4eda::module_builder;
-use eir::{backend, builder::SysBuilder, xform};
+use eir::{builder::SysBuilder, xform};
 
-fn i2b_sys() -> SysBuilder {
+fn dt_conv_sys() -> SysBuilder {
   module_builder!(
     driver()() {
       i32 = 0.int<32>;
       _b32 = i32.cast(bits<32>);
+      _u32 = i32.cast(uint<32>);
+      _i64 = i32.sext(int<64>);
     }
   );
 
-  let mut sys = SysBuilder::new("i2b");
+  let mut sys = SysBuilder::new("dt_conv");
   let _driver = driver_builder(&mut sys);
   sys
 }
 
 #[test]
-fn i2b() {
-  let mut sys = i2b_sys();
+fn dt_conv() {
+  let mut sys = dt_conv_sys();
 
   println!("{}", sys);
 
@@ -29,11 +31,7 @@ fn i2b() {
 
   println!("{}", sys);
 
-  let config = backend::common::Config {
-    temp_dir: true,
-    sim_threshold: 200,
-    idle_threshold: 200,
-  };
+  let config = eir::backend::common::Config::default();
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 

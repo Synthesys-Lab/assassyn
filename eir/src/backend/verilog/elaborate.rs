@@ -1418,6 +1418,40 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           ))
         }
 
+        Opcode::Sext => {
+          let src_ref = expr.get_operand(0).unwrap();
+          let src = src_ref.get_value();
+          let src_dtype = src.get_dtype(expr.sys).unwrap();
+          let dest_dtype = expr.dtype();
+          let a = dump_ref!(self.sys, src);
+          if src_dtype.is_int()
+            && src_dtype.is_signed()
+            && dest_dtype.is_int()
+            && dest_dtype.is_signed()
+            && dest_dtype.get_bits() > src_dtype.get_bits()
+          {
+            // perform sext
+            Some(format!(
+              "logic [{}:0] _{};\nassign _{} = {{{}'{{{}[{}]}}, {}}};\n\n",
+              expr.dtype().get_bits() - 1,
+              expr.get_key(),
+              expr.get_key(),
+              dest_dtype.get_bits() - src_dtype.get_bits(),
+              a,
+              src_dtype.get_bits() - 1,
+              a
+            ))
+          } else {
+            Some(format!(
+              "logic [{}:0] _{};\nassign _{} = {};\n\n",
+              expr.dtype().get_bits() - 1,
+              expr.get_key(),
+              expr.get_key(),
+              a
+            ))
+          }
+        }
+
         Opcode::Bind(_) => {
           // currently handled in AsyncCall
           Some("".to_string())
