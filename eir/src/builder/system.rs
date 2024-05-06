@@ -731,6 +731,7 @@ impl SysBuilder {
     match op {
       Opcode::Add | Opcode::Sub | Opcode::BitwiseAnd | Opcode::BitwiseOr | Opcode::BitwiseXor => {
         match (&aty, &bty) {
+          // TODO(@were): Add one more bit to handle overflow.
           (DataType::Int(a), DataType::Int(b)) => DataType::Int(*a.max(b)),
           (DataType::UInt(a), DataType::UInt(b)) => DataType::UInt(*a.max(b)),
           _ => panic!(

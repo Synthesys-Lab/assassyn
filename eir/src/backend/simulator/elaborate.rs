@@ -473,12 +473,13 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             "{{
               let a = ValueCastTo::<BigUint>::cast(&{});
               let b = ValueCastTo::<BigUint>::cast(&{});
-              ValueCastTo::<{}>::cast((a << {}) | b)
+              let c = (a << {}) | b;
+              ValueCastTo::<{}>::cast(&c)
             }}",
             a,
             b,
-            dtype_to_rust_type(&expr.dtype()),
             b_bits,
+            dtype_to_rust_type(&expr.dtype()),
           }
         }
         Opcode::Select => {
@@ -701,6 +702,22 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       bigint,
       other,
       other.to_lowercase()
+    ));
+    res.push_str(&format!(
+      "impl ValueCastTo<{}> for bool {{ fn cast(&self) -> {} {{
+        if *self {{ 1.to_{}().unwrap() }} else {{ 0.to_{}().unwrap() }}
+      }} }}\n",
+      bigint,
+      bigint,
+      bigint.to_lowercase(),
+      bigint.to_lowercase()
+    ));
+    res.push_str(&format!(
+      "impl ValueCastTo<bool> for {} {{ fn cast(&self) -> bool {{
+        !self.eq(&0.to_{}().unwrap())
+      }} }}\n",
+      bigint,
+      bigint.to_lowercase()
     ));
   }
 

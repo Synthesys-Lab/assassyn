@@ -233,6 +233,25 @@ impl Visitor<String> for IRPrinter {
       )
     } else {
       match expr.get_opcode() {
+        Opcode::Concat => {
+          let a = expr.get_operand(0).unwrap().get_value().to_string(expr.sys);
+          let (b, b_bits) = {
+            let b = expr.get_operand(1).unwrap().get_value().clone();
+            (
+              b.to_string(expr.sys),
+              b.get_dtype(expr.sys).unwrap().get_bits(),
+            )
+          };
+          format!(
+            "_{} = concat({}, {}) // {} << {} | {}",
+            expr.get_key(),
+            a,
+            b,
+            a,
+            b_bits,
+            b,
+          )
+        }
         Opcode::Load => {
           format!(
             "_{} = {}",
