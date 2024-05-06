@@ -360,32 +360,38 @@ impl Visitor<String> for IRPrinter {
           res
         }
         Opcode::Slice => {
-          let res = format!(
+          format!(
             "_{} = {}[{}:{}]",
             expr.get_key(),
             expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
             expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
             expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
-          );
-          res
+          )
         }
         Opcode::Cast => {
-          let res = format!(
+          format!(
             "_{} = {}.cast({})",
             expr.get_key(),
             expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
             expr.dtype().to_string()
-          );
-          res
+          )
         }
         Opcode::Sext => {
-          let res = format!(
+          format!(
             "_{} = {}.sext({})",
             expr.get_key(),
             expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
             expr.dtype().to_string()
-          );
-          res
+          )
+        }
+        Opcode::Select => {
+          format!(
+            "_{} = select({}, {}, {})",
+            expr.get_key(),
+            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+            expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
+            expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
+          )
         }
         Opcode::Bind(_) => {
           let (callee, arg_n) = {

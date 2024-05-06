@@ -188,7 +188,7 @@ impl Parse for Expr {
       }
       // TODO(@were): Deprecate pop, make it opaque to users.
       "flip" | "pop" | "valid" | "peek" => Ok(Expr::Unary((a, operator))),
-      "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "bitwise_and"
+      "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "neq" | "bitwise_and"
       | "bitwise_or" | "concat" => {
         let b = content.parse::<ExprTerm>()?;
         Ok(Expr::Binary((a, operator, b)))

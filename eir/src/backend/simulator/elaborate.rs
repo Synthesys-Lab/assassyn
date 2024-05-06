@@ -450,8 +450,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           format!(
             "{{
               let a = ValueCastTo::<BigUint>::cast(&{});
-              let mask = BigUint::parse_bytes(\"{}\", 2).unwrap();
-              ValueCastTo::<{}>::cast((a >> {}) & mask)
+              let mask = BigUint::parse_bytes(\"{}\".as_bytes(), 2).unwrap();
+              let res = (a >> {}) & mask;
+              ValueCastTo::<{}>::cast(&res)
             }}",
             a,
             "1".repeat((r - l + 1) as usize),
@@ -588,19 +589,17 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         res.push_str(&format!("  if stamp / 100 == {} {{\n", cycle));
       }
       BlockKind::WaitUntil(cond) => {
-        let dtype = {
+        let value = {
           let cond = cond.as_ref::<Block>(block.sys).unwrap();
-          cond.get_value().unwrap().get_dtype(block.sys).unwrap()
+          let value = cond.get_value().unwrap().clone();
+          value
         };
-        let cond = self.dispatch(block.sys, &cond, vec![]).unwrap();
+        let cond_block = self.dispatch(block.sys, &cond, vec![]).unwrap();
+        let cond_block = cond_block[1..cond_block.len() - 1].to_string();
         res.push_str(&format!(
-          "  if {}{} {{\n",
-          cond,
-          if dtype.get_bits() == 1 {
-            "".into()
-          } else {
-            format!(" != 0")
-          }
+          "{}  if {} {{\n",
+          cond_block,
+          dump_ref!(self.sys, &value)
         ));
       }
       BlockKind::Valued(_) | BlockKind::None => {
@@ -644,11 +643,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         );
         res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
       }
-      BlockKind::Valued(value) => {
-        res.push_str(&dump_ref!(self.sys, value));
-        res.push('}');
-      }
-      BlockKind::None => {
+      BlockKind::Valued(_) | BlockKind::None => {
         res.push('}');
       }
     }

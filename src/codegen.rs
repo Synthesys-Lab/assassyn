@@ -38,7 +38,8 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> 
 pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
     expr::Expr::Binary((a, op, b)) => match op.to_string().as_str() {
-      "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" | "igt" | "concat" => {
+      "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "neq" | "eq" | "igt"
+      | "concat" => {
         let method_id = format!("create_{}", op);
         let method_id = syn::Ident::new(&method_id, op.span());
         let a = emit_expr_term(a)?;

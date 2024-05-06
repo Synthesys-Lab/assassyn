@@ -38,6 +38,7 @@ pub enum Opcode {
   IGE,
   ILE,
   EQ,
+  NEQ,
   // Unary operations
   Neg,
   Flip,
@@ -80,7 +81,7 @@ impl Opcode {
   }
   pub fn is_cmp(&self) -> bool {
     match self {
-      Opcode::IGT | Opcode::ILT | Opcode::IGE | Opcode::ILE | Opcode::EQ => true,
+      Opcode::IGT | Opcode::ILT | Opcode::IGE | Opcode::ILE | Opcode::EQ | Opcode::NEQ => true,
       _ => false,
     }
   }
@@ -100,6 +101,7 @@ impl ToString for Opcode {
       Opcode::IGE => ">=".into(),
       Opcode::ILE => "<=".into(),
       Opcode::EQ => "==".into(),
+      Opcode::NEQ => "!=".into(),
       Opcode::Neg => "-".into(),
       Opcode::Flip => "!".into(),
       Opcode::Load => "load".into(),

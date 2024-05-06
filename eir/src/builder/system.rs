@@ -103,7 +103,9 @@ macro_rules! create_arith_op_impl {
 
   (unary, $func_name:ident, $opcode: expr) => {
     pub fn $func_name(&mut self, x: BaseNode) -> BaseNode {
-      let res_ty = x.get_dtype(self).unwrap();
+      let res_ty = x.get_dtype(self).unwrap_or_else(|| {
+        panic!("{} has no type!", x.to_string(self));
+      });
       self.create_expr(res_ty, $opcode, vec![x.clone()], true)
     }
   };
@@ -473,6 +475,7 @@ impl SysBuilder {
   create_arith_op_impl!(binary, create_ilt, Opcode::ILT);
   create_arith_op_impl!(binary, create_ile, Opcode::ILE);
   create_arith_op_impl!(binary, create_eq, Opcode::EQ);
+  create_arith_op_impl!(binary, create_neq, Opcode::NEQ);
   create_arith_op_impl!(binary, create_concat, Opcode::Concat);
 
   create_arith_op_impl!(unary, create_neg, Opcode::Neg);
@@ -573,9 +576,12 @@ impl SysBuilder {
         )
       })
     };
-    let port = module
-      .get_port_by_name(&key)
-      .expect(format!("{} is NOT a FIFO of {}", key, module.get_name()).as_str());
+    let port = module.get_port_by_name(&key).expect(&format!(
+      "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
+      key,
+      module.get_name(),
+      module.upcast()
+    ));
     assert_eq!(port.scalar_ty(), value.get_dtype(self).unwrap());
     let port_idx = port.idx();
     let module_name = module.get_name().to_string();
@@ -728,18 +734,26 @@ impl SysBuilder {
   fn combine_types(&self, op: Opcode, a: &BaseNode, b: &BaseNode) -> DataType {
     let aty = a.get_dtype(self).unwrap();
     let bty = b.get_dtype(self).unwrap();
+    if op.is_cmp() {
+      return DataType::uint_ty(1);
+    }
     match op {
-      Opcode::Add | Opcode::Sub | Opcode::BitwiseAnd | Opcode::BitwiseOr | Opcode::BitwiseXor => {
+      Opcode::Add | Opcode::Sub => {
         match (&aty, &bty) {
           // TODO(@were): Add one more bit to handle overflow.
           (DataType::Int(a), DataType::Int(b)) => DataType::Int(*a.max(b)),
           (DataType::UInt(a), DataType::UInt(b)) => DataType::UInt(*a.max(b)),
           _ => panic!(
-            "Cannot combine types {} and {}",
+            "Cannot combine types {} and {} for {:?}",
             aty.to_string(),
-            bty.to_string()
+            bty.to_string(),
+            op
           ),
         }
+      }
+      Opcode::BitwiseAnd => DataType::bits_ty(aty.get_bits().min(bty.get_bits())),
+      Opcode::BitwiseOr | Opcode::BitwiseXor => {
+        DataType::bits_ty(aty.get_bits().max(bty.get_bits()))
       }
       Opcode::Mul => match (&aty, &bty) {
         (DataType::Int(a), DataType::Int(b)) => DataType::Int(a + b),
@@ -755,7 +769,6 @@ impl SysBuilder {
         let b_bits = b.get_dtype(self).unwrap().get_bits();
         DataType::bits_ty(a_bits + b_bits)
       }
-      Opcode::EQ | Opcode::IGT | Opcode::IGE | Opcode::ILT | Opcode::ILE => DataType::uint_ty(1),
       _ => panic!("Unsupported opcode {:?}", op),
     }
   }

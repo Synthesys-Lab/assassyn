@@ -1,51 +1,44 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
-// #[test]
+#[test]
 fn multi_call() {
-  module_builder!(adder()(a:int<32>, b:int<32>) {
-    c = a.add(b);
-    log("adder: {} + {} = {}", a, b, c);
+  module_builder!(sqr()(a:int<32>) {
+    b = a.mul(a);
+    log("adder: {} * {} = {}", a, a, b);
   });
 
   module_builder!(
-    arbiter(adder)(a0:int<32>, b0:int<32>, a1:int<32>, b1:int<32>)
+    arbiter(sqr)(a0:int<32>, a1:int<32>)
       #explicit_pop, #allow_partial_call, #no_arbiter {
       wait_until {
         a0_valid = a0.valid();
-        b0_valid = b0.valid();
-        valid0 = a0_valid.bitwise_and(b0_valid);
         a1_valid = a1.valid();
-        b1_valid = b1.valid();
-        valid1 = a1_valid.bitwise_and(b1_valid);
-        valid = valid0.bitwise_or(valid1);
+        valid = a0_valid.bitwise_or(a1_valid);
         valid
       } {
-        hot_valid = valid0.concat(valid1);
+        hot_valid = a1_valid.concat(a0_valid);
         // grant is a one-hot vector
-        last_grant = array(int<1>, 1);
-        gv = last_grant[0];
-        // gv_1h = lut[0b10, 0b01][gv];
-        gv_zero = gv.eq(0);
-        gv_1h = default 2.int<32>.case(gv_zero, 1);
-        gv_1h_flip = gv.flip();
-        hi = gv_1h_flip.bitwise_and(hot_valid);
-        lo = gv_1h.bitwise_and(hot_valid);
-        hi_flip = hi.flip();
-        new_grant = default hi.case(hi_flip, lo);
-        grant0 = new_grant.eq(1);
-        grant1 = new_grant.eq(2);
+        grant_1h = array(int<2>, 1, [1.int<2>]);
+        gv = grant_1h[0];
+        gv_flip = gv.flip();
+        hi = gv_flip.bitwise_and(hot_valid);
+        lo = gv.bitwise_and(hot_valid);
+        hi_nez = hi.neq(0.bits<2>);
+        new_grant = default lo.case(hi_nez, hi);
+        grant0 = new_grant.eq(1.bits<2>);
+        grant1 = new_grant.eq(2.bits<2>);
         when grant0 {
+          log("grants even");
           a0 = a0.pop();
-          b0 = b0.pop();
-          async_call adder { a: a0, b: b0 };
-          last_grant[0] = 0;
+          async_call sqr { a: a0 };
+          grant_1h[0] = 1.int<2>;
         }
         when grant1 {
+          log("grants odd");
           a1 = a1.pop();
-          b1 = b1.pop();
-          async_call adder { a: a1, b: b1 };
-          last_grant[0] = 1;
+          async_call sqr { a: a1 };
+          grant_1h[0] = 2.int<2>;
         }
       }
     }
@@ -55,17 +48,22 @@ fn multi_call() {
     cnt = array(int<32>, 1);
     k = cnt[0.int<32>];
     v = k.add(1);
+    even = v.mul(2);
+    even = even.slice(0, 31);
+    even = even.cast(int<32>);
+    odd = even.add(1);
     cnt[0] = v;
     is_odd = v.bitwise_and(1);
     when is_odd {
-      async_call arbiter { a0: v, b0: v };
-      async_call arbiter { a1: v, b1: v };
+      async_call arbiter { a0: even };
+      async_call arbiter { a1: odd };
     }
   });
 
   let mut sys = SysBuilder::new("multi_call");
-  let adder = adder_builder(&mut sys);
-  driver_builder(&mut sys, adder);
+  let adder = sqr_builder(&mut sys);
+  let arbiter = arbiter_builder(&mut sys, adder);
+  driver_builder(&mut sys, arbiter);
   eir::builder::verify(&sys);
 
   println!("{}", sys);
@@ -75,24 +73,15 @@ fn multi_call() {
   // TODO(@boyang): Should we also test the verilog backend?
   // eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  run_simulator(
-    &sys,
-    &config,
-    Some((
-      |x| {
-        if x.contains("adder") {
-          let raw = x.split(" ").collect::<Vec<&str>>();
-          let len = raw.len();
-          let a = raw[len - 5].parse::<i32>().unwrap();
-          let b = raw[len - 3].parse::<i32>().unwrap();
-          let c = raw[len - 1].parse::<i32>().unwrap();
-          assert_eq!(c, a + b);
-          true
-        } else {
-          false
-        }
-      },
-      Some(100),
-    )),
-  );
+  let mut last_grant: Option<i32> = None;
+  run_simulator(&sys, &config, None).lines().for_each(|x| {
+    if x.contains("grants odd") {
+      assert!(last_grant.map_or(true, |x| x == 0));
+      last_grant = Some(1);
+    }
+    if x.contains("grants even") {
+      assert!(last_grant.map_or(true, |x| x == 1));
+      last_grant = Some(0);
+    }
+  });
 }
