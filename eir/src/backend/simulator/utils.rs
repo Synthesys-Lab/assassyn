@@ -55,9 +55,9 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
       format!("{}8", prefix)
     } else if bits > 64 {
       if dtype.is_signed() {
-        format!("num_bigint::BigInt")
+        format!("BigInt")
       } else {
-        format!("num_bitint::BigUint")
+        format!("BigUint")
       }
     } else {
       panic!("Not implemented yet, {:?}", dtype)

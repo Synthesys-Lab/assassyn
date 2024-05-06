@@ -277,7 +277,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             .as_ref::<ArrayPtr>(expr.sys)
             .unwrap();
           format!(
-            "{}[{} as usize]",
+            "{}[{} as usize].clone()",
             NodeRefDumper
               .dispatch(expr.sys, &handle.get_array(), vec![])
               .unwrap(),
@@ -390,7 +390,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             quote::quote! {
               q.push(Reverse(Event{
                 stamp: stamp + 50,
-                kind: EventKind::#fifo_push((EventKind::#module_writer.into(), #slab_idx, #value))
+                kind: EventKind::#fifo_push(
+                  (EventKind::#module_writer.into(), #slab_idx, #value.clone()))
               }))
             }
             .to_string()
@@ -643,6 +644,24 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     .to_string(),
   );
   res.push_str("impl ValueCastTo<bool> for bool { fn cast(&self) -> bool { self.clone() } }\n");
+
+  let bigints = ["BigInt", "BigUint"];
+  for i in 0..2 {
+    let bigint = bigints[i];
+    let other = bigints[1 - i];
+    res.push_str(&format!(
+      "impl ValueCastTo<{}> for {} {{ fn cast(&self) -> {} {{ self.clone() }} }}\n",
+      bigint, bigint, bigint
+    ));
+    res.push_str(&format!(
+      "impl ValueCastTo<{}> for {} {{ fn cast(&self) -> {} {{ self.to_{}().unwrap() }} }}\n",
+      other,
+      bigint,
+      other,
+      other.to_lowercase()
+    ));
+  }
+
   // Dump a template based data cast so that big integers are unified in.
   for sign_i in 0..=1 {
     for i in 3..7 {
@@ -651,36 +670,42 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
         "impl ValueCastTo<bool> for {} {{ fn cast(&self) -> bool {{ *self != 0 }} }}\n",
         src_ty
       ));
-      res.push_str(
-        &format!(
-          "impl ValueCastTo<{}> for bool {{ fn cast(&self) -> {} {{ if *self {{ 1 }} else {{ 0 }} }} }}\n",
-          src_ty, src_ty
-        )
-      );
-      res.push_str(
-        &format!(
-          "impl ValueCastTo<BigInt> for {} {{ fn cast(&self) -> BigInt {{ self.to_bigint().unwrap() }} }}\n",
+      res.push_str(&format!(
+        "impl ValueCastTo<{}> for bool {{
+            fn cast(&self) -> {} {{ if *self {{ 1 }} else {{ 0 }} }}
+          }}\n",
+        src_ty, src_ty
+      ));
+      for idx in 0..2 {
+        let bigint = bigints[idx];
+        res.push_str(&format!(
+          "impl ValueCastTo<{}> for {} {{ fn cast(&self) -> {} {{ self.to_{}().unwrap() }} }}\n",
+          bigint,
           src_ty,
-        )
-      );
-      res.push_str(
-        &format!(
-          "impl ValueCastTo<BigUint> for {} {{ fn cast(&self) -> BigUint {{ self.to_biguint().unwrap() }} }}\n",
-          src_ty,
-        )
-      );
-      res.push_str(
-        &format!(
-          "impl ValueCastTo<{}> for BigInt {{ fn cast(&self) -> {} {{ self.to_i64().unwrap() as {} }} }}\n",
-          src_ty, src_ty, src_ty
-        )
-      );
-      res.push_str(
-        &format!(
-          "impl ValueCastTo<{}> for BigUint {{ fn cast(&self) -> {} {{ self.to_u64().unwrap() as {} }} }}\n",
-          src_ty, src_ty, src_ty
-        )
-      );
+          bigint,
+          bigint.to_lowercase()
+        ));
+      }
+      res.push_str(&format!(
+        "impl ValueCastTo<{}> for BigInt {{
+            fn cast(&self) -> {} {{
+              let (sign, data) = self.to_u64_digits();
+              match sign {{
+                num_bigint::Sign::Plus => data[0] as {},
+                num_bigint::Sign::Minus => ((!data[0] + 1) & ({}::MAX as u64)) as {},
+                num_bigint::Sign::NoSign => data[0] as {},
+              }}
+            }}
+          }}\n",
+        src_ty, src_ty, src_ty, src_ty, src_ty, src_ty
+      ));
+      res.push_str(&format!(
+        "impl ValueCastTo<{}> for BigUint {{
+            fn cast(&self) -> {} {{ self.to_u64_digits()[0] as {} }}
+          }}\n",
+        src_ty, src_ty, src_ty
+      ));
+
       for sign_j in 0..=1 {
         for j in 3..7 {
           let dst_ty = format!("{}{}", ['u', 'i'][sign_j], 1 << j);
@@ -723,7 +748,8 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     ));
   }
   let array_types = analysis::types::array_types_used(sys);
-  for aty in array_types.iter() {
+  for (_, dtypes) in array_types.iter() {
+    let aty = dtypes.iter().next().unwrap();
     let (scalar_ty, size) = unwrap_array_ty(aty);
     let scalar_str = dtype_to_rust_type(&scalar_ty);
     let array_str = array_ty_to_id(&scalar_ty, size);
@@ -733,7 +759,8 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     ));
   }
   let fifo_types = analysis::types::fifo_types_used(sys);
-  for fty in fifo_types.iter() {
+  for (_, dtypes) in fifo_types.iter() {
+    let fty = dtypes.iter().next().unwrap();
     let ty = dtype_to_rust_type(&fty);
     res.push_str(&format!(
       "  FIFO{}Push((Box<EventKind>, usize, {})),\n",
@@ -756,13 +783,15 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     .to_string(),
   );
   res.push_str("\n\nfn is_push(&self) -> bool { match self {\n");
-  for fty in fifo_types.iter() {
+  for (_, dtypes) in fifo_types.iter() {
+    let fty = dtypes.iter().next().unwrap();
     let ty = dtype_to_rust_type(&fty);
     res.push_str(&format!("  EventKind::FIFO{}Push(_) => true,\n", ty,));
   }
   res.push_str("_ => false, }}\n\n");
   res.push_str("fn is_pop(&self) -> bool { match self {\n");
-  for fty in fifo_types.iter() {
+  for (_, dtypes) in fifo_types.iter() {
+    let fty = dtypes.iter().next().unwrap();
     let ty = dtype_to_rust_type(&fty);
     res.push_str(&format!("  EventKind::FIFO{}Pop(_) => true,\n", ty,));
   }
@@ -771,7 +800,8 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
 
   // Dump the universal set of data types used in this simulation.
   res.push_str("pub enum DataSlab {");
-  for array in array_types.iter() {
+  for (_, dtypes) in array_types.iter() {
+    let array = dtypes.iter().next().unwrap();
     let (scalar_ty, size) = unwrap_array_ty(array);
     res.push_str(&format!(
       "  Array{}(Box<{}>),\n",
@@ -779,7 +809,8 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       dtype_to_rust_type(&array),
     ));
   }
-  for fifo in fifo_types.iter() {
+  for (_, dtypes) in fifo_types.iter() {
+    let fifo = dtypes.iter().next().unwrap();
     res.push_str(&format!(
       "  FIFO{}(Box<VecDeque<{}>>),\n",
       dtype_to_rust_type(&fifo),
@@ -884,7 +915,8 @@ macro_rules! impl_unwrap_slab {
 }",
   );
 
-  for array in array_types.iter() {
+  for (_, dtypes) in array_types.iter() {
+    let array = dtypes.iter().next().unwrap();
     let (scalar_ty, size) = unwrap_array_ty(array);
     let aid = array_ty_to_id(&scalar_ty, size);
     let scalar_ty = dtype_to_rust_type(&scalar_ty);
@@ -894,7 +926,8 @@ macro_rules! impl_unwrap_slab {
     ));
   }
 
-  for fifo in fifo_types.iter() {
+  for (_, dtypes) in fifo_types.iter() {
+    let fifo = dtypes.iter().next().unwrap();
     let ty = dtype_to_rust_type(fifo);
     res.push_str(&format!(
       "impl_unwrap_slab!(VecDeque<{}>, FIFO{});\n",
@@ -1072,7 +1105,7 @@ macro_rules! impl_unwrap_slab {
     }
     .to_string(),
   );
-  res.push_str("    match event.0.kind {\n");
+  res.push_str("    match &event.0.kind {\n");
   for module in sys.module_iter() {
     let module_eventkind = &format!("Module{}", camelize(&namify(module.get_name())));
     res.push_str(&format!("      EventKind::{} => {{\n", module_eventkind));
@@ -1139,7 +1172,8 @@ macro_rules! impl_unwrap_slab {
       res.push_str("idled += 1; stamp = event.0.stamp; }\n");
     }
   }
-  for aty in array_types.iter() {
+  for (_, dtypes) in array_types.iter() {
+    let aty = dtypes.iter().next().unwrap();
     let (scalar_ty, size) = unwrap_array_ty(aty);
     let aid = array_ty_to_id(&scalar_ty, size);
     let array_write = syn::Ident::new(&format!("Array{}Write", aid), Span::call_site());
@@ -1149,7 +1183,13 @@ macro_rules! impl_unwrap_slab {
     res.push_str(
       &quote::quote! {
         EventKind::#array_write((_, slab_idx, idx, value)) => {
+          let slab_idx = *slab_idx;
+          let idx = *idx;
           data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
+          let value = match data_slab[slab_idx].last_written.operation.as_ref() {
+            EventKind::#array_write((_, _, _, value)) => value.clone(),
+            _ => panic!("Invalid last written operation"),
+          };
           data_slab[slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>()[idx] = value;
           stamp = event.0.stamp;
         }
@@ -1157,7 +1197,8 @@ macro_rules! impl_unwrap_slab {
       .to_string(),
     );
   }
-  for fifo_scalar_ty in fifo_types.iter() {
+  for (_, dtypes) in fifo_types.iter() {
+    let fifo_scalar_ty = dtypes.iter().next().unwrap();
     let ty = dtype_to_rust_type(fifo_scalar_ty);
     let fifo_push_event = syn::Ident::new(&format!("FIFO{}Push", ty), Span::call_site());
     let fifo_pop_event = syn::Ident::new(&format!("FIFO{}Pop", ty), Span::call_site());
@@ -1167,6 +1208,7 @@ macro_rules! impl_unwrap_slab {
     res.push_str(
       &quote::quote! {
         EventKind::#fifo_push_event((_, slab_idx, value)) => {
+          let value = value.clone();
           data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
           data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().push_back(value);
           stamp = event.0.stamp;
@@ -1209,6 +1251,7 @@ fn dump_modules(
       use std::collections::VecDeque;
       use std::collections::BinaryHeap;
       use std::cmp::Reverse;
+      use num_bigint::{BigInt, BigUint};
     }
     .to_string()
     .as_bytes(),

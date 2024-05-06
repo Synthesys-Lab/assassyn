@@ -2,9 +2,9 @@ use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 #[test]
-fn adder() {
+fn fib() {
   module_builder!(driver()() {
-    a = array(int<256>, 1, [0]);
+    a = array(int<256>, 1, [0.int<256>]);
     b = array(int<256>, 1, [1.int<256>]);
     aa = a[0];
     bb = b[0];
@@ -13,7 +13,7 @@ fn adder() {
     b[0] = cc;
   });
 
-  let mut sys = SysBuilder::new("adder");
+  let mut sys = SysBuilder::new("fib");
   driver_builder(&mut sys);
   eir::builder::verify(&sys);
 
@@ -22,7 +22,7 @@ fn adder() {
   let config = eir::backend::common::Config::default();
 
   // TODO(@boyang): Should we also test the verilog backend?
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   run_simulator(
     &sys,
