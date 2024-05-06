@@ -919,13 +919,25 @@ macro_rules! impl_unwrap_slab {
       &format!("Array{}", array_ty_to_id(&scalar_ty, size)),
       Span::call_site(),
     );
-    let init_scalar = if scalar_ty.get_bits() == 1 {
-      "false".into()
+    let initializer = if let Some(init) = array.get_initializer() {
+      let list = init
+        .iter()
+        .map(|x| dump_ref!(sys, x))
+        .collect::<Vec<String>>()
+        .join(", ");
+      format!("[{}]", list)
     } else {
-      format!("0 as {}", scalar_str)
-    }
-    .parse::<proc_macro2::TokenStream>()
-    .unwrap();
+      format!(
+        "[{}; {}]",
+        if scalar_ty.get_bits() == 1 {
+          "false".into()
+        } else {
+          format!("0 as {}", scalar_str)
+        },
+        size
+      )
+    };
+    let initializer = initializer.parse::<proc_macro2::TokenStream>().unwrap();
     res.push_str(&format!(
       "  // {} -> {}\n",
       slab_cache.len(),
@@ -934,7 +946,7 @@ macro_rules! impl_unwrap_slab {
     res.push_str(
       &quote::quote! {
         SlabEntry {
-          payload: DataSlab::#aty_id(Box::new([#init_scalar; #size])),
+          payload: DataSlab::#aty_id(Box::new(#initializer)),
           last_written: LastOperation {
             operation: EventKind::None.into(),
             stamp: 0

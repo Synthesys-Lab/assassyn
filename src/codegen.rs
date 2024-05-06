@@ -1,21 +1,24 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{punctuated::Punctuated, spanned::Spanned, Token};
 
-use crate::ast::{
-  self,
-  expr::{self, DType, ExprTerm},
-  node::{ArrayAccess, BodyPred, CallKind, FuncArgs, PortDecl, Statement},
+use crate::{
+  ast::{
+    self,
+    expr::{self, DType, ExprTerm},
+    node::{ArrayAccess, BodyPred, CallKind, FuncArgs, PortDecl, Statement, WeakSpanned},
+  },
+  utils::punctuated_span,
 };
 
 use eir::ir::data::DataType;
 
-pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
+pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> {
   match &dtype.dtype {
-    DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int_ty(#bits) }.into()),
-    DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint_ty(#bits) }.into()),
-    DataType::Bits(bits) => Ok(quote! { eir::ir::data::DataType::raw_ty(#bits) }.into()),
+    DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int_ty(#bits) }),
+    DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint_ty(#bits) }),
+    DataType::Bits(bits) => Ok(quote! { eir::ir::data::DataType::raw_ty(#bits) }),
     DataType::Module(args) => {
       let args = args
         .iter()
@@ -26,11 +29,7 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<TokenStream> {
           })
         })
         .collect::<Result<Vec<_>, _>>()?;
-      let args = args
-        .into_iter()
-        .map(|x| x.into())
-        .collect::<Vec<proc_macro2::TokenStream>>();
-      Ok(quote! { eir::ir::data::DataType::module(vec![#(#args.into()),*]) }.into())
+      Ok(quote! { eir::ir::data::DataType::module(vec![#(#args.into()),*]) })
     }
     _ => Err(syn::Error::new(dtype.span, "Unsupported type")),
   }
@@ -42,8 +41,8 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "eq" | "igt" | "concat" => {
         let method_id = format!("create_{}", op);
         let method_id = syn::Ident::new(&method_id, op.span());
-        let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
-        let b: proc_macro2::TokenStream = emit_expr_term(b)?.into();
+        let a = emit_expr_term(a)?;
+        let b = emit_expr_term(b)?;
         Ok(quote! {{
           let lhs = #a.clone();
           let rhs = #b.clone();
@@ -63,7 +62,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     },
     expr::Expr::Unary((a, op)) => match op.to_string().as_str() {
       "flip" => {
-        let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
+        let a = emit_expr_term(a)?;
         let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
         Ok(quote! {{
           let res = sys.#method_id(#a.clone());
@@ -72,7 +71,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       }
       "pop" => {
         let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
-        let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
+        let a = emit_expr_term(a)?;
         Ok(quote!(sys.#method_id(#a.clone(), None);))
       }
       "valid" | "peek" => {
@@ -114,9 +113,9 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     },
     expr::Expr::Slice((a, l, r)) => {
       let method_id = syn::Ident::new("create_slice", a.span());
-      let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
-      let l: proc_macro2::TokenStream = emit_expr_term(l)?.into();
-      let r: proc_macro2::TokenStream = emit_expr_term(r)?.into();
+      let a = emit_expr_term(a)?;
+      let l = emit_expr_term(l)?;
+      let r = emit_expr_term(r)?;
       Ok(quote! {{
         let src = #a.clone();
         let start = #l;
@@ -127,8 +126,8 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     }
     expr::Expr::DTConv((op, a, ty)) => {
       let method_id = syn::Ident::new(format!("create_{}", op).as_str(), a.span());
-      let a: proc_macro2::TokenStream = emit_expr_term(a)?.into();
-      let ty: proc_macro2::TokenStream = emit_type(ty)?.into();
+      let a = emit_expr_term(a)?;
+      let ty = emit_type(ty)?;
       Ok(quote! {{
         let src = #a.clone();
         let res = sys.#method_id(src, #ty);
@@ -137,13 +136,13 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     }
     expr::Expr::Term(term) => {
       let res = emit_expr_term(term)?;
-      Ok(res.into())
+      Ok(res)
     }
     expr::Expr::Select((default, cases)) => {
-      let mut res: proc_macro2::TokenStream = emit_expr_term(default)?.into();
+      let mut res = emit_expr_term(default)?;
       for (cond, value) in cases.iter() {
-        let cond: proc_macro2::TokenStream = emit_expr_term(cond)?.into();
-        let value: proc_macro2::TokenStream = emit_expr_term(value)?.into();
+        let cond = emit_expr_term(cond)?;
+        let value = emit_expr_term(value)?;
         res = quote! {{
           let carry = #res;
           let cond = #cond.clone();
@@ -156,25 +155,24 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
   }
 }
 
-fn emit_expr_term(expr: &ExprTerm) -> syn::Result<TokenStream> {
+fn emit_expr_term(expr: &ExprTerm) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
-    ExprTerm::Ident(id) => Ok(id.into_token_stream().into()),
+    ExprTerm::Ident(id) => Ok(id.into_token_stream()),
     ExprTerm::Const((ty, lit)) => {
       let ty = emit_type(ty)?;
-      let ty: proc_macro2::TokenStream = ty.into();
       let res = quote! { sys.get_const_int(#ty, #lit) };
-      Ok(res.into())
+      Ok(res)
     }
     ExprTerm::StrLit(lit) => {
       let value = lit.value();
-      Ok(quote! { sys.get_str_literal(#value.to_string()) }.into())
+      Ok(quote! { sys.get_str_literal(#value.to_string()) })
     }
   }
 }
 
 fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> {
   let id = aa.id.clone();
-  let idx: proc_macro2::TokenStream = emit_expr_term(&aa.idx)?.into();
+  let idx = emit_expr_term(&aa.idx)?;
   Ok(quote! {{
     let idx = #idx.clone();
     sys.create_array_ptr(#id.clone(), idx)
@@ -187,7 +185,6 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
       .iter()
       .map(|(k, v)| {
         let value = emit_expr_term(v).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {v}));
-        let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
           let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, None);
@@ -198,7 +195,6 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
       .iter()
       .map(|x| {
         let value = emit_expr_term(x).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {x}));
-        let value: proc_macro2::TokenStream = value.into();
         quote! {
           let value = #value.clone();
           let bind = sys.push_bind(bind, value, None);
@@ -271,7 +267,7 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
           let mut emit_args: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
           let mut arg_ids: Punctuated<syn::Ident, Token![,]> = Punctuated::new();
           for (i, elem) in args.iter().enumerate() {
-            let elem: proc_macro2::TokenStream = emit_expr_term(elem)?.into();
+            let elem = emit_expr_term(elem)?;
             let id = syn::Ident::new(&format!("_{}", i), elem.span());
             emit_args.push(quote! { let #id = #elem });
             emit_args.push_punct(Token![;](elem.span()));
@@ -298,11 +294,31 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         }
       },
     },
-    Statement::ArrayAlloc((id, ty, size)) => {
+    Statement::ArrayAlloc((id, ty, size, init)) => {
       let ty = emit_type(ty)?;
-      let ty: proc_macro2::TokenStream = ty.into();
-      quote! {
-        let #id = sys.create_array(#ty, stringify!(#id), #size);
+      let (init_values, init_list) = if let Some(init) = init {
+        let mut init_values = Punctuated::new();
+        let mut init_list = Punctuated::new();
+        for (i, elem) in init.iter().enumerate() {
+          let id = syn::Ident::new(&format!("_{}", i), elem.span());
+          let value = emit_expr_term(elem)?;
+          init_list.push_value(id.clone());
+          init_list.push_punct(Token![,](elem.span()));
+          init_values.push_value(quote! { let #id = #value });
+          init_values.push_punct(Token![;](elem.span()));
+        }
+        let init_span = punctuated_span(init).unwrap_or(id.span());
+        (
+          Some(init_values),
+          quote_spanned! { init_span => Some(vec![#init_list]) },
+        )
+      } else {
+        (None, quote_spanned! { id.span() => None })
+      };
+      quote_spanned! {
+        id.span() =>
+          #init_values
+          let #id = sys.create_array(#ty, stringify!(#id), #size, #init_list);
       }
     }
     Statement::BodyScope((pred, body)) => {
@@ -468,7 +484,7 @@ pub(crate) fn emit_ports(
     port_peeks.push(quote! { let #id = module.get_port(#i).expect(#err_log).upcast() });
     port_peeks.push_punct(Token![;](id.span()));
     // Declarations: <id>: <ty>,
-    let ty: proc_macro2::TokenStream = emit_type(&ty)?.into();
+    let ty = emit_type(&ty)?;
     port_decls.push(quote! { eir::builder::PortInfo::new(stringify!(#id), #ty) });
     port_decls.push_punct(Token![,](id.span()));
     // Pop the port instances

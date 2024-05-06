@@ -220,6 +220,7 @@ pub struct Array {
   name: String,
   scalar_ty: DataType,
   size: usize,
+  init: Option<Vec<BaseNode>>,
 }
 
 impl Typed for Array {
@@ -229,12 +230,13 @@ impl Typed for Array {
 }
 
 impl Array {
-  pub fn new(scalar_ty: DataType, name: String, size: usize) -> Array {
+  pub fn new(scalar_ty: DataType, name: String, size: usize, init: Option<Vec<BaseNode>>) -> Array {
     Self {
       key: 0,
       scalar_ty,
       name,
       size,
+      init,
     }
   }
 
@@ -248,5 +250,9 @@ impl Array {
 
   pub fn scalar_ty(&self) -> DataType {
     self.scalar_ty.clone()
+  }
+
+  pub fn get_initializer(&self) -> Option<&Vec<BaseNode>> {
+    self.init.as_ref()
   }
 }

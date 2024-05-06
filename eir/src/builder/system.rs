@@ -485,10 +485,23 @@ impl SysBuilder {
   /// * `ty` - The data type of data in the array.
   /// * `name` - The name of the array.
   /// * `size` - The size of the array.
+  /// * `init` - A vector of initial values of this array.
   // TODO(@were): Add array types, memory, register, or signal wire.
-  pub fn create_array(&mut self, ty: DataType, name: &str, size: usize) -> BaseNode {
+  pub fn create_array(
+    &mut self,
+    ty: DataType,
+    name: &str,
+    size: usize,
+    init: Option<Vec<BaseNode>>,
+  ) -> BaseNode {
     let array_name = self.identifier(name);
-    let instance = Array::new(ty.clone(), array_name.clone(), size);
+    if let Some(init) = &init {
+      assert_eq!(init.len(), size);
+      init.iter().for_each(|x| {
+        assert_eq!(x.get_dtype(self).unwrap(), ty);
+      });
+    }
+    let instance = Array::new(ty.clone(), array_name.clone(), size, init);
     let key = self.insert_element(instance);
     self.sym_tab.insert(array_name, key.clone());
     key

@@ -46,7 +46,7 @@ fn spin_lock() {
 
   let mut sys = SysBuilder::new("spin_trigger");
   let sqr = squarer_builder(&mut sys);
-  let lock = sys.create_array(eir::ir::DataType::Int(1), "lock", 1);
+  let lock = sys.create_array(eir::ir::DataType::Int(1), "lock", 1, None);
   let spin_agent = spin_agent_builder(&mut sys, sqr, lock);
   let _driver = driver_builder(&mut sys, spin_agent, lock);
 

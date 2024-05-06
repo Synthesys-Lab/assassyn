@@ -1,7 +1,7 @@
 use eir::ir::DataType;
 use syn::{parenthesized, parse::Parse, punctuated::Punctuated, Token};
 
-use super::node::ArrayAccess;
+use super::node::{ArrayAccess, WeakSpanned};
 
 pub(crate) enum ExprTerm {
   Ident(syn::Ident),
@@ -47,8 +47,8 @@ impl Parse for ModuleAttrs {
   }
 }
 
-impl ExprTerm {
-  pub(crate) fn span(&self) -> proc_macro2::Span {
+impl WeakSpanned for ExprTerm {
+  fn span(&self) -> proc_macro2::Span {
     match self {
       ExprTerm::Ident(id) => id.span(),
       ExprTerm::Const((_, lit)) => lit.span(),

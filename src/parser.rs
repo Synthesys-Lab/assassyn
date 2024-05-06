@@ -1,4 +1,4 @@
-use syn::{braced, parenthesized, parse::Parse, punctuated::Punctuated};
+use syn::{braced, bracketed, parenthesized, parse::Parse, punctuated::Punctuated};
 
 use crate::ast::{
   self,
@@ -169,7 +169,17 @@ impl Parse for Statement {
                       let ty = args.parse::<DType>()?;
                       args.parse::<syn::Token![,]>()?;
                       let size = args.parse::<syn::LitInt>()?;
-                      Ok(node::Statement::ArrayAlloc((id, ty, size)))
+                      let initializer = if !args.is_empty() {
+                        args.parse::<syn::Token![,]>()?;
+                        let initializer;
+                        bracketed!(initializer in args);
+                        let initializer =
+                          initializer.parse_terminated(ExprTerm::parse, syn::Token![,])?;
+                        Some(initializer)
+                      } else {
+                        None
+                      };
+                      Ok(node::Statement::ArrayAlloc((id, ty, size, initializer)))
                     }
                     // <id> = bind <func-id> { <id>: <expr> }; a partial function call
                     "bind" => {

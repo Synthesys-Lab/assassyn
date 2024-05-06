@@ -9,6 +9,7 @@ use syn::{parse_macro_input, Token};
 mod ast;
 mod codegen;
 mod parser;
+mod utils;
 
 use ast::node;
 
