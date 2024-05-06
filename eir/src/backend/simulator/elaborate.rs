@@ -433,35 +433,30 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
         Opcode::Slice => {
           let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
-          let l = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
-          let r = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
-          let bits = {
-            let dtype = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .get_dtype(self.sys)
-              .unwrap();
-            dtype.get_bits()
-          };
+          let l = expr
+            .get_operand(1)
+            .unwrap()
+            .get_value()
+            .as_ref::<IntImm>(self.sys)
+            .expect("Only const slice supported")
+            .get_value();
+          let r = expr
+            .get_operand(2)
+            .unwrap()
+            .get_value()
+            .as_ref::<IntImm>(self.sys)
+            .expect("Only const slice supported")
+            .get_value();
           format!(
             "{{
-            let a = {} as u64;
-            let l = {} as usize;
-            let r = {} as usize;
-            let len = r - l + 1;
-            let mask = !0 >> ({} - len);
-            ValueCastTo::<{}>::cast(&((a >> l) & mask))
-          }}",
+              let a = ValueCastTo::<BigUint>::cast(&{});
+              let mask = BigUint::parse_bytes(\"{}\", 2).unwrap();
+              ValueCastTo::<{}>::cast((a >> {}) & mask)
+            }}",
             a,
+            "1".repeat((r - l + 1) as usize),
             l,
-            r,
-            bits,
-            if expr.dtype().get_bits() == 1 {
-              "bool".to_string()
-            } else {
-              format!("{}", dtype_to_rust_type(&expr.dtype()))
-            }
+            dtype_to_rust_type(&expr.dtype()),
           )
         }
         Opcode::Select => {
