@@ -70,9 +70,9 @@ impl Visitor<String> for NodeRefDumper {
       NodeKind::IntImm => {
         let int_imm = node.as_ref::<IntImm>(sys).unwrap();
         Some(format!(
-          "({} as {})",
+          "ValueCastTo::<{}>::cast(&{})",
+          dtype_to_rust_type(&int_imm.dtype()),
           int_imm.get_value(),
-          dtype_to_rust_type(&int_imm.dtype())
         ))
       }
       NodeKind::StrImm => {
@@ -246,12 +246,12 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       let ty = expr.dtype();
       let ty = dtype_to_rust_type(&ty);
       format!(
-        "({} as {}) {} ({} as {})",
+        "ValueCastTo::<{}>::cast(&{}) {} ValueCastTo::<{}>::cast(&{})",
+        ty,
         dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value()),
-        ty,
         expr.get_opcode().to_string(),
-        dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value()),
         ty,
+        dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value()),
       )
     } else if expr.get_opcode().is_unary() {
       format!(
@@ -432,7 +432,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             let r = {} as usize;
             let len = r - l + 1;
             let mask = !0 >> ({} - len);
-            ((a >> l) & mask) {}
+            ValueCastTo::<{}>::cast(&((a >> l) & mask))
           }}",
             a,
             l,
@@ -626,8 +626,9 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     }
     .to_string(),
   );
-  for sign_i in 0..1 {
-    for i in 3..=7 {
+  // Dump a template based data cast so that big integers are unified in.
+  for sign_i in 0..=1 {
+    for i in 3..7 {
       let src_ty = format!("{}{}", ['u', 'i'][sign_i], 1 << i);
       res.push_str(&format!(
         "impl ValueCastTo<bool> for {} {{ fn cast(&self) -> bool {{ *self != 0 }} }}\n",
@@ -651,16 +652,20 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
           src_ty,
         )
       );
-      for sign_j in 0..1 {
+      for sign_j in 0..=1 {
         for j in 3..7 {
-          if i == j && sign_i == sign_j {
-            continue;
-          }
           let dst_ty = format!("{}{}", ['u', 'i'][sign_j], 1 << j);
-          res.push_str(&format!(
-            "impl ValueCastTo<{}> for {} {{ fn cast(&self) -> {} {{ *self as {} }} }}\n",
-            dst_ty, src_ty, dst_ty, dst_ty
-          ));
+          if i == j && sign_i == sign_j {
+            res.push_str(&format!(
+              "impl ValueCastTo<{}> for {} {{ fn cast(&self) -> {} {{ self.clone() }} }}\n",
+              dst_ty, src_ty, dst_ty
+            ));
+          } else {
+            res.push_str(&format!(
+              "impl ValueCastTo<{}> for {} {{ fn cast(&self) -> {} {{ *self as {} }} }}\n",
+              dst_ty, src_ty, dst_ty, dst_ty
+            ));
+          }
         }
       }
     }
