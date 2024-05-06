@@ -6,7 +6,17 @@ use crate::{
 };
 
 pub(super) fn namify(name: &str) -> String {
-  name.replace(".", "_")
+  name
+    .chars()
+    .into_iter()
+    .map(|x| {
+      if x.is_alphabetic() || x.is_digit(10) || x == '_' {
+        x
+      } else {
+        '_'
+      }
+    })
+    .collect()
 }
 
 pub(super) fn camelize(name: &str) -> String {
@@ -42,8 +52,14 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
       "bool".to_string()
     } else if bits.is_power_of_two() && bits < 8 {
       format!("{}8", prefix)
+    } else if bits > 64 {
+      if dtype.is_signed() {
+        format!("num_bigint::BigInt")
+      } else {
+        format!("num_bitint::BigUint")
+      }
     } else {
-      format!("{}{}", prefix, dtype.get_bits().next_power_of_two())
+      panic!("Not implemented yet, {:?}", dtype)
     };
   }
   if dtype.is_raw() {
@@ -68,7 +84,7 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
 }
 
 pub(super) fn array_ty_to_id(scalar_ty: &DataType, size: usize) -> String {
-  format!("{}x{}", dtype_to_rust_type(scalar_ty), size)
+  format!("{}x{}", namify(&dtype_to_rust_type(scalar_ty)), size)
 }
 
 pub(super) fn user_contains_opcode(

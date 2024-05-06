@@ -1,6 +1,6 @@
 use std::{
   collections::HashMap,
-  fs::{self, File},
+  fs::{self, File, OpenOptions},
   io::Write,
   path::Path,
   process::Command,
@@ -620,9 +620,51 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       fn cyclize(stamp: usize) -> String {
         format!("Cycle @{}.{:02}", stamp / 100, stamp % 100)
       }
+      trait ValueCastTo<T> {
+        fn cast(&self) -> T;
+      }
     }
     .to_string(),
   );
+  for sign_i in 0..1 {
+    for i in 3..=7 {
+      let src_ty = format!("{}{}", ['u', 'i'][sign_i], 1 << i);
+      res.push_str(&format!(
+        "impl ValueCastTo<bool> for {} {{ fn cast(&self) -> bool {{ *self != 0 }} }}\n",
+        src_ty
+      ));
+      res.push_str(
+        &format!(
+          "impl ValueCastTo<{}> for bool {{ fn cast(&self) -> {} {{ if *self {{ 1 }} else {{ 0 }} }} }}\n",
+          src_ty, src_ty
+        )
+      );
+      res.push_str(
+        &format!(
+          "impl ValueCastTo<BigInt> for {} {{ fn cast(&self) -> BigInt {{ self.to_bigint().unwrap() }} }}\n",
+          src_ty,
+        )
+      );
+      res.push_str(
+        &format!(
+          "impl ValueCastTo<BigUint> for {} {{ fn cast(&self) -> BigUint {{ self.to_biguint().unwrap() }} }}\n",
+          src_ty,
+        )
+      );
+      for sign_j in 0..1 {
+        for j in 3..7 {
+          if i == j && sign_i == sign_j {
+            continue;
+          }
+          let dst_ty = format!("{}{}", ['u', 'i'][sign_j], 1 << j);
+          res.push_str(&format!(
+            "impl ValueCastTo<{}> for {} {{ fn cast(&self) -> {} {{ *self as {} }} }}\n",
+            dst_ty, src_ty, dst_ty, dst_ty
+          ));
+        }
+      }
+    }
+  }
   res.push('\n');
 
   // Dump the event enum. Each event corresponds to a module.
@@ -1129,6 +1171,7 @@ fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
     use std::collections::VecDeque;
     use std::collections::BinaryHeap;
     use std::cmp::{Ord, Reverse};
+    use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
   };
   fd.write(src.to_string().as_bytes())?;
   fd.write("\n\n\n".as_bytes())
@@ -1156,6 +1199,13 @@ pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::
     .output()
     .expect("Failed to init cargo project");
   assert!(output.status.success());
+  {
+    let mut toml = OpenOptions::new()
+      .write(true)
+      .append(true)
+      .open(format!("{}/Cargo.toml", dir_name))?;
+    writeln!(toml, "num-bigint = \"0.4\"")?;
+  }
   let fname = format!("{}/src/main.rs", dir_name);
   eprintln!("Writing simulator source to file: {}", fname);
   let mut fd = fs::File::create(fname.clone()).expect("Open failure");

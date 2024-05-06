@@ -116,7 +116,7 @@ impl ToString for Opcode {
       Opcode::Sext => "sext".into(),
       Opcode::Select => "select".into(),
       Opcode::Bind(_) => "".into(),
-      Opcode::Concat => "<->".into(),
+      Opcode::Concat => "concat".into(),
     }
   }
 }
