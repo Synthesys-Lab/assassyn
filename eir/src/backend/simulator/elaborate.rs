@@ -7,6 +7,7 @@ use std::{
 };
 
 use proc_macro2::Span;
+use quote::quote;
 use syn::Ident;
 
 use crate::{
@@ -106,7 +107,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     ));
     // Dump the function signature.
     // First, some common function parameters are dumped.
-    res.push_str(&format!("fn {}(\n", namify(module.get_name())));
+    res.push_str(&format!("pub fn {}(\n", namify(module.get_name())));
     res.push_str("  stamp: usize,\n");
     res.push_str("  q: &mut BinaryHeap<Reverse<Event>>,\n");
     for port in module.port_iter() {
@@ -613,19 +614,35 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
 
 fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode, usize>) {
   let mut res = String::new();
-  // Dump the helper function of cycles.
-  res.push_str("// Simulation runtime.\n");
+  res.push_str(
+    &quote! {
+      use std::collections::VecDeque;
+      use std::collections::BinaryHeap;
+      use std::cmp::{Ord, Reverse};
+      use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
+    }
+    .to_string(),
+  );
+
+  for module in sys.module_iter() {
+    res.push_str(&format!(
+      "use super::modules::{};\n",
+      namify(module.get_name())
+    ));
+  }
+
   res.push_str(
     &quote::quote! {
-      fn cyclize(stamp: usize) -> String {
+      pub fn cyclize(stamp: usize) -> String {
         format!("Cycle @{}.{:02}", stamp / 100, stamp % 100)
       }
-      trait ValueCastTo<T> {
+      pub trait ValueCastTo<T> {
         fn cast(&self) -> T;
       }
     }
     .to_string(),
   );
+  res.push_str("impl ValueCastTo<bool> for bool { fn cast(&self) -> bool { self.clone() } }\n");
   // Dump a template based data cast so that big integers are unified in.
   for sign_i in 0..=1 {
     for i in 3..7 {
@@ -686,7 +703,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   //   None
   // }
   res.push_str("#[derive(Clone, Debug, Eq, PartialEq)]\n");
-  res.push_str("enum EventKind {\n");
+  res.push_str("pub enum EventKind {\n");
   for module in sys.module_iter() {
     res.push_str(&format!(
       "  Module{},\n",
@@ -741,7 +758,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   res.push('}');
 
   // Dump the universal set of data types used in this simulation.
-  res.push_str("enum DataSlab {");
+  res.push_str("pub enum DataSlab {");
   for array in array_types.iter() {
     let (scalar_ty, size) = unwrap_array_ty(array);
     res.push_str(&format!(
@@ -761,20 +778,20 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   // Dump the slab entry struct.
   res.push_str(
     &quote::quote! {
-      struct LastOperation {
-        operation: Box<EventKind>,
-        stamp: usize,
+      pub struct LastOperation {
+        pub operation: Box<EventKind>,
+        pub stamp: usize,
       }
-      struct SlabEntry {
-        payload: DataSlab,
-        last_written: LastOperation,
+      pub struct SlabEntry {
+        pub payload: DataSlab,
+        pub last_written: LastOperation,
       }
       impl LastOperation {
         fn update(&mut self, operation: Box<EventKind>, stamp: usize) {
           self.operation = operation;
           self.stamp = stamp;
         }
-        fn ok(&mut self, operation: Box<EventKind>, stamp: usize) {
+        pub fn ok(&mut self, operation: Box<EventKind>, stamp: usize) {
           if self.stamp == stamp {
             if (self.operation.is_none() && self.operation.is_none()) ||
                (self.operation.is_push() && operation.as_ref().is_pop()) ||
@@ -790,7 +807,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
           }
         }
       }
-      trait UnwrapSlab {
+      pub trait UnwrapSlab {
         fn unwrap(entry: &SlabEntry) -> &Self;
         fn unwrap_mut(entry: &mut SlabEntry) -> &mut Self;
       }
@@ -809,9 +826,9 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   res.push_str(
     &quote::quote! {
       #[derive(Clone, Debug, PartialEq, Eq)]
-      struct Event {
-        stamp: usize,
-        kind: EventKind,
+      pub struct Event {
+        pub stamp: usize,
+        pub kind: EventKind,
       }
       impl std::cmp::Ord for Event {
         fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -875,7 +892,7 @@ macro_rules! impl_unwrap_slab {
 
   // TODO(@were): Make all arguments of the modules FIFO channels.
   // TODO(@were): Profile the maxium size of all the FIFO channels.
-  res.push_str("fn main() {\n");
+  res.push_str("pub fn simulate() {\n");
   res.push_str("  // The global time stamp\n");
   res.push_str("  let mut stamp: usize = 0;\n");
   res.push_str("  // Count the consecutive cycles idled\n");
@@ -1157,11 +1174,21 @@ macro_rules! impl_unwrap_slab {
   (res, slab_cache)
 }
 
-fn dump_module(
+fn dump_modules(
   sys: &SysBuilder,
   fd: &mut File,
   slab_cache: &HashMap<BaseNode, usize>,
 ) -> Result<(), std::io::Error> {
+  fd.write(
+    &quote! {
+      use super::runtime::*;
+      use std::collections::VecDeque;
+      use std::collections::BinaryHeap;
+      use std::cmp::Reverse;
+    }
+    .to_string()
+    .as_bytes(),
+  )?;
   let mut em = ElaborateModule::new(sys, slab_cache);
   for module in em.sys.module_iter() {
     if let Some(buffer) = em.visit_module(&module) {
@@ -1171,12 +1198,14 @@ fn dump_module(
   Ok(())
 }
 
-fn dump_header(fd: &mut File) -> Result<usize, std::io::Error> {
+fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
   let src = quote::quote! {
-    use std::collections::VecDeque;
-    use std::collections::BinaryHeap;
-    use std::cmp::{Ord, Reverse};
-    use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
+    mod runtime;
+    mod modules;
+
+    fn main() {
+      runtime::simulate();
+    }
   };
   fd.write(src.to_string().as_bytes())?;
   fd.write("\n\n\n".as_bytes())
@@ -1204,30 +1233,49 @@ pub fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::
     .output()
     .expect("Failed to init cargo project");
   assert!(output.status.success());
+  // Dump the Cargo.toml and rustfmt.toml
   {
-    let mut toml = OpenOptions::new()
+    let mut cargo = OpenOptions::new()
       .write(true)
       .append(true)
       .open(format!("{}/Cargo.toml", dir_name))?;
-    writeln!(toml, "num-bigint = \"0.4\"")?;
+    writeln!(cargo, "num-bigint = \"0.4\"")?;
+    let mut fmt = fs::File::create(format!("{}/rustfmt.toml", dir_name))?;
+    writeln!(fmt, "max_width = 100")?;
+    writeln!(fmt, "tab_spaces = 2")?;
+    fmt.flush()?;
   }
+  // eprintln!("Writing simulator source to file: {}", fname);
   let fname = format!("{}/src/main.rs", dir_name);
-  eprintln!("Writing simulator source to file: {}", fname);
-  let mut fd = fs::File::create(fname.clone()).expect("Open failure");
-  dump_header(&mut fd).expect("Dump head failure");
   let (rt_src, ri) = dump_runtime(sys, config);
-  dump_module(sys, &mut fd, &ri).expect("Dump module failure");
-  fd.write(rt_src.as_bytes()).expect("Dump runtime failure");
-  fd.flush().expect("Flush failure");
+  {
+    let modules_file = format!("{}/src/modules.rs", dir_name);
+    let mut fd = fs::File::create(modules_file).expect("Open failure");
+    dump_modules(sys, &mut fd, &ri).expect("Dump module failure");
+    fd.flush().expect("Flush modules failure");
+  }
+  {
+    let runtime_file = format!("{}/src/runtime.rs", dir_name);
+    let mut fruntime = fs::File::create(runtime_file).expect("Open failure");
+    fruntime
+      .write(rt_src.as_bytes())
+      .expect("Dump runtime failure");
+    fruntime.flush().expect("Flush runtime failure");
+  }
+  {
+    let mut fd = fs::File::create(fname.clone()).expect("Open failure");
+    dump_main(&mut fd).expect("Dump head failure");
+    fd.flush().expect("Flush main failure");
+  }
   Ok(fname)
 }
 
 pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
   let fname = elaborate_impl(sys, config)?;
-  let output = Command::new("rustfmt")
-    .arg(&fname)
-    .arg("--config")
-    .arg("max_width=100,tab_spaces=2")
+  let output = Command::new("cargo")
+    .arg("fmt")
+    .arg("--manifest-path")
+    .arg(&format!("{}/Cargo.toml", config.dir_name(sys)))
     .output()
     .expect("Failed to format");
   assert!(output.status.success(), "Failed to format: {:?}", output);

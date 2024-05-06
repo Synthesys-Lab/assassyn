@@ -35,18 +35,8 @@ pub fn run_simulator(
   let dir_name = config.dir_name(sys);
   let manifest = format!("{}/Cargo.toml", dir_name);
   let output = Command::new("cargo")
-    .arg("build")
-    .arg("--manifest-path")
-    .arg(&manifest)
-    .output()
-    .expect("Failed to compile");
-  assert!(
-    output.status.success(),
-    "Failed to compile {}",
-    config.dir_name(sys)
-  );
-  let output = Command::new("cargo")
     .arg("run")
+    .arg("--release")
     .arg("--manifest-path")
     .arg(&manifest)
     .output()

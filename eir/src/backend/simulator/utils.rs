@@ -46,11 +46,12 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
   if dtype.is_int() {
     let prefix = if dtype.is_signed() { "i" } else { "u" };
     let bits = dtype.get_bits();
-    return if bits.is_power_of_two() && bits >= 8 && bits <= 64 {
-      format!("{}{}", prefix, dtype.get_bits())
+    return if bits >= 8 && bits <= 64 {
+      let bits = bits.next_power_of_two();
+      format!("{}{}", prefix, bits)
     } else if bits == 1 {
       "bool".to_string()
-    } else if bits.is_power_of_two() && bits < 8 {
+    } else if bits < 8 {
       format!("{}8", prefix)
     } else if bits > 64 {
       if dtype.is_signed() {
