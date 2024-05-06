@@ -149,8 +149,14 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         .as_str(),
       )
     }
-    if module_is_memory(&self.module_name) {
-      res.push_str("mem: &mut Vec<i32>,");
+    if let Some(params) = parse_memory_module_name(&self.module_name) {
+      res.push_str(
+        format!(
+          "mem: &mut Vec<{}>,",
+          dtype_to_rust_type(&DataType::Bits(params.width))
+        )
+        .as_str(),
+      );
     }
     res.push_str(") {\n");
     self.indent += 2;
@@ -221,23 +227,68 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
       }
 
-      let fifo = module.port_iter().next().unwrap();
-      let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
-      let fifo_ty = fifo.scalar_ty();
-      let fifo_pop = syn::Ident::new(
-        &format!("FIFO{}Pop", dtype_to_rust_type(&fifo_ty)),
+      let fifos = module.port_iter().collect::<Vec<_>>();
+
+      let module_writer = self.current_module_id();
+
+      let addr_fifo = &fifos[0];
+      let addr_fifo_idx = *self.slab_cache.get(&addr_fifo.upcast()).unwrap();
+      let addr_fifo_ty = addr_fifo.scalar_ty();
+      let addr_fifo_pop = syn::Ident::new(
+        &format!("FIFO{}Pop", dtype_to_rust_type(&addr_fifo_ty)),
         Span::call_site(),
       );
-      let module_writer = self.current_module_id();
-      let fifo_name = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
+      let addr_fifo_name = syn::Ident::new(&fifo_name!(addr_fifo), Span::call_site());
       res.push_str(
         quote::quote! {
           let raddr = {
           q.push(Reverse(Event{
             stamp: stamp + 50,
-            kind: EventKind::#fifo_pop((EventKind::#module_writer.into(), #slab_idx))
+            kind: EventKind::#addr_fifo_pop((EventKind::#module_writer.into(), #addr_fifo_idx))
           }));
-          #fifo_name.front().unwrap().clone()
+          #addr_fifo_name.front().unwrap().clone()
+        };}
+        .to_string()
+        .as_str(),
+      );
+
+      let write_fifo = &fifos[1];
+      let write_fifo_idx = *self.slab_cache.get(&write_fifo.upcast()).unwrap();
+      let write_fifo_ty = write_fifo.scalar_ty();
+      let write_fifo_pop = syn::Ident::new(
+        &format!("FIFO{}Pop", dtype_to_rust_type(&write_fifo_ty)),
+        Span::call_site(),
+      );
+      let write_fifo_name = syn::Ident::new(&fifo_name!(write_fifo), Span::call_site());
+      res.push_str(
+        quote::quote! {
+          let write = {
+          q.push(Reverse(Event{
+            stamp: stamp + 50,
+            kind: EventKind::#write_fifo_pop((EventKind::#module_writer.into(), #write_fifo_idx))
+          }));
+          #write_fifo_name.front().unwrap().clone()
+        };}
+        .to_string()
+        .as_str(),
+      );
+
+      let wdata_fifo = &fifos[2];
+      let wdata_fifo_idx = *self.slab_cache.get(&wdata_fifo.upcast()).unwrap();
+      let wdata_fifo_ty = wdata_fifo.scalar_ty();
+      let wdata_fifo_pop = syn::Ident::new(
+        &format!("FIFO{}Pop", dtype_to_rust_type(&wdata_fifo_ty)),
+        Span::call_site(),
+      );
+      let wdata_fifo_name = syn::Ident::new(&fifo_name!(wdata_fifo), Span::call_site());
+      res.push_str(
+        quote::quote! {
+          let wdata = {
+          q.push(Reverse(Event{
+            stamp: stamp + 50,
+            kind: EventKind::#wdata_fifo_pop((EventKind::#module_writer.into(), #wdata_fifo_idx))
+          }));
+          #wdata_fifo_name.front().unwrap().clone()
         };}
         .to_string()
         .as_str(),
@@ -1125,8 +1176,10 @@ macro_rules! impl_unwrap_slab {
     if let Some(param) = parse_memory_module_name(&module.get_name().to_string()) {
       res.push_str(
         format!(
-          "let mut {}_mem = vec![0i32; {}];\n",
-          param.name, param.depth
+          "let mut {}_mem = vec![0 as {}; {}];\n",
+          param.name,
+          dtype_to_rust_type(&DataType::Bits(param.width)),
+          param.depth
         )
         .as_str(),
       );

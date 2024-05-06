@@ -54,20 +54,22 @@ impl SysBuilder {
   pub fn create_memory(
     &mut self,
     name: &str,
-    ty: DataType,
+    width: usize,
     depth: usize,
     (lat_min, lat_max): (usize, usize),
     init_file: Option<String>,
   ) -> BaseNode {
-    // TODO: addr is a UInt, not Int
+    let ty = DataType::Bits(width);
     let ports = vec![
-      PortInfo::new("raddr", DataType::Int(depth.ilog2() as usize)),
+      PortInfo::new("addr", DataType::UInt(depth.ilog2() as usize)),
+      PortInfo::new("write", DataType::Bits(1)),
+      PortInfo::new("wdata", ty.clone()),
       PortInfo::new("r", DataType::Module(vec![ty.clone().into()])),
     ];
     let name = name.replace("_", "");
     let module_name = self.symbol_table.identifier(&format!(
       "__builtin_memory_w{}_d{}_l{}_{}_{}{}{}",
-      ty.get_bits(),
+      width,
       depth,
       lat_min,
       lat_max,
