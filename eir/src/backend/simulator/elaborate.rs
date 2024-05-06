@@ -432,13 +432,17 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             let r = {} as usize;
             let len = r - l + 1;
             let mask = !0 >> ({} - len);
-            ((a >> l) & mask) as {}
+            ((a >> l) & mask) {}
           }}",
             a,
             l,
             r,
             bits,
-            dtype_to_rust_type(&expr.dtype())
+            if expr.dtype().get_bits() == 1 {
+              "!= 0".to_string()
+            } else {
+              format!("as {}", dtype_to_rust_type(&expr.dtype()))
+            }
           )
         }
         Opcode::Select => {
