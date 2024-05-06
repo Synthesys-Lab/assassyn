@@ -669,6 +669,18 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
           src_ty,
         )
       );
+      res.push_str(
+        &format!(
+          "impl ValueCastTo<{}> for BigInt {{ fn cast(&self) -> {} {{ self.to_i64().unwrap() as {} }} }}\n",
+          src_ty, src_ty, src_ty
+        )
+      );
+      res.push_str(
+        &format!(
+          "impl ValueCastTo<{}> for BigUint {{ fn cast(&self) -> {} {{ self.to_u64().unwrap() as {} }} }}\n",
+          src_ty, src_ty, src_ty
+        )
+      );
       for sign_j in 0..=1 {
         for j in 3..7 {
           let dst_ty = format!("{}{}", ['u', 'i'][sign_j], 1 << j);
