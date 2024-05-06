@@ -60,6 +60,27 @@ macro_rules! dump_ref {
 
 struct NodeRefDumper;
 
+fn int_imm_dumper_impl(ty: &DataType, value: u64) -> String {
+  if ty.get_bits() == 1 {
+    return if value == 0 {
+      "false".to_string()
+    } else {
+      "true".to_string()
+    };
+  }
+  if ty.get_bits() <= 64 {
+    format!("{}{}", value, dtype_to_rust_type(ty))
+  } else {
+    let scalar_ty = if ty.is_signed() { "u64" } else { "i64" };
+    format!(
+      "ValueCastTo::<{}>::cast(&({} as {}))",
+      dtype_to_rust_type(ty),
+      value,
+      scalar_ty
+    )
+  }
+}
+
 impl Visitor<String> for NodeRefDumper {
   fn dispatch(&mut self, sys: &SysBuilder, node: &BaseNode, _: Vec<NodeKind>) -> Option<String> {
     match node.get_kind() {
@@ -70,11 +91,7 @@ impl Visitor<String> for NodeRefDumper {
       NodeKind::FIFO => fifo_name!(node.as_ref::<FIFO>(sys).unwrap()).into(),
       NodeKind::IntImm => {
         let int_imm = node.as_ref::<IntImm>(sys).unwrap();
-        Some(format!(
-          "ValueCastTo::<{}>::cast(&{})",
-          dtype_to_rust_type(&int_imm.dtype()),
-          int_imm.get_value(),
-        ))
+        Some(int_imm_dumper_impl(&int_imm.dtype(), int_imm.get_value()))
       }
       NodeKind::StrImm => {
         let str_imm = node.as_ref::<StrImm>(sys).unwrap();
@@ -441,9 +458,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             r,
             bits,
             if expr.dtype().get_bits() == 1 {
-              "!= 0".to_string()
+              "bool".to_string()
             } else {
-              format!("as {}", dtype_to_rust_type(&expr.dtype()))
+              format!("{}", dtype_to_rust_type(&expr.dtype()))
             }
           )
         }
@@ -469,13 +486,17 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           {
             // perform zero extension
             format!(
-              "{} as {} as {}",
-              a,
+              "ValueCastTo::<{}>::cast(ValueCastTo::<{}>::cast(&{}))",
+              dtype_to_rust_type(&dest_dtype),
               dtype_to_rust_type(&src_dtype).replace("i", "u"),
-              dtype_to_rust_type(&dest_dtype)
+              a,
             )
           } else {
-            format!("{} as {}", a, dtype_to_rust_type(&dest_dtype))
+            format!(
+              "ValueCastTo::<{}>::cast(&{})",
+              dtype_to_rust_type(&dest_dtype),
+              a
+            )
           }
         }
         Opcode::Sext => {
@@ -483,7 +504,11 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           let src = src_ref.get_value();
           let dest_dtype = expr.dtype();
           let a = dump_ref!(self.sys, src);
-          format!("{} as {}", a, dtype_to_rust_type(&dest_dtype))
+          format!(
+            "ValueCastTo::<{}>::cast(&{})",
+            dtype_to_rust_type(&dest_dtype),
+            a
+          )
         }
         Opcode::Bind(_) => {
           let callee = {
@@ -520,9 +545,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
 
   fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> Option<String> {
     format!(
-      "({} as {})",
+      "ValueCastTo::<{}>::cast(&{})",
+      dtype_to_rust_type(&int_imm.dtype()),
       int_imm.get_value(),
-      dtype_to_rust_type(&int_imm.dtype())
     )
     .into()
   }
@@ -947,7 +972,6 @@ macro_rules! impl_unwrap_slab {
   let mut slab_cache: HashMap<BaseNode, usize> = HashMap::new();
   for array in sys.array_iter() {
     let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
-    let scalar_str = dtype_to_rust_type(&scalar_ty);
     let aty_id = Ident::new(
       &format!("Array{}", array_ty_to_id(&scalar_ty, size)),
       Span::call_site(),
@@ -960,15 +984,7 @@ macro_rules! impl_unwrap_slab {
         .join(", ");
       format!("[{}]", list)
     } else {
-      format!(
-        "[{}; {}]",
-        if scalar_ty.get_bits() == 1 {
-          "false".into()
-        } else {
-          format!("0 as {}", scalar_str)
-        },
-        size
-      )
+      format!("[{}; {}]", int_imm_dumper_impl(&scalar_ty, 0), size)
     };
     let initializer = initializer.parse::<proc_macro2::TokenStream>().unwrap();
     res.push_str(&format!(
@@ -1209,13 +1225,13 @@ macro_rules! impl_unwrap_slab {
       &quote::quote! {
         EventKind::#fifo_push_event((_, slab_idx, value)) => {
           let value = value.clone();
-          data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
-          data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().push_back(value);
+          data_slab[*slab_idx].last_written.ok(event.0.kind.clone().into(), event.0.stamp);
+          data_slab[*slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().push_back(value);
           stamp = event.0.stamp;
         }
         EventKind::#fifo_pop_event((_, slab_idx)) => {
-          data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);
-          data_slab[slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().pop_front();
+          data_slab[*slab_idx].last_written.ok(event.0.kind.clone().into(), event.0.stamp);
+          data_slab[*slab_idx].unwrap_payload_mut::<VecDeque<#ty>>().pop_front();
           stamp = event.0.stamp;
         }
       }

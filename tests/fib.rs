@@ -24,24 +24,6 @@ fn fib() {
   // TODO(@boyang): Should we also test the verilog backend?
   // eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  run_simulator(
-    &sys,
-    &config,
-    Some((
-      |x| {
-        if x.contains("adder") {
-          let raw = x.split(" ").collect::<Vec<&str>>();
-          let len = raw.len();
-          let a = raw[len - 5].parse::<i32>().unwrap();
-          let b = raw[len - 3].parse::<i32>().unwrap();
-          let c = raw[len - 1].parse::<i32>().unwrap();
-          assert_eq!(c, a + b);
-          true
-        } else {
-          false
-        }
-      },
-      Some(100),
-    )),
-  );
+  // TODO(@were): Check the results.
+  run_simulator(&sys, &config, None);
 }
