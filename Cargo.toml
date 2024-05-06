@@ -10,6 +10,7 @@ eir = { path = "./eir" }
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 proc-macro2 = "1.0"
+num-bigint = "0.4"
 
 [lib]
 proc-macro = true

@@ -459,6 +459,28 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             dtype_to_rust_type(&expr.dtype()),
           )
         }
+        Opcode::Concat => {
+          let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
+          let b = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
+          let b_bits = expr
+            .get_operand(1)
+            .unwrap()
+            .get_value()
+            .get_dtype(expr.sys)
+            .unwrap()
+            .get_bits();
+          format! {
+            "{{
+              let a = ValueCastTo::<BigUint>::cast(&{});
+              let b = ValueCastTo::<BigUint>::cast(&{});
+              ValueCastTo::<{}>::cast((a << {}) | b)
+            }}",
+            a,
+            b,
+            dtype_to_rust_type(&expr.dtype()),
+            b_bits,
+          }
+        }
         Opcode::Select => {
           let cond = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
           let true_value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
