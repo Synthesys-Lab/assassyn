@@ -19,7 +19,7 @@ pub(crate) struct PortDecl {
 /// An array access is something like `a[<expr>]`
 pub(crate) struct ArrayAccess {
   pub(crate) id: syn::Ident,
-  pub(crate) idx: ExprTerm,
+  pub(crate) idx: Box<expr::Expr>,
 }
 
 impl Parse for ArrayAccess {
@@ -27,7 +27,7 @@ impl Parse for ArrayAccess {
     let id = input.parse::<syn::Ident>()?;
     let idx;
     syn::bracketed!(idx in input);
-    let idx = idx.parse::<ExprTerm>()?;
+    let idx = Box::new(idx.parse::<expr::Expr>()?);
     Ok(Self { id, idx })
   }
 }
@@ -40,14 +40,14 @@ pub(crate) struct FuncCall {
 
 /// Function arguments can either be {a: v0, b: v1}, or (v0, v1).
 pub(crate) enum FuncArgs {
-  Bound(Vec<(syn::Ident, ExprTerm)>),
-  Plain(Vec<ExprTerm>),
+  Bound(Vec<(syn::Ident, expr::Expr)>),
+  Plain(Vec<expr::Expr>),
 }
 
 /// Key value pair is a component of FuncArgs::Bound.
 pub(crate) struct KVPair {
   pub(crate) key: syn::Ident,
-  pub(crate) value: ExprTerm,
+  pub(crate) value: expr::Expr,
 }
 
 /// A body is a sequence of instructions.

@@ -2,7 +2,7 @@ use syn::{braced, bracketed, parenthesized, parse::Parse, punctuated::Punctuated
 
 use crate::ast::{
   self,
-  expr::LValue,
+  expr::{self, LValue},
   node::{self, CallKind, FuncArgs, FuncCall, Statement},
   DType, ExprTerm,
 };
@@ -24,7 +24,7 @@ impl Parse for node::KVPair {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let key = input.parse::<syn::Ident>()?;
     let _ = input.parse::<syn::Token![:]>()?;
-    let value = input.parse::<ExprTerm>()?;
+    let value = input.parse::<expr::Expr>()?;
     Ok(node::KVPair { key, value })
   }
 }
@@ -44,8 +44,8 @@ impl Parse for node::FuncCall {
     } else if input.peek(syn::token::Paren) {
       let content;
       let _ = parenthesized!(content in input);
-      let args = content.parse_terminated(ExprTerm::parse, syn::Token![,])?;
-      FuncArgs::Plain(args.into_iter().collect::<Vec<_>>())
+      let args = content.parse_terminated(expr::Expr::parse, syn::Token![,])?;
+      FuncArgs::Plain(args.into_iter().collect())
     } else {
       return Err(syn::Error::new(
         input.span(),

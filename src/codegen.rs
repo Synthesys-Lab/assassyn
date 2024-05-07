@@ -173,9 +173,9 @@ fn emit_expr_term(expr: &ExprTerm) -> syn::Result<proc_macro2::TokenStream> {
 
 fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> {
   let id = aa.id.clone();
-  let idx = emit_expr_term(&aa.idx)?;
+  let idx = emit_expr_body(aa.idx.as_ref())?;
   Ok(quote! {{
-    let idx = #idx.clone();
+    let idx = { #idx }.clone();
     sys.create_array_ptr(#id.clone(), idx)
   }})
 }
@@ -185,9 +185,9 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
     FuncArgs::Bound(binds) => binds
       .iter()
       .map(|(k, v)| {
-        let value = emit_expr_term(v).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {v}));
+        let value = emit_expr_body(v).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {v}));
         quote! {
-          let value = #value.clone();
+          let value = { #value }.clone();
           let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, None);
         }
       })
@@ -195,9 +195,9 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
     FuncArgs::Plain(vec) => vec
       .iter()
       .map(|x| {
-        let value = emit_expr_term(x).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {x}));
+        let value = emit_expr_body(x).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {x}));
         quote! {
-          let value = #value.clone();
+          let value = { #value }.clone();
           let bind = sys.push_bind(bind, value, None);
         }
       })
@@ -280,9 +280,9 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
           let mut emit_args: Punctuated<proc_macro2::TokenStream, Token![;]> = Punctuated::new();
           let mut arg_ids: Punctuated<syn::Ident, Token![,]> = Punctuated::new();
           for (i, elem) in args.iter().enumerate() {
-            let elem = emit_expr_term(elem)?;
+            let elem = emit_expr_body(elem)?;
             let id = syn::Ident::new(&format!("_{}", i), elem.span());
-            emit_args.push(quote! { let #id = #elem });
+            emit_args.push(quote! { let #id = { #elem } });
             emit_args.push_punct(Token![;](elem.span()));
             arg_ids.push(id);
             arg_ids.push_punct(Token![,](elem.span()));

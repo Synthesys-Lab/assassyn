@@ -41,6 +41,7 @@ pub fn run_simulator(
     .arg(&manifest)
     .output()
     .unwrap_or_else(|_| panic!("Failed to run \"{}\"", config.dir_name(sys)));
+  assert!(output.status.success());
   let raw_output = String::from_utf8(output.stdout).unwrap();
   println!("{}", raw_output);
   assert!(

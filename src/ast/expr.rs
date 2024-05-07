@@ -177,24 +177,24 @@ impl Parse for Expr {
     let a = tok;
     input.parse::<syn::Token![.]>()?; // Consume "."
     let operator = input.parse::<syn::Ident>()?;
-    let content;
-    parenthesized!(content in input);
+    let operands;
+    parenthesized!(operands in input);
     match operator.to_string().as_str() {
       "slice" => {
-        let l = content.parse::<ExprTerm>()?;
-        content.parse::<syn::Token![,]>()?; // Consume ","
-        let r = content.parse::<ExprTerm>()?;
+        let l = operands.parse::<ExprTerm>()?;
+        operands.parse::<syn::Token![,]>()?; // Consume ","
+        let r = operands.parse::<ExprTerm>()?;
         Ok(Expr::Slice((a, l, r)))
       }
       // TODO(@were): Deprecate pop, make it opaque to users.
       "flip" | "pop" | "valid" | "peek" => Ok(Expr::Unary((a, operator))),
       "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "neq" | "bitwise_and"
       | "bitwise_or" | "concat" => {
-        let b = content.parse::<ExprTerm>()?;
+        let b = operands.parse::<ExprTerm>()?;
         Ok(Expr::Binary((a, operator, b)))
       }
       "cast" | "sext" => {
-        let t = content.parse::<DType>()?;
+        let t = operands.parse::<DType>()?;
         Ok(Expr::DTConv((operator, a, t)))
       }
       _ => Err(syn::Error::new(
