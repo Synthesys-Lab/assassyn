@@ -35,6 +35,7 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> 
   }
 }
 
+// TODO(@were): Double confirm this assumption: All these are right values.
 pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
     expr::Expr::Binary((a, op, b)) => match op.to_string().as_str() {
@@ -42,8 +43,8 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       | "concat" => {
         let method_id = format!("create_{}", op);
         let method_id = syn::Ident::new(&method_id, op.span());
-        let a = emit_expr_term(a)?;
-        let b = emit_expr_term(b)?;
+        let a = emit_expr_body(a)?;
+        let b = emit_expr_body(b)?;
         Ok(quote! {{
           let lhs = #a.clone();
           let rhs = #b.clone();
@@ -63,7 +64,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     },
     expr::Expr::Unary((a, op)) => match op.to_string().as_str() {
       "flip" => {
-        let a = emit_expr_term(a)?;
+        let a = emit_expr_body(a)?;
         let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
         Ok(quote! {{
           let res = sys.#method_id(#a.clone());
@@ -72,7 +73,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       }
       "pop" => {
         let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
-        let a = emit_expr_term(a)?;
+        let a = emit_expr_body(a)?;
         Ok(quote!(sys.#method_id(#a.clone(), None)))
       }
       "valid" | "peek" => {
@@ -85,8 +86,8 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         // block before the pop, so we do not worry about "popping before validation".
         //
         // This is kinda back-and-forth in the code generator.
-        let fifo_self = match a {
-          ExprTerm::Ident(id) => {
+        let fifo_self = match a.as_ref() {
+          expr::Expr::Term(ExprTerm::Ident(id)) => {
             let name = id.to_string();
             quote! {{
               let module = module.as_ref::<eir::ir::Module>(sys).unwrap();
@@ -113,8 +114,9 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       )),
     },
     expr::Expr::Slice((a, l, r)) => {
-      let method_id = syn::Ident::new("create_slice", a.span());
-      let a = emit_expr_term(a)?;
+      // TODO(@were): Fix the span.
+      let method_id = syn::Ident::new("create_slice", Span::call_site());
+      let a = emit_expr_body(a)?;
       let l = emit_expr_term(l)?;
       let r = emit_expr_term(r)?;
       Ok(quote! {{
@@ -126,8 +128,9 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       }})
     }
     expr::Expr::DTConv((op, a, ty)) => {
-      let method_id = syn::Ident::new(format!("create_{}", op).as_str(), a.span());
-      let a = emit_expr_term(a)?;
+      // TODO(@were): Fix the span.
+      let method_id = syn::Ident::new(format!("create_{}", op).as_str(), Span::call_site());
+      let a = emit_expr_body(a)?;
       let ty = emit_type(ty)?;
       Ok(quote! {{
         let src = #a.clone();
@@ -137,7 +140,14 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     }
     expr::Expr::Term(term) => {
       let res = emit_expr_term(term)?;
-      Ok(res)
+      if let ExprTerm::ArrayAccess(_) = term {
+        Ok(quote! {{
+          let ptr = { #res };
+          sys.create_array_read(ptr)
+        }})
+      } else {
+        Ok(res)
+      }
     }
     expr::Expr::Select((default, cases)) => {
       let mut res = emit_expr_term(default)?;
@@ -152,6 +162,42 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         }};
       }
       Ok(res)
+    }
+    //
+    //(DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)
+    expr::Expr::ArrayAlloc((ty, size, init)) => {
+      let ty = emit_type(ty)?;
+      let (init_values, init_list) = if let Some(init) = init {
+        let mut init_values = Punctuated::new();
+        let mut init_list = Punctuated::new();
+        for (i, elem) in init.iter().enumerate() {
+          let id = syn::Ident::new(&format!("_{}", i), elem.span());
+          let value = emit_expr_term(elem)?;
+          init_list.push_value(id.clone());
+          init_list.push_punct(Token![,](elem.span()));
+          init_values.push_value(quote! { let #id = #value });
+          init_values.push_punct(Token![;](elem.span()));
+        }
+        let init_span = punctuated_span(init).unwrap_or(ty.span());
+        (
+          Some(init_values),
+          quote_spanned! { init_span => Some(vec![#init_list]) },
+        )
+      } else {
+        (None, quote_spanned! { ty.span() => None })
+      };
+      Ok(quote_spanned! {
+        ty.span() => {
+          #init_values
+          sys.create_array(#ty, "array", #size, #init_list)
+        }
+      })
+    }
+    expr::Expr::Bind(call) => {
+      let func = &call.func;
+      let args = &call.args;
+      let args = emit_arg_binds(func, args);
+      Ok(quote! {{ #args; bind }})
     }
   }
 }
@@ -213,51 +259,37 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
 pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStream> {
   let res: proc_macro2::TokenStream = match inst {
     Statement::Assign((left, right)) => {
-      let right: proc_macro2::TokenStream = emit_expr_body(right)?;
-      quote_spanned! {
-        left.span() =>
-          let temp = #right;
-          if let Ok(mut expr_mut) = temp.as_mut::<eir::ir::Expr>(sys) {
-            expr_mut.set_name(stringify!(#left).to_string());
+      match left {
+        expr::LValue::Ident(id) => {
+          let right = emit_expr_body(right)?;
+          quote_spanned! {
+            id.span() =>
+              let temp = #right;
+              if let Ok(mut expr_mut) = temp.as_mut::<eir::ir::Expr>(sys) {
+                expr_mut.set_name(stringify!(#id).to_string());
+              }
+              // if let Ok(mut array_mut) = temp.as_mut::<eir::ir::Array>(sys) {
+              //   array_mut.set_name(stringify!(#id).to_string());
+              // }
+              let #id = temp;
           }
-          let #left = temp;
+        }
+        expr::LValue::ArrayAccess(aa) => {
+          let array_ptr = emit_array_access(aa)?;
+          let right = emit_expr_body(right)?;
+          quote! {{
+            let ptr = #array_ptr;
+            let value = #right;
+            sys.create_array_write(ptr, value);
+          }}
+        }
+        expr::LValue::IdentList(l) => {
+          return Err(syn::Error::new(
+            l.span(),
+            "Assigning to a list of identifiers is not supported",
+          ))
+        }
       }
-    }
-    Statement::ArrayAssign((aa, right)) => {
-      let right: proc_macro2::TokenStream = emit_expr_body(right)?;
-      let array_ptr = emit_array_access(aa)?;
-      quote! {{
-        let ptr = #array_ptr;
-        let value = #right;
-        sys.create_array_write(ptr, value);
-      }}
-    }
-    Statement::ArrayRead((id, aa)) => {
-      let array_ptr = emit_array_access(aa)?;
-      quote! {
-        let #id = {
-          let ptr = #array_ptr;
-          let res = sys.create_array_read(ptr);
-          if let Ok(mut expr_mut) = res.as_mut::<eir::ir::Expr>(sys) {
-            expr_mut.set_name(stringify!(#id).to_string());
-          }
-          res
-        };
-      }
-    }
-    Statement::Bind((id, call)) => {
-      let func = &call.func;
-      let args = &call.args;
-      let args = emit_arg_binds(func, args);
-      quote!(
-        let #id = {
-          #args;
-          if let Ok(mut expr_mut) = bind.as_mut::<eir::ir::Expr>(sys) {
-            expr_mut.set_name(stringify!(#id).to_string());
-          }
-          bind
-        };
-      )
     }
     Statement::Call((kind, call)) => match kind {
       CallKind::Async => {
@@ -308,33 +340,6 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         }
       },
     },
-    Statement::ArrayAlloc((id, ty, size, init)) => {
-      let ty = emit_type(ty)?;
-      let (init_values, init_list) = if let Some(init) = init {
-        let mut init_values = Punctuated::new();
-        let mut init_list = Punctuated::new();
-        for (i, elem) in init.iter().enumerate() {
-          let id = syn::Ident::new(&format!("_{}", i), elem.span());
-          let value = emit_expr_term(elem)?;
-          init_list.push_value(id.clone());
-          init_list.push_punct(Token![,](elem.span()));
-          init_values.push_value(quote! { let #id = #value });
-          init_values.push_punct(Token![;](elem.span()));
-        }
-        let init_span = punctuated_span(init).unwrap_or(id.span());
-        (
-          Some(init_values),
-          quote_spanned! { init_span => Some(vec![#init_list]) },
-        )
-      } else {
-        (None, quote_spanned! { id.span() => None })
-      };
-      quote_spanned! {
-        id.span() =>
-          #init_values
-          let #id = sys.create_array(#ty, stringify!(#id), #size, #init_list);
-      }
-    }
     Statement::BodyScope((pred, body)) => {
       let unwraped_body = emit_body(body)?;
       let (block_init, scoped) = match pred {

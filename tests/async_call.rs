@@ -12,13 +12,12 @@ fn async_call() {
 
   module_builder!(
     driver(/*external interf*/adder)(/*in-ports*/) {
-      cnt    = array(int<32>, 1);
-      read   = cnt[0];
-      plus   = read.add(1);
-      cnt[0] = plus;
-      cond   = read.ilt(100);
+      cnt     = array(int<32>, 1);
+      new_cnt = cnt[0].add(1);
+      cnt[0]  = new_cnt;
+      cond    = cnt[0].ilt(100);
       when cond {
-        async_call adder { a: read, b: read };
+        async_call adder { a: cnt[0], b: cnt[0] };
       }
     }
   );

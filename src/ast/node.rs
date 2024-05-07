@@ -1,10 +1,9 @@
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
-use syn::Token;
 
 use super::expr;
+use super::expr::LValue;
 use super::DType;
-use super::ExprTerm;
 
 pub trait WeakSpanned {
   fn span(&self) -> proc_macro2::Span;
@@ -68,19 +67,8 @@ pub(crate) enum CallKind {
 }
 
 pub(crate) enum Statement {
-  Assign((syn::Ident, expr::Expr)),
-  ArrayAlloc(
-    (
-      syn::Ident,
-      DType,
-      syn::LitInt,
-      Option<Punctuated<ExprTerm, Token![,]>>,
-    ),
-  ),
-  ArrayAssign((ArrayAccess, expr::Expr)),
-  ArrayRead((syn::Ident, ArrayAccess)),
+  Assign((LValue, expr::Expr)),
   Call((CallKind, FuncCall)),
-  Bind((syn::Ident, FuncCall)),
   BodyScope((BodyPred, Box<Body>)),
   Log(Vec<expr::Expr>),
   ExprTerm(expr::ExprTerm),

@@ -256,3 +256,10 @@ impl Array {
     self.init.as_ref()
   }
 }
+
+impl ArrayMut<'_> {
+  pub fn set_name(&mut self, name: String) {
+    let new_name = self.sys.symbol_table.identifier(name.as_str());
+    self.get_mut().name = new_name;
+  }
+}
