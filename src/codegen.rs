@@ -142,12 +142,12 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     expr::Expr::Select((default, cases)) => {
       let mut res = emit_expr_term(default)?;
       for (cond, value) in cases.iter() {
-        let cond = emit_expr_term(cond)?;
-        let value = emit_expr_term(value)?;
+        let cond = emit_expr_body(cond)?;
+        let value = emit_expr_body(value)?;
         res = quote! {{
           let carry = #res;
-          let cond = #cond.clone();
-          let value = #value.clone();
+          let cond = { #cond }.clone();
+          let value = { #value }.clone();
           sys.create_select(cond, value, carry)
         }};
       }
@@ -168,6 +168,7 @@ fn emit_expr_term(expr: &ExprTerm) -> syn::Result<proc_macro2::TokenStream> {
       let value = lit.value();
       Ok(quote! { sys.get_str_literal(#value.to_string()) })
     }
+    ExprTerm::ArrayAccess(aa) => emit_array_access(aa),
   }
 }
 

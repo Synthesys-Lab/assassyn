@@ -7,6 +7,7 @@ pub(crate) enum ExprTerm {
   Ident(syn::Ident),
   Const((DType, syn::LitInt)),
   StrLit(syn::LitStr),
+  ArrayAccess(ArrayAccess),
 }
 
 pub(crate) struct ModuleAttrs {
@@ -53,6 +54,7 @@ impl WeakSpanned for ExprTerm {
       ExprTerm::Ident(id) => id.span(),
       ExprTerm::Const((_, lit)) => lit.span(),
       ExprTerm::StrLit(lit) => lit.span(),
+      ExprTerm::ArrayAccess(ArrayAccess { id, .. }) => id.span(),
     }
   }
 }
@@ -70,7 +72,21 @@ impl Parse for ExprTerm {
           line!()
         )
       });
-      Ok(ExprTerm::Ident(id))
+      if input.peek(syn::token::Bracket) {
+        let raw_idx;
+        syn::bracketed!(raw_idx in input);
+        let idx = raw_idx.parse::<Expr>().unwrap_or_else(|_| {
+          panic!(
+            "{}:{}: Failed to parse expression in array access",
+            file!(),
+            line!()
+          )
+        });
+        let idx = Box::new(idx);
+        Ok(ExprTerm::ArrayAccess(ArrayAccess { id, idx }))
+      } else {
+        Ok(ExprTerm::Ident(id))
+      }
     } else if input.cursor().literal().is_some() {
       let lit = input.parse::<syn::LitInt>()?;
       let ty = if input.peek(syn::Token![.]) {
@@ -135,6 +151,7 @@ impl Parse for LValue {
   }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) enum Expr {
   // ExprTerm . syn::Ident ( ExprTerm ): a.add(b)
   Binary((ExprTerm, syn::Ident, ExprTerm)),
@@ -142,13 +159,17 @@ pub(crate) enum Expr {
   Unary((ExprTerm, syn::Ident)),
   // "default" ExprTerm . "case" ( ExprTerm, ExprTerm )
   //                    . "case" ( ExprTerm, ExprTerm ) *
-  Select((ExprTerm, Vec<(ExprTerm, ExprTerm)>)),
+  Select((ExprTerm, Vec<(Box<Expr>, Box<Expr>)>)),
   // ExprTerm . slice ( ExprTerm, ExprTerm )
   Slice((ExprTerm, ExprTerm, ExprTerm)),
   // ExprTerm . [cast | sext] ( DType )
   DTConv((syn::Ident, ExprTerm, DType)),
   // ExprTerm
   Term(ExprTerm),
+}
+
+fn expr_terminates(input: &syn::parse::ParseStream) -> bool {
+  input.is_empty() || input.peek(syn::Token![;]) || input.peek(syn::Token![,])
 }
 
 impl Parse for Expr {
@@ -163,15 +184,15 @@ impl Parse for Expr {
           input.parse::<syn::Ident>()?; // Consume "case"
           let content;
           parenthesized!(content in input);
-          let cond = content.parse::<ExprTerm>()?;
+          let cond = content.parse::<Expr>()?;
           content.parse::<syn::Token![,]>().expect("Expect a \",\""); // Consume ","
-          let value = content.parse::<ExprTerm>()?;
-          cases.push((cond, value));
+          let value = content.parse::<Expr>()?;
+          cases.push((Box::new(cond), Box::new(value)));
         }
         return Ok(Expr::Select((default_value, cases)));
       }
     }
-    if !input.peek(syn::Token![.]) {
+    if expr_terminates(&input) {
       return Ok(Expr::Term(tok));
     }
     let a = tok;
