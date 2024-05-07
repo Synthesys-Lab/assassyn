@@ -241,7 +241,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       let addr_fifo_name = syn::Ident::new(&fifo_name!(addr_fifo), Span::call_site());
       res.push_str(
         quote::quote! {
-          let raddr = {
+          let addr = {
           q.push(Reverse(Event{
             stamp: stamp + 50,
             kind: EventKind::#addr_fifo_pop((EventKind::#module_writer.into(), #addr_fifo_idx))
@@ -294,13 +294,17 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         .as_str(),
       );
 
-      res.push_str("let rdata = mem[raddr as usize];\n");
+      res.push_str("let rdata = mem[addr as usize];\n");
 
       // TODO: truely randomize latency, requires emitting cargo wrapped project
       res.push_str(format!("let read_latency = {};\n", params.lat_min).as_str());
 
+      res.push_str("if write {");
+      res.push_str("mem[addr as usize] = wdata;");
+      res.push_str("} else {");
       res.push_str(rdata_fifo.unwrap().as_str());
       res.push_str(rdata_module.unwrap().as_str());
+      res.push_str("}");
     } else {
       res.push_str(&self.visit_block(&module.get_body()).unwrap());
     }

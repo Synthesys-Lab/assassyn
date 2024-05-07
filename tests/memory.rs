@@ -12,15 +12,16 @@ fn sram_sys() -> SysBuilder {
     driver(sink, mem)() {
       cnt = array(int<32>, 1);
       v = cnt[0];
-      v = v.slice(0, 9);
-      v = v.cast(uint<10>);
-      w = v.slice(0, 0);
-      w = w.cast(bits<1>);
-      d = cnt[0];
-      d = d.cast(bits<32>);
-      async_call mem { addr: v, write: w, wdata: d, r: sink };
-      c = cnt[0];
-      plused = c.add(1);
+      write = v.slice(0, 0);
+      write = write.cast(bits<1>);
+      wdata = v.cast(bits<32>);
+      plused = v.add(1);
+      waddr = plused.slice(0, 9);
+      waddr = waddr.cast(uint<10>);
+      raddr = v.slice(0, 9);
+      raddr = raddr.cast(uint<10>);
+      addr = default raddr.case(write, waddr);
+      async_call mem { addr: addr, write: write, wdata: wdata, r: sink };
       cnt[0] = plused;
     }
   );

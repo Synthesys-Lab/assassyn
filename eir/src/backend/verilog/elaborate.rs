@@ -897,9 +897,8 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         .as_str(),
       );
       if let Some(init_file) = params.init_file {
-        eprintln!("sv {}", self.current_module);
         res.push_str(format!("// init_file =  {}\n\n", init_file).as_str());
-        // todo!();
+        todo!();
       }
 
       let mut rdata_fifo: Option<String> = None;
@@ -950,22 +949,46 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         .as_str(),
       );
 
-      // TODO: truely randomize latency
-      res.push_str(format!("localparam read_latency = {};\n", params.lat_min).as_str());
+      res.push_str("logic write;\n");
+      res.push_str("assign write = fifo_write_pop_data;\n\n");
 
+      // TODO: truely randomize latency
+      res.push_str(format!("localparam read_latency = {};\n\n", params.lat_min).as_str());
+
+      res.push_str("// read logic\n");
       let rdata_fifo = rdata_fifo.unwrap();
-      res.push_str(format!("assign fifo_{}_push_valid = trigger;\n", rdata_fifo).as_str());
       res.push_str(
         format!(
-          "assign fifo_{}_push_data = mem[fifo_raddr_pop_data];\n",
+          "assign fifo_{}_push_valid = trigger && !write;\n",
           rdata_fifo
         )
         .as_str(),
       );
-      res.push_str(format!("assign fifo_raddr_pop_ready = trigger;\n\n").as_str());
+      res.push_str(
+        format!(
+          "assign fifo_{}_push_data = mem[fifo_addr_pop_data];\n\n",
+          rdata_fifo
+        )
+        .as_str(),
+      );
+
+      res.push_str("// write logic\n");
+      res.push_str(
+        "always @(posedge clk) if (write) mem[fifo_addr_pop_data] <= fifo_wdata_pop_data;\n\n",
+      );
+
+      res.push_str(format!("assign fifo_addr_pop_ready = trigger;\n").as_str());
+      res.push_str(format!("assign fifo_write_pop_ready = trigger;\n").as_str());
+      res.push_str(format!("assign fifo_wdata_pop_ready = trigger;\n\n").as_str());
 
       let rdata_module = rdata_module.unwrap();
-      res.push_str(format!("assign {}_trigger_push_valid = trigger;\n\n", rdata_module).as_str());
+      res.push_str(
+        format!(
+          "assign {}_trigger_push_valid = trigger && !write;\n\n",
+          rdata_module
+        )
+        .as_str(),
+      );
     } else {
       let mut body_waituntil_cnt = 0;
       let mut wait_until: Option<String> = None;
@@ -1221,7 +1244,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             format_str = format_str.replacen(
               "{}",
               match elem.get_value().get_dtype(self.sys).unwrap() {
-                DataType::Int(_) => "%d",
+                DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "%d",
                 DataType::Str => "%s",
                 _ => "?",
               },
@@ -1450,6 +1473,21 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
               a
             ))
           }
+        }
+
+        Opcode::Select => {
+          let cond = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
+          let true_value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
+          let false_value = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
+          Some(format!(
+            "logic [{}:0] _{};\nassign _{} = {} ? {} : {};\n\n",
+            expr.dtype().get_bits() - 1,
+            expr.get_key(),
+            expr.get_key(),
+            cond,
+            true_value,
+            false_value
+          ))
         }
 
         Opcode::Bind(_) => {
