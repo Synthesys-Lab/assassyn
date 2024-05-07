@@ -139,7 +139,6 @@ impl Parse for LValue {
   }
 }
 
-#[allow(clippy::type_complexity)]
 pub(crate) enum Expr {
   // ExprTerm . syn::Ident ( ExprTerm ): a.add(b)
   Binary((Box<Expr>, syn::Ident, Box<Expr>)),
@@ -147,7 +146,7 @@ pub(crate) enum Expr {
   Unary((Box<Expr>, syn::Ident)),
   // "default" ExprTerm . "case" ( ExprTerm, ExprTerm )
   //                    . "case" ( ExprTerm, ExprTerm ) *
-  Select((ExprTerm, Vec<(Box<Expr>, Box<Expr>)>)),
+  Select((Box<Expr>, Vec<(Expr, Expr)>)),
   // "bind" FuncCall
   Bind(FuncCall),
   // "array" ( DType, syn::LitInt, Option<ExprTerm> )
@@ -161,7 +160,11 @@ pub(crate) enum Expr {
 }
 
 fn expr_terminates(input: &syn::parse::ParseStream) -> bool {
-  input.is_empty() || input.peek(syn::Token![;]) || input.peek(syn::Token![,])
+  input.is_empty() || input.peek(syn::Token![;]) || input.peek(syn::Token![,]) || {
+    input.cursor().punct().map_or(false, |(punct, next)| {
+      punct.as_char() == '.' && next.ident().map_or(false, |(ident, _)| ident.eq("case"))
+    })
+  }
 }
 
 impl Parse for Expr {
@@ -170,7 +173,7 @@ impl Parse for Expr {
     if let ExprTerm::Ident(id) = &tok {
       match id.to_string().as_str() {
         "default" => {
-          let default_value = input.parse::<ExprTerm>()?;
+          let default_value = input.parse::<Expr>()?;
           let mut cases = Vec::new();
           while !input.peek(syn::Token![;]) {
             input.parse::<syn::Token![.]>()?; // Consume "."
@@ -180,9 +183,9 @@ impl Parse for Expr {
             let cond = content.parse::<Expr>()?;
             content.parse::<syn::Token![,]>().expect("Expect a \",\""); // Consume ","
             let value = content.parse::<Expr>()?;
-            cases.push((Box::new(cond), Box::new(value)));
+            cases.push((cond, value));
           }
-          return Ok(Expr::Select((default_value, cases)));
+          return Ok(Expr::Select((Box::new(default_value), cases)));
         }
         "bind" => {
           let func = input.parse::<FuncCall>()?;
@@ -211,39 +214,55 @@ impl Parse for Expr {
     if expr_terminates(&input) {
       return Ok(Expr::Term(tok));
     }
-    let a = Box::new(Expr::Term(tok));
-    input.parse::<syn::Token![.]>()?; // Consume "."
-    let operator = input.parse::<syn::Ident>()?;
-    let operands;
-    parenthesized!(operands in input);
-    match operator.to_string().as_str() {
-      "slice" => {
-        let l = operands.parse::<ExprTerm>()?;
-        operands.parse::<syn::Token![,]>()?; // Consume ","
-        let r = operands.parse::<ExprTerm>()?;
-        Ok(Expr::Slice((a, l, r)))
+    let mut expr = Expr::Term(tok);
+    while !expr_terminates(&input) {
+      match input.parse::<syn::Token![.]>() {
+        // Consume "."
+        Ok(_) => {}
+        Err(_) => {
+          Err(syn::Error::new(
+            input.span(),
+            format!("{}:{}: Expected \".\" or terminator.", file!(), line!(),),
+          ))?;
+        }
       }
-      // TODO(@were): Deprecate pop, make it opaque to users.
-      "flip" | "pop" | "valid" | "peek" => Ok(Expr::Unary((a, operator))),
-      "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "neq" | "bitwise_and"
-      | "bitwise_or" | "concat" => {
-        let b = Box::new(operands.parse::<Expr>()?);
-        Ok(Expr::Binary((a, operator, b)))
+      let operator = input.parse::<syn::Ident>()?;
+      let operands;
+      parenthesized!(operands in input);
+      match operator.to_string().as_str() {
+        "slice" => {
+          let l = operands.parse::<ExprTerm>()?;
+          operands.parse::<syn::Token![,]>()?; // Consume ","
+          let r = operands.parse::<ExprTerm>()?;
+          expr = Expr::Slice((Box::new(expr), l, r));
+        }
+        // TODO(@were): Deprecate pop, make it opaque to users.
+        "flip" | "pop" | "valid" | "peek" => {
+          expr = Expr::Unary((Box::new(expr), operator));
+        }
+        "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "neq" | "bitwise_and"
+        | "bitwise_or" | "concat" => {
+          let b = Box::new(operands.parse::<Expr>()?);
+          expr = Expr::Binary((Box::new(expr), operator, b))
+        }
+        "cast" | "sext" => {
+          let t = operands.parse::<DType>()?;
+          expr = Expr::DTConv((operator, Box::new(expr), t))
+        }
+        _ => {
+          return Err(syn::Error::new(
+            operator.span(),
+            format!(
+              "{}:{}: Unsupported operator: \"{}\"",
+              file!(),
+              line!(),
+              operator
+            ),
+          ))
+        }
       }
-      "cast" | "sext" => {
-        let t = operands.parse::<DType>()?;
-        Ok(Expr::DTConv((operator, a, t)))
-      }
-      _ => Err(syn::Error::new(
-        operator.span(),
-        format!(
-          "{}:{}: Unsupported operator: \"{}\"",
-          file!(),
-          line!(),
-          operator
-        ),
-      )),
     }
+    Ok(expr)
   }
 }
 

@@ -150,12 +150,12 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       }
     }
     expr::Expr::Select((default, cases)) => {
-      let mut res = emit_expr_term(default)?;
+      let mut res = emit_expr_body(default.as_ref())?;
       for (cond, value) in cases.iter() {
         let cond = emit_expr_body(cond)?;
         let value = emit_expr_body(value)?;
         res = quote! {{
-          let carry = #res;
+          let carry = { #res }.clone();
           let cond = { #cond }.clone();
           let value = { #value }.clone();
           sys.create_select(cond, value, carry)
