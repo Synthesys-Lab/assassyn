@@ -10,11 +10,9 @@ fn bind() {
 
   module_builder!(driver(lhs, rhs)() {
     cnt = array(int<32>, 1);
-    k = cnt[0.int<32>];
-    v = k.add(1);
+    v = cnt[0].add(1);
     cnt[0] = v;
-    mul = v.add(v);
-    async_call lhs { a: mul };
+    async_call lhs { a: v.mul(v).slice(0, 31).cast(int<32>) };
     async_call rhs { a: v };
   });
 

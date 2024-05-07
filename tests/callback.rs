@@ -7,9 +7,8 @@ fn callback() {
     driver(sqr, memory_read)() {
       cnt = array(int<32>, 1);
       v = cnt[0];
-      async_call memory_read { v: v, func: sqr };
-      plused = v.add(1);
-      cnt[0] = plused;
+      async_call memory_read { v: cnt[0], func: sqr };
+      cnt[0] = v.add(1);
     }
   );
 

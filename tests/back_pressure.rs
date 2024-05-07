@@ -10,11 +10,9 @@ fn back_pressure() {
 
   module_builder!(driver(lhs, rhs)() {
     cnt = array(int<32>, 1);
-    k = cnt[0.int<32>];
-    v = k.add(1);
+    v = cnt[0].add(1);
     cnt[0] = v;
-    add = v.add(v);
-    async_call lhs { a: add };
+    async_call lhs { a: v.add(v) };
     async_call rhs { b: v };
   });
 
