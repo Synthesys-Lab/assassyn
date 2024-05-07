@@ -679,18 +679,15 @@ impl Visitor<String> for NodeRefDumper {
       NodeKind::FIFO => namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into(),
       NodeKind::IntImm => {
         let int_imm = node.as_ref::<IntImm>(sys).unwrap();
-        Some(format!("({})", int_imm.get_value()))
+        Some(format!("{}", int_imm.get_value()))
       }
       NodeKind::StrImm => {
         let str_imm = node.as_ref::<StrImm>(sys).unwrap();
         let value = str_imm.get_value();
         quote::quote!(#value).to_string().into()
       }
-      NodeKind::Module => {
-        let module_name = namify(node.as_ref::<Module>(sys).unwrap().get_name());
-        format!("Box::new(EventKind::Module_{})", module_name).into()
-      }
-      _ => Some(format!("_{}", node.get_key())),
+      NodeKind::Expr => Some(namify(node.to_string(sys).as_str())),
+      _ => panic!("Unknown node of kind {:?}", node.get_kind()),
     }
   }
 }
@@ -1002,8 +999,8 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
               body_waituntil_cnt += 1;
               let cond = cond.as_ref::<Expr>(self.sys).unwrap();
               wait_until = Some(format!(
-                " && (_{}{})",
-                cond.get_key(),
+                " && ({}{})",
+                namify(cond.upcast().to_string(self.sys).as_str()),
                 if cond.dtype().get_bits() == 1 {
                   "".into()
                 } else {
@@ -1193,20 +1190,20 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
     if expr.get_opcode().is_binary() || expr.get_opcode().is_cmp() {
       Some(format!(
-        "logic [{}:0] _{};\nassign _{} = {} {} {};\n\n",
+        "logic [{}:0] {};\nassign {} = {} {} {};\n\n",
         expr.dtype().get_bits() - 1,
-        expr.get_key(),
-        expr.get_key(),
+        namify(expr.upcast().to_string(self.sys).as_str()),
+        namify(expr.upcast().to_string(self.sys).as_str()),
         dump_ref!(self.sys, expr.get_operand(0).unwrap().get_value()),
         expr.get_opcode().to_string(),
         dump_ref!(self.sys, expr.get_operand(1).unwrap().get_value())
       ))
     } else if expr.get_opcode().is_unary() {
       Some(format!(
-        "logic [{}:0] _{};\nassign _{} = {}{};\n\n",
+        "logic [{}:0] {};\nassign {} = {}{};\n\n",
         expr.dtype().get_bits() - 1,
-        expr.get_key(),
-        expr.get_key(),
+        namify(expr.upcast().to_string(self.sys).as_str()),
+        namify(expr.upcast().to_string(self.sys).as_str()),
         expr.get_opcode().to_string(),
         dump_ref!(self.sys, expr.get_operand(0).unwrap().get_value())
       ))
@@ -1220,10 +1217,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             .as_ref::<FIFO>(self.sys)
             .unwrap();
           Some(format!(
-            "logic [{}:0] _{};\nassign _{} = fifo_{}_pop_data;\nassign fifo_{}_pop_ready = trigger{};\n\n",
+            "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\nassign fifo_{}_pop_ready = trigger{};\n\n",
             fifo.scalar_ty().get_bits() - 1,
-            expr.get_key(),
-            expr.get_key(),
+            namify(expr.upcast().to_string(self.sys).as_str()),
+            namify(expr.upcast().to_string(self.sys).as_str()),
             fifo_name!(fifo),
             fifo_name!(fifo),
             (self.pred.clone().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string())
@@ -1283,10 +1280,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             .unwrap();
           let array_ref = &array_ptr.get_array().as_ref::<Array>(self.sys).unwrap();
           Some(format!(
-            "logic [{}:0] _{};\nassign _{} = array_{}_q[{}];\n\n",
+            "logic [{}:0] {};\nassign {} = array_{}_q[{}];\n\n",
             expr.dtype().get_bits() - 1,
-            expr.get_key(),
-            expr.get_key(),
+            namify(expr.upcast().to_string(self.sys).as_str()),
+            namify(expr.upcast().to_string(self.sys).as_str()),
             namify(array_ref.get_name()),
             dump_ref!(self.sys, array_ptr.get_idx())
           ))
@@ -1380,10 +1377,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             .unwrap();
           let fifo_name = fifo_name!(fifo);
           Some(format!(
-            "logic [{}:0] _{};\nassign _{} = fifo_{}_pop_data;\n\n",
+            "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\n\n",
             fifo.scalar_ty().get_bits() - 1,
-            expr.get_key(),
-            expr.get_key(),
+            namify(expr.upcast().to_string(self.sys).as_str()),
+            namify(expr.upcast().to_string(self.sys).as_str()),
             fifo_name
           ))
         }
@@ -1420,10 +1417,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           let l = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
           let r = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
           Some(format!(
-            "logic [{}:0] _{};\nassign _{} = {}[{}:{}];\n\n",
+            "logic [{}:0] {};\nassign {} = {}[{}:{}];\n\n",
             expr.dtype().get_bits() - 1,
-            expr.get_key(),
-            expr.get_key(),
+            namify(expr.upcast().to_string(self.sys).as_str()),
+            namify(expr.upcast().to_string(self.sys).as_str()),
             a,
             r,
             l
@@ -1433,10 +1430,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         Opcode::Cast => {
           let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
           Some(format!(
-            "logic [{}:0] _{};\nassign _{} = {};\n\n",
+            "logic [{}:0] {};\nassign {} = {};\n\n",
             expr.dtype().get_bits() - 1,
-            expr.get_key(),
-            expr.get_key(),
+            namify(expr.upcast().to_string(self.sys).as_str()),
+            namify(expr.upcast().to_string(self.sys).as_str()),
             a
           ))
         }
@@ -1455,10 +1452,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           {
             // perform sext
             Some(format!(
-              "logic [{}:0] _{};\nassign _{} = {{{}'{{{}[{}]}}, {}}};\n\n",
+              "logic [{}:0] {};\nassign {} = {{{}'{{{}[{}]}}, {}}};\n\n",
               expr.dtype().get_bits() - 1,
-              expr.get_key(),
-              expr.get_key(),
+              namify(expr.upcast().to_string(self.sys).as_str()),
+              namify(expr.upcast().to_string(self.sys).as_str()),
               dest_dtype.get_bits() - src_dtype.get_bits(),
               a,
               src_dtype.get_bits() - 1,
@@ -1466,10 +1463,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             ))
           } else {
             Some(format!(
-              "logic [{}:0] _{};\nassign _{} = {};\n\n",
+              "logic [{}:0] {};\nassign {} = {};\n\n",
               expr.dtype().get_bits() - 1,
-              expr.get_key(),
-              expr.get_key(),
+              namify(expr.upcast().to_string(self.sys).as_str()),
+              namify(expr.upcast().to_string(self.sys).as_str()),
               a
             ))
           }
@@ -1480,10 +1477,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           let true_value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
           let false_value = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
           Some(format!(
-            "logic [{}:0] _{};\nassign _{} = {} ? {} : {};\n\n",
+            "logic [{}:0] {};\nassign {} = {} ? {} : {};\n\n",
             expr.dtype().get_bits() - 1,
-            expr.get_key(),
-            expr.get_key(),
+            namify(expr.upcast().to_string(self.sys).as_str()),
+            namify(expr.upcast().to_string(self.sys).as_str()),
             cond,
             true_value,
             false_value

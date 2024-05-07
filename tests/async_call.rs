@@ -5,8 +5,8 @@ use eir::{builder::SysBuilder, test_utils::run_simulator};
 fn async_call() {
   module_builder!(
     adder()(a:int<32>, b:int<32>) {
-      log("Simulating module adder");
-      _c = a.add(b);
+      c = a.add(b);
+      log("Simulating module adder {} = {} + {}", c, a, b);
     }
   );
 
@@ -23,7 +23,7 @@ fn async_call() {
     }
   );
 
-  let mut sys = SysBuilder::new("main");
+  let mut sys = SysBuilder::new("async_call");
   // Create a trivial module.
   let adder = adder_builder(&mut sys);
   // Build the driver module.
@@ -37,8 +37,6 @@ fn async_call() {
   config.idle_threshold = 200;
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
-
-  eir::backend::simulator::elaborate(&sys, &config).unwrap();
 
   run_simulator(
     &sys,

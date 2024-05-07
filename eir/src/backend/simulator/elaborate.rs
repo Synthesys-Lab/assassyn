@@ -20,10 +20,7 @@ use super::utils::{
   array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty, user_contains_opcode,
 };
 
-use self::{
-  ir_printer::IRPrinter,
-  module::memory::{module_is_memory, parse_memory_module_name},
-};
+use self::{ir_printer::IRPrinter, module::memory::parse_memory_module_name};
 
 use super::analysis;
 
@@ -102,7 +99,7 @@ impl Visitor<String> for NodeRefDumper {
         let module_name = namify(node.as_ref::<Module>(sys).unwrap().get_name());
         format!("Box::new(EventKind::Module{})", module_name).into()
       }
-      _ => Some(format!("_{}", node.get_key())),
+      _ => Some(format!("{}", namify(node.to_string(sys).as_str()))),
     }
   }
 }
@@ -608,9 +605,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       format!("{}{};\n", " ".repeat(self.indent), res)
     } else {
       format!(
-        "{}let _{} = {};\n",
+        "{}let {} = {};\n",
         " ".repeat(self.indent),
-        expr.get_key(),
+        namify(expr.upcast().to_string(self.sys).as_str()),
         res
       )
     }
