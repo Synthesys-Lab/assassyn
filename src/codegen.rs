@@ -73,7 +73,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       "pop" => {
         let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
         let a = emit_expr_term(a)?;
-        Ok(quote!(sys.#method_id(#a.clone(), None);))
+        Ok(quote!(sys.#method_id(#a.clone(), None)))
       }
       "valid" | "peek" => {
         let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
@@ -213,8 +213,13 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
   let res: proc_macro2::TokenStream = match inst {
     Statement::Assign((left, right)) => {
       let right: proc_macro2::TokenStream = emit_expr_body(right)?;
-      quote! {
-        let #left = #right;
+      quote_spanned! {
+        left.span() =>
+          let temp = #right;
+          if let Ok(mut expr_mut) = temp.as_mut::<eir::ir::Expr>(sys) {
+            expr_mut.set_name(stringify!(#left).to_string());
+          }
+          let #left = temp;
       }
     }
     Statement::ArrayAssign((aa, right)) => {
@@ -231,7 +236,11 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
       quote! {
         let #id = {
           let ptr = #array_ptr;
-          sys.create_array_read(ptr)
+          let res = sys.create_array_read(ptr);
+          if let Ok(mut expr_mut) = res.as_mut::<eir::ir::Expr>(sys) {
+            expr_mut.set_name(stringify!(#id).to_string());
+          }
+          res
         };
       }
     }
@@ -242,6 +251,9 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
       quote!(
         let #id = {
           #args;
+          if let Ok(mut expr_mut) = bind.as_mut::<eir::ir::Expr>(sys) {
+            expr_mut.set_name(stringify!(#id).to_string());
+          }
           bind
         };
       )

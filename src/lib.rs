@@ -154,5 +154,8 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
   };
 
+  // Open this when the compiler complains about the generated code.
+  // eprintln!("{}", res);
+
   res.into()
 }

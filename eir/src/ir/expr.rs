@@ -19,6 +19,7 @@ pub enum BindKind {
   Unknown,
 }
 
+// TODO(@were): Use delcarative macro to generate the following code.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Opcode {
   // Side-effect operations
@@ -55,13 +56,28 @@ pub enum Opcode {
   Slice,
   Cast,
   Sext,
-  // Level-2 syntax sugar, will be re-written in synthesizable operations
-  SpinTrigger,
   // Non-synthesizable operations
   Log,
 }
 
 impl Opcode {
+  pub fn is_valued(&self) -> bool {
+    if self.is_binary() || self.is_unary() || self.is_cmp() {
+      return true;
+    }
+    match self {
+      Opcode::Load
+      | Opcode::FIFOPop
+      | Opcode::Bind(_)
+      | Opcode::FIFOValid
+      | Opcode::Select
+      | Opcode::Slice
+      | Opcode::Concat
+      | Opcode::Sext
+      | Opcode::Cast => true,
+      _ => false,
+    }
+  }
   pub fn is_binary(&self) -> bool {
     match self {
       Opcode::Add
@@ -107,7 +123,6 @@ impl ToString for Opcode {
       Opcode::Load => "load".into(),
       Opcode::Store => "store".into(),
       Opcode::AsyncCall => "trigger".into(),
-      Opcode::SpinTrigger => "wait_until".into(),
       Opcode::FIFOPush => "push".into(),
       Opcode::FIFOPop => "pop".into(),
       Opcode::FIFOPeek => "peek".into(),
@@ -124,6 +139,7 @@ impl ToString for Opcode {
 }
 
 pub struct Expr {
+  name: Option<String>,
   pub(super) key: usize,
   parent: BaseNode,
   dtype: DataType,
@@ -140,6 +156,7 @@ impl Expr {
     parent: BaseNode,
   ) -> Self {
     Self {
+      name: None,
       key: 0,
       parent,
       dtype,
@@ -155,6 +172,10 @@ impl Expr {
 
   pub fn get_num_operands(&self) -> usize {
     self.operands.len()
+  }
+
+  pub fn get_name(&self) -> Option<&String> {
+    self.name.as_ref()
   }
 }
 
@@ -282,5 +303,20 @@ impl ExprMut<'_> {
 
   pub fn remove_operand(&mut self, i: usize) {
     self.set_operand_impl(i, None);
+  }
+
+  pub fn set_name(&mut self, name: String) {
+    let name = {
+      let module = self
+        .get()
+        .get_parent()
+        .as_ref::<Block>(self.sys)
+        .unwrap()
+        .get_module()
+        .upcast();
+      let mut module_mut = module.as_mut::<Module>(self.sys).unwrap();
+      module_mut.get_mut().symbol_table.identifier(&name)
+    };
+    self.get_mut().name = Some(name);
   }
 }

@@ -13,6 +13,8 @@ use crate::ir::{
 
 use self::{expr::BindKind, user::Operand};
 
+use super::symbol_table::SymbolTable;
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
 
@@ -51,11 +53,11 @@ pub struct SysBuilder {
   /// The name of the system.
   name: String,
   /// The global symbols in this system, including modules and arrays.
-  pub(crate) sym_tab: HashMap<String, BaseNode>,
-  /// The symbol table of this system to handle components with same identifiers.
-  unique_ids: HashMap<String, usize>,
+  pub(crate) global_symbols: HashMap<String, BaseNode>,
   /// The current module to be built.
   pub(crate) inesert_point: InsertPoint,
+  /// The symbol table to maintain the unique identifiers.
+  pub(crate) symbol_table: SymbolTable,
 }
 
 /// The information of an input of a module.
@@ -116,7 +118,7 @@ macro_rules! impl_typed_iter {
     /// Iterate over all the modules of the system.
     pub fn $func_name<'a>(&'a self) -> impl Iterator<Item = $ty_ref<'a>> {
       self
-        .sym_tab
+        .global_symbols
         .iter()
         .filter(|(_, v)| {
           if let NodeKind::$ty = v.get_kind() {
@@ -138,11 +140,11 @@ impl SysBuilder {
   pub fn new(name: &str) -> Self {
     let res = Self {
       name: name.into(),
-      sym_tab: HashMap::new(),
+      global_symbols: HashMap::new(),
       slab: slab::Slab::new(),
       cached_nodes: HashMap::new(),
       inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
-      unique_ids: HashMap::new(),
+      symbol_table: SymbolTable::new(),
     };
     res
   }
@@ -197,7 +199,7 @@ impl SysBuilder {
 
   /// Get the module by its name.
   pub fn get_module<'a>(&'a self, name: &str) -> Option<ModuleRef<'a>> {
-    if let Some(reference) = self.sym_tab.get(name) {
+    if let Some(reference) = self.global_symbols.get(name) {
       reference.as_ref::<Module>(self).unwrap().into()
     } else {
       None
@@ -206,7 +208,7 @@ impl SysBuilder {
 
   /// Get the array by its name.
   pub fn get_array<'a>(&'a self, name: &str) -> Option<ArrayRef<'a>> {
-    if let Some(reference) = self.sym_tab.get(name) {
+    if let Some(reference) = self.global_symbols.get(name) {
       reference.as_ref::<Array>(self).unwrap().into()
     } else {
       None
@@ -497,7 +499,7 @@ impl SysBuilder {
     size: usize,
     init: Option<Vec<BaseNode>>,
   ) -> BaseNode {
-    let array_name = self.identifier(name);
+    let array_name = self.symbol_table.identifier(name);
     if let Some(init) = &init {
       assert_eq!(init.len(), size);
       init.iter().for_each(|x| {
@@ -506,7 +508,7 @@ impl SysBuilder {
     }
     let instance = Array::new(ty.clone(), array_name.clone(), size, init);
     let key = self.insert_element(instance);
-    self.sym_tab.insert(array_name, key.clone());
+    self.global_symbols.insert(array_name, key.clone());
     key
   }
 
@@ -843,30 +845,6 @@ impl SysBuilder {
   pub fn create_sext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     let res = self.create_expr(dest_ty, Opcode::Sext, vec![src], true);
     res
-  }
-
-  /// The helper function to generate a unique identifier.
-  ///
-  /// # Arguments
-  /// * `id` - The original identifier.
-  ///
-  /// # Returns
-  /// The unique identifier.
-  ///
-  // TODO(@were): Overengineer a dedicated module for this later.
-  pub(crate) fn identifier(&mut self, id: &str) -> String {
-    // If the identifier is already in the symbol table, we append a number to it.
-    if let Some(x) = self.unique_ids.get_mut(id.into()) {
-      // Append a number after.
-      let res = format!("{}.{}", id, x);
-      *x += 1;
-      // To avoid user to use the appended identifier, we also insert it into the symbol table.
-      self.unique_ids.insert(res.clone(), 0);
-      return res;
-    }
-    // If not, we just use itself.
-    self.unique_ids.insert(id.into(), 0);
-    id.into()
   }
 
   pub(crate) fn dispose(&mut self, node: BaseNode) {

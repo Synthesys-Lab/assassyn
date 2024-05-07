@@ -350,7 +350,10 @@ impl BaseNode {
         format!("{}[{}]", array.to_string(sys), idx.to_string(sys))
       }
       NodeKind::Expr => {
-        format!("_{}", self.get_key())
+        let expr = self.as_ref::<Expr>(sys).unwrap();
+        expr
+          .get_name()
+          .map_or_else(|| format!("_{}", expr.get_key()), |x| x.clone())
       }
       NodeKind::StrImm => {
         let str_imm = self.as_ref::<StrImm>(sys).unwrap();

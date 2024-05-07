@@ -73,6 +73,12 @@ impl FIFO {
   }
 }
 
+impl FIFOMut<'_> {
+  pub fn set_name(&mut self, name: String) {
+    self.get_mut().name = name;
+  }
+}
+
 impl Typed for FIFO {
   fn dtype(&self) -> DataType {
     DataType::void()

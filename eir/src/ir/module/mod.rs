@@ -3,6 +3,7 @@ pub mod meta;
 
 use std::collections::{HashMap, HashSet};
 
+use crate::builder::symbol_table::SymbolTable;
 use crate::builder::system::PortInfo;
 use crate::builder::SysBuilder;
 use crate::ir::node::*;
@@ -40,6 +41,8 @@ pub struct Module {
   pub(crate) user_set: HashSet<BaseNode>,
   /// The attributes of this module.
   pub(crate) attr: HashSet<Attribute>,
+  /// The symbol table that maintains the unique identifiers.
+  pub(crate) symbol_table: SymbolTable,
 }
 
 impl Module {
@@ -67,6 +70,7 @@ impl Module {
       parameterizable: None,
       user_set: HashSet::new(),
       attr: HashSet::new(),
+      symbol_table: SymbolTable::new(),
     }
   }
 
@@ -326,22 +330,32 @@ impl SysBuilder {
       .into_iter()
       .map(|x| self.insert_element(FIFO::new(&x.ty, x.name.as_str())))
       .collect::<Vec<_>>();
-    let module_name = self.identifier(name);
+    let module_name = self.symbol_table.identifier(name);
     let module = Module::new(&module_name, ports);
     let module = self.insert_element(module);
-    // Set the parents of the inputs after instantiating the parent module.
+    // This part is kinda dirty, since we run into a chicken-egg problem: the port parent cannot
+    // be set before the module is constructed. However, module's constructor accepts the ports
+    // as inputs. The parent of the ports after the module is constructed.
     for i in 0..n_inputs {
-      let input = module
-        .as_ref::<Module>(self)
-        .unwrap()
-        .get_port(i)
-        .unwrap()
-        .upcast();
+      let (input, name) = {
+        let module = module.as_ref::<Module>(self).unwrap();
+        let port = module.get_port(i).unwrap();
+        (port.upcast(), port.get_name().clone())
+      };
+      // Use the symbol table of the module to register the names.
+      let new_name = {
+        let mut module_mut = module.as_mut::<Module>(self).unwrap();
+        module_mut.get_mut().symbol_table.identifier(&name)
+      };
+      assert_eq!(
+        name, new_name,
+        "The names of the ports should be unique! Otherwise, `Module::get_port_by_name` will not work!"
+      );
       let mut fifo_mut = self.get_mut::<FIFO>(&input).unwrap();
       fifo_mut.get_mut().set_parent(module.clone());
       fifo_mut.get_mut().set_idx(i);
     }
-    self.sym_tab.insert(module_name, module.clone());
+    self.global_symbols.insert(module_name, module.clone());
     let body = Block::new(BlockKind::None, module.clone());
     let body = self.insert_element(body);
     self.get_mut::<Module>(&module).unwrap().get_mut().body = body.clone();

@@ -65,7 +65,7 @@ impl SysBuilder {
       PortInfo::new("r", DataType::Module(vec![ty.clone().into()])),
     ];
     let name = name.replace("_", "");
-    let module_name = self.identifier(&format!(
+    let module_name = self.symbol_table.identifier(&format!(
       "__builtin_memory_w{}_d{}_l{}_{}_{}{}{}",
       ty.get_bits(),
       depth,

@@ -216,49 +216,149 @@ impl Visitor<String> for IRPrinter {
 
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
     let mnem = expr.get_opcode().to_string();
-    let res = if expr.get_opcode().is_binary() || expr.get_opcode().is_cmp() {
-      format!(
-        "_{} = {} {} {}",
-        expr.get_key(),
-        expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
-        mnem,
-        expr.get_operand(1).unwrap().get_value().to_string(expr.sys)
-      )
-    } else if expr.get_opcode().is_unary() {
-      format!(
-        "_{} = {} {}",
-        expr.get_key(),
-        mnem,
-        expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
-      )
+    let res = if expr.get_opcode().is_valued() {
+      let rhs = if expr.get_opcode().is_binary() || expr.get_opcode().is_cmp() {
+        format!(
+          "{} {} {}",
+          expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+          mnem,
+          expr.get_operand(1).unwrap().get_value().to_string(expr.sys)
+        )
+      } else if expr.get_opcode().is_unary() {
+        format!(
+          "{} {}",
+          mnem,
+          expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
+        )
+      } else {
+        match expr.get_opcode() {
+          Opcode::Concat => {
+            let a = expr.get_operand(0).unwrap().get_value().to_string(expr.sys);
+            let (b, b_bits) = {
+              let b = expr.get_operand(1).unwrap().get_value().clone();
+              (
+                b.to_string(expr.sys),
+                b.get_dtype(expr.sys).unwrap().get_bits(),
+              )
+            };
+            format!("concat({}, {}) // {} << {} | {}", a, b, a, b_bits, b,)
+          }
+          Opcode::Load => expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+          Opcode::FIFOPop => {
+            // TODO(@were): Support multiple pop.
+            let fifo = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_ref::<FIFO>(expr.sys)
+              .unwrap();
+            let module_name = {
+              let parent = fifo.get_parent();
+              let module = parent.as_ref::<Module>(expr.sys).unwrap();
+              module.get_name().to_string()
+            };
+            let fifo_name = fifo.get_name();
+            format!("{}.{}.pop()", module_name, fifo_name)
+          }
+          Opcode::FIFOPeek | Opcode::FIFOValid => {
+            // TODO(@were): Support multiple peek.
+            let fifo = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_ref::<FIFO>(expr.sys)
+              .unwrap();
+            let module_name = {
+              let parent = fifo.get_parent();
+              let module = parent.as_ref::<Module>(expr.sys).unwrap();
+              module.get_name().to_string()
+            };
+            let fifo_name = fifo.get_name();
+            let method = match expr.get_opcode() {
+              Opcode::FIFOPeek => "peek",
+              Opcode::FIFOValid => "valid",
+              _ => unreachable!(),
+            };
+            format!("{}.{}.{}()", module_name, fifo_name, method)
+          }
+          Opcode::Slice => {
+            format!(
+              "{}[{}:{}]",
+              expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+              expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
+              expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
+            )
+          }
+          Opcode::Cast => {
+            format!(
+              "{}.cast({})",
+              expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+              expr.dtype().to_string()
+            )
+          }
+          Opcode::Sext => {
+            format!(
+              "{}.sext({})",
+              expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+              expr.dtype().to_string()
+            )
+          }
+          Opcode::Select => {
+            format!(
+              "select({}, {}, {})",
+              expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+              expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
+              expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
+            )
+          }
+          Opcode::Bind(_) => {
+            let (callee, arg_n) = {
+              let n = expr.get_num_operands() - 1;
+              (expr.get_operand(n).unwrap().get_value().clone(), n)
+            };
+            let arg_list = expr
+              .operand_iter()
+              .take(arg_n)
+              .enumerate()
+              .map(|(i, v)| {
+                let v = if v.get_value().is_unknown() {
+                  "None".to_string()
+                } else {
+                  v.get_value().to_string(expr.sys)
+                };
+                let arg = match callee.get_kind() {
+                  NodeKind::Module => {
+                    let name = callee
+                      .as_ref::<Module>(expr.sys)
+                      .unwrap()
+                      .get_port(i)
+                      .unwrap()
+                      .get_name()
+                      .to_string();
+                    format!("{}:", name)
+                  }
+                  _ => format!("arg{}", i),
+                };
+                format!("{} {}", arg, v)
+              })
+              .collect::<Vec<String>>()
+              .join(", ");
+            let module_name = match callee.get_kind() {
+              NodeKind::Module => callee
+                .as_ref::<Module>(expr.sys)
+                .unwrap()
+                .get_name()
+                .to_string(),
+              _ => callee.to_string(expr.sys),
+            };
+            format!("bind {} {{ {} }}", module_name, arg_list).into()
+          }
+          _ => panic!("{:?} is NOT a valued opcode!", expr.get_opcode()),
+        }
+      };
+      format!("{} = {}", expr.upcast().to_string(expr.sys), rhs)
     } else {
       match expr.get_opcode() {
-        Opcode::Concat => {
-          let a = expr.get_operand(0).unwrap().get_value().to_string(expr.sys);
-          let (b, b_bits) = {
-            let b = expr.get_operand(1).unwrap().get_value().clone();
-            (
-              b.to_string(expr.sys),
-              b.get_dtype(expr.sys).unwrap().get_bits(),
-            )
-          };
-          format!(
-            "_{} = concat({}, {}) // {} << {} | {}",
-            expr.get_key(),
-            a,
-            b,
-            a,
-            b_bits,
-            b,
-          )
-        }
-        Opcode::Load => {
-          format!(
-            "_{} = {}",
-            expr.get_key(),
-            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
-          )
-        }
         Opcode::Store => {
           format!(
             "{} = {} // handle: _{}",
@@ -271,71 +371,6 @@ impl Visitor<String> for IRPrinter {
           format!(
             "async_call {}",
             expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
-          )
-        }
-        Opcode::SpinTrigger => {
-          let mut res = String::new();
-          self.indent += 2;
-          res.push_str(&format!(
-            "async {{\n{}while !{} {{ }} // DO NOT move on until this is true\n",
-            " ".repeat(self.indent),
-            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
-          ));
-          res.push_str(&format!(
-            "{}call {}(",
-            " ".repeat(self.indent),
-            expr.get_operand(1).unwrap().get_value().to_string(expr.sys)
-          ));
-          for op in expr.operand_iter().skip(2) {
-            res.push_str(&op.get_value().to_string(expr.sys));
-            res.push_str(", ");
-          }
-          res.push_str(")\n");
-          self.indent -= 2;
-          res.push_str(&format!("{}}}", " ".repeat(self.indent)));
-          res
-        }
-        Opcode::FIFOPop => {
-          // TODO(@were): Support multiple pop.
-          let fifo = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<FIFO>(expr.sys)
-            .unwrap();
-          let module_name = {
-            let parent = fifo.get_parent();
-            let module = parent.as_ref::<Module>(expr.sys).unwrap();
-            module.get_name().to_string()
-          };
-          let fifo_name = fifo.get_name();
-          format!("_{} = {}.{}.pop()", expr.get_key(), module_name, fifo_name)
-        }
-        Opcode::FIFOPeek | Opcode::FIFOValid => {
-          // TODO(@were): Support multiple peek.
-          let fifo = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<FIFO>(expr.sys)
-            .unwrap();
-          let module_name = {
-            let parent = fifo.get_parent();
-            let module = parent.as_ref::<Module>(expr.sys).unwrap();
-            module.get_name().to_string()
-          };
-          let fifo_name = fifo.get_name();
-          let method = match expr.get_opcode() {
-            Opcode::FIFOPeek => "peek",
-            Opcode::FIFOValid => "valid",
-            _ => unreachable!(),
-          };
-          format!(
-            "_{} = {}.{}.{}()",
-            expr.get_key(),
-            module_name,
-            fifo_name,
-            method
           )
         }
         Opcode::FIFOPush => {
@@ -358,88 +393,6 @@ impl Visitor<String> for IRPrinter {
           }
           res.push(')');
           res
-        }
-        Opcode::Slice => {
-          format!(
-            "_{} = {}[{}:{}]",
-            expr.get_key(),
-            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
-            expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
-            expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
-          )
-        }
-        Opcode::Cast => {
-          format!(
-            "_{} = {}.cast({})",
-            expr.get_key(),
-            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
-            expr.dtype().to_string()
-          )
-        }
-        Opcode::Sext => {
-          format!(
-            "_{} = {}.sext({})",
-            expr.get_key(),
-            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
-            expr.dtype().to_string()
-          )
-        }
-        Opcode::Select => {
-          format!(
-            "_{} = select({}, {}, {})",
-            expr.get_key(),
-            expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
-            expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
-            expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
-          )
-        }
-        Opcode::Bind(_) => {
-          let (callee, arg_n) = {
-            let n = expr.get_num_operands() - 1;
-            (expr.get_operand(n).unwrap().get_value().clone(), n)
-          };
-          let arg_list = expr
-            .operand_iter()
-            .take(arg_n)
-            .enumerate()
-            .map(|(i, v)| {
-              let v = if v.get_value().is_unknown() {
-                "None".to_string()
-              } else {
-                v.get_value().to_string(expr.sys)
-              };
-              let arg = match callee.get_kind() {
-                NodeKind::Module => {
-                  let name = callee
-                    .as_ref::<Module>(expr.sys)
-                    .unwrap()
-                    .get_port(i)
-                    .unwrap()
-                    .get_name()
-                    .to_string();
-                  format!("{}:", name)
-                }
-                _ => format!("arg{}", i),
-              };
-              format!("{} {}", arg, v)
-            })
-            .collect::<Vec<String>>()
-            .join(", ");
-          let module_name = match callee.get_kind() {
-            NodeKind::Module => callee
-              .as_ref::<Module>(expr.sys)
-              .unwrap()
-              .get_name()
-              .to_string(),
-            _ => callee.to_string(expr.sys),
-          };
-          format!(
-            "_{} = bind {} {{ {} }}",
-            expr.get_key(),
-            module_name,
-            arg_list
-          )
-          .into()
         }
         _ => {
           panic!("Unimplemented opcode: {:?}", expr.get_opcode());
