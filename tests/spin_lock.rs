@@ -27,8 +27,7 @@ fn spin_lock() {
     driver(spin_agent, lock)() {
       cnt = array(int<32>, 1);
       v = cnt[0];
-      and_1 = v.bitwise_and(1);
-      is_odd = and_1.eq(1);
+      is_odd = v.slice(0, 1);
       is_even = is_odd.flip();
       v = v.add(1);
       cnt[0] = v;
@@ -73,7 +72,7 @@ fn spin_lock() {
         if l.contains("agent move on") {
           let (cycle, _) = parse_cycle(l);
           assert!(
-            cycle % 4 == 1 || cycle % 4 == 2,
+            cycle % 4 == 1 || cycle % 4 == 3,
             "agent move on {} % 4 = {}",
             cycle,
             cycle % 4
@@ -81,7 +80,7 @@ fn spin_lock() {
         }
         if l.contains("squarer") {
           let (cycle, _) = parse_cycle(l);
-          assert!(cycle % 4 == 2 || cycle % 4 == 3, "{}", l);
+          assert!(cycle % 4 == 2 || cycle % 4 == 0, "{}", l);
         }
         false
       },

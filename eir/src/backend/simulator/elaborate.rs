@@ -449,7 +449,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             .get_value();
           format!(
             "{{
-              let a = ValueCastTo::<BigUint>::cast(&{});
+              let a = ValueCastTo::<BigUint>::cast(&({} as u64));
               let mask = BigUint::parse_bytes(\"{}\".as_bytes(), 2).unwrap();
               let res = (a >> {}) & mask;
               ValueCastTo::<{}>::cast(&res)
@@ -505,7 +505,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           {
             // perform zero extension
             format!(
-              "ValueCastTo::<{}>::cast(ValueCastTo::<{}>::cast(&{}))",
+              "ValueCastTo::<{}>::cast(&ValueCastTo::<{}>::cast(&{}))",
               dtype_to_rust_type(&dest_dtype),
               dtype_to_rust_type(&src_dtype).replace("i", "u"),
               a,
@@ -744,6 +744,9 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
         "impl ValueCastTo<{}> for BigInt {{
             fn cast(&self) -> {} {{
               let (sign, data) = self.to_u64_digits();
+              if data.is_empty() {{
+                return 0;
+              }}
               match sign {{
                 num_bigint::Sign::Plus => data[0] as {},
                 num_bigint::Sign::Minus => ((!data[0] + 1) & ({}::MAX as u64)) as {},
@@ -755,7 +758,14 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       ));
       res.push_str(&format!(
         "impl ValueCastTo<{}> for BigUint {{
-            fn cast(&self) -> {} {{ self.to_u64_digits()[0] as {} }}
+            fn cast(&self) -> {} {{
+              let data = self.to_u64_digits();
+              if data.is_empty() {{
+                return 0;
+              }} else {{
+                return data[0] as {};
+              }}
+            }}
           }}\n",
         src_ty, src_ty, src_ty
       ));
