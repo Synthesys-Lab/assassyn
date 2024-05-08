@@ -37,14 +37,6 @@ macro_rules! find_opcode_attr {
 macro_rules! register_opcodes {
   ( $( $opcode:ident ( $mn:literal ) => { $($ky:ident),* } ),* $(,)? ) => {
 
-    struct __OpcodeInfo {
-      side_effect: bool,
-      binary: bool,
-      unary: bool,
-      cmp: bool,
-      valued: bool,
-    }
-
     #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
     pub enum Opcode {
       $( $opcode ),*
