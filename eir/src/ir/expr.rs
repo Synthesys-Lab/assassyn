@@ -6,6 +6,7 @@ use crate::ir::node::IsElement;
 use crate::ir::*;
 
 use self::{
+  instructions::AsExpr,
   node::{ExprMut, ExprRef, OperandRef, Parented},
   user::Operand,
 };
@@ -22,6 +23,7 @@ pub enum BindKind {
 // TODO(@were): Use delcarative macro to generate the following code.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Opcode {
+  GetElementPtr,
   // Side-effect operations
   Load,
   Store,
@@ -67,6 +69,7 @@ impl Opcode {
     }
     match self {
       Opcode::Load
+      | Opcode::GetElementPtr
       | Opcode::FIFOPop
       | Opcode::Bind(_)
       | Opcode::FIFOValid
@@ -134,6 +137,7 @@ impl ToString for Opcode {
       Opcode::Select => "select".into(),
       Opcode::Bind(_) => "".into(),
       Opcode::Concat => "concat".into(),
+      Opcode::GetElementPtr => "gep".into(),
     }
   }
 }
@@ -192,6 +196,12 @@ impl Parented for Expr {
 
   fn set_parent(&mut self, parent: BaseNode) {
     self.parent = parent;
+  }
+}
+
+impl<'a> ExprRef<'a> {
+  pub fn as_sub<T: AsExpr<'a>>(self) -> Result<T, String> {
+    T::downcast(self)
   }
 }
 

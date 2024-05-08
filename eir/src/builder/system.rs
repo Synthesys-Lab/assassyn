@@ -4,6 +4,7 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use crate::ir::{
   bind::{as_bind_expr, get_bind_callee, is_fully_bound},
+  instructions::gep::GetElementPtr,
   ir_printer::IRPrinter,
   module::Attribute,
   node::*,
@@ -355,14 +356,13 @@ impl SysBuilder {
       DataType::Int(_) | DataType::UInt(_) => {}
       _ => panic!("Invalid index type"),
     }
-    let cached_key = CacheKey::ArrayPtr((array.clone(), idx.clone()));
-    if let Some(cached) = self.cached_nodes.get(&cached_key) {
-      return cached.clone();
-    }
-    let instance = ArrayPtr::new(array.clone(), idx.clone());
-    let key = self.insert_element(instance);
-    self.cached_nodes.insert(cached_key, key.clone());
-    key
+    let res = self.create_expr(
+      DataType::void(),
+      Opcode::GetElementPtr,
+      vec![array, idx],
+      true,
+    );
+    res
   }
 
   pub fn create_log(&mut self, fmt: BaseNode, mut args: Vec<BaseNode>) -> BaseNode {
@@ -706,8 +706,12 @@ impl SysBuilder {
   /// * `ptr` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
   pub fn create_array_read<'elem>(&mut self, ptr: BaseNode) -> BaseNode {
-    let array = self.get::<ArrayPtr>(&ptr).unwrap().get_array().clone();
-    let dtype = self.get::<Array>(&array).unwrap().scalar_ty().clone();
+    let (array, dtype) = {
+      let gep = ptr.as_expr::<GetElementPtr>(self).unwrap();
+      let array = gep.get_array();
+      let dtype = array.scalar_ty();
+      (array.upcast(), dtype)
+    };
     let res = self.create_expr(dtype, Opcode::Load, vec![ptr.clone()], true);
     self.insert_external_interface(array.clone(), res.clone(), 0);
     res
@@ -720,7 +724,13 @@ impl SysBuilder {
   /// * `value` - The value to be written.
   /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
   pub fn create_array_write(&mut self, ptr: BaseNode, value: BaseNode) -> BaseNode {
-    let array = self.get::<ArrayPtr>(&ptr).unwrap().get_array().clone();
+    let array = {
+      let gep = ptr.as_expr::<GetElementPtr>(self).unwrap();
+      let array = gep.get_array();
+      let dtype = array.scalar_ty();
+      assert_eq!(value.get_dtype(self).unwrap(), dtype);
+      array.upcast()
+    };
     let operands = vec![ptr.clone(), value.clone()];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands, true);
     self.insert_external_interface(array, res.clone(), 0);

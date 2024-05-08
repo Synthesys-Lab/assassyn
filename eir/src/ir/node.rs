@@ -3,6 +3,7 @@ use std::ops::Deref;
 use crate::builder::SysBuilder;
 use crate::ir::*;
 
+use self::instructions::AsExpr;
 use self::user::Operand;
 
 use super::super::ir::visitor::Visitor;
@@ -219,7 +220,7 @@ macro_rules! register_elements {
   };
 }
 
-register_elements!(Module, FIFO, Expr, Array, IntImm, Block, ArrayPtr, StrImm, Operand);
+register_elements!(Module, FIFO, Expr, Array, IntImm, Block, StrImm, Operand);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
 pub struct BaseNode {
@@ -231,7 +232,6 @@ pub struct BaseNode {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum CacheKey {
   IntImm((DataType, u64)),
-  ArrayPtr((BaseNode, BaseNode)),
 }
 
 impl BaseNode {
@@ -273,7 +273,7 @@ impl BaseNode {
         let expr = self.as_ref::<Expr>(sys).unwrap();
         expr.dtype().clone().into()
       }
-      NodeKind::Block | NodeKind::ArrayPtr => None,
+      NodeKind::Block => None,
       NodeKind::StrImm => {
         let str_imm = self.as_ref::<StrImm>(sys).unwrap();
         str_imm.dtype().clone().into()
@@ -295,7 +295,6 @@ impl BaseNode {
       NodeKind::Array => None,
       NodeKind::IntImm => None,
       NodeKind::StrImm => None,
-      NodeKind::ArrayPtr => None,
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
@@ -324,6 +323,16 @@ impl BaseNode {
   ) -> Result<T::Mutator, String> {
     T::mutator(sys, self.clone())
   }
+
+  pub fn as_expr<'elem, 'sys: 'elem, T: AsExpr<'elem>>(
+    &self,
+    sys: &'sys SysBuilder,
+  ) -> Result<T, String> {
+    match self.get_kind() {
+      NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().as_sub::<T>(),
+      _ => Err(format!("{:?} is NOT an expression", self)),
+    }
+  }
 }
 
 impl BaseNode {
@@ -342,12 +351,6 @@ impl BaseNode {
       NodeKind::Block => {
         let block = self.as_ref::<Block>(sys).unwrap();
         IRPrinter::new(false).visit_block(&block).unwrap()
-      }
-      NodeKind::ArrayPtr => {
-        let handle = self.as_ref::<ArrayPtr>(sys).unwrap();
-        let array = handle.get_array();
-        let idx = handle.get_idx();
-        format!("{}[{}]", array.to_string(sys), idx.to_string(sys))
       }
       NodeKind::Expr => {
         let expr = self.as_ref::<Expr>(sys).unwrap();

@@ -20,7 +20,9 @@ use super::utils::{
   array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty, user_contains_opcode,
 };
 
-use self::{ir_printer::IRPrinter, module::memory::parse_memory_module_name};
+use self::{
+  instructions::gep::GetElementPtr, ir_printer::IRPrinter, module::memory::parse_memory_module_name,
+};
 
 use super::analysis;
 
@@ -339,33 +341,33 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     } else {
       match expr.get_opcode() {
         Opcode::Load => {
-          let handle = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<ArrayPtr>(expr.sys)
-            .unwrap();
+          let (array, idx) = {
+            let gep = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_expr::<GetElementPtr>(expr.sys)
+              .unwrap();
+            (gep.get_array(), gep.get_index())
+          };
           format!(
             "{}[{} as usize].clone()",
-            NodeRefDumper
-              .dispatch(expr.sys, &handle.get_array(), vec![])
-              .unwrap(),
-            NodeRefDumper
-              .dispatch(expr.sys, &handle.get_idx(), vec![])
-              .unwrap()
+            namify(array.get_name()),
+            NodeRefDumper.dispatch(expr.sys, &idx, vec![]).unwrap()
           )
         }
         Opcode::Store => {
-          let handle = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<ArrayPtr>(expr.sys)
-            .unwrap();
-          let array = handle.get_array();
-          let slab_idx = *self.slab_cache.get(&array).unwrap();
-          let array = array.as_ref::<Array>(expr.sys).unwrap();
-          let idx = dump_ref!(expr.sys, handle.get_idx());
+          let (array, idx) = {
+            let gep = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_expr::<GetElementPtr>(expr.sys)
+              .unwrap();
+            (gep.get_array(), gep.get_index())
+          };
+          let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
+          let idx = dump_ref!(expr.sys, &idx);
           let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
           let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
           let aid = array_ty_to_id(&scalar_ty, size);
@@ -381,6 +383,12 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             }))
           }
           .to_string()
+        }
+        Opcode::GetElementPtr => {
+          format!(
+            "\n// To be generated in its load/store user\n// GEP: {}\n",
+            IRPrinter::new(false).visit_expr(&expr).unwrap()
+          )
         }
         Opcode::AsyncCall => {
           let to_trigger = if let Ok(module) = {

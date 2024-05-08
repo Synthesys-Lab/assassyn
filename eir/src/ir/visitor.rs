@@ -49,10 +49,6 @@ pub trait Visitor<T> {
     None
   }
 
-  fn visit_handle(&mut self, _: &ArrayPtrRef<'_>) -> Option<T> {
-    None
-  }
-
   fn enter(&mut self, sys: &SysBuilder) -> Option<T> {
     for elem in sys.module_iter() {
       let res = self.visit_module(&elem);
@@ -82,7 +78,6 @@ pub trait Visitor<T> {
       NodeKind::FIFO => self.visit_input(&node.as_ref::<FIFO>(sys).unwrap()),
       NodeKind::Array => self.visit_array(&node.as_ref::<Array>(sys).unwrap()),
       NodeKind::IntImm => self.visit_int_imm(&node.as_ref::<IntImm>(sys).unwrap()),
-      NodeKind::ArrayPtr => self.visit_handle(&node.as_ref::<ArrayPtr>(sys).unwrap()),
       NodeKind::StrImm => self.visit_string_imm(&node.as_ref::<StrImm>(sys).unwrap()),
       NodeKind::Operand => self.visit_operand(&node.as_ref::<Operand>(sys).unwrap()),
       NodeKind::Unknown => {

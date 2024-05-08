@@ -187,34 +187,6 @@ impl IntImm {
   }
 }
 
-/// Handle is like a "pointer" to an array element.
-/// It is similar to LLVM's `GetElementPtrInst`, but 1-d.
-pub struct ArrayPtr {
-  pub(crate) key: usize,
-  /// The array to be accessed.
-  array: BaseNode,
-  /// The index of the array.
-  idx: BaseNode,
-}
-
-impl ArrayPtr {
-  pub fn new(array: BaseNode, idx: BaseNode) -> Self {
-    Self { key: 0, array, idx }
-  }
-
-  pub fn get_array(&self) -> &BaseNode {
-    &self.array
-  }
-
-  pub fn get_idx(&self) -> &BaseNode {
-    &self.idx
-  }
-
-  pub fn is_const(&self) -> bool {
-    self.get_idx().get_kind() == NodeKind::IntImm
-  }
-}
-
 pub struct Array {
   pub(crate) key: usize,
   name: String,

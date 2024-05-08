@@ -10,7 +10,7 @@ use crate::{
   ir::{module::memory::parse_memory_module_name, node::*, visitor::Visitor, *},
 };
 
-use self::bind::get_bind_callee;
+use self::{bind::get_bind_callee, instructions::gep::GetElementPtr};
 
 fn namify(name: &str) -> String {
   name.replace(".", "_")
@@ -1272,31 +1272,37 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         }
 
         Opcode::Load => {
-          let array_ptr = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<ArrayPtr>(self.sys)
-            .unwrap();
-          let array_ref = &array_ptr.get_array().as_ref::<Array>(self.sys).unwrap();
+          let (array_ref, array_idx) = {
+            let gep = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_expr::<GetElementPtr>(self.sys)
+              .unwrap();
+            (gep.get_array(), gep.get_index())
+          };
           Some(format!(
             "logic [{}:0] {};\nassign {} = array_{}_q[{}];\n\n",
             expr.dtype().get_bits() - 1,
             namify(expr.upcast().to_string(self.sys).as_str()),
             namify(expr.upcast().to_string(self.sys).as_str()),
             namify(array_ref.get_name()),
-            dump_ref!(self.sys, array_ptr.get_idx())
+            dump_ref!(self.sys, &array_idx)
           ))
         }
 
+        Opcode::GetElementPtr => Some("".into()),
+
         Opcode::Store => {
-          let array_ptr = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<ArrayPtr>(self.sys)
-            .unwrap();
-          let array_ref = &array_ptr.get_array().as_ref::<Array>(self.sys).unwrap();
+          let (array_ref, array_idx) = {
+            let gep = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_expr::<GetElementPtr>(self.sys)
+              .unwrap();
+            (gep.get_array(), gep.get_index())
+          };
           let array_name = namify(array_ref.get_name());
           match self.array_drivers.get_mut(&array_name) {
             Some(ads) => {
@@ -1316,7 +1322,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             array_name,
             dump_ref!(self.sys, expr.get_operand(1).unwrap().get_value()),
             array_name,
-            dump_ref!(self.sys, array_ptr.get_idx())
+            dump_ref!(self.sys, &array_idx)
           ))
         }
 

@@ -232,6 +232,16 @@ impl Visitor<String> for IRPrinter {
         )
       } else {
         match expr.get_opcode() {
+          Opcode::GetElementPtr => {
+            let array = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_ref::<Array>(expr.sys)
+              .unwrap();
+            let idx = expr.get_operand(1).unwrap().get_value().to_string(expr.sys);
+            format!("&{}[{}]", array.get_name(), idx)
+          }
           Opcode::Concat => {
             let a = expr.get_operand(0).unwrap().get_value().to_string(expr.sys);
             let (b, b_bits) = {
