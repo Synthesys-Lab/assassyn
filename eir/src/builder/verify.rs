@@ -21,10 +21,48 @@ impl Operand {
   }
 }
 
-struct Verifier;
+struct Verifier {
+  in_wait_until_cond: bool,
+}
+
+impl Verifier {
+  fn new() -> Self {
+    Self {
+      in_wait_until_cond: false,
+    }
+  }
+}
 
 impl Visitor<()> for Verifier {
+  fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<()> {
+    if let BlockKind::WaitUntil(cond) = block.get_kind() {
+      if let Ok(cond) = cond.as_ref::<Block>(block.sys) {
+        assert!(
+          cond.get_value().is_some(),
+          "WaitUntil condition must be a valued block!"
+        );
+        self.in_wait_until_cond = true;
+        for elem in cond.iter() {
+          self.dispatch(block.sys, &elem, vec![]);
+        }
+        self.in_wait_until_cond = false;
+      } else {
+        panic!("WaitUntil condition must be a valued block!");
+      }
+    }
+    for expr in block.iter() {
+      self.dispatch(block.sys, &expr, vec![]);
+    }
+    ().into()
+  }
+
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
+    if self.in_wait_until_cond {
+      assert!(
+        !expr.get_opcode().has_side_effect(),
+        "WaitUntil operations should have no side effects!"
+      );
+    }
     for user in expr.users().iter() {
       let operand = user.as_ref::<Operand>(expr.sys).unwrap();
       assert!(operand.get_value().eq(&expr.upcast()));
@@ -92,6 +130,6 @@ pub fn verify(sys: &SysBuilder) {
       user.as_ref::<Operand>(sys).unwrap().verify(sys);
     }
     let body = m.get_body();
-    Verifier.visit_block(&body);
+    Verifier::new().visit_block(&body);
   }
 }
