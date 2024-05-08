@@ -11,6 +11,12 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
+      - name: Install verilator
+        run: |
+          sudo apt-get install -y git help2man perl python3 make autoconf g++ flex bison ccache \
+            libunwind-dev libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev;
+          git clone https://github.com/verilator/verilator && cd verilator && git checkout stable;
+          autoconf && ./configure && make -j `nproc` && sudo make install;
       - uses: actions/checkout@v3
         with: 
           ref: ${{ github.head_ref }}
@@ -35,3 +41,6 @@ jobs:
       - name: Generate test result
         run: |
           cargo test;
+      - name: Lint the generated sv codes
+        run: |
+          find /tmp/*.sv -print0 | xargs -0 -n1 sh -c 'verilator --lint-only --bbox-sys --timing $0 || exit 255';
