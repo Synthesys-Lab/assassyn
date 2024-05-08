@@ -168,8 +168,9 @@ impl<'a> VerilogDumper<'a> {
     res.push_str("always_ff @(posedge clk or negedge rst_n)");
     res.push_str(
       format!(
-        "if (!rst_n) array_{}_q <= '{{default : 4'h0}};\n",
+        "if (!rst_n) array_{}_q <= '{{default : {}'d0}};\n",
         array_name,
+        array.scalar_ty().get_bits()
       )
       .as_str(),
     );
@@ -177,6 +178,8 @@ impl<'a> VerilogDumper<'a> {
       " else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
       array_name, array_name, array_name, array_name
     ));
+
+    res.push_str("\n");
 
     res
   }
