@@ -990,36 +990,40 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         .as_str(),
       );
     } else {
-      let mut body_waituntil_cnt = 0;
       let mut wait_until: Option<String> = None;
 
-      for elem in module.get_body().iter().skip(1) {
-        match elem.get_kind() {
-          NodeKind::Expr => break,
-          NodeKind::Block => {
-            let block = elem.as_ref::<Block>(self.sys).unwrap();
-            if let BlockKind::WaitUntil(cond) = block.get_kind() {
-              body_waituntil_cnt += 1;
-              let cond = cond.as_ref::<Expr>(self.sys).unwrap();
-              wait_until = Some(format!(
-                " && ({}{})",
-                namify(cond.upcast().to_string(self.sys).as_str()),
-                if cond.dtype().get_bits() == 1 {
-                  "".into()
-                } else {
-                  format!(" != 0")
+      if let BlockKind::WaitUntil(cond) = module.get_body().get_kind() {
+        let cond_block = cond.as_ref::<Block>(self.sys).unwrap();
+        match cond_block.get_kind() {
+          BlockKind::Valued(value_node) => {
+            for elem in cond_block.iter() {
+              match elem.get_kind() {
+                NodeKind::Expr => {
+                  let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+                  res.push_str(self.visit_expr(&expr).unwrap().as_str());
                 }
-              ));
+                NodeKind::Block => {
+                  let block = elem.as_ref::<Block>(self.sys).unwrap();
+                  res.push_str(self.visit_block(&block).unwrap().as_str());
+                }
+                _ => {
+                  panic!("Unexpected reference type: {:?}", elem);
+                }
+              }
             }
+            let value = value_node.as_ref::<Expr>(self.sys).unwrap();
+            wait_until = Some(format!(
+              " && ({}{})",
+              namify(value_node.to_string(self.sys).as_str()),
+              if value.dtype().get_bits() == 1 {
+                "".into()
+              } else {
+                format!(" != 0")
+              }
+            ));
           }
-          _ => {
-            panic!("Unexpected reference type: {:?}", elem);
-          }
+          _ => panic!("Expect valued block for wait_until condition"),
         }
-      }
-
-      if body_waituntil_cnt > 1 {
-        panic!("multiple wait_until blocks in {}", module.get_name());
       }
 
       res.push_str(format!("logic trigger;\n").as_str());
@@ -1388,6 +1392,22 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           Some(format!(
             "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\n\n",
             fifo.scalar_ty().get_bits() - 1,
+            namify(expr.upcast().to_string(self.sys).as_str()),
+            namify(expr.upcast().to_string(self.sys).as_str()),
+            fifo_name
+          ))
+        }
+
+        Opcode::FIFOValid => {
+          let fifo = expr
+            .get_operand(0)
+            .unwrap()
+            .get_value()
+            .as_ref::<FIFO>(self.sys)
+            .unwrap();
+          let fifo_name = fifo_name!(fifo);
+          Some(format!(
+            "logic {};\nassign {} = fifo_{}_pop_valid;\n\n",
             namify(expr.upcast().to_string(self.sys).as_str()),
             namify(expr.upcast().to_string(self.sys).as_str()),
             fifo_name
