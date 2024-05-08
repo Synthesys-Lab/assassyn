@@ -20,33 +20,17 @@ pub enum BindKind {
   Unknown,
 }
 
-macro_rules! parse_opcode_info {
-  ( $mn:literal $($ky:ident),* ) => {
-    {
-      let mut res = __OpcodeInfo {
-        mnmonic: $mn,
-        side_effect: false,
-        binary: false,
-        unary: false,
-        cmp: false,
-        valued: false,
-      };
-      parse_opcode_info!(@parse res ; $($ky),*);
-      res
-    }
+macro_rules! find_opcode_attr {
+  ( $target:ident; $($ky:ident),* ) => {
+    find_opcode_attr!(@find $target ; $($ky),*)
   };
 
-  (@parse $res:ident ; $first:ident, $($rest:ident),*) => {
-    {
-      $res.$first = true;
-      parse_opcode_info!(@parse $res ; $($rest),*)
-    }
+  (@find $target:ident ; $first:ident, $($rest:ident),*) => {
+    stringify!($target) == stringify!($first) || find_opcode_attr!(@find $target ; $($rest),*)
   };
 
-  (@parse $res:expr ; $ky:ident) => {
-    {
-      $res.$ky = true
-    }
+  (@find $target:expr ; $ky:ident) => {
+    stringify!($target) == stringify!($ky)
   };
 }
 
@@ -59,7 +43,6 @@ macro_rules! register_opcodes {
       unary: bool,
       cmp: bool,
       valued: bool,
-      mnmonic: &'static str,
     }
 
     #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -70,7 +53,7 @@ macro_rules! register_opcodes {
     impl ToString for Opcode {
       fn to_string(&self) -> String {
         match self {
-          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).mnmonic.into() ),*
+          $( Opcode::$opcode => $mn.into() ),*
         }
       }
     }
@@ -78,27 +61,27 @@ macro_rules! register_opcodes {
     impl Opcode {
       pub fn is_valued(&self) -> bool {
         match self {
-          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).valued ),*
+          $( Opcode::$opcode => find_opcode_attr!(valued; $($ky),*) ),*
         }
       }
       pub fn is_cmp(&self) -> bool {
         match self {
-          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).cmp ),*
+          $( Opcode::$opcode => find_opcode_attr!(cmp; $($ky),*) ),*
         }
       }
       pub fn is_binary(&self) -> bool {
         match self {
-          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).binary ),*
+          $( Opcode::$opcode => find_opcode_attr!(binary; $($ky),*) ),*
         }
       }
       pub fn is_unary(&self) -> bool {
         match self {
-          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).unary ),*
+          $( Opcode::$opcode => find_opcode_attr!(unary; $($ky),*) ),*
         }
       }
       pub fn has_side_effect(&self) -> bool {
         match self {
-          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).side_effect ),*
+          $( Opcode::$opcode => find_opcode_attr!(side_effect; $($ky),*) ),*
         }
       }
 

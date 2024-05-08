@@ -718,7 +718,14 @@ impl SysBuilder {
       let gep = ptr.as_expr::<GetElementPtr>(self).unwrap();
       let array = gep.get_array();
       let dtype = array.scalar_ty();
-      assert_eq!(value.get_dtype(self).unwrap(), dtype);
+      assert_eq!(
+        value.get_dtype(self).unwrap(),
+        dtype,
+        "Cannot write {:?} with type {:?} to an array with type {:?}",
+        value.to_string(self),
+        value.get_dtype(self).unwrap(),
+        dtype
+      );
       array.upcast()
     };
     let operands = vec![ptr.clone(), value.clone()];
