@@ -21,7 +21,7 @@ use super::utils::{
 };
 
 use self::{
-  instructions::gep::GetElementPtr, ir_printer::IRPrinter, module::memory::parse_memory_module_name,
+  instructions::GetElementPtr, ir_printer::IRPrinter, module::memory::parse_memory_module_name,
 };
 
 use super::analysis;

@@ -31,8 +31,6 @@ fn common_read() {
 
   eir::builder::verify(&sys);
   println!("{}", sys);
-  eir::xform::common_read::unify_common_reads(&mut sys);
-  println!("{}", sys);
 
   let mut config = eir::backend::common::Config::default();
   config.sim_threshold = 200;

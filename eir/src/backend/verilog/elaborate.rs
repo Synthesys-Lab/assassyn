@@ -10,7 +10,7 @@ use crate::{
   ir::{module::memory::parse_memory_module_name, node::*, visitor::Visitor, *},
 };
 
-use self::{bind::get_bind_callee, instructions::gep::GetElementPtr};
+use self::{bind::get_bind_callee, instructions::GetElementPtr};
 
 fn namify(name: &str) -> String {
   name.replace(".", "_")

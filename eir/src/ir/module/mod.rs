@@ -9,7 +9,7 @@ use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
-use self::instructions::gep::GetElementPtr;
+use self::instructions::GetElementPtr;
 use self::user::Operand;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

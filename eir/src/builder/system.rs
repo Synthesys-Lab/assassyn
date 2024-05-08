@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use crate::ir::{
   bind::{as_bind_expr, get_bind_callee, is_fully_bound},
-  instructions::gep::GetElementPtr,
+  instructions::GetElementPtr,
   ir_printer::IRPrinter,
   module::Attribute,
   node::*,

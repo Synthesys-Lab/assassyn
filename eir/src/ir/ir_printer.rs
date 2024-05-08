@@ -253,7 +253,12 @@ impl Visitor<String> for IRPrinter {
             };
             format!("concat({}, {}) // {} << {} | {}", a, b, a, b_bits, b,)
           }
-          Opcode::Load => expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+          Opcode::Load => {
+            format!(
+              "*{}",
+              expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
+            )
+          }
           Opcode::FIFOPop => {
             // TODO(@were): Support multiple pop.
             let fifo = expr
@@ -371,7 +376,7 @@ impl Visitor<String> for IRPrinter {
       match expr.get_opcode() {
         Opcode::Store => {
           format!(
-            "{} = {} // handle: _{}",
+            "*{} = {} // handle: _{}",
             expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
             expr.get_operand(1).unwrap().get_value().to_string(expr.sys),
             expr.get_key()

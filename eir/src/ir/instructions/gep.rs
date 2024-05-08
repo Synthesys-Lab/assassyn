@@ -1,13 +1,9 @@
 use crate::ir::{
-  node::{ArrayRef, BaseNode, ExprRef, NodeKind},
-  Array, Opcode,
+  node::{ArrayRef, BaseNode, NodeKind},
+  Array,
 };
 
-use super::AsExpr;
-
-pub struct GetElementPtr<'a> {
-  expr: ExprRef<'a>,
-}
+use super::GetElementPtr;
 
 impl<'a> GetElementPtr<'a> {
   pub fn get_array(&self) -> ArrayRef<'a> {
@@ -28,19 +24,6 @@ impl<'a> GetElementPtr<'a> {
     match self.expr.get_operand(1).unwrap().get_value().get_kind() {
       NodeKind::IntImm => true,
       _ => false,
-    }
-  }
-}
-
-impl<'a> AsExpr<'a> for GetElementPtr<'a> {
-  fn downcast(expr: ExprRef<'a>) -> Result<Self, String> {
-    if expr.get_opcode() == Opcode::GetElementPtr {
-      Ok(GetElementPtr { expr })
-    } else {
-      Err(format!(
-        "Expecting Opcode::GetElementPtr, but got {:?}",
-        expr.get_opcode().to_string()
-      ))
     }
   }
 }
