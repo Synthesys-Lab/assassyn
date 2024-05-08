@@ -1288,6 +1288,18 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
               .unwrap();
             (gep.get_array(), gep.get_index())
           };
+          let array_name = namify(array_ref.get_name());
+          match self.array_drivers.get_mut(&array_name) {
+            Some(ads) => {
+              ads.insert(self.current_module.clone());
+            }
+            None => {
+              self.array_drivers.insert(
+                array_name.clone(),
+                HashSet::from([self.current_module.clone()]),
+              );
+            }
+          }
           Some(format!(
             "logic [{}:0] {};\nassign {} = array_{}_q[{}];\n\n",
             expr.dtype().get_bits() - 1,
