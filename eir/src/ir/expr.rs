@@ -20,127 +20,132 @@ pub enum BindKind {
   Unknown,
 }
 
-// TODO(@were): Use delcarative macro to generate the following code.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum Opcode {
-  GetElementPtr,
-  // Side-effect operations
-  Load,
-  Store,
+macro_rules! parse_opcode_info {
+  ( $mn:literal $($ky:ident),* ) => {
+    {
+      let mut res = __OpcodeInfo {
+        mnmonic: $mn,
+        side_effect: false,
+        binary: false,
+        unary: false,
+        cmp: false,
+        valued: false,
+      };
+      parse_opcode_info!(@parse res ; $($ky),*);
+      res
+    }
+  };
+
+  (@parse $res:ident ; $first:ident, $($rest:ident),*) => {
+    {
+      $res.$first = true;
+      parse_opcode_info!(@parse $res ; $($rest),*)
+    }
+  };
+
+  (@parse $res:expr ; $ky:ident) => {
+    {
+      $res.$ky = true
+    }
+  };
+}
+
+macro_rules! register_opcodes {
+  ( $( $opcode:ident ( $mn:literal ) => { $($ky:ident),* } ),* $(,)? ) => {
+
+    struct __OpcodeInfo {
+      side_effect: bool,
+      binary: bool,
+      unary: bool,
+      cmp: bool,
+      valued: bool,
+      mnmonic: &'static str,
+    }
+
+    #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+    pub enum Opcode {
+      $( $opcode ),*
+    }
+
+    impl ToString for Opcode {
+      fn to_string(&self) -> String {
+        match self {
+          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).mnmonic.into() ),*
+        }
+      }
+    }
+
+    impl Opcode {
+      pub fn is_valued(&self) -> bool {
+        match self {
+          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).valued ),*
+        }
+      }
+      pub fn is_cmp(&self) -> bool {
+        match self {
+          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).cmp ),*
+        }
+      }
+      pub fn is_binary(&self) -> bool {
+        match self {
+          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).binary ),*
+        }
+      }
+      pub fn is_unary(&self) -> bool {
+        match self {
+          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).unary ),*
+        }
+      }
+      pub fn has_side_effect(&self) -> bool {
+        match self {
+          $( Opcode::$opcode => parse_opcode_info!($mn $($ky),*).side_effect ),*
+        }
+      }
+
+    }
+
+  };
+}
+
+register_opcodes!(
+  GetElementPtr("gep") => { valued },
+  // Memory operations
+  Load("load") => { valued },
+  Store("store") => { side_effect },
   // Binary operations
-  Add,
-  Sub,
-  Mul,
-  BitwiseAnd,
-  BitwiseOr,
-  BitwiseXor,
-  Concat,
+  Add("+") => { binary, valued },
+  Sub("-") => { binary, valued },
+  Mul("*") => { binary, valued },
+  BitwiseAnd("&") => { binary, valued },
+  BitwiseOr("|") => { binary, valued },
+  BitwiseXor("^") => { binary, valued },
+  Concat("concat") => { valued },
   // Comparison operations
-  IGT,
-  ILT,
-  IGE,
-  ILE,
-  EQ,
-  NEQ,
+  IGT(">") => { cmp, valued },
+  ILT("<") => { cmp, valued },
+  IGE(">=") => { cmp, valued },
+  ILE("<=") => { cmp, valued },
+  EQ("==") => { cmp, valued },
+  NEQ("!=") => { cmp, valued },
   // Unary operations
-  Neg,
-  Flip,
+  Neg("-") => { unary, valued },
+  Flip("!") => { unary, valued },
   // Triary operations
-  Select,
+  Select("select") => { valued },
   // Eventual operations
-  Bind(BindKind),
-  FIFOPush,
-  FIFOPop,
-  FIFOPeek,
-  FIFOValid,
-  AsyncCall,
+  Bind("bind") => { valued },
+  FIFOPush("push") => { side_effect },
+  FIFOPop("pop") => { side_effect, valued },
+  FIFOPeek("peek") => { valued },
+  FIFOValid("valid") => { valued },
+  AsyncCall("async_call") => { side_effect },
   // Other synthesizable operations
-  Slice,
-  Cast,
-  Sext,
+  Slice("slice") => { valued },
+  Cast("cast") => { valued },
+  Sext("sext") => { valued },
   // Non-synthesizable operations
-  Log,
-}
-
-impl Opcode {
-  pub fn is_valued(&self) -> bool {
-    if self.is_binary() || self.is_unary() || self.is_cmp() {
-      return true;
-    }
-    match self {
-      Opcode::Load
-      | Opcode::GetElementPtr
-      | Opcode::FIFOPop
-      | Opcode::Bind(_)
-      | Opcode::FIFOValid
-      | Opcode::Select
-      | Opcode::Slice
-      | Opcode::Concat
-      | Opcode::Sext
-      | Opcode::Cast => true,
-      _ => false,
-    }
-  }
-  pub fn is_binary(&self) -> bool {
-    match self {
-      Opcode::Add
-      | Opcode::Mul
-      | Opcode::Sub
-      | Opcode::BitwiseAnd
-      | Opcode::BitwiseOr
-      | Opcode::BitwiseXor => true,
-      _ => false,
-    }
-  }
-  pub fn is_unary(&self) -> bool {
-    match self {
-      Opcode::Neg | Opcode::Flip => true,
-      _ => false,
-    }
-  }
-  pub fn is_cmp(&self) -> bool {
-    match self {
-      Opcode::IGT | Opcode::ILT | Opcode::IGE | Opcode::ILE | Opcode::EQ | Opcode::NEQ => true,
-      _ => false,
-    }
-  }
-}
-
-impl ToString for Opcode {
-  fn to_string(&self) -> String {
-    match self {
-      Opcode::Add => "+".into(),
-      Opcode::Sub => "-".into(),
-      Opcode::Mul => "*".into(),
-      Opcode::BitwiseAnd => "&".into(),
-      Opcode::BitwiseOr => "|".into(),
-      Opcode::BitwiseXor => "^".into(),
-      Opcode::IGT => ">".into(),
-      Opcode::ILT => "<".into(),
-      Opcode::IGE => ">=".into(),
-      Opcode::ILE => "<=".into(),
-      Opcode::EQ => "==".into(),
-      Opcode::NEQ => "!=".into(),
-      Opcode::Neg => "-".into(),
-      Opcode::Flip => "!".into(),
-      Opcode::Load => "load".into(),
-      Opcode::Store => "store".into(),
-      Opcode::AsyncCall => "trigger".into(),
-      Opcode::FIFOPush => "push".into(),
-      Opcode::FIFOPop => "pop".into(),
-      Opcode::FIFOPeek => "peek".into(),
-      Opcode::FIFOValid => "valid".into(),
-      Opcode::Log => "log".into(),
-      Opcode::Slice => "slice".into(),
-      Opcode::Cast => "cast".into(),
-      Opcode::Sext => "sext".into(),
-      Opcode::Select => "select".into(),
-      Opcode::Bind(_) => "".into(),
-      Opcode::Concat => "concat".into(),
-      Opcode::GetElementPtr => "gep".into(),
-    }
-  }
-}
+  Log("log") => { side_effect }
+);
 
 pub struct Expr {
   name: Option<String>,

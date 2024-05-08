@@ -326,7 +326,7 @@ impl Visitor<String> for IRPrinter {
               expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
             )
           }
-          Opcode::Bind(_) => {
+          Opcode::Bind => {
             let (callee, arg_n) = {
               let n = expr.get_num_operands() - 1;
               (expr.get_operand(n).unwrap().get_value().clone(), n)

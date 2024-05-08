@@ -221,7 +221,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
               to_trigger
             ));
           }
-          Opcode::Bind(_) => { /* don't care, processed in corresponding AsyncCall` */ }
+          Opcode::Bind => { /* don't care, processed in corresponding AsyncCall` */ }
           _ => panic!("Unexpected expr of {:?} in memory body", expr.get_opcode()),
         }
       }
@@ -589,7 +589,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             a
           )
         }
-        Opcode::Bind(_) => {
+        Opcode::Bind => {
           let callee = {
             let n = expr.get_num_operands();
             let callee = expr.get_operand(n - 1).unwrap().get_value().clone();

@@ -11,7 +11,7 @@ pub(crate) fn as_bind_expr(sys: &SysBuilder, node: BaseNode) -> Option<ExprRef<'
   node
     .as_ref::<Expr>(sys)
     .map_or(None, |x| match x.get_opcode() {
-      Opcode::Bind(_) => Some(x),
+      Opcode::Bind => Some(x),
       _ => {
         eprintln!("{:?}", x.get_opcode());
         None
