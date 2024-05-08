@@ -4,9 +4,7 @@ use eir::{builder::SysBuilder, test_utils::run_simulator};
 #[test]
 fn concat() {
   module_builder!(adder()(a:int<32>, b:int<32>) {
-    a_valid = a.valid();
-    b_valid = b.valid();
-    valids = a_valid.concat(b_valid);
+    valids = a.valid().concat(b.valid());
     c = a.add(b);
     cc = valids.concat(c);
     // TODO: Change this 32 to 33 later

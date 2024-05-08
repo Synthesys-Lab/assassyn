@@ -19,7 +19,7 @@ pub(super) fn namify(name: &str) -> String {
     .collect()
 }
 
-pub(super) fn camelize(name: &str) -> String {
+pub fn camelize(name: &str) -> String {
   let mut result = String::new();
   let mut capitalize = true;
   for c in name.chars() {

@@ -12,7 +12,7 @@ use crate::{
   utils::punctuated_span,
 };
 
-use eir::ir::data::DataType;
+use eir::{backend::simulator::camelize, ir::data::DataType};
 
 pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> {
   match &dtype.dtype {
@@ -258,39 +258,37 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
 
 pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStream> {
   let res: proc_macro2::TokenStream = match inst {
-    Statement::Assign((left, right)) => {
-      match left {
-        expr::LValue::Ident(id) => {
-          let right = emit_expr_body(right)?;
-          quote_spanned! {
-            id.span() =>
-              let temp = #right;
-              if let Ok(mut expr_mut) = temp.as_mut::<eir::ir::Expr>(sys) {
-                expr_mut.set_name(stringify!(#id).to_string());
-              }
-              // if let Ok(mut array_mut) = temp.as_mut::<eir::ir::Array>(sys) {
-              //   array_mut.set_name(stringify!(#id).to_string());
-              // }
-              let #id = temp;
-          }
-        }
-        expr::LValue::ArrayAccess(aa) => {
-          let array_ptr = emit_array_access(aa)?;
-          let right = emit_expr_body(right)?;
-          quote! {{
-            let ptr = #array_ptr;
-            let value = #right;
-            sys.create_array_write(ptr, value);
-          }}
-        }
-        expr::LValue::IdentList(l) => {
-          return Err(syn::Error::new(
-            l.span(),
-            "Assigning to a list of identifiers is not supported",
-          ))
+    Statement::Assign((left, right)) => match left {
+      expr::LValue::Ident(id) => {
+        let right = emit_expr_body(right)?;
+        quote_spanned! {
+          id.span() =>
+            let temp = #right;
+            if let Ok(mut expr_mut) = temp.as_mut::<eir::ir::Expr>(sys) {
+              expr_mut.set_name(stringify!(#id).to_string());
+            }
+            if let Ok(mut array_mut) = temp.as_mut::<eir::ir::Array>(sys) {
+              array_mut.set_name(stringify!(#id).to_string());
+            }
+            let #id = temp;
         }
       }
-    }
+      expr::LValue::ArrayAccess(aa) => {
+        let array_ptr = emit_array_access(aa)?;
+        let right = emit_expr_body(right)?;
+        quote! {{
+          let ptr = #array_ptr;
+          let value = #right;
+          sys.create_array_write(ptr, value);
+        }}
+      }
+      expr::LValue::IdentList(l) => {
+        return Err(syn::Error::new(
+          l.span(),
+          "Assigning to a list of identifiers is not supported",
+        ))
+      }
+    },
     Statement::Call((kind, call)) => match kind {
       CallKind::Async => {
         let args = emit_arg_binds(&call.func, &call.args);
@@ -518,22 +516,6 @@ pub(crate) fn emit_ports(
     quote! {#port_peeks},
     quote! {#port_pops},
   ))
-}
-
-fn camelize(s: &str) -> String {
-  let mut res = String::new();
-  let mut capitalize = true;
-  for c in s.chars() {
-    if c == '_' {
-      capitalize = true;
-    } else if capitalize {
-      res.push(c.to_ascii_uppercase());
-      capitalize = false;
-    } else {
-      res.push(c);
-    }
-  }
-  res
 }
 
 pub(crate) fn emit_attrs(

@@ -18,7 +18,8 @@ pub enum Attribute {
   EagerBind,        // All the binds in this module will be called after arguments are fully bound.
   AllowPartialCall, // Allow some arguments are not given to call this module.
   NoArbiter,        // The compiler will skip to generate an arbiter for this module,
-                    // even if it has multiple callers.
+  // even if it has multiple callers.
+  Systolic, // The module is a systolic array.
 }
 
 /// The data structure for a module.
