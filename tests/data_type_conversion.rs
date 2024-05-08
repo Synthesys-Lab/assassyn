@@ -5,9 +5,10 @@ fn dt_conv_sys() -> SysBuilder {
   module_builder!(
     driver()() {
       i32 = 0.int<32>;
-      _b32 = i32.cast(bits<32>);
-      _u32 = i32.cast(uint<32>);
-      _i64 = i32.sext(int<64>);
+      b32 = i32.cast(bits<32>);
+      u32 = i32.cast(uint<32>);
+      i64 = i32.sext(int<64>);
+      log("{} {} {}", b32, u32, i64);
     }
   );
 

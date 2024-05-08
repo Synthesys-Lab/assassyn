@@ -853,8 +853,28 @@ impl SysBuilder {
 
   /// Create a sext operation.
   pub fn create_sext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
-    let res = self.create_expr(dest_ty, Opcode::Sext, vec![src], true);
-    res
+    let src_ty = src.get_dtype(self).unwrap();
+    match src.get_kind() {
+      NodeKind::IntImm => match dest_ty {
+        DataType::Int(width) | DataType::UInt(width) | DataType::Bits(width) => {
+          if src_ty.get_bits() > width {
+            panic!(
+              "Can not sext immediate number {} to a narrower type {:?}",
+              src.to_string(self),
+              dest_ty
+            )
+          } else {
+            self.get_const_int(dest_ty, src.as_ref::<IntImm>(self).unwrap().get_value())
+          }
+        }
+        _ => panic!(
+          "Can not sext immediate number {} to type {:?}",
+          src.to_string(self),
+          dest_ty
+        ),
+      },
+      _ => self.create_expr(dest_ty, Opcode::Sext, vec![src], true),
+    }
   }
 
   pub(crate) fn dispose(&mut self, node: BaseNode) {
