@@ -1459,7 +1459,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           let r = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
           Some(format!(
             "logic [{}:0] {};\nassign {} = {}[{}:{}];\n\n",
-            expr.dtype().get_bits(),
+            expr.dtype().get_bits() - 1,
             namify(expr.upcast().to_string(self.sys).as_str()),
             namify(expr.upcast().to_string(self.sys).as_str()),
             a,
