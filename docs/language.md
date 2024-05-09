@@ -249,16 +249,16 @@ module_builder!(foo()(a: int<32>, b: int<32>) {
 ````
 
 ```` Rust
-module_builder!(foo()(a: int<32>, b: int<32>) {
+module_builder!(
+  // `lock` is declared as a global array.
+  foo(lock)(a: int<32>, b: int<32>) {
   // A spin lock always accepts a array value, because an array value is side-effected, which
   // can give different results when invoked multiple times. Wait until will wait the value in
   // the given array to be true to execute the body.
   //
   // NOTE: A spin lock can only appear in the main body of a module.
   wait_until {
-    a_valid = a.valid();
-    b_valid = b.valid();
-    valid = a_valid.bitwise_and(b_valid);
+    valid = lock[0];
     valid
   } {
     // implicitly pops the FIFOs
