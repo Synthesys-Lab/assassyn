@@ -19,5 +19,12 @@ simple tutorial to how Rust AST library and procedural macro works.
 
 ## Github
 
-TODO: Write instructions for Github PR usage.
+<!-- TODO: Write instructions for Github PR usage. -->
 
+**Formatting:** To ensure consistent code style, copy `assassyn/utils/pre-commit` to `.git/hooks/pre-commit`. This setup automatically formats your code and checks coding style with each commit.
+
+**Branching:** 
+1. Fork the repository to your account.
+2. Clone your fork: `git clone <url-to-your-fork>`.
+3. Create a new branch for your changes: `git checkout -b <your-dev-branch>`.
+4. After development, submit a pull request to the master branch from your branch.

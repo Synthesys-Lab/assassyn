@@ -21,7 +21,7 @@ try some proof of concepts in test cases.
 cargo test [case-name]
 ````
 
-Refer our [developer doc](./docs/developers.md.md) for more details.
+Refer our [developer doc](./docs/developers.md) for more details.
 
 ## Why yet another RTL generator?
 
