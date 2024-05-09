@@ -1,19 +1,19 @@
+mod cases;
+
 macro_rules! register_test {
 
   ($module:ident :: $func:ident) => {
-    mod $module;
     #[test]
     fn $func() {
-        $module::$func();
+        cases::$module::$func();
     }
   };
 
   ($module:ident :: { $($func:ident),* $(,)? }) => {
-    mod $module;
     $(
       #[test]
       fn $func() {
-          $module::$func();
+          cases::$module::$func();
       }
     )*
   }
