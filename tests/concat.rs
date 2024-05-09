@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
-#[test]
-fn concat() {
+pub fn concat() {
   module_builder!(adder()(a:int<32>, b:int<32>) {
     valids = a.valid().concat(b.valid());
     c = a.add(b);

@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator, xform};
 
-#[test]
-fn select() {
+pub fn select() {
   module_builder!(driver()() {
     rng0 = array(int<32>, 1);
     rng1 = array(int<32>, 1);

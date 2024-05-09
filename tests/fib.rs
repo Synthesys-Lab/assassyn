@@ -2,8 +2,7 @@ use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 use num_bigint::BigInt;
 
-#[test]
-fn fib() {
+pub fn fib() {
   module_builder!(driver()() {
     a = array(int<256>, 1, [0.int<256>]);
     b = array(int<256>, 1, [1.int<256>]);

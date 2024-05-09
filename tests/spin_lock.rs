@@ -5,8 +5,7 @@ use eir::{
   xform,
 };
 
-#[test]
-fn spin_lock() {
+pub fn spin_lock() {
   module_builder!(
     squarer()(a:int<32>) {
       b = a.mul(a);

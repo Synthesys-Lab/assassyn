@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::{backend, builder::SysBuilder, xform};
 
-#[test]
-fn callback() {
+pub fn callback() {
   module_builder!(
     driver(sqr, memory_read)() {
       cnt = array(int<32>, 1);

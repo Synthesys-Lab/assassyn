@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
-#[test]
-fn inline0() {
+pub fn inline0() {
   module_builder!(adder(a, b)() {
     c = a.add(b);
     log("adder: {} + {} = {}", a, b, c);
@@ -47,8 +46,7 @@ fn inline0() {
   );
 }
 
-#[test]
-fn inline1() {
+pub fn inline1() {
   module_builder!(ae(a, b)() {
     c = a.add(b);
     eq = a.eq(b);

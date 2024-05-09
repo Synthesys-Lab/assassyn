@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
-#[test]
-fn common_read() {
+pub fn common_read() {
   module_builder!(
     adder()(a:int<32>, b:int<32>) {
       c = a.add(b);

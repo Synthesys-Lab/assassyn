@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::builder::SysBuilder;
 
-#[test]
-fn helloworld() {
+pub fn helloworld() {
   module_builder!(driver()() {
     log("{}, {}!", "Hello", "world");
   });

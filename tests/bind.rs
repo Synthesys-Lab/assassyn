@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
-#[test]
-fn bind() {
+pub fn bind() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
     c = a.sub(b);
     log("sub: {} - {} = {}", a, b, c);

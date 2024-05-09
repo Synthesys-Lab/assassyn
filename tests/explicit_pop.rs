@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
-#[test]
-fn explicit_pop() {
+pub fn explicit_pop() {
   module_builder!(adder()(a:int<32>, b:int<32>) #explicit_pop {
     a = a.pop();
     b = b.pop();

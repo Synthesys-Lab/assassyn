@@ -4,8 +4,7 @@ use eir::{
   test_utils::{parse_cycle, run_simulator},
 };
 
-#[test]
-fn testbench() {
+pub fn testbench() {
   module_builder!(testbench()() {
     cycle 0 { log("cycle 0"); }
     cycle 2 { log("cycle 2"); }

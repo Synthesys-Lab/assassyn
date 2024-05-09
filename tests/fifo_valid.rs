@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::builder::SysBuilder;
 
-#[test]
-fn fifo_valid() {
+pub fn fifo_valid() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
     wait_until {
       a_valid = a.valid();

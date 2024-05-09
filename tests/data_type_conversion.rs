@@ -17,8 +17,7 @@ fn dt_conv_sys() -> SysBuilder {
   sys
 }
 
-#[test]
-fn dt_conv() {
+pub fn dt_conv() {
   let mut sys = dt_conv_sys();
 
   println!("{}", sys);

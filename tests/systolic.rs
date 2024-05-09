@@ -22,8 +22,7 @@ impl ProcElem {
   }
 }
 
-#[test]
-fn systolic_array() {
+pub fn systolic_array() {
   module_builder!(
     pe(east, south)(west:int<32>, north:int<32>) #eager_bind {
       c = west.mul(north);

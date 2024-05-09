@@ -1,8 +1,7 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
-#[test]
-fn back_pressure() {
+pub fn back_pressure() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
     c = a.sub(b);
     log("sub: {} - {} = {}", a, b, c);
