@@ -10,7 +10,7 @@ use crate::{
   ir::{module::memory::parse_memory_module_name, node::*, visitor::Visitor, *},
 };
 
-use self::{bind::get_bind_callee, instructions::GetElementPtr};
+use self::instructions::{Bind, GetElementPtr};
 
 fn namify(name: &str) -> String {
   name.replace(".", "_")
@@ -659,8 +659,15 @@ fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
     NodeKind::Expr => {
       let expr = node.as_ref::<Expr>(sys).unwrap();
       if expr.get_opcode() == Opcode::AsyncCall {
-        let triggered_module =
-          get_bind_callee(sys, expr.get_operand(0).unwrap().get_value().clone());
+        let triggered_module = {
+          let bind = expr
+            .get_operand(0)
+            .unwrap()
+            .get_value()
+            .as_expr::<Bind>(sys)
+            .unwrap();
+          bind.get_callee()
+        };
         let triggered_module = triggered_module.as_ref::<Module>(sys).unwrap();
         triggered_modules.push(namify(triggered_module.get_name()));
       }
@@ -928,7 +935,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             let module = {
               let operand = expr.get_operand(0).unwrap();
               let bind = operand.get_value();
-              let module = get_bind_callee(expr.sys, bind.clone());
+              let module = {
+                let bind = bind.as_expr::<Bind>(expr.sys).unwrap();
+                bind.get_callee()
+              };
               module.as_ref::<Module>(expr.sys).unwrap()
             };
             rdata_module = Some(namify(module.get_name()));
@@ -1427,7 +1437,15 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         }
 
         Opcode::AsyncCall => {
-          let module = get_bind_callee(self.sys, expr.get_operand(0).unwrap().get_value().clone());
+          let module = {
+            let operand = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_expr::<Bind>(self.sys)
+              .unwrap();
+            operand.get_callee()
+          };
           let module = module.as_ref::<Module>(self.sys).unwrap();
           let module_name = namify(module.get_name());
           match self.trigger_drivers.get_mut(&module_name) {

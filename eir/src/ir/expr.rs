@@ -1,7 +1,5 @@
 use std::collections::HashSet;
 
-use expr::{ir_printer::IRPrinter, visitor::Visitor};
-
 use crate::ir::node::IsElement;
 use crate::ir::*;
 
@@ -221,19 +219,19 @@ impl ExprMut<'_> {
 
   /// Erase the expression from its parent block
   pub fn erase_from_parent(&mut self) {
-    eprintln!(
-      "erasing {}",
-      IRPrinter::new(false)
-        .dispatch(self.sys, &self.get().upcast(), vec![])
-        .unwrap()
-    );
-    for elem in self.get().users().iter() {
-      let operand = elem.as_ref::<Operand>(self.sys).unwrap();
-      let user = IRPrinter::new(false)
-        .dispatch(self.sys, operand.get_user(), vec![])
-        .unwrap();
-      eprintln!("user: {} {:?}", elem.to_string(self.sys), user);
-    }
+    // eprintln!(
+    //   "erasing {}",
+    //   IRPrinter::new(false)
+    //     .dispatch(self.sys, &self.get().upcast(), vec![])
+    //     .unwrap()
+    // );
+    // for elem in self.get().users().iter() {
+    //   let operand = elem.as_ref::<Operand>(self.sys).unwrap();
+    //   let user = IRPrinter::new(false)
+    //     .dispatch(self.sys, operand.get_user(), vec![])
+    //     .unwrap();
+    //   eprintln!("user: {} {:?}", elem.to_string(self.sys), user);
+    // }
 
     assert!(self.get().users().is_empty());
     let parent = self.get().get_parent();

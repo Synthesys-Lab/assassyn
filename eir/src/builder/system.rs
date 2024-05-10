@@ -3,16 +3,11 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use crate::ir::{
-  bind::{as_bind_expr, get_bind_callee, is_fully_bound},
-  instructions::GetElementPtr,
-  ir_printer::IRPrinter,
-  module::Attribute,
-  node::*,
-  visitor::Visitor,
+  instructions::GetElementPtr, ir_printer::IRPrinter, module::Attribute, node::*, visitor::Visitor,
   *,
 };
 
-use self::user::Operand;
+use self::{instructions::Bind, user::Operand};
 
 use super::symbol_table::SymbolTable;
 
@@ -560,7 +555,8 @@ impl SysBuilder {
     eager: Option<bool>,
   ) -> BaseNode {
     let module = {
-      let callee = get_bind_callee(self, bind);
+      let bind = bind.as_expr::<Bind>(self).unwrap();
+      let callee = bind.get_callee();
       callee.as_ref::<Module>(self).unwrap_or_else(|_| {
         panic!(
           "Only module callee can be used for bind, but {:?} got!",
@@ -600,7 +596,10 @@ impl SysBuilder {
         .get_attrs()
         .contains(&Attribute::EagerBind),
     );
-    if eager && is_fully_bound(self, bind) {
+    if eager && {
+      let bind = bind.as_expr::<Bind>(self).unwrap();
+      bind.fully_bound()
+    } {
       self.create_async_call(bind)
     } else {
       bind
@@ -610,17 +609,17 @@ impl SysBuilder {
   /// Add a bind to the current module.
   pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
     let (callee, signature, port_idx) = {
-      let callee = get_bind_callee(self, bind);
-      let bind = as_bind_expr(self, bind).unwrap();
+      let bind = bind.as_expr::<Bind>(self).unwrap();
+      let callee = bind.get_callee();
       let signature = callee.get_dtype(self).unwrap();
       let port_idx = {
         let mut idx = None;
-        for i in 0..bind.get_num_operands() - 1 {
-          let operand = bind.get_operand(i).unwrap();
-          if operand.get_value().is_unknown() && idx.is_none() {
+        for i in 0..bind.get_num_args() {
+          let arg = bind.get_arg(i).unwrap();
+          if arg.is_unknown() && idx.is_none() {
             idx = Some(i);
           } else if idx.is_some() {
-            assert!(operand.get_value().is_unknown());
+            assert!(arg.is_unknown());
           }
         }
         idx.expect("All arguments bound!")
@@ -646,7 +645,10 @@ impl SysBuilder {
         .get_attrs()
         .contains(&Attribute::EagerBind),
     );
-    if eager && is_fully_bound(self, bind) {
+    if eager && {
+      let bind = bind.as_expr::<Bind>(self).unwrap();
+      bind.fully_bound()
+    } {
       self.create_async_call(bind)
     } else {
       bind

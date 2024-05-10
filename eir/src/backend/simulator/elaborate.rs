@@ -13,7 +13,7 @@ use syn::Ident;
 use crate::{
   backend::common::Config,
   builder::system::SysBuilder,
-  ir::{bind::get_bind_callee, node::*, visitor::Visitor, *},
+  ir::{instructions::Bind, node::*, visitor::Visitor, *},
 };
 
 use super::utils::{
@@ -207,14 +207,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
               .get_operand(0)
               .unwrap()
               .get_value()
-              .as_ref::<Expr>(self.sys)
+              .as_expr::<Bind>(self.sys)
               .unwrap();
-            let module = bind
-              .get_operand(bind.get_num_operands() - 1)
-              .unwrap()
-              .get_value()
-              .as_ref::<Module>(self.sys)
-              .unwrap();
+            let module = bind.get_callee().as_ref::<Module>(self.sys).unwrap();
             let to_trigger = format!("EventKind::Module{}", camelize(&namify(module.get_name())));
             rdata_module = Some(format!(
               "q.push(Reverse(Event{{ stamp: stamp + read_latency * 100, kind: {} }}))",
@@ -392,9 +387,13 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
         Opcode::AsyncCall => {
           let to_trigger = if let Ok(module) = {
-            let callee =
-              get_bind_callee(self.sys, expr.get_operand(0).unwrap().get_value().clone());
-            callee.as_ref::<Module>(self.sys)
+            let bind = expr
+              .get_operand(0)
+              .unwrap()
+              .get_value()
+              .as_expr::<Bind>(self.sys)
+              .unwrap();
+            bind.get_callee().as_ref::<Module>(self.sys)
           } {
             format!("EventKind::Module{}", camelize(&namify(module.get_name())))
           } else {
@@ -591,8 +590,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
         Opcode::Bind => {
           let callee = {
-            let n = expr.get_num_operands();
-            let callee = expr.get_operand(n - 1).unwrap().get_value().clone();
+            let bind = expr.upcast().as_expr::<Bind>(expr.sys).unwrap();
+            let callee = bind.get_callee();
             let module = callee.as_ref::<Module>(expr.sys).unwrap();
             format!("EventKind::Module{}", camelize(&namify(module.get_name())))
           };

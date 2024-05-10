@@ -1,6 +1,7 @@
 use super::expr::Opcode;
 use super::node::ExprRef;
 
+pub mod call;
 pub mod gep;
 pub mod load;
 
@@ -44,4 +45,4 @@ macro_rules! register_opcode {
   () => {};
 }
 
-register_opcode!(GetElementPtr, Load);
+register_opcode!(GetElementPtr, Load, Bind,);
