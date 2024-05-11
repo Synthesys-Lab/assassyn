@@ -23,22 +23,22 @@ impl Parse for ModuleAttrs {
       }
       input.parse::<Token![#]>()?;
       let raw_attr = input.parse::<syn::Ident>()?;
-      attrs.push_value(match raw_attr.to_string().as_str() {
-        "allow_partial_call" | "optnone" | "explicit_pop" | "eager_bind" | "no_arbiter" => {
-          raw_attr.clone()
-        }
-        _ => {
-          return Err(syn::Error::new(
-            raw_attr.span(),
-            format!(
-              "{}:{}: Unsupported attribute: \"{}\"",
-              file!(),
-              line!(),
-              raw_attr
-            ),
-          ))
-        }
-      });
+      attrs.push_value(
+        match eir::ir::module::Attribute::from_string(&raw_attr.to_string()) {
+          Some(_) => raw_attr,
+          _ => {
+            return Err(syn::Error::new(
+              raw_attr.span(),
+              format!(
+                "{}:{}: Unsupported attribute: \"{}\"",
+                file!(),
+                line!(),
+                raw_attr
+              ),
+            ))
+          }
+        },
+      );
       if !input.peek(Token![,]) {
         break;
       }

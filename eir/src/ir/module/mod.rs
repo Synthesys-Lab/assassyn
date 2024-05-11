@@ -1,3 +1,4 @@
+pub mod attrs;
 pub mod memory;
 pub mod meta;
 
@@ -11,17 +12,7 @@ use crate::ir::*;
 
 use self::instructions::GetElementPtr;
 use self::user::Operand;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Attribute {
-  ExplicitPop,      // In this module, FIFO pops are explicitly defined.
-  OptNone,          // Avoid optimization on this module.
-  EagerBind,        // All the binds in this module will be called after arguments are fully bound.
-  AllowPartialCall, // Allow some arguments are not given to call this module.
-  NoArbiter,        // The compiler will skip to generate an arbiter for this module,
-  // even if it has multiple callers.
-  Systolic, // The module is a systolic array.
-}
+pub use attrs::Attribute;
 
 /// The data structure for a module.
 pub struct Module {

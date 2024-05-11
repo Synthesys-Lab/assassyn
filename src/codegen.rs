@@ -298,8 +298,7 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
             !sys
               .get_current_module()
               .unwrap()
-              .get_attrs()
-              .contains(&eir::ir::module::Attribute::EagerBind)
+              .has_attr(eir::ir::module::Attribute::EagerBind)
           } {
             sys.create_async_call(bind);
           }
