@@ -1394,6 +1394,7 @@ fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
   fd.write(src.to_string().as_bytes())?;
   fd.write("\n\n\n".as_bytes())
 }
+
 fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
   let dir_name = config.dir_name(sys);
   if Path::new(&dir_name).exists() {
