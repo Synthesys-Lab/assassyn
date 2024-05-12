@@ -66,6 +66,7 @@ pub(crate) enum CallKind {
   Async,
 }
 
+// TODO(@were): Add a span to this data structure.
 pub(crate) enum Statement {
   Assign((LValue, expr::Expr)),
   Call((CallKind, FuncCall)),

@@ -16,9 +16,9 @@ use eir::{backend::simulator::camelize, ir::data::DataType};
 
 pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> {
   match &dtype.dtype {
-    DataType::Int(bits) => Ok(quote! { eir::ir::data::DataType::int_ty(#bits) }),
-    DataType::UInt(bits) => Ok(quote! { eir::ir::data::DataType::uint_ty(#bits) }),
-    DataType::Bits(bits) => Ok(quote! { eir::ir::data::DataType::raw_ty(#bits) }),
+    DataType::Int(bits) => Ok(quote_spanned! { dtype.span => DataType::int_ty(#bits) }),
+    DataType::UInt(bits) => Ok(quote_spanned! { dtype.span => DataType::uint_ty(#bits) }),
+    DataType::Bits(bits) => Ok(quote_spanned! { dtype.span => DataType::raw_ty(#bits) }),
     DataType::Module(args) => {
       let args = args
         .iter()
@@ -29,7 +29,7 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> 
           })
         })
         .collect::<Result<Vec<_>, _>>()?;
-      Ok(quote! { eir::ir::data::DataType::module(vec![#(#args.into()),*]) })
+      Ok(quote_spanned! { dtype.span => DataType::module(vec![#(#args.into()),*]) })
     }
     _ => Err(syn::Error::new(dtype.span, "Unsupported type")),
   }
@@ -39,13 +39,14 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> 
 pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
     expr::Expr::Binary((a, op, b)) => match op.to_string().as_str() {
+      // TODO(@were): Find a better way to make this unify with parser and codegen.
       "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "neq" | "eq" | "igt"
       | "concat" => {
         let method_id = format!("create_{}", op);
         let method_id = syn::Ident::new(&method_id, op.span());
         let a = emit_expr_body(a)?;
         let b = emit_expr_body(b)?;
-        Ok(quote! {{
+        Ok(quote_spanned! { op.span() => {
           let lhs = #a.clone();
           let rhs = #b.clone();
           let res = sys.#method_id(None, lhs, rhs);
@@ -66,7 +67,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       "flip" => {
         let a = emit_expr_body(a)?;
         let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
-        Ok(quote! {{
+        Ok(quote_spanned! { op.span() => {
           let res = sys.#method_id(#a.clone());
           res
         }})
@@ -74,22 +75,14 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       "pop" => {
         let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
         let a = emit_expr_body(a)?;
-        Ok(quote!(sys.#method_id(#a.clone(), None)))
+        Ok(quote_spanned!( op.span() => sys.#method_id(#a.clone(), None)))
       }
       "valid" | "peek" => {
         let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
-        // @were: I am not sure  if this is a temporary hack or a long-term solution
-        // to get compatible with the current implicit FIFO pop.
-        // Before, the ID of the ExprTerm directly refers to the FIFO instance, but now
-        // after the implicit FIFO pop, it refers to a value from the FIFO.
-        // However, when generating a valid, it will typically be used in the wait_until
-        // block before the pop, so we do not worry about "popping before validation".
-        //
-        // This is kinda back-and-forth in the code generator.
         let fifo_self = match a.as_ref() {
           expr::Expr::Term(ExprTerm::Ident(id)) => {
             let name = id.to_string();
-            quote! {{
+            quote_spanned! { op.span() => {
               let module = module.as_ref::<eir::ir::Module>(sys).unwrap();
               module.get_port_by_name(#name).unwrap_or_else(|| {
                 panic!("Module {} has no port named {}", module.get_name(), #name)
@@ -103,7 +96,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
             ))
           }
         };
-        Ok(quote! {{
+        Ok(quote_spanned! { op.span() => {
           let fifo = #fifo_self;
           sys.#method_id(fifo)
         }})
@@ -119,7 +112,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       let a = emit_expr_body(a)?;
       let l = emit_expr_term(l)?;
       let r = emit_expr_term(r)?;
-      Ok(quote! {{
+      Ok(quote_spanned! { a.span() => {
         let src = #a.clone();
         let start = #l;
         let end = #r;
@@ -132,7 +125,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       let method_id = syn::Ident::new(format!("create_{}", op).as_str(), Span::call_site());
       let a = emit_expr_body(a)?;
       let ty = emit_type(ty)?;
-      Ok(quote! {{
+      Ok(quote_spanned! { op.span() => {
         let src = #a.clone();
         let res = sys.#method_id(src, #ty);
         res
@@ -141,7 +134,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     expr::Expr::Term(term) => {
       let res = emit_expr_term(term)?;
       if let ExprTerm::ArrayAccess(_) = term {
-        Ok(quote! {{
+        Ok(quote_spanned! { term.span() => {
           let ptr = { #res };
           sys.create_array_read(ptr)
         }})
@@ -154,6 +147,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       for (cond, value) in cases.iter() {
         let cond = emit_expr_body(cond)?;
         let value = emit_expr_body(value)?;
+        // TODO(@were): Support span here.
         res = quote! {{
           let carry = { #res }.clone();
           let cond = { #cond }.clone();
@@ -163,7 +157,6 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       }
       Ok(res)
     }
-    //
     //(DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)
     expr::Expr::ArrayAlloc((ty, size, init)) => {
       let ty = emit_type(ty)?;
@@ -207,12 +200,12 @@ fn emit_expr_term(expr: &ExprTerm) -> syn::Result<proc_macro2::TokenStream> {
     ExprTerm::Ident(id) => Ok(id.into_token_stream()),
     ExprTerm::Const((ty, lit)) => {
       let ty = emit_type(ty)?;
-      let res = quote! { sys.get_const_int(#ty, #lit) };
+      let res = quote_spanned! { expr.span() => sys.get_const_int(#ty, #lit) };
       Ok(res)
     }
     ExprTerm::StrLit(lit) => {
       let value = lit.value();
-      Ok(quote! { sys.get_str_literal(#value.to_string()) })
+      Ok(quote_spanned! { expr.span() => sys.get_str_literal(#value.to_string()) })
     }
     ExprTerm::ArrayAccess(aa) => emit_array_access(aa),
   }
@@ -221,12 +214,14 @@ fn emit_expr_term(expr: &ExprTerm) -> syn::Result<proc_macro2::TokenStream> {
 fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> {
   let id = aa.id.clone();
   let idx = emit_expr_body(aa.idx.as_ref())?;
-  Ok(quote! {{
+  // TODO(@were): Better span handling later.
+  Ok(quote_spanned! { aa.id.span() => {
     let idx = { #idx }.clone();
     sys.create_array_ptr(#id.clone(), idx)
   }})
 }
 
+// TODO(@were): Union the func and arg span to have the span.
 pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2::TokenStream {
   let bind = match args {
     FuncArgs::Bound(binds) => binds
@@ -256,6 +251,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
   }
 }
 
+// FIXME(@were): Quote the whole span of the whole statement.
 pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStream> {
   let res: proc_macro2::TokenStream = match inst {
     Statement::Assign((left, right)) => match left {

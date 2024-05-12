@@ -111,7 +111,9 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 
   let res = quote! {
 
+
     fn #decl_name (sys: &mut eir::builder::SysBuilder) -> eir::ir::node::BaseNode {
+      use eir::ir::data::DataType;
       let res = sys.create_module(stringify!(#module_name), vec![#port_decls]);
       let mut module_mut = res
         .as_mut::<eir::ir::Module>(sys)
@@ -125,6 +127,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
       module: eir::ir::node::BaseNode,
       #parameterization
     ) -> #ret_tys {
+      use eir::ir::data::DataType;
       use eir::ir::node::IsElement;
       {
         let mut module_mut = module
