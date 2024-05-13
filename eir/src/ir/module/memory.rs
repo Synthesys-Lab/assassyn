@@ -81,7 +81,7 @@ impl SysBuilder {
     self.set_current_module(module_node);
     let module = module_node.as_ref::<Module>(self).unwrap();
     let r_module_fifo = module.get_port_by_name("r").unwrap();
-    let r_module = self.create_fifo_pop(r_module_fifo.upcast().clone(), None);
+    let r_module = self.create_fifo_pop(r_module_fifo.upcast().clone());
     let bind = self.get_init_bind(r_module);
     let const_zero = self.get_const_int(ty.clone(), 0);
     let bind = self.push_bind(bind, const_zero, Some(false));

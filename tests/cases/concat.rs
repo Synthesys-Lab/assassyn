@@ -3,11 +3,9 @@ use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 pub fn concat() {
   module_builder!(adder()(a:int<32>, b:int<32>) {
-    valids = a.valid().concat(b.valid());
-    c = a.add(b);
-    cc = valids.concat(c);
+    c = a.concat(b);
     // TODO: Change this 32 to 33 later
-    log("add with pred: (0b11 << 32) | {} + {} = {}", a, b, cc);
+    log("add with pred: {} << 32 + {} = {}", a, b, c);
   });
 
   module_builder!(driver(adder)() {
@@ -39,12 +37,13 @@ pub fn concat() {
           eprintln!("{}", x);
           let raw = x.split(" ").collect::<Vec<&str>>();
           let len = raw.len();
-          let a = raw[len - 5].parse::<i32>().unwrap();
-          let b = raw[len - 3].parse::<i32>().unwrap();
+          let ref_a = raw[len - 7].parse::<i32>().unwrap();
+          let ref_b = raw[len - 3].parse::<i32>().unwrap();
           let c = raw[len - 1].parse::<u64>().unwrap();
-          let sum = c & 0xFFFFFFFF;
-          assert_eq!(sum, (a + b) as u64);
-          assert_eq!(c >> 32, 0b11);
+          let a = c >> 32 & 0xFFFFFFFF;
+          let b = c & 0xFFFFFFFF;
+          assert_eq!(a, ref_a as u64);
+          assert_eq!(b, ref_b as u64);
           true
         } else {
           false

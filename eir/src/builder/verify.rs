@@ -60,7 +60,8 @@ impl Visitor<()> for Verifier {
     if self.in_wait_until_cond {
       assert!(
         !expr.get_opcode().has_side_effect(),
-        "WaitUntil operations should have no side effects!"
+        "WaitUntil operations should have no side effects, but {:?} found!",
+        expr.get_opcode()
       );
     }
     for user in expr.users().iter() {

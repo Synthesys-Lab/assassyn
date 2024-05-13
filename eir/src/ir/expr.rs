@@ -33,7 +33,7 @@ macro_rules! find_opcode_attr {
 }
 
 macro_rules! register_opcodes {
-  ( $( $opcode:ident ( $mn:literal ) => { $($ky:ident),* } ),* $(,)? ) => {
+  ( $( $opcode:ident ( $fe_method: literal $mn:literal $arity:expr ) => { $($ky:ident),* } ),* $(,)? ) => {
 
     #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
     pub enum Opcode {
@@ -74,6 +74,27 @@ macro_rules! register_opcodes {
           $( Opcode::$opcode => find_opcode_attr!(side_effect; $($ky),*) ),*
         }
       }
+      pub fn fifo_related(&self) -> bool {
+        match self {
+          $( Opcode::$opcode => find_opcode_attr!(fifo_related; $($ky),*) ),*
+        }
+      }
+      pub fn arity(&self) -> Option<usize> {
+        let res = match self {
+          $( Opcode::$opcode => $arity ),*
+        };
+        if res == usize::MAX {
+          None
+        } else {
+          Some(res)
+        }
+      }
+      pub fn from_str(s: &str) -> Option<Opcode> {
+        match s {
+          $( $fe_method => Some(Opcode::$opcode) ),*,
+          _ => None
+        }
+      }
 
     }
 
@@ -81,43 +102,43 @@ macro_rules! register_opcodes {
 }
 
 register_opcodes!(
-  GetElementPtr("gep") => { valued },
+  GetElementPtr("_gep" "gep" 2 /*array, idx*/) => { valued },
   // Memory operations
-  Load("load") => { valued },
-  Store("store") => { side_effect },
+  Load("_load" "load" 1 /*gep*/) => { valued },
+  Store("_store" "store" 2 /*gep value*/) => { side_effect },
   // Binary operations
-  Add("+") => { binary, valued },
-  Sub("-") => { binary, valued },
-  Mul("*") => { binary, valued },
-  BitwiseAnd("&") => { binary, valued },
-  BitwiseOr("|") => { binary, valued },
-  BitwiseXor("^") => { binary, valued },
-  Concat("concat") => { valued },
+  Add("add" "+" 2 /*lhs rhs*/) => { binary, valued },
+  Sub("sub" "-" 2 /*lhs rhs*/) => { binary, valued },
+  Mul("mul" "*" 2 /*lhs rhs*/) => { binary, valued },
+  BitwiseAnd("bitwise_and" "&" 2/*lhs rhs*/) => { binary, valued },
+  BitwiseOr("bitwise_or" "|" 2/*lhs rhs*/) => { binary, valued },
+  BitwiseXor("bitwise_xor" "^" 2/*lhs rhs*/) => { binary, valued },
+  Concat("concat" "concat" 2/*msb lsb*/) => { valued },
   // Comparison operations
-  IGT(">") => { cmp, valued },
-  ILT("<") => { cmp, valued },
-  IGE(">=") => { cmp, valued },
-  ILE("<=") => { cmp, valued },
-  EQ("==") => { cmp, valued },
-  NEQ("!=") => { cmp, valued },
+  IGT("igt" ">" 2 /*lhs rhs*/) => { cmp, valued },
+  ILT("ilt" "<" 2 /*lhs rhs*/) => { cmp, valued },
+  IGE("ige" ">=" 2 /*lhs rhs*/) => { cmp, valued },
+  ILE("ile" "<=" 2 /*lhs rhs*/) => { cmp, valued },
+  EQ("eq" "==" 2 /*lhs rhs*/) => { cmp, valued },
+  NEQ("neq" "!=" 2 /*lhs rhs*/) => { cmp, valued },
   // Unary operations
-  Neg("-") => { unary, valued },
-  Flip("!") => { unary, valued },
+  Neg("neg" "-" 1 /*value*/) => { unary, valued },
+  Flip("flip" "!" 1 /*value*/) => { unary, valued },
   // Triary operations
-  Select("select") => { valued },
+  Select("select" "select" 3 /*cond true_val false_val*/) => { valued },
   // Eventual operations
-  Bind("bind") => { valued },
-  FIFOPush("push") => { side_effect },
-  FIFOPop("pop") => { side_effect, valued },
-  FIFOPeek("peek") => { valued },
-  FIFOValid("valid") => { valued },
-  AsyncCall("async_call") => { side_effect },
+  Bind("_bind" "bind" usize::MAX /* N/A */) => { valued },
+  FIFOPush("push" "push" 2 /*fifo value*/ ) => { side_effect, fifo_related },
+  FIFOPop("pop" "pop" 1 /*fifo*/) => { side_effect, valued, fifo_related },
+  FIFOPeek("peek" "peek" 1 /*fifo*/) => { valued, fifo_related },
+  FIFOValid("valid" "valid" 1 /*fifo*/) => { valued, fifo_related },
+  AsyncCall("_async_call" "async_call" usize::MAX /* N/A */) => { side_effect },
   // Other synthesizable operations
-  Slice("slice") => { valued },
-  Cast("cast") => { valued },
-  Sext("sext") => { valued },
+  Slice("slice" "slice" 3 /*op [lo, hi]*/) => { valued },
+  Cast("cast" "cast" 1 /*value*/) => { valued },
+  Sext("sext" "sext" 1 /*value*/) => { valued },
   // Non-synthesizable operations
-  Log("log") => { side_effect }
+  Log("_log" "log" usize::MAX /*N/A*/) => { side_effect }
 );
 
 pub struct Expr {

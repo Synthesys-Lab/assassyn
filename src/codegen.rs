@@ -12,7 +12,10 @@ use crate::{
   utils::punctuated_span,
 };
 
-use eir::{backend::simulator::camelize, ir::data::DataType};
+use eir::{
+  backend::simulator::camelize,
+  ir::{data::DataType, Opcode},
+};
 
 pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> {
   match &dtype.dtype {
@@ -38,87 +41,59 @@ pub(crate) fn emit_type(dtype: &DType) -> syn::Result<proc_macro2::TokenStream> 
 // TODO(@were): Double confirm this assumption: All these are right values.
 pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2::TokenStream> {
   match expr {
-    expr::Expr::Binary((a, op, b)) => match op.to_string().as_str() {
-      // TODO(@were): Find a better way to make this unify with parser and codegen.
-      "add" | "mul" | "sub" | "bitwise_and" | "bitwise_or" | "ilt" | "neq" | "eq" | "igt"
-      | "concat" => {
-        let method_id = format!("create_{}", op);
-        let method_id = syn::Ident::new(&method_id, op.span());
-        let a = emit_expr_body(a)?;
-        let b = emit_expr_body(b)?;
-        Ok(quote_spanned! { op.span() => {
-          let lhs = #a.clone();
-          let rhs = #b.clone();
-          let res = sys.#method_id(None, lhs, rhs);
-          res
-        }})
-      }
-      _ => Err(syn::Error::new(
-        op.span(),
-        format!(
-          "{}:{}: Unsupported method in codegen \"{}\"",
-          file!(),
-          line!(),
-          op
-        ),
-      )),
-    },
-    expr::Expr::Unary((a, op)) => match op.to_string().as_str() {
-      "flip" => {
-        let a = emit_expr_body(a)?;
-        let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
-        Ok(quote_spanned! { op.span() => {
-          let res = sys.#method_id(#a.clone());
-          res
-        }})
-      }
-      "pop" => {
-        let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
-        let a = emit_expr_body(a)?;
-        Ok(quote_spanned!( op.span() => sys.#method_id(#a.clone(), None)))
-      }
-      "valid" | "peek" => {
-        let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
-        let fifo_self = match a.as_ref() {
-          expr::Expr::Term(ExprTerm::Ident(id)) => {
-            let name = id.to_string();
-            quote_spanned! { op.span() => {
-              let module = module.as_ref::<eir::ir::Module>(sys).unwrap();
-              module.get_port_by_name(#name).unwrap_or_else(|| {
-                panic!("Module {} has no port named {}", module.get_name(), #name)
-              }).upcast()
-            }}
-          }
-          _ => {
-            return Err(syn::Error::new(
+    expr::Expr::MethodCall((self_, op, operands)) => {
+      let opcode = Opcode::from_str(&op.to_string()).unwrap();
+      match opcode {
+        Opcode::FIFOPop | Opcode::FIFOPeek | Opcode::FIFOValid => {
+          let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
+          match self_.as_ref() {
+            expr::Expr::Term(ExprTerm::Ident(id)) => Ok(quote! {{ sys.#method_id(#id) }}),
+            _ => Err(syn::Error::new(
               op.span(),
               "Expected an identifier for valid/peek!",
-            ))
+            )),
           }
-        };
-        Ok(quote_spanned! { op.span() => {
-          let fifo = #fifo_self;
-          sys.#method_id(fifo)
-        }})
+        }
+        Opcode::Slice => {
+          // TODO(@were): Fix the span.
+          let method_id = syn::Ident::new("create_slice", Span::call_site());
+          let a = emit_expr_body(self_)?;
+          let l = emit_expr_body(&operands[0])?;
+          let r = emit_expr_body(&operands[1])?;
+          Ok(quote! {{
+            let src = #a.clone();
+            let start = #l;
+            let end = #r;
+            let res = sys.#method_id(src, start, end);
+            res
+          }})
+        }
+        _ => {
+          let a = emit_expr_body(self_)?;
+          let method_id = syn::Ident::new(format!("create_{}", op).as_str(), op.span());
+          let (b_def, b_use) = if opcode.arity().unwrap() == 2 {
+            let b = emit_expr_body(&operands[0])?;
+            (Some(quote! { let rhs = #b.clone(); }), Some(quote! { rhs }))
+          } else if opcode.arity().unwrap() == 1 {
+            (None, None)
+          } else {
+            return Err(syn::Error::new(
+              op.span(),
+              format!(
+                "Unsupported operator: \"{}\" with arity {}",
+                op,
+                opcode.arity().unwrap_or(0)
+              ),
+            ));
+          };
+          Ok(quote_spanned! { op.span() => {
+            let src = #a.clone();
+            #b_def
+            let res = sys.#method_id(src, #b_use);
+            res
+          }})
+        }
       }
-      _ => Err(syn::Error::new(
-        op.span(),
-        format!("Not supported method {}", op),
-      )),
-    },
-    expr::Expr::Slice((a, l, r)) => {
-      // TODO(@were): Fix the span.
-      let method_id = syn::Ident::new("create_slice", Span::call_site());
-      let a = emit_expr_body(a)?;
-      let l = emit_expr_term(l)?;
-      let r = emit_expr_term(r)?;
-      Ok(quote_spanned! { a.span() => {
-        let src = #a.clone();
-        let start = #l;
-        let end = #r;
-        let res = sys.#method_id(None, src, start, end);
-        res
-      }})
     }
     expr::Expr::DTConv((op, a, ty)) => {
       // TODO(@were): Fix the span.
@@ -335,69 +310,30 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
     },
     Statement::BodyScope((pred, body)) => {
       let unwraped_body = emit_body(body)?;
-      let (block_init, scoped) = match pred {
-        BodyPred::Condition(ref cond) => (
-          quote! {
-            let cond = #cond.clone();
-            let block_pred = eir::ir::block::BlockKind::Condition(cond);
-            let (block, tick_ip) = (sys.create_block(block_pred), true);
-          },
-          true,
-        ),
-        BodyPred::Cycle(cycle) => (
-          quote! {
-            let cycle = #cycle.clone();
-            let block_pred = eir::ir::block::BlockKind::Cycle(cycle);
-            let (block, tick_ip) = (sys.create_block(block_pred), true);
-          },
-          true,
-        ),
-        BodyPred::WaitUntil(lock) => {
-          let lock_emission = emit_body(lock).unwrap();
-          let value_id = block_value_id(lock);
-          assert!(lock.valued);
-          (
-            quote! {
-              sys.set_current_block_wait_until();
-              let block_restored = sys.get_current_block().unwrap().upcast();
-              let valued_block = {
-                let master = sys.get_current_block().unwrap().upcast();
-                let master = master.as_ref::<eir::ir::block::Block>(sys).unwrap();
-                match master.get_kind() {
-                  eir::ir::block::BlockKind::WaitUntil(valued_block) => valued_block.clone(),
-                  _ => unreachable!(),
-                }
-              };
-              sys.set_current_block(valued_block.clone());
-              #lock_emission
-              valued_block.as_mut::<eir::ir::block::Block>(sys).unwrap().set_value(#value_id);
-              let (block, tick_ip) = (block_restored, false)
-            },
-            false,
-          )
-        }
+      let block_init = match pred {
+        BodyPred::Condition(ref cond) => quote! {
+          let cond = #cond.clone();
+          let block_pred = eir::ir::block::BlockKind::Condition(cond);
+          let block = sys.create_block(block_pred);
+        },
+        BodyPred::Cycle(cycle) => quote! {
+          let cycle = #cycle.clone();
+          let block_pred = eir::ir::block::BlockKind::Cycle(cycle);
+          let block = sys.create_block(block_pred);
+        },
+        _ => panic!("wait_until should only be the root of a module"),
       };
       let emission = quote! {
         #block_init;
         sys.set_current_block(block.clone());
         #unwraped_body
-        let cur_module = sys
-          .get_current_module()
-          .expect("[When] No current module")
-          .upcast();
-        if tick_ip {
-          let ip = sys.get_current_ip();
-          let ip = ip.next(sys).expect("[When] No next ip");
-          sys.set_current_ip(ip);
-        }
+        let ip = sys.get_current_ip();
+        let ip = ip.next(sys).expect("[When] No next ip");
+        sys.set_current_ip(ip);
       };
-      if scoped {
-        quote! {{
-          #emission
-        }}
-      } else {
-        emission
-      }
+      quote! {{
+        #emission
+      }}
     }
     Statement::Log(args) => {
       let args = args
@@ -439,6 +375,43 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
 fn block_value_id(body: &ast::node::Body) -> syn::Ident {
   let ptr = body as *const _ as usize;
   syn::Ident::new(&format!("valued_of_{}", ptr), Span::call_site())
+}
+
+pub(crate) fn emit_module_body(
+  body: &ast::node::Body,
+  implicit_pops: proc_macro2::TokenStream,
+) -> syn::Result<proc_macro2::TokenStream> {
+  if body.stmts.len() == 1 {
+    if let Statement::BodyScope((BodyPred::WaitUntil(lock), body)) = &body.stmts[0] {
+      let lock_emission = emit_body(lock).unwrap();
+      let value_id = block_value_id(lock);
+      assert!(lock.valued);
+      let unwraped_body = emit_body(body)?;
+      return Ok(quote! {
+        sys.set_current_block_wait_until();
+        let block_restored = sys.get_current_block().unwrap().upcast();
+        let valued_block = {
+          let master = sys.get_current_block().unwrap().upcast();
+          let master = master.as_ref::<eir::ir::block::Block>(sys).unwrap();
+          match master.get_kind() {
+            eir::ir::block::BlockKind::WaitUntil(valued_block) => valued_block.clone(),
+            _ => unreachable!(),
+          }
+        };
+        sys.set_current_block(valued_block.clone());
+        #lock_emission
+        valued_block.as_mut::<eir::ir::block::Block>(sys).unwrap().set_value(#value_id);
+        sys.set_current_block(block_restored);
+        #implicit_pops
+        #unwraped_body
+      });
+    }
+  }
+  let body = emit_body(body)?;
+  Ok(quote! {
+    #implicit_pops
+    #body
+  })
 }
 
 /// Emit a braced block of instructions.
@@ -501,7 +474,7 @@ pub(crate) fn emit_ports(
     port_decls.push_punct(Token![,](id.span()));
     // Pop the port instances
     if !explicit_pop {
-      port_pops.push(quote! { let #id = sys.create_fifo_pop(#id.clone(), None) });
+      port_pops.push(quote! { let #id = sys.create_fifo_pop(#id.clone()) });
       port_pops.push_punct(Token![;](id.span()));
     }
   }

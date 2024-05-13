@@ -1,4 +1,4 @@
-use codegen::{emit_attrs, emit_body, emit_ports, emit_rets};
+use codegen::{emit_attrs, emit_module_body, emit_ports, emit_rets};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::parenthesized;
@@ -86,7 +86,7 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
       Err(e) => return e.to_compile_error().into(),
     };
 
-  let body = match emit_body(&parsed_module.body) {
+  let body = match emit_module_body(&parsed_module.body, port_pops) {
     Ok(x) => x,
     Err(e) => return e.to_compile_error().into(),
   };
@@ -143,7 +143,6 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
           .as_ref::<eir::ir::Module>(&sys)
           .expect("[Init Port] No current module!");
         #port_peeks
-        #port_pops
         ( #port_ids )
       };
       #body

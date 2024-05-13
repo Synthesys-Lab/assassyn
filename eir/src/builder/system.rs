@@ -89,12 +89,8 @@ impl PortInfo {
 /// is always executed.
 macro_rules! create_arith_op_impl {
   (binary, $func_name:ident, $opcode: expr) => {
-    pub fn $func_name(&mut self, ty: Option<DataType>, a: BaseNode, b: BaseNode) -> BaseNode {
-      let res_ty = if let Some(ty) = ty {
-        ty
-      } else {
-        self.combine_types($opcode, &a, &b)
-      };
+    pub fn $func_name(&mut self, a: BaseNode, b: BaseNode) -> BaseNode {
+      let res_ty = self.combine_types($opcode, &a, &b);
       self.create_expr(res_ty, $opcode, vec![a, b], true)
     }
   };
@@ -742,7 +738,7 @@ impl SysBuilder {
   /// * `op` - The operation code to be combined.
   /// * `a` - The lhs operand.
   /// * `b` - The rhs operand.
-  fn combine_types(&self, op: Opcode, a: &BaseNode, b: &BaseNode) -> DataType {
+  pub fn combine_types(&self, op: Opcode, a: &BaseNode, b: &BaseNode) -> DataType {
     let aty = a.get_dtype(self).unwrap();
     let bty = b.get_dtype(self).unwrap();
     if op.is_cmp() {
@@ -799,14 +795,9 @@ impl SysBuilder {
   /// * `num_elems` - The number of elements to be popped. If None is given, the number of elements
   /// is one.
   /// * `cond` - The condition of popping the FIFO. If None is given, the pop is unconditional.
-  pub fn create_fifo_pop(&mut self, fifo: BaseNode, num_elems: Option<BaseNode>) -> BaseNode {
-    let num_elems = if let Some(num_elems) = num_elems {
-      num_elems
-    } else {
-      self.get_const_int(DataType::uint_ty(32), 1)
-    };
+  pub fn create_fifo_pop(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-    let res = self.create_expr(ty, Opcode::FIFOPop, vec![fifo.clone(), num_elems], true);
+    let res = self.create_expr(ty, Opcode::FIFOPop, vec![fifo.clone()], true);
     res
   }
 
@@ -819,7 +810,11 @@ impl SysBuilder {
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
-    assert_eq!(fifo.get_kind(), NodeKind::FIFO);
+    assert_eq!(
+      fifo.get_kind(),
+      NodeKind::FIFO,
+      "Expect FIFO as the operand"
+    );
     let res = self.create_expr(DataType::int_ty(1), Opcode::FIFOValid, vec![fifo], true);
     res
   }
@@ -828,25 +823,17 @@ impl SysBuilder {
   ///
   /// TODO(@were): Should we allow `start` and `end` to be variables?
   /// TODO(@were): Should we use [start, end) or [start, end]? For now, [start, end] used.
-  pub fn create_slice(
-    &mut self,
-    ty: Option<DataType>,
-    src: BaseNode,
-    start: BaseNode,
-    end: BaseNode,
-  ) -> BaseNode {
-    let ty = if let Some(ty) = ty {
-      ty
-    } else if let Ok(start) = start.as_ref::<IntImm>(self) {
+  pub fn create_slice(&mut self, src: BaseNode, start: BaseNode, end: BaseNode) -> BaseNode {
+    let ty = if let Ok(start) = start.as_ref::<IntImm>(self) {
       if let Ok(end) = end.as_ref::<IntImm>(self) {
         assert!(start.get_value() <= end.get_value());
         let bits = end.get_value() - start.get_value() + 1;
         DataType::int_ty(bits as usize)
       } else {
-        src.get_dtype(self).unwrap()
+        panic!("End is NOT a constant!");
       }
     } else {
-      src.get_dtype(self).unwrap()
+      panic!("Start is NOT a constant!");
     };
     let res = self.create_expr(ty, Opcode::Slice, vec![src, start, end], true);
     res

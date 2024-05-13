@@ -1,4 +1,4 @@
-use eir::ir::DataType;
+use eir::ir::{DataType, Opcode};
 use syn::{bracketed, parenthesized, parse::Parse, punctuated::Punctuated, Token};
 
 use super::node::{ArrayAccess, FuncCall, WeakSpanned};
@@ -140,10 +140,8 @@ impl Parse for LValue {
 }
 
 pub(crate) enum Expr {
-  // ExprTerm . syn::Ident ( ExprTerm ): a.add(b)
-  Binary((Box<Expr>, syn::Ident, Box<Expr>)),
-  // ExprTerm . syn::Ident ( ): a.flip()
-  Unary((Box<Expr>, syn::Ident)),
+  // ExprTerm . syn::Ident ( args )
+  MethodCall((Box<Expr>, syn::Ident, Punctuated<Expr, Token![,]>)),
   // "default" ExprTerm . "case" ( ExprTerm, ExprTerm )
   //                    . "case" ( ExprTerm, ExprTerm ) *
   Select((Box<Expr>, Vec<(Expr, Expr)>)),
@@ -151,8 +149,6 @@ pub(crate) enum Expr {
   Bind(FuncCall),
   // "array" ( DType, syn::LitInt, Option<ExprTerm> )
   ArrayAlloc((DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)),
-  // ExprTerm . slice ( ExprTerm, ExprTerm )
-  Slice((Box<Expr>, ExprTerm, ExprTerm)),
   // ExprTerm . [cast | sext] ( DType )
   DTConv((syn::Ident, Box<Expr>, DType)),
   // ExprTerm
@@ -227,29 +223,32 @@ impl Parse for Expr {
         }
       }
       let operator = input.parse::<syn::Ident>()?;
-      let operands;
-      parenthesized!(operands in input);
-      match operator.to_string().as_str() {
-        "slice" => {
-          let l = operands.parse::<ExprTerm>()?;
-          operands.parse::<syn::Token![,]>()?; // Consume ","
-          let r = operands.parse::<ExprTerm>()?;
-          expr = Expr::Slice((Box::new(expr), l, r));
+      let raw_operands;
+      parenthesized!(raw_operands in input);
+      let op = Opcode::from_str(&operator.to_string());
+      match op {
+        // TODO(@were): Is it possible to unify this part?
+        Some(Opcode::Cast) | Some(Opcode::Sext) => {
+          let dtype = raw_operands.parse::<DType>()?;
+          expr = Expr::DTConv((operator, Box::new(expr), dtype));
         }
-        // TODO(@were): Deprecate pop, make it opaque to users.
-        "flip" | "pop" | "valid" | "peek" => {
-          expr = Expr::Unary((Box::new(expr), operator));
+        Some(x) => {
+          let operands = raw_operands.parse_terminated(Expr::parse, syn::Token![,])?;
+          if x.arity().map_or(false, |x| x - 1 != operands.len()) {
+            return Err(syn::Error::new(
+              operator.span(),
+              format!(
+                "{}:{}: Wrong operand number {} != {}.",
+                file!(),
+                line!(),
+                x.arity().unwrap() - 1,
+                operands.len()
+              ),
+            ));
+          }
+          expr = Expr::MethodCall((Box::new(expr), operator, operands));
         }
-        "add" | "mul" | "sub" | "igt" | "ilt" | "ige" | "ile" | "eq" | "neq" | "bitwise_and"
-        | "bitwise_or" | "concat" => {
-          let b = Box::new(operands.parse::<Expr>()?);
-          expr = Expr::Binary((Box::new(expr), operator, b))
-        }
-        "cast" | "sext" => {
-          let t = operands.parse::<DType>()?;
-          expr = Expr::DTConv((operator, Box::new(expr), t))
-        }
-        _ => {
+        None => {
           return Err(syn::Error::new(
             operator.span(),
             format!(
