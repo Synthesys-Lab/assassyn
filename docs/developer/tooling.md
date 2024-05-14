@@ -33,7 +33,7 @@ style with each commit.
    - Go to the Pull Request tab in our repo ![image](./imag/pr-tab.png)
    - Find the `New Pull Request` button <img src="./imag/new-pr.png" width=75>
    - Select the base branch as `master` and compare branch as your development branch.
-   ![](./imag/pr-base-dev.png | width=65)
+   <img src="./imag/pr-base-dev.png" width=65>
    - After filling out the PR title and description, click `Create Pull Request`
    ![image](./imag/create-pr.png)
    - If there is a conflict, resolve it by rebasing the master branch to your development branch.
