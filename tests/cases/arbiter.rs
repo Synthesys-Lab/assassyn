@@ -1,7 +1,7 @@
 use eda4eda::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
-pub fn multi_call() {
+pub fn arbiter() {
   module_builder!(sqr()(a:int<32>) #no_arbiter {
     b = a.mul(a);
     log("adder: {} * {} = {}", a, a, b);

@@ -1,3 +1,4 @@
+pub mod arbiter;
 pub mod async_call;
 pub mod back_pressure;
 pub mod bind;
@@ -12,7 +13,6 @@ pub mod fifo_valid;
 pub mod helloworld;
 pub mod inline;
 pub mod memory;
-pub mod multi_call;
 pub mod select;
 pub mod spin_lock;
 pub mod systolic;
