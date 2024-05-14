@@ -34,3 +34,14 @@ style with each commit.
    - Find the `New Pull Request` button ![alt text](./imag/new-pr.png)
    - Select the base branch as `master` and compare branch as your development branch.
    ![alt text](./imag/pr-base-dev.png)
+   - After filling out the PR title and description, click `Create Pull Request`
+   ![alt text](./imag/create-pr.png)
+   - If there is a conflict, resolve it by rebasing the master branch to your development branch.
+     - `git remote add upstream https://github.com/synthesys-lab/assassyn`
+     - `git fetch upstream`
+     - `git rebase upstream/master # Follow the git instructions to resolve conflicts`
+     - `git push -f origin <your-dev-branch>`
+   - Wait for all the checks done by the CI/CD pipeline, and the code review from the maintainers.
+   ![alt text](./imag/pr-checks.png)
+   - If everything is good, the maintainers will merge your PR.
+
