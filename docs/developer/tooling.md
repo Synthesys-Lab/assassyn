@@ -31,9 +31,9 @@ style with each commit.
 3. Create a new branch for your changes: `git checkout -b <your-dev-branch>`.
 4. After development, submit a pull request to the master branch from your branch.
    - Go to the Pull Request tab in our repo ![alt text](./imag/pr-tab.png)
-   - Find the `New Pull Request` button ![alt text](./imag/new-pr.png|width=75)
+   - Find the `New Pull Request` button ![alt text](./imag/new-pr.png | width=75)
    - Select the base branch as `master` and compare branch as your development branch.
-   ![alt text](./imag/pr-base-dev.png|width=65)
+   ![alt text](./imag/pr-base-dev.png | width=65)
    - After filling out the PR title and description, click `Create Pull Request`
    ![alt text](./imag/create-pr.png)
    - If there is a conflict, resolve it by rebasing the master branch to your development branch.
