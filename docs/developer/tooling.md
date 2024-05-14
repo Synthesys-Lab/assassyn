@@ -19,7 +19,7 @@ A test case not only checks the correctness of a newly written module, but also 
 example to see how certain interfaces should be used. Moreover, it also offers a light-weighted
 way to write a toy example to play with this framework, and sanity-check the build success.
 
-## Github
+## Git & Github Usage
 
 **Formatting:** To ensure consistent code style, copy `assassyn/utils/pre-commit` to your
 `.git/hooks/pre-commit`. This setup automatically formats your code and checks coding
@@ -30,3 +30,7 @@ style with each commit.
 2. Clone your fork: `git clone <url-to-your-fork>`.
 3. Create a new branch for your changes: `git checkout -b <your-dev-branch>`.
 4. After development, submit a pull request to the master branch from your branch.
+   - Go to the Pull Request tab in our repo ![alt text](./imag/pr-tab.png)
+   - Find the `New Pull Request` button ![alt text](./imag/new-pr.png)
+   - Select the base branch as `master` and compare branch as your development branch.
+   ![alt text](./imag/pr-base-dev.png)
