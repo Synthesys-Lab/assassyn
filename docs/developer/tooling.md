@@ -26,7 +26,7 @@ way to write a toy example to play with this framework, and sanity-check the bui
 style with each commit.
 
 **Adding New Features:** 
-1. Fork the repository to your account <img src"./imag/fork.png" width=100>
+1. Fork the repository to your account <img src="./imag/fork.png" width=100>
 2. Clone your fork: `git clone <url-to-your-fork>`.
 3. Create a new branch for your changes: `git checkout -b <your-dev-branch>`.
 4. After development, submit a pull request to the master branch from your branch.
