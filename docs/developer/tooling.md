@@ -26,22 +26,22 @@ way to write a toy example to play with this framework, and sanity-check the bui
 style with each commit.
 
 **Adding New Features:** 
-1. Fork the repository to your account ![alt text](./imag/fork.png)
+1. Fork the repository to your account ![image](./imag/fork.png)
 2. Clone your fork: `git clone <url-to-your-fork>`.
 3. Create a new branch for your changes: `git checkout -b <your-dev-branch>`.
 4. After development, submit a pull request to the master branch from your branch.
-   - Go to the Pull Request tab in our repo ![alt text](./imag/pr-tab.png)
-   - Find the `New Pull Request` button ![alt text](./imag/new-pr.png | width=75)
+   - Go to the Pull Request tab in our repo ![image](./imag/pr-tab.png)
+   - Find the `New Pull Request` button ![image](./imag/new-pr.png | width=75)
    - Select the base branch as `master` and compare branch as your development branch.
-   ![alt text](./imag/pr-base-dev.png | width=65)
+   ![image](./imag/pr-base-dev.png | width=65)
    - After filling out the PR title and description, click `Create Pull Request`
-   ![alt text](./imag/create-pr.png)
+   ![image](./imag/create-pr.png)
    - If there is a conflict, resolve it by rebasing the master branch to your development branch.
      - `git remote add upstream https://github.com/synthesys-lab/assassyn`
      - `git fetch upstream`
      - `git rebase upstream/master # Follow the git instructions to resolve conflicts`
      - `git push -f origin <your-dev-branch>`
    - Wait for all the checks done by the CI/CD pipeline, and the code review from the maintainers.
-   ![alt text](./imag/pr-checks.png)
+   ![image](./imag/pr-checks.png)
    - If everything is good, the maintainers will merge your PR.
 
