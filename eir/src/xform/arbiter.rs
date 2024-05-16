@@ -5,6 +5,7 @@ use crate::{
   ir::{
     instructions::{Bind, FIFOPush},
     ir_printer::IRPrinter,
+    module,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
     Block, BlockKind, DataType, Expr, Module,
@@ -54,7 +55,18 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
 pub fn inject_arbiter(sys: &mut SysBuilder) {
   let module_with_multi_caller = find_module_with_multi_callers(sys);
   for (callee, callers) in module_with_multi_caller.iter() {
+    if {
+      let module = callee.as_ref::<Module>(sys).unwrap();
+      module.get_attrs().contains(&module::Attribute::NoArbiter)
+        || module.get_attrs().contains(&module::Attribute::OptNone)
+    } {
+      continue;
+    }
     let module_name = callee.as_ref::<Module>(sys).unwrap().get_name().to_string();
+    {
+      let mut callee_mut = callee.as_mut::<Module>(sys).unwrap();
+      callee_mut.add_attr(module::Attribute::OptNone);
+    }
     let mut ports = Vec::new();
     for (i, caller) in callers.iter().enumerate() {
       let bind = caller.as_expr::<Bind>(sys).unwrap();
@@ -71,6 +83,8 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         });
     }
     let arbiter = sys.create_module("arbiter", ports);
+    let mut arbiter_mut = arbiter.as_mut::<Module>(sys).unwrap();
+    arbiter_mut.add_attr(module::Attribute::NoArbiter);
     sys.set_current_module(arbiter);
     sys.set_current_block_wait_until();
     if let BlockKind::WaitUntil(cond) = sys.get_current_block().unwrap().get_kind() {
