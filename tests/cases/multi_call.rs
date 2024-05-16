@@ -40,6 +40,17 @@ pub fn multi_call() {
   // TODO(@boyang): Should we also test the verilog backend?
   // eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  let raw = run_simulator(&sys, &config, None);
-  eprintln!("{}", raw);
+  let mut last_grant = None;
+  run_simulator(&sys, &config, None).lines().for_each(|x| {
+    if x.contains("adder") {
+      let raw = x.split_whitespace().collect::<Vec<&str>>();
+      let len = raw.len();
+      let a = raw[len - 5].parse::<i32>().unwrap();
+      let b = raw[len - 3].parse::<i32>().unwrap();
+      let c = raw[len - 1].parse::<i32>().unwrap();
+      assert_eq!(a + b, c);
+      assert!(last_grant.map_or(true, |last| { last % 2 != a % 2 }));
+      last_grant = Some(a);
+    }
+  });
 }

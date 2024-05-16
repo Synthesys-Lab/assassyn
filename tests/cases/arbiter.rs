@@ -59,7 +59,7 @@ pub fn arbiter() {
     }
   });
 
-  let mut sys = SysBuilder::new("multi_call");
+  let mut sys = SysBuilder::new("arbiter");
   let adder = sqr_builder(&mut sys);
   let arbiter = arbiter_builder(&mut sys, adder);
   driver_builder(&mut sys, arbiter);

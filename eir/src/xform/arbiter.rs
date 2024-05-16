@@ -33,6 +33,12 @@ impl Visitor<()> for GatherBinds {
   }
 }
 
+fn bits_to_int(sys: &mut SysBuilder, x: &BaseNode) -> BaseNode {
+  let dtype = x.get_dtype(sys).unwrap();
+  let bits = dtype.get_bits();
+  sys.create_cast(x.clone(), DataType::int_ty(bits))
+}
+
 fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet<BaseNode>> {
   let mut gather_binds = GatherBinds {
     binds: HashMap::new(),
@@ -97,15 +103,15 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       let mut cond_mut = cond.as_mut::<Block>(sys).unwrap();
       cond_mut.set_value(valid);
       sys.set_current_block(restore_block);
-      let mut valid_hot = sub_valids[0].clone();
-      for sub_valid in sub_valids.iter().skip(1) {
+      let mut valid_hot = sub_valids[callers.len() - 1].clone();
+      for sub_valid in sub_valids.iter().rev().skip(1) {
         valid_hot = sys.create_concat(valid_hot, sub_valid.clone());
       }
 
       let (last_grant_reg, grant_scalar_ty, grant_hot_ty) = {
         let dtype = DataType::int_ty(callers.len());
         let bits = usize::BITS - callers.len().next_power_of_two().leading_zeros();
-        let one = sys.get_const_int(dtype.clone(), 0);
+        let one = sys.get_const_int(dtype.clone(), 1);
         (
           sys.create_array(dtype.clone(), "last_grant", 1, Some(vec![one])),
           DataType::int_ty(bits as usize),
@@ -117,18 +123,22 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       let ptr = sys.create_array_ptr(last_grant_reg, zero);
       let last_grant_1h = sys.create_array_read(ptr);
 
-      // low_mask = last_grant_1h - 1
+      // low_mask = ((last_grant_1h - 1) << 1) + 1
       let one = sys.get_const_int(grant_hot_ty.clone(), 1);
       let lo = sys.create_sub(last_grant_1h, one);
+      let lo = sys.create_shl(lo, one);
+      let lo = sys.create_add(lo, one);
       // high_mask = ~low_mask
       let hi = sys.create_flip(lo);
       // low_valid = valid_hot & low_mask
       let lo_valid = sys.create_bitwise_and(lo.clone(), valid_hot.clone());
-      let lo_valid_neg = sys.create_neg(lo_valid.clone());
+      let signed_lo_valid = bits_to_int(sys, &lo_valid);
+      let lo_valid_neg = sys.create_neg(signed_lo_valid);
       let lo_grant = sys.create_bitwise_and(lo_valid, lo_valid_neg);
       // high_valid = valid_hot & high_mask
       let hi_valid = sys.create_bitwise_and(hi.clone(), valid_hot.clone());
-      let hi_valid_neg = sys.create_neg(hi_valid);
+      let signed_hi_valid = bits_to_int(sys, &hi_valid);
+      let hi_valid_neg = sys.create_neg(signed_hi_valid);
       let hi_grant = sys.create_bitwise_and(hi_valid, hi_valid_neg);
       let zero = sys.get_const_int(hi_grant.get_dtype(sys).unwrap(), 0);
       let hi_nez = sys.create_neq(hi_grant.clone(), zero);
