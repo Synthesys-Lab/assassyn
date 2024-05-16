@@ -226,7 +226,7 @@ impl Visitor<String> for IRPrinter {
         )
       } else if expr.get_opcode().is_unary() {
         format!(
-          "{} {}",
+          "{}{}",
           mnem,
           expr.get_operand(0).unwrap().get_value().to_string(expr.sys)
         )

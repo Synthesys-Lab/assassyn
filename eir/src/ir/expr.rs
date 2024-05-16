@@ -110,6 +110,8 @@ register_opcodes!(
   Add("add" "+" 2 /*lhs rhs*/) => { binary, valued },
   Sub("sub" "-" 2 /*lhs rhs*/) => { binary, valued },
   Mul("mul" "*" 2 /*lhs rhs*/) => { binary, valued },
+  Shl("shl" "<<" 2 /*lhs rhs*/) => { binary, valued },
+  Shr("shr" ">>" 2 /*lhs rhs*/) => { binary, valued },
   BitwiseAnd("bitwise_and" "&" 2/*lhs rhs*/) => { binary, valued },
   BitwiseOr("bitwise_or" "|" 2/*lhs rhs*/) => { binary, valued },
   BitwiseXor("bitwise_xor" "^" 2/*lhs rhs*/) => { binary, valued },

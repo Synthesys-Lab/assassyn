@@ -459,6 +459,8 @@ impl SysBuilder {
 
   create_arith_op_impl!(binary, create_add, Opcode::Add);
   create_arith_op_impl!(binary, create_sub, Opcode::Sub);
+  create_arith_op_impl!(binary, create_shl, Opcode::Shl);
+  create_arith_op_impl!(binary, create_shr, Opcode::Shr);
   create_arith_op_impl!(binary, create_bitwise_and, Opcode::BitwiseAnd);
   create_arith_op_impl!(binary, create_bitwise_or, Opcode::BitwiseOr);
   create_arith_op_impl!(binary, create_bitwise_xor, Opcode::BitwiseXor);
@@ -766,6 +768,16 @@ impl SysBuilder {
           ),
         }
       }
+      Opcode::Shl | Opcode::Shr => match (&aty, &bty) {
+        (DataType::Int(a), DataType::Int(_)) => DataType::Int(*a),
+        (DataType::UInt(a), DataType::UInt(_)) => DataType::UInt(*a),
+        _ => panic!(
+          "Cannot combine types {} and {} for {:?}",
+          aty.to_string(),
+          bty.to_string(),
+          op
+        ),
+      },
       Opcode::BitwiseAnd => DataType::bits_ty(aty.get_bits().min(bty.get_bits())),
       Opcode::BitwiseOr | Opcode::BitwiseXor => {
         DataType::bits_ty(aty.get_bits().max(bty.get_bits()))
