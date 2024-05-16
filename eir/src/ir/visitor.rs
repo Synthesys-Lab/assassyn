@@ -43,7 +43,7 @@ pub trait Visitor<T> {
     }
     for elem in block.iter() {
       if let Some(x) = self.dispatch(block.sys, elem, vec![]) {
-        return x.into();
+        return Some(x);
       }
     }
     None

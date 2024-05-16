@@ -1,7 +1,9 @@
 use super::expr::Opcode;
 use super::node::ExprRef;
+use super::{ir_printer::IRPrinter, visitor::Visitor};
 
 pub mod call;
+pub mod fifo;
 pub mod gep;
 pub mod load;
 
@@ -30,6 +32,13 @@ macro_rules! register_opcode {
     pub struct $elem<'a> {
       expr: ExprRef<'a>,
     }
+
+    impl ToString for $elem<'_> {
+      fn to_string(&self) -> String {
+        IRPrinter::new(false).visit_expr(&self.expr).unwrap()
+      }
+    }
+
   };
 
   (emit_impl $elem:ident, $($rest:ident),* ) => {
@@ -45,4 +54,4 @@ macro_rules! register_opcode {
   () => {};
 }
 
-register_opcode!(GetElementPtr, Load, Bind,);
+register_opcode!(GetElementPtr, Load, Bind, AsyncCall, FIFOPush);

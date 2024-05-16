@@ -33,7 +33,7 @@ macro_rules! find_opcode_attr {
 }
 
 macro_rules! register_opcodes {
-  ( $( $opcode:ident ( $fe_method: literal $mn:literal $arity:expr ) => { $($ky:ident),* } ),* $(,)? ) => {
+  ( $( $opcode:ident $( ( $subcode:ident ) )? ( $fe_method: literal $mn:literal $arity:expr ) => { $($ky:ident),* } ),* $(,)? ) => {
 
     #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
     pub enum Opcode {

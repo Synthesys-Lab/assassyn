@@ -130,6 +130,10 @@ macro_rules! emit_elem_impl {
         {
           <$name>::downcast(&self.sys.slab, &self.elem).unwrap()
         }
+
+        pub fn clone(&self) -> [<$name Ref>] <'sys> {
+          [<$name Ref>] { sys: self.sys, elem: self.elem }
+        }
       }
 
       impl Deref for [<$name Ref>]<'_> {
