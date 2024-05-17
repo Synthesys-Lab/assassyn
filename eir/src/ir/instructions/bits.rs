@@ -1,7 +1,6 @@
 use super::Slice;
 
 impl Slice<'_> {
-
   pub fn l(&self) -> usize {
     self.l_intimm().get_value() as usize
   }
@@ -10,4 +9,3 @@ impl Slice<'_> {
     self.r_intimm().get_value() as usize
   }
 }
-

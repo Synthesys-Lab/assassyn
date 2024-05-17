@@ -1284,9 +1284,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           let name = namify(expr.upcast().to_string(self.sys).as_str());
           let load = expr.as_sub::<instructions::Load>().unwrap();
           let gep = load.pointer();
-          let (array_ref, array_idx) = {
-            (gep.array(), gep.index())
-          };
+          let (array_ref, array_idx) = { (gep.array(), gep.index()) };
           let array_name = namify(array_ref.get_name());
           match self.array_drivers.get_mut(&array_name) {
             Some(ads) => {
@@ -1314,9 +1312,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         Opcode::Store => {
           let store = expr.as_sub::<instructions::Store>().unwrap();
           let gep = store.pointer();
-          let (array_ref, array_idx) = {
-            (gep.array(), gep.index())
-          };
+          let (array_ref, array_idx) = { (gep.array(), gep.index()) };
           let array_name = namify(array_ref.get_name());
           match self.array_drivers.get_mut(&array_name) {
             Some(ads) => {

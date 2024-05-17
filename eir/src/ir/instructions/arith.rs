@@ -24,7 +24,6 @@ impl Unary<'_> {
       ),
     }
   }
-
 }
 
 impl Compare<'_> {
@@ -38,4 +37,3 @@ impl Compare<'_> {
     }
   }
 }
-

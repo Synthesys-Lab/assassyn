@@ -38,4 +38,3 @@ impl Bind<'_> {
       .all(|x| !x.get_value().is_unknown())
   }
 }
-

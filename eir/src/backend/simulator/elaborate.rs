@@ -352,9 +352,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::Load => {
         let load = expr.as_sub::<instructions::Load>().unwrap();
         let gep = load.pointer();
-        let (array, idx) = {
-          (gep.array(), gep.index())
-        };
+        let (array, idx) = { (gep.array(), gep.index()) };
         format!(
           "{}[{} as usize].clone()",
           namify(array.get_name()),
@@ -366,9 +364,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::Store => {
         let store = expr.as_sub::<instructions::Store>().unwrap();
         let gep = store.pointer();
-        let (array, idx) = {
-          (gep.array(), gep.index())
-        };
+        let (array, idx) = { (gep.array(), gep.index()) };
         let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
         let idx = dump_ref!(store.get().sys, &idx);
         let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
