@@ -1,6 +1,6 @@
 use crate::ir::{node::BaseNode, IntImm};
 
-use super::{Slice, Concat};
+use super::{Concat, Slice};
 
 impl Slice<'_> {
   pub fn x(&self) -> BaseNode {
@@ -31,7 +31,6 @@ impl Slice<'_> {
 }
 
 impl Concat<'_> {
-
   pub fn msb(&self) -> BaseNode {
     self.expr.get_operand(0).unwrap().get_value().clone()
   }
@@ -39,5 +38,4 @@ impl Concat<'_> {
   pub fn lsb(&self) -> BaseNode {
     self.expr.get_operand(1).unwrap().get_value().clone()
   }
-
 }

@@ -3,11 +3,10 @@ use super::node::ExprRef;
 use super::{ir_printer::IRPrinter, visitor::Visitor};
 
 pub mod arith;
+pub mod bits;
 pub mod call;
 pub mod data;
 pub mod fifo;
-pub mod gep;
-pub mod bits;
 
 pub trait AsExpr<'a>: Sized {
   fn downcast(expr: ExprRef<'a>) -> Result<Self, String>;
