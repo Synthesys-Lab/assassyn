@@ -234,15 +234,15 @@ impl Parse for Expr {
       match op {
         Some(x) => {
           let operands = raw_operands.parse_terminated(Expr::parse, syn::Token![,])?;
-          if x.arity().map_or(false, |x| {
-            // Count the number of valued operands
-            operands
-              .iter()
-              .filter(|x| !matches!(x, Expr::Term(ExprTerm::DType(_))))
-              .count()
-              != x - 1
-            // "self" is not counted, so minus 1
-          }) {
+          // Count the number of valued operands
+          let valued_terms = operands
+            .iter()
+            .filter(|x| !matches!(x, Expr::Term(ExprTerm::DType(_))))
+            .count();
+          if x.arity().map_or(
+            false,
+            |x| valued_terms != x - 1, // "self" is not counted, so minus 1
+          ) {
             return Err(syn::Error::new(
               operator.span(),
               format!(
