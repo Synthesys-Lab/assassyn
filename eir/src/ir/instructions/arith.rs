@@ -1,6 +1,6 @@
-use crate::ir::{expr::subcode, node::BaseNode, Opcode};
+use crate::ir::{expr::subcode, Opcode};
 
-use super::{Binary, Compare, Select, Unary};
+use super::{Binary, Compare, Unary};
 
 impl Binary<'_> {
   pub fn get_opcode(&self) -> subcode::Binary {
@@ -11,14 +11,6 @@ impl Binary<'_> {
         self.expr.get_opcode()
       ),
     }
-  }
-
-  pub fn a(&self) -> BaseNode {
-    self.expr.get_operand(0).unwrap().get_value().clone()
-  }
-
-  pub fn b(&self) -> BaseNode {
-    self.expr.get_operand(1).unwrap().get_value().clone()
   }
 }
 
@@ -33,9 +25,6 @@ impl Unary<'_> {
     }
   }
 
-  pub fn x(&self) -> BaseNode {
-    self.expr.get_operand(0).unwrap().get_value().clone()
-  }
 }
 
 impl Compare<'_> {
@@ -48,26 +37,5 @@ impl Compare<'_> {
       ),
     }
   }
-
-  pub fn a(&self) -> BaseNode {
-    self.expr.get_operand_value(0).unwrap().clone()
-  }
-
-  pub fn b(&self) -> BaseNode {
-    self.expr.get_operand_value(1).unwrap().clone()
-  }
 }
 
-impl Select<'_> {
-  pub fn get_cond(&self) -> BaseNode {
-    self.expr.get_operand_value(0).unwrap().clone()
-  }
-
-  pub fn true_value(&self) -> BaseNode {
-    self.expr.get_operand_value(1).unwrap().clone()
-  }
-
-  pub fn false_value(&self) -> BaseNode {
-    self.expr.get_operand_value(2).unwrap().clone()
-  }
-}

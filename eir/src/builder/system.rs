@@ -558,7 +558,7 @@ impl SysBuilder {
   ) -> BaseNode {
     let module = {
       let bind = bind.as_expr::<Bind>(self).unwrap();
-      let callee = bind.get_callee();
+      let callee = bind.callee();
       callee.as_ref::<Module>(self).unwrap_or_else(|_| {
         panic!(
           "Only module callee can be used for bind, but {:?} got!",
@@ -612,7 +612,7 @@ impl SysBuilder {
   pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
     let (callee, signature, port_idx) = {
       let bind = bind.as_expr::<Bind>(self).unwrap();
-      let callee = bind.get_callee();
+      let callee = bind.callee();
       let signature = callee.get_dtype(self).unwrap();
       let port_idx = {
         let mut idx = None;

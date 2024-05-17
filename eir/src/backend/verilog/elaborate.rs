@@ -12,7 +12,7 @@ use crate::{
 
 use self::{
   expr::subcode,
-  instructions::{Bind, GetElementPtr},
+  instructions::{Bind, FIFOPush},
 };
 
 fn namify(name: &str) -> String {
@@ -661,15 +661,11 @@ fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
     }
     NodeKind::Expr => {
       let expr = node.as_ref::<Expr>(sys).unwrap();
-      if expr.get_opcode() == Opcode::AsyncCall {
+      if matches!(expr.get_opcode(), Opcode::AsyncCall) {
+        let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
         let triggered_module = {
-          let bind = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_expr::<Bind>(sys)
-            .unwrap();
-          bind.get_callee()
+          let bind = call.bind();
+          bind.callee()
         };
         let triggered_module = triggered_module.as_ref::<Module>(sys).unwrap();
         triggered_modules.push(namify(triggered_module.get_name()));
@@ -918,12 +914,8 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         self.visit_expr(expr.clone());
         match expr.get_opcode() {
           Opcode::FIFOPush => {
-            let fifo = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_ref::<FIFO>(self.sys)
-              .unwrap();
+            let push = expr.as_sub::<FIFOPush>().unwrap();
+            let fifo = push.fifo();
             let fifo_module = namify(
               fifo
                 .get_parent()
@@ -935,14 +927,10 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             rdata_fifo = Some(format!("{}_{}", fifo_module, fifo_name));
           }
           Opcode::AsyncCall => {
+            let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
             let module = {
-              let operand = expr.get_operand(0).unwrap();
-              let bind = operand.get_value();
-              let module = {
-                let bind = bind.as_expr::<Bind>(expr.sys).unwrap();
-                bind.get_callee()
-              };
-              module.as_ref::<Module>(expr.sys).unwrap()
+              let bind = call.bind();
+              bind.callee().as_ref::<Module>(call.get().sys).unwrap()
             };
             rdata_module = Some(namify(module.get_name()));
           }
@@ -1292,13 +1280,11 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         }
 
         Opcode::Load => {
+          let dtype = expr.dtype();
+          let name = namify(expr.upcast().to_string(self.sys).as_str());
+          let load = expr.as_sub::<instructions::Load>().unwrap();
+          let gep = load.pointer();
           let (array_ref, array_idx) = {
-            let gep = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_expr::<GetElementPtr>(self.sys)
-              .unwrap();
             (gep.array(), gep.index())
           };
           let array_name = namify(array_ref.get_name());
@@ -1315,9 +1301,9 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           }
           Some(format!(
             "logic [{}:0] {};\nassign {} = array_{}_q[{}];\n\n",
-            expr.dtype().get_bits() - 1,
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            namify(expr.upcast().to_string(self.sys).as_str()),
+            dtype.get_bits() - 1,
+            name,
+            name,
             namify(array_ref.get_name()),
             dump_ref!(self.sys, &array_idx)
           ))
@@ -1326,13 +1312,9 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         Opcode::GetElementPtr => Some("".into()),
 
         Opcode::Store => {
+          let store = expr.as_sub::<instructions::Store>().unwrap();
+          let gep = store.pointer();
           let (array_ref, array_idx) = {
-            let gep = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_expr::<GetElementPtr>(self.sys)
-              .unwrap();
             (gep.array(), gep.index())
           };
           let array_name = namify(array_ref.get_name());
@@ -1352,7 +1334,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             array_name,
             (self.pred.clone().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string()),
             array_name,
-            dump_ref!(self.sys, expr.get_operand(1).unwrap().get_value()),
+            dump_ref!(self.sys, &store.value()),
             array_name,
             dump_ref!(self.sys, &array_idx)
           ))
@@ -1440,7 +1422,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
               .get_value()
               .as_expr::<Bind>(self.sys)
               .unwrap();
-            operand.get_callee()
+            operand.callee()
           };
           let module = module.as_ref::<Module>(self.sys).unwrap();
           let module_name = namify(module.get_name());

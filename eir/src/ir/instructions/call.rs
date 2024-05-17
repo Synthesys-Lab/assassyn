@@ -1,6 +1,6 @@
 use crate::ir::node::BaseNode;
 
-use super::{AsyncCall, Bind};
+use super::Bind;
 
 impl Bind<'_> {
   /// Get the arguments of this bind expression.
@@ -12,7 +12,7 @@ impl Bind<'_> {
     }
   }
   /// Get the callee of this bind expression.
-  pub fn get_callee(&self) -> BaseNode {
+  pub fn callee(&self) -> BaseNode {
     self
       .expr
       .get_operand(self.expr.get_num_operands() - 1)
@@ -39,14 +39,3 @@ impl Bind<'_> {
   }
 }
 
-impl AsyncCall<'_> {
-  pub fn get_bind(&self) -> Bind<'_> {
-    return self
-      .expr
-      .get_operand(0)
-      .unwrap()
-      .get_value()
-      .as_expr(self.expr.sys)
-      .unwrap();
-  }
-}

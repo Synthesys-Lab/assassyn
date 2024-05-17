@@ -24,7 +24,7 @@ impl Visitor<()> for GatherBinds {
     let expr = expr.clone();
     if let Ok(bind) = expr.as_sub::<Bind>() {
       eprintln!("bind: {}", bind.to_string());
-      let callee = bind.get_callee();
+      let callee = bind.callee();
       if !self.binds.contains_key(&callee) {
         self.binds.insert(callee, HashSet::new());
       }
@@ -78,7 +78,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
           let fifo_push = arg.as_expr::<FIFOPush>(sys).unwrap();
           ports.push(PortInfo::new(
             &format!("{}.caller{}.arg{}", module_name, i, j),
-            fifo_push.get_value().get_dtype(sys).unwrap(),
+            fifo_push.value().get_dtype(sys).unwrap(),
           ));
         });
     }

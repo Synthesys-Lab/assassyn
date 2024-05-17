@@ -1,6 +1,7 @@
 use super::expr::Opcode;
 use super::node::ExprRef;
 use super::{ir_printer::IRPrinter, visitor::Visitor};
+use crate::{ir, ir::node::BaseNode};
 
 pub mod arith;
 pub mod bits;
@@ -13,58 +14,90 @@ pub trait AsExpr<'a>: Sized {
 }
 
 macro_rules! register_opcode {
-
-  ($($operator:ident $( { $subcode:ident } )? ),* $(,)?) => {
-    $(
-      impl<'a> AsExpr<'a> for $operator<'a> {
-        fn downcast(expr: ExprRef<'a>) -> Result<Self, String> {
-          if let Opcode::$operator $( { $subcode } )? = expr.get_opcode() {
-            $( let _ = $subcode; )?
-            Ok($operator { expr })
-          } else {
-            Err(format!(
-              "Expecting Opcode::{}, but got {:?}",
-              stringify!($elem),
-              expr.get_opcode()
-            ))
-          }
-        }
+  (@emit_sema $operator:ident => { ($method:ident, $idx:literal, BaseNode) $( ( $($rest_sema:tt)* ) )* }) => {
+    impl $operator<'_> {
+      pub fn $method(&self) -> BaseNode {
+        self.expr.get_operand_value($idx).unwrap()
       }
+    }
+    register_opcode!(@emit_sema $operator => { $( ( $($rest_sema)* ) )* } );
+  };
 
-      pub struct $operator<'a> {
-        expr: ExprRef<'a>,
+  (@emit_sema $operator:ident => { ($method:ident, $idx:literal, expr::$op:ident) $( ( $($rest_sema:tt)* ) )* }) => {
+    impl $operator<'_> {
+      pub fn $method(&self) -> $op<'_> {
+        self.expr.get_operand_value($idx).unwrap().as_expr::<$op>(self.get().sys).unwrap()
       }
+    }
+    register_opcode!(@emit_sema $operator => { $( ( $($rest_sema)* ) )* } );
+  };
 
+  (@emit_sema $operator:ident => { ($method:ident, $idx:literal, node::$ty:ident) $( ( $($rest_sema:tt)* ) )* }) => {
+    paste::paste! {
       impl $operator<'_> {
-        pub fn get(&self) -> &ExprRef<'_> {
-          &self.expr
+        pub fn $method(&self) -> ir::node::[< $ty Ref>]<'_> {
+          self.expr.get_operand_value($idx).unwrap().as_ref::<ir::$ty>(self.get().sys).unwrap()
         }
       }
+    }
+    register_opcode!(@emit_sema $operator => { $( ( $($rest_sema)* ) )* } );
+  };
 
-      impl ToString for $operator<'_> {
-        fn to_string(&self) -> String {
-          IRPrinter::new(false).visit_expr(self.expr.clone()).unwrap()
+  (@emit_sema $operator:ident => { }) => { };
+
+  ($operator:ident $( { $subcode:ident } )? => { $( ( $($sema_info:tt)* ) )* }, $( $rest:tt )* ) => {
+    impl<'a> AsExpr<'a> for $operator<'a> {
+      fn downcast(expr: ExprRef<'a>) -> Result<Self, String> {
+        if let Opcode::$operator $( { $subcode } )? = expr.get_opcode() {
+          $( let _ = $subcode; )?
+          Ok($operator { expr })
+        } else {
+          Err(format!(
+            "Expecting Opcode::{}, but got {:?}",
+            stringify!($elem),
+            expr.get_opcode()
+          ))
         }
       }
-    )*
+    }
+
+    pub struct $operator<'a> {
+      expr: ExprRef<'a>,
+    }
+
+    impl $operator<'_> {
+      pub fn get(&self) -> &ExprRef<'_> {
+        &self.expr
+      }
+    }
+
+    impl ToString for $operator<'_> {
+      fn to_string(&self) -> String {
+        IRPrinter::new(false).visit_expr(self.expr.clone()).unwrap()
+      }
+    }
+
+    register_opcode!(@emit_sema $operator => { $( ( $($sema_info)* ) )* });
+
+    register_opcode!( $( $rest )* );
   };
 
   () => {};
 }
 
 register_opcode!(
-  GetElementPtr,
-  Load,
-  Store,
-  Bind,
-  AsyncCall,
-  FIFOPush,
-  FIFOPop,
-  FIFOField { field },
-  Binary { binop },
-  Unary { uop },
-  Select,
-  Compare { cmp },
-  Slice,
-  Concat,
+  GetElementPtr => { (array, 0, node::Array) (index, 1, BaseNode) },
+  Load => { (pointer, 0, expr::GetElementPtr) },
+  Store => { (pointer, 0, expr::GetElementPtr) (value, 1, BaseNode) },
+  Bind => { },
+  AsyncCall => { (bind, 0, expr::Bind) },
+  FIFOPush => { (fifo, 0, node::FIFO) (value, 1, BaseNode) },
+  FIFOPop => { (fifo, 0, node::FIFO) },
+  FIFOField { field } => { (fifo, 0, node::FIFO) },
+  Binary { binop } => { (a, 0, BaseNode) (b, 1, BaseNode) },
+  Unary { uop } => { (x, 0, BaseNode) },
+  Select => { (cond, 0, BaseNode) (true_value, 1, BaseNode) (false_value, 2, BaseNode) },
+  Compare { cmp } => { (a, 0, BaseNode) (b, 1, BaseNode) },
+  Slice => { (x, 0, BaseNode) (l_intimm, 1, node::IntImm) (r_intimm, 2, node::IntImm) },
+  Concat => { (msb, 0, BaseNode) (lsb, 1, BaseNode) },
 );

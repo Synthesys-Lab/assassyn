@@ -210,7 +210,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
               .get_value()
               .as_expr::<Bind>(self.sys)
               .unwrap();
-            let module = bind.get_callee().as_ref::<Module>(self.sys).unwrap();
+            let module = bind.callee().as_ref::<Module>(self.sys).unwrap();
             let to_trigger = format!("EventKind::Module{}", camelize(&namify(module.get_name())));
             rdata_module = Some(format!(
               "q.push(Reverse(Event{{ stamp: stamp + read_latency * 100, kind: {} }}))",
@@ -351,8 +351,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Load => {
         let load = expr.as_sub::<instructions::Load>().unwrap();
+        let gep = load.pointer();
         let (array, idx) = {
-          let gep = load.pointer();
           (gep.array(), gep.index())
         };
         format!(
@@ -365,8 +365,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Store => {
         let store = expr.as_sub::<instructions::Store>().unwrap();
+        let gep = store.pointer();
         let (array, idx) = {
-          let gep = store.pointer();
           (gep.array(), gep.index())
         };
         let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
@@ -396,8 +396,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::AsyncCall => {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
         let to_trigger = if let Ok(module) = {
-          let bind = call.get_bind();
-          bind.get_callee().as_ref::<Module>(self.sys)
+          let bind = call.bind();
+          bind.callee().as_ref::<Module>(self.sys)
         } {
           format!("EventKind::Module{}", camelize(&namify(module.get_name())))
         } else {
@@ -411,7 +411,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::FIFOPop => {
         // TODO(@were): Support multiple pop.
         let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
-        let fifo = pop.get_fifo();
+        let fifo = pop.fifo();
         let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
         let fifo_ty = fifo.scalar_ty();
         let fifo_pop = syn::Ident::new(
@@ -431,7 +431,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::FIFOField { field } => {
         let get_field = expr.as_sub::<instructions::FIFOField>().unwrap();
-        let fifo = get_field.get_fifo();
+        let fifo = get_field.fifo();
         match get_field.get_field() {
           subcode::FIFO::Peek => format!("{}.front().unwrap().clone()", fifo_name!(fifo)),
           subcode::FIFO::Valid => format!("!{}.is_empty()", fifo_name!(fifo)),
@@ -440,13 +440,13 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::FIFOPush => {
         let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
-        let fifo = push.get_fifo();
+        let fifo = push.fifo();
         let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
         let fifo_push = syn::Ident::new(
           &format!("FIFO{}Push", dtype_to_rust_type(&fifo.scalar_ty())),
           Span::call_site(),
         );
-        let value = dump_ref!(self.sys, &push.get_value());
+        let value = dump_ref!(self.sys, &push.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
         let module_writer = self.current_module_id();
         if !fifo.is_placeholder() {
@@ -513,9 +513,10 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
       }
       Opcode::Select => {
-        let cond = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
-        let true_value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
-        let false_value = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
+        let select = expr.as_sub::<instructions::Select>().unwrap();
+        let cond = dump_ref!(self.sys, &select.cond());
+        let true_value = dump_ref!(self.sys, &select.true_value());
+        let false_value = dump_ref!(self.sys, &select.false_value());
         format!(
           "if {} {{ {} }} else {{ {} }}",
           cond, true_value, false_value
@@ -555,7 +556,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Bind => {
         let bind = expr.as_sub::<Bind>().unwrap();
-        let callee = bind.get_callee();
+        let callee = bind.callee();
         let module = callee.as_ref::<Module>(bind.get().sys).unwrap();
         format!("EventKind::Module{}", camelize(&namify(module.get_name())))
       }
