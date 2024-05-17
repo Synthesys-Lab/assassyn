@@ -29,6 +29,14 @@ impl ToString for Concat<'_> {
         b.get_dtype(self.expr.sys).unwrap().get_bits(),
       )
     };
-    format!("{} = concat({}, {}) // {} << {} | {}", self.expr.get_name(), a, b, a, b_bits, b,)
+    format!(
+      "{} = concat({}, {}) // {} << {} | {}",
+      self.expr.get_name(),
+      a,
+      b,
+      a,
+      b_bits,
+      b,
+    )
   }
 }

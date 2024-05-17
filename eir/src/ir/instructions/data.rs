@@ -1,4 +1,4 @@
-use crate::ir::node::{NodeKind, IsElement};
+use crate::ir::node::{IsElement, NodeKind};
 
 use super::{GetElementPtr, Load, Store};
 

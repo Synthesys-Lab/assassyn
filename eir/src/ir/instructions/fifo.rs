@@ -1,6 +1,6 @@
 use crate::ir::{
   expr::subcode,
-  node::{FIFORef, Parented, IsElement},
+  node::{FIFORef, IsElement, Parented},
   visitor::Visitor,
   Opcode,
 };
@@ -45,7 +45,11 @@ impl ToString for FIFOField<'_> {
 
 impl ToString for FIFOPop<'_> {
   fn to_string(&self) -> String {
-    format!("{} = {}.pop()", self.expr.get_name(), FIFODumper.visit_input(self.fifo()).unwrap())
+    format!(
+      "{} = {}.pop()",
+      self.expr.get_name(),
+      FIFODumper.visit_input(self.fifo()).unwrap()
+    )
   }
 }
 
