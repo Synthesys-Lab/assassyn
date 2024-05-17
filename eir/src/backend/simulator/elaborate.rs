@@ -518,13 +518,12 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           cond, true_value, false_value
         )
       }
-      Opcode::Cast { cast } => {
-        let src_ref = expr.get_operand(0).unwrap();
-        let src = src_ref.get_value();
-        let src_dtype = src.get_dtype(expr.sys).unwrap();
-        let dest_dtype = expr.dtype();
-        let a = dump_ref!(self.sys, src);
-        match cast {
+      Opcode::Cast { .. } => {
+        let cast = expr.as_sub::<instructions::Cast>().unwrap();
+        let src_dtype = cast.src_type();
+        let dest_dtype = cast.dest_type();
+        let a = dump_ref!(cast.get().sys, &cast.x());
+        match cast.get_opcode() {
           Cast::ZExt => {
             // perform zero extension
             format!(
