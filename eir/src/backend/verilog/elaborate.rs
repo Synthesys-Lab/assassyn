@@ -1216,7 +1216,8 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         Some(format!(
           "logic [{}:0] {};\nassign {} = {}{};\n\n",
           dbits,
-          name, name,
+          name,
+          name,
           uop.get_opcode().to_string(),
           dump_ref!(self.sys, &uop.x())
         ))
