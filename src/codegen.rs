@@ -96,17 +96,6 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         }
       }
     }
-    // expr::Expr::DTConv((op, a, ty)) => {
-    //   // TODO(@were): Fix the span.
-    //   let method_id = syn::Ident::new(format!("create_{}", op).as_str(), Span::call_site());
-    //   let a = emit_expr_body(a)?;
-    //   let ty = emit_type(ty)?;
-    //   Ok(quote_spanned! { op.span() => {
-    //     let src = #a.clone();
-    //     let res = sys.#method_id(src, #ty);
-    //     res
-    //   }})
-    // }
     expr::Expr::Term(term) => {
       let res = emit_expr_term(term)?;
       if let ExprTerm::ArrayAccess(_) = term {
