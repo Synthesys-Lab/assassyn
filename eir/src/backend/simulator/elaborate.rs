@@ -21,7 +21,7 @@ use super::utils::{
 };
 
 use self::{
-  expr::subcode::Cast, instructions::GetElementPtr, ir_printer::IRPrinter,
+  expr::subcode::Cast, instructions, ir_printer::IRPrinter,
   module::memory::parse_memory_module_name,
 };
 
@@ -310,306 +310,258 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
   }
 
   fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
-    let res = if expr.get_opcode().is_binary() {
-      let ty = expr.dtype();
-      let ty = dtype_to_rust_type(&ty);
-      format!(
-        "ValueCastTo::<{}>::cast(&{}) {} ValueCastTo::<{}>::cast(&{})",
-        ty,
-        dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value()),
-        expr.get_opcode().to_string(),
-        ty,
-        dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value()),
-      )
-    } else if expr.get_opcode().is_unary() {
-      format!(
-        "{}{}",
-        expr.get_opcode().to_string(),
-        dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value())
-      )
-    } else if expr.get_opcode().is_cmp() {
-      format!(
-        "{} {} {}",
-        dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value()),
-        expr.get_opcode().to_string(),
-        dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value()),
-      )
-    } else {
-      match expr.get_opcode() {
-        Opcode::Load => {
-          let (array, idx) = {
-            let gep = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_expr::<GetElementPtr>(expr.sys)
-              .unwrap();
-            (gep.get_array(), gep.get_index())
-          };
-          format!(
-            "{}[{} as usize].clone()",
-            namify(array.get_name()),
-            NodeRefDumper.dispatch(expr.sys, &idx, vec![]).unwrap()
-          )
+    let res = match expr.get_opcode() {
+      Opcode::Binary { .. } => {
+        let bin = expr.clone().as_sub::<instructions::Binary>().unwrap();
+        let ty = bin.get().dtype();
+        let ty = dtype_to_rust_type(&ty);
+        let lhs = format!(
+          "ValueCastTo::<{}>::cast(&{})",
+          ty,
+          dump_ref!(self.sys, &bin.a())
+        );
+        let rhs = format!(
+          "ValueCastTo::<{}>::cast(&{})",
+          ty,
+          dump_ref!(self.sys, &bin.b())
+        );
+        format!("{} {} {}", lhs, bin.get_opcode().to_string(), rhs)
+      }
+      Opcode::Unary { .. } => {
+        let uop = expr.clone().as_sub::<instructions::Unary>().unwrap();
+        format!(
+          "{}{}",
+          uop.get_opcode().to_string(),
+          dump_ref!(self.sys, &uop.x())
+        )
+      }
+      Opcode::Compare { .. } => {
+        let cmp = expr.clone().as_sub::<instructions::Compare>().unwrap();
+        format!(
+          "{} {} {}",
+          dump_ref!(self.sys, &cmp.a()),
+          expr.get_opcode().to_string(),
+          dump_ref!(self.sys, &cmp.b()),
+        )
+      }
+      Opcode::Load => {
+        let load = expr.clone().as_sub::<instructions::Load>().unwrap();
+        let (array, idx) = {
+          let gep = load.get_pointer();
+          (gep.get_array(), gep.get_index())
+        };
+        format!(
+          "{}[{} as usize].clone()",
+          namify(array.get_name()),
+          NodeRefDumper.dispatch(expr.sys, &idx, vec![]).unwrap()
+        )
+      }
+      Opcode::Store => {
+        let store = expr.clone().as_sub::<instructions::Store>().unwrap();
+        let (array, idx) = {
+          let gep = store.get_pointer();
+          (gep.get_array(), gep.get_index())
+        };
+        let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
+        let idx = dump_ref!(expr.sys, &idx);
+        let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
+        let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
+        let aid = array_ty_to_id(&scalar_ty, size);
+        let id = syn::Ident::new(&format!("Array{}Write", aid), Span::call_site());
+        let value = dump_ref!(self.sys, &store.get_value());
+        let value = value.parse::<proc_macro2::TokenStream>().unwrap();
+        let module_writer = self.current_module_id();
+        quote::quote! {
+          q.push(Reverse(Event{
+            stamp: stamp + 50,
+            kind: EventKind::#id(
+              (EventKind::#module_writer.into(), #slab_idx, #idx as usize, #value))
+          }))
         }
-        Opcode::Store => {
-          let (array, idx) = {
-            let gep = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_expr::<GetElementPtr>(expr.sys)
-              .unwrap();
-            (gep.get_array(), gep.get_index())
-          };
-          let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
-          let idx = dump_ref!(expr.sys, &idx);
-          let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
-          let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
-          let aid = array_ty_to_id(&scalar_ty, size);
-          let id = syn::Ident::new(&format!("Array{}Write", aid), Span::call_site());
-          let value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
-          let value = value.parse::<proc_macro2::TokenStream>().unwrap();
-          let module_writer = self.current_module_id();
+        .to_string()
+      }
+      Opcode::GetElementPtr => {
+        format!(
+          "\n// To be generated in its load/store user\n// GEP: {}\n",
+          IRPrinter::new(false).visit_expr(&expr).unwrap()
+        )
+      }
+      Opcode::AsyncCall => {
+        let to_trigger = if let Ok(module) = {
+          let bind = expr
+            .get_operand(0)
+            .unwrap()
+            .get_value()
+            .as_expr::<Bind>(self.sys)
+            .unwrap();
+          bind.get_callee().as_ref::<Module>(self.sys)
+        } {
+          format!("EventKind::Module{}", camelize(&namify(module.get_name())))
+        } else {
+          panic!("AsyncCall target is not a module, did you rewrite the callback?");
+        };
+        format!(
+          "q.push(Reverse(Event{{ stamp: stamp + 100, kind: {} }}))",
+          to_trigger
+        )
+      }
+      Opcode::FIFOPop => {
+        // TODO(@were): Support multiple pop.
+        let pop = expr.clone().as_sub::<instructions::FIFOPop>().unwrap();
+        let fifo = pop.get_fifo();
+        let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
+        let fifo_ty = fifo.scalar_ty();
+        let fifo_pop = syn::Ident::new(
+          &format!("FIFO{}Pop", dtype_to_rust_type(&fifo_ty)),
+          Span::call_site(),
+        );
+        let module_writer = self.current_module_id();
+        let fifo_name = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
+        quote::quote! {{
+          q.push(Reverse(Event{
+            stamp: stamp + 50,
+            kind: EventKind::#fifo_pop((EventKind::#module_writer.into(), #slab_idx))
+          }));
+          #fifo_name.front().unwrap().clone()
+        }}
+        .to_string()
+      }
+      Opcode::FIFOField { field } => {
+        let get_field = expr.clone().as_sub::<instructions::FIFOField>().unwrap();
+        let fifo = get_field.get_fifo();
+        match get_field.get_field() {
+          subcode::FIFO::Peek => format!("{}.front().unwrap().clone()", fifo_name!(fifo)),
+          subcode::FIFO::Valid => format!("!{}.is_empty()", fifo_name!(fifo)),
+          _ => panic!("Unsupported FIFO field: {:?}", field),
+        }
+      }
+      Opcode::FIFOPush => {
+        let push = expr.clone().as_sub::<instructions::FIFOPush>().unwrap();
+        let fifo = push.get_fifo();
+        let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
+        let fifo_push = syn::Ident::new(
+          &format!("FIFO{}Push", dtype_to_rust_type(&fifo.scalar_ty())),
+          Span::call_site(),
+        );
+        let value = dump_ref!(self.sys, &push.get_value());
+        let value = value.parse::<proc_macro2::TokenStream>().unwrap();
+        let module_writer = self.current_module_id();
+        if !fifo.is_placeholder() {
           quote::quote! {
             q.push(Reverse(Event{
               stamp: stamp + 50,
-              kind: EventKind::#id(
-                (EventKind::#module_writer.into(), #slab_idx, #idx as usize, #value))
+              kind: EventKind::#fifo_push(
+                (EventKind::#module_writer.into(), #slab_idx, #value.clone()))
             }))
           }
           .to_string()
+        } else {
+          panic!("FIFO is a placeholder, cannot push to it! Did you forget to rewrite callbacks?");
         }
-        Opcode::GetElementPtr => {
-          format!(
-            "\n// To be generated in its load/store user\n// GEP: {}\n",
-            IRPrinter::new(false).visit_expr(&expr).unwrap()
-          )
+      }
+      Opcode::Log => {
+        let mut res = String::new();
+        res.push_str(&format!(
+          "print!(\"@line:{{:<5}}\t{{}}:\t[{}]\t\", line!(), cyclize(stamp));",
+          self.module_name
+        ));
+        res.push_str("println!(");
+        for elem in expr.operand_iter() {
+          res.push_str(&format!("{}, ", dump_ref!(self.sys, elem.get_value())));
         }
-        Opcode::AsyncCall => {
-          let to_trigger = if let Ok(module) = {
-            let bind = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_expr::<Bind>(self.sys)
-              .unwrap();
-            bind.get_callee().as_ref::<Module>(self.sys)
-          } {
-            format!("EventKind::Module{}", camelize(&namify(module.get_name())))
-          } else {
-            panic!("AsyncCall target is not a module, did you rewrite the callback?");
-          };
-          format!(
-            "q.push(Reverse(Event{{ stamp: stamp + 100, kind: {} }}))",
-            to_trigger
-          )
-        }
-        Opcode::FIFOPop => {
-          // TODO(@were): Support multiple pop.
-          let fifo = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<FIFO>(self.sys)
-            .unwrap();
-          let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
-          let fifo_ty = fifo.scalar_ty();
-          let fifo_pop = syn::Ident::new(
-            &format!("FIFO{}Pop", dtype_to_rust_type(&fifo_ty)),
-            Span::call_site(),
-          );
-          let module_writer = self.current_module_id();
-          let fifo_name = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
-          quote::quote! {{
-            q.push(Reverse(Event{
-              stamp: stamp + 50,
-              kind: EventKind::#fifo_pop((EventKind::#module_writer.into(), #slab_idx))
-            }));
-            #fifo_name.front().unwrap().clone()
-          }}
-          .to_string()
-        }
-        Opcode::FIFOField { field } => {
-          let fifo = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<FIFO>(self.sys)
-            .unwrap();
-          match field {
-            subcode::FIFO::Peek => {
-              format!("{}.front().unwrap().clone()", fifo_name!(fifo))
-            }
-            subcode::FIFO::Valid => {
-              format!("!{}.is_empty()", fifo_name!(fifo))
-            }
-            _ => {
-              panic!("Unsupported FIFO field: {:?}", field);
-            }
-          }
-        }
-        Opcode::FIFOPush => {
-          let fifo = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<FIFO>(self.sys)
-            .unwrap();
-          let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
-          let fifo_push = syn::Ident::new(
-            &format!("FIFO{}Push", dtype_to_rust_type(&fifo.scalar_ty())),
-            Span::call_site(),
-          );
-          let value = dump_ref!(self.sys, expr.get_operand(1).unwrap().get_value());
-          let value = value.parse::<proc_macro2::TokenStream>().unwrap();
-          let module_writer = self.current_module_id();
-          if !fifo.is_placeholder() {
-            quote::quote! {
-              q.push(Reverse(Event{
-                stamp: stamp + 50,
-                kind: EventKind::#fifo_push(
-                  (EventKind::#module_writer.into(), #slab_idx, #value.clone()))
-              }))
-            }
-            .to_string()
-          } else {
-            panic!(
-              "FIFO is a placeholder, cannot push to it! Did you forget to rewrite callbacks?"
-            );
-          }
-        }
-        Opcode::Log => {
-          let mut res = String::new();
-          res.push_str(&format!(
-            "print!(\"@line:{{:<5}}\t{{}}:\t[{}]\t\", line!(), cyclize(stamp));",
-            self.module_name
-          ));
-          res.push_str("println!(");
-          for elem in expr.operand_iter() {
-            res.push_str(&format!("{}, ", dump_ref!(self.sys, elem.get_value())));
-          }
-          res.push(')');
-          res
-        }
-        Opcode::Slice => {
-          let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
-          let l = expr
-            .get_operand(1)
-            .unwrap()
-            .get_value()
-            .as_ref::<IntImm>(self.sys)
-            .expect("Only const slice supported")
-            .get_value();
-          let r = expr
-            .get_operand(2)
-            .unwrap()
-            .get_value()
-            .as_ref::<IntImm>(self.sys)
-            .expect("Only const slice supported")
-            .get_value();
-          format!(
-            "{{
+        res.push(')');
+        res
+      }
+      Opcode::Slice => {
+        let slice = expr.clone().as_sub::<instructions::Slice>().unwrap();
+        let a = dump_ref!(self.sys, &slice.x());
+        let l = slice.l();
+        let r = slice.r();
+        format!(
+          "{{
               let a = ValueCastTo::<BigUint>::cast(&({} as u64));
               let mask = BigUint::parse_bytes(\"{}\".as_bytes(), 2).unwrap();
               let res = (a >> {}) & mask;
               ValueCastTo::<{}>::cast(&res)
             }}",
-            a,
-            "1".repeat((r - l + 1) as usize),
-            l,
-            dtype_to_rust_type(&expr.dtype()),
-          )
-        }
-        Opcode::Concat => {
-          let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
-          let b = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
-          let b_bits = expr
-            .get_operand(1)
-            .unwrap()
-            .get_value()
-            .get_dtype(expr.sys)
-            .unwrap()
-            .get_bits();
-          format! {
-            "{{
+          a,
+          "1".repeat((r - l + 1) as usize),
+          l,
+          dtype_to_rust_type(&expr.dtype()),
+        )
+      }
+      Opcode::Concat => {
+        let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
+        let b = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
+        let b_bits = expr
+          .get_operand(1)
+          .unwrap()
+          .get_value()
+          .get_dtype(expr.sys)
+          .unwrap()
+          .get_bits();
+        format! {
+          "{{
               let a = ValueCastTo::<BigUint>::cast(&{});
               let b = ValueCastTo::<BigUint>::cast(&{});
               let c = (a << {}) | b;
               ValueCastTo::<{}>::cast(&c)
             }}",
-            a,
-            b,
-            b_bits,
-            dtype_to_rust_type(&expr.dtype()),
+          a,
+          b,
+          b_bits,
+          dtype_to_rust_type(&expr.dtype()),
+        }
+      }
+      Opcode::Select => {
+        let cond = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
+        let true_value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
+        let false_value = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
+        format!(
+          "if {} {{ {} }} else {{ {} }}",
+          cond, true_value, false_value
+        )
+      }
+      Opcode::Cast { cast } => {
+        let src_ref = expr.get_operand(0).unwrap();
+        let src = src_ref.get_value();
+        let src_dtype = src.get_dtype(expr.sys).unwrap();
+        let dest_dtype = expr.dtype();
+        let a = dump_ref!(self.sys, src);
+        match cast {
+          Cast::ZExt => {
+            // perform zero extension
+            format!(
+              "ValueCastTo::<{}>::cast(&ValueCastTo::<{}>::cast(&{}))",
+              dtype_to_rust_type(&dest_dtype),
+              dtype_to_rust_type(&src_dtype).replace("i", "u"),
+              a,
+            )
+          }
+          Cast::Cast => {
+            format!(
+              "ValueCastTo::<{}>::cast(&{})",
+              dtype_to_rust_type(&dest_dtype),
+              a
+            )
+          }
+          Cast::SExt => {
+            format!(
+              "ValueCastTo::<{}>::cast(&{})",
+              dtype_to_rust_type(&dest_dtype),
+              a
+            )
           }
         }
-        Opcode::Select => {
-          let cond = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
-          let true_value = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
-          let false_value = dump_ref!(self.sys, &expr.get_operand(2).unwrap().get_value());
-          format!(
-            "if {} {{ {} }} else {{ {} }}",
-            cond, true_value, false_value
-          )
-        }
-        Opcode::Cast { cast } => {
-          let src_ref = expr.get_operand(0).unwrap();
-          let src = src_ref.get_value();
-          let src_dtype = src.get_dtype(expr.sys).unwrap();
-          let dest_dtype = expr.dtype();
-          let a = dump_ref!(self.sys, src);
-          match cast {
-            Cast::ZExt => {
-              // perform zero extension
-              format!(
-                "ValueCastTo::<{}>::cast(&ValueCastTo::<{}>::cast(&{}))",
-                dtype_to_rust_type(&dest_dtype),
-                dtype_to_rust_type(&src_dtype).replace("i", "u"),
-                a,
-              )
-            }
-            Cast::Cast => {
-              format!(
-                "ValueCastTo::<{}>::cast(&{})",
-                dtype_to_rust_type(&dest_dtype),
-                a
-              )
-            }
-            Cast::SExt => {
-              format!(
-                "ValueCastTo::<{}>::cast(&{})",
-                dtype_to_rust_type(&dest_dtype),
-                a
-              )
-            }
-          }
-          // if src_dtype.is_int()
-          //   && src_dtype.is_signed()
-          //   && dest_dtype.is_int()
-          //   && !dest_dtype.is_signed()
-          // {
-          // } else {
-          // }
-        }
-        Opcode::Bind => {
-          let callee = {
-            let bind = expr.upcast().as_expr::<Bind>(expr.sys).unwrap();
-            let callee = bind.get_callee();
-            let module = callee.as_ref::<Module>(expr.sys).unwrap();
-            format!("EventKind::Module{}", camelize(&namify(module.get_name())))
-          };
-          format!("let {} = {}", dump_ref!(self.sys, &expr.upcast()), callee)
-        }
-        _ => {
-          if !expr.get_opcode().is_unary()
-            && !expr.get_opcode().is_binary()
-            && !expr.get_opcode().is_cmp()
-          {
-            panic!("Unknown opcode: {:?}", expr.get_opcode());
-          }
-          format!("// TODO: opcode: {}\n", expr.get_opcode().to_string())
-        }
+      }
+      Opcode::Bind => {
+        let callee = {
+          let bind = expr.upcast().as_expr::<Bind>(expr.sys).unwrap();
+          let callee = bind.get_callee();
+          let module = callee.as_ref::<Module>(expr.sys).unwrap();
+          format!("EventKind::Module{}", camelize(&namify(module.get_name())))
+        };
+        format!("let {} = {}", dump_ref!(self.sys, &expr.upcast()), callee)
       }
     };
     if expr.dtype().is_void() {
