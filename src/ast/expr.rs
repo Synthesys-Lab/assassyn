@@ -225,10 +225,12 @@ impl Parse for Expr {
       let operator = input.parse::<syn::Ident>()?;
       let raw_operands;
       parenthesized!(raw_operands in input);
+
       let op = Opcode::from_str(&operator.to_string());
+
       match op {
         // TODO(@were): Is it possible to unify this part?
-        Some(Opcode::Cast) | Some(Opcode::Sext) => {
+        Some(Opcode::Cast { .. }) => {
           let dtype = raw_operands.parse::<DType>()?;
           expr = Expr::DTConv((operator, Box::new(expr), dtype));
         }

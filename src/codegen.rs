@@ -44,7 +44,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     expr::Expr::MethodCall((self_, op, operands)) => {
       let opcode = Opcode::from_str(&op.to_string()).unwrap();
       match opcode {
-        Opcode::FIFOPop | Opcode::FIFOPeek | Opcode::FIFOValid => {
+        Opcode::FIFOPop | Opcode::FIFOField { .. } => {
           let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
           match self_.as_ref() {
             expr::Expr::Term(ExprTerm::Ident(id)) => Ok(quote! {{ sys.#method_id(#id) }}),

@@ -275,7 +275,7 @@ impl Visitor<String> for IRPrinter {
             let fifo_name = fifo.get_name();
             format!("{}.{}.pop()", module_name, fifo_name)
           }
-          Opcode::FIFOPeek | Opcode::FIFOValid => {
+          Opcode::FIFOField { field } => {
             // TODO(@were): Support multiple peek.
             let fifo = expr
               .get_operand(0)
@@ -289,11 +289,7 @@ impl Visitor<String> for IRPrinter {
               module.get_name().to_string()
             };
             let fifo_name = fifo.get_name();
-            let method = match expr.get_opcode() {
-              Opcode::FIFOPeek => "peek",
-              Opcode::FIFOValid => "valid",
-              _ => unreachable!(),
-            };
+            let method = field.to_string();
             format!("{}.{}.{}()", module_name, fifo_name, method)
           }
           Opcode::Slice => {
@@ -304,17 +300,11 @@ impl Visitor<String> for IRPrinter {
               expr.get_operand(2).unwrap().get_value().to_string(expr.sys),
             )
           }
-          Opcode::Cast => {
+          Opcode::Cast { cast } => {
             format!(
-              "{}.cast({})",
+              "{}.{}({})",
               expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
-              expr.dtype().to_string()
-            )
-          }
-          Opcode::Sext => {
-            format!(
-              "{}.sext({})",
-              expr.get_operand(0).unwrap().get_value().to_string(expr.sys),
+              cast.to_string(),
               expr.dtype().to_string()
             )
           }

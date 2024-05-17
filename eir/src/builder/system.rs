@@ -7,7 +7,11 @@ use crate::ir::{
   *,
 };
 
-use self::{instructions::Bind, user::Operand};
+use self::{
+  expr::subcode::{self, Binary},
+  instructions::Bind,
+  user::Operand,
+};
 
 use super::symbol_table::SymbolTable;
 
@@ -457,24 +461,24 @@ impl SysBuilder {
     res
   }
 
-  create_arith_op_impl!(binary, create_add, Opcode::Add);
-  create_arith_op_impl!(binary, create_sub, Opcode::Sub);
-  create_arith_op_impl!(binary, create_shl, Opcode::Shl);
-  create_arith_op_impl!(binary, create_shr, Opcode::Shr);
-  create_arith_op_impl!(binary, create_bitwise_and, Opcode::BitwiseAnd);
-  create_arith_op_impl!(binary, create_bitwise_or, Opcode::BitwiseOr);
-  create_arith_op_impl!(binary, create_bitwise_xor, Opcode::BitwiseXor);
-  create_arith_op_impl!(binary, create_mul, Opcode::Mul);
-  create_arith_op_impl!(binary, create_igt, Opcode::IGT);
-  create_arith_op_impl!(binary, create_ige, Opcode::IGE);
-  create_arith_op_impl!(binary, create_ilt, Opcode::ILT);
-  create_arith_op_impl!(binary, create_ile, Opcode::ILE);
-  create_arith_op_impl!(binary, create_eq, Opcode::EQ);
-  create_arith_op_impl!(binary, create_neq, Opcode::NEQ);
+  create_arith_op_impl!(binary, create_add, Binary::Add.into());
+  create_arith_op_impl!(binary, create_sub, Binary::Sub.into());
+  create_arith_op_impl!(binary, create_shl, Binary::Shl.into());
+  create_arith_op_impl!(binary, create_shr, Binary::Shr.into());
+  create_arith_op_impl!(binary, create_bitwise_and, Binary::BitwiseAnd.into());
+  create_arith_op_impl!(binary, create_bitwise_or, Binary::BitwiseOr.into());
+  create_arith_op_impl!(binary, create_bitwise_xor, Binary::BitwiseXor.into());
+  create_arith_op_impl!(binary, create_mul, subcode::Binary::Mul.into());
+  create_arith_op_impl!(binary, create_igt, subcode::Compare::IGT.into());
+  create_arith_op_impl!(binary, create_ige, subcode::Compare::IGE.into());
+  create_arith_op_impl!(binary, create_ilt, subcode::Compare::ILT.into());
+  create_arith_op_impl!(binary, create_ile, subcode::Compare::ILE.into());
+  create_arith_op_impl!(binary, create_eq, subcode::Compare::EQ.into());
+  create_arith_op_impl!(binary, create_neq, subcode::Compare::NEQ.into());
   create_arith_op_impl!(binary, create_concat, Opcode::Concat);
 
-  create_arith_op_impl!(unary, create_neg, Opcode::Neg);
-  create_arith_op_impl!(unary, create_flip, Opcode::Flip);
+  create_arith_op_impl!(unary, create_neg, subcode::Unary::Neg.into());
+  create_arith_op_impl!(unary, create_flip, subcode::Unary::Flip.into());
 
   /// Create a register array associated to this system.
   /// An array can be a register, or memory.
@@ -754,49 +758,47 @@ impl SysBuilder {
       }
       return DataType::uint_ty(1);
     }
-    match op {
-      Opcode::Add | Opcode::Sub => {
-        match (&aty, &bty) {
-          // TODO(@were): Add one more bit to handle overflow.
-          (DataType::Int(a), DataType::Int(b)) => DataType::Int(*a.max(b)),
-          (DataType::UInt(a), DataType::UInt(b)) => DataType::UInt(*a.max(b)),
-          _ => panic!(
-            "Cannot combine types {} and {} for {:?}",
-            aty.to_string(),
-            bty.to_string(),
-            op
-          ),
+    let res = match op {
+      Opcode::Binary { binop } => {
+        match binop {
+          Binary::Add | Binary::Sub => match (&aty, &bty) {
+            // TODO(@were): Add one more bit to handle overflow.
+            (DataType::Int(a), DataType::Int(b)) => Some(DataType::Int(*a.max(b))),
+            (DataType::UInt(a), DataType::UInt(b)) => Some(DataType::UInt(*a.max(b))),
+            _ => None,
+          },
+          Binary::Shl | Binary::Shr => match (&aty, &bty) {
+            (DataType::Int(a), DataType::Int(_)) => Some(DataType::Int(*a)),
+            (DataType::UInt(a), DataType::UInt(_)) => Some(DataType::UInt(*a)),
+            _ => None,
+          },
+          Binary::BitwiseAnd => Some(DataType::bits_ty(aty.get_bits().min(bty.get_bits()))),
+          Binary::BitwiseOr | Binary::BitwiseXor => {
+            Some(DataType::bits_ty(aty.get_bits().max(bty.get_bits())))
+          }
+          Binary::Mul => match (&aty, &bty) {
+            (DataType::Int(a), DataType::Int(b)) => Some(DataType::Int(a + b)),
+            (DataType::UInt(a), DataType::UInt(b)) => Some(DataType::UInt(a + b)),
+            _ => None,
+          },
         }
       }
-      Opcode::Shl | Opcode::Shr => match (&aty, &bty) {
-        (DataType::Int(a), DataType::Int(_)) => DataType::Int(*a),
-        (DataType::UInt(a), DataType::UInt(_)) => DataType::UInt(*a),
-        _ => panic!(
-          "Cannot combine types {} and {} for {:?}",
-          aty.to_string(),
-          bty.to_string(),
-          op
-        ),
-      },
-      Opcode::BitwiseAnd => DataType::bits_ty(aty.get_bits().min(bty.get_bits())),
-      Opcode::BitwiseOr | Opcode::BitwiseXor => {
-        DataType::bits_ty(aty.get_bits().max(bty.get_bits()))
-      }
-      Opcode::Mul => match (&aty, &bty) {
-        (DataType::Int(a), DataType::Int(b)) => DataType::Int(a + b),
-        (DataType::UInt(a), DataType::UInt(b)) => DataType::UInt(a + b),
-        _ => panic!(
-          "Cannot combine types {} and {}",
-          aty.to_string(),
-          bty.to_string()
-        ),
-      },
       Opcode::Concat => {
         let a_bits = a.get_dtype(self).unwrap().get_bits();
         let b_bits = b.get_dtype(self).unwrap().get_bits();
-        DataType::bits_ty(a_bits + b_bits)
+        Some(DataType::bits_ty(a_bits + b_bits))
       }
       _ => panic!("Unsupported opcode {:?}", op),
+    };
+    if let Some(res) = res {
+      res
+    } else {
+      panic!(
+        "Cannot combine types {} and {} for {:?}",
+        aty.to_string(),
+        bty.to_string(),
+        op
+      );
     }
   }
 
@@ -817,7 +819,7 @@ impl SysBuilder {
   /// FIFO.
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-    let res = self.create_expr(ty, Opcode::FIFOPeek, vec![fifo], true);
+    let res = self.create_expr(ty, subcode::FIFO::Peek.into(), vec![fifo], true);
     res
   }
 
@@ -827,7 +829,12 @@ impl SysBuilder {
       NodeKind::FIFO,
       "Expect FIFO as the operand"
     );
-    let res = self.create_expr(DataType::int_ty(1), Opcode::FIFOValid, vec![fifo], true);
+    let res = self.create_expr(
+      DataType::int_ty(1),
+      subcode::FIFO::Valid.into(),
+      vec![fifo],
+      true,
+    );
     res
   }
 
@@ -853,7 +860,20 @@ impl SysBuilder {
 
   /// Create a cast operation.
   pub fn create_cast(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
-    let res = self.create_expr(dest_ty, Opcode::Cast, vec![src], true);
+    let src_dtype = src.get_dtype(self).unwrap();
+
+    if src_dtype.is_int() && src_dtype.is_signed() && dest_ty.is_int() && !dest_ty.is_signed() {
+      return self.create_expr(dest_ty, subcode::Cast::ZExt.into(), vec![src], true);
+    }
+
+    let res = self.create_expr(
+      dest_ty,
+      Opcode::Cast {
+        cast: subcode::Cast::Cast,
+      },
+      vec![src],
+      true,
+    );
     res
   }
 
@@ -879,7 +899,14 @@ impl SysBuilder {
           dest_ty
         ),
       },
-      _ => self.create_expr(dest_ty, Opcode::Sext, vec![src], true),
+      _ => self.create_expr(
+        dest_ty,
+        Opcode::Cast {
+          cast: subcode::Cast::SExt,
+        },
+        vec![src],
+        true,
+      ),
     }
   }
 

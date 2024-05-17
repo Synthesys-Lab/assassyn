@@ -13,7 +13,7 @@ use syn::Ident;
 use crate::{
   backend::common::Config,
   builder::system::SysBuilder,
-  ir::{instructions::Bind, node::*, visitor::Visitor, *},
+  ir::{expr::subcode, instructions::Bind, node::*, visitor::Visitor, *},
 };
 
 use super::utils::{
@@ -21,7 +21,8 @@ use super::utils::{
 };
 
 use self::{
-  instructions::GetElementPtr, ir_printer::IRPrinter, module::memory::parse_memory_module_name,
+  expr::subcode::Cast, instructions::GetElementPtr, ir_printer::IRPrinter,
+  module::memory::parse_memory_module_name,
 };
 
 use super::analysis;
@@ -429,23 +430,24 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           }}
           .to_string()
         }
-        Opcode::FIFOPeek => {
+        Opcode::FIFOField { field } => {
           let fifo = expr
             .get_operand(0)
             .unwrap()
             .get_value()
             .as_ref::<FIFO>(self.sys)
             .unwrap();
-          format!("{}.front().unwrap().clone()", fifo_name!(fifo))
-        }
-        Opcode::FIFOValid => {
-          let fifo = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<FIFO>(self.sys)
-            .unwrap();
-          format!("!{}.is_empty()", fifo_name!(fifo))
+          match field {
+            subcode::FIFO::Peek => {
+              format!("{}.front().unwrap().clone()", fifo_name!(fifo))
+            }
+            subcode::FIFO::Valid => {
+              format!("!{}.is_empty()", fifo_name!(fifo))
+            }
+            _ => {
+              panic!("Unsupported FIFO field: {:?}", field);
+            }
+          }
         }
         Opcode::FIFOPush => {
           let fifo = expr
@@ -551,42 +553,44 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             cond, true_value, false_value
           )
         }
-        Opcode::Cast => {
+        Opcode::Cast { cast } => {
           let src_ref = expr.get_operand(0).unwrap();
           let src = src_ref.get_value();
           let src_dtype = src.get_dtype(expr.sys).unwrap();
           let dest_dtype = expr.dtype();
           let a = dump_ref!(self.sys, src);
-          if src_dtype.is_int()
-            && src_dtype.is_signed()
-            && dest_dtype.is_int()
-            && !dest_dtype.is_signed()
-          {
-            // perform zero extension
-            format!(
-              "ValueCastTo::<{}>::cast(&ValueCastTo::<{}>::cast(&{}))",
-              dtype_to_rust_type(&dest_dtype),
-              dtype_to_rust_type(&src_dtype).replace("i", "u"),
-              a,
-            )
-          } else {
-            format!(
-              "ValueCastTo::<{}>::cast(&{})",
-              dtype_to_rust_type(&dest_dtype),
-              a
-            )
+          match cast {
+            Cast::ZExt => {
+              // perform zero extension
+              format!(
+                "ValueCastTo::<{}>::cast(&ValueCastTo::<{}>::cast(&{}))",
+                dtype_to_rust_type(&dest_dtype),
+                dtype_to_rust_type(&src_dtype).replace("i", "u"),
+                a,
+              )
+            }
+            Cast::Cast => {
+              format!(
+                "ValueCastTo::<{}>::cast(&{})",
+                dtype_to_rust_type(&dest_dtype),
+                a
+              )
+            }
+            Cast::SExt => {
+              format!(
+                "ValueCastTo::<{}>::cast(&{})",
+                dtype_to_rust_type(&dest_dtype),
+                a
+              )
+            }
           }
-        }
-        Opcode::Sext => {
-          let src_ref = expr.get_operand(0).unwrap();
-          let src = src_ref.get_value();
-          let dest_dtype = expr.dtype();
-          let a = dump_ref!(self.sys, src);
-          format!(
-            "ValueCastTo::<{}>::cast(&{})",
-            dtype_to_rust_type(&dest_dtype),
-            a
-          )
+          // if src_dtype.is_int()
+          //   && src_dtype.is_signed()
+          //   && dest_dtype.is_int()
+          //   && !dest_dtype.is_signed()
+          // {
+          // } else {
+          // }
         }
         Opcode::Bind => {
           let callee = {

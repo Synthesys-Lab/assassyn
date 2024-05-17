@@ -10,7 +10,10 @@ use crate::{
   ir::{module::memory::parse_memory_module_name, node::*, visitor::Visitor, *},
 };
 
-use self::instructions::{Bind, GetElementPtr};
+use self::{
+  expr::subcode,
+  instructions::{Bind, GetElementPtr},
+};
 
 fn namify(name: &str) -> String {
   name.replace(".", "_")
@@ -1403,7 +1406,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           Some("".to_string())
         }
 
-        Opcode::FIFOPeek => {
+        Opcode::FIFOField { field } => {
           let fifo = expr
             .get_operand(0)
             .unwrap()
@@ -1411,29 +1414,22 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             .as_ref::<FIFO>(self.sys)
             .unwrap();
           let fifo_name = fifo_name!(fifo);
-          Some(format!(
-            "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\n\n",
-            fifo.scalar_ty().get_bits() - 1,
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            fifo_name
-          ))
-        }
-
-        Opcode::FIFOValid => {
-          let fifo = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_ref::<FIFO>(self.sys)
-            .unwrap();
-          let fifo_name = fifo_name!(fifo);
-          Some(format!(
-            "logic {};\nassign {} = fifo_{}_pop_valid;\n\n",
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            fifo_name
-          ))
+          match field {
+            subcode::FIFO::Valid => Some(format!(
+              "logic {};\nassign {} = fifo_{}_pop_valid;\n\n",
+              namify(expr.upcast().to_string(self.sys).as_str()),
+              namify(expr.upcast().to_string(self.sys).as_str()),
+              fifo_name
+            )),
+            subcode::FIFO::Peek => Some(format!(
+              "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\n\n",
+              fifo.scalar_ty().get_bits() - 1,
+              namify(expr.upcast().to_string(self.sys).as_str()),
+              namify(expr.upcast().to_string(self.sys).as_str()),
+              fifo_name
+            )),
+            subcode::FIFO::AlmostFull => todo!(),
+          }
         }
 
         Opcode::AsyncCall => {
@@ -1486,48 +1482,49 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
           ))
         }
 
-        Opcode::Cast => {
+        Opcode::Cast { cast } => {
           let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
-          Some(format!(
-            "logic [{}:0] {};\nassign {} = {};\n\n",
-            expr.dtype().get_bits() - 1,
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            a
-          ))
-        }
-
-        Opcode::Sext => {
-          let src_ref = expr.get_operand(0).unwrap();
-          let src = src_ref.get_value();
-          let src_dtype = src.get_dtype(expr.sys).unwrap();
-          let dest_dtype = expr.dtype();
-          let a = dump_ref!(self.sys, src);
-          if src_dtype.is_int()
-            && src_dtype.is_signed()
-            && dest_dtype.is_int()
-            && dest_dtype.is_signed()
-            && dest_dtype.get_bits() > src_dtype.get_bits()
-          {
-            // perform sext
-            Some(format!(
-              "logic [{}:0] {};\nassign {} = {{{}'{{{}[{}]}}, {}}};\n\n",
-              expr.dtype().get_bits() - 1,
-              namify(expr.upcast().to_string(self.sys).as_str()),
-              namify(expr.upcast().to_string(self.sys).as_str()),
-              dest_dtype.get_bits() - src_dtype.get_bits(),
-              a,
-              src_dtype.get_bits() - 1,
-              a
-            ))
-          } else {
-            Some(format!(
+          match cast {
+            subcode::Cast::Cast | subcode::Cast::ZExt => Some(format!(
               "logic [{}:0] {};\nassign {} = {};\n\n",
               expr.dtype().get_bits() - 1,
               namify(expr.upcast().to_string(self.sys).as_str()),
               namify(expr.upcast().to_string(self.sys).as_str()),
               a
-            ))
+            )),
+            subcode::Cast::SExt => {
+              let src_ref = expr.get_operand(0).unwrap();
+              let src = src_ref.get_value();
+              let src_dtype = src.get_dtype(expr.sys).unwrap();
+              let dest_dtype = expr.dtype();
+              let a = dump_ref!(self.sys, src);
+              if src_dtype.is_int()
+                && src_dtype.is_signed()
+                && dest_dtype.is_int()
+                && dest_dtype.is_signed()
+                && dest_dtype.get_bits() > src_dtype.get_bits()
+              {
+                // perform sext
+                Some(format!(
+                  "logic [{}:0] {};\nassign {} = {{{}'{{{}[{}]}}, {}}};\n\n",
+                  expr.dtype().get_bits() - 1,
+                  namify(expr.upcast().to_string(self.sys).as_str()),
+                  namify(expr.upcast().to_string(self.sys).as_str()),
+                  dest_dtype.get_bits() - src_dtype.get_bits(),
+                  a,
+                  src_dtype.get_bits() - 1,
+                  a
+                ))
+              } else {
+                Some(format!(
+                  "logic [{}:0] {};\nassign {} = {};\n\n",
+                  expr.dtype().get_bits() - 1,
+                  namify(expr.upcast().to_string(self.sys).as_str()),
+                  namify(expr.upcast().to_string(self.sys).as_str()),
+                  a
+                ))
+              }
+            }
           }
         }
 

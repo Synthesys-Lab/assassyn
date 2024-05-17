@@ -11,6 +11,8 @@ use self::{
 
 use super::{block::Block, node::BaseNode};
 
+pub mod subcode;
+
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
 pub enum BindKind {
   KVBind,
@@ -33,115 +35,131 @@ macro_rules! find_opcode_attr {
 }
 
 macro_rules! register_opcodes {
-  ( $( $opcode:ident $( ( $subcode:ident ) )? ( $fe_method: literal $mn:literal $arity:expr ) => { $($ky:ident),* } ),* $(,)? ) => {
+  ( $( $var_id:ident ( $( { $subcode:ident : $subty:ty }, )? $( $mn:ident, )? $arity:literal ) =>
+       { $( $attrs:ident ),* $(,)? } ),* ) => {
 
-    #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+    #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
     pub enum Opcode {
-      $( $opcode ),*
+      $( $var_id $( { $subcode : $subty } )? ),*
     }
 
     impl ToString for Opcode {
       fn to_string(&self) -> String {
         match self {
-          $( Opcode::$opcode => $mn.into() ),*
+          $( Opcode::$var_id $( { $subcode } )?  => {
+            $( $subcode.to_string() )?
+            $( stringify!($mn).to_string() )?
+          }),*
         }
       }
     }
 
-    impl Opcode {
-      pub fn is_valued(&self) -> bool {
-        match self {
-          $( Opcode::$opcode => find_opcode_attr!(valued; $($ky),*) ),*
-        }
-      }
-      pub fn is_cmp(&self) -> bool {
-        match self {
-          $( Opcode::$opcode => find_opcode_attr!(cmp; $($ky),*) ),*
-        }
-      }
-      pub fn is_binary(&self) -> bool {
-        match self {
-          $( Opcode::$opcode => find_opcode_attr!(binary; $($ky),*) ),*
-        }
-      }
-      pub fn is_unary(&self) -> bool {
-        match self {
-          $( Opcode::$opcode => find_opcode_attr!(unary; $($ky),*) ),*
-        }
-      }
-      pub fn has_side_effect(&self) -> bool {
-        match self {
-          $( Opcode::$opcode => find_opcode_attr!(side_effect; $($ky),*) ),*
-        }
-      }
-      pub fn fifo_related(&self) -> bool {
-        match self {
-          $( Opcode::$opcode => find_opcode_attr!(fifo_related; $($ky),*) ),*
-        }
-      }
-      pub fn arity(&self) -> Option<usize> {
-        let res = match self {
-          $( Opcode::$opcode => $arity ),*
-        };
-        if res == usize::MAX {
+    paste::paste!{
+      impl Opcode {
+        pub fn from_str(s: &str) -> Option<Opcode> {
+          if let Some(general) = match s {
+            $( $( stringify!($mn) => Some(Opcode::$var_id), )? )*
+            _ => None,
+          } {
+            return Some(general)
+          }
+          $( $(if let Some(sub) = $subty::from_str(s) {
+            return Some(sub.into())
+          })? )*
           None
-        } else {
-          Some(res)
         }
-      }
-      pub fn from_str(s: &str) -> Option<Opcode> {
-        match s {
-          $( $fe_method => Some(Opcode::$opcode) ),*,
-          _ => None
-        }
-      }
 
+        pub fn is_valued(&self) -> bool {
+          match self {
+            $( Opcode::$var_id $( { $subcode } )? => {
+              $( let _ = $subcode; )?
+              find_opcode_attr!(valued; $($attrs),*)
+            })*
+          }
+        }
+        pub fn has_side_effect(&self) -> bool {
+          match self {
+            $( Opcode::$var_id $( { $subcode } )? => {
+              $( let _ = $subcode; )?
+              find_opcode_attr!(side_effect; $($attrs),*)
+            }),*
+          }
+        }
+        pub fn arity(&self) -> Option<usize> {
+          let res : i64 = match self {
+            $( Opcode::$var_id $( { $subcode } )? => {
+              $( let _ = $subcode; )?
+              $arity
+            } ),*
+          };
+          if res == -1 {
+            None
+          } else {
+            Some(res as usize)
+          }
+        }
+      }
     }
-
   };
 }
 
+// A declared opcode should have the following fields:
+// variant_name: ident
+// (
+//   { subcode:ident : subty:ty }? // Optional 1
+//   { mnemonic:ident, }?          // Optional 2
+//   arity:literal                 // Mandatory, the number of operands, -1 for variadic
+//   =>
+//   { valued, side_effect }       // Optional 3
+// )
+//
+// NOTE: Optional 1 and 2 are exclusive but one of them is mandatory!
 register_opcodes!(
-  GetElementPtr("_gep" "gep" 2 /*array, idx*/) => { valued },
+  GetElementPtr(gep, 2 /*array, idx*/) => { valued },
   // Memory operations
-  Load("_load" "load" 1 /*gep*/) => { valued },
-  Store("_store" "store" 2 /*gep value*/) => { side_effect },
-  // Binary operations
-  Add("add" "+" 2 /*lhs rhs*/) => { binary, valued },
-  Sub("sub" "-" 2 /*lhs rhs*/) => { binary, valued },
-  Mul("mul" "*" 2 /*lhs rhs*/) => { binary, valued },
-  Shl("shl" "<<" 2 /*lhs rhs*/) => { binary, valued },
-  Shr("shr" ">>" 2 /*lhs rhs*/) => { binary, valued },
-  BitwiseAnd("bitwise_and" "&" 2/*lhs rhs*/) => { binary, valued },
-  BitwiseOr("bitwise_or" "|" 2/*lhs rhs*/) => { binary, valued },
-  BitwiseXor("bitwise_xor" "^" 2/*lhs rhs*/) => { binary, valued },
-  Concat("concat" "concat" 2/*msb lsb*/) => { valued },
-  // Comparison operations
-  IGT("igt" ">" 2 /*lhs rhs*/) => { cmp, valued },
-  ILT("ilt" "<" 2 /*lhs rhs*/) => { cmp, valued },
-  IGE("ige" ">=" 2 /*lhs rhs*/) => { cmp, valued },
-  ILE("ile" "<=" 2 /*lhs rhs*/) => { cmp, valued },
-  EQ("eq" "==" 2 /*lhs rhs*/) => { cmp, valued },
-  NEQ("neq" "!=" 2 /*lhs rhs*/) => { cmp, valued },
-  // Unary operations
-  Neg("neg" "-" 1 /*value*/) => { unary, valued },
-  Flip("flip" "!" 1 /*value*/) => { unary, valued },
-  // Triary operations
-  Select("select" "select" 3 /*cond true_val false_val*/) => { valued },
+  Load(load, 1 /*gep*/) => { valued },
+  Store(store, 2 /*gep value*/) => { side_effect },
+  // Arith operations
+  Binary({ binop: subcode::Binary }, 2 /*lhs rhs*/) => { valued },
+  Unary({ uop: subcode::Unary }, 1 /*value*/) => { valued },
+  Select(select, 3 /*cond true_val false_val*/) => { valued },
+  Compare({ cmp: subcode::Compare }, 2 /*lhs rhs*/) => { valued },
   // Eventual operations
-  Bind("_bind" "bind" usize::MAX /* N/A */) => { valued },
-  FIFOPush("push" "push" 2 /*fifo value*/ ) => { side_effect, fifo_related },
-  FIFOPop("pop" "pop" 1 /*fifo*/) => { side_effect, valued, fifo_related },
-  FIFOPeek("peek" "peek" 1 /*fifo*/) => { valued, fifo_related },
-  FIFOValid("valid" "valid" 1 /*fifo*/) => { valued, fifo_related },
-  AsyncCall("_async_call" "async_call" usize::MAX /* N/A */) => { side_effect },
+  Bind(bind, 1 /*value*/) => { valued },
+  FIFOPush(push, 2 /*fifo value*/) => { side_effect },
+  FIFOPop(pop, 1 /*fifo*/) => { side_effect, valued },
+  FIFOField({ field: subcode::FIFO }, 1 /*fifo*/) => { valued },
+  AsyncCall(async_call, -1 /* N/A */) => { side_effect },
   // Other synthesizable operations
-  Slice("slice" "slice" 3 /*op [lo, hi]*/) => { valued },
-  Cast("cast" "cast" 1 /*value*/) => { valued },
-  Sext("sext" "sext" 1 /*value*/) => { valued },
+  Slice(slice, 3 /*op [lo, hi]*/) => { valued },
+  Cast({ cast: subcode::Cast }, 1 /*value*/) => { valued },
+  Concat(concat, 2/*msb lsb*/) => { valued },
   // Non-synthesizable operations
-  Log("_log" "log" usize::MAX /*N/A*/) => { side_effect }
+  Log(log, -1 /*N/A*/) => { side_effect }
 );
+
+impl Opcode {
+  pub fn is_binary(&self) -> bool {
+    match self {
+      &Opcode::Binary { .. } => true,
+      _ => false,
+    }
+  }
+
+  pub fn is_cmp(&self) -> bool {
+    match self {
+      &Opcode::Compare { .. } => true,
+      _ => false,
+    }
+  }
+
+  pub fn is_unary(&self) -> bool {
+    match self {
+      &Opcode::Unary { .. } => true,
+      _ => false,
+    }
+  }
+}
 
 pub struct Expr {
   name: Option<String>,
@@ -242,20 +260,6 @@ impl ExprMut<'_> {
 
   /// Erase the expression from its parent block
   pub fn erase_from_parent(&mut self) {
-    // eprintln!(
-    //   "erasing {}",
-    //   IRPrinter::new(false)
-    //     .dispatch(self.sys, &self.get().upcast(), vec![])
-    //     .unwrap()
-    // );
-    // for elem in self.get().users().iter() {
-    //   let operand = elem.as_ref::<Operand>(self.sys).unwrap();
-    //   let user = IRPrinter::new(false)
-    //     .dispatch(self.sys, operand.get_user(), vec![])
-    //     .unwrap();
-    //   eprintln!("user: {} {:?}", elem.to_string(self.sys), user);
-    // }
-
     assert!(self.get().users().is_empty());
     let parent = self.get().get_parent();
     let expr = self.get().upcast();

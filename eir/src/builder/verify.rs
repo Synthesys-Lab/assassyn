@@ -1,3 +1,4 @@
+use crate::ir::expr::subcode;
 use crate::ir::{node::*, visitor::Visitor};
 
 use crate::ir::*;
@@ -87,39 +88,40 @@ impl Visitor<()> for Verifier {
         _ => {}
       }
     }
-    if expr.get_opcode() == Opcode::Cast {
-      let src_ty = expr
-        .get_operand(0)
-        .unwrap()
-        .get_value()
-        .get_dtype(expr.sys)
-        .unwrap();
-      let dest_ty = expr.dtype();
-      assert!(
-        // uint to int, width must be expanded
-        (
-          dest_ty.is_int() && dest_ty.is_signed() &&
-          src_ty.is_int() && !src_ty.is_signed() &&
-          dest_ty.get_bits() > src_ty.get_bits()
-        ) ||
-        // other senario, disallow trimming
-        (dest_ty.get_bits() >= src_ty.get_bits())
-      );
-    }
-    if expr.get_opcode() == Opcode::Sext {
-      let src_ty = expr
-        .get_operand(0)
-        .unwrap()
-        .get_value()
-        .get_dtype(expr.sys)
-        .unwrap();
-      let dest_ty = expr.dtype();
-      assert!(
-        // dest needs to be int
-        dest_ty.is_int() && dest_ty.is_signed() &&
-        // disallow trimming
-        dest_ty.get_bits() >= src_ty.get_bits()
-      );
+    match expr.get_opcode() {
+      Opcode::Cast { cast } => {
+        let src_ty = expr
+          .get_operand(0)
+          .unwrap()
+          .get_value()
+          .get_dtype(expr.sys)
+          .unwrap();
+        let dest_ty = expr.dtype();
+        match cast {
+          subcode::Cast::Cast => {
+            assert!(
+              // uint to int, width must be expanded
+              (
+                dest_ty.is_int() && dest_ty.is_signed() &&
+                src_ty.is_int() && !src_ty.is_signed() &&
+                dest_ty.get_bits() > src_ty.get_bits()
+              ) ||
+              // other senario, disallow trimming
+              (dest_ty.get_bits() >= src_ty.get_bits())
+            );
+          }
+          subcode::Cast::SExt => {
+            assert!(
+              // dest needs to be int
+              dest_ty.is_int() && dest_ty.is_signed() &&
+              // disallow trimming
+              dest_ty.get_bits() >= src_ty.get_bits()
+            );
+          }
+          _ => {}
+        }
+      }
+      _ => {}
     }
     None
   }
