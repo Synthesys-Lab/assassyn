@@ -702,7 +702,7 @@ impl SysBuilder {
   pub fn create_array_read<'elem>(&mut self, ptr: BaseNode) -> BaseNode {
     let (array, dtype) = {
       let gep = ptr.as_expr::<GetElementPtr>(self).unwrap();
-      let array = gep.get_array();
+      let array = gep.array();
       let dtype = array.scalar_ty();
       (array.upcast(), dtype)
     };
@@ -720,7 +720,7 @@ impl SysBuilder {
   pub fn create_array_write(&mut self, ptr: BaseNode, value: BaseNode) -> BaseNode {
     let array = {
       let gep = ptr.as_expr::<GetElementPtr>(self).unwrap();
-      let array = gep.get_array();
+      let array = gep.array();
       let dtype = array.scalar_ty();
       assert_eq!(
         value.get_dtype(self).unwrap(),

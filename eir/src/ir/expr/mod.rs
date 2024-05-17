@@ -225,6 +225,10 @@ impl<'a> ExprRef<'a> {
 }
 
 impl ExprRef<'_> {
+  pub fn get_operand_value(&self, i: usize) -> Option<BaseNode> {
+    self.get_operand(i).map(|x| x.get_value().clone())
+  }
+
   pub fn get_operand(&self, i: usize) -> Option<OperandRef<'_>> {
     self
       .operands

@@ -266,7 +266,7 @@ impl<'a> ModuleMut<'a> {
     match value.get_kind() {
       NodeKind::Expr => {
         if let Ok(gep) = value.as_expr::<GetElementPtr>(self.sys) {
-          let array = gep.get_array();
+          let array = gep.array();
           self.insert_external_interface(array.upcast(), operand);
         }
       }

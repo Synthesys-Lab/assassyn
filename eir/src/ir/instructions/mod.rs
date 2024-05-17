@@ -7,7 +7,7 @@ pub mod call;
 pub mod data;
 pub mod fifo;
 pub mod gep;
-pub mod slice;
+pub mod bits;
 
 pub trait AsExpr<'a>: Sized {
   fn downcast(expr: ExprRef<'a>) -> Result<Self, String>;
@@ -64,6 +64,8 @@ register_opcode!(
   FIFOField { field },
   Binary { binop },
   Unary { uop },
+  Select,
   Compare { cmp },
   Slice,
+  Concat,
 );

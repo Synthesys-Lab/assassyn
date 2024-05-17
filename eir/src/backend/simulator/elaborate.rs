@@ -352,8 +352,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::Load => {
         let load = expr.as_sub::<instructions::Load>().unwrap();
         let (array, idx) = {
-          let gep = load.get_pointer();
-          (gep.get_array(), gep.get_index())
+          let gep = load.pointer();
+          (gep.array(), gep.index())
         };
         format!(
           "{}[{} as usize].clone()",
@@ -366,8 +366,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::Store => {
         let store = expr.as_sub::<instructions::Store>().unwrap();
         let (array, idx) = {
-          let gep = store.get_pointer();
-          (gep.get_array(), gep.get_index())
+          let gep = store.pointer();
+          (gep.array(), gep.index())
         };
         let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
         let idx = dump_ref!(store.get().sys, &idx);
@@ -375,7 +375,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
         let aid = array_ty_to_id(&scalar_ty, size);
         let id = syn::Ident::new(&format!("Array{}Write", aid), Span::call_site());
-        let value = dump_ref!(self.sys, &store.get_value());
+        let value = dump_ref!(self.sys, &store.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
         let module_writer = self.current_module_id();
         quote::quote! {
@@ -394,13 +394,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         )
       }
       Opcode::AsyncCall => {
+        let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
         let to_trigger = if let Ok(module) = {
-          let bind = expr
-            .get_operand(0)
-            .unwrap()
-            .get_value()
-            .as_expr::<Bind>(self.sys)
-            .unwrap();
+          let bind = call.get_bind();
           bind.get_callee().as_ref::<Module>(self.sys)
         } {
           format!("EventKind::Module{}", camelize(&namify(module.get_name())))
@@ -498,15 +494,11 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         )
       }
       Opcode::Concat => {
-        let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
-        let b = dump_ref!(self.sys, &expr.get_operand(1).unwrap().get_value());
-        let b_bits = expr
-          .get_operand(1)
-          .unwrap()
-          .get_value()
-          .get_dtype(expr.sys)
-          .unwrap()
-          .get_bits();
+        let dtype = expr.dtype();
+        let concat = expr.as_sub::<instructions::Concat>().unwrap();
+        let a = dump_ref!(self.sys, &concat.msb());
+        let b = dump_ref!(self.sys, &concat.lsb());
+        let b_bits = concat.lsb().get_dtype(concat.get().sys).unwrap().get_bits();
         format! {
           "{{
               let a = ValueCastTo::<BigUint>::cast(&{});
@@ -517,7 +509,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           a,
           b,
           b_bits,
-          dtype_to_rust_type(&expr.dtype()),
+          dtype_to_rust_type(&dtype),
         }
       }
       Opcode::Select => {

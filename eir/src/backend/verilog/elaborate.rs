@@ -1299,7 +1299,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
               .get_value()
               .as_expr::<GetElementPtr>(self.sys)
               .unwrap();
-            (gep.get_array(), gep.get_index())
+            (gep.array(), gep.index())
           };
           let array_name = namify(array_ref.get_name());
           match self.array_drivers.get_mut(&array_name) {
@@ -1333,7 +1333,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
               .get_value()
               .as_expr::<GetElementPtr>(self.sys)
               .unwrap();
-            (gep.get_array(), gep.get_index())
+            (gep.array(), gep.index())
           };
           let array_name = namify(array_ref.get_name());
           match self.array_drivers.get_mut(&array_name) {
