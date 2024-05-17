@@ -54,6 +54,19 @@ macro_rules! register_opcodes {
       }
     }
 
+    impl ToString for ExprRef<'_> {
+      fn to_string(&self) -> String {
+        match self.get_opcode() {
+          $( Opcode::$var_id $( { $subcode } )? => {
+            $( let _ = $subcode; )?
+            let sub = self.clone().as_sub::<instructions::$var_id>().unwrap();
+            sub.to_string()
+          })*
+        }
+      }
+    }
+
+
     paste::paste!{
       impl Opcode {
         pub fn from_str(s: &str) -> Option<Opcode> {
@@ -197,8 +210,12 @@ impl Expr {
     self.operands.len()
   }
 
-  pub fn get_name(&self) -> Option<&String> {
-    self.name.as_ref()
+  pub fn get_name(&self) -> String {
+    if let Some(x) = self.name.clone() {
+      x
+    } else {
+      format!("_{}", self.key)
+    }
   }
 }
 

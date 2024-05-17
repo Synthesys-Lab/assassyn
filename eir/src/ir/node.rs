@@ -358,9 +358,7 @@ impl BaseNode {
       }
       NodeKind::Expr => {
         let expr = self.as_ref::<Expr>(sys).unwrap();
-        expr
-          .get_name()
-          .map_or_else(|| format!("_{}", expr.get_key()), |x| x.clone())
+        expr.get_name()
       }
       NodeKind::StrImm => {
         let str_imm = self.as_ref::<StrImm>(sys).unwrap();

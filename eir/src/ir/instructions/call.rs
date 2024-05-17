@@ -1,6 +1,9 @@
-use crate::ir::node::BaseNode;
+use crate::ir::{
+  node::{BaseNode, IsElement, NodeKind},
+  Module,
+};
 
-use super::Bind;
+use super::{AsyncCall, Bind};
 
 impl Bind<'_> {
   /// Get the arguments of this bind expression.
@@ -36,5 +39,48 @@ impl Bind<'_> {
       .operand_iter()
       .take(n)
       .all(|x| !x.get_value().is_unknown())
+  }
+}
+
+impl ToString for Bind<'_> {
+  fn to_string(&self) -> String {
+    let callee = self.callee();
+    let arg_list = self
+      .arg_iter()
+      .enumerate()
+      .map(|(i, v)| {
+        let arg = match callee.get_kind() {
+          NodeKind::Module => {
+            let name = callee
+              .as_ref::<Module>(self.expr.sys)
+              .unwrap()
+              .get_port(i)
+              .unwrap()
+              .get_name()
+              .to_string();
+            format!("{}:", name)
+          }
+          _ => format!("arg{}:", i),
+        };
+        format!("{} {}", arg, v.to_string(self.expr.sys))
+      })
+      .collect::<Vec<String>>()
+      .join(", ");
+    let module_name = match callee.get_kind() {
+      NodeKind::Module => callee
+        .as_ref::<Module>(self.expr.sys)
+        .unwrap()
+        .get_name()
+        .to_string(),
+      _ => callee.to_string(self.expr.sys),
+    };
+    format!("bind {} {{ {} }}", module_name, arg_list).into()
+  }
+}
+
+impl ToString for AsyncCall<'_> {
+  fn to_string(&self) -> String {
+    let bind = self.bind().get().upcast().to_string(self.expr.sys);
+    format!("async_call {}", bind)
   }
 }

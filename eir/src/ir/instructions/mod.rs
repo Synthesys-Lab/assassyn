@@ -1,6 +1,5 @@
 use super::expr::Opcode;
 use super::node::ExprRef;
-use super::{ir_printer::IRPrinter, visitor::Visitor};
 use crate::{ir, ir::node::BaseNode};
 
 pub mod arith;
@@ -8,6 +7,7 @@ pub mod bits;
 pub mod call;
 pub mod data;
 pub mod fifo;
+pub mod log;
 
 pub trait AsExpr<'a>: Sized {
   fn downcast(expr: ExprRef<'a>) -> Result<Self, String>;
@@ -71,12 +71,6 @@ macro_rules! register_opcode {
       }
     }
 
-    impl ToString for $operator<'_> {
-      fn to_string(&self) -> String {
-        IRPrinter::new(false).visit_expr(self.expr.clone()).unwrap()
-      }
-    }
-
     register_opcode!(@emit_sema $operator => { $( ( $($sema_info)* ) )* });
 
     register_opcode!( $( $rest )* );
@@ -101,4 +95,5 @@ register_opcode!(
   Slice => { (x, 0, BaseNode) (l_intimm, 1, node::IntImm) (r_intimm, 2, node::IntImm) },
   Concat => { (msb, 0, BaseNode) (lsb, 1, BaseNode) },
   Cast { cast } => { (x, 0, BaseNode) }, // NOTE: This "," cannot be omitted!
+  Log => { },
 );
