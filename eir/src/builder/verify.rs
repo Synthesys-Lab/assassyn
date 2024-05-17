@@ -89,15 +89,11 @@ impl Visitor<()> for Verifier {
       }
     }
     match expr.get_opcode() {
-      Opcode::Cast { cast } => {
-        let src_ty = expr
-          .get_operand(0)
-          .unwrap()
-          .get_value()
-          .get_dtype(expr.sys)
-          .unwrap();
-        let dest_ty = expr.dtype();
-        match cast {
+      Opcode::Cast { .. } => {
+        let cast = expr.as_sub::<instructions::Cast>().unwrap();
+        let src_ty = cast.src_type();
+        let dest_ty = cast.dest_type();
+        match cast.get_opcode() {
           subcode::Cast::Cast => {
             assert!(
               // uint to int, width must be expanded

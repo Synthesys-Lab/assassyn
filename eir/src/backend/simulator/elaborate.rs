@@ -181,12 +181,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         let expr = node.as_ref::<Expr>(self.sys).unwrap();
         match expr.get_opcode() {
           Opcode::FIFOPush => {
-            let fifo = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_ref::<FIFO>(self.sys)
-              .unwrap();
+            let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
+            let fifo = push.fifo();
             let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
             let fifo_push = syn::Ident::new(
               &format!("FIFO{}Push", dtype_to_rust_type(&fifo.scalar_ty())),
@@ -204,12 +200,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             );
           }
           Opcode::AsyncCall => {
-            let bind = expr
-              .get_operand(0)
-              .unwrap()
-              .get_value()
-              .as_expr::<Bind>(self.sys)
-              .unwrap();
+            let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
+            let bind = call.bind();
             let module = bind.callee().as_ref::<Module>(self.sys).unwrap();
             let to_trigger = format!("EventKind::Module{}", camelize(&namify(module.get_name())));
             rdata_module = Some(format!(

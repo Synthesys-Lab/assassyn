@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
   builder::SysBuilder,
-  ir::{node::*, Operand, FIFO, *},
+  ir::{node::*, Operand, FIFO, *}, xform::callback::instructions::FIFOPush,
 };
 
 pub(super) fn gather_single_callback_fifos(sys: &SysBuilder) -> Vec<(BaseNode, BaseNode)> {
@@ -18,8 +18,8 @@ pub(super) fn gather_single_callback_fifos(sys: &SysBuilder) -> Vec<(BaseNode, B
             let expr = operand.get_user().as_ref::<Expr>(sys).unwrap();
             match expr.get_opcode() {
               Opcode::FIFOPush => {
-                let module_operand = expr.get_operand(1).unwrap();
-                let module = module_operand.get_value().clone();
+                let push = expr.as_sub::<FIFOPush>().unwrap();
+                let module = push.value();
                 assert!(module.get_kind() == NodeKind::Module);
                 module.into()
               }

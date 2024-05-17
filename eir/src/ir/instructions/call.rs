@@ -62,7 +62,12 @@ impl ToString for Bind<'_> {
           }
           _ => format!("arg{}:", i),
         };
-        format!("{} {}", arg, v.to_string(self.expr.sys))
+        let feed = if v.is_unknown() {
+          "None".to_string()
+        } else {
+          v.to_string(self.expr.sys)
+        };
+        format!("{} {}", arg, feed)
       })
       .collect::<Vec<String>>()
       .join(", ");

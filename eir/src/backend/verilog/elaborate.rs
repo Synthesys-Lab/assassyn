@@ -1462,22 +1462,19 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         ))
       }
 
-      Opcode::Cast { cast } => {
-        let a = dump_ref!(self.sys, &expr.get_operand(0).unwrap().get_value());
-        match cast {
+      Opcode::Cast { .. } => {
+        let dbits = expr.dtype().get_bits() - 1;
+        let name = namify(expr.upcast().to_string(self.sys).as_str());
+        let cast = expr.as_sub::<instructions::Cast>().unwrap();
+        let a = dump_ref!(self.sys, &cast.x());
+        match cast.get_opcode() {
           subcode::Cast::Cast | subcode::Cast::ZExt => Some(format!(
             "logic [{}:0] {};\nassign {} = {};\n\n",
-            expr.dtype().get_bits() - 1,
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            namify(expr.upcast().to_string(self.sys).as_str()),
-            a
+            dbits, name, name, a
           )),
           subcode::Cast::SExt => {
-            let src_ref = expr.get_operand(0).unwrap();
-            let src = src_ref.get_value();
-            let src_dtype = src.get_dtype(expr.sys).unwrap();
-            let dest_dtype = expr.dtype();
-            let a = dump_ref!(self.sys, src);
+            let src_dtype = cast.src_type();
+            let dest_dtype = cast.dest_type();
             if src_dtype.is_int()
               && src_dtype.is_signed()
               && dest_dtype.is_int()
@@ -1487,9 +1484,9 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
               // perform sext
               Some(format!(
                 "logic [{}:0] {};\nassign {} = {{{}'{{{}[{}]}}, {}}};\n\n",
-                expr.dtype().get_bits() - 1,
-                namify(expr.upcast().to_string(self.sys).as_str()),
-                namify(expr.upcast().to_string(self.sys).as_str()),
+                dbits,
+                name,
+                name,
                 dest_dtype.get_bits() - src_dtype.get_bits(),
                 a,
                 src_dtype.get_bits() - 1,
@@ -1498,10 +1495,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
             } else {
               Some(format!(
                 "logic [{}:0] {};\nassign {} = {};\n\n",
-                expr.dtype().get_bits() - 1,
-                namify(expr.upcast().to_string(self.sys).as_str()),
-                namify(expr.upcast().to_string(self.sys).as_str()),
-                a
+                dbits, name, name, a
               ))
             }
           }
