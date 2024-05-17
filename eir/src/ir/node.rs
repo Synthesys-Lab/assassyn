@@ -354,7 +354,7 @@ impl BaseNode {
       }
       NodeKind::Block => {
         let block = self.as_ref::<Block>(sys).unwrap();
-        IRPrinter::new(false).visit_block(&block).unwrap()
+        IRPrinter::new(false).visit_block(block).unwrap()
       }
       NodeKind::Expr => {
         let expr = self.as_ref::<Expr>(sys).unwrap();

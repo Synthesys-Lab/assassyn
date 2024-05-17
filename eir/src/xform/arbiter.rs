@@ -19,7 +19,7 @@ struct GatherBinds {
 }
 
 impl Visitor<()> for GatherBinds {
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     let value = expr.upcast();
     let expr = expr.clone();
     if let Ok(bind) = expr.as_sub::<Bind>() {
@@ -46,7 +46,7 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
   };
   for m in sys.module_iter() {
     eprintln!("@module: {}", m.get_name());
-    gather_binds.visit_module(&m);
+    gather_binds.visit_module(m);
   }
   gather_binds.binds.retain(|_, v| v.len() > 1);
   return gather_binds.binds;

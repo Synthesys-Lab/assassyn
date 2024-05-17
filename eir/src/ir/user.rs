@@ -103,7 +103,7 @@ impl GatherAllUses {
 }
 
 impl Visitor<()> for GatherAllUses {
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     if let Opcode::AsyncCall = expr.get_opcode() {
       let bind = expr.get_operand(0).unwrap().get_value().clone();
       self.dispatch(expr.sys, &bind, vec![]);
@@ -188,7 +188,7 @@ impl SysBuilder {
     );
     // eprintln!("by {}", dst.to_string(self));
     for m in self.module_iter() {
-      gather.visit_module(&m);
+      gather.visit_module(m);
     }
     for (expr, i, new_value) in gather.uses {
       let new_value = new_value.map_or(dst.clone(), |x| x);

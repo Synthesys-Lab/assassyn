@@ -44,7 +44,7 @@ macro_rules! register_opcode {
 
       impl ToString for $operator<'_> {
         fn to_string(&self) -> String {
-          IRPrinter::new(false).visit_expr(&self.expr).unwrap()
+          IRPrinter::new(false).visit_expr(self.expr.clone()).unwrap()
         }
       }
     )*

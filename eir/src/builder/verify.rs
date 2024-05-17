@@ -35,7 +35,7 @@ impl Verifier {
 }
 
 impl Visitor<()> for Verifier {
-  fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<()> {
+  fn visit_block(&mut self, block: BlockRef<'_>) -> Option<()> {
     if let BlockKind::WaitUntil(cond) = block.get_kind() {
       if let Ok(cond) = cond.as_ref::<Block>(block.sys) {
         assert!(
@@ -57,7 +57,7 @@ impl Visitor<()> for Verifier {
     ().into()
   }
 
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     if self.in_wait_until_cond {
       assert!(
         !expr.get_opcode().has_side_effect(),
@@ -133,6 +133,6 @@ pub fn verify(sys: &SysBuilder) {
       user.as_ref::<Operand>(sys).unwrap().verify(sys);
     }
     let body = m.get_body();
-    Verifier::new().visit_block(&body);
+    Verifier::new().visit_block(body);
   }
 }

@@ -924,11 +924,11 @@ impl Display for SysBuilder {
     let mut printer = IRPrinter::new(false);
     write!(f, "system {} {{\n", self.name)?;
     for elem in self.array_iter() {
-      write!(f, "  {};\n", printer.visit_array(&elem).unwrap())?;
+      write!(f, "  {};\n", printer.visit_array(elem).unwrap())?;
     }
     printer.inc_indent();
     for elem in self.module_iter() {
-      write!(f, "\n{}", printer.visit_module(&elem).unwrap())?;
+      write!(f, "\n{}", printer.visit_module(elem).unwrap())?;
     }
     printer.dec_indent();
     write!(f, "}}")

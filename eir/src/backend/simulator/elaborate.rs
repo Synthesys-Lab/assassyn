@@ -115,7 +115,7 @@ impl ElaborateModule<'_, '_> {
 }
 
 impl Visitor<String> for ElaborateModule<'_, '_> {
-  fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.module_name = module.get_name().to_string();
     let mut res = String::new();
     res.push_str(&format!(
@@ -301,7 +301,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       res.push_str(rdata_module.unwrap().as_str());
       res.push_str("}");
     } else {
-      res.push_str(&self.visit_block(&module.get_body()).unwrap());
+      res.push_str(&self.visit_block(module.get_body()).unwrap());
     }
 
     self.indent -= 2;
@@ -309,10 +309,15 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     res.into()
   }
 
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
+    let id = if expr.get_opcode().is_valued() {
+      Some(namify(expr.upcast().to_string(self.sys).as_str()))
+    } else {
+      None
+    };
     let res = match expr.get_opcode() {
       Opcode::Binary { .. } => {
-        let bin = expr.clone().as_sub::<instructions::Binary>().unwrap();
+        let bin = expr.as_sub::<instructions::Binary>().unwrap();
         let ty = bin.get().dtype();
         let ty = dtype_to_rust_type(&ty);
         let lhs = format!(
@@ -328,7 +333,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         format!("{} {} {}", lhs, bin.get_opcode().to_string(), rhs)
       }
       Opcode::Unary { .. } => {
-        let uop = expr.clone().as_sub::<instructions::Unary>().unwrap();
+        let uop = expr.as_sub::<instructions::Unary>().unwrap();
         format!(
           "{}{}",
           uop.get_opcode().to_string(),
@@ -336,16 +341,16 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         )
       }
       Opcode::Compare { .. } => {
-        let cmp = expr.clone().as_sub::<instructions::Compare>().unwrap();
+        let cmp = expr.as_sub::<instructions::Compare>().unwrap();
         format!(
           "{} {} {}",
           dump_ref!(self.sys, &cmp.a()),
-          expr.get_opcode().to_string(),
+          cmp.get_opcode().to_string(),
           dump_ref!(self.sys, &cmp.b()),
         )
       }
       Opcode::Load => {
-        let load = expr.clone().as_sub::<instructions::Load>().unwrap();
+        let load = expr.as_sub::<instructions::Load>().unwrap();
         let (array, idx) = {
           let gep = load.get_pointer();
           (gep.get_array(), gep.get_index())
@@ -353,17 +358,19 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         format!(
           "{}[{} as usize].clone()",
           namify(array.get_name()),
-          NodeRefDumper.dispatch(expr.sys, &idx, vec![]).unwrap()
+          NodeRefDumper
+            .dispatch(load.get().sys, &idx, vec![])
+            .unwrap()
         )
       }
       Opcode::Store => {
-        let store = expr.clone().as_sub::<instructions::Store>().unwrap();
+        let store = expr.as_sub::<instructions::Store>().unwrap();
         let (array, idx) = {
           let gep = store.get_pointer();
           (gep.get_array(), gep.get_index())
         };
         let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
-        let idx = dump_ref!(expr.sys, &idx);
+        let idx = dump_ref!(store.get().sys, &idx);
         let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
         let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
         let aid = array_ty_to_id(&scalar_ty, size);
@@ -382,8 +389,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::GetElementPtr => {
         format!(
-          "\n// To be generated in its load/store user\n// GEP: {}\n",
-          IRPrinter::new(false).visit_expr(&expr).unwrap()
+          "0 /* GEP: {}, to be handled by its load/store user */",
+          IRPrinter::new(false).visit_expr(expr).unwrap()
         )
       }
       Opcode::AsyncCall => {
@@ -407,7 +414,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::FIFOPop => {
         // TODO(@were): Support multiple pop.
-        let pop = expr.clone().as_sub::<instructions::FIFOPop>().unwrap();
+        let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
         let fifo = pop.get_fifo();
         let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
         let fifo_ty = fifo.scalar_ty();
@@ -427,7 +434,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         .to_string()
       }
       Opcode::FIFOField { field } => {
-        let get_field = expr.clone().as_sub::<instructions::FIFOField>().unwrap();
+        let get_field = expr.as_sub::<instructions::FIFOField>().unwrap();
         let fifo = get_field.get_fifo();
         match get_field.get_field() {
           subcode::FIFO::Peek => format!("{}.front().unwrap().clone()", fifo_name!(fifo)),
@@ -436,7 +443,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
       }
       Opcode::FIFOPush => {
-        let push = expr.clone().as_sub::<instructions::FIFOPush>().unwrap();
+        let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
         let fifo = push.get_fifo();
         let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
         let fifo_push = syn::Ident::new(
@@ -473,7 +480,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         res
       }
       Opcode::Slice => {
-        let slice = expr.clone().as_sub::<instructions::Slice>().unwrap();
+        let slice = expr.as_sub::<instructions::Slice>().unwrap();
         let a = dump_ref!(self.sys, &slice.x());
         let l = slice.l();
         let r = slice.r();
@@ -487,7 +494,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           a,
           "1".repeat((r - l + 1) as usize),
           l,
-          dtype_to_rust_type(&expr.dtype()),
+          dtype_to_rust_type(&slice.get().dtype()),
         )
       }
       Opcode::Concat => {
@@ -555,29 +562,21 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
       }
       Opcode::Bind => {
-        let callee = {
-          let bind = expr.upcast().as_expr::<Bind>(expr.sys).unwrap();
-          let callee = bind.get_callee();
-          let module = callee.as_ref::<Module>(expr.sys).unwrap();
-          format!("EventKind::Module{}", camelize(&namify(module.get_name())))
-        };
-        format!("let {} = {}", dump_ref!(self.sys, &expr.upcast()), callee)
+        let bind = expr.as_sub::<Bind>().unwrap();
+        let callee = bind.get_callee();
+        let module = callee.as_ref::<Module>(bind.get().sys).unwrap();
+        format!("EventKind::Module{}", camelize(&namify(module.get_name())))
       }
     };
-    if expr.dtype().is_void() {
-      format!("{}{};\n", " ".repeat(self.indent), res)
+    if let Some(id) = id {
+      format!("{}let {} = {};\n", " ".repeat(self.indent), id, res)
     } else {
-      format!(
-        "{}let {} = {};\n",
-        " ".repeat(self.indent),
-        namify(expr.upcast().to_string(self.sys).as_str()),
-        res
-      )
+      format!("{}{};\n", " ".repeat(self.indent), res)
     }
     .into()
   }
 
-  fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> Option<String> {
+  fn visit_int_imm(&mut self, int_imm: IntImmRef<'_>) -> Option<String> {
     format!(
       "ValueCastTo::<{}>::cast(&{})",
       dtype_to_rust_type(&int_imm.dtype()),
@@ -586,7 +585,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     .into()
   }
 
-  fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
+  fn visit_block(&mut self, block: BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
     match block.get_kind() {
       BlockKind::Condition(cond) => {
@@ -626,11 +625,11 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(&self.visit_expr(&expr).unwrap());
+          res.push_str(&self.visit_expr(expr).unwrap());
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(&self.visit_block(&block).unwrap());
+          res.push_str(&self.visit_block(block).unwrap());
         }
         _ => {
           panic!("Unexpected reference type: {:?}", elem);
@@ -1044,7 +1043,7 @@ macro_rules! impl_unwrap_slab {
     res.push_str(&format!(
       "  // {} -> {}\n",
       slab_cache.len(),
-      IRPrinter::new(false).visit_array(&array).unwrap(),
+      IRPrinter::new(false).visit_array(array.clone()).unwrap(),
     ));
     res.push_str(
       &quote::quote! {
@@ -1330,7 +1329,7 @@ fn dump_modules(
   )?;
   let mut em = ElaborateModule::new(sys, slab_cache);
   for module in em.sys.module_iter() {
-    if let Some(buffer) = em.visit_module(&module) {
+    if let Some(buffer) = em.visit_module(module) {
       fd.write(buffer.as_bytes())?;
     }
   }

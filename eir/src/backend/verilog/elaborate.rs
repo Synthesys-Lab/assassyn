@@ -712,7 +712,7 @@ macro_rules! dump_ref {
 }
 
 impl<'a> Visitor<String> for VerilogDumper<'a> {
-  fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     if module.get_name() == "testbench" {
       self.has_testbench = true;
     }
@@ -915,7 +915,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
       let mut rdata_module: Option<String> = None;
       for node in module.get_body().iter() {
         let expr = node.as_ref::<Expr>(self.sys).unwrap();
-        self.visit_expr(&expr);
+        self.visit_expr(expr.clone());
         match expr.get_opcode() {
           Opcode::FIFOPush => {
             let fifo = expr
@@ -1013,11 +1013,11 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
               match elem.get_kind() {
                 NodeKind::Expr => {
                   let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-                  res.push_str(self.visit_expr(&expr).unwrap().as_str());
+                  res.push_str(self.visit_expr(expr).unwrap().as_str());
                 }
                 NodeKind::Block => {
                   let block = elem.as_ref::<Block>(self.sys).unwrap();
-                  res.push_str(self.visit_block(&block).unwrap().as_str());
+                  res.push_str(self.visit_block(block).unwrap().as_str());
                 }
                 _ => {
                   panic!("Unexpected reference type: {:?}", elem);
@@ -1054,11 +1054,11 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         match elem.get_kind() {
           NodeKind::Expr => {
             let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-            res.push_str(self.visit_expr(&expr).unwrap().as_str());
+            res.push_str(self.visit_expr(expr).unwrap().as_str());
           }
           NodeKind::Block => {
             let block = elem.as_ref::<Block>(self.sys).unwrap();
-            res.push_str(self.visit_block(&block).unwrap().as_str());
+            res.push_str(self.visit_block(block).unwrap().as_str());
           }
           _ => {
             panic!("Unexpected reference type: {:?}", elem);
@@ -1169,7 +1169,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     Some(res)
   }
 
-  fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
+  fn visit_block(&mut self, block: BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
     match block.get_kind() {
       BlockKind::Condition(cond) => {
@@ -1192,11 +1192,11 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(&expr).unwrap().as_str());
+          res.push_str(self.visit_expr(expr).unwrap().as_str());
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(&block).unwrap().as_str());
+          res.push_str(self.visit_block(block).unwrap().as_str());
         }
         _ => {
           panic!("Unexpected reference type: {:?}", elem);
@@ -1207,7 +1207,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     res.into()
   }
 
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
     if expr.get_opcode().is_binary() || expr.get_opcode().is_cmp() {
       Some(format!(
         "logic [{}:0] {};\nassign {} = {} {} {};\n\n",
@@ -1564,7 +1564,7 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
 
   for module in vd.sys.module_iter() {
     vd.current_module = namify(module.get_name()).to_string();
-    fd.write(vd.visit_module(&module).unwrap().as_bytes())?;
+    fd.write(vd.visit_module(module).unwrap().as_bytes())?;
   }
 
   vd.dump_runtime(fd, config.sim_threshold)?;

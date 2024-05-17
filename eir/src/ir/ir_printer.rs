@@ -35,7 +35,7 @@ struct ExtInterDumper<'a> {
 
 // TODO(@were): Fix this, dump the actual value of the operand_of one a line.
 impl Visitor<String> for ExtInterDumper<'_> {
-  fn visit_input(&mut self, input: &FIFORef<'_>) -> Option<String> {
+  fn visit_input(&mut self, input: FIFORef<'_>) -> Option<String> {
     let module = input.get_parent().as_ref::<Module>(input.sys).unwrap();
     let mut res = format!(
       "{}.{}: fifo<{}> {{\n",
@@ -46,8 +46,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
     for op in self.users.iter() {
       let expr = IRPrinter::new(self.redundancy)
         .visit_expr(
-          &op
-            .as_ref::<Operand>(input.sys)
+          op.as_ref::<Operand>(input.sys)
             .unwrap()
             .get_user()
             .as_ref::<Expr>(input.sys)
@@ -60,7 +59,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
     res.into()
   }
 
-  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
+  fn visit_array(&mut self, array: ArrayRef<'_>) -> Option<String> {
     let mut res = format!(
       "Array: {}[{} x {}] {{\n",
       array.get_name(),
@@ -70,8 +69,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
     for op in self.users.iter() {
       let expr = IRPrinter::new(self.redundancy)
         .visit_expr(
-          &op
-            .as_ref::<Operand>(array.sys)
+          op.as_ref::<Operand>(array.sys)
             .unwrap()
             .get_user()
             .as_ref::<Expr>(array.sys)
@@ -84,7 +82,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
     res.into()
   }
 
-  fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     format!("Module: {}", module.get_name()).into()
   }
 }
@@ -92,7 +90,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
 struct FIFODumper;
 
 impl Visitor<String> for FIFODumper {
-  fn visit_input(&mut self, fifo: &FIFORef<'_>) -> Option<String> {
+  fn visit_input(&mut self, fifo: FIFORef<'_>) -> Option<String> {
     if fifo.is_placeholder() {
       format!("{}.{}", fifo.get_parent().to_string(fifo.sys), fifo.idx())
     } else {
@@ -107,7 +105,7 @@ impl Visitor<String> for FIFODumper {
 }
 
 impl Visitor<String> for IRPrinter {
-  fn visit_input(&mut self, input: &FIFORef<'_>) -> Option<String> {
+  fn visit_input(&mut self, input: FIFORef<'_>) -> Option<String> {
     format!(
       "{}: fifo<{}>",
       input.get_name(),
@@ -116,7 +114,7 @@ impl Visitor<String> for IRPrinter {
     .into()
   }
 
-  fn visit_array(&mut self, array: &ArrayRef<'_>) -> Option<String> {
+  fn visit_array(&mut self, array: ArrayRef<'_>) -> Option<String> {
     format!(
       "Array: {}[{} x {}]",
       array.get_name(),
@@ -126,13 +124,13 @@ impl Visitor<String> for IRPrinter {
     .into()
   }
 
-  fn visit_int_imm(&mut self, int_imm: &IntImmRef<'_>) -> Option<String> {
+  fn visit_int_imm(&mut self, int_imm: IntImmRef<'_>) -> Option<String> {
     format!("({}:{})", int_imm.get_value(), int_imm.dtype().to_string()).into()
   }
 
-  fn visit_operand(&mut self, operand: &OperandRef<'_>) -> Option<String> {
+  fn visit_operand(&mut self, operand: OperandRef<'_>) -> Option<String> {
     let expr = operand.get_user().as_ref::<Expr>(operand.sys).unwrap();
-    let expr = self.visit_expr(&expr).unwrap();
+    let expr = self.visit_expr(expr).unwrap();
     format!(
       "{} // in {}",
       operand.get_value().to_string(operand.sys),
@@ -141,7 +139,7 @@ impl Visitor<String> for IRPrinter {
     .into()
   }
 
-  fn visit_module(&mut self, module: &ModuleRef<'_>) -> Option<String> {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     let mut res = String::new();
     for (elem, ops) in module.ext_interf_iter() {
       res.push_str(&format!(
@@ -185,7 +183,7 @@ impl Visitor<String> for IRPrinter {
     ));
     module.get();
     for elem in module.port_iter() {
-      res.push_str(&self.visit_input(&elem).unwrap());
+      res.push_str(&self.visit_input(elem).unwrap());
       res.push_str(", ");
     }
     res.push_str(") {\n");
@@ -195,7 +193,7 @@ impl Visitor<String> for IRPrinter {
       self.inc_indent();
     }
 
-    let body = self.visit_block(&module.get_body()).unwrap();
+    let body = self.visit_block(module.get_body()).unwrap();
     res.push_str(&body);
     res.push('\n');
 
@@ -209,12 +207,12 @@ impl Visitor<String> for IRPrinter {
     res.into()
   }
 
-  fn visit_string_imm(&mut self, str_imm: &StrImmRef<'_>) -> Option<String> {
+  fn visit_string_imm(&mut self, str_imm: StrImmRef<'_>) -> Option<String> {
     let value = str_imm.get_value();
     quote::quote!(#value).to_string().into()
   }
 
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<String> {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
     let mnem = expr.get_opcode().to_string();
     let res = if expr.get_opcode().is_valued() {
       let rhs = if expr.get_opcode().is_binary() || expr.get_opcode().is_cmp() {
@@ -406,7 +404,7 @@ impl Visitor<String> for IRPrinter {
     };
     format!("{}{}", " ".repeat(self.indent), res).into()
   }
-  fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<String> {
+  fn visit_block(&mut self, block: BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
     // Scope begins
     match block.get_kind() {
@@ -449,11 +447,11 @@ impl Visitor<String> for IRPrinter {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(block.sys).unwrap();
-          res.push_str(&format!("{}\n", self.visit_expr(&expr).unwrap()));
+          res.push_str(&format!("{}\n", self.visit_expr(expr).unwrap()));
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(block.sys).unwrap();
-          res.push_str(&format!("{}\n", self.visit_block(&block).unwrap()));
+          res.push_str(&format!("{}\n", self.visit_block(block).unwrap()));
         }
         _ => {
           panic!("Not an block-able element: {:?}", elem);
