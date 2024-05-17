@@ -2,7 +2,8 @@ use std::collections::HashSet;
 
 use crate::{
   builder::SysBuilder,
-  ir::{node::*, Operand, FIFO, *}, xform::callback::instructions::FIFOPush,
+  ir::{node::*, Operand, FIFO, *},
+  xform::callback::instructions::FIFOPush,
 };
 
 pub(super) fn gather_single_callback_fifos(sys: &SysBuilder) -> Vec<(BaseNode, BaseNode)> {
