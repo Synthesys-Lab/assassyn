@@ -1,4 +1,4 @@
-use eda4eda::module_builder;
+use assassyn::module_builder;
 use eir::{backend, builder::SysBuilder, xform};
 
 module_builder!(
