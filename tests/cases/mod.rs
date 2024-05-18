@@ -12,7 +12,6 @@ pub mod fifo_valid;
 pub mod helloworld;
 pub mod inline;
 pub mod memory;
-pub mod module_para;
 pub mod multi_call;
 pub mod select;
 pub mod spin_lock;

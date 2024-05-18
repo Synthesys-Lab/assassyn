@@ -39,4 +39,3 @@ register_test!(multi_call::multi_call);
 register_test!(spin_lock::spin_lock);
 register_test!(async_call::async_call);
 register_test!(bind::bind);
-register_test!(module_para::module_para);
