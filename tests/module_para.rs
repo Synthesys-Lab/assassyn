@@ -6,12 +6,25 @@ mod module_para {
 	  	use eda4eda::module_builder;
 	  	use eir::builder::SysBuilder;
 
+		/* module foo: raw_params
+		TokenStream [
+			Ident { ident: "arr1", span: #0 bytes(165..169) }, 
+			Punct { ch: ',', spacing: Alone, span: #0 bytes(169..170) }, 
+			Ident { ident: "arr2", span: #0 bytes(171..175) }
+		]
+		 */
+
 	  	module_builder!(
 	  	  	foo(arr1, arr2) () {
 	  	  	    log("{}!", "I am foo, I take an array");
 	  	  	}
 	  	);
 
+		/* module bar: raw_params
+		TokenStream [
+			Ident { ident: "foo", span: #0 bytes(283..286) }
+		]
+		 */
 	  	module_builder!(
 	  	  	bar(foo) () {
 	  	  	    log("{}!", "I am bar, I take foo");
