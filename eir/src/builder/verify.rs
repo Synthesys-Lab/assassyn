@@ -94,27 +94,20 @@ impl Visitor<()> for Verifier {
         let src_ty = cast.src_type();
         let dest_ty = cast.dest_type();
         match cast.get_opcode() {
-          subcode::Cast::Cast => {
+          subcode::Cast::BitCast => {
             assert!(
-              // uint to int, width must be expanded
-              (
-                dest_ty.is_int() && dest_ty.is_signed() &&
-                src_ty.is_int() && !src_ty.is_signed() &&
-                dest_ty.get_bits() > src_ty.get_bits()
-              ) ||
-              // other senario, disallow trimming
-              (dest_ty.get_bits() >= src_ty.get_bits())
+              // only support same-width data type conversions
+              dest_ty.get_bits() == src_ty.get_bits(),
+              "Only support bitcast between types of the same width"
             );
           }
-          subcode::Cast::SExt => {
+          subcode::Cast::SExt | subcode::Cast::ZExt => {
             assert!(
-              // dest needs to be int
-              dest_ty.is_int() && dest_ty.is_signed() &&
-              // disallow trimming
-              dest_ty.get_bits() >= src_ty.get_bits()
+              // disallow trimming or "extend" to same width
+              dest_ty.get_bits() > src_ty.get_bits(),
+              "Dest type must be wider than src type for extension"
             );
           }
-          _ => {}
         }
       }
       _ => {}

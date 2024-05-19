@@ -859,17 +859,11 @@ impl SysBuilder {
   }
 
   /// Create a cast operation.
-  pub fn create_cast(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
-    let src_dtype = src.get_dtype(self).unwrap();
-
-    if src_dtype.is_int() && src_dtype.is_signed() && dest_ty.is_int() && !dest_ty.is_signed() {
-      return self.create_expr(dest_ty, subcode::Cast::ZExt.into(), vec![src], true);
-    }
-
+  pub fn create_bitcast(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     let res = self.create_expr(
       dest_ty,
       Opcode::Cast {
-        cast: subcode::Cast::Cast,
+        cast: subcode::Cast::BitCast,
       },
       vec![src],
       true,
@@ -877,28 +871,34 @@ impl SysBuilder {
     res
   }
 
+  fn retype_imm(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
+    // When dealing with immediates,
+    // currently there's no difference between zext and sext,
+    // because we don't have negtive immediates.
+    // And we convert the immediates without checking for src/dest type width,
+    // because whether a type can hold an imm is checked in verifier.
+    self.get_const_int(dest_ty, src.as_ref::<IntImm>(self).unwrap().get_value())
+  }
+
   /// Create a sext operation.
   pub fn create_sext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
-    let src_ty = src.get_dtype(self).unwrap();
     match src.get_kind() {
-      NodeKind::IntImm => match dest_ty {
-        DataType::Int(width) | DataType::UInt(width) | DataType::Bits(width) => {
-          if src_ty.get_bits() > width {
-            panic!(
-              "Can not sext immediate number {} to a narrower type {:?}",
-              src.to_string(self),
-              dest_ty
-            )
-          } else {
-            self.get_const_int(dest_ty, src.as_ref::<IntImm>(self).unwrap().get_value())
-          }
-        }
-        _ => panic!(
-          "Can not sext immediate number {} to type {:?}",
-          src.to_string(self),
-          dest_ty
-        ),
-      },
+      NodeKind::IntImm => self.retype_imm(src, dest_ty),
+      _ => self.create_expr(
+        dest_ty,
+        Opcode::Cast {
+          cast: subcode::Cast::SExt,
+        },
+        vec![src],
+        true,
+      ),
+    }
+  }
+
+  /// Create a zext operation.
+  pub fn create_zext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
+    match src.get_kind() {
+      NodeKind::IntImm => self.retype_imm(src, dest_ty),
       _ => self.create_expr(
         dest_ty,
         Opcode::Cast {

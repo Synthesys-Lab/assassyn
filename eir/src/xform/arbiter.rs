@@ -37,7 +37,7 @@ impl Visitor<()> for GatherBinds {
 fn bits_to_int(sys: &mut SysBuilder, x: &BaseNode) -> BaseNode {
   let dtype = x.get_dtype(sys).unwrap();
   let bits = dtype.get_bits();
-  sys.create_cast(x.clone(), DataType::int_ty(bits))
+  sys.create_bitcast(x.clone(), DataType::int_ty(bits))
 }
 
 fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet<BaseNode>> {

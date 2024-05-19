@@ -13,13 +13,13 @@ fn sram_sys() -> SysBuilder {
       cnt = array(int<32>, 1);
       v = cnt[0];
       write = v.slice(0, 0);
-      write = write.cast(bits<1>);
-      wdata = v.cast(bits<32>);
+      write = write.bitcast(bits<1>);
+      wdata = v.bitcast(bits<32>);
       plused = v.add(1);
       waddr = plused.slice(0, 9);
-      waddr = waddr.cast(uint<10>);
+      waddr = waddr.bitcast(uint<10>);
       raddr = v.slice(0, 9);
-      raddr = raddr.cast(uint<10>);
+      raddr = raddr.bitcast(uint<10>);
       addr = default raddr.case(write, waddr);
       async_call mem { addr: addr, write: write, wdata: wdata, r: sink };
       cnt[0] = plused;

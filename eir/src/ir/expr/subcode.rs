@@ -95,7 +95,7 @@ impl From<FIFO> for Opcode {
 
 register_subcode!(
   Cast {
-    Cast(cast "cast"),
+    BitCast(bitcast "bitcast"),
     SExt(sext "sext"),
     ZExt(zext "zext"),
   }

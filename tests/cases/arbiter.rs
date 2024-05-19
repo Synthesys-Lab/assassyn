@@ -49,7 +49,7 @@ pub fn arbiter() {
     v = k.add(1);
     even = v.mul(2);
     even = even.slice(0, 31);
-    even = even.cast(int<32>);
+    even = even.bitcast(int<32>);
     odd = even.add(1);
     cnt[0] = v;
     is_odd = v.bitwise_and(1);
