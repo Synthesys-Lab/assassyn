@@ -1,3 +1,4 @@
+use crate::ir::expr::subcode;
 use crate::ir::{node::*, visitor::Visitor};
 
 use crate::ir::*;
@@ -34,7 +35,7 @@ impl Verifier {
 }
 
 impl Visitor<()> for Verifier {
-  fn visit_block(&mut self, block: &BlockRef<'_>) -> Option<()> {
+  fn visit_block(&mut self, block: BlockRef<'_>) -> Option<()> {
     if let BlockKind::WaitUntil(cond) = block.get_kind() {
       if let Ok(cond) = cond.as_ref::<Block>(block.sys) {
         assert!(
@@ -56,7 +57,7 @@ impl Visitor<()> for Verifier {
     ().into()
   }
 
-  fn visit_expr(&mut self, expr: &ExprRef<'_>) -> Option<()> {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     if self.in_wait_until_cond {
       assert!(
         !expr.get_opcode().has_side_effect(),
@@ -84,53 +85,56 @@ impl Visitor<()> for Verifier {
           let module = operand.as_ref::<Module>(expr.sys).unwrap();
           module.users().contains(operand);
         }
+        NodeKind::IntImm => {
+          let imm_value = operand.as_ref::<IntImm>(expr.sys).unwrap().get_value();
+          let imm_dtype = operand.get_dtype(expr.sys).unwrap();
+          let imm_dtype_width = imm_dtype.get_bits();
+          assert!(
+            imm_value < (1 << (imm_dtype_width - if imm_dtype.is_signed() { 1 } else { 0 })),
+            "Datatype {} can not hold immediate {}",
+            imm_dtype.to_string(),
+            imm_value
+          )
+        }
         _ => {}
       }
     }
-    if expr.get_opcode() == Opcode::Cast {
-      let src_ty = expr
-        .get_operand(0)
-        .unwrap()
-        .get_value()
-        .get_dtype(expr.sys)
-        .unwrap();
-      let dest_ty = expr.dtype();
-      assert!(
-        // uint to int, width must be expanded
-        (
-          dest_ty.is_int() && dest_ty.is_signed() &&
-          src_ty.is_int() && !src_ty.is_signed() &&
-          dest_ty.get_bits() > src_ty.get_bits()
-        ) ||
-        // other senario, disallow trimming
-        (dest_ty.get_bits() >= src_ty.get_bits())
-      );
+    match expr.get_opcode() {
+      Opcode::Cast { .. } => {
+        let cast = expr.as_sub::<instructions::Cast>().unwrap();
+        let src_ty = cast.src_type();
+        let dest_ty = cast.dest_type();
+        match cast.get_opcode() {
+          subcode::Cast::BitCast => {
+            assert!(
+              // only support same-width data type conversions
+              dest_ty.get_bits() == src_ty.get_bits(),
+              "Only support bitcast between types of the same width"
+            );
+          }
+          subcode::Cast::SExt | subcode::Cast::ZExt => {
+            assert!(
+              // disallow trimming or "extend" to same width
+              dest_ty.get_bits() > src_ty.get_bits(),
+              "Dest type must be wider than src type for extension"
+            );
+          }
+        }
+      }
+      _ => {}
     }
-    if expr.get_opcode() == Opcode::Sext {
-      let src_ty = expr
-        .get_operand(0)
-        .unwrap()
-        .get_value()
-        .get_dtype(expr.sys)
-        .unwrap();
-      let dest_ty = expr.dtype();
-      assert!(
-        // dest needs to be int
-        dest_ty.is_int() && dest_ty.is_signed() &&
-        // disallow trimming
-        dest_ty.get_bits() >= src_ty.get_bits()
-      );
+    None
+  }
+
+  fn visit_module(&mut self, m: ModuleRef<'_>) -> Option<()> {
+    for user in m.users().iter() {
+      user.as_ref::<Operand>(m.sys).unwrap().verify(m.sys);
     }
+    self.visit_block(m.get_body());
     None
   }
 }
 
 pub fn verify(sys: &SysBuilder) {
-  for m in sys.module_iter() {
-    for user in m.users().iter() {
-      user.as_ref::<Operand>(sys).unwrap().verify(sys);
-    }
-    let body = m.get_body();
-    Verifier::new().visit_block(&body);
-  }
+  Verifier::new().enter(sys);
 }

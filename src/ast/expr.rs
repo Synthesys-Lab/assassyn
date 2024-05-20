@@ -8,6 +8,7 @@ pub(crate) enum ExprTerm {
   Const((DType, syn::LitInt)),
   StrLit(syn::LitStr),
   ArrayAccess(ArrayAccess),
+  DType(DType),
 }
 
 pub(crate) struct ModuleAttrs {
@@ -55,13 +56,17 @@ impl WeakSpanned for ExprTerm {
       ExprTerm::Const((_, lit)) => lit.span(),
       ExprTerm::StrLit(lit) => lit.span(),
       ExprTerm::ArrayAccess(ArrayAccess { id, .. }) => id.span(),
+      ExprTerm::DType(dtype) => dtype.span,
     }
   }
 }
 
 impl Parse for ExprTerm {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-    if input.peek(syn::LitStr) {
+    if DType::dtype_starts(&input) {
+      let dtype = input.parse::<DType>()?;
+      Ok(ExprTerm::DType(dtype))
+    } else if input.peek(syn::LitStr) {
       let lit = input.parse::<syn::LitStr>()?;
       Ok(ExprTerm::StrLit(lit))
     } else if input.cursor().ident().is_some() {
@@ -149,8 +154,6 @@ pub(crate) enum Expr {
   Bind(FuncCall),
   // "array" ( DType, syn::LitInt, Option<ExprTerm> )
   ArrayAlloc((DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)),
-  // ExprTerm . [cast | sext] ( DType )
-  DTConv((syn::Ident, Box<Expr>, DType)),
   // ExprTerm
   Term(ExprTerm),
 }
@@ -225,16 +228,21 @@ impl Parse for Expr {
       let operator = input.parse::<syn::Ident>()?;
       let raw_operands;
       parenthesized!(raw_operands in input);
+
       let op = Opcode::from_str(&operator.to_string());
+
       match op {
-        // TODO(@were): Is it possible to unify this part?
-        Some(Opcode::Cast) | Some(Opcode::Sext) => {
-          let dtype = raw_operands.parse::<DType>()?;
-          expr = Expr::DTConv((operator, Box::new(expr), dtype));
-        }
         Some(x) => {
           let operands = raw_operands.parse_terminated(Expr::parse, syn::Token![,])?;
-          if x.arity().map_or(false, |x| x - 1 != operands.len()) {
+          // Count the number of valued operands
+          let valued_terms = operands
+            .iter()
+            .filter(|x| !matches!(x, Expr::Term(ExprTerm::DType(_))))
+            .count();
+          if x.arity().map_or(
+            false,
+            |x| valued_terms != x - 1, // "self" is not counted, so minus 1
+          ) {
             return Err(syn::Error::new(
               operator.span(),
               format!(
@@ -269,6 +277,16 @@ impl Parse for Expr {
 pub(crate) struct DType {
   pub(crate) span: proc_macro2::Span,
   pub(crate) dtype: DataType,
+}
+
+impl DType {
+  pub(crate) fn dtype_starts(input: &syn::parse::ParseStream) -> bool {
+    if let Some((id, _)) = input.cursor().ident() {
+      matches!(id.to_string().as_str(), "int" | "uint" | "bits" | "module")
+    } else {
+      false
+    }
+  }
 }
 
 impl Parse for DType {

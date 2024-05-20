@@ -2,6 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::backend::simulator::utils::dtype_to_rust_type;
 use crate::builder::SysBuilder;
+use crate::ir::node::ModuleRef;
+use crate::ir::visitor::Visitor;
 use crate::ir::{DataType, Typed};
 
 // TODO(@were): Is it possible to unify both arrays and fifos?
@@ -28,17 +30,21 @@ pub(in crate::backend::simulator) fn array_types_used(
   return type_gather_impl(types);
 }
 
+struct FIFOTypesUsedVisitor {
+  res: Vec<DataType>,
+}
+
+impl Visitor<()> for FIFOTypesUsedVisitor {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
+    self.res.extend(module.port_iter().map(|x| x.scalar_ty()));
+    None
+  }
+}
+
 pub(in crate::backend::simulator) fn fifo_types_used(
   sys: &SysBuilder,
 ) -> HashMap<String, HashSet<DataType>> {
-  let types = sys
-    .module_iter()
-    .flat_map(|x| {
-      x.port_iter()
-        .map(|x| x.scalar_ty())
-        .collect::<Vec<_>>()
-        .into_iter()
-    })
-    .collect();
-  return type_gather_impl(types);
+  let mut visitor = FIFOTypesUsedVisitor { res: Vec::new() };
+  visitor.enter(sys);
+  return type_gather_impl(visitor.res);
 }

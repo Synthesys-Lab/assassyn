@@ -1,5 +1,6 @@
 use crate::builder::system::SysBuilder;
 
+pub mod arbiter;
 pub mod callback;
 pub mod rewrite_wait_until;
 
@@ -9,6 +10,7 @@ pub struct Config {
 
 pub fn basic(sys: &mut SysBuilder, config: &Config) {
   callback::rewrite_fifos(sys);
+  arbiter::inject_arbiter(sys);
   if config.rewrite_wait_until {
     rewrite_wait_until::rewrite_wait_until(sys);
   }

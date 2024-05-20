@@ -1,20 +1,21 @@
 use crate::backend::simulator::camelize;
 
+use super::memory::MemoryParams;
 use super::Module;
 
 macro_rules! define_attrs {
-  ( $($attrs: ident),* $(,)* ) => {
+  ( $($attrs: ident $( ( $vty:ty ) )? ),* $(,)* ) => {
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum Attribute {
-      $($attrs,)*
+      $($attrs $( ( $vty ) )? ),*
     }
 
     impl Attribute {
       pub fn from_string(s: &str) -> Option<Attribute> {
         let s = camelize(s);
         match s.as_str() {
-          $(stringify!($attrs) => Some(Attribute::$attrs),)*
+          $(stringify!($attrs) => Some(Attribute::$attrs $( ( <$vty>::default() ) )? ),)*
           _ => None,
         }
       }
@@ -37,4 +38,5 @@ define_attrs!(
   NoArbiter,        // The compiler will skip to generate an arbiter for this module,
   // even if it has multiple callers.
   Systolic, // The module is a systolic array.
+  Memory(MemoryParams),
 );

@@ -1,6 +1,9 @@
-use crate::ir::node::BaseNode;
+use crate::ir::{
+  node::{BaseNode, IsElement, NodeKind},
+  Module,
+};
 
-use super::Bind;
+use super::{AsyncCall, Bind};
 
 impl Bind<'_> {
   /// Get the arguments of this bind expression.
@@ -12,7 +15,7 @@ impl Bind<'_> {
     }
   }
   /// Get the callee of this bind expression.
-  pub fn get_callee(&self) -> BaseNode {
+  pub fn callee(&self) -> BaseNode {
     self
       .expr
       .get_operand(self.expr.get_num_operands() - 1)
@@ -24,6 +27,10 @@ impl Bind<'_> {
   pub fn get_num_args(&self) -> usize {
     self.expr.get_num_operands() - 1
   }
+  /// Get an iterator over all arguments.
+  pub fn arg_iter(&self) -> impl Iterator<Item = BaseNode> + '_ {
+    (0..self.get_num_args()).map(|i| self.get_arg(i).unwrap())
+  }
   /// Check if all arguments are fully bound.
   pub fn fully_bound(&self) -> bool {
     let n = self.expr.get_num_operands();
@@ -32,5 +39,53 @@ impl Bind<'_> {
       .operand_iter()
       .take(n)
       .all(|x| !x.get_value().is_unknown())
+  }
+}
+
+impl ToString for Bind<'_> {
+  fn to_string(&self) -> String {
+    let callee = self.callee();
+    let arg_list = self
+      .arg_iter()
+      .enumerate()
+      .map(|(i, v)| {
+        let arg = match callee.get_kind() {
+          NodeKind::Module => {
+            let name = callee
+              .as_ref::<Module>(self.expr.sys)
+              .unwrap()
+              .get_port(i)
+              .unwrap()
+              .get_name()
+              .to_string();
+            format!("{}:", name)
+          }
+          _ => format!("arg{}:", i),
+        };
+        let feed = if v.is_unknown() {
+          "None".to_string()
+        } else {
+          v.to_string(self.expr.sys)
+        };
+        format!("{} {}", arg, feed)
+      })
+      .collect::<Vec<String>>()
+      .join(", ");
+    let module_name = match callee.get_kind() {
+      NodeKind::Module => callee
+        .as_ref::<Module>(self.expr.sys)
+        .unwrap()
+        .get_name()
+        .to_string(),
+      _ => callee.to_string(self.expr.sys),
+    };
+    format!("bind {} {{ {} }}", module_name, arg_list).into()
+  }
+}
+
+impl ToString for AsyncCall<'_> {
+  fn to_string(&self) -> String {
+    let bind = self.bind().get().upcast().to_string(self.expr.sys);
+    format!("async_call {}", bind)
   }
 }

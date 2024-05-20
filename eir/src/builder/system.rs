@@ -7,7 +7,11 @@ use crate::ir::{
   *,
 };
 
-use self::{instructions::Bind, user::Operand};
+use self::{
+  expr::subcode::{self, Binary},
+  instructions::Bind,
+  user::Operand,
+};
 
 use super::symbol_table::SymbolTable;
 
@@ -106,20 +110,22 @@ macro_rules! create_arith_op_impl {
 }
 
 macro_rules! impl_typed_iter {
-  ($func_name:ident, $ty: ident, $ty_ref: ident) => {
-    /// Iterate over all the modules of the system.
-    pub fn $func_name<'a>(&'a self) -> impl Iterator<Item = $ty_ref<'a>> {
-      self
-        .global_symbols
-        .iter()
-        .filter(|(_, v)| {
-          if let NodeKind::$ty = v.get_kind() {
-            true
-          } else {
-            false
-          }
-        })
-        .map(|(_, x)| x.as_ref::<$ty>(self).unwrap())
+  ($func_name:ident, $ty: ident) => {
+    paste::paste! {
+      /// Iterate over all the modules of the system.
+      pub fn $func_name<'a>(&'a self) -> impl Iterator<Item = [<$ty Ref>]<'a>> {
+        self
+          .global_symbols
+          .iter()
+          .filter(|(_, v)| {
+            if let NodeKind::$ty = v.get_kind() {
+              true
+            } else {
+              false
+            }
+          })
+          .map(|(_, x)| x.as_ref::<$ty>(self).unwrap())
+      }
     }
   };
 }
@@ -168,8 +174,8 @@ impl SysBuilder {
     T::reference(self, key.clone())
   }
 
-  impl_typed_iter!(module_iter, Module, ModuleRef);
-  impl_typed_iter!(array_iter, Array, ArrayRef);
+  impl_typed_iter!(module_iter, Module);
+  impl_typed_iter!(array_iter, Array);
 
   /// The helper function to get an element of the system and downcast it to its actual type's
   /// mutable reference.
@@ -343,9 +349,10 @@ impl SysBuilder {
   /// * `idx` - The index to be accessed.
   pub fn create_array_ptr(&mut self, array: BaseNode, idx: BaseNode) -> BaseNode {
     assert_eq!(array.get_kind(), NodeKind::Array);
-    match idx.get_dtype(self).unwrap() {
+    let dtype = idx.get_dtype(self).unwrap();
+    match dtype {
       DataType::Int(_) | DataType::UInt(_) => {}
-      _ => panic!("Invalid index type"),
+      _ => panic!("Invalid index type {}", dtype.to_string()),
     }
     let res = self.create_expr(
       DataType::void(),
@@ -457,22 +464,24 @@ impl SysBuilder {
     res
   }
 
-  create_arith_op_impl!(binary, create_add, Opcode::Add);
-  create_arith_op_impl!(binary, create_sub, Opcode::Sub);
-  create_arith_op_impl!(binary, create_bitwise_and, Opcode::BitwiseAnd);
-  create_arith_op_impl!(binary, create_bitwise_or, Opcode::BitwiseOr);
-  create_arith_op_impl!(binary, create_bitwise_xor, Opcode::BitwiseXor);
-  create_arith_op_impl!(binary, create_mul, Opcode::Mul);
-  create_arith_op_impl!(binary, create_igt, Opcode::IGT);
-  create_arith_op_impl!(binary, create_ige, Opcode::IGE);
-  create_arith_op_impl!(binary, create_ilt, Opcode::ILT);
-  create_arith_op_impl!(binary, create_ile, Opcode::ILE);
-  create_arith_op_impl!(binary, create_eq, Opcode::EQ);
-  create_arith_op_impl!(binary, create_neq, Opcode::NEQ);
+  create_arith_op_impl!(binary, create_add, Binary::Add.into());
+  create_arith_op_impl!(binary, create_sub, Binary::Sub.into());
+  create_arith_op_impl!(binary, create_shl, Binary::Shl.into());
+  create_arith_op_impl!(binary, create_shr, Binary::Shr.into());
+  create_arith_op_impl!(binary, create_bitwise_and, Binary::BitwiseAnd.into());
+  create_arith_op_impl!(binary, create_bitwise_or, Binary::BitwiseOr.into());
+  create_arith_op_impl!(binary, create_bitwise_xor, Binary::BitwiseXor.into());
+  create_arith_op_impl!(binary, create_mul, subcode::Binary::Mul.into());
+  create_arith_op_impl!(binary, create_igt, subcode::Compare::IGT.into());
+  create_arith_op_impl!(binary, create_ige, subcode::Compare::IGE.into());
+  create_arith_op_impl!(binary, create_ilt, subcode::Compare::ILT.into());
+  create_arith_op_impl!(binary, create_ile, subcode::Compare::ILE.into());
+  create_arith_op_impl!(binary, create_eq, subcode::Compare::EQ.into());
+  create_arith_op_impl!(binary, create_neq, subcode::Compare::NEQ.into());
   create_arith_op_impl!(binary, create_concat, Opcode::Concat);
 
-  create_arith_op_impl!(unary, create_neg, Opcode::Neg);
-  create_arith_op_impl!(unary, create_flip, Opcode::Flip);
+  create_arith_op_impl!(unary, create_neg, subcode::Unary::Neg.into());
+  create_arith_op_impl!(unary, create_flip, subcode::Unary::Flip.into());
 
   /// Create a register array associated to this system.
   /// An array can be a register, or memory.
@@ -552,7 +561,7 @@ impl SysBuilder {
   ) -> BaseNode {
     let module = {
       let bind = bind.as_expr::<Bind>(self).unwrap();
-      let callee = bind.get_callee();
+      let callee = bind.callee();
       callee.as_ref::<Module>(self).unwrap_or_else(|_| {
         panic!(
           "Only module callee can be used for bind, but {:?} got!",
@@ -606,7 +615,7 @@ impl SysBuilder {
   pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
     let (callee, signature, port_idx) = {
       let bind = bind.as_expr::<Bind>(self).unwrap();
-      let callee = bind.get_callee();
+      let callee = bind.callee();
       let signature = callee.get_dtype(self).unwrap();
       let port_idx = {
         let mut idx = None;
@@ -696,7 +705,7 @@ impl SysBuilder {
   pub fn create_array_read<'elem>(&mut self, ptr: BaseNode) -> BaseNode {
     let (array, dtype) = {
       let gep = ptr.as_expr::<GetElementPtr>(self).unwrap();
-      let array = gep.get_array();
+      let array = gep.array();
       let dtype = array.scalar_ty();
       (array.upcast(), dtype)
     };
@@ -714,7 +723,7 @@ impl SysBuilder {
   pub fn create_array_write(&mut self, ptr: BaseNode, value: BaseNode) -> BaseNode {
     let array = {
       let gep = ptr.as_expr::<GetElementPtr>(self).unwrap();
-      let array = gep.get_array();
+      let array = gep.array();
       let dtype = array.scalar_ty();
       assert_eq!(
         value.get_dtype(self).unwrap(),
@@ -752,39 +761,47 @@ impl SysBuilder {
       }
       return DataType::uint_ty(1);
     }
-    match op {
-      Opcode::Add | Opcode::Sub => {
-        match (&aty, &bty) {
-          // TODO(@were): Add one more bit to handle overflow.
-          (DataType::Int(a), DataType::Int(b)) => DataType::Int(*a.max(b)),
-          (DataType::UInt(a), DataType::UInt(b)) => DataType::UInt(*a.max(b)),
-          _ => panic!(
-            "Cannot combine types {} and {} for {:?}",
-            aty.to_string(),
-            bty.to_string(),
-            op
-          ),
+    let res = match op {
+      Opcode::Binary { binop } => {
+        match binop {
+          Binary::Add | Binary::Sub => match (&aty, &bty) {
+            // TODO(@were): Add one more bit to handle overflow.
+            (DataType::Int(a), DataType::Int(b)) => Some(DataType::Int(*a.max(b))),
+            (DataType::UInt(a), DataType::UInt(b)) => Some(DataType::UInt(*a.max(b))),
+            _ => None,
+          },
+          Binary::Shl | Binary::Shr => match (&aty, &bty) {
+            (DataType::Int(a), DataType::Int(_)) => Some(DataType::Int(*a)),
+            (DataType::UInt(a), DataType::UInt(_)) => Some(DataType::UInt(*a)),
+            _ => None,
+          },
+          Binary::BitwiseAnd => Some(DataType::bits_ty(aty.get_bits().min(bty.get_bits()))),
+          Binary::BitwiseOr | Binary::BitwiseXor => {
+            Some(DataType::bits_ty(aty.get_bits().max(bty.get_bits())))
+          }
+          Binary::Mul => match (&aty, &bty) {
+            (DataType::Int(a), DataType::Int(b)) => Some(DataType::Int(a + b)),
+            (DataType::UInt(a), DataType::UInt(b)) => Some(DataType::UInt(a + b)),
+            _ => None,
+          },
         }
       }
-      Opcode::BitwiseAnd => DataType::bits_ty(aty.get_bits().min(bty.get_bits())),
-      Opcode::BitwiseOr | Opcode::BitwiseXor => {
-        DataType::bits_ty(aty.get_bits().max(bty.get_bits()))
-      }
-      Opcode::Mul => match (&aty, &bty) {
-        (DataType::Int(a), DataType::Int(b)) => DataType::Int(a + b),
-        (DataType::UInt(a), DataType::UInt(b)) => DataType::UInt(a + b),
-        _ => panic!(
-          "Cannot combine types {} and {}",
-          aty.to_string(),
-          bty.to_string()
-        ),
-      },
       Opcode::Concat => {
         let a_bits = a.get_dtype(self).unwrap().get_bits();
         let b_bits = b.get_dtype(self).unwrap().get_bits();
-        DataType::bits_ty(a_bits + b_bits)
+        Some(DataType::bits_ty(a_bits + b_bits))
       }
       _ => panic!("Unsupported opcode {:?}", op),
+    };
+    if let Some(res) = res {
+      res
+    } else {
+      panic!(
+        "Cannot combine types {} and {} for {:?}",
+        aty.to_string(),
+        bty.to_string(),
+        op
+      );
     }
   }
 
@@ -805,7 +822,7 @@ impl SysBuilder {
   /// FIFO.
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-    let res = self.create_expr(ty, Opcode::FIFOPeek, vec![fifo], true);
+    let res = self.create_expr(ty, subcode::FIFO::Peek.into(), vec![fifo], true);
     res
   }
 
@@ -815,7 +832,12 @@ impl SysBuilder {
       NodeKind::FIFO,
       "Expect FIFO as the operand"
     );
-    let res = self.create_expr(DataType::int_ty(1), Opcode::FIFOValid, vec![fifo], true);
+    let res = self.create_expr(
+      DataType::int_ty(1),
+      subcode::FIFO::Valid.into(),
+      vec![fifo],
+      true,
+    );
     res
   }
 
@@ -840,34 +862,54 @@ impl SysBuilder {
   }
 
   /// Create a cast operation.
-  pub fn create_cast(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
-    let res = self.create_expr(dest_ty, Opcode::Cast, vec![src], true);
+  pub fn create_bitcast(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
+    let res = self.create_expr(
+      dest_ty,
+      Opcode::Cast {
+        cast: subcode::Cast::BitCast,
+      },
+      vec![src],
+      true,
+    );
     res
+  }
+
+  fn retype_imm(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
+    // When dealing with immediates,
+    // currently there's no difference between zext and sext,
+    // because we don't have negtive immediates.
+    // And we convert the immediates without checking for src/dest type width,
+    // because whether a type can hold an imm is checked in verifier.
+    self.get_const_int(dest_ty, src.as_ref::<IntImm>(self).unwrap().get_value())
   }
 
   /// Create a sext operation.
   pub fn create_sext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
-    let src_ty = src.get_dtype(self).unwrap();
     match src.get_kind() {
-      NodeKind::IntImm => match dest_ty {
-        DataType::Int(width) | DataType::UInt(width) | DataType::Bits(width) => {
-          if src_ty.get_bits() > width {
-            panic!(
-              "Can not sext immediate number {} to a narrower type {:?}",
-              src.to_string(self),
-              dest_ty
-            )
-          } else {
-            self.get_const_int(dest_ty, src.as_ref::<IntImm>(self).unwrap().get_value())
-          }
-        }
-        _ => panic!(
-          "Can not sext immediate number {} to type {:?}",
-          src.to_string(self),
-          dest_ty
-        ),
-      },
-      _ => self.create_expr(dest_ty, Opcode::Sext, vec![src], true),
+      NodeKind::IntImm => self.retype_imm(src, dest_ty),
+      _ => self.create_expr(
+        dest_ty,
+        Opcode::Cast {
+          cast: subcode::Cast::SExt,
+        },
+        vec![src],
+        true,
+      ),
+    }
+  }
+
+  /// Create a zext operation.
+  pub fn create_zext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
+    match src.get_kind() {
+      NodeKind::IntImm => self.retype_imm(src, dest_ty),
+      _ => self.create_expr(
+        dest_ty,
+        Opcode::Cast {
+          cast: subcode::Cast::SExt,
+        },
+        vec![src],
+        true,
+      ),
     }
   }
 
@@ -885,11 +927,11 @@ impl Display for SysBuilder {
     let mut printer = IRPrinter::new(false);
     write!(f, "system {} {{\n", self.name)?;
     for elem in self.array_iter() {
-      write!(f, "  {};\n", printer.visit_array(&elem).unwrap())?;
+      write!(f, "  {};\n", printer.visit_array(elem).unwrap())?;
     }
     printer.inc_indent();
     for elem in self.module_iter() {
-      write!(f, "\n{}", printer.visit_module(&elem).unwrap())?;
+      write!(f, "\n{}", printer.visit_module(elem).unwrap())?;
     }
     printer.dec_indent();
     write!(f, "}}")

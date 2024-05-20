@@ -44,7 +44,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     expr::Expr::MethodCall((self_, op, operands)) => {
       let opcode = Opcode::from_str(&op.to_string()).unwrap();
       match opcode {
-        Opcode::FIFOPop | Opcode::FIFOPeek | Opcode::FIFOValid => {
+        Opcode::FIFOPop | Opcode::FIFOField { .. } => {
           let method_id = syn::Ident::new(&format!("create_fifo_{}", op), op.span());
           match self_.as_ref() {
             expr::Expr::Term(ExprTerm::Ident(id)) => Ok(quote! {{ sys.#method_id(#id) }}),
@@ -71,21 +71,22 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         _ => {
           let a = emit_expr_body(self_)?;
           let method_id = syn::Ident::new(format!("create_{}", op).as_str(), op.span());
-          let (b_def, b_use) = if opcode.arity().unwrap() == 2 {
-            let b = emit_expr_body(&operands[0])?;
-            (Some(quote! { let rhs = #b.clone(); }), Some(quote! { rhs }))
-          } else if opcode.arity().unwrap() == 1 {
-            (None, None)
-          } else {
-            return Err(syn::Error::new(
-              op.span(),
-              format!(
-                "Unsupported operator: \"{}\" with arity {}",
-                op,
-                opcode.arity().unwrap_or(0)
-              ),
-            ));
-          };
+          let (b_def, b_use) =
+            if opcode.arity().unwrap() == 2 || matches!(opcode, Opcode::Cast { .. }) {
+              let b = emit_expr_body(&operands[0])?;
+              (Some(quote! { let rhs = #b.clone(); }), Some(quote! { rhs }))
+            } else if opcode.arity().unwrap() == 1 {
+              (None, None)
+            } else {
+              return Err(syn::Error::new(
+                op.span(),
+                format!(
+                  "Unsupported operator: \"{}\" with arity {}",
+                  op,
+                  opcode.arity().unwrap_or(0)
+                ),
+              ));
+            };
           Ok(quote_spanned! { op.span() => {
             let src = #a.clone();
             #b_def
@@ -94,17 +95,6 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           }})
         }
       }
-    }
-    expr::Expr::DTConv((op, a, ty)) => {
-      // TODO(@were): Fix the span.
-      let method_id = syn::Ident::new(format!("create_{}", op).as_str(), Span::call_site());
-      let a = emit_expr_body(a)?;
-      let ty = emit_type(ty)?;
-      Ok(quote_spanned! { op.span() => {
-        let src = #a.clone();
-        let res = sys.#method_id(src, #ty);
-        res
-      }})
     }
     expr::Expr::Term(term) => {
       let res = emit_expr_term(term)?;
@@ -183,6 +173,7 @@ fn emit_expr_term(expr: &ExprTerm) -> syn::Result<proc_macro2::TokenStream> {
       Ok(quote_spanned! { expr.span() => sys.get_str_literal(#value.to_string()) })
     }
     ExprTerm::ArrayAccess(aa) => emit_array_access(aa),
+    ExprTerm::DType(ty) => emit_type(ty),
   }
 }
 

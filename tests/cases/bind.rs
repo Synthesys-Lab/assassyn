@@ -1,4 +1,4 @@
-use eda4eda::module_builder;
+use assassyn::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 pub fn bind() {
@@ -11,7 +11,7 @@ pub fn bind() {
     cnt = array(int<32>, 1);
     v = cnt[0].add(1);
     cnt[0] = v;
-    async_call lhs { a: v.mul(v).slice(0, 31).cast(int<32>) };
+    async_call lhs { a: v.mul(v).slice(0, 31).bitcast(int<32>) };
     async_call rhs { a: v };
   });
 

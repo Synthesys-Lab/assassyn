@@ -1,14 +1,14 @@
-use eda4eda::module_builder;
+use assassyn::module_builder;
 use eir::{builder::SysBuilder, xform};
 
 fn dt_conv_sys() -> SysBuilder {
   module_builder!(
     driver()() {
       i32 = 0.int<32>;
-      b32 = i32.cast(bits<32>);
-      u32 = i32.cast(uint<32>);
-      i64 = i32.sext(int<64>);
-      log("{} {} {}", b32, u32, i64);
+      b32 = i32.bitcast(bits<32>);
+      i64z = i32.zext(int<64>);
+      i64s = i32.sext(int<64>);
+      log("{} {} {}", b32, i64z, i64s);
     }
   );
 

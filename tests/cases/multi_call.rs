@@ -1,69 +1,37 @@
-use eda4eda::module_builder;
+use assassyn::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 pub fn multi_call() {
-  module_builder!(sqr()(a:int<32>) #no_arbiter {
-    b = a.mul(a);
-    log("adder: {} * {} = {}", a, a, b);
+  module_builder!(adder()(a:int<32>, b:int<32>) {
+    c = a.add(b);
+    log("adder: {} + {} = {}", a, b, c);
   });
 
-  module_builder!(
-    arbiter(sqr)(a0:int<32>, a1:int<32>)
-      #explicit_pop, #allow_partial_call, #no_arbiter {
-      wait_until {
-        a0_valid = a0.valid();
-        a1_valid = a1.valid();
-        valid = a0_valid.bitwise_or(a1_valid);
-        valid
-      } {
-        hot_valid = a1_valid.concat(a0_valid);
-        // grant is a one-hot vector
-        grant_1h = array(int<2>, 1, [1.int<2>]);
-        gv = grant_1h[0];
-        gv_flip = gv.flip();
-        hi = gv_flip.bitwise_and(hot_valid);
-        lo = gv.bitwise_and(hot_valid);
-        hi_nez = hi.neq(0.bits<2>);
-        new_grant = default lo.case(hi_nez, hi);
-        grant0 = new_grant.eq(1.bits<2>);
-        grant1 = new_grant.eq(2.bits<2>);
-        when grant0 {
-          log("grants even");
-          a0 = a0.pop();
-          async_call sqr { a: a0 };
-          grant_1h[0] = 1.int<2>;
-        }
-        when grant1 {
-          log("grants odd");
-          a1 = a1.pop();
-          async_call sqr { a: a1 };
-          grant_1h[0] = 2.int<2>;
-        }
-      }
-    }
-  );
-
-  module_builder!(driver(arbiter)() {
-    cnt = array(int<32>, 1);
-    k = cnt[0.int<32>];
-    v = k.add(1);
-    even = v.mul(2);
-    even = even.slice(0, 31);
-    even = even.cast(int<32>);
-    odd = even.add(1);
+  module_builder!(driver(sqr)() {
+    cnt    = array(int<32>, 1);
+    k      = cnt[0.int<32>];
+    v      = k.add(1);
+    even   = v.mul(2).slice(0, 31).bitcast(int<32>);
+    even2  = even.mul(2).slice(0, 31).bitcast(int<32>);
+    odd    = even.add(1);
+    odd2   = odd.mul(2).slice(0, 31).bitcast(int<32>);
     cnt[0] = v;
     is_odd = v.bitwise_and(1);
     when is_odd {
-      async_call arbiter { a0: even };
-      async_call arbiter { a1: odd };
+      // TODO(@were): Enforce the partial call.
+      async_call sqr { a: even, b: even2 };
+      async_call sqr { a: odd,  b: odd2 };
     }
   });
 
   let mut sys = SysBuilder::new("multi_call");
-  let adder = sqr_builder(&mut sys);
-  let arbiter = arbiter_builder(&mut sys, adder);
-  driver_builder(&mut sys, arbiter);
+  let adder = adder_builder(&mut sys);
+  driver_builder(&mut sys, adder);
   eir::builder::verify(&sys);
+  let pass = eir::xform::Config {
+    rewrite_wait_until: true,
+  };
+  eir::xform::basic(&mut sys, &pass);
 
   println!("{}", sys);
 
@@ -72,15 +40,17 @@ pub fn multi_call() {
   // TODO(@boyang): Should we also test the verilog backend?
   // eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  let mut last_grant: Option<i32> = None;
+  let mut last_grant = None;
   run_simulator(&sys, &config, None).lines().for_each(|x| {
-    if x.contains("grants odd") {
-      assert!(last_grant.map_or(true, |x| x == 0));
-      last_grant = Some(1);
-    }
-    if x.contains("grants even") {
-      assert!(last_grant.map_or(true, |x| x == 1));
-      last_grant = Some(0);
+    if x.contains("adder") {
+      let raw = x.split_whitespace().collect::<Vec<&str>>();
+      let len = raw.len();
+      let a = raw[len - 5].parse::<i32>().unwrap();
+      let b = raw[len - 3].parse::<i32>().unwrap();
+      let c = raw[len - 1].parse::<i32>().unwrap();
+      assert_eq!(a + b, c);
+      assert!(last_grant.map_or(true, |last| { last % 2 != a % 2 }));
+      last_grant = Some(a);
     }
   });
 }

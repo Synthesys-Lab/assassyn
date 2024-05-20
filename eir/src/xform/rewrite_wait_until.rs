@@ -1,11 +1,18 @@
 use crate::{
   builder::SysBuilder,
-  ir::{node::IsElement, Block, BlockKind, Module},
+  ir::{
+    node::{BaseNode, IsElement, ModuleRef},
+    visitor::Visitor,
+    Block, BlockKind, Module,
+  },
 };
 
-pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
-  let mut to_rewrite = Vec::new();
-  for module in sys.module_iter() {
+struct GatherModulesToRewrite {
+  to_rewrite: Vec<BaseNode>,
+}
+
+impl Visitor<()> for GatherModulesToRewrite {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
     match module.get_name() {
       "driver" | "testbench" => {} // Both driver and testbench are unconditionally executed, skip!
       _ => {
@@ -17,10 +24,9 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
                 "Warning: module {} has no inputs, but is neither the driver nor testbench.",
                 module.get_name()
               );
-              continue;
             }
             // All the unconditional root block should be rewritten.
-            to_rewrite.push(module.upcast());
+            self.to_rewrite.push(module.upcast());
           }
           BlockKind::WaitUntil(_) => {} // We respect existing wait_until blocks.
           _ => {
@@ -29,7 +35,16 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
         }
       }
     }
+    None
   }
+}
+
+pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
+  let mut analyzer = GatherModulesToRewrite {
+    to_rewrite: Vec::new(),
+  };
+  analyzer.enter(sys);
+  let to_rewrite = analyzer.to_rewrite;
   for module in to_rewrite.into_iter() {
     let (ports, body) = {
       let module = module.as_ref::<Module>(sys).unwrap();

@@ -1,4 +1,4 @@
-use eda4eda::module_builder;
+use assassyn::module_builder;
 use eir::{
   builder::SysBuilder,
   test_utils::{parse_cycle, run_simulator},

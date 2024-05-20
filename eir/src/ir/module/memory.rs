@@ -1,46 +1,55 @@
+use std::ops::RangeInclusive;
+
 use crate::builder::{PortInfo, SysBuilder};
 use crate::ir::node::*;
 use crate::ir::*;
 
+use super::Attribute;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MemoryParams {
-  pub name: String,
   pub width: usize,
   pub depth: usize,
-  pub lat_min: usize,
-  pub lat_max: usize,
+  pub lat: RangeInclusive<usize>,
   pub init_file: Option<String>,
 }
 
-pub fn module_is_memory(module_name: &String) -> bool {
-  module_name.starts_with("__builtin_memory")
+impl Default for MemoryParams {
+  fn default() -> Self {
+    Self {
+      width: 0,
+      depth: 0,
+      lat: 0..=0,
+      init_file: None,
+    }
+  }
 }
 
-pub fn parse_memory_module_name(module_name: &String) -> Option<MemoryParams> {
-  if module_is_memory(module_name) {
-    let mem_name = module_name.replace("__builtin_memory_", "");
-    let mem_name = mem_name.replace(".", "_");
-    let mut mem_params = mem_name.split("_").collect::<Vec<_>>();
-    mem_params.remove(mem_params.len() - 1);
-    let mem_width = mem_params[0][1..].parse::<usize>().unwrap();
-    let mem_depth = mem_params[1][1..].parse::<usize>().unwrap();
-    let mem_lat_min = mem_params[2][1..].parse::<usize>().unwrap();
-    let mem_lat_max = mem_params[3].parse::<usize>().unwrap();
-    let mem_name = mem_params[4].to_string();
-    let init_file = if mem_params.len() == 6 {
-      Some(mem_params[5].to_string())
-    } else {
-      None
-    };
-    Some(MemoryParams {
-      name: mem_name,
-      width: mem_width,
-      depth: mem_depth,
-      lat_min: mem_lat_min,
-      lat_max: mem_lat_max,
+impl MemoryParams {
+  pub fn new(
+    width: usize,
+    depth: usize,
+    lat: RangeInclusive<usize>,
+    init_file: Option<String>,
+  ) -> Self {
+    Self {
+      width,
+      depth,
+      lat,
       init_file,
-    })
-  } else {
-    None
+    }
+  }
+}
+
+impl ToString for MemoryParams {
+  fn to_string(&self) -> String {
+    format!(
+      "width: {} depth: {} lat: [{:?}], file: {}",
+      self.width,
+      self.depth,
+      self.lat,
+      self.init_file.clone().map_or("None".to_string(), |x| x)
+    )
   }
 }
 
@@ -56,7 +65,7 @@ impl SysBuilder {
     name: &str,
     width: usize,
     depth: usize,
-    (lat_min, lat_max): (usize, usize),
+    lat: RangeInclusive<usize>,
     init_file: Option<String>,
   ) -> BaseNode {
     let ty = DataType::Bits(width);
@@ -66,26 +75,45 @@ impl SysBuilder {
       PortInfo::new("wdata", ty.clone()),
       PortInfo::new("r", DataType::Module(vec![ty.clone().into()])),
     ];
-    let name = name.replace("_", "");
-    let module_name = self.symbol_table.identifier(&format!(
-      "__builtin_memory_w{}_d{}_l{}_{}_{}{}{}",
-      width,
-      depth,
-      lat_min,
-      lat_max,
-      name,
-      init_file.as_ref().map_or("", |_| "_"),
-      init_file.unwrap_or("".to_string())
-    ));
+
+    let module_name = self.symbol_table.identifier(name);
     let module_node = self.create_module(&module_name, ports);
+
+    let param = MemoryParams::new(width, depth, lat, init_file);
+    module_node
+      .as_mut::<Module>(self)
+      .unwrap()
+      .add_attr(Attribute::Memory(param));
+
     self.set_current_module(module_node);
     let module = module_node.as_ref::<Module>(self).unwrap();
-    let r_module_fifo = module.get_port_by_name("r").unwrap();
-    let r_module = self.create_fifo_pop(r_module_fifo.upcast().clone());
-    let bind = self.get_init_bind(r_module);
-    let const_zero = self.get_const_int(ty.clone(), 0);
-    let bind = self.push_bind(bind, const_zero, Some(false));
+    let addr = module.get_port(0).unwrap().upcast();
+    let write = module.get_port(1).unwrap().upcast();
+    let wdata = module.get_port(2).unwrap().upcast();
+    let r = module.get_port(3).unwrap().upcast();
+
+    let addr = self.create_fifo_pop(addr);
+    let write = self.create_fifo_pop(write);
+    let wdata = self.create_fifo_pop(wdata);
+    let r = self.create_fifo_pop(r);
+
+    let buffer_name = self.symbol_table.identifier(&format!("{}_buffer", name));
+    let array = self.create_array(ty, &buffer_name, depth, None);
+
+    let ptr = self.create_array_ptr(array, addr);
+    let write_block = self.create_block(BlockKind::Condition(write));
+
+    {
+      self.set_current_block(write_block);
+      self.create_array_write(ptr, wdata);
+    }
+
+    let read_data = self.create_array_read(ptr);
+    let data = self.create_select(write, wdata, read_data);
+    let bind = self.get_init_bind(r);
+    let bind = self.push_bind(bind, data, false.into());
     self.create_async_call(bind);
+
     module_node
   }
 }
