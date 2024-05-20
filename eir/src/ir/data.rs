@@ -52,7 +52,7 @@ impl DataType {
 
   pub fn is_scalar(&self) -> bool {
     match self {
-      DataType::Int(_) | DataType::UInt(_) | DataType::Fp32 => true,
+      DataType::Bits(_) | DataType::Int(_) | DataType::UInt(_) | DataType::Fp32 => true,
       _ => false,
     }
   }

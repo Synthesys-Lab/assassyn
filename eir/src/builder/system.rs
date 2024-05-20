@@ -8,9 +8,7 @@ use crate::ir::{
 };
 
 use self::{
-  expr::subcode::{self, Binary},
-  instructions::Bind,
-  user::Operand,
+  expr::subcode::{self, Binary}, instructions::Bind, user::Operand
 };
 
 use super::symbol_table::SymbolTable;
@@ -110,20 +108,22 @@ macro_rules! create_arith_op_impl {
 }
 
 macro_rules! impl_typed_iter {
-  ($func_name:ident, $ty: ident, $ty_ref: ident) => {
-    /// Iterate over all the modules of the system.
-    pub fn $func_name<'a>(&'a self) -> impl Iterator<Item = $ty_ref<'a>> {
-      self
-        .global_symbols
-        .iter()
-        .filter(|(_, v)| {
-          if let NodeKind::$ty = v.get_kind() {
-            true
-          } else {
-            false
-          }
-        })
-        .map(|(_, x)| x.as_ref::<$ty>(self).unwrap())
+  ($func_name:ident, $ty: ident) => {
+    paste::paste! {
+      /// Iterate over all the modules of the system.
+      pub fn $func_name<'a>(&'a self) -> impl Iterator<Item = [<$ty Ref>]<'a>> {
+        self
+          .global_symbols
+          .iter()
+          .filter(|(_, v)| {
+            if let NodeKind::$ty = v.get_kind() {
+              true
+            } else {
+              false
+            }
+          })
+          .map(|(_, x)| x.as_ref::<$ty>(self).unwrap())
+      }
     }
   };
 }
@@ -172,8 +172,8 @@ impl SysBuilder {
     T::reference(self, key.clone())
   }
 
-  impl_typed_iter!(module_iter, Module, ModuleRef);
-  impl_typed_iter!(array_iter, Array, ArrayRef);
+  impl_typed_iter!(module_iter, Module);
+  impl_typed_iter!(array_iter, Array);
 
   /// The helper function to get an element of the system and downcast it to its actual type's
   /// mutable reference.
@@ -347,9 +347,10 @@ impl SysBuilder {
   /// * `idx` - The index to be accessed.
   pub fn create_array_ptr(&mut self, array: BaseNode, idx: BaseNode) -> BaseNode {
     assert_eq!(array.get_kind(), NodeKind::Array);
-    match idx.get_dtype(self).unwrap() {
+    let dtype = idx.get_dtype(self).unwrap();
+    match dtype {
       DataType::Int(_) | DataType::UInt(_) => {}
-      _ => panic!("Invalid index type"),
+      _ => panic!("Invalid index type {}", dtype.to_string()),
     }
     let res = self.create_expr(
       DataType::void(),

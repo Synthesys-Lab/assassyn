@@ -121,14 +121,16 @@ impl Visitor<()> for Verifier {
     }
     None
   }
+
+  fn visit_module(&mut self, m: ModuleRef<'_>) -> Option<()> {
+    for user in m.users().iter() {
+      user.as_ref::<Operand>(m.sys).unwrap().verify(m.sys);
+    }
+    self.visit_block(m.get_body());
+    None
+  }
 }
 
 pub fn verify(sys: &SysBuilder) {
-  for m in sys.module_iter() {
-    for user in m.users().iter() {
-      user.as_ref::<Operand>(sys).unwrap().verify(sys);
-    }
-    let body = m.get_body();
-    Verifier::new().visit_block(body);
-  }
+  Verifier::new().enter(sys);
 }

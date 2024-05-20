@@ -6,34 +6,39 @@ use crate::{
   xform::callback::instructions::FIFOPush,
 };
 
+fn analyze_module(m: ModuleRef<'_>, res: &mut Vec<(BaseNode, BaseNode)>) {
+  let sys = m.sys;
+  for port in m.port_iter() {
+    if port.scalar_ty().is_module() {
+      let unique_modules = port
+        .users()
+        .iter()
+        .map(|user| user.as_ref::<Operand>(sys).unwrap())
+        .filter_map(|operand| {
+          let expr = operand.get_user().as_ref::<Expr>(sys).unwrap();
+          match expr.get_opcode() {
+            Opcode::FIFOPush => {
+              let push = expr.as_sub::<FIFOPush>().unwrap();
+              let module = push.value();
+              assert!(module.get_kind() == NodeKind::Module);
+              module.into()
+            }
+            Opcode::FIFOPop => None,
+            x => panic!("Unexpected opcode {:?}", x),
+          }
+        })
+        .collect::<HashSet<_>>();
+      if unique_modules.len() == 1 {
+        res.push((port.upcast(), unique_modules.into_iter().next().unwrap()));
+      }
+    }
+  }
+}
+
 pub(super) fn gather_single_callback_fifos(sys: &SysBuilder) -> Vec<(BaseNode, BaseNode)> {
   let mut res = Vec::new();
   for m in sys.module_iter() {
-    for port in m.port_iter() {
-      if port.scalar_ty().is_module() {
-        let unique_modules = port
-          .users()
-          .iter()
-          .map(|user| user.as_ref::<Operand>(sys).unwrap())
-          .filter_map(|operand| {
-            let expr = operand.get_user().as_ref::<Expr>(sys).unwrap();
-            match expr.get_opcode() {
-              Opcode::FIFOPush => {
-                let push = expr.as_sub::<FIFOPush>().unwrap();
-                let module = push.value();
-                assert!(module.get_kind() == NodeKind::Module);
-                module.into()
-              }
-              Opcode::FIFOPop => None,
-              x => panic!("Unexpected opcode {:?}", x),
-            }
-          })
-          .collect::<HashSet<_>>();
-        if unique_modules.len() == 1 {
-          res.push((port.upcast(), unique_modules.into_iter().next().unwrap()));
-        }
-      }
-    }
+    analyze_module(m, &mut res);
   }
   res
 }

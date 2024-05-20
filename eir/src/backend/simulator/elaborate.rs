@@ -22,7 +22,6 @@ use super::utils::{
 
 use self::{
   expr::subcode::Cast, instructions, ir_printer::IRPrinter,
-  module::memory::parse_memory_module_name,
 };
 
 use super::analysis;
@@ -115,6 +114,7 @@ impl ElaborateModule<'_, '_> {
 }
 
 impl Visitor<String> for ElaborateModule<'_, '_> {
+
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.module_name = module.get_name().to_string();
     let mut res = String::new();
@@ -149,152 +149,10 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         .as_str(),
       )
     }
-    if let Some(params) = parse_memory_module_name(&self.module_name) {
-      res.push_str(
-        format!(
-          "mem: &mut Vec<{}>,",
-          dtype_to_rust_type(&DataType::Bits(params.width))
-        )
-        .as_str(),
-      );
-    }
     res.push_str(") {\n");
     self.indent += 2;
 
-    if let Some(params) = parse_memory_module_name(&self.module_name) {
-      res.push_str(format!("// Memory {}\n", params.name).as_str());
-      res.push_str(
-        format!(
-          "// width = {}, depth = {}, lat = [{}, {}]\n",
-          params.width, params.depth, params.lat_min, params.lat_max
-        )
-        .as_str(),
-      );
-      if let Some(init_file) = params.init_file {
-        res.push_str(format!("// init_file =  {}\n\n", init_file).as_str());
-        todo!();
-      }
-
-      let mut rdata_fifo: Option<String> = None;
-      let mut rdata_module: Option<String> = None;
-      for node in module.get_body().iter() {
-        let expr = node.as_ref::<Expr>(self.sys).unwrap();
-        match expr.get_opcode() {
-          Opcode::FIFOPush => {
-            let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
-            let fifo = push.fifo();
-            let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
-            let fifo_push = syn::Ident::new(
-              &format!("FIFO{}Push", dtype_to_rust_type(&fifo.scalar_ty())),
-              Span::call_site(),
-            );
-            let module_writer = self.current_module_id();
-            rdata_fifo = Some(
-              quote::quote! {
-                q.push(Reverse(Event{
-                  stamp: stamp + read_latency * 100 - 50,
-                  kind: EventKind::#fifo_push((EventKind::#module_writer.into(), #slab_idx, rdata))
-                }));
-              }
-              .to_string(),
-            );
-          }
-          Opcode::AsyncCall => {
-            let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
-            let bind = call.bind();
-            let module = bind.callee().as_ref::<Module>(self.sys).unwrap();
-            let to_trigger = format!("EventKind::Module{}", camelize(&namify(module.get_name())));
-            rdata_module = Some(format!(
-              "q.push(Reverse(Event{{ stamp: stamp + read_latency * 100, kind: {} }}))",
-              to_trigger
-            ));
-          }
-          Opcode::Bind => { /* don't care, processed in corresponding AsyncCall` */ }
-          _ => panic!("Unexpected expr of {:?} in memory body", expr.get_opcode()),
-        }
-      }
-
-      let fifos = module.port_iter().collect::<Vec<_>>();
-
-      let module_writer = self.current_module_id();
-
-      let addr_fifo = &fifos[0];
-      let addr_fifo_idx = *self.slab_cache.get(&addr_fifo.upcast()).unwrap();
-      let addr_fifo_ty = addr_fifo.scalar_ty();
-      let addr_fifo_pop = syn::Ident::new(
-        &format!("FIFO{}Pop", dtype_to_rust_type(&addr_fifo_ty)),
-        Span::call_site(),
-      );
-      let addr_fifo_name = syn::Ident::new(&fifo_name!(addr_fifo), Span::call_site());
-      res.push_str(
-        quote::quote! {
-          let addr = {
-          q.push(Reverse(Event{
-            stamp: stamp + 50,
-            kind: EventKind::#addr_fifo_pop((EventKind::#module_writer.into(), #addr_fifo_idx))
-          }));
-          #addr_fifo_name.front().unwrap().clone()
-        };}
-        .to_string()
-        .as_str(),
-      );
-
-      let write_fifo = &fifos[1];
-      let write_fifo_idx = *self.slab_cache.get(&write_fifo.upcast()).unwrap();
-      let write_fifo_ty = write_fifo.scalar_ty();
-      let write_fifo_pop = syn::Ident::new(
-        &format!("FIFO{}Pop", dtype_to_rust_type(&write_fifo_ty)),
-        Span::call_site(),
-      );
-      let write_fifo_name = syn::Ident::new(&fifo_name!(write_fifo), Span::call_site());
-      res.push_str(
-        quote::quote! {
-          let write = {
-          q.push(Reverse(Event{
-            stamp: stamp + 50,
-            kind: EventKind::#write_fifo_pop((EventKind::#module_writer.into(), #write_fifo_idx))
-          }));
-          #write_fifo_name.front().unwrap().clone()
-        };}
-        .to_string()
-        .as_str(),
-      );
-
-      let wdata_fifo = &fifos[2];
-      let wdata_fifo_idx = *self.slab_cache.get(&wdata_fifo.upcast()).unwrap();
-      let wdata_fifo_ty = wdata_fifo.scalar_ty();
-      let wdata_fifo_pop = syn::Ident::new(
-        &format!("FIFO{}Pop", dtype_to_rust_type(&wdata_fifo_ty)),
-        Span::call_site(),
-      );
-      let wdata_fifo_name = syn::Ident::new(&fifo_name!(wdata_fifo), Span::call_site());
-      res.push_str(
-        quote::quote! {
-          let wdata = {
-          q.push(Reverse(Event{
-            stamp: stamp + 50,
-            kind: EventKind::#wdata_fifo_pop((EventKind::#module_writer.into(), #wdata_fifo_idx))
-          }));
-          #wdata_fifo_name.front().unwrap().clone()
-        };}
-        .to_string()
-        .as_str(),
-      );
-
-      res.push_str("let rdata = mem[addr as usize];\n");
-
-      // TODO: truely randomize latency, requires emitting cargo wrapped project
-      res.push_str(format!("let read_latency = {};\n", params.lat_min).as_str());
-
-      res.push_str("if write {");
-      res.push_str("mem[addr as usize] = wdata;");
-      res.push_str("} else {");
-      res.push_str(rdata_fifo.unwrap().as_str());
-      res.push_str(rdata_module.unwrap().as_str());
-      res.push_str("}");
-    } else {
-      res.push_str(&self.visit_block(module.get_body()).unwrap());
-    }
+    res.push_str(&self.visit_block(module.get_body()).unwrap());
 
     self.indent -= 2;
     res.push_str("}\n");
@@ -1114,21 +972,6 @@ macro_rules! impl_unwrap_slab {
     );
   }
 
-  // memory storage element
-  for module in sys.module_iter() {
-    if let Some(param) = parse_memory_module_name(&module.get_name().to_string()) {
-      res.push_str(
-        format!(
-          "let mut {}_mem = vec![0 as {}; {}];\n",
-          param.name,
-          dtype_to_rust_type(&DataType::Bits(param.width)),
-          param.depth
-        )
-        .as_str(),
-      );
-    }
-  }
-
   // generate cycle gatekeeper
   for module in sys.module_iter() {
     let module_gatekeeper = syn::Ident::new(
@@ -1212,9 +1055,6 @@ macro_rules! impl_unwrap_slab {
     for elem in ext_interf_args {
       res.push_str(&elem);
       res.push(',');
-    }
-    if let Some(param) = parse_memory_module_name(&module.get_name().to_string()) {
-      res.push_str(format!("&mut {}_mem", param.name).as_str());
     }
     res.push_str(");\n");
     if !module.get_name().eq("driver") {

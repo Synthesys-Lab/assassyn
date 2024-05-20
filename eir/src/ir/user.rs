@@ -186,10 +186,7 @@ impl SysBuilder {
       "replace {}",
       IRPrinter::new(false).dispatch(self, &src, vec![]).unwrap()
     );
-    // eprintln!("by {}", dst.to_string(self));
-    for m in self.module_iter() {
-      gather.visit_module(m);
-    }
+    gather.enter(self);
     for (expr, i, new_value) in gather.uses {
       let new_value = new_value.map_or(dst.clone(), |x| x);
       eprintln!(

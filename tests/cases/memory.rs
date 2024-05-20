@@ -32,7 +32,7 @@ fn sram_sys() -> SysBuilder {
     "sram",
     32,
     1024,
-    /* latency: [min, max] */ (1, 1),
+    1..=1,
     None,
   );
   let _driver = driver_builder(&mut sys, sink, memory);
