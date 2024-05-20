@@ -5,7 +5,7 @@ module_builder!(
   memory(k, write, rdata)() {
     is_read = write.flip();
     when is_read {
-      rdata = rdata.cast(int<32>);
+      rdata = rdata.bitcast(int<32>);
       delta = rdata.add(k);
       log("{} + {} = {}", rdata, k, delta);
     }
@@ -24,7 +24,7 @@ fn sram_sys() -> SysBuilder {
       raddr = v.slice(0, 9);
       raddr = raddr.bitcast(uint<10>);
       addr = default raddr.case(write, waddr);
-      async_call memory { addr: addr, write: write, wdata: v.cast(bits<32>) };
+      async_call memory { addr: addr, write: write, wdata: v.bitcast(bits<32>) };
       cnt[0] = plused;
     }
   );
