@@ -1,6 +1,10 @@
 use crate::{
   builder::SysBuilder,
-  ir::{node::{BaseNode, IsElement, ModuleRef}, visitor::Visitor, Block, BlockKind, Module},
+  ir::{
+    node::{BaseNode, IsElement, ModuleRef},
+    visitor::Visitor,
+    Block, BlockKind, Module,
+  },
 };
 
 struct GatherModulesToRewrite {
@@ -8,7 +12,6 @@ struct GatherModulesToRewrite {
 }
 
 impl Visitor<()> for GatherModulesToRewrite {
-
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
     match module.get_name() {
       "driver" | "testbench" => {} // Both driver and testbench are unconditionally executed, skip!
@@ -34,11 +37,12 @@ impl Visitor<()> for GatherModulesToRewrite {
     }
     None
   }
-  
 }
 
 pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
-  let mut analyzer = GatherModulesToRewrite { to_rewrite: Vec::new() };
+  let mut analyzer = GatherModulesToRewrite {
+    to_rewrite: Vec::new(),
+  };
   analyzer.enter(sys);
   let to_rewrite = analyzer.to_rewrite;
   for module in to_rewrite.into_iter() {

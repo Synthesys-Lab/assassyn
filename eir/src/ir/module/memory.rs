@@ -80,7 +80,10 @@ impl SysBuilder {
     let module_node = self.create_module(&module_name, ports);
 
     let param = MemoryParams::new(width, depth, lat, init_file);
-    module_node.as_mut::<Module>(self).unwrap().add_attr(Attribute::Memory(param));
+    module_node
+      .as_mut::<Module>(self)
+      .unwrap()
+      .add_attr(Attribute::Memory(param));
 
     self.set_current_module(module_node);
     let module = module_node.as_ref::<Module>(self).unwrap();

@@ -1,7 +1,7 @@
 use crate::backend::simulator::camelize;
 
-use super::Module;
 use super::memory::MemoryParams;
+use super::Module;
 
 macro_rules! define_attrs {
   ( $($attrs: ident $( ( $vty:ty ) )? ),* $(,)* ) => {

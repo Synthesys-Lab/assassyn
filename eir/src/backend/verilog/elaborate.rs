@@ -890,265 +890,165 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     self.indent -= 2;
     res.push_str(");\n\n");
 
-//    if let Some(params) = parse_memory_module_name(&self.current_module) {
-//      res.push_str(format!("// Memory {}\n", params.name).as_str());
-//      res.push_str(
-//        format!(
-//          "// width = {}, depth = {}, lat = [{}, {}]\n",
-//          params.width, params.depth, params.lat_min, params.lat_max
-//        )
-//        .as_str(),
-//      );
-//      if let Some(init_file) = params.init_file {
-//        res.push_str(format!("// init_file =  {}\n\n", init_file).as_str());
-//        todo!();
-//      }
-//
-//      let mut rdata_fifo: Option<String> = None;
-//      let mut rdata_module: Option<String> = None;
-//      for node in module.get_body().iter() {
-//        let expr = node.as_ref::<Expr>(self.sys).unwrap();
-//        self.visit_expr(expr.clone());
-//        match expr.get_opcode() {
-//          Opcode::FIFOPush => {
-//            let push = expr.as_sub::<FIFOPush>().unwrap();
-//            let fifo = push.fifo();
-//            let fifo_module = namify(
-//              fifo
-//                .get_parent()
-//                .as_ref::<Module>(self.sys)
-//                .unwrap()
-//                .get_name(),
-//            );
-//            let fifo_name = namify(fifo.get_name());
-//            rdata_fifo = Some(format!("{}_{}", fifo_module, fifo_name));
-//          }
-//          Opcode::AsyncCall => {
-//            let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
-//            let module = {
-//              let bind = call.bind();
-//              bind.callee().as_ref::<Module>(call.get().sys).unwrap()
-//            };
-//            rdata_module = Some(namify(module.get_name()));
-//          }
-//          Opcode::Bind => { /* don't care, currently processed in corresponding AsyncCall` */ }
-//          _ => panic!("Unexpected expr of {:?} in memory body", expr.get_opcode()),
-//        }
-//      }
-//
-//      res.push_str(format!("logic trigger;\nassign trigger = trigger_pop_valid;\nassign trigger_pop_ready = trigger;\n\n").as_str());
-//
-//      res.push_str(
-//        format!(
-//          "logic [{}:0] mem [0:{}];\n\n",
-//          params.width - 1,
-//          params.depth - 1
-//        )
-//        .as_str(),
-//      );
-//
-//      res.push_str("logic write;\n");
-//      res.push_str("assign write = fifo_write_pop_data;\n\n");
-//
-//      // TODO: truely randomize latency
-//      res.push_str(format!("localparam read_latency = {};\n\n", params.lat_min).as_str());
-//
-//      res.push_str("// read logic\n");
-//      let rdata_fifo = rdata_fifo.unwrap();
-//      res.push_str(
-//        format!(
-//          "assign fifo_{}_push_valid = trigger && !write;\n",
-//          rdata_fifo
-//        )
-//        .as_str(),
-//      );
-//      res.push_str(
-//        format!(
-//          "assign fifo_{}_push_data = mem[fifo_addr_pop_data];\n\n",
-//          rdata_fifo
-//        )
-//        .as_str(),
-//      );
-//
-//      res.push_str("// write logic\n");
-//      res.push_str(
-//        "always @(posedge clk) if (write) mem[fifo_addr_pop_data] <= fifo_wdata_pop_data;\n\n",
-//      );
-//
-//      res.push_str(format!("assign fifo_addr_pop_ready = trigger;\n").as_str());
-//      res.push_str(format!("assign fifo_write_pop_ready = trigger;\n").as_str());
-//      res.push_str(format!("assign fifo_wdata_pop_ready = trigger;\n\n").as_str());
-//
-//      let rdata_module = rdata_module.unwrap();
-//      res.push_str(
-//        format!(
-//          "assign {}_trigger_push_valid = trigger && !write;\n\n",
-//          rdata_module
-//        )
-//        .as_str(),
-//      );
-//    } else
-    {
-      let mut wait_until: Option<String> = None;
+    let mut wait_until: Option<String> = None;
 
-      if let BlockKind::WaitUntil(cond) = module.get_body().get_kind() {
-        let cond_block = cond.as_ref::<Block>(self.sys).unwrap();
-        match cond_block.get_kind() {
-          BlockKind::Valued(value_node) => {
-            for elem in cond_block.iter() {
-              match elem.get_kind() {
-                NodeKind::Expr => {
-                  let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-                  res.push_str(self.visit_expr(expr).unwrap().as_str());
-                }
-                NodeKind::Block => {
-                  let block = elem.as_ref::<Block>(self.sys).unwrap();
-                  res.push_str(self.visit_block(block).unwrap().as_str());
-                }
-                _ => {
-                  panic!("Unexpected reference type: {:?}", elem);
-                }
+    if let BlockKind::WaitUntil(cond) = module.get_body().get_kind() {
+      let cond_block = cond.as_ref::<Block>(self.sys).unwrap();
+      match cond_block.get_kind() {
+        BlockKind::Valued(value_node) => {
+          for elem in cond_block.iter() {
+            match elem.get_kind() {
+              NodeKind::Expr => {
+                let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+                res.push_str(self.visit_expr(expr).unwrap().as_str());
+              }
+              NodeKind::Block => {
+                let block = elem.as_ref::<Block>(self.sys).unwrap();
+                res.push_str(self.visit_block(block).unwrap().as_str());
+              }
+              _ => {
+                panic!("Unexpected reference type: {:?}", elem);
               }
             }
-            let value = value_node.as_ref::<Expr>(self.sys).unwrap();
-            wait_until = Some(format!(
-              " && ({}{})",
-              namify(value_node.to_string(self.sys).as_str()),
-              if value.dtype().get_bits() == 1 {
-                "".into()
-              } else {
-                format!(" != 0")
-              }
-            ));
           }
-          _ => panic!("Expect valued block for wait_until condition"),
+          let value = value_node.as_ref::<Expr>(self.sys).unwrap();
+          wait_until = Some(format!(
+            " && ({}{})",
+            namify(value_node.to_string(self.sys).as_str()),
+            if value.dtype().get_bits() == 1 {
+              "".into()
+            } else {
+              format!(" != 0")
+            }
+          ));
         }
+        _ => panic!("Expect valued block for wait_until condition"),
       }
-
-      res.push_str(format!("logic trigger;\n").as_str());
-      res.push_str(format!("assign trigger_pop_ready = trigger;\n\n").as_str());
-
-      if module.get_name() == "testbench" {
-        res.push_str("int cycle_cnt;\n");
-        res.push_str("always_ff @(posedge clk or negedge rst_n) if (!rst_n) cycle_cnt <= 0; ");
-        res.push_str("else if (trigger) cycle_cnt <= cycle_cnt + 1;\n\n");
-      }
-
-      self.fifo_pushes.clear();
-      self.triggers.clear();
-      for elem in module.get_body().iter() {
-        match elem.get_kind() {
-          NodeKind::Expr => {
-            let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-            res.push_str(self.visit_expr(expr).unwrap().as_str());
-          }
-          NodeKind::Block => {
-            let block = elem.as_ref::<Block>(self.sys).unwrap();
-            res.push_str(self.visit_block(block).unwrap().as_str());
-          }
-          _ => {
-            panic!("Unexpected reference type: {:?}", elem);
-          }
-        }
-      }
-
-      for (m, preds) in self.triggers.drain() {
-        let mut valid_conds = Vec::<String>::new();
-        let mut has_unconditional_branch = false;
-        let mut has_conditional_branch = false;
-        for p in preds {
-          if p == "" {
-            if has_unconditional_branch {
-              panic!("multiple unconditional branches for trigger {}", m);
-            }
-            if has_conditional_branch {
-              panic!(
-                "mixed conditional and unconditional branches for trigger {}",
-                m
-              );
-            }
-            has_unconditional_branch = true;
-          } else {
-            if has_unconditional_branch {
-              panic!(
-                "mixed conditional and unconditional branches for trigger {}",
-                m
-              );
-            }
-            has_conditional_branch = true;
-            valid_conds.push(p.clone());
-          }
-        }
-        if has_conditional_branch {
-          res.push_str(
-            format!(
-              "assign {}_trigger_push_valid = trigger && ({});\n\n",
-              m,
-              valid_conds.join(" || ")
-            )
-            .as_str(),
-          );
-        } else {
-          res.push_str(format!("assign {}_trigger_push_valid = trigger;\n\n", m).as_str());
-        }
-      }
-
-      for (f, branches) in self.fifo_pushes.drain() {
-        let mut valid_conds = Vec::<String>::new();
-        let mut data_str = String::new();
-        let mut has_unconditional_branch = false;
-        let mut has_conditional_branch = false;
-        for (p, v) in branches {
-          if p == "" {
-            if has_unconditional_branch {
-              panic!("multiple unconditional branches for fifo {}", f);
-            }
-            if has_conditional_branch {
-              panic!(
-                "mixed conditional and unconditional branches for fifo {}",
-                f
-              );
-            }
-            has_unconditional_branch = true;
-            data_str.push_str(format!("{}", v).as_str());
-          } else {
-            if has_unconditional_branch {
-              panic!(
-                "mixed conditional and unconditional branches for fifo {}",
-                f
-              );
-            }
-            has_conditional_branch = true;
-            valid_conds.push(p.clone());
-            data_str.push_str(format!("{} ? {} : ", p, v).as_str());
-          }
-        }
-        if has_conditional_branch {
-          data_str.push_str(format!("'x").as_str());
-        }
-        if has_conditional_branch {
-          res.push_str(
-            format!(
-              "assign fifo_{}_push_valid = trigger && ({});\n",
-              f,
-              valid_conds.join(" || ")
-            )
-            .as_str(),
-          );
-        } else {
-          res.push_str(format!("assign fifo_{}_push_valid = trigger;\n", f).as_str());
-        }
-        res.push_str(format!("assign fifo_{}_push_data = {};\n\n", f, data_str).as_str());
-      }
-
-      res.push_str(
-        format!(
-          "assign trigger = trigger_pop_valid{};\n\n",
-          wait_until.unwrap_or("".to_string())
-        )
-        .as_str(),
-      );
     }
+
+    res.push_str(format!("logic trigger;\n").as_str());
+    res.push_str(format!("assign trigger_pop_ready = trigger;\n\n").as_str());
+
+    if module.get_name() == "testbench" {
+      res.push_str("int cycle_cnt;\n");
+      res.push_str("always_ff @(posedge clk or negedge rst_n) if (!rst_n) cycle_cnt <= 0; ");
+      res.push_str("else if (trigger) cycle_cnt <= cycle_cnt + 1;\n\n");
+    }
+
+    self.fifo_pushes.clear();
+    self.triggers.clear();
+    for elem in module.get_body().iter() {
+      match elem.get_kind() {
+        NodeKind::Expr => {
+          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+          res.push_str(self.visit_expr(expr).unwrap().as_str());
+        }
+        NodeKind::Block => {
+          let block = elem.as_ref::<Block>(self.sys).unwrap();
+          res.push_str(self.visit_block(block).unwrap().as_str());
+        }
+        _ => {
+          panic!("Unexpected reference type: {:?}", elem);
+        }
+      }
+    }
+
+    for (m, preds) in self.triggers.drain() {
+      let mut valid_conds = Vec::<String>::new();
+      let mut has_unconditional_branch = false;
+      let mut has_conditional_branch = false;
+      for p in preds {
+        if p == "" {
+          if has_unconditional_branch {
+            panic!("multiple unconditional branches for trigger {}", m);
+          }
+          if has_conditional_branch {
+            panic!(
+              "mixed conditional and unconditional branches for trigger {}",
+              m
+            );
+          }
+          has_unconditional_branch = true;
+        } else {
+          if has_unconditional_branch {
+            panic!(
+              "mixed conditional and unconditional branches for trigger {}",
+              m
+            );
+          }
+          has_conditional_branch = true;
+          valid_conds.push(p.clone());
+        }
+      }
+      if has_conditional_branch {
+        res.push_str(
+          format!(
+            "assign {}_trigger_push_valid = trigger && ({});\n\n",
+            m,
+            valid_conds.join(" || ")
+          )
+          .as_str(),
+        );
+      } else {
+        res.push_str(format!("assign {}_trigger_push_valid = trigger;\n\n", m).as_str());
+      }
+    }
+
+    for (f, branches) in self.fifo_pushes.drain() {
+      let mut valid_conds = Vec::<String>::new();
+      let mut data_str = String::new();
+      let mut has_unconditional_branch = false;
+      let mut has_conditional_branch = false;
+      for (p, v) in branches {
+        if p == "" {
+          if has_unconditional_branch {
+            panic!("multiple unconditional branches for fifo {}", f);
+          }
+          if has_conditional_branch {
+            panic!(
+              "mixed conditional and unconditional branches for fifo {}",
+              f
+            );
+          }
+          has_unconditional_branch = true;
+          data_str.push_str(format!("{}", v).as_str());
+        } else {
+          if has_unconditional_branch {
+            panic!(
+              "mixed conditional and unconditional branches for fifo {}",
+              f
+            );
+          }
+          has_conditional_branch = true;
+          valid_conds.push(p.clone());
+          data_str.push_str(format!("{} ? {} : ", p, v).as_str());
+        }
+      }
+      if has_conditional_branch {
+        data_str.push_str(format!("'x").as_str());
+      }
+      if has_conditional_branch {
+        res.push_str(
+          format!(
+            "assign fifo_{}_push_valid = trigger && ({});\n",
+            f,
+            valid_conds.join(" || ")
+          )
+          .as_str(),
+        );
+      } else {
+        res.push_str(format!("assign fifo_{}_push_valid = trigger;\n", f).as_str());
+      }
+      res.push_str(format!("assign fifo_{}_push_data = {};\n\n", f, data_str).as_str());
+    }
+
+    res.push_str(
+      format!(
+        "assign trigger = trigger_pop_valid{};\n\n",
+        wait_until.unwrap_or("".to_string())
+      )
+      .as_str(),
+    );
 
     res.push_str(format!("endmodule // {}\n\n\n", namify(module.get_name())).as_str());
 

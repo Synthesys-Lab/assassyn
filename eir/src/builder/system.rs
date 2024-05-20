@@ -8,7 +8,9 @@ use crate::ir::{
 };
 
 use self::{
-  expr::subcode::{self, Binary}, instructions::Bind, user::Operand
+  expr::subcode::{self, Binary},
+  instructions::Bind,
+  user::Operand,
 };
 
 use super::symbol_table::SymbolTable;

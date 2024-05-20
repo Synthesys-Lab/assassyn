@@ -28,13 +28,7 @@ fn sram_sys() -> SysBuilder {
 
   let mut sys = SysBuilder::new("sram");
   let sink = mem_sink_builder(&mut sys);
-  let memory = sys.create_memory(
-    "sram",
-    32,
-    1024,
-    1..=1,
-    None,
-  );
+  let memory = sys.create_memory("sram", 32, 1024, 1..=1, None);
   let _driver = driver_builder(&mut sys, sink, memory);
   sys
 }

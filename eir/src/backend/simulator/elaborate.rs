@@ -20,9 +20,7 @@ use super::utils::{
   array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty, user_contains_opcode,
 };
 
-use self::{
-  expr::subcode::Cast, instructions, ir_printer::IRPrinter,
-};
+use self::{expr::subcode::Cast, instructions, ir_printer::IRPrinter};
 
 use super::analysis;
 
@@ -114,7 +112,6 @@ impl ElaborateModule<'_, '_> {
 }
 
 impl Visitor<String> for ElaborateModule<'_, '_> {
-
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.module_name = module.get_name().to_string();
     let mut res = String::new();

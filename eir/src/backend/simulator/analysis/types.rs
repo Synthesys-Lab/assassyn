@@ -36,10 +36,7 @@ struct FIFOTypesUsedVisitor {
 
 impl Visitor<()> for FIFOTypesUsedVisitor {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
-    self.res.extend(
-     module.port_iter()
-       .map(|x| x.scalar_ty())
-       );
+    self.res.extend(module.port_iter().map(|x| x.scalar_ty()));
     None
   }
 }
@@ -47,7 +44,7 @@ impl Visitor<()> for FIFOTypesUsedVisitor {
 pub(in crate::backend::simulator) fn fifo_types_used(
   sys: &SysBuilder,
 ) -> HashMap<String, HashSet<DataType>> {
-  let mut visitor = FIFOTypesUsedVisitor{ res: Vec::new() };
+  let mut visitor = FIFOTypesUsedVisitor { res: Vec::new() };
   visitor.enter(sys);
   return type_gather_impl(visitor.res);
 }
