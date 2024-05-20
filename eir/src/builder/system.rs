@@ -559,7 +559,6 @@ impl SysBuilder {
     value: BaseNode,
     eager: Option<bool>,
   ) -> BaseNode {
-
     let (port_idx, module_name, module_node) = {
       let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
       let module = bind.callee();
@@ -631,7 +630,8 @@ impl SysBuilder {
       let dst_dtype = callee.get_port(port_idx).unwrap().scalar_ty();
       let value_dtype = value.get_dtype(self).unwrap();
       assert_eq!(
-        dst_dtype, value_dtype,
+        dst_dtype,
+        value_dtype,
         "Cannot push value of type {} to port {} of type {}",
         value_dtype.to_string(),
         port_idx,
@@ -666,7 +666,12 @@ impl SysBuilder {
     idx: usize,
     value: BaseNode,
   ) -> BaseNode {
-    let port = module.as_ref::<Module>(self).unwrap().get_port(idx).unwrap().upcast();
+    let port = module
+      .as_ref::<Module>(self)
+      .unwrap()
+      .get_port(idx)
+      .unwrap()
+      .upcast();
 
     // Create the expression.
     let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
