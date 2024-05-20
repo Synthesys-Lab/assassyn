@@ -84,20 +84,29 @@ impl SysBuilder {
     let module = self.create_module(name, ports);
     self.set_current_module(module);
 
-    let (addr, write, _) = {
+    let (addr, write, wdata) = {
       let module = module.as_ref::<Module>(self).unwrap();
       let addr = module.get_port(0).unwrap().upcast();
       let write = module.get_port(1).unwrap().upcast();
       let wdata = module.get_port(2).unwrap().upcast();
 
       let addr = self.create_fifo_pop(addr);
+      addr.as_mut::<Expr>(self).unwrap().set_name("addr".into());
       let write = self.create_fifo_pop(write);
+      write.as_mut::<Expr>(self).unwrap().set_name("write".into());
       let wdata = self.create_fifo_pop(wdata);
+      wdata.as_mut::<Expr>(self).unwrap().set_name("wdata".into());
       (addr, write, wdata)
     };
 
     let ptr = self.create_array_ptr(array, addr);
     let rdata = self.create_array_read(ptr);
+
+    let wblock = self.create_block(BlockKind::Condition(write));
+    self.set_current_block(wblock);
+    self.create_array_write(ptr, wdata);
+    let new_ip = self.get_current_ip().next(self).unwrap();
+    self.set_current_ip(new_ip);
 
     inliner(self, module, write, rdata);
     let param = MemoryParams::new(width, depth, lat, init_file);

@@ -1,11 +1,10 @@
 use assassyn::module_builder;
 use eir::{backend, builder::SysBuilder, ir::node::BaseNode, xform};
 
-
 module_builder!(
   memory(k, write, rdata)() {
-    read = write.flip();
-    when read {
+    is_read = write.flip();
+    when is_read {
       rdata = rdata.cast(int<32>);
       delta = rdata.add(k);
       log("{} + {} = {}", rdata, k, delta);
@@ -42,7 +41,7 @@ fn sram_sys() -> SysBuilder {
     None,
     |x: &mut SysBuilder, module: BaseNode, write: BaseNode, rdata: BaseNode| {
       memory_impl(x, module, const128, write, rdata);
-    }
+    },
   );
   let _driver = driver_builder(&mut sys, memory);
   sys
