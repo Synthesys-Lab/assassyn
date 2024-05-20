@@ -575,7 +575,13 @@ impl SysBuilder {
       module.get_name(),
       module.upcast()
     ));
-    assert_eq!(port.scalar_ty(), value.get_dtype(self).unwrap());
+    assert_eq!(
+      port.scalar_ty(),
+      value.get_dtype(self).unwrap(),
+      "Port \"{}\" requires {}",
+      key,
+      port.scalar_ty().to_string()
+    );
     let port_idx = port.idx();
     let module_name = module.get_name().to_string();
     let module = module.upcast();
@@ -850,7 +856,7 @@ impl SysBuilder {
       if let Ok(end) = end.as_ref::<IntImm>(self) {
         assert!(start.get_value() <= end.get_value());
         let bits = end.get_value() - start.get_value() + 1;
-        DataType::int_ty(bits as usize)
+        DataType::bits_ty(bits as usize)
       } else {
         panic!("End is NOT a constant!");
       }

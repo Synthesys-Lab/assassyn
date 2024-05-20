@@ -1,35 +1,31 @@
 use assassyn::module_builder;
 use eir::{backend, builder::SysBuilder, ir::node::BaseNode, xform};
 
+
 module_builder!(
-  mem_sink(memory_buffer, k)(addr: uint<10>, write: bits<1>, wdata: bits<32>) {
-    when write {
-      memory_buffer[addr] = wdata;
-    }
+  memory(k, write, rdata)() {
     read = write.flip();
     when read {
-      rdata = memory_buffer[addr];
+      rdata = rdata.cast(int<32>);
       delta = rdata.add(k);
-      log("{} was read", delta);
+      log("{} + {} = {}", rdata, k, delta);
     }
   }
 );
 
 fn sram_sys() -> SysBuilder {
   module_builder!(
-    driver(mem)() {
+    driver(memory)() {
       cnt = array(int<32>, 1);
       v = cnt[0];
       write = v.slice(0, 0);
-      write = write.cast(bits<1>);
-      wdata = v.cast(bits<32>);
       plused = v.add(1);
       waddr = plused.slice(0, 9);
       waddr = waddr.cast(uint<10>);
       raddr = v.slice(0, 9);
       raddr = raddr.cast(uint<10>);
       addr = default raddr.case(write, waddr);
-      async_call mem { addr: addr, write: write, wdata: wdata };
+      async_call memory { addr: addr, write: write, wdata: v.cast(bits<32>) };
       cnt[0] = plused;
     }
   );
@@ -44,7 +40,9 @@ fn sram_sys() -> SysBuilder {
     1024,
     1..=1,
     None,
-    |x: &mut SysBuilder, memory: BaseNode| mem_sink_builder(x, memory, const128),
+    |x: &mut SysBuilder, module: BaseNode, write: BaseNode, rdata: BaseNode| {
+      memory_impl(x, module, const128, write, rdata);
+    }
   );
   let _driver = driver_builder(&mut sys, memory);
   sys
