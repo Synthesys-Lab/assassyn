@@ -85,6 +85,17 @@ impl Visitor<()> for Verifier {
           let module = operand.as_ref::<Module>(expr.sys).unwrap();
           module.users().contains(operand);
         }
+        NodeKind::IntImm => {
+          let imm_value = operand.as_ref::<IntImm>(expr.sys).unwrap().get_value();
+          let imm_dtype = operand.get_dtype(expr.sys).unwrap();
+          let imm_dtype_width = imm_dtype.get_bits();
+          assert!(
+            imm_value < (1 << (imm_dtype_width - if imm_dtype.is_signed() { 1 } else { 0 })),
+            "Datatype {} can not hold immediate {}",
+            imm_dtype.to_string(),
+            imm_value
+          )
+        }
         _ => {}
       }
     }
@@ -94,27 +105,20 @@ impl Visitor<()> for Verifier {
         let src_ty = cast.src_type();
         let dest_ty = cast.dest_type();
         match cast.get_opcode() {
-          subcode::Cast::Cast => {
+          subcode::Cast::BitCast => {
             assert!(
-              // uint to int, width must be expanded
-              (
-                dest_ty.is_int() && dest_ty.is_signed() &&
-                src_ty.is_int() && !src_ty.is_signed() &&
-                dest_ty.get_bits() > src_ty.get_bits()
-              ) ||
-              // other senario, disallow trimming
-              (dest_ty.get_bits() >= src_ty.get_bits())
+              // only support same-width data type conversions
+              dest_ty.get_bits() == src_ty.get_bits(),
+              "Only support bitcast between types of the same width"
             );
           }
-          subcode::Cast::SExt => {
+          subcode::Cast::SExt | subcode::Cast::ZExt => {
             assert!(
-              // dest needs to be int
-              dest_ty.is_int() && dest_ty.is_signed() &&
-              // disallow trimming
-              dest_ty.get_bits() >= src_ty.get_bits()
+              // disallow trimming or "extend" to same width
+              dest_ty.get_bits() > src_ty.get_bits(),
+              "Dest type must be wider than src type for extension"
             );
           }
-          _ => {}
         }
       }
       _ => {}

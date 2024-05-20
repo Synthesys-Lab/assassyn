@@ -371,20 +371,13 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         let dest_dtype = cast.dest_type();
         let a = dump_ref!(cast.get().sys, &cast.x());
         match cast.get_opcode() {
-          Cast::ZExt => {
+          Cast::ZExt | Cast::BitCast => {
             // perform zero extension
             format!(
               "ValueCastTo::<{}>::cast(&ValueCastTo::<{}>::cast(&{}))",
               dtype_to_rust_type(&dest_dtype),
               dtype_to_rust_type(&src_dtype).replace("i", "u"),
               a,
-            )
-          }
-          Cast::Cast => {
-            format!(
-              "ValueCastTo::<{}>::cast(&{})",
-              dtype_to_rust_type(&dest_dtype),
-              a
             )
           }
           Cast::SExt => {

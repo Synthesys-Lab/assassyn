@@ -1369,7 +1369,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         let cast = expr.as_sub::<instructions::Cast>().unwrap();
         let a = dump_ref!(self.sys, &cast.x());
         match cast.get_opcode() {
-          subcode::Cast::Cast | subcode::Cast::ZExt => Some(format!(
+          subcode::Cast::BitCast | subcode::Cast::ZExt => Some(format!(
             "logic [{}:0] {};\nassign {} = {};\n\n",
             dbits, name, name, a
           )),

@@ -18,7 +18,7 @@ pub fn arbiter() {
       } {
         hot_valid = a1_valid.concat(a0_valid);
         // grant is a one-hot vector
-        grant_1h = array(int<2>, 1, [1.int<2>]);
+        grant_1h = array(bits<2>, 1, [1.bits<2>]);
         gv = grant_1h[0];
         gv_flip = gv.flip();
         hi = gv_flip.bitwise_and(hot_valid);
@@ -31,13 +31,13 @@ pub fn arbiter() {
           log("grants even");
           a0 = a0.pop();
           async_call sqr { a: a0 };
-          grant_1h[0] = 1.int<2>;
+          grant_1h[0] = 1.bits<2>;
         }
         when grant1 {
           log("grants odd");
           a1 = a1.pop();
           async_call sqr { a: a1 };
-          grant_1h[0] = 2.int<2>;
+          grant_1h[0] = 2.bits<2>;
         }
       }
     }
@@ -49,7 +49,7 @@ pub fn arbiter() {
     v = k.add(1);
     even = v.mul(2);
     even = even.slice(0, 31);
-    even = even.cast(int<32>);
+    even = even.bitcast(int<32>);
     odd = even.add(1);
     cnt[0] = v;
     is_odd = v.bitwise_and(1);
