@@ -85,6 +85,17 @@ impl Visitor<()> for Verifier {
           let module = operand.as_ref::<Module>(expr.sys).unwrap();
           module.users().contains(operand);
         }
+        NodeKind::IntImm => {
+          let imm_value = operand.as_ref::<IntImm>(expr.sys).unwrap().get_value();
+          let imm_dtype = operand.get_dtype(expr.sys).unwrap();
+          let imm_dtype_width = imm_dtype.get_bits();
+          assert!(
+            imm_value < (1 << (imm_dtype_width - if imm_dtype.is_signed() { 1 } else { 0 })),
+            "Datatype {} can not hold immediate {}",
+            imm_dtype.to_string(),
+            imm_value
+          )
+        }
         _ => {}
       }
     }
