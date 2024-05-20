@@ -60,14 +60,17 @@ impl SysBuilder {
   ///
   /// * `name` - The name of the module.
   /// * `inputs` - The inputs' information to the module. Refer to `PortInfo` for more details.
-  pub fn create_memory(
+  pub fn create_memory<F>(
     &mut self,
     name: &str,
     width: usize,
     depth: usize,
     lat: RangeInclusive<usize>,
     init_file: Option<String>,
-  ) -> BaseNode {
+    foo: F,
+  ) -> BaseNode 
+    where F: FnOnce(&mut SysBuilder, BaseNode) -> BaseNode
+  {
     let ty = DataType::Bits(width);
     let ports = vec![
       PortInfo::new("addr", DataType::UInt(depth.ilog2() as usize)),
