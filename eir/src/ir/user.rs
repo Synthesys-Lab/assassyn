@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{builder::SysBuilder, ir::ir_printer::IRPrinter};
+use crate::builder::SysBuilder;
 
 use super::{node::*, visitor::Visitor, Expr, Module, Opcode, FIFO};
 
@@ -88,15 +88,13 @@ impl_user_methods!(FIFO);
 
 struct GatherAllUses {
   src: BaseNode,
-  dst: BaseNode,
   uses: HashSet<(BaseNode, usize, Option<BaseNode>)>,
 }
 
 impl GatherAllUses {
-  fn new(src: BaseNode, dst: BaseNode) -> Self {
+  fn new(src: BaseNode) -> Self {
     Self {
       src,
-      dst,
       uses: HashSet::new(),
     }
   }
@@ -109,23 +107,8 @@ impl Visitor<()> for GatherAllUses {
       self.dispatch(expr.sys, &bind, vec![]);
     }
     for (i, operand) in expr.operand_iter().enumerate() {
-      match operand.get_value().get_kind() {
-        NodeKind::FIFO => {
-          let fifo = operand.get_value().as_ref::<FIFO>(expr.sys).unwrap();
-          if fifo.is_placeholder() && fifo.get_parent().eq(&self.src) {
-            if let Ok(module) = self.dst.as_ref::<Module>(expr.sys) {
-              let new_value = module.get_port(fifo.idx()).unwrap();
-              self
-                .uses
-                .insert((expr.upcast(), i, Some(new_value.upcast())));
-            }
-          }
-        }
-        _ => {
-          if operand.get_value().eq(&self.src) {
-            self.uses.insert((expr.upcast(), i, None));
-          }
-        }
+      if operand.get_value().eq(&self.src) {
+        self.uses.insert((expr.upcast(), i, None));
       }
     }
     None
@@ -181,18 +164,10 @@ impl SysBuilder {
 
   // TODO(@were): I strongly believe we can have a BFS based gatherer to have better performance.
   pub fn replace_all_uses_with(&mut self, src: BaseNode, dst: BaseNode) {
-    let mut gather = GatherAllUses::new(src, dst);
-    eprintln!(
-      "replace {}",
-      IRPrinter::new(false).dispatch(self, &src, vec![]).unwrap()
-    );
+    let mut gather = GatherAllUses::new(src);
     gather.enter(self);
     for (expr, i, new_value) in gather.uses {
       let new_value = new_value.map_or(dst.clone(), |x| x);
-      eprintln!(
-        "use: {}",
-        IRPrinter::new(false).dispatch(self, &expr, vec![]).unwrap()
-      );
       let mut expr_mut = expr.as_mut::<Expr>(self).unwrap();
       expr_mut.set_operand(i, new_value);
     }

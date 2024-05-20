@@ -20,15 +20,11 @@ struct FIFODumper;
 
 impl Visitor<String> for FIFODumper {
   fn visit_input(&mut self, fifo: FIFORef<'_>) -> Option<String> {
-    if fifo.is_placeholder() {
-      format!("{}.{}", fifo.get_parent().to_string(fifo.sys), fifo.idx())
-    } else {
-      format!(
-        "{}.{}",
-        fifo.get_parent().to_string(fifo.sys),
-        fifo.get_name()
-      )
-    }
+    format!(
+      "{}.{}",
+      fifo.get_parent().to_string(fifo.sys),
+      fifo.get_name()
+    )
     .into()
   }
 }

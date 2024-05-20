@@ -33,27 +33,6 @@ impl FIFO {
     }
   }
 
-  /// When instantiating a port whose module is not deterministically known when building the IR,
-  /// we use a placeholder FIFO to represent the port. The parent is the module's expression,
-  /// not the module reference, which will typically be a FIFOPop expression from the parent module.
-  pub fn placeholder(dtype: DataType, parent: BaseNode, idx: usize) -> Self {
-    Self {
-      key: 0,
-      parent,
-      name: idx.to_string(),
-      dtype,
-      idx,
-      user_set: HashSet::new(),
-    }
-  }
-
-  pub fn is_placeholder(&self) -> bool {
-    match self.parent.get_kind() {
-      NodeKind::Module => false,
-      _ => true,
-    }
-  }
-
   /// A redundant data structure to store the index of the port in the parent module.
   pub fn idx(&self) -> usize {
     self.idx

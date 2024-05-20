@@ -29,7 +29,6 @@ register_test!(systolic::systolic_array);
 register_test!(memory::sram);
 register_test!(multi_call::multi_call);
 register_test!(eager_bind::eager_bind);
-register_test!(callback::callback);
 register_test!(data_type_conversion::dt_conv);
 register_test!(inline::{inline0, inline1});
 register_test!(explicit_pop::explicit_pop);

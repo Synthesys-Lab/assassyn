@@ -1,5 +1,5 @@
 use crate::ir::{
-  node::{BaseNode, IsElement, NodeKind},
+  node::{BaseNode, IsElement, ModuleRef},
   Module,
 };
 
@@ -15,13 +15,13 @@ impl Bind<'_> {
     }
   }
   /// Get the callee of this bind expression.
-  pub fn callee(&self) -> BaseNode {
+  pub fn callee(&self) -> ModuleRef<'_> {
     self
       .expr
-      .get_operand(self.expr.get_num_operands() - 1)
+      .get_operand_value(self.get().get_num_operands() - 1)
       .unwrap()
-      .get_value()
-      .clone()
+      .as_ref::<Module>(self.get().sys)
+      .unwrap()
   }
   /// Get the number of arguments of the callee.
   pub fn get_num_args(&self) -> usize {
@@ -49,19 +49,7 @@ impl ToString for Bind<'_> {
       .arg_iter()
       .enumerate()
       .map(|(i, v)| {
-        let arg = match callee.get_kind() {
-          NodeKind::Module => {
-            let name = callee
-              .as_ref::<Module>(self.expr.sys)
-              .unwrap()
-              .get_port(i)
-              .unwrap()
-              .get_name()
-              .to_string();
-            format!("{}:", name)
-          }
-          _ => format!("arg{}:", i),
-        };
+        let arg = callee.get_port(i).unwrap().get_name().to_string();
         let feed = if v.is_unknown() {
           "None".to_string()
         } else {
@@ -71,15 +59,7 @@ impl ToString for Bind<'_> {
       })
       .collect::<Vec<String>>()
       .join(", ");
-    let module_name = match callee.get_kind() {
-      NodeKind::Module => callee
-        .as_ref::<Module>(self.expr.sys)
-        .unwrap()
-        .get_name()
-        .to_string(),
-      _ => callee.to_string(self.expr.sys),
-    };
-    format!("bind {} {{ {} }}", module_name, arg_list).into()
+    format!("bind {} {{ {} }}", callee.get_name(), arg_list).into()
   }
 }
 
