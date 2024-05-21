@@ -4,7 +4,6 @@ use crate::{
   builder::{PortInfo, SysBuilder},
   ir::{
     instructions::{Bind, FIFOPush},
-    ir_printer::IRPrinter,
     module,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
@@ -23,7 +22,6 @@ impl Visitor<()> for GatherBinds {
     let value = expr.upcast();
     let expr = expr.clone();
     if let Ok(bind) = expr.as_sub::<Bind>() {
-      eprintln!("bind: {}", bind.to_string());
       let callee = bind.callee().upcast();
       if !self.binds.contains_key(&callee) {
         self.binds.insert(callee, HashSet::new());
@@ -45,7 +43,6 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
     binds: HashMap::new(),
   };
   for m in sys.module_iter() {
-    eprintln!("@module: {}", m.get_name());
     gather_binds.visit_module(m);
   }
   gather_binds.binds.retain(|_, v| v.len() > 1);
@@ -200,12 +197,5 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         sys.set_current_block(restore_block);
       }
     }
-    eprintln!(
-      "{}",
-      IRPrinter::new(false)
-        .dispatch(sys, &arbiter, vec![])
-        .unwrap()
-    );
   }
-  eprintln!("{}", sys);
 }

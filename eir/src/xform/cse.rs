@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::{
   builder::SysBuilder,
   ir::{
-    node::{BaseNode, BlockRef, ExprRef, IsElement},
+    node::{BaseNode, BlockRef, ExprRef, IsElement, ModuleRef},
     visitor::Visitor,
-    Block, Expr, Opcode,
+    Block, BlockKind, Expr, Opcode,
   },
 };
 
@@ -21,9 +21,17 @@ impl DepthAnalysis {
 }
 
 impl Visitor<()> for DepthAnalysis {
+  fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
+    self.depth.insert(module.upcast(), self.cur);
+    self.visit_block(module.get_body());
+    None
+  }
   fn visit_block(&mut self, block: BlockRef<'_>) -> Option<()> {
     self.depth.insert(block.upcast(), self.cur);
     self.cur += 1;
+    if let BlockKind::WaitUntil(cond) = block.get_kind() {
+      self.dispatch(block.sys, cond, vec![]);
+    }
     for elem in block.iter() {
       self.dispatch(block.sys, elem, vec![]);
     }
@@ -63,60 +71,64 @@ enum CommonExpr {
 }
 
 fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<CommonExpr> {
-  let mut finder = FindCommonSubexpression {
-    common: HashMap::new(),
-  };
-  finder.enter(sys);
   let mut res = Vec::new();
-  for (_, exprs) in finder.common {
-    if exprs.len() != 1 {
-      let mut parents = exprs
-        .iter()
-        .map(|x| x.get_parent(sys).unwrap())
-        .collect::<Vec<_>>();
-      // Hoist all parents to the same depth
-      while let Some(x) = {
-        let ref_depth = da.get_depth(&parents[0]);
-        if let Some(diff) = parents
-          .iter_mut()
-          .filter(|x| {
-            let depth = da.get_depth(&x);
-            depth != ref_depth
-          })
-          .next()
-        {
-          if da.get_depth(diff) < ref_depth {
-            Some(&mut parents[0])
+  for m in sys.module_iter() {
+    let mut finder = FindCommonSubexpression {
+      common: HashMap::new(),
+    };
+    finder.visit_module(m);
+    for (_, exprs) in finder.common {
+      if exprs.len() != 1 {
+        let mut parents = exprs
+          .iter()
+          .map(|x| x.get_parent(sys).unwrap())
+          .collect::<Vec<_>>();
+        // Hoist all parents to the same depth
+        while let Some(x) = {
+          let ref_depth = da.get_depth(&parents[0]);
+          if let Some(diff) = parents
+            .iter_mut()
+            .filter(|x| {
+              let depth = da.get_depth(&x);
+              depth != ref_depth
+            })
+            .next()
+          {
+            if da.get_depth(diff) < ref_depth {
+              Some(&mut parents[0])
+            } else {
+              Some(diff)
+            }
           } else {
-            Some(diff)
+            None
           }
-        } else {
-          None
+        } {
+          *x = x.get_parent(sys).unwrap();
         }
-      } {
-        *x = x.get_parent(sys).unwrap();
-      }
-      // Hoist all the parents to the same node
-      while parents.iter().any(|x| x.ne(&parents[0])) {
-        parents
-          .iter_mut()
-          .for_each(|x| *x = x.get_parent(sys).unwrap());
-      }
-      let block = parents[0].as_ref::<Block>(sys).unwrap();
-      let mut master_idx = None;
-      for expr in exprs.iter() {
-        if expr.get_parent(sys).unwrap() == block.upcast() {
-          let idx = block.iter().position(|x| x.eq(expr)).unwrap();
-          if master_idx.map_or(true, |x| idx < x) {
-            master_idx = Some(idx);
+        // Hoist all the parents to the same node
+        while parents.iter().any(|x| x.ne(&parents[0])) {
+          parents
+            .iter_mut()
+            .for_each(|x| *x = x.get_parent(sys).unwrap());
+        }
+        // TODO(@were): Support non-block parents
+        if let Ok(block) = parents[0].as_ref::<Block>(sys) {
+          let mut master_idx = None;
+          for expr in exprs.iter() {
+            if expr.get_parent(sys).unwrap() == block.upcast() {
+              let idx = block.iter().position(|x| x.eq(expr)).unwrap();
+              if master_idx.map_or(true, |x| idx < x) {
+                master_idx = Some(idx);
+              }
+            }
+          }
+          if let Some(master_idx) = master_idx {
+            let master = block.get().get(master_idx).unwrap().clone();
+            let mut duplica = exprs.clone();
+            duplica.retain(|x| x.ne(&master));
+            res.push(CommonExpr::Master { master, duplica });
           }
         }
-      }
-      if let Some(master_idx) = master_idx {
-        let master = block.get().get(master_idx).unwrap().clone();
-        let mut duplica = exprs.clone();
-        duplica.retain(|x| x.ne(&master));
-        res.push(CommonExpr::Master { master, duplica });
       }
     }
   }

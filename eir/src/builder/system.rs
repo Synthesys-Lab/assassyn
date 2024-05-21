@@ -559,90 +559,62 @@ impl SysBuilder {
     value: BaseNode,
     eager: Option<bool>,
   ) -> BaseNode {
-    let (port_idx, module_name, module_node, eager_callee) = {
-      let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
-      let module = bind.callee();
-      let port = module.get_port_by_name(&key).expect(&format!(
-        "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
-        key,
-        module.get_name(),
-        module.upcast()
-      ));
-      assert_eq!(
-        port.scalar_ty(),
-        value.get_dtype(self).unwrap(),
-        "Port \"{}\" requires {}",
-        key,
-        port.scalar_ty().to_string()
-      );
-      (
-        port.idx(),
-        module.get_name().to_string(),
-        module.upcast(),
-        module.get_attrs().contains(&Attribute::EagerCallee),
-      )
-    };
-
-    let fifo_push = self.create_fifo_push(module_node, port_idx, value);
-    let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
-    assert!(
-      bind_mut
-        .get()
-        .get_operand(port_idx)
-        .unwrap()
-        .get_value()
-        .is_unknown(),
-      "Port \"{}\", indexed @{}, of Module \"{}\" is already bound!",
+    let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
+    let module = bind.callee();
+    let port = module.get_port_by_name(&key).expect(&format!(
+      "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
       key,
-      port_idx,
-      module_name
+      module.get_name(),
+      module.upcast()
+    ));
+    assert_eq!(
+      port.scalar_ty(),
+      value.get_dtype(self).unwrap(),
+      "Port \"{}\" requires {}",
+      key,
+      port.scalar_ty().to_string()
     );
-    bind_mut.set_operand(port_idx, fifo_push);
-    let eager = eager.unwrap_or(eager_callee);
-    if eager && bind.as_expr::<Bind>(self).unwrap().fully_bound() {
-      self.create_async_call(bind)
-    } else {
-      bind
-    }
+    self.bind_arg(bind.get().upcast(), port.idx(), value, eager)
   }
 
   /// Add a bind to the current module.
   pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
-    let (callee, port_idx, eager_callee) = {
-      let bind = bind.as_expr::<Bind>(self).unwrap();
-      let callee = bind.callee();
-      let port_idx = {
-        let mut idx = None;
-        for i in 0..bind.get_num_args() {
-          let arg = bind.get_arg(i).unwrap();
-          if arg.is_unknown() && idx.is_none() {
-            idx = Some(i);
-          } else if idx.is_some() {
-            assert!(arg.is_unknown());
-          }
+    let bind = bind.as_expr::<Bind>(self).unwrap();
+    let port_idx = {
+      let mut idx = None;
+      for i in 0..bind.get_num_args() {
+        let arg = bind.get_arg(i).unwrap();
+        if arg.is_unknown() && idx.is_none() {
+          idx = Some(i);
+        } else if idx.is_some() {
+          assert!(arg.is_unknown());
         }
-        idx.expect("All arguments bound!")
-      };
-      let dst_dtype = callee.get_port(port_idx).unwrap().scalar_ty();
-      let value_dtype = value.get_dtype(self).unwrap();
-      assert_eq!(
-        dst_dtype,
-        value_dtype,
-        "Cannot push value of type {} to port {} of type {}",
-        value_dtype.to_string(),
-        port_idx,
-        dst_dtype.to_string()
-      );
-      (
-        callee.upcast(),
-        port_idx,
-        callee.get_attrs().contains(&Attribute::EagerCallee),
-      )
+      }
+      idx.expect("All arguments bound!")
     };
-    let fifo_push = self.create_fifo_push(callee, port_idx, value);
+    self.bind_arg(bind.get().upcast(), port_idx, value, eager)
+  }
+
+  fn bind_arg(
+    &mut self,
+    bind: BaseNode,
+    idx: usize,
+    value: BaseNode,
+    eager: Option<bool>,
+  ) -> BaseNode {
+    let bind_expr = bind.as_expr::<Bind>(self).unwrap();
+    assert!(
+      bind_expr.get_arg(idx).unwrap().is_unknown(),
+      "Argument {} is already bound!",
+      idx
+    );
+    let callee = bind_expr.callee();
+    let eager = eager.unwrap_or(callee.get_attrs().contains(&Attribute::EagerCallee));
+    let callee = callee.upcast();
+    let fifo_push = self.create_fifo_push(callee, idx, value);
     let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
-    bind_mut.set_operand(port_idx, fifo_push);
-    let eager = eager.unwrap_or(eager_callee);
+    bind_mut.set_operand(idx, fifo_push);
+
     if eager && bind.as_expr::<Bind>(self).unwrap().fully_bound() {
       self.create_async_call(bind)
     } else {
@@ -657,12 +629,17 @@ impl SysBuilder {
     idx: usize,
     value: BaseNode,
   ) -> BaseNode {
-    let port = module
-      .as_ref::<Module>(self)
-      .unwrap()
-      .get_port(idx)
-      .unwrap()
-      .upcast();
+    let (ptype, port) = {
+      let module = module
+        .as_ref::<Module>(self)
+        .unwrap();
+      let port = module
+        .get_port(idx)
+        .unwrap();
+      (port.scalar_ty().clone(), port.upcast())
+    };
+    let vtype = value.get_dtype(self).unwrap();
+    assert_eq!(ptype, vtype, "Port type mismatch!");
 
     // Create the expression.
     let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
