@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use crate::{
   builder::SysBuilder,
   ir::{
-    node::{BaseNode, BlockRef, ExprRef, IsElement}, visitor::Visitor, Block, Expr, Opcode
+    node::{BaseNode, BlockRef, ExprRef, IsElement},
+    visitor::Visitor,
+    Block, Expr, Opcode,
   },
 };
 
@@ -54,7 +56,10 @@ impl Visitor<()> for FindCommonSubexpression {
 }
 
 enum CommonExpr {
-  Master{master: BaseNode, duplica: Vec<BaseNode>}
+  Master {
+    master: BaseNode,
+    duplica: Vec<BaseNode>,
+  },
 }
 
 fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<CommonExpr> {
@@ -65,14 +70,21 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
   let mut res = Vec::new();
   for (_, exprs) in finder.common {
     if exprs.len() != 1 {
-      let mut parents = exprs.iter().map(|x| x.get_parent(sys).unwrap()).collect::<Vec<_>>();
+      let mut parents = exprs
+        .iter()
+        .map(|x| x.get_parent(sys).unwrap())
+        .collect::<Vec<_>>();
       // Hoist all parents to the same depth
       while let Some(x) = {
         let ref_depth = da.get_depth(&parents[0]);
-        if let Some(diff) = parents.iter_mut().filter(|x| {
-          let depth = da.get_depth(&x);
-          depth != ref_depth
-        }).next() {
+        if let Some(diff) = parents
+          .iter_mut()
+          .filter(|x| {
+            let depth = da.get_depth(&x);
+            depth != ref_depth
+          })
+          .next()
+        {
           if da.get_depth(diff) < ref_depth {
             Some(&mut parents[0])
           } else {
@@ -86,7 +98,9 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
       }
       // Hoist all the parents to the same node
       while parents.iter().any(|x| x.ne(&parents[0])) {
-        parents.iter_mut().for_each(|x| *x = x.get_parent(sys).unwrap());
+        parents
+          .iter_mut()
+          .for_each(|x| *x = x.get_parent(sys).unwrap());
       }
       let block = parents[0].as_ref::<Block>(sys).unwrap();
       let mut master_idx = None;
@@ -102,7 +116,7 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
         let master = block.get().get(master_idx).unwrap().clone();
         let mut duplica = exprs.clone();
         duplica.retain(|x| x.ne(&master));
-        res.push(CommonExpr::Master{master, duplica});
+        res.push(CommonExpr::Master { master, duplica });
       }
     }
   }
@@ -118,7 +132,7 @@ pub fn common_code_elimination(sys: &mut SysBuilder) {
   let ce = find_common_subexpression(sys, &depth);
   for elem in ce {
     match elem {
-      CommonExpr::Master{master, duplica} => {
+      CommonExpr::Master { master, duplica } => {
         for dup in duplica {
           sys.replace_all_uses_with(dup.clone(), master);
           let mut dup_mut = dup.as_mut::<Expr>(sys).unwrap();

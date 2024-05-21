@@ -1,7 +1,7 @@
 use crate::builder::system::SysBuilder;
 
-pub mod cse;
 pub mod arbiter;
+pub mod cse;
 pub mod rewrite_wait_until;
 
 pub struct Config {
