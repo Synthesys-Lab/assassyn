@@ -233,7 +233,11 @@ impl Visitor<String> for IRPrinter {
         self.inc_indent();
       }
       BlockKind::None | BlockKind::Valued(_) => {
-        res.push_str(&format!("{}{{ // {}\n", " ".repeat(self.indent), block.get_key()));
+        res.push_str(&format!(
+          "{}{{ // {}\n",
+          " ".repeat(self.indent),
+          block.get_key()
+        ));
         self.inc_indent();
       }
     }

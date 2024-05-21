@@ -630,12 +630,8 @@ impl SysBuilder {
     value: BaseNode,
   ) -> BaseNode {
     let (ptype, port) = {
-      let module = module
-        .as_ref::<Module>(self)
-        .unwrap();
-      let port = module
-        .get_port(idx)
-        .unwrap();
+      let module = module.as_ref::<Module>(self).unwrap();
+      let port = module.get_port(idx).unwrap();
       (port.scalar_ty().clone(), port.upcast())
     };
     let vtype = value.get_dtype(self).unwrap();
