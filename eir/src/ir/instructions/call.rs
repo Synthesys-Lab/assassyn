@@ -55,7 +55,7 @@ impl ToString for Bind<'_> {
         } else {
           v.to_string(self.expr.sys)
         };
-        format!("{} {}", arg, feed)
+        format!("{}: {}", arg, feed)
       })
       .collect::<Vec<String>>()
       .join(", ");

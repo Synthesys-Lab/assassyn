@@ -559,7 +559,7 @@ impl SysBuilder {
     value: BaseNode,
     eager: Option<bool>,
   ) -> BaseNode {
-    let (port_idx, module_name, module_node) = {
+    let (port_idx, module_name, module_node, eager_callee) = {
       let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
       let module = bind.callee();
       let port = module.get_port_by_name(&key).expect(&format!(
@@ -575,7 +575,12 @@ impl SysBuilder {
         key,
         port.scalar_ty().to_string()
       );
-      (port.idx(), module.get_name().to_string(), module.upcast())
+      (
+        port.idx(),
+        module.get_name().to_string(),
+        module.upcast(),
+        module.get_attrs().contains(&Attribute::EagerCallee),
+      )
     };
 
     let fifo_push = self.create_fifo_push(module_node, port_idx, value);
@@ -593,17 +598,8 @@ impl SysBuilder {
       module_name
     );
     bind_mut.set_operand(port_idx, fifo_push);
-    let eager = eager.unwrap_or(
-      self
-        .get_current_module()
-        .unwrap()
-        .get_attrs()
-        .contains(&Attribute::EagerBind),
-    );
-    if eager && {
-      let bind = bind.as_expr::<Bind>(self).unwrap();
-      bind.fully_bound()
-    } {
+    let eager = eager.unwrap_or(eager_callee);
+    if eager && bind.as_expr::<Bind>(self).unwrap().fully_bound() {
       self.create_async_call(bind)
     } else {
       bind
@@ -612,7 +608,7 @@ impl SysBuilder {
 
   /// Add a bind to the current module.
   pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
-    let (callee, port_idx) = {
+    let (callee, port_idx, eager_callee) = {
       let bind = bind.as_expr::<Bind>(self).unwrap();
       let callee = bind.callee();
       let port_idx = {
@@ -637,22 +633,17 @@ impl SysBuilder {
         port_idx,
         dst_dtype.to_string()
       );
-      (callee.upcast(), port_idx)
+      (
+        callee.upcast(),
+        port_idx,
+        callee.get_attrs().contains(&Attribute::EagerCallee),
+      )
     };
     let fifo_push = self.create_fifo_push(callee, port_idx, value);
     let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
     bind_mut.set_operand(port_idx, fifo_push);
-    let eager = eager.unwrap_or(
-      self
-        .get_current_module()
-        .unwrap()
-        .get_attrs()
-        .contains(&Attribute::EagerBind),
-    );
-    if eager && {
-      let bind = bind.as_expr::<Bind>(self).unwrap();
-      bind.fully_bound()
-    } {
+    let eager = eager.unwrap_or(eager_callee);
+    if eager && bind.as_expr::<Bind>(self).unwrap().fully_bound() {
       self.create_async_call(bind)
     } else {
       bind

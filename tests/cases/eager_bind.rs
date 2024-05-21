@@ -2,7 +2,7 @@ use assassyn::module_builder;
 use eir::builder::SysBuilder;
 
 pub fn eager_bind() {
-  module_builder!(sub()(a:int<32>, b:int<32>) {
+  module_builder!(sub()(a:int<32>, b:int<32>) #eager_callee {
     c = a.sub(b);
     log("sub: {} - {} = {}", a, b, c);
   });
@@ -24,7 +24,7 @@ pub fn eager_bind() {
   );
 
   module_builder!(
-    rhs(bound)(v:int<32>) #eager_bind {
+    rhs(bound)(v:int<32>) {
       _bound = bind bound { b: v };
     }
   );

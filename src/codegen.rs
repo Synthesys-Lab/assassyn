@@ -154,7 +154,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     expr::Expr::Bind(call) => {
       let func = &call.func;
       let args = &call.args;
-      let args = emit_arg_binds(func, args);
+      let args = emit_arg_binds(func, args, true);
       Ok(quote! {{ #args; bind }})
     }
   }
@@ -188,7 +188,18 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
 }
 
 // TODO(@were): Union the func and arg span to have the span.
-pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2::TokenStream {
+pub(crate) fn emit_arg_binds(
+  func: &syn::Ident,
+  args: &FuncArgs,
+  is_bind: bool,
+) -> proc_macro2::TokenStream {
+  // If it is a bind, give a None to respect the callee's eager.
+  let override_eager = if is_bind {
+    quote!{ None }
+  } else {
+    // If it is a function call, give it a false to anyways disable the callee's eager.
+    quote!{ Some(false) }
+  };
   let bind = match args {
     FuncArgs::Bound(binds) => binds
       .iter()
@@ -196,7 +207,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
         let value = emit_expr_body(v).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {v}));
         quote! {
           let value = { #value }.clone();
-          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, None);
+          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, #override_eager);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -206,7 +217,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
         let value = emit_expr_body(x).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {x}));
         quote! {
           let value = { #value }.clone();
-          let bind = sys.push_bind(bind, value, None);
+          let bind = sys.push_bind(bind, value, #override_eager);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -253,17 +264,10 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
     },
     Statement::Call((kind, call)) => match kind {
       CallKind::Async => {
-        let args = emit_arg_binds(&call.func, &call.args);
+        let args = emit_arg_binds(&call.func, &call.args, false);
         quote! {{
           #args;
-          if {
-            !sys
-              .get_current_module()
-              .unwrap()
-              .has_attr(eir::ir::module::Attribute::EagerBind)
-          } {
-            sys.create_async_call(bind);
-          }
+          sys.create_async_call(bind);
         }}
       }
       CallKind::Inline(lval) => match &call.args {
