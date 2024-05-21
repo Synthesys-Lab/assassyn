@@ -24,7 +24,7 @@ pub fn array() {
   module_builder!(
     mod_c(arr)(a:int<32>) {
       v = arr[0];
-      log("{}, arr: {}", a, v);
+      log("a = {} arr = {}", a, v);
     }
   );
 
@@ -52,10 +52,25 @@ pub fn array() {
   println!("{}", sys);
 
   let mut config = eir::backend::common::Config::default();
-  config.sim_threshold = 200;
-  config.idle_threshold = 200;
+  config.sim_threshold = 100;
+  config.idle_threshold = 100;
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  run_simulator(&sys, &config, None);
+  run_simulator(&sys, &config,     Some((
+    /*Condition Assertion*/
+    |x| {
+      if x.contains("arr") {
+        let raw = x.split(" ").collect::<Vec<&str>>();
+        let len = raw.len();
+        let a = raw[len - 4].parse::<i32>().unwrap();
+        let arr = raw[len - 1].parse::<i32>().unwrap();
+        assert!(a == 0 || arr == a - 1);
+        true
+      } else {
+        false
+      }
+    },
+    /*Expected Lines*/ Some(100),
+  )));
 }
