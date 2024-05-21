@@ -559,27 +559,26 @@ impl SysBuilder {
     value: BaseNode,
     eager: Option<bool>,
   ) -> BaseNode {
-    let module = {
-      let bind = bind.as_expr::<Bind>(self).unwrap();
-      let callee = bind.callee();
-      callee.as_ref::<Module>(self).unwrap_or_else(|_| {
-        panic!(
-          "Only module callee can be used for bind, but {:?} got!",
-          callee
-        )
-      })
+    let (port_idx, module_name, module_node) = {
+      let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
+      let module = bind.callee();
+      let port = module.get_port_by_name(&key).expect(&format!(
+        "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
+        key,
+        module.get_name(),
+        module.upcast()
+      ));
+      assert_eq!(
+        port.scalar_ty(),
+        value.get_dtype(self).unwrap(),
+        "Port \"{}\" requires {}",
+        key,
+        port.scalar_ty().to_string()
+      );
+      (port.idx(), module.get_name().to_string(), module.upcast())
     };
-    let port = module.get_port_by_name(&key).expect(&format!(
-      "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
-      key,
-      module.get_name(),
-      module.upcast()
-    ));
-    assert_eq!(port.scalar_ty(), value.get_dtype(self).unwrap());
-    let port_idx = port.idx();
-    let module_name = module.get_name().to_string();
-    let module = module.upcast();
-    let fifo_push = self.create_fifo_push(module.clone(), port_idx, value);
+
+    let fifo_push = self.create_fifo_push(module_node, port_idx, value);
     let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
     assert!(
       bind_mut
@@ -613,10 +612,9 @@ impl SysBuilder {
 
   /// Add a bind to the current module.
   pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
-    let (callee, signature, port_idx) = {
+    let (callee, port_idx) = {
       let bind = bind.as_expr::<Bind>(self).unwrap();
       let callee = bind.callee();
-      let signature = callee.get_dtype(self).unwrap();
       let port_idx = {
         let mut idx = None;
         for i in 0..bind.get_num_args() {
@@ -629,17 +627,18 @@ impl SysBuilder {
         }
         idx.expect("All arguments bound!")
       };
-      (callee, signature, port_idx)
+      let dst_dtype = callee.get_port(port_idx).unwrap().scalar_ty();
+      let value_dtype = value.get_dtype(self).unwrap();
+      assert_eq!(
+        dst_dtype,
+        value_dtype,
+        "Cannot push value of type {} to port {} of type {}",
+        value_dtype.to_string(),
+        port_idx,
+        dst_dtype.to_string()
+      );
+      (callee.upcast(), port_idx)
     };
-    match &signature {
-      DataType::Module(ports) => {
-        assert_eq!(
-          ports.get(port_idx).unwrap().as_ref().clone(),
-          value.get_dtype(self).unwrap(),
-        );
-      }
-      _ => panic!("Invalid signature"),
-    }
     let fifo_push = self.create_fifo_push(callee, port_idx, value);
     let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
     bind_mut.set_operand(port_idx, fifo_push);
@@ -667,32 +666,18 @@ impl SysBuilder {
     idx: usize,
     value: BaseNode,
   ) -> BaseNode {
-    match module.get_dtype(self) {
-      Some(DataType::Module(_)) => {}
-      _ => panic!("Invalid module type"),
-    }
-
-    let port = match module.get_kind() {
-      NodeKind::Module => module
-        .as_ref::<Module>(self)
-        .unwrap()
-        .get_port(idx)
-        .expect("Invalid port index")
-        .upcast(),
-      _ => {
-        let dtype = value.get_dtype(self).unwrap();
-        let fifo = FIFO::placeholder(dtype, module.clone(), idx);
-        self.insert_element(fifo)
-      }
-    };
+    let port = module
+      .as_ref::<Module>(self)
+      .unwrap()
+      .get_port(idx)
+      .unwrap()
+      .upcast();
 
     // Create the expression.
     let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
 
     // Maintain the external interface redundancy when it is determined.
-    if !port.as_ref::<FIFO>(self).unwrap().is_placeholder() {
-      self.insert_external_interface(port, res.clone(), 0);
-    }
+    self.insert_external_interface(port, res.clone(), 0);
 
     res
   }
@@ -850,7 +835,7 @@ impl SysBuilder {
       if let Ok(end) = end.as_ref::<IntImm>(self) {
         assert!(start.get_value() <= end.get_value());
         let bits = end.get_value() - start.get_value() + 1;
-        DataType::int_ty(bits as usize)
+        DataType::bits_ty(bits as usize)
       } else {
         panic!("End is NOT a constant!");
       }

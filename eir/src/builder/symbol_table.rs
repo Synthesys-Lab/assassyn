@@ -9,7 +9,7 @@ impl SymbolTable {
     // If the identifier is already in the symbol table, we append a number to it.
     if let Some(x) = self.unique_ids.get_mut(id.into()) {
       // Append a number after.
-      let res = format!("{}.{}", id, x);
+      let res = format!("{}_{}", id, x);
       *x += 1;
       // To avoid user to use the appended identifier, we also insert it into the symbol table.
       self.unique_ids.insert(res.clone(), 0);

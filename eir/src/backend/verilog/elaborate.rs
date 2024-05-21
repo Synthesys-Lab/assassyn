@@ -660,12 +660,11 @@ fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
       let expr = node.as_ref::<Expr>(sys).unwrap();
       if matches!(expr.get_opcode(), Opcode::AsyncCall) {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
-        let triggered_module = {
-          let bind = call.bind();
-          bind.callee()
-        };
-        let triggered_module = triggered_module.as_ref::<Module>(sys).unwrap();
-        triggered_modules.push(namify(triggered_module.get_name()));
+        // let triggered_module = {
+        //   let bind = call.bind();
+        //   bind.callee()
+        // };
+        triggered_modules.push(namify(call.bind().callee().get_name()));
       }
     }
     _ => {}
@@ -706,17 +705,17 @@ macro_rules! dump_ref {
 
 impl<'a> Visitor<String> for VerilogDumper<'a> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
-    if module.get_name() == "testbench" {
+    if self.current_module == "testbench" {
       self.has_testbench = true;
     }
 
-    if module.get_name() == "driver" {
+    if self.current_module == "driver" {
       self.has_driver = true;
     }
 
     let mut res = String::new();
 
-    res.push_str(format!("module {} (\n", namify(module.get_name())).as_str());
+    res.push_str(format!("module {} (\n", self.current_module).as_str());
 
     self.indent += 2;
     res.push_str(format!("{}input logic clk,\n", " ".repeat(self.indent)).as_str());
@@ -929,7 +928,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     res.push_str(format!("logic trigger;\n").as_str());
     res.push_str(format!("assign trigger_pop_ready = trigger;\n\n").as_str());
 
-    if module.get_name() == "testbench" {
+    if self.current_module == "testbench" {
       res.push_str("int cycle_cnt;\n");
       res.push_str("always_ff @(posedge clk or negedge rst_n) if (!rst_n) cycle_cnt <= 0; ");
       res.push_str("else if (trigger) cycle_cnt <= cycle_cnt + 1;\n\n");
@@ -1042,6 +1041,39 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
       res.push_str(format!("assign fifo_{}_push_data = {};\n\n", f, data_str).as_str());
     }
 
+    // tie off array store port
+    for (interf, _ops) in module.ext_interf_iter() {
+      if interf.get_kind() == NodeKind::Array {
+        let array_ref = interf.as_ref::<Array>(&self.sys).unwrap();
+        let array_name = namify(array_ref.get_name());
+        let mut read_only = false;
+        match self.array_drivers.get_mut(&array_name) {
+          Some(ads) => {
+            if !ads.contains(&self.current_module) {
+              read_only = true;
+            }
+            ads.insert(self.current_module.clone());
+          }
+          None => {
+            read_only = true;
+            self.array_drivers.insert(
+              array_name.clone(),
+              HashSet::from([self.current_module.clone()]),
+            );
+          }
+        }
+        if read_only {
+          res.push_str(
+            format!(
+              "assign array_{}_w = '0;\nassign array_{}_d = '0;\nassign array_{}_widx = '0;\n\n",
+              array_name, array_name, array_name
+            )
+            .as_str(),
+          );
+        }
+      }
+    }
+
     res.push_str(
       format!(
         "assign trigger = trigger_pop_valid{};\n\n",
@@ -1050,7 +1082,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
       .as_str(),
     );
 
-    res.push_str(format!("endmodule // {}\n\n\n", namify(module.get_name())).as_str());
+    res.push_str(format!("endmodule // {}\n\n\n", self.current_module).as_str());
 
     Some(res)
   }
@@ -1203,18 +1235,6 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         let load = expr.as_sub::<instructions::Load>().unwrap();
         let gep = load.pointer();
         let (array_ref, array_idx) = { (gep.array(), gep.index()) };
-        let array_name = namify(array_ref.get_name());
-        match self.array_drivers.get_mut(&array_name) {
-          Some(ads) => {
-            ads.insert(self.current_module.clone());
-          }
-          None => {
-            self.array_drivers.insert(
-              array_name.clone(),
-              HashSet::from([self.current_module.clone()]),
-            );
-          }
-        }
         Some(format!(
           "logic [{}:0] {};\nassign {} = array_{}_q[{}];\n\n",
           dtype.get_bits() - 1,
@@ -1321,12 +1341,11 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
 
       Opcode::AsyncCall => {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
-        let module = {
+        let module_name = {
           let bind = call.bind();
-          bind.callee()
+          bind.callee().get_name().to_string()
         };
-        let module = module.as_ref::<Module>(self.sys).unwrap();
-        let module_name = namify(module.get_name());
+        let module_name = namify(&module_name);
         match self.trigger_drivers.get_mut(&module_name) {
           Some(tds) => {
             tds.insert(self.current_module.clone());

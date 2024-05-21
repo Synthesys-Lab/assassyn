@@ -15,8 +15,8 @@ pub fn select() {
     rand0 = v0.add(67890);
     rand1 = v1.add(09876);
 
-    rand0 = rand0.slice(0, 31);
-    rand1 = rand1.slice(0, 31);
+    rand0 = rand0.slice(0, 31).bitcast(int<32>);
+    rand1 = rand1.slice(0, 31).bitcast(int<32>);
 
     gt = rand0.igt(rand1);
     mux = default rand1.case(gt, rand0);

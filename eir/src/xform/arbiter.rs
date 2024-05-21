@@ -24,7 +24,7 @@ impl Visitor<()> for GatherBinds {
     let expr = expr.clone();
     if let Ok(bind) = expr.as_sub::<Bind>() {
       eprintln!("bind: {}", bind.to_string());
-      let callee = bind.callee();
+      let callee = bind.callee().upcast();
       if !self.binds.contains_key(&callee) {
         self.binds.insert(callee, HashSet::new());
       }

@@ -238,17 +238,12 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::AsyncCall => {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
-        let to_trigger = if let Ok(module) = {
-          let bind = call.bind();
-          bind.callee().as_ref::<Module>(self.sys)
-        } {
-          format!("EventKind::Module{}", camelize(&namify(module.get_name())))
-        } else {
-          panic!("AsyncCall target is not a module, did you rewrite the callback?");
-        };
+        let bind = call.bind();
+        let event_kind = camelize(&namify(bind.callee().get_name()));
+        let event_kind = format!("EventKind::Module{}", event_kind);
         format!(
           "q.push(Reverse(Event{{ stamp: stamp + 100, kind: {} }}))",
-          to_trigger
+          event_kind
         )
       }
       Opcode::FIFOPop => {
@@ -292,18 +287,14 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         let value = dump_ref!(self.sys, &push.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
         let module_writer = self.current_module_id();
-        if !fifo.is_placeholder() {
-          quote::quote! {
-            q.push(Reverse(Event{
-              stamp: stamp + 50,
-              kind: EventKind::#fifo_push(
-                (EventKind::#module_writer.into(), #slab_idx, #value.clone()))
-            }))
-          }
-          .to_string()
-        } else {
-          panic!("FIFO is a placeholder, cannot push to it! Did you forget to rewrite callbacks?");
+        quote::quote! {
+          q.push(Reverse(Event{
+            stamp: stamp + 50,
+            kind: EventKind::#fifo_push(
+              (EventKind::#module_writer.into(), #slab_idx, #value.clone()))
+          }))
         }
+        .to_string()
       }
       Opcode::Log => {
         let mut res = String::new();
@@ -391,8 +382,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Bind => {
         let bind = expr.as_sub::<Bind>().unwrap();
-        let callee = bind.callee();
-        let module = callee.as_ref::<Module>(bind.get().sys).unwrap();
+        let module = bind.callee();
         format!("EventKind::Module{}", camelize(&namify(module.get_name())))
       }
     };

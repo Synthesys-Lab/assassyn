@@ -14,7 +14,7 @@ pub trait AsExpr<'a>: Sized {
 }
 
 macro_rules! register_opcode {
-  (@emit_sema $operator:ident => { ($method:ident, $idx:literal, BaseNode) $( ( $($rest_sema:tt)* ) )* }) => {
+  (@emit_sema $operator:ident => { ($method:ident, $idx:expr, BaseNode) $( ( $($rest_sema:tt)* ) )* }) => {
     impl $operator<'_> {
       pub fn $method(&self) -> BaseNode {
         self.expr.get_operand_value($idx).unwrap()
@@ -23,7 +23,7 @@ macro_rules! register_opcode {
     register_opcode!(@emit_sema $operator => { $( ( $($rest_sema)* ) )* } );
   };
 
-  (@emit_sema $operator:ident => { ($method:ident, $idx:literal, expr::$op:ident) $( ( $($rest_sema:tt)* ) )* }) => {
+  (@emit_sema $operator:ident => { ($method:ident, $idx:expr, expr::$op:ident) $( ( $($rest_sema:tt)* ) )* }) => {
     impl $operator<'_> {
       pub fn $method(&self) -> $op<'_> {
         self.expr.get_operand_value($idx).unwrap().as_expr::<$op>(self.get().sys).unwrap()
@@ -32,7 +32,7 @@ macro_rules! register_opcode {
     register_opcode!(@emit_sema $operator => { $( ( $($rest_sema)* ) )* } );
   };
 
-  (@emit_sema $operator:ident => { ($method:ident, $idx:literal, node::$ty:ident) $( ( $($rest_sema:tt)* ) )* }) => {
+  (@emit_sema $operator:ident => { ($method:ident, $idx:expr, node::$ty:ident) $( ( $($rest_sema:tt)* ) )* }) => {
     paste::paste! {
       impl $operator<'_> {
         pub fn $method(&self) -> ir::node::[< $ty Ref>]<'_> {
@@ -83,7 +83,7 @@ register_opcode!(
   GetElementPtr => { (array, 0, node::Array) (index, 1, BaseNode) },
   Load => { (pointer, 0, expr::GetElementPtr) },
   Store => { (pointer, 0, expr::GetElementPtr) (value, 1, BaseNode) },
-  Bind => { },
+  Bind => {  },
   AsyncCall => { (bind, 0, expr::Bind) },
   FIFOPush => { (fifo, 0, node::FIFO) (value, 1, BaseNode) },
   FIFOPop => { (fifo, 0, node::FIFO) },

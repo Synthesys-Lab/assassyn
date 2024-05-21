@@ -1,4 +1,5 @@
 use super::{Concat, Slice};
+use crate::ir::Typed;
 
 impl Slice<'_> {
   pub fn l(&self) -> usize {
@@ -15,7 +16,14 @@ impl ToString for Slice<'_> {
     let a = self.x().to_string(self.expr.sys);
     let l = self.l();
     let r = self.r();
-    format!("{} = {}[{}:{}] // {}", self.expr.get_name(), a, l, r, a,)
+    format!(
+      "{} = {}[{}:{}] // {}",
+      self.expr.get_name(),
+      a,
+      l,
+      r,
+      self.expr.dtype().to_string()
+    )
   }
 }
 
