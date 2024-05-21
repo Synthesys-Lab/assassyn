@@ -28,6 +28,9 @@ pub fn common_read() {
   // Build the driver module.
   driver_builder(&mut sys, adder);
 
+  println!("{}", sys);
+  let o1 = eir::xform::Config { rewrite_wait_until: true };
+  eir::xform::basic(&mut sys, &o1);
   eir::builder::verify(&sys);
   println!("{}", sys);
 
