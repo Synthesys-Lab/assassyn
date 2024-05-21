@@ -195,10 +195,10 @@ pub(crate) fn emit_arg_binds(
 ) -> proc_macro2::TokenStream {
   // If it is a bind, give a None to respect the callee's eager.
   let override_eager = if is_bind {
-    quote!{ None }
+    quote! { None }
   } else {
     // If it is a function call, give it a false to anyways disable the callee's eager.
-    quote!{ Some(false) }
+    quote! { Some(false) }
   };
   let bind = match args {
     FuncArgs::Bound(binds) => binds

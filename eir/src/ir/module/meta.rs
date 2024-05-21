@@ -35,7 +35,6 @@ impl TemplateInstance {
   }
 }
 
-
 impl Default for TemplateMaster {
   fn default() -> Self {
     TemplateMaster { params: Vec::new() }
@@ -50,4 +49,3 @@ impl Default for TemplateInstance {
     }
   }
 }
-
