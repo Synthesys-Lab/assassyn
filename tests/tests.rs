@@ -20,6 +20,7 @@ macro_rules! register_test {
 
 }
 
+register_test!(array::array);
 register_test!(back_pressure::back_pressure);
 register_test!(fifo_valid::fifo_valid);
 register_test!(fib::fib);

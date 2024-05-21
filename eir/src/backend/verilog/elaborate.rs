@@ -1042,6 +1042,26 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
       res.push_str(format!("assign fifo_{}_push_data = {};\n\n", f, data_str).as_str());
     }
 
+    // tie off array store port
+    for (interf, _ops) in module.ext_interf_iter() {
+      if interf.get_kind() == NodeKind::Array {
+        let array_ref = interf.as_ref::<Array>(&self.sys).unwrap();
+        let array_name = namify(array_ref.get_name());
+        let ads = self.array_drivers.get_mut(&array_name).unwrap();
+        if !ads.contains(&self.current_module) {
+          // load only
+          res.push_str(
+            format!(
+              "assign array_{}_w = '0;\nassign array_{}_d = '0;\nassign array_{}_widx = '0;\n\n",
+              array_name, array_name, array_name
+            )
+            .as_str(),
+          );
+          ads.insert(self.current_module.clone());
+        }
+      }
+    }
+
     res.push_str(
       format!(
         "assign trigger = trigger_pop_valid{};\n\n",
@@ -1203,18 +1223,6 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         let load = expr.as_sub::<instructions::Load>().unwrap();
         let gep = load.pointer();
         let (array_ref, array_idx) = { (gep.array(), gep.index()) };
-        let array_name = namify(array_ref.get_name());
-        match self.array_drivers.get_mut(&array_name) {
-          Some(ads) => {
-            ads.insert(self.current_module.clone());
-          }
-          None => {
-            self.array_drivers.insert(
-              array_name.clone(),
-              HashSet::from([self.current_module.clone()]),
-            );
-          }
-        }
         Some(format!(
           "logic [{}:0] {};\nassign {} = array_{}_q[{}];\n\n",
           dtype.get_bits() - 1,

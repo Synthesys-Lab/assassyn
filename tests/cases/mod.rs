@@ -1,4 +1,5 @@
 pub mod arbiter;
+pub mod array;
 pub mod async_call;
 pub mod back_pressure;
 pub mod bind;
