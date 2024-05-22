@@ -2,6 +2,7 @@ use std::{
   collections::{HashMap, HashSet},
   fs::File,
   io::{Error, Write},
+  path::PathBuf,
 };
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
   ir::{node::*, visitor::Visitor, *},
 };
 
-use self::expr::subcode;
+use self::{expr::subcode, module::Attribute};
 
 fn namify(name: &str) -> String {
   name.replace(".", "_")
@@ -53,7 +54,7 @@ impl<'a> VerilogDumper<'a> {
     }
   }
 
-  fn dump_array(&self, array: &ArrayRef) -> String {
+  fn dump_array(&self, array: &ArrayRef, mem_init_path: Option<&String>) -> String {
     let mut res = String::new();
     let array_name = namify(array.get_name());
     res.push_str(format!("// array: {}[{}]\n", array_name, array.get_size()).as_str());
@@ -165,17 +166,28 @@ impl<'a> VerilogDumper<'a> {
       )
       .as_str(),
     );
-    res.push_str("always_ff @(posedge clk or negedge rst_n)");
-    res.push_str(
-      format!(
-        "if (!rst_n) array_{}_q <= '{{default : {}'d0}};\n",
-        array_name,
-        array.scalar_ty().get_bits()
-      )
-      .as_str(),
-    );
+    res.push_str("always_ff @(posedge clk or negedge rst_n)\n");
+    if mem_init_path.is_some() {
+      res.push_str(
+        format!(
+          "if (!rst_n) $readmemh(\"{}\", array_{}_q);\n",
+          mem_init_path.unwrap(),
+          array_name
+        )
+        .as_str(),
+      );
+    } else {
+      res.push_str(
+        format!(
+          "if (!rst_n) array_{}_q <= '{{default : {}'d0}};\n",
+          array_name,
+          array.scalar_ty().get_bits()
+        )
+        .as_str(),
+      );
+    }
     res.push_str(&format!(
-      " else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
+      "else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
       array_name, array_name, array_name, array_name
     ));
 
@@ -523,9 +535,34 @@ impl<'a> VerilogDumper<'a> {
     res.push_str("  input logic rst_n\n");
     res.push_str(");\n\n");
 
+    // memory initializations map
+    let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new(); // array -> init_file_path
+    let mut tests_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    tests_dir.push("../tests/resources");
+    for module in self.sys.module_iter() {
+      for attr in module.get_attrs() {
+        match attr {
+          Attribute::Memory(param) => {
+            if let Some(init_file) = &param.init_file {
+              let mut init_file_path = tests_dir.clone();
+              init_file_path.push(init_file);
+              let init_file_path = init_file_path.to_str().unwrap();
+              let array = param.array.as_ref::<Array>(self.sys).unwrap();
+              mem_init_map.insert(array.upcast(), init_file_path.to_string());
+            }
+          }
+          _ => {}
+        }
+      }
+    }
+
     // array storage element definitions
     for array in self.sys.array_iter() {
-      res.push_str(self.dump_array(&array).as_str());
+      res.push_str(
+        self
+          .dump_array(&array, mem_init_map.get(&array.upcast()))
+          .as_str(),
+      );
     }
 
     // fifo storage element definitions
@@ -608,6 +645,7 @@ logic rst_n;
 initial begin
   $fsdbDumpfile(\"wave.fsdb\");
   $fsdbDumpvars();
+  $fsdbDumpMDA();
 end
 
 initial begin
