@@ -162,11 +162,65 @@ pub fn module_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream
   res.into()
 }
 
+struct ModuleParserClone {
+  module_name: syn::Ident,
+  ports: Punctuated<node::PortDecl, Token![,]>,
+  parameters: Punctuated<node::ParaDecl, Token![,]>,
+  attrs: Punctuated<syn::Ident, Token![,]>,
+  body: node::Body,
+  exposes: Option<Punctuated<syn::Ident, Token![,]>>,
+}
+
+impl Parse for ModuleParserClone {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let tok = input
+      .parse::<syn::Ident>()
+      .map_err(|e| syn::Error::new(e.span(), "Expected module name"))?;
+    let module_name = tok.clone();
+    // parse the parameters
+    let raw_params;
+    parenthesized!(raw_params in input);
+    let parameters = raw_params.parse_terminated(node::ParaDecl::parse, Token![,])?;
+    // parse the ports
+    let raw_ports;
+    parenthesized!(raw_ports in input);
+    let ports = raw_ports.parse_terminated(node::PortDecl::parse, Token![,])?;
+    // parse the attributes
+    let attrs = input.parse::<ModuleAttrs>()?.attrs;
+    // parse the body
+    let body = input.parse::<node::Body>()?;
+    // .expose(<var-id>) is optional
+    let exposes = if input.peek(Token![.]) {
+      input.parse::<Token![.]>()?;
+      let expose_kw = input.parse::<syn::Ident>()?;
+      assert_eq!(expose_kw.to_string(), "expose");
+      let exposes;
+      parenthesized!(exposes in input);
+      let exposes = exposes.parse_terminated(syn::Ident::parse, Token![,])?;
+      Some(exposes)
+    } else {
+      None
+    };
+
+    Ok(ModuleParserClone {
+      module_name,
+      ports,
+      parameters,
+      attrs,
+      body,
+      exposes,
+    })
+  }
+}
+
 #[proc_macro]
 pub fn test_para_paser(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-   
+  let parsed_module = parse_macro_input!(input as ModuleParserClone);
 
-
+  let parameters = &parsed_module.parameters;
+  for elem in parameters.iter() {
+    println!("{:?}", elem);
+  }
 
   let res = quote!();
   res.into()

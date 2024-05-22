@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod module_para {
+    use assassyn::test_para_paser;
+
 
   #[test]
   pub fn module_para() {
@@ -14,22 +16,22 @@ mod module_para {
     ]
      */
 
-    module_builder!(
-        foo(arr1, arr2) () {
-            log("{}!", "I am foo, I take an array");
-        }
-    );
+    // module_builder!(
+    //     foo(arr1, arr2) () {
+    //         log("{}!", "I am foo, I take an array");
+    //     }
+    // );
 
     /* module bar: raw_params
     TokenStream [
       Ident { ident: "foo", span: #0 bytes(283..286) }
     ]
      */
-    module_builder!(
-        bar(foo) () {
-            log("{}!", "I am bar, I take foo");
-        }
-    );
+    // module_builder!(
+    //     bar(foo) () {
+    //         log("{}!", "I am bar, I take foo");
+    //     }
+    // );
 
     /*
       module_builder!(
@@ -39,9 +41,13 @@ mod module_para {
       )
     */
 
-    let mut sys = SysBuilder::new("foo_bar");
-    let arr1 = sys.create_array(eir::ir::DataType::Int(1), "arr", 1, None);
-    let arr2 = sys.create_array(eir::ir::DataType::Int(1), "arr", 1, None);
+    test_para_paser!(
+      foo (arr1: [int<32>; 16], arr2: [int<1>; 1], bar: [uint<2>; 2]) () {
+      }
+    )
+    // let mut sys = SysBuilder::new("foo_bar");
+    // let arr1 = sys.create_array(eir::ir::DataType::Int(1), "arr", 1, None);
+    // let arr2 = sys.create_array(eir::ir::DataType::Int(1), "arr", 1, None);
 
     // NOTE:
     // The parameter can be: Array, and module at first
@@ -59,11 +65,11 @@ mod module_para {
     // and we should verify the type and metadata in there as well (TO BE DECIDED)
 
 
-    println!("{:?}", arr1.get_kind());
-    println!("{:?}", arr2.get_kind());
+    // println!("{:?}", arr1.get_kind());
+    // println!("{:?}", arr2.get_kind());
 
-    let _foo = foo_builder(&mut sys, arr1, arr2);
-    println!("{:?}", arr1.get_dtype(&mut sys));
-    let _bar = bar_builder(&mut sys, _foo);
+    // let _foo = foo_builder(&mut sys, arr1, arr2);
+    // println!("{:?}", arr1.get_dtype(&mut sys));
+    // let _bar = bar_builder(&mut sys, _foo);
   }
 }

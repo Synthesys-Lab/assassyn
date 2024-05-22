@@ -338,11 +338,13 @@ impl Parse for DType {
   }
 }
 
+#[derive(Debug)]
 struct ArrayAttr {
   ty: eir::ir::DataType,
   len: usize
 }
 
+#[derive(Debug)]
 pub(crate) struct PType {
   pub(crate) span: proc_macro2::Span,
   pub(crate) ptype: NodeKind,
