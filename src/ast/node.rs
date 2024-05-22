@@ -15,6 +15,13 @@ pub(crate) struct PortDecl {
   pub(crate) ty: DType,
 }
 
+/// A parameter declaration is something like `lock: [int<32>; 1]` for arary
+/// foo: module
+pub(crate) struct ParaDecl {
+  pub(crate) id: syn::Ident,
+  pub(crate) ty: expr::PType,
+}
+
 /// An array access is something like `a[<expr>]`
 pub(crate) struct ArrayAccess {
   pub(crate) id: syn::Ident,

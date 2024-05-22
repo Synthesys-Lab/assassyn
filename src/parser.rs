@@ -2,7 +2,7 @@ use syn::{braced, parenthesized, parse::Parse, punctuated::Punctuated};
 
 use crate::ast::{
   self,
-  expr::{self, LValue},
+  expr::{self, LValue, PType},
   node::{self, CallKind, FuncArgs, FuncCall, Statement},
   DType, ExprTerm,
 };
@@ -18,6 +18,19 @@ impl Parse for node::PortDecl {
     let ty = input.parse::<DType>()?;
     Ok(node::PortDecl { id, ty })
   }
+}
+
+impl Parse for node::ParaDecl {
+  fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    let id = input
+      .parse::<syn::Ident>()
+      .map_err(|e| syn::Error::new(e.span(), "Expected a port id"))?;
+    let _ = input
+      .parse::<syn::Token![:]>()
+      .map_err(|e| syn::Error::new(e.span(), "Expected a paramater id"))?;
+    let ty = input.parse::<PType>()?;
+    Ok(node::ParaDecl { id, ty })
+  } 
 }
 
 impl Parse for node::KVPair {
