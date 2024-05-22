@@ -28,6 +28,7 @@ register_test!(testbench::testbench);
 register_test!(concat::concat);
 register_test!(systolic::systolic_array);
 register_test!(memory::sram);
+register_test!(memory::sram_init);
 register_test!(multi_call::multi_call);
 register_test!(eager_bind::eager_bind);
 register_test!(data_type_conversion::dt_conv);

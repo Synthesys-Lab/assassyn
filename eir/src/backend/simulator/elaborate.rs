@@ -2,7 +2,7 @@ use std::{
   collections::HashMap,
   fs::{self, File, OpenOptions},
   io::Write,
-  path::Path,
+  path::{Path, PathBuf},
   process::Command,
 };
 
@@ -20,7 +20,7 @@ use super::utils::{
   array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty, user_contains_opcode,
 };
 
-use self::{expr::subcode::Cast, instructions, ir_printer::IRPrinter};
+use self::{expr::subcode::Cast, instructions, ir_printer::IRPrinter, module::Attribute};
 
 use super::analysis;
 
@@ -491,6 +491,8 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       use std::collections::BinaryHeap;
       use std::cmp::{Ord, Reverse};
       use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
+      use num_traits::Num;
+      use std::fs::read_to_string;
     }
     .to_string(),
   );
@@ -506,6 +508,21 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     &quote::quote! {
       pub fn cyclize(stamp: usize) -> String {
         format!("Cycle @{}.{:02}", stamp / 100, stamp % 100)
+      }
+      pub fn init_vec_by_hex_file<T: Num, const N: usize>(array: &mut [T; N], init_file: &str) {
+        let mut idx = 0;
+        for line in read_to_string(init_file).expect("can not open hex file").lines() {
+          let line = line.trim();
+          if line.len() == 0 || line.starts_with("//") {
+            continue;
+          }
+          if line.starts_with("@") {
+            todo!();
+          }
+          let line = line.replace("_", "");
+          array[idx] = T::from_str_radix(line.as_str(), 16).ok().unwrap();
+          idx += 1;
+        }
       }
       pub trait ValueCastTo<T> {
         fn cast(&self) -> T;
@@ -952,6 +969,48 @@ macro_rules! impl_unwrap_slab {
     );
   }
 
+  // generate memory initializations
+  let mut tests_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+  tests_dir.push("../tests/resources");
+  for module in sys.module_iter() {
+    for attr in module.get_attrs() {
+      match attr {
+        Attribute::Memory(param) => {
+          if let Some(init_file) = &param.init_file {
+            let mut init_file_path = tests_dir.clone();
+            init_file_path.push(init_file);
+            let init_file_path = init_file_path.to_str().unwrap();
+            let array = param.array.as_ref::<Array>(sys).unwrap();
+            let slab_idx = slab_cache.get(&param.array).unwrap();
+            let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
+            let scalar_ty = dtype_to_rust_type(&scalar_ty)
+              .parse::<proc_macro2::TokenStream>()
+              .unwrap();
+            res.push_str(
+              format!(
+                "\n// initializing array {}, slab_idx = {}, with file {}\n",
+                array.get_name(),
+                slab_idx,
+                init_file
+              )
+              .as_str(),
+            );
+            res.push_str(
+              &quote::quote! {
+                init_vec_by_hex_file(
+                  data_slab[#slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>(),
+                  #init_file_path
+                );
+              }
+              .to_string(),
+            );
+          }
+        }
+        _ => {}
+      }
+    }
+  }
+
   // generate cycle gatekeeper
   for module in sys.module_iter() {
     let module_gatekeeper = syn::Ident::new(
@@ -1178,6 +1237,7 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::io::
       .append(true)
       .open(format!("{}/Cargo.toml", dir_name))?;
     writeln!(cargo, "num-bigint = \"0.4\"")?;
+    writeln!(cargo, "num-traits = \"0.2\"")?;
     let mut fmt = fs::File::create(format!("{}/rustfmt.toml", dir_name))?;
     writeln!(fmt, "max_width = 100")?;
     writeln!(fmt, "tab_spaces = 2")?;

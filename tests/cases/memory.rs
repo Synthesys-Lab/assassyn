@@ -2,7 +2,7 @@ use assassyn::module_builder;
 use eir::{backend, builder::SysBuilder, ir::node::BaseNode, xform};
 
 module_builder!(
-  memory(k, write, rdata)() {
+  reader(k, write, rdata)() {
     is_read = write.flip();
     when is_read {
       rdata = rdata.bitcast(int<32>);
@@ -40,7 +40,7 @@ fn sram_sys() -> SysBuilder {
     1..=1,
     None,
     |x: &mut SysBuilder, module: BaseNode, write: BaseNode, rdata: BaseNode| {
-      memory_impl(x, module, const128, write, rdata);
+      reader_impl(x, module, const128, write, rdata);
     },
   );
   let _driver = driver_builder(&mut sys, memory);
@@ -49,6 +49,64 @@ fn sram_sys() -> SysBuilder {
 
 pub fn sram() {
   let mut sys = sram_sys();
+
+  println!("{}", sys);
+
+  eir::builder::verify(&sys);
+  let o0 = xform::Config {
+    rewrite_wait_until: false,
+  };
+  eir::xform::basic(&mut sys, &o0);
+  eir::builder::verify(&sys);
+
+  println!("{}", sys);
+
+  let config = backend::common::Config {
+    override_dump: true,
+    temp_dir: true,
+    sim_threshold: 200,
+    idle_threshold: 200,
+  };
+
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+
+  eir::test_utils::run_simulator(&sys, &config, None);
+}
+
+fn sram_init_sys() -> SysBuilder {
+  module_builder!(
+    driver(memory)() {
+      cnt = array(int<32>, 1);
+      v = cnt[0];
+      plused = v.add(1);
+      raddr = v.slice(0, 9);
+      raddr = raddr.bitcast(uint<10>);
+      write = 0.bits<1>;
+      async_call memory { addr: raddr, write: write, wdata: v.bitcast(bits<32>) };
+      cnt[0] = plused;
+    }
+  );
+
+  let mut sys = SysBuilder::new("sram_init");
+
+  let const128 = sys.get_const_int(eir::ir::DataType::Int(32), 128);
+
+  let memory = sys.create_memory(
+    "memory",
+    32,
+    1024,
+    1..=1,
+    Some("init.hex".to_string()),
+    |x: &mut SysBuilder, module: BaseNode, write: BaseNode, rdata: BaseNode| {
+      reader_impl(x, module, const128, write, rdata);
+    },
+  );
+  let _driver = driver_builder(&mut sys, memory);
+  sys
+}
+
+pub fn sram_init() {
+  let mut sys = sram_init_sys();
 
   println!("{}", sys);
 
