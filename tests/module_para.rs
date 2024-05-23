@@ -41,8 +41,13 @@ mod module_para {
       )
     */
 
+    // test_para_paser!(
+    //   foo (arr1: [int<32>; 16], arr2: [int<1>; 1], bar: [uint<2>; 2]) () {
+    //   }
+    // );
+
     test_para_paser!(
-      foo (arr1: [int<32>; 16], arr2: [int<1>; 1], bar: [uint<2>; 2]) () {
+      foo (bar: module, arr1: [int<32>; 16]) () {
       }
     )
     // let mut sys = SysBuilder::new("foo_bar");

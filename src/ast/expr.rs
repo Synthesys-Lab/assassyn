@@ -339,7 +339,7 @@ impl Parse for DType {
 }
 
 #[derive(Debug)]
-struct ArrayAttr {
+pub(crate) struct ArrayAttr {
   ty: eir::ir::DataType,
   len: usize
 }

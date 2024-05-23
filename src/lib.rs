@@ -14,6 +14,7 @@ mod utils;
 use ast::node;
 
 use crate::ast::expr::ModuleAttrs;
+use ast::expr::PType;
 
 struct ModuleParser {
   module_name: syn::Ident,
@@ -217,10 +218,10 @@ impl Parse for ModuleParserClone {
 pub fn test_para_paser(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
   let parsed_module = parse_macro_input!(input as ModuleParserClone);
 
-  let parameters = &parsed_module.parameters;
-  for elem in parameters.iter() {
-    println!("{:?}", elem);
-  }
+  // let parameters = &parsed_module.parameters;
+  // for elem in parameters.iter() {
+  //   println!("{:?}", elem);
+  // }
 
   let res = quote!();
   res.into()
