@@ -163,11 +163,7 @@ pub fn array_partition1() {
 
   let mut a = [0, 0, 0, 0];
 
-  run_simulator(
-    &sys,
-    &config,
-    None,
-  ).lines().for_each(|x| {
+  run_simulator(&sys, &config, None).lines().for_each(|x| {
     if x.contains("a[idx0] + a[idx1]") {
       let raw = x.split_whitespace().collect::<Vec<_>>();
       let (cycle, _) = parse_cycle(x);
