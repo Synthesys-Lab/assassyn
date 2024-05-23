@@ -1,5 +1,9 @@
 use assassyn::module_builder;
-use eir::{builder::SysBuilder, test_utils::{parse_cycle, run_simulator}, xform};
+use eir::{
+  builder::SysBuilder,
+  test_utils::{parse_cycle, run_simulator},
+  xform,
+};
 
 pub fn array_multi_read() {
   use assassyn::module_builder;
@@ -108,14 +112,73 @@ pub fn array_partition0() {
 
   println!("{}", sys);
 
-  run_simulator(&sys, &config, Some((|x| {
-    if x.contains("sum(a[:])") {
+  run_simulator(
+    &sys,
+    &config,
+    Some((
+      |x| {
+        if x.contains("sum(a[:])") {
+          let raw = x.split_whitespace().collect::<Vec<_>>();
+          let (cycle, _) = parse_cycle(x);
+          let sum = raw[raw.len() - 1].parse::<i32>().unwrap();
+          assert_eq!(sum % 4, 0);
+          assert_eq!(((cycle as i32) - 1).max(0) * 4, sum);
+        }
+        false
+      },
+      None,
+    )),
+  );
+}
+
+pub fn array_partition1() {
+  module_builder!(
+    driver()() {
+      a = array(int<32>, 4, #fully_partitioned);
+      cnt = array(int<32>, 1);
+      v = cnt[0];
+      new_v = v.add(1.int<32>);
+      cnt[0] = new_v;
+      idx0 = v.slice(0, 1);
+      idx1 = new_v.slice(0, 1);
+      a[idx0] = v.mul(v).slice(0, 31).bitcast(int<32>);
+      a[idx1] = new_v.add(new_v);
+      sum = a[idx0].add(a[idx1]);
+      log("a[idx0] + a[idx1] = {}", sum);
+    }
+  );
+
+  let mut sys = SysBuilder::new("array_partition1");
+  driver_builder(&mut sys);
+
+  println!("{}", sys);
+
+  let o1 = eir::xform::Config {
+    rewrite_wait_until: true,
+  };
+  let config = eir::backend::common::Config::default();
+  xform::basic(&mut sys, &o1);
+
+  println!("{}", sys);
+
+  let mut a = [0, 0, 0, 0];
+
+  run_simulator(
+    &sys,
+    &config,
+    None,
+  ).lines().for_each(|x| {
+    if x.contains("a[idx0] + a[idx1]") {
       let raw = x.split_whitespace().collect::<Vec<_>>();
       let (cycle, _) = parse_cycle(x);
+      let idx0 = cycle % 4;
+      let idx1 = (cycle + 1) % 4;
+      let cycle = cycle as i32;
       let sum = raw[raw.len() - 1].parse::<i32>().unwrap();
-      assert_eq!(sum % 4, 0);
-      assert_eq!(((cycle as i32) - 1).max(0) * 4, sum);
+      let expect = a[idx0] + a[idx1];
+      assert_eq!(expect, sum, "@cycle: {}", cycle);
+      a[idx0] = cycle * cycle;
+      a[idx1] = (cycle + 1) * 2;
     }
-    false
-  }, None)));
+  });
 }
