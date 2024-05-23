@@ -22,7 +22,10 @@ module_builder!(
     pc[0] = 0.int<1>.concat(new_pc);
     log("instruction: {:x}", inst);
     opcode = inst.slice(0, 6);
-    log("opcode: {:07b}", opcode);
+    rd = inst.slice(7, 11);
+    funct = inst.slice(12, 14);
+    rs1 = inst.slice(15, 19);
+    log("opcode: {:07b}, rd: {}, funct: {:03b}, rs1: {}", opcode, rd, funct, rs1);
     // not_br = opcode.neq(0b1100111);
     // when not_br {
     //   pc[0] = pc[0].add(4);
@@ -49,7 +52,9 @@ fn main() {
 
   let mut sys = SysBuilder::new("minor_cpu");
   
-  let pc = sys.create_array(eir::ir::DataType::Bits(33), "pc", 1, None, vec![]);
+  let pc = sys.create_array(eir::ir::DataType::Bits(32), "pc", 1, None, vec![]);
+
+  let pc_valid = sys.create_array(eir::ir::DataType::Bits(1), "pc_valid", 1, None, vec![]);
 
   let decoder = sys.create_memory(
     "decoder",
