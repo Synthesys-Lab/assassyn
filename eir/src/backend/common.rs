@@ -16,7 +16,6 @@ pub struct Config {
 }
 
 impl Default for Config {
-
   fn default() -> Self {
     Config {
       base_dir: env::temp_dir(),
@@ -26,7 +25,6 @@ impl Default for Config {
       resource_base: PathBuf::new(),
     }
   }
-
 }
 
 impl Config {
@@ -40,5 +38,4 @@ impl Config {
   pub fn dir_name(&self, sys: &SysBuilder) -> PathBuf {
     self.base_dir.join(sys.get_name())
   }
-
 }

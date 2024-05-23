@@ -1220,7 +1220,10 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
   } else {
     fs::create_dir_all(&dir_name)?;
   }
-  eprintln!("Writing simulator code to rust project: {}", dir_name.to_str().unwrap());
+  eprintln!(
+    "Writing simulator code to rust project: {}",
+    dir_name.to_str().unwrap()
+  );
   let output = Command::new("cargo")
     .arg("init")
     .arg(&dir_name)
