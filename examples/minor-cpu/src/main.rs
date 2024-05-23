@@ -60,7 +60,7 @@ fn main() {
     32,
     1024,
     1..=1,
-    Some("../binary.mem".to_string()),
+    Some("binary.mem".into()),
     |sys, module, write, rdata| {
       inst_buffer_impl(sys, module, write, rdata, decoder);
     },
