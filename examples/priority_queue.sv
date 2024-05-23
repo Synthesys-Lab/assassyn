@@ -114,7 +114,7 @@ generate
                                 OP_DEQ: begin
                                     `define left_child pq_tree[l].nodes[{pq_tokens[`safe_l_minus_1].position, 1'b0}]
                                     `define right_child pq_tree[l].nodes[{pq_tokens[`safe_l_minus_1].position, 1'b1}]
-                                    unique case ({`left_child[1 + OW - 1 + W - 1], `right_child[1 + OW - 1 + W - 1]})
+                                    unique case ({`left_child[1 + OW + W - 1], `right_child[1 + OW + W - 1]})
                                         2'b00: begin // both child inactive
                                             pq_tokens[l].operation <= OP_NOP;
                                             pq_tokens[l].position <= '0;
@@ -204,10 +204,26 @@ initial begin
     @(posedge clk iff enq_ready);
     enq_value = 32'h444;
     @(posedge clk iff enq_ready);
+    enq_value = 32'h4444;
+    @(posedge clk iff enq_ready);
+    enq_value = 32'h44444;
+    @(posedge clk iff enq_ready);
+    enq_value = 32'h444444;
+    @(posedge clk iff enq_ready);
+    enq_value = 32'h4444444;
+    @(posedge clk iff enq_ready);
     enq_valid = '0;
     enq_value = '0;
     #10;
     deq_req = '1;
+    @(posedge clk iff deq_valid);
+    $display("%t DEQ: %h", $time, deq_value);
+    @(posedge clk iff deq_valid);
+    $display("%t DEQ: %h", $time, deq_value);
+    @(posedge clk iff deq_valid);
+    $display("%t DEQ: %h", $time, deq_value);
+    @(posedge clk iff deq_valid);
+    $display("%t DEQ: %h", $time, deq_value);
     @(posedge clk iff deq_valid);
     $display("%t DEQ: %h", $time, deq_value);
     @(posedge clk iff deq_valid);
