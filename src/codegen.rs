@@ -317,11 +317,14 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
     Statement::BodyScope((pred, body)) => {
       let unwraped_body = emit_body(body)?;
       let block_init = match pred {
-        BodyPred::Condition(ref cond) => quote! {
-          let cond = #cond.clone();
-          let block_pred = eir::ir::block::BlockKind::Condition(cond);
-          let block = sys.create_block(block_pred);
-        },
+        BodyPred::Condition(ref cond) => {
+          let cond = emit_expr_body(cond)?;
+          quote! {
+            let cond = { #cond }.clone();
+            let block_pred = eir::ir::block::BlockKind::Condition(cond);
+            let block = sys.create_block(block_pred);
+          }
+        }
         BodyPred::Cycle(cycle) => quote! {
           let cycle = #cycle.clone();
           let block_pred = eir::ir::block::BlockKind::Cycle(cycle);

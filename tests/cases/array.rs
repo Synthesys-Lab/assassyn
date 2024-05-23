@@ -10,8 +10,7 @@ pub fn array_multi_read() {
 
   module_builder!(
     mod_a(arr)(a:int<32>) {
-      is_odd = a.slice(0, 0);
-      when is_odd {
+      when a.slice(0, 0) {
         arr[0] = a;
       }
     }
@@ -19,9 +18,7 @@ pub fn array_multi_read() {
 
   module_builder!(
     mod_b(arr)(a:int<32>) {
-      is_odd = a.slice(0, 0);
-      is_even = is_odd.flip();
-      when is_even {
+      when a.slice(0, 0).flip() {
         arr[0] = a;
       }
     }

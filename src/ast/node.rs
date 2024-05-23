@@ -57,7 +57,7 @@ pub(crate) struct Body {
 
 pub(crate) enum BodyPred {
   WaitUntil(Box<Body>),
-  Condition(syn::Ident),
+  Condition(expr::Expr),
   Cycle(syn::LitInt),
 }
 

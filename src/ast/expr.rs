@@ -167,11 +167,15 @@ pub(crate) enum Expr {
 }
 
 fn expr_terminates(input: &syn::parse::ParseStream) -> bool {
-  input.is_empty() || input.peek(syn::Token![;]) || input.peek(syn::Token![,]) || {
-    input.cursor().punct().map_or(false, |(punct, next)| {
-      punct.as_char() == '.' && next.ident().map_or(false, |(ident, _)| ident.eq("case"))
-    })
-  }
+  input.peek(syn::token::Brace)
+    || input.is_empty()
+    || input.peek(syn::Token![;])
+    || input.peek(syn::Token![,])
+    || {
+      input.cursor().punct().map_or(false, |(punct, next)| {
+        punct.as_char() == '.' && next.ident().map_or(false, |(ident, _)| ident.eq("case"))
+      })
+    }
 }
 
 impl Parse for Expr {

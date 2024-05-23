@@ -14,9 +14,8 @@ pub fn async_call() {
       cnt    = array(int<32>, 1);
       v      = cnt[0];
       new_v  = v.add(1);
-      cond   = v.ilt(100);
       cnt[0] = new_v;
-      when cond {
+      when v.ilt(100.int<32>) {
         async_call adder { a: v, b: v };
       }
     }
