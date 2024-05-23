@@ -7,7 +7,7 @@ use crate::{
     instructions,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
-    Array, BlockKind, Expr, Opcode,
+    Array, BlockKind, Expr, IntImm, Opcode,
   },
 };
 
@@ -99,28 +99,39 @@ pub fn rewrite_array_partitions(sys: &mut SysBuilder) {
       match opcode {
         Opcode::Load => {
           sys.set_insert_before(user.clone());
-          let p0 = sys.create_array_read(partition[0], zero);
-          let new_load = (1..size).fold(p0, |acc, x| {
-            let cur = sys.get_const_int(idx_ty.clone(), x as u64);
-            let value = sys.create_array_read(partition[x], zero);
-            let cond = sys.create_eq(idx.clone(), cur);
-            sys.create_select(cond, value, acc)
-          });
+          let new_load = if let Ok(idx_imm) = idx.as_ref::<IntImm>(sys) {
+            let idx = idx_imm.get_value();
+            sys.create_array_read(partition[idx as usize], zero)
+          } else {
+            let p0 = sys.create_array_read(partition[0], zero);
+            (1..size).fold(p0, |acc, x| {
+              let cur = sys.get_const_int(idx_ty.clone(), x as u64);
+              let value = sys.create_array_read(partition[x], zero);
+              let cond = sys.create_eq(idx.clone(), cur);
+              sys.create_select(cond, value, acc)
+            })
+          };
           sys.replace_all_uses_with(user.clone(), new_load);
         }
-        Opcode::Store => (0..size).for_each(|x| {
-          sys.set_insert_before(user.clone());
-          let cur = sys.get_const_int(idx_ty.clone(), x as u64);
-          let cond = sys.create_eq(idx.clone(), cur);
-          let block = sys.create_block(BlockKind::Condition(cond));
-          sys.set_current_block(block);
-          sys.create_array_write(partition[x], zero, value.unwrap());
-        }),
+        Opcode::Store => {
+          if let Ok(idx_imm) = idx.as_ref::<IntImm>(sys) {
+            let idx = idx_imm.get_value();
+            sys.create_array_write(partition[idx as usize], zero, value.unwrap());
+          } else {
+            (0..size).for_each(|x| {
+              sys.set_insert_before(user.clone());
+              let cur = sys.get_const_int(idx_ty.clone(), x as u64);
+              let cond = sys.create_eq(idx.clone(), cur);
+              let block = sys.create_block(BlockKind::Condition(cond));
+              sys.set_current_block(block);
+              sys.create_array_write(partition[x], zero, value.unwrap());
+            });
+          }
+        }
         _ => unreachable!(),
       }
       user.as_mut::<Expr>(sys).unwrap().erase_from_parent();
     }
     sys.remove_array(array.clone());
   }
-
 }

@@ -1,5 +1,5 @@
 use assassyn::module_builder;
-use eir::{builder::SysBuilder, test_utils::run_simulator, xform};
+use eir::{builder::SysBuilder, test_utils::{parse_cycle, run_simulator}, xform};
 
 pub fn array_multi_read() {
   use assassyn::module_builder;
@@ -79,7 +79,7 @@ pub fn array_multi_read() {
   );
 }
 
-pub fn array_partition() {
+pub fn array_partition0() {
   module_builder!(
     driver()() {
       a = array(int<32>, 4, #fully_partitioned);
@@ -95,16 +95,27 @@ pub fn array_partition() {
     }
   );
 
-  let mut sys = SysBuilder::new("array_partition");
+  let mut sys = SysBuilder::new("array_partition0");
   driver_builder(&mut sys);
 
   println!("{}", sys);
 
-  let o1 = eir::xform::Config{ rewrite_wait_until: true };
+  let o1 = eir::xform::Config {
+    rewrite_wait_until: true,
+  };
   let config = eir::backend::common::Config::default();
   xform::basic(&mut sys, &o1);
 
   println!("{}", sys);
 
-  run_simulator(&sys, &config, None);
+  run_simulator(&sys, &config, Some((|x| {
+    if x.contains("sum(a[:])") {
+      let raw = x.split_whitespace().collect::<Vec<_>>();
+      let (cycle, _) = parse_cycle(x);
+      let sum = raw[raw.len() - 1].parse::<i32>().unwrap();
+      assert_eq!(sum % 4, 0);
+      assert_eq!(((cycle as i32) - 1).max(0) * 4, sum);
+    }
+    false
+  }, None)));
 }
