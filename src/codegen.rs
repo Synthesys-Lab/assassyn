@@ -100,8 +100,8 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       let res = emit_expr_term(term)?;
       if let ExprTerm::ArrayAccess(_) = term {
         Ok(quote_spanned! { term.span() => {
-          let ptr = { #res };
-          sys.create_array_read(ptr)
+          let (array, idx) = { #res };
+          sys.create_array_read(array, idx)
         }})
       } else {
         Ok(res)
@@ -182,8 +182,11 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   let idx = emit_expr_body(aa.idx.as_ref())?;
   // TODO(@were): Better span handling later.
   Ok(quote_spanned! { aa.id.span() => {
-    let idx = { #idx }.clone();
-    sys.create_array_ptr(#id.clone(), idx)
+    {
+      let array = { #id }.clone();
+      let idx = { #idx }.clone();
+      (array, idx)
+    }
   }})
 }
 
@@ -250,9 +253,9 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         let array_ptr = emit_array_access(aa)?;
         let right = emit_expr_body(right)?;
         quote! {{
-          let ptr = #array_ptr;
+          let (array, idx) = #array_ptr;
           let value = #right;
-          sys.create_array_write(ptr, value);
+          sys.create_array_write(array, idx, value);
         }}
       }
       expr::LValue::IdentList(l) => {

@@ -80,9 +80,8 @@ macro_rules! register_opcode {
 }
 
 register_opcode!(
-  GetElementPtr => { (array, 0, node::Array) (index, 1, BaseNode) },
-  Load => { (pointer, 0, expr::GetElementPtr) },
-  Store => { (pointer, 0, expr::GetElementPtr) (value, 1, BaseNode) },
+  Load => { (array, 0, node::Array) (idx, 1, BaseNode) },
+  Store => { (array, 0, node::Array) (idx, 1, BaseNode) (value, 2, BaseNode) },
   Bind => {  },
   AsyncCall => { (bind, 0, expr::Bind) },
   FIFOPush => { (fifo, 0, node::FIFO) (value, 1, BaseNode) },

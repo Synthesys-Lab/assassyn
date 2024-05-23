@@ -198,8 +198,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Load => {
         let load = expr.as_sub::<instructions::Load>().unwrap();
-        let gep = load.pointer();
-        let (array, idx) = { (gep.array(), gep.index()) };
+        let (array, idx) = (load.array(), load.idx());
         format!(
           "{}[{} as usize].clone()",
           namify(array.get_name()),
@@ -210,8 +209,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Store => {
         let store = expr.as_sub::<instructions::Store>().unwrap();
-        let gep = store.pointer();
-        let (array, idx) = { (gep.array(), gep.index()) };
+        let (array, idx) = (store.array(), store.idx());
         let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
         let idx = dump_ref!(store.get().sys, &idx);
         let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
@@ -229,12 +227,6 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           }))
         }
         .to_string()
-      }
-      Opcode::GetElementPtr => {
-        format!(
-          "0 /* GEP: {}, to be handled by its load/store user */",
-          IRPrinter::new(false).visit_expr(expr).unwrap()
-        )
       }
       Opcode::AsyncCall => {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();

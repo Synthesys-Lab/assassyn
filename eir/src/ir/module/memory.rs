@@ -103,12 +103,11 @@ impl SysBuilder {
       (addr, write, wdata)
     };
 
-    let ptr = self.create_array_ptr(array, addr);
-    let rdata = self.create_array_read(ptr);
+    let rdata = self.create_array_read(array, addr);
 
     let wblock = self.create_block(BlockKind::Condition(write));
     self.set_current_block(wblock);
-    self.create_array_write(ptr, wdata);
+    self.create_array_write(array, addr, wdata);
     let new_ip = self.get_current_ip().next(self).unwrap();
     self.set_current_ip(new_ip);
 

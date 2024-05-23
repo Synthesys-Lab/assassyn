@@ -128,7 +128,6 @@ macro_rules! register_opcodes {
 //
 // NOTE: Optional 1 and 2 are exclusive but one of them is mandatory!
 register_opcodes!(
-  GetElementPtr(gep, 2 /*array, idx*/) => { valued },
   // Memory operations
   Load(load, 1 /*gep*/) => { valued },
   Store(store, 2 /*gep value*/) => { side_effect },

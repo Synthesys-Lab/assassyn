@@ -97,7 +97,7 @@ fn sram_init_sys() -> SysBuilder {
     32,
     1024,
     1..=1,
-    Some("./tests/resources/init.hex".to_string()),
+    Some("./init.hex".to_string()),
     |x: &mut SysBuilder, module: BaseNode, write: BaseNode, rdata: BaseNode| {
       reader_impl(x, module, const128, write, rdata);
     },

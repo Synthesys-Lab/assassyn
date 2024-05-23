@@ -131,8 +131,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       };
 
       let zero = sys.get_const_int(DataType::int_ty(1), 0);
-      let ptr = sys.create_array_ptr(last_grant_reg, zero);
-      let last_grant_1h = sys.create_array_read(ptr);
+      let last_grant_1h = sys.create_array_read(last_grant_reg, zero);
 
       // low_mask = ((last_grant_1h - 1) << 1) + 1
       let one = sys.get_const_int(grant_hot_ty.clone(), 1);
@@ -163,7 +162,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         let grant_to = sys.create_slice(grant, i, i);
         let block = sys.create_block(BlockKind::Condition(grant_to));
         sys.set_current_block(block);
-        sys.create_array_write(ptr, i_1h);
+        sys.create_array_write(last_grant_reg, zero, i_1h);
         let bind = caller.as_expr::<Bind>(sys).unwrap();
         let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
         let mut new_bind = sys.get_init_bind(callee.clone());

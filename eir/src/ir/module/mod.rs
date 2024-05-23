@@ -10,7 +10,6 @@ use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
-use self::instructions::GetElementPtr;
 use self::user::Operand;
 pub use attrs::Attribute;
 
@@ -205,7 +204,7 @@ impl<'a> ModuleMut<'a> {
   /// * `operand` - The operand node that uses this external interface.
   pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
     assert!(
-      ext_node.get_kind() == NodeKind::Array || ext_node.get_kind() == NodeKind::FIFO,
+      matches!(ext_node.get_kind(), NodeKind::Array | NodeKind::FIFO),
       "Expecting Array or FIFO but got {:?}",
       ext_node
     );
@@ -262,13 +261,10 @@ impl<'a> ModuleMut<'a> {
     // Reconnect the external interfaces if applicable.
     // TODO(@were): Maybe later unify a common interface for this.
     let operand_ref = operand.as_ref::<Operand>(self.sys).unwrap();
-    let value = operand_ref.get_value();
+    let value = operand_ref.get_value().clone();
     match value.get_kind() {
-      NodeKind::Expr => {
-        if let Ok(gep) = value.as_expr::<GetElementPtr>(self.sys) {
-          let array = gep.array();
-          self.insert_external_interface(array.upcast(), operand);
-        }
+      NodeKind::Array => {
+        self.insert_external_interface(value, operand);
       }
       NodeKind::FIFO => {
         self.insert_external_interface(value.clone(), operand);
