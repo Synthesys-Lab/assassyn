@@ -2,10 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
-use crate::ir::{
-  ir_printer::IRPrinter, module::Attribute, node::*, visitor::Visitor,
-  *,
-};
+use crate::ir::{ir_printer::IRPrinter, module::Attribute, node::*, visitor::Visitor, *};
 
 use self::{
   expr::subcode::{self, Binary},
@@ -652,7 +649,12 @@ impl SysBuilder {
   /// * `ptr` - The pointer to the array element.
   /// * `value` - The value to be written.
   /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
-  pub fn create_array_write(&mut self, array: BaseNode, idx: BaseNode, value: BaseNode) -> BaseNode {
+  pub fn create_array_write(
+    &mut self,
+    array: BaseNode,
+    idx: BaseNode,
+    value: BaseNode,
+  ) -> BaseNode {
     assert!(self.indexable(idx));
     assert!(matches!(array.get_kind(), NodeKind::Array));
     let operands = vec![array, idx, value];
