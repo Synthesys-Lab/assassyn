@@ -187,12 +187,18 @@ impl IntImm {
   }
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum ArrayAttr {
+  FullyPartition,
+}
+
 pub struct Array {
   pub(crate) key: usize,
   name: String,
   scalar_ty: DataType,
   size: usize,
   init: Option<Vec<BaseNode>>,
+  attrs: Vec<ArrayAttr>,
 }
 
 impl Typed for Array {
@@ -202,14 +208,25 @@ impl Typed for Array {
 }
 
 impl Array {
-  pub fn new(scalar_ty: DataType, name: String, size: usize, init: Option<Vec<BaseNode>>) -> Array {
+  pub fn new(
+    scalar_ty: DataType,
+    name: String,
+    size: usize,
+    init: Option<Vec<BaseNode>>,
+    attrs: Vec<ArrayAttr>,
+  ) -> Array {
     Self {
       key: 0,
       scalar_ty,
       name,
       size,
       init,
+      attrs,
     }
+  }
+  
+  pub fn get_attrs(&self) -> &Vec<ArrayAttr> {
+    &self.attrs
   }
 
   pub fn get_size(&self) -> usize {

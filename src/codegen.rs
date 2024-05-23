@@ -122,8 +122,8 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       }
       Ok(res)
     }
-    //(DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)
-    expr::Expr::ArrayAlloc((ty, size, init)) => {
+    //("array", DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)
+    expr::Expr::ArrayAlloc((tok, ty, size, init, attrs)) => {
       let ty = emit_type(ty)?;
       let (init_values, init_list) = if let Some(init) = init {
         let mut init_values = Punctuated::new();
@@ -142,12 +142,20 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           quote_spanned! { init_span => Some(vec![#init_list]) },
         )
       } else {
-        (None, quote_spanned! { ty.span() => None })
+        (None, quote_spanned! { tok.span() => None })
       };
+      let mut attr_list : Punctuated<_, Token![,]> = Punctuated::new();
+      attrs.iter().for_each(|attr| {
+        let id = camelize(&attr.to_string());
+        let id = syn::Ident::new(&id, attr.span());
+        attr_list.push_value(quote! { eir::ir::data::ArrayAttr::#id });
+        attr_list.push_punct(Token![,](attr.span()));
+      });
+
       Ok(quote_spanned! {
-        ty.span() => {
+        tok.span() => {
           #init_values
-          sys.create_array(#ty, "array", #size, #init_list)
+          sys.create_array(#ty, "array", #size, #init_list, vec![#attr_list])
         }
       })
     }

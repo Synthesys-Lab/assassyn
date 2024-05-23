@@ -124,7 +124,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         let bits = usize::BITS - callers.len().next_power_of_two().leading_zeros();
         let one = sys.get_const_int(dtype.clone(), 1);
         (
-          sys.create_array(dtype.clone(), "last_grant", 1, Some(vec![one])),
+          sys.create_array(dtype.clone(), "last_grant", 1, Some(vec![one]), vec![]),
           DataType::int_ty(bits as usize),
           dtype,
         )

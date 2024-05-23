@@ -5,9 +5,7 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 use crate::ir::{ir_printer::IRPrinter, module::Attribute, node::*, visitor::Visitor, *};
 
 use self::{
-  expr::subcode::{self, Binary},
-  instructions::Bind,
-  user::Operand,
+  data::ArrayAttr, expr::subcode::{self, Binary}, instructions::Bind, user::Operand
 };
 
 use super::symbol_table::SymbolTable;
@@ -473,6 +471,7 @@ impl SysBuilder {
     name: &str,
     size: usize,
     init: Option<Vec<BaseNode>>,
+    attrs: Vec<ArrayAttr>
   ) -> BaseNode {
     let array_name = self.symbol_table.identifier(name);
     if let Some(init) = &init {
@@ -481,7 +480,7 @@ impl SysBuilder {
         assert_eq!(x.get_dtype(self).unwrap(), ty);
       });
     }
-    let instance = Array::new(ty.clone(), array_name.clone(), size, init);
+    let instance = Array::new(ty.clone(), array_name.clone(), size, init, attrs);
     let key = self.insert_element(instance);
     self.global_symbols.insert(array_name, key.clone());
     key

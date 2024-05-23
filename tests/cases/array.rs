@@ -1,6 +1,8 @@
-pub fn array() {
+use assassyn::module_builder;
+use eir::{builder::SysBuilder, test_utils::run_simulator};
+
+pub fn array_multi_read() {
   use assassyn::module_builder;
-  use eir::{builder::SysBuilder, test_utils::run_simulator};
 
   module_builder!(
     mod_a(arr)(a:int<32>) {
@@ -40,8 +42,8 @@ pub fn array() {
     }
   );
 
-  let mut sys = SysBuilder::new("array");
-  let arr = sys.create_array(eir::ir::DataType::Int(32), "arr", 1, None);
+  let mut sys = SysBuilder::new("array_multi_read");
+  let arr = sys.create_array(eir::ir::DataType::Int(32), "arr", 1, None, vec![]);
   let mod_a = mod_a_builder(&mut sys, arr);
   let mod_b = mod_b_builder(&mut sys, arr);
   let mod_c = mod_c_builder(&mut sys, arr);
@@ -75,4 +77,30 @@ pub fn array() {
       /*Expected Lines*/ Some(100),
     )),
   );
+}
+
+pub fn array_partition() {
+  module_builder!(
+    driver()() {
+      a = array(int<32>, 4, #fully_partition);
+      cnt = array(int<32>, 1);
+      v = cnt[0];
+      cnt[0] = v.add(1.int<32>);
+      a[0] = v;
+      a[1] = v;
+      a[2] = v;
+      a[3] = v;
+      all = a[0].add(a[1]).add(a[2]).add(a[3]);
+      log("sum(a[:]) = {}", all);
+    }
+  );
+
+  let mut sys = SysBuilder::new("array_partition");
+  driver_builder(&mut sys);
+
+  println!("{}", sys);
+
+  let config = eir::backend::common::Config::default();
+
+  run_simulator(&sys, &config, None);
 }

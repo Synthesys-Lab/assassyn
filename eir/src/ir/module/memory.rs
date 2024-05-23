@@ -84,7 +84,7 @@ impl SysBuilder {
     ];
 
     let array_name = self.symbol_table.identifier(&format!("{}.array", name));
-    let array = self.create_array(ty, &array_name, depth, None);
+    let array = self.create_array(ty, &array_name, depth, None, vec![]);
     let module = self.create_module(name, ports);
     self.set_current_module(module);
 

@@ -153,7 +153,15 @@ pub(crate) enum Expr {
   // "bind" FuncCall
   Bind(FuncCall),
   // "array" ( DType, syn::LitInt, Option<ExprTerm> )
-  ArrayAlloc((DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)),
+  ArrayAlloc(
+    (
+      syn::Ident,
+      DType,
+      syn::LitInt,
+      Option<Punctuated<ExprTerm, Token![,]>>,
+      Vec<syn::Ident>,
+    ),
+  ),
   // ExprTerm
   Term(ExprTerm),
 }
@@ -196,16 +204,21 @@ impl Parse for Expr {
           let ty = args.parse::<DType>()?;
           args.parse::<syn::Token![,]>()?;
           let size = args.parse::<syn::LitInt>()?;
-          let initializer = if !args.is_empty() {
+          let mut initializer = None;
+          let mut attrs = Vec::new();
+          while !args.is_empty() {
             args.parse::<syn::Token![,]>()?;
-            let initializer;
-            bracketed!(initializer in args);
-            let initializer = initializer.parse_terminated(ExprTerm::parse, syn::Token![,])?;
-            Some(initializer)
-          } else {
-            None
-          };
-          return Ok(Expr::ArrayAlloc((ty, size, initializer)));
+            if args.peek(syn::token::Bracket) {
+              let raw_init;
+              bracketed!(raw_init in args);
+              let parsed = raw_init.parse_terminated(ExprTerm::parse, syn::Token![,])?;
+              initializer = Some(parsed);
+            } else if args.peek(syn::Token![#]) {
+              args.parse::<syn::Token![#]>()?;
+              attrs.push(args.parse::<syn::Ident>()?);
+            }
+          }
+          return Ok(Expr::ArrayAlloc((id.clone(), ty, size, initializer, attrs)));
         }
         _ => {}
       }
