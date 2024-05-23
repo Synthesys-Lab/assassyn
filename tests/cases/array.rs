@@ -91,7 +91,7 @@ pub fn array_partition0() {
       a[1] = v;
       a[2] = v;
       a[3] = v;
-      all = a[0].add(a[1]).add(a[2]).add(a[3]);
+      all = add(a[0], a[1], a[2], a[3]);
       log("sum(a[:]) = {}", all);
     }
   );

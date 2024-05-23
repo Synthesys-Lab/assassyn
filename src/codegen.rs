@@ -71,30 +71,41 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         _ => {
           let a = emit_expr_body(self_)?;
           let method_id = syn::Ident::new(format!("create_{}", op).as_str(), op.span());
-          let (b_def, b_use) =
-            if opcode.arity().unwrap() == 2 || matches!(opcode, Opcode::Cast { .. }) {
-              let b = emit_expr_body(&operands[0])?;
-              (Some(quote! { let rhs = #b.clone(); }), Some(quote! { rhs }))
-            } else if opcode.arity().unwrap() == 1 {
-              (None, None)
-            } else {
-              return Err(syn::Error::new(
-                op.span(),
-                format!(
-                  "Unsupported operator: \"{}\" with arity {}",
-                  op,
-                  opcode.arity().unwrap_or(0)
-                ),
-              ));
-            };
+          let (operand_def, operand_use) = {
+            let mut operand_def = Punctuated::new();
+            let mut operand_use = Punctuated::new();
+            for elem in operands.iter() {
+              let value = emit_expr_body(elem)?;
+              let id = syn::Ident::new(&format!("_{}", operand_def.len()), Span::call_site());
+              operand_def.push(quote! { let #id = #value });
+              operand_def.push_punct(Token![;](Span::call_site()));
+              operand_use.push(id);
+              operand_use.push_punct(Token![,](Span::call_site()));
+            }
+            (operand_def, operand_use)
+          };
           Ok(quote_spanned! { op.span() => {
             let src = #a.clone();
-            #b_def
-            let res = sys.#method_id(src, #b_use);
+            #operand_def
+            let res = sys.#method_id(src, #operand_use);
             res
           }})
         }
       }
+    }
+    expr::Expr::BinaryReduce((op, operands)) => {
+      let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
+      let mut res = emit_expr_body(&operands[0])?;
+      res = quote! {{ let value = { #res }.clone(); value }};
+      for i in 1..operands.len() {
+        let operand = emit_expr_body(&operands[i])?;
+        res = quote! {{
+          let value = { #res }.clone();
+          let operand = { #operand }.clone();
+          sys.#method_id(value, operand)
+        }};
+      }
+      Ok(res)
     }
     expr::Expr::Term(term) => {
       let res = emit_expr_term(term)?;

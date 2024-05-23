@@ -637,7 +637,12 @@ impl SysBuilder {
   /// * `ptr` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
   pub fn create_array_read<'elem>(&mut self, array: BaseNode, idx: BaseNode) -> BaseNode {
-    assert!(self.indexable(idx));
+    assert!(
+      self.indexable(idx),
+      "{}'s type, {:?}, is not indexable!",
+      idx.to_string(self),
+      idx.get_dtype(self).unwrap()
+    );
     assert!(matches!(array.get_kind(), NodeKind::Array));
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
     let res = self.create_expr(dtype, Opcode::Load, vec![array, idx], true);
@@ -657,7 +662,12 @@ impl SysBuilder {
     idx: BaseNode,
     value: BaseNode,
   ) -> BaseNode {
-    assert!(self.indexable(idx));
+    assert!(
+      self.indexable(idx),
+      "{}'s type, {:?}, is not indexable!",
+      idx.to_string(self),
+      idx.get_dtype(self).unwrap()
+    );
     assert!(matches!(array.get_kind(), NodeKind::Array));
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
     assert_eq!(dtype, value.get_dtype(self).unwrap());

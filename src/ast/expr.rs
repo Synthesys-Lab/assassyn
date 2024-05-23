@@ -147,6 +147,8 @@ impl Parse for LValue {
 pub(crate) enum Expr {
   // ExprTerm . syn::Ident ( args )
   MethodCall((Box<Expr>, syn::Ident, Punctuated<Expr, Token![,]>)),
+  // BinaryOp ( Expr, Expr, ... )
+  BinaryReduce((syn::Ident, Punctuated<Expr, Token![,]>)),
   // "default" ExprTerm . "case" ( ExprTerm, ExprTerm )
   //                    . "case" ( ExprTerm, ExprTerm ) *
   Select((Box<Expr>, Vec<(Expr, Expr)>)),
@@ -181,7 +183,7 @@ fn expr_terminates(input: &syn::parse::ParseStream) -> bool {
 impl Parse for Expr {
   fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
     let tok = input.parse::<ExprTerm>()?;
-    if let ExprTerm::Ident(id) = &tok {
+    let preliminary = if let ExprTerm::Ident(id) = &tok {
       match id.to_string().as_str() {
         "default" => {
           let default_value = input.parse::<Expr>()?;
@@ -224,13 +226,44 @@ impl Parse for Expr {
           }
           return Ok(Expr::ArrayAlloc((id.clone(), ty, size, initializer, attrs)));
         }
-        _ => {}
+        _ => {
+          if if let Some(op) = Opcode::from_str(&id.to_string()) {
+            op.arity().map_or(false, |x| x == 2)
+          } else {
+            false
+          } {
+            if !input.peek(syn::token::Paren) {
+              return Err(syn::Error::new(
+                id.span(),
+                format!(
+                  "{}:{}: Expected a pair of parentheses for binary reduce.",
+                  file!(),
+                  line!(),
+                ),
+              ));
+            }
+            let raw_operands;
+            parenthesized!(raw_operands in input);
+            let operands = raw_operands.parse_terminated(Expr::parse, syn::Token![,])?;
+            if operands.len() < 2 {
+              return Err(syn::Error::new(
+                id.span(),
+                format!("{}:{}: At least 2 operands to reduce!", file!(), line!(),),
+              ));
+            }
+            Expr::BinaryReduce((id.clone(), operands))
+          } else {
+            Expr::Term(tok)
+          }
+        }
       }
-    }
+    } else {
+      Expr::Term(tok)
+    };
     if expr_terminates(&input) {
-      return Ok(Expr::Term(tok));
+      return Ok(preliminary);
     }
-    let mut expr = Expr::Term(tok);
+    let mut expr = preliminary;
     while !expr_terminates(&input) {
       match input.parse::<syn::Token![.]>() {
         // Consume "."

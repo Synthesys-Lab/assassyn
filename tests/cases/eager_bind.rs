@@ -12,8 +12,8 @@ pub fn eager_bind() {
     k = cnt[0.int<32>];
     v = k.add(1);
     cnt[0] = v;
-    mul = v.add(v);
-    async_call lhs { v: mul };
+    vv = v.add(v);
+    async_call lhs { v: vv };
     async_call rhs { v: v };
   });
 
