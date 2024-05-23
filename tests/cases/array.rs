@@ -1,5 +1,5 @@
 use assassyn::module_builder;
-use eir::{builder::SysBuilder, test_utils::run_simulator};
+use eir::{builder::SysBuilder, test_utils::run_simulator, xform};
 
 pub fn array_multi_read() {
   use assassyn::module_builder;
@@ -82,7 +82,7 @@ pub fn array_multi_read() {
 pub fn array_partition() {
   module_builder!(
     driver()() {
-      a = array(int<32>, 4, #fully_partition);
+      a = array(int<32>, 4, #fully_partitioned);
       cnt = array(int<32>, 1);
       v = cnt[0];
       cnt[0] = v.add(1.int<32>);
@@ -100,7 +100,11 @@ pub fn array_partition() {
 
   println!("{}", sys);
 
+  let o1 = eir::xform::Config{ rewrite_wait_until: true };
   let config = eir::backend::common::Config::default();
+  xform::basic(&mut sys, &o1);
+
+  println!("{}", sys);
 
   run_simulator(&sys, &config, None);
 }

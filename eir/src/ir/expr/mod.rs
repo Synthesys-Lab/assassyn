@@ -258,12 +258,20 @@ impl ExprRef<'_> {
       .iter()
       .map(|x| x.as_ref::<Operand>(self.sys).unwrap())
   }
+
   // Get the next expression in the block
   pub fn next(&self) -> Option<BaseNode> {
+    let idx = self.idx();
+    let block = self.get_parent().as_ref::<Block>(self.sys).unwrap();
+    block.get().get(idx).map(|x| x.clone())
+  }
+
+  // The index of the instruction in its parent block
+  pub fn idx(&self) -> usize {
     let parent = self.get().get_parent();
     let block = self.sys.get::<Block>(&parent).unwrap();
-    let pos = block.iter().position(|x| *x == self.upcast());
-    block.get().get(pos.unwrap()).map(|x| x.clone())
+    let mut iter = block.iter();
+    iter.position(|x| *x == self.upcast()).unwrap()
   }
 }
 

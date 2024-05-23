@@ -144,7 +144,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       } else {
         (None, quote_spanned! { tok.span() => None })
       };
-      let mut attr_list : Punctuated<_, Token![,]> = Punctuated::new();
+      let mut attr_list: Punctuated<_, Token![,]> = Punctuated::new();
       attrs.iter().for_each(|attr| {
         let id = camelize(&attr.to_string());
         let id = syn::Ident::new(&id, attr.span());

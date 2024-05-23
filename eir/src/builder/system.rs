@@ -5,7 +5,10 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 use crate::ir::{ir_printer::IRPrinter, module::Attribute, node::*, visitor::Visitor, *};
 
 use self::{
-  data::ArrayAttr, expr::subcode::{self, Binary}, instructions::Bind, user::Operand
+  data::ArrayAttr,
+  expr::subcode::{self, Binary},
+  instructions::Bind,
+  user::Operand,
 };
 
 use super::symbol_table::SymbolTable;
@@ -471,7 +474,7 @@ impl SysBuilder {
     name: &str,
     size: usize,
     init: Option<Vec<BaseNode>>,
-    attrs: Vec<ArrayAttr>
+    attrs: Vec<ArrayAttr>,
   ) -> BaseNode {
     let array_name = self.symbol_table.identifier(name);
     if let Some(init) = &init {
@@ -656,6 +659,8 @@ impl SysBuilder {
   ) -> BaseNode {
     assert!(self.indexable(idx));
     assert!(matches!(array.get_kind(), NodeKind::Array));
+    let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
+    assert_eq!(dtype, value.get_dtype(self).unwrap());
     let operands = vec![array, idx, value];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands, true);
     self.insert_external_interface(array, res.clone(), 0);
