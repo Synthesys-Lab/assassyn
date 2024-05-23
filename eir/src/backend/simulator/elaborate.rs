@@ -1199,18 +1199,23 @@ fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
 
 fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io::Error> {
   let dir_name = config.dir_name(sys);
-  if Path::new(&dir_name).exists() {
-    if config.override_dump {
-      fs::remove_dir_all(&dir_name)?;
-      fs::create_dir_all(&dir_name)?;
-    } else {
-      eprintln!(
-        "Directory {} already exists, may possibly lead to dump failure.",
-        dir_name.to_str().unwrap()
-      );
+  let dir = Path::new(&dir_name);
+  if !dir.exists() {
+    fs::create_dir_all(&dir_name)?;
+  }
+  assert!(dir.is_dir());
+  let files = fs::read_dir(&dir_name)?;
+  if config.override_dump {
+    for elem in files {
+      let path = elem?.path();
+      if path.is_dir() {
+        fs::remove_dir_all(path)?;
+      } else {
+        fs::remove_file(path)?;
+      }
     }
   } else {
-    fs::create_dir_all(&dir_name)?;
+    assert!(files.count() == 0);
   }
   eprintln!(
     "Writing simulator code to rust project: {}",
