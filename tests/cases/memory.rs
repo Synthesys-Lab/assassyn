@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use assassyn::module_builder;
 use eir::{backend, builder::SysBuilder, ir::node::BaseNode, xform};
 
@@ -62,10 +64,9 @@ pub fn sram() {
   println!("{}", sys);
 
   let config = backend::common::Config {
-    override_dump: true,
-    temp_dir: true,
     sim_threshold: 200,
     idle_threshold: 200,
+    ..Default::default()
   };
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
@@ -119,11 +120,13 @@ pub fn sram_init() {
 
   println!("{}", sys);
 
+  eprintln!("{:?}", PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/resources"));
+
   let config = backend::common::Config {
-    override_dump: true,
-    temp_dir: true,
     sim_threshold: 200,
     idle_threshold: 200,
+    resource_base: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/resources").into(),
+    ..Default::default()
   };
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();

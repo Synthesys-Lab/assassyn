@@ -17,8 +17,10 @@ pub fn testbench() {
 
   eprintln!("{}", sys);
 
-  let mut config = eir::backend::common::Config::default();
-  config.sim_threshold = 101;
+  let config = eir::backend::common::Config {
+    sim_threshold: 101,
+    ..Default::default()
+  };
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 

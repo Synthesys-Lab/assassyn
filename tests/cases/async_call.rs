@@ -31,9 +31,11 @@ pub fn async_call() {
   eir::builder::verify(&sys);
   println!("{}", sys);
 
-  let mut config = eir::backend::common::Config::default();
-  config.sim_threshold = 200;
-  config.idle_threshold = 200;
+  let config = eir::backend::common::Config {
+    sim_threshold: 200,
+    idle_threshold: 200,
+    ..Default::default()
+  };
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 

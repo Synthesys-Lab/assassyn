@@ -51,9 +51,7 @@ pub fn array() {
   eir::builder::verify(&sys);
   println!("{}", sys);
 
-  let mut config = eir::backend::common::Config::default();
-  config.sim_threshold = 100;
-  config.idle_threshold = 100;
+  let config = eir::backend::common::Config::default();
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 

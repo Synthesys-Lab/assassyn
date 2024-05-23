@@ -2,7 +2,6 @@ use std::{
   collections::{HashMap, HashSet},
   fs::File,
   io::{Error, Write},
-  path::PathBuf,
 };
 
 use crate::{
@@ -23,8 +22,9 @@ macro_rules! fifo_name {
   }};
 }
 
-struct VerilogDumper<'a> {
+struct VerilogDumper<'a, 'b> {
   sys: &'a SysBuilder,
+  config: &'b Config,
   indent: usize,
   pred: Option<String>,
   fifo_pushes: HashMap<String, Vec<(String, String)>>, // fifo_name -> [(pred, value)]
@@ -37,10 +37,11 @@ struct VerilogDumper<'a> {
   fifo_drivers: HashMap<String, HashSet<String>>,    // fifo -> {driver module}
 }
 
-impl<'a> VerilogDumper<'a> {
-  fn new(sys: &'a SysBuilder) -> Self {
+impl<'a, 'b> VerilogDumper<'a, 'b> {
+  fn new(sys: &'a SysBuilder, config: &'b Config) -> Self {
     Self {
       sys,
+      config,
       indent: 0,
       pred: None,
       fifo_pushes: HashMap::new(),
@@ -523,7 +524,7 @@ impl<'a> VerilogDumper<'a> {
   }
 
   fn dump_runtime(
-    self: VerilogDumper<'a>,
+    self: VerilogDumper<'a, 'b>,
     mut fd: File,
     sim_threshold: usize,
   ) -> Result<(), Error> {
@@ -537,14 +538,12 @@ impl<'a> VerilogDumper<'a> {
 
     // memory initializations map
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new(); // array -> init_file_path
-    let mut tests_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    tests_dir.push("../tests/resources");
     for module in self.sys.module_iter() {
       for attr in module.get_attrs() {
         match attr {
           Attribute::Memory(param) => {
             if let Some(init_file) = &param.init_file {
-              let mut init_file_path = tests_dir.clone();
+              let mut init_file_path = self.config.resource_base.clone();
               init_file_path.push(init_file);
               let init_file_path = init_file_path.to_str().unwrap();
               let array = param.array.as_ref::<Array>(self.sys).unwrap();
@@ -741,7 +740,7 @@ macro_rules! dump_ref {
   };
 }
 
-impl<'a> Visitor<String> for VerilogDumper<'a> {
+impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     if self.current_module == "testbench" {
       self.has_testbench = true;
@@ -1485,9 +1484,9 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
 
 pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
   let fname = config.fname(sys, "sv");
-  println!("Writing verilog rtl to {}", fname);
+  println!("Writing verilog rtl to {}", fname.to_str().unwrap());
 
-  let mut vd = VerilogDumper::new(sys);
+  let mut vd = VerilogDumper::new(sys, config);
 
   let mut fd = File::create(fname)?;
 

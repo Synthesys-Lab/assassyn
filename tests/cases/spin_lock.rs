@@ -48,9 +48,11 @@ pub fn spin_lock() {
   let spin_agent = spin_agent_builder(&mut sys, sqr, lock);
   let _driver = driver_builder(&mut sys, spin_agent, lock);
 
-  let mut config = eir::backend::common::Config::default();
-  config.sim_threshold = 200;
-  config.idle_threshold = 200;
+  let config = eir::backend::common::Config {
+    sim_threshold: 200,
+    idle_threshold: 200,
+    ..Default::default()
+  };
 
   eir::builder::verify(&sys);
 
