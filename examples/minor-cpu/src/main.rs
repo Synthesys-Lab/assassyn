@@ -34,6 +34,7 @@ module_builder!(
       rs2   = inst.slice(20, 24);
       u_imm = inst.slice(12, 31);
       i_imm = inst.slice(20, 31);
+      b_imm = inst.slice(31, 31).concat(inst.slice(7, 7)).concat(inst.slice(25, 30)).concat(inst.slice(8, 11));
 
       is_lui  = opcode.eq(0b0110111.bits<7>);
       is_addi = opcode.eq(0b0010011.bits<7>);
@@ -46,8 +47,9 @@ module_builder!(
       write_rd   = bitwise_or(is_lui, is_addi, is_li, is_add);
       read_rs1   = bitwise_or(is_lui, is_addi, is_li, is_add, is_bne);
       read_rs2   = is_add;
-      read_i_imm = bitwise_or(is_li, is_addi, is_bne);
+      read_i_imm = bitwise_or(is_li, is_addi);
       read_u_imm = is_lui;
+      read_b_imm = is_bne;
 
       when is_bne {
         on_branch[0] = 1.bits<1>;
@@ -56,12 +58,12 @@ module_builder!(
       value_a = read_rs1.select(register_file[rs1], 0.bits<32>);
       reg_a   = read_rs1.select(rs1, 0.bits<5>);
 
-      value_b = read_rs2.select(register_file[rs2],
-                                read_i_imm.select(i_imm.bitcast(bits<32>),
-                                                  read_u_imm.select(u_imm.bitcast(bits<32>), 0.bits<32>)));
+      lhs_cond = concat(read_rs2, read_i_imm, read_u_imm, read_b_imm);
+      value_b = lhs_cond.select_1hot(register_file[rs2], i_imm.zext(bits<32>), u_imm.zext(bits<32>), b_imm.zext(bits<32>));
+
       reg_b   = read_rs2.select(rs2, 0.bits<5>);
 
-      rd_reg = write_rd.select(rd, 0.bits<5>);
+      rd_reg  = write_rd.select(rd, 0.bits<5>);
 
       async_call exec(opcode, value_a, value_b, reg_a, reg_b, rd_reg);
 
@@ -69,7 +71,7 @@ module_builder!(
       when is_addi { log("addi: rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm); }
       when is_add  { log("add:  rd: x{}, rs1: x{}, rs2: {}", rd, rs1, rs2); }
       when is_li   { log("li:   rd: x{}, rs1: x{}, imm: {:x}", rd, rs1, i_imm); }
-      when is_bne  { log("bne:           rs1: x{}, imm: {:x}, set on_branch reg", rs1, i_imm); }
+      when is_bne  { log("bne:  rs1:x{}, rs2: x{}, imm: {:x}, set on_branch reg", rs1, rs2, i_imm); }
       when is_ret  { log("ret"); }
 
       when supported.flip() {
@@ -102,7 +104,7 @@ module_builder!(
       // handle read after write
       a_valid = reg_onwrite[_a_reg.peek()].flip();
       b_valid = reg_onwrite[_b_reg.peek()].flip();
-      c_valid = reg_onwrite[rd_reg].flip();
+      c_valid = reg_onwrite[rd_reg.peek()].flip();
       log("x{}.a_valid: {}, x{}.b_valid: {}, x{}.rd_valid: {}",
           _a_reg.peek(), a_valid,
           _b_reg.peek(), b_valid,

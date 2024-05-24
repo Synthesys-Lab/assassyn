@@ -368,6 +368,33 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::Log, args, true)
   }
 
+  pub fn create_select_1hot(
+    &mut self,
+    site: Filesite,
+    cond: BaseNode,
+    values: Vec<BaseNode>,
+  ) -> BaseNode {
+    let dtype = cond.get_dtype(self).unwrap();
+    assert_eq!(
+      dtype.get_bits(),
+      values.len(),
+      "{} Select1Hot value count mismatch!",
+      site
+    );
+    let v0type = values[0].get_dtype(self).unwrap();
+    for i in 1..values.len() {
+      let vitype = values[i].get_dtype(self).unwrap();
+      assert_eq!(
+        v0type, vitype,
+        "{} Select1Hot value type mismatch {:?} != {:?}",
+        site, v0type, vitype,
+      );
+    }
+    let mut args = vec![cond];
+    args.extend(values);
+    self.create_expr(dtype, Opcode::Select1Hot, args, true)
+  }
+
   pub fn create_select(
     &mut self,
     site: Filesite,

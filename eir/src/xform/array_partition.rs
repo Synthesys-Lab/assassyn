@@ -117,7 +117,12 @@ pub fn rewrite_array_partitions(sys: &mut SysBuilder) {
         Opcode::Store => {
           if let Ok(idx_imm) = idx.as_ref::<IntImm>(sys) {
             let idx = idx_imm.get_value();
-            sys.create_array_write(created_here!(), partition[idx as usize], zero, value.unwrap());
+            sys.create_array_write(
+              created_here!(),
+              partition[idx as usize],
+              zero,
+              value.unwrap(),
+            );
           } else {
             (0..size).for_each(|x| {
               sys.set_insert_before(user.clone());

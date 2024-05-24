@@ -90,6 +90,7 @@ register_opcode!(
   Binary { binop } => { (a, 0, BaseNode) (b, 1, BaseNode) },
   Unary { uop } => { (x, 0, BaseNode) },
   Select => { (cond, 0, BaseNode) (true_value, 1, BaseNode) (false_value, 2, BaseNode) },
+  Select1Hot => { (cond, 0, BaseNode) },
   Compare { cmp } => { (a, 0, BaseNode) (b, 1, BaseNode) },
   Slice => { (x, 0, BaseNode) (l_intimm, 1, node::IntImm) (r_intimm, 2, node::IntImm) },
   Concat => { (msb, 0, BaseNode) (lsb, 1, BaseNode) },

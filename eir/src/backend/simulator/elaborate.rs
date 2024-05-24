@@ -348,6 +348,23 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           cond, true_value, false_value
         )
       }
+      Opcode::Select1Hot => {
+        let select1hot = expr.as_sub::<instructions::Select1Hot>().unwrap();
+        let cond = select1hot.cond();
+        let mut res = format!(
+          "{{ let cond = {}; assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");",
+          dump_ref!(self.sys, &cond)
+        );
+        for (i, value) in select1hot.value_iter().enumerate() {
+          res.push_str(&format!(
+            "if cond >> {} & 1 != 0 {{ {} }} else ",
+            i,
+            dump_ref!(self.sys, &value)
+          ));
+        }
+        res.push('}');
+        res
+      }
       Opcode::Cast { .. } => {
         let cast = expr.as_sub::<instructions::Cast>().unwrap();
         let src_dtype = cast.src_type();

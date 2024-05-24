@@ -135,6 +135,7 @@ register_opcodes!(
   Binary({ binop: subcode::Binary }, 2 /*lhs rhs*/) => { valued },
   Unary({ uop: subcode::Unary }, 1 /*value*/) => { valued },
   Select(select, 3 /*cond true_val false_val*/) => { valued },
+  Select1Hot(select_1hot, -1) => { valued },
   Compare({ cmp: subcode::Compare }, 2 /*lhs rhs*/) => { valued },
   // Eventual operations
   Bind(bind, 1 /*value*/) => { valued },

@@ -84,6 +84,11 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
             }
             (operand_def, operand_use)
           };
+          let operand_use = if Opcode::from_str(&op.to_string()).unwrap().arity().is_none() {
+            quote! { vec![#operand_use] }
+          } else {
+            quote! { #operand_use }
+          };
           Ok(quote_spanned! { op.span() => {
             let src = #a.clone();
             #operand_def
