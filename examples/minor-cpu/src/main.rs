@@ -34,7 +34,10 @@ module_builder!(
       rs2   = inst.slice(20, 24);
       u_imm = inst.slice(12, 31);
       i_imm = inst.slice(20, 31);
-      b_imm = inst.slice(31, 31).concat(inst.slice(7, 7)).concat(inst.slice(25, 30)).concat(inst.slice(8, 11));
+
+      sign = inst.slice(31, 31);
+      b_imm = concat(sign, inst.slice(7, 7), inst.slice(25, 30), inst.slice(8, 11), 0.bits<1>);
+      b_imm = sign.select(0x7ffff.bits<19>, 0.bits<19>).concat(b_imm);
 
       is_lui  = opcode.eq(0b0110111.bits<7>);
       is_addi = opcode.eq(0b0010011.bits<7>);
@@ -59,7 +62,7 @@ module_builder!(
       reg_a   = read_rs1.select(rs1, 0.bits<5>);
 
       lhs_cond = concat(read_rs2, read_i_imm, read_u_imm, read_b_imm);
-      value_b = lhs_cond.select_1hot(register_file[rs2], i_imm.zext(bits<32>), u_imm.zext(bits<32>), b_imm.zext(bits<32>));
+      value_b = lhs_cond.select_1hot(register_file[rs2], i_imm.zext(bits<32>), u_imm.zext(bits<32>), b_imm);
 
       reg_b   = read_rs2.select(rs2, 0.bits<5>);
 
@@ -71,7 +74,9 @@ module_builder!(
       when is_addi { log("addi: rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm); }
       when is_add  { log("add:  rd: x{}, rs1: x{}, rs2: {}", rd, rs1, rs2); }
       when is_li   { log("li:   rd: x{}, rs1: x{}, imm: {:x}", rd, rs1, i_imm); }
-      when is_bne  { log("bne:  rs1:x{}, rs2: x{}, imm: {:x}, set on_branch reg", rs1, rs2, i_imm); }
+      when is_bne  {
+        log("bne:  rs1:x{}, rs2: x{}, imm: {}, set on_branch reg", rs1, rs2, b_imm.bitcast(int<32>));
+      }
       when is_ret  { log("ret"); }
 
       when supported.flip() {

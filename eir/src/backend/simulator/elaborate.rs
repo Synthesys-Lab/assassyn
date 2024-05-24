@@ -356,13 +356,16 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           dump_ref!(self.sys, &cond)
         );
         for (i, value) in select1hot.value_iter().enumerate() {
+          if i != 0 {
+            res.push_str(" else ");
+          }
           res.push_str(&format!(
-            "if cond >> {} & 1 != 0 {{ {} }} else ",
+            "if cond >> {} & 1 != 0 {{ {} }}",
             i,
             dump_ref!(self.sys, &value)
           ));
         }
-        res.push('}');
+        res.push_str(" else { unreachable!() } }");
         res
       }
       Opcode::Cast { .. } => {

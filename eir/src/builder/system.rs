@@ -374,9 +374,9 @@ impl SysBuilder {
     cond: BaseNode,
     values: Vec<BaseNode>,
   ) -> BaseNode {
-    let dtype = cond.get_dtype(self).unwrap();
+    let cond_ty = cond.get_dtype(self).unwrap();
     assert_eq!(
-      dtype.get_bits(),
+      cond_ty.get_bits(),
       values.len(),
       "{} Select1Hot value count mismatch!",
       site
@@ -392,7 +392,7 @@ impl SysBuilder {
     }
     let mut args = vec![cond];
     args.extend(values);
-    self.create_expr(dtype, Opcode::Select1Hot, args, true)
+    self.create_expr(v0type, Opcode::Select1Hot, args, true)
   }
 
   pub fn create_select(
