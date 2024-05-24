@@ -156,7 +156,11 @@ impl SysBuilder {
     let block = self.create_block_impl(BlockKind::None, true);
     let operand = Operand::new(cond);
     let operand_ref = self.insert_element(operand);
-    operand_ref.as_mut::<Operand>(self).unwrap().get_mut().set_user(block.clone());
+    operand_ref
+      .as_mut::<Operand>(self)
+      .unwrap()
+      .get_mut()
+      .set_user(block.clone());
     let kind = BlockKind::Condition(operand_ref);
     block.as_mut::<Block>(self).unwrap().get_mut().kind = kind;
     self.add_user(operand_ref);

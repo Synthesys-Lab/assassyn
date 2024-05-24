@@ -33,7 +33,7 @@ pub fn cond_cse() {
   driver_builder(&mut sys, adder);
 
   eir::builder::verify(&sys);
-  let o1 = xform::Config{
+  let o1 = xform::Config {
     rewrite_wait_until: true,
   };
   eir::xform::basic(&mut sys, &o1);
