@@ -3,8 +3,8 @@ use crate::builder::system::SysBuilder;
 pub mod arbiter;
 pub mod array_partition;
 pub mod cse;
-pub mod rewrite_wait_until;
 pub mod erase_metadata;
+pub mod rewrite_wait_until;
 
 pub struct Config {
   pub rewrite_wait_until: bool,
