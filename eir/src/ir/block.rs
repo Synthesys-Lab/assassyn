@@ -153,12 +153,12 @@ impl SysBuilder {
 
   /// Create a block and insert it to the current module.
   pub fn create_block(&mut self, kind: BlockKind) -> BaseNode {
-    match kind {
+    let kind = match kind {
       BlockKind::WaitUntil(_) => {
         panic!("Use `set_current_block_wait_until` to have a wait-until block!");
       }
-      _ => {}
-    }
+      _ => kind,
+    };
     self.create_block_impl(kind, true)
   }
 

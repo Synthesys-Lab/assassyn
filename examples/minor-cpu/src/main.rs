@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use assassyn::module_builder;
-use eir::{backend::simulator::elaborate, builder::SysBuilder, ir::data::ArrayAttr};
+use eir::{backend::simulator::elaborate, builder::SysBuilder, ir::data::ArrayAttr, xform};
 
 module_builder!(
   driver(fetcher)() {
@@ -13,9 +13,9 @@ module_builder!(
   fetcher(decoder, pc, on_branch)() {
     when on_branch[0].flip() {
       log("fetching inst from: 0x{:x}", pc[0]);
-      to_fetch = pc[0].slice(0, 9).bitcast(uint<10>);
+      to_fetch = pc[0].slice(2, 11).bitcast(uint<10>);
       async_call decoder { write: 0.bits<1>, wdata: 0.bits<32>, addr: to_fetch };
-      pc[0] = pc[0].bitcast(int<32>).add(1.int<32>).bitcast(bits<32>);
+      pc[0] = pc[0].bitcast(int<32>).add(4.int<32>).bitcast(bits<32>);
     }
     when on_branch[0] {
       log("on a branch, stall fetching");
@@ -49,7 +49,7 @@ module_builder!(
       supported  = bitwise_or(is_lui, is_addi, is_li, is_add, is_bne, is_ret);
       write_rd   = bitwise_or(is_lui, is_addi, is_li, is_add);
       read_rs1   = bitwise_or(is_lui, is_addi, is_li, is_add, is_bne);
-      read_rs2   = is_add;
+      read_rs2   = bitwise_or(is_add, is_bne);
       read_i_imm = bitwise_or(is_li, is_addi);
       read_u_imm = is_lui;
       read_b_imm = is_bne;
@@ -61,22 +61,23 @@ module_builder!(
       value_a = read_rs1.select(register_file[rs1], 0.bits<32>);
       reg_a   = read_rs1.select(rs1, 0.bits<5>);
 
-      lhs_cond = concat(read_rs2, read_i_imm, read_u_imm, read_b_imm);
-      value_b = lhs_cond.select_1hot(register_file[rs2], i_imm.zext(bits<32>), u_imm.zext(bits<32>), b_imm);
 
+      value_b = read_rs2.select(register_file[rs2], 0.bits<32>);
       reg_b   = read_rs2.select(rs2, 0.bits<5>);
+
+      no_imm = bitwise_or(read_i_imm, read_u_imm, read_b_imm).flip();
+      imm_cond = concat(read_i_imm, read_u_imm, read_b_imm, no_imm);
+      imm_value = imm_cond.select_1hot(i_imm.zext(bits<32>), u_imm.zext(bits<32>), b_imm, 0.bits<32>);
 
       rd_reg  = write_rd.select(rd, 0.bits<5>);
 
-      async_call exec(opcode, value_a, value_b, reg_a, reg_b, rd_reg);
+      async_call exec(opcode, value_a, value_b, imm_value, reg_a, reg_b, rd_reg);
 
       when is_lui  { log("lui:  rd: x{}, imm: {:x}", rd, u_imm); }
       when is_addi { log("addi: rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm); }
       when is_add  { log("add:  rd: x{}, rs1: x{}, rs2: {}", rd, rs1, rs2); }
       when is_li   { log("li:   rd: x{}, rs1: x{}, imm: {:x}", rd, rs1, i_imm); }
-      when is_bne  {
-        log("bne:  rs1:x{}, rs2: x{}, imm: {}, set on_branch reg", rs1, rs2, b_imm.bitcast(int<32>));
-      }
+      when is_bne  { log("bne:  rs1:x{}, rs2: x{}, imm: {}, set on_branch reg", rs1, rs2, b_imm.bitcast(int<32>)); }
       when is_ret  { log("ret"); }
 
       when supported.flip() {
@@ -100,6 +101,7 @@ module_builder!(
     opcode: bits<7>,
     a: bits<32>,
     b: bits<32>,
+    c: bits<32>,
     // FIXME: value used in wait_until is NOT considered as used. Warnings are casted.
     _a_reg: bits<5>,
     _b_reg: bits<5>,
@@ -130,12 +132,17 @@ module_builder!(
       is_bne  = opcode.eq(0b1100011.bits<7>);
       // is_ret  = opcode.eq(0b1100111.bits<7>);
 
+      // instruction attributes
+      uses_imm = bitwise_or(is_addi, is_lui, is_li, is_bne);
+      is_branch = is_bne;
+
+      rhs = uses_imm.select(c, b);
+
       invoke_adder = bitwise_or(is_addi, is_add, is_li, is_lui);
 
-      is_branch = is_bne;
-      add_res = a.bitcast(int<32>).add(b.bitcast(int<32>)).bitcast(bits<32>);
-      log("adder: a: {:x}, b: {:x}, res: {:x}", a, b, add_res);
-      result = invoke_adder.select(add_res, 0.bits<32>);
+      result = a.bitcast(int<32>).add(rhs.bitcast(int<32>)).bitcast(bits<32>);
+      log("adder: a: {:x}, b: {:x}, res: {:x}", a, b, result);
+      result = invoke_adder.select(result, 0.bits<32>);
 
       when is_branch {
         on_branch[0] = 0.bits<1>;
@@ -143,7 +150,8 @@ module_builder!(
       }
 
       when is_bne {
-        br_dest = a.neq(0.bits<32>).select(pc[0], b);
+        new_pc  = pc[0].bitcast(int<32>).sub(4.int<32>).add(c.bitcast(int<32>)).bitcast(bits<32>);
+        br_dest = a.neq(b).select(new_pc, pc[0]);
         log("if {} != 0: branch to {}; br_dest", a, b);
         pc[0] = br_dest;
       }
@@ -235,6 +243,12 @@ fn main() {
     sim_threshold: 20,
     ..Default::default()
   };
+
+  let o1 = eir::xform::Config{
+    rewrite_wait_until: true,
+  };
+  xform::basic(&mut sys, &o1);
+  println!("{}", sys);
 
   elaborate(&mut sys, &config).unwrap();
 }

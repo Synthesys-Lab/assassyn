@@ -929,6 +929,7 @@ impl SysBuilder {
   }
 
   pub(crate) fn dispose(&mut self, node: BaseNode) {
+    eprintln!("Dispose {:?}", node);
     self.slab.remove(node.get_key());
   }
 
