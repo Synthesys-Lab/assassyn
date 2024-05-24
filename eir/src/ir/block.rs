@@ -130,6 +130,28 @@ impl BlockMut<'_> {
   pub fn set_value(&mut self, value: BaseNode) {
     self.get_mut().kind = BlockKind::Valued(value);
   }
+
+  /// Set the condition of the block.
+  pub fn set_cond(&mut self, cond: BaseNode) {
+    let operand = Operand::new(cond);
+    let operand_ref = self.sys.insert_element(operand);
+    operand_ref
+      .as_mut::<Operand>(self.sys)
+      .unwrap()
+      .get_mut()
+      .set_user(self.elem.clone());
+    match &self.get().kind {
+      BlockKind::Condition(x) => {
+        self.sys.remove_user(x.clone());
+      }
+      BlockKind::None => {}
+      _ => {
+        panic!("Invalid block kind!");
+      }
+    }
+    self.get_mut().kind = BlockKind::Condition(operand_ref);
+    self.sys.add_user(operand_ref);
+  }
 }
 
 impl SysBuilder {
@@ -154,16 +176,7 @@ impl SysBuilder {
   /// Create a block and insert it to the current module.
   pub fn create_conditional_block(&mut self, cond: BaseNode) -> BaseNode {
     let block = self.create_block_impl(BlockKind::None, true);
-    let operand = Operand::new(cond);
-    let operand_ref = self.insert_element(operand);
-    operand_ref
-      .as_mut::<Operand>(self)
-      .unwrap()
-      .get_mut()
-      .set_user(block.clone());
-    let kind = BlockKind::Condition(operand_ref);
-    block.as_mut::<Block>(self).unwrap().get_mut().kind = kind;
-    self.add_user(operand_ref);
+    block.as_mut::<Block>(self).unwrap().set_cond(cond);
     block
   }
 
