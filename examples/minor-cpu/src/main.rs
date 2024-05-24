@@ -24,7 +24,7 @@ module_builder!(
 );
 
 module_builder!(
-  decoder(we, inst, pc, on_branch, register_file, reg_onwrite, exec)() {
+  decoder(we, inst, pc, on_branch, exec)() {
     when on_branch[0].flip() {
       // Slice the fields.
       opcode = inst.slice(0, 6);
@@ -33,8 +33,9 @@ module_builder!(
       rd    = inst.slice(7, 11);
       rs1   = inst.slice(15, 19);
       rs2   = inst.slice(20, 24);
-      u_imm = inst.slice(12, 31);
       i_imm = inst.slice(20, 31);
+
+      u_imm = inst.slice(12, 31).concat(0.bits<12>);
 
       sign = inst.slice(31, 31);
       b_imm = concat(sign, inst.slice(7, 7), inst.slice(25, 30), inst.slice(8, 11), 0.bits<1>);
@@ -59,22 +60,20 @@ module_builder!(
         on_branch[0] = 1.bits<1>;
       }
 
-      value_a = read_rs1.select(register_file[rs1], 0.bits<32>);
       reg_a   = read_rs1.select(rs1, 0.bits<5>);
 
 
-      value_b = read_rs2.select(register_file[rs2], 0.bits<32>);
       reg_b   = read_rs2.select(rs2, 0.bits<5>);
 
       no_imm = bitwise_or(read_i_imm, read_u_imm, read_b_imm).flip();
       imm_cond = concat(read_i_imm, read_u_imm, read_b_imm, no_imm);
-      imm_value = imm_cond.select_1hot(i_imm.zext(bits<32>), u_imm.zext(bits<32>), b_imm, 0.bits<32>);
+      imm_value = imm_cond.select_1hot(i_imm.zext(bits<32>), u_imm, b_imm, 0.bits<32>);
 
       rd_reg  = write_rd.select(rd, 0.bits<5>);
 
-      async_call exec(opcode, value_a, value_b, imm_value, reg_a, reg_b, rd_reg);
+      async_call exec(opcode, imm_value, reg_a, reg_b, rd_reg);
 
-      when is_lui  { log("lui:  rd: x{}, imm: {:x}", rd, u_imm); }
+      when is_lui  { log("lui:  rd: x{}, imm: 0x{:x}", rd, u_imm); }
       when is_lw   { log("lw:   rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm); }
       when is_addi { log("addi: rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm); }
       when is_add  { log("add:  rd: x{}, rs1: x{}, rs2: x{}", rd, rs1, rs2); }
@@ -96,28 +95,27 @@ module_builder!(
     reg_onwrite,
     on_branch,
     pc,
+    rf,
     memory,
     writeback
   )(
     opcode: bits<7>,
-    a: bits<32>,
-    b: bits<32>,
-    c: bits<32>,
+    imm_value: bits<32>,
     // FIXME: value used in wait_until is NOT considered as used. Warnings are casted.
-    _a_reg: bits<5>,
-    _b_reg: bits<5>,
+    a_reg: bits<5>,
+    b_reg: bits<5>,
     rd_reg: bits<5>
   ) {
     wait_until {
       // handle read after write
-      a_valid = reg_onwrite[_a_reg.peek()].flip();
-      b_valid = reg_onwrite[_b_reg.peek()].flip();
+      a_valid = reg_onwrite[a_reg.peek()].flip();
+      b_valid = reg_onwrite[b_reg.peek()].flip();
       c_valid = reg_onwrite[rd_reg.peek()].flip();
-      log("x{}.a_valid: {}, x{}.b_valid: {}, x{}.rd_valid: {}",
-          _a_reg.peek(), a_valid,
-          _b_reg.peek(), b_valid,
-          rd_reg.peek(), c_valid);
       valid = bitwise_and(a_valid, b_valid, c_valid);
+      when valid.flip() {
+        log("operand not ready, stall execution, x{}: {}, x{}: {}, x{}: {}",
+            a_reg.peek(), a_valid, b_reg.peek(), b_valid, rd_reg.peek(), c_valid);
+      }
       valid
     } {
 
@@ -126,23 +124,26 @@ module_builder!(
         log("set x{} onwrite", rd_reg);
       }
 
+      is_lui  = opcode.eq(0b0110111.bits<7>);
       is_addi = opcode.eq(0b0010011.bits<7>);
       is_add  = opcode.eq(0b0110011.bits<7>);
-      is_lui  = opcode.eq(0b0110111.bits<7>);
+      is_lw   = opcode.eq(0b0000011.bits<7>);
       is_bne  = opcode.eq(0b1100011.bits<7>);
       // is_ret  = opcode.eq(0b1100111.bits<7>);
 
       // instruction attributes
-      uses_imm = bitwise_or(is_addi, is_lui, is_bne);
+      uses_imm = bitwise_or(is_addi, is_bne);
       is_branch = is_bne;
+      a = rf[a_reg];
+      b = rf[b_reg];
 
-      rhs = uses_imm.select(c, b);
+      rhs = uses_imm.select(imm_value, b);
 
-      invoke_adder = bitwise_or(is_addi, is_add, is_lui);
+      invoke_adder = bitwise_or(is_addi, is_add, is_lw);
 
       result = a.bitcast(int<32>).add(rhs.bitcast(int<32>)).bitcast(bits<32>);
-      log("adder: a: {:x}, b: {:x}, res: {:x}", a, b, result);
-      result = invoke_adder.select(result, 0.bits<32>);
+      result = concat(invoke_adder, is_lui, is_branch).select_1hot(result, imm_value, 0.bits<32>);
+      log("{:07b}: a: {:x}, b: {:x}, res: {:x}", opcode, a, rhs, result);
 
       when is_branch {
         on_branch[0] = 0.bits<1>;
@@ -150,14 +151,19 @@ module_builder!(
       }
 
       when is_bne {
-        new_pc  = pc[0].bitcast(int<32>).sub(4.int<32>).add(c.bitcast(int<32>)).bitcast(bits<32>);
-        log("{} + {} + {}", pc[0].bitcast(int<32>), 4.int<32>, c.bitcast(int<32>));
+        new_pc  = pc[0].bitcast(int<32>).sub(4.int<32>).add(imm_value.bitcast(int<32>)).bitcast(bits<32>);
+        log("{} + {} + {}", pc[0].bitcast(int<32>), 4.int<32>, imm_value.bitcast(int<32>));
         br_dest = a.neq(b).select(new_pc, pc[0]);
         log("if {} != {}: branch to {}; actual: {}", a, b, new_pc, br_dest);
         pc[0] = br_dest;
       }
 
-      async_call memory { write: 0.bits<1>, addr: result.slice(0, 9).bitcast(uint<10>), wdata: a };
+      is_memory = is_lw;
+      when is_memory {
+        log("addr: {:x}", result);
+      }
+
+      async_call memory { write: 0.bits<1>, addr: result.slice(0, 17).bitcast(uint<17>), wdata: a };
       wb = bind writeback { opcode: opcode, rd: rd_reg, result: result };
     }
   }.expose(wb)
@@ -171,20 +177,20 @@ module_builder!(
 
 module_builder!(
   writeback(reg_file, reg_onwrite)(opcode: bits<7>, rd: bits<5>, result: bits<32>, mdata: bits<32>) {
+    is_lui  = opcode.eq(0b0110111.bits<7>);
     is_addi = opcode.eq(0b0010011.bits<7>);
     is_add  = opcode.eq(0b0110011.bits<7>);
-    is_lui  = opcode.eq(0b0110111.bits<7>);
-    is_bne  = opcode.eq(0b1100011.bits<7>);
     is_lw   = opcode.eq(0b0000011.bits<7>);
+    is_bne  = opcode.eq(0b1100011.bits<7>);
+    // is_ret  = opcode.eq(0b1100111.bits<7>);
 
     is_result = bitwise_or(is_addi, is_add, is_lui, is_bne);
     is_memory = is_lw;
     cond = is_memory.concat(is_result);
-    log("opcode: {:b}, cond: {:b}", opcode, cond);
     data = cond.select_1hot(mdata, result);
 
     when rd.neq(0.bits<5>) {
-      log("writeback: x{} = {:x}", rd, data);
+      log("opcode: {:07b}, writeback: x{} = {:x}", opcode, rd, data);
       reg_file[rd] = data;
       reg_onwrite[rd] = 0.bits<1>;
     }
@@ -209,13 +215,14 @@ fn main() {
   // Top function
   let writeback = writeback_builder(&mut sys, reg_file, reg_onwrite);
 
-  let memory_access = sys.declare_memory("memory_access", 32, 1024, 1..=1, None);
+  let memory_access = sys.declare_memory("memory_access", 32, 65536 * 2, 1..=1, None);
 
   let (exec, wb) = execution_builder(
     &mut sys,
     reg_onwrite,
     on_branch,
     pc,
+    reg_file,
     memory_access,
     writeback,
   );
@@ -238,8 +245,6 @@ fn main() {
         rdata,
         pc,
         on_branch,
-        reg_file,
-        reg_onwrite,
         exec,
       );
     },
@@ -253,7 +258,7 @@ fn main() {
 
   let config = eir::backend::common::Config {
     resource_base: PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-    sim_threshold: 20,
+    sim_threshold: 100,
     ..Default::default()
   };
 
