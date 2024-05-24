@@ -115,7 +115,7 @@ macro_rules! create_arith_op_impl {
     pub fn $func_name(&mut self, site: Filesite, a: BaseNode, b: BaseNode) -> BaseNode {
       match self.combine_types($opcode, &a, &b) {
         Ok(res_ty) => self.create_expr(res_ty, $opcode, vec![a, b], true),
-        Err(msg) => panic!("{}{}", site.to_string(), msg),
+        Err(msg) => panic!("{} {}", site, msg),
       }
     }
   };
@@ -668,10 +668,16 @@ impl SysBuilder {
   /// # Arguments
   /// * `ptr` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
-  pub fn create_array_read<'elem>(&mut self, array: BaseNode, idx: BaseNode) -> BaseNode {
+  pub fn create_array_read<'elem>(
+    &mut self,
+    site: Filesite,
+    array: BaseNode,
+    idx: BaseNode,
+  ) -> BaseNode {
     assert!(
       self.indexable(idx),
-      "{}'s type, {:?}, is not indexable!",
+      "{} {}'s type, {:?}, is not indexable!",
+      site,
       idx.to_string(self),
       idx.get_dtype(self).unwrap()
     );
@@ -690,19 +696,33 @@ impl SysBuilder {
   /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
   pub fn create_array_write(
     &mut self,
+    site: Filesite,
     array: BaseNode,
     idx: BaseNode,
     value: BaseNode,
   ) -> BaseNode {
     assert!(
       self.indexable(idx),
-      "{}'s type, {:?}, is not indexable!",
+      "{} {}'s type, {:?}, is not indexable!",
+      site,
       idx.to_string(self),
       idx.get_dtype(self).unwrap()
     );
-    assert!(matches!(array.get_kind(), NodeKind::Array));
+    assert!(
+      matches!(array.get_kind(), NodeKind::Array),
+      "{} Expect an array, but {:?}",
+      site,
+      array
+    );
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
-    assert_eq!(dtype, value.get_dtype(self).unwrap());
+    let vtype = value.get_dtype(self).unwrap_or_else(|| {
+      panic!("{} {} has no type!", site, value.to_string(self));
+    });
+    assert_eq!(
+      dtype, vtype,
+      "{} Value type mismatch {:?} != {:?}!",
+      site, dtype, vtype
+    );
     let operands = vec![array, idx, value];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands, true);
     self.insert_external_interface(array, res.clone(), 0);

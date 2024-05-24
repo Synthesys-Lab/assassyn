@@ -112,7 +112,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
       if let ExprTerm::ArrayAccess(_) = term {
         Ok(quote_spanned! { term.span() => {
           let (array, idx) = { #res };
-          sys.create_array_read(array, idx)
+          sys.create_array_read(eir::created_here!(), array, idx)
         }})
       } else {
         Ok(res)
@@ -274,7 +274,7 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         quote! {{
           let (array, idx) = #array_ptr;
           let value = #right;
-          sys.create_array_write(array, idx, value);
+          sys.create_array_write(eir::created_here!(), array, idx, value);
         }}
       }
       expr::LValue::IdentList(l) => {

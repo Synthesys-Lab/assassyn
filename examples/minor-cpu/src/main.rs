@@ -12,7 +12,7 @@ module_builder!(
 module_builder!(
   fetcher(decoder, pc, on_branch)() {
     when on_branch[0].flip() {
-      log("fetching inst from: {:x}", pc[0]);
+      log("fetching inst from: 0x{:x}", pc[0]);
       to_fetch = pc[0].slice(0, 9).bitcast(uint<10>);
       async_call decoder { write: 0.bits<1>, wdata: 0.bits<32>, addr: to_fetch };
       pc[0] = pc[0].bitcast(int<32>).add(1.int<32>).bitcast(bits<32>);
@@ -49,30 +49,35 @@ module_builder!(
       read_i_imm = bitwise_or(is_li, is_addi, is_bne);
       read_u_imm = is_lui;
 
-      when write_rd {
-        reg_onwrite[rd] = 1.bits<1>;
+      when is_bne {
+        on_branch[0] = 1.bits<1>;
       }
 
       value_a = read_rs1.select(register_file[rs1], 0.bits<32>);
       reg_a   = read_rs1.select(rs1, 0.bits<5>);
 
-      value_b = read_rs2.select(register_file[rs2], read_i_imm.select(i_imm, read_u_imm.select(u_imm, 0.bits<32>)));
+      value_b = read_rs2.select(register_file[rs2],
+                                read_i_imm.select(i_imm.bitcast(bits<32>),
+                                                  read_u_imm.select(u_imm.bitcast(bits<32>), 0.bits<32>)));
       reg_b   = read_rs2.select(rs2, 0.bits<5>);
 
       rd_reg = write_rd.select(rd, 0.bits<5>);
 
       async_call exec(opcode, value_a, value_b, reg_a, reg_b, rd_reg);
 
-      when is_lui  { log("lui:  rd: x{}, imm: {:b}", rd, u_imm); }
-      when is_addi { log("addi: rd: x{}, rs1: x{}, imm: {:b}", rd, rs1, i_imm); }
-      when is_add  { log("add:  rd: x{}, rs1: x{}, rs2: x{}", rd, rs1, rs2); }
-      when is_li   { log("li:   rd: x{}, rs1: x{}, imm: {:b}", rd, rs1, i_imm); }
-      when is_bne  { log("bne:           rs1: x{}, imm: {:b}", rs1, i_imm); }
+      when is_lui  { log("lui:  rd: x{}, imm: {:x}", rd, u_imm); }
+      when is_addi { log("addi: rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm); }
+      when is_add  { log("add:  rd: x{}, rs1: x{}, rs2: {}", rd, rs1, rs2); }
+      when is_li   { log("li:   rd: x{}, rs1: x{}, imm: {:x}", rd, rs1, i_imm); }
+      when is_bne  { log("bne:           rs1: x{}, imm: {:x}, set on_branch reg", rs1, i_imm); }
       when is_ret  { log("ret"); }
 
       when supported.flip() {
         log("unsupported opcode: {:b}, raw_inst: {:x}", opcode, inst);
       }
+    }
+    when on_branch[0] {
+      log("on a branch, fetched instruction may wrong, stall decoding");
     }
   }
 );
@@ -94,12 +99,22 @@ module_builder!(
     rd_reg: bits<5>
   ) {
     wait_until {
+      // handle read after write
       a_valid = reg_onwrite[_a_reg.peek()].flip();
       b_valid = reg_onwrite[_b_reg.peek()].flip();
-      c_valid = reg_onwrite[rd_reg.peek()].flip();
-      valid = a_valid.bitwise_and(b_valid).bitwise_and(c_valid);
+      c_valid = reg_onwrite[rd_reg].flip();
+      log("x{}.a_valid: {}, x{}.b_valid: {}, x{}.rd_valid: {}",
+          _a_reg.peek(), a_valid,
+          _b_reg.peek(), b_valid,
+          rd_reg.peek(), c_valid);
+      valid = bitwise_and(a_valid, b_valid, c_valid);
       valid
     } {
+
+      when rd_reg.neq(0.bits<5>) {
+        reg_onwrite[rd_reg] = 1.bits<1>;
+        log("set x{} onwrite", rd_reg);
+      }
 
       is_addi = opcode.eq(0b0010011.bits<7>);
       is_add  = opcode.eq(0b0110011.bits<7>);
@@ -117,26 +132,34 @@ module_builder!(
 
       when is_branch {
         on_branch[0] = 0.bits<1>;
+        log("reset on_branch reg");
       }
 
       when is_bne {
-        new_pc = pc[0].bitcast(int<32>).add(1.int<32>).bitcast(bits<32>);
-        pc[0] = a.neq(0.bits<32>).select(b, new_pc);
+        br_dest = a.neq(0.bits<32>).select(pc[0], b);
+        log("if {} != 0: branch to {}; br_dest", a, b);
+        pc[0] = br_dest;
       }
 
       async_call memory { write: 0.bits<1>, addr: result.slice(0, 9).bitcast(uint<10>), wdata: a };
-      wb = bind writeback { rd: rd_reg };
+      wb = bind writeback { rd: rd_reg, result: result };
     }
   }.expose(wb)
 );
 
 module_builder!(
   memory_access(we, data, writeback)() {
+    async_call writeback();
   }
 );
 
 module_builder!(
-  writeback()(rd: bits<5>) {
+  writeback(reg_file, reg_onwrite)(rd: bits<5>, result: bits<32>) {
+    when rd.neq(0.bits<5>) {
+      log("writeback: x{} = {:x}", rd, result);
+      reg_file[rd] = result;
+      reg_onwrite[rd] = 0.bits<1>;
+    }
   }
 );
 
@@ -156,7 +179,7 @@ fn main() {
   };
 
   // Top function
-  let writeback = writeback_builder(&mut sys);
+  let writeback = writeback_builder(&mut sys, reg_file, reg_onwrite);
 
   let memory_access = sys.declare_memory("memory_access", 32, 1024, 1..=1, None);
 
