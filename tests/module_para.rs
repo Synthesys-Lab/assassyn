@@ -47,7 +47,7 @@ mod module_para {
     // );
 
     test_para_paser!(
-      foo (bar: module, arr1: [int<32>; 16]) () {
+      foo (bar: [module], arr1: [int<32>; 16],) () {
       }
     )
     // let mut sys = SysBuilder::new("foo_bar");

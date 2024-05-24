@@ -351,72 +351,62 @@ pub(crate) struct PType {
   pub(crate) array_attr: Option<ArrayAttr>
 }
 
-impl PType {
-  pub(crate) fn ptype_module(input: &syn::parse::ParseStream) -> bool {
-    let cursor = input.cursor();
-    if let Some((id, _)) = cursor.ident() {
-        matches!(id.to_string().as_str(), "module")
-    } else {
-        false
-    }
-  }
-}
-
-// [type<bit-length>; array-length] or module
+// [type<bit-length>; array-length] or [module]
 impl Parse for PType {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
       let span = input.cursor().span(); 
-      if PType::ptype_module(&input) {
-        Ok(PType {
-          span, ptype: NodeKind::Module, array_attr: None
-        }) 
-      } else {
+      {
         let attr;
         syn::bracketed!(attr in input);
         let type_ident = attr.parse::<syn::Ident>()?;
 
         match type_ident.to_string().as_str() {
-            "int" => {
-              attr.parse::<syn::Token![<]>()?;
-              let bits = attr.parse::<syn::LitInt>()?;
-              attr.parse::<syn::Token![>]>()?;
+          "int" => {
+            attr.parse::<syn::Token![<]>()?;
+            let bits = attr.parse::<syn::LitInt>()?;
+            attr.parse::<syn::Token![>]>()?;
 
-              attr.parse::<syn::Token![;]>()?;
+            attr.parse::<syn::Token![;]>()?;
 
-              let array_len = attr.parse::<syn::LitInt>()?;
+            let array_len = attr.parse::<syn::LitInt>()?;
 
-              let array_attr = ArrayAttr {
-                ty: eir::ir::DataType::Int(bits.base10_parse::<usize>()?),
-                len: array_len.base10_parse::<usize>()?
-              };
+            let array_attr = ArrayAttr {
+              ty: eir::ir::DataType::Int(bits.base10_parse::<usize>()?),
+              len: array_len.base10_parse::<usize>()?
+            };
 
-              Ok(PType {
-                span, ptype: NodeKind::Array, array_attr: Some(array_attr)
-              })
-            }
-            "uint" => {
-              attr.parse::<syn::Token![<]>()?;
-              let bits = attr.parse::<syn::LitInt>()?;
-              attr.parse::<syn::Token![>]>()?;
+            Ok(PType {
+              span, ptype: NodeKind::Array, array_attr: Some(array_attr)
+            })
+          }
+          "uint" => {
+            attr.parse::<syn::Token![<]>()?;
+            let bits = attr.parse::<syn::LitInt>()?;
+            attr.parse::<syn::Token![>]>()?;
 
-              attr.parse::<syn::Token![;]>()?;
+            attr.parse::<syn::Token![;]>()?;
 
-              let array_len = attr.parse::<syn::LitInt>()?;
+            let array_len = attr.parse::<syn::LitInt>()?;
 
-              let array_attr = ArrayAttr {
-                ty: eir::ir::DataType::UInt(bits.base10_parse::<usize>()?),
-                len: array_len.base10_parse::<usize>()?
-              };
+            let array_attr = ArrayAttr {
+              ty: eir::ir::DataType::UInt(bits.base10_parse::<usize>()?),
+              len: array_len.base10_parse::<usize>()?
+            };
 
-              Ok(PType {
-                span, ptype: NodeKind::Array, array_attr: Some(array_attr)
-              })
-            }
-            
-            _ => Err(syn::Error::new(
-              type_ident.span(), 
-              format!("Unsupported array type as parameters: {}", type_ident)
-            ))
+            Ok(PType {
+              span, ptype: NodeKind::Array, array_attr: Some(array_attr)
+            })
+          }
+          "module" => {
+            Ok(PType {
+              span, ptype: NodeKind::Module, array_attr: None
+            })
+          }
+          
+          _ => Err(syn::Error::new(
+            type_ident.span(), 
+            format!("Unsupported array type as parameters: {}", type_ident)
+          ))
         }
       }
     } 
