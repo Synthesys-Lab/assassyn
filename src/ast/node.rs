@@ -17,7 +17,7 @@ pub(crate) struct PortDecl {
 
 /// A parameter declaration is something like `lock: [int<32>; 1]` for arary
 /// foo: module
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ParaDecl {
   pub(crate) id: syn::Ident,
   pub(crate) ty: expr::PType,
