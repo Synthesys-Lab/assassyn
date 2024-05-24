@@ -26,6 +26,7 @@ module_builder!(
 module_builder!(
   decoder(we, inst, pc, on_branch, register_file, reg_onwrite, exec)() {
     when on_branch[0].flip() {
+      // Slice the fields.
       opcode = inst.slice(0, 6);
       // funct = inst.slice(12, 14);
       rd    = inst.slice(7, 11);
@@ -87,6 +88,7 @@ module_builder!(
     opcode: bits<7>,
     a: bits<32>,
     b: bits<32>,
+    // FIXME: value used in wait_until is NOT considered as used. Warnings are casted.
     _a_reg: bits<5>,
     _b_reg: bits<5>,
     rd_reg: bits<5>
@@ -110,6 +112,7 @@ module_builder!(
 
       is_branch = is_bne;
       add_res = a.bitcast(int<32>).add(b.bitcast(int<32>)).bitcast(bits<32>);
+      log("adder: a: {:x}, b: {:x}, res: {:x}", a, b, add_res);
       result = invoke_adder.select(add_res, 0.bits<32>);
 
       when is_branch {
@@ -121,7 +124,7 @@ module_builder!(
         pc[0] = a.neq(0.bits<32>).select(b, new_pc);
       }
 
-      async_call memory { write: 0.bits<1>, addr: result, data: a };
+      async_call memory { write: 0.bits<1>, addr: result.slice(0, 9).bitcast(uint<10>), wdata: a };
       wb = bind writeback { rd: rd_reg };
     }
   }.expose(wb)
@@ -133,7 +136,7 @@ module_builder!(
 );
 
 module_builder!(
-  writeback()() {
+  writeback()(rd: bits<5>) {
   }
 );
 
@@ -142,17 +145,17 @@ fn main() {
 
   let bits1 = eir::ir::DataType::Bits(1);
   let bits32 = eir::ir::DataType::Bits(32);
+
+  // Declare data structures
   let pc = sys.create_array(bits32.clone(), "pc", 1, None, vec![]);
-
   let on_branch = sys.create_array(bits1.clone(), "on_branch", 1, None, vec![]);
-
   let reg_file = sys.create_array(bits32.clone(), "rf.data", 32, None, vec![]);
-
   let reg_onwrite = {
     let fully_partitioned = vec![ArrayAttr::FullyPartitioned];
     sys.create_array(bits1.clone(), "rf.onwrite", 32, None, fully_partitioned)
   };
 
+  // Top function
   let writeback = writeback_builder(&mut sys);
 
   let memory_access = sys.declare_memory("memory_access", 32, 1024, 1..=1, None);

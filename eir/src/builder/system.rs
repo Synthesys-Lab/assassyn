@@ -351,9 +351,10 @@ impl SysBuilder {
     true_val: BaseNode,
     false_val: BaseNode,
   ) -> BaseNode {
-    let ty = true_val.get_dtype(self).unwrap();
-    assert_eq!(ty, false_val.get_dtype(self).unwrap());
-    self.create_expr(ty, Opcode::Select, vec![cond, true_val, false_val], true)
+    let t_ty = true_val.get_dtype(self).unwrap();
+    let f_ty = false_val.get_dtype(self).unwrap();
+    assert_eq!(t_ty, f_ty, "Select value type mismatch: {:?} and {:?}", t_ty, f_ty);
+    self.create_expr(f_ty, Opcode::Select, vec![cond, true_val, false_val], true)
   }
 
   /// The helper function to create an expression.
