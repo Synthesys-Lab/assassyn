@@ -84,8 +84,12 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
             }
             (operand_def, operand_use)
           };
-          let operand_use = if Opcode::from_str(&op.to_string()).unwrap().arity().is_none() {
-            quote! { vec![#operand_use] }
+          let operand_use = if matches!(
+            Opcode::from_str(&op.to_string()).unwrap(),
+            Opcode::Select1Hot
+          ) {
+            let rev = operand_use.into_iter().rev().collect::<Punctuated<_, Token![,]>>();
+            quote! { vec![#rev] }
           } else {
             quote! { #operand_use }
           };

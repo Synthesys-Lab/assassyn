@@ -28,6 +28,7 @@ module_builder!(
     when on_branch[0].flip() {
       // Slice the fields.
       opcode = inst.slice(0, 6);
+      log("decoding: {:b}", opcode);
       // funct = inst.slice(12, 14);
       rd    = inst.slice(7, 11);
       rs1   = inst.slice(15, 19);
@@ -42,15 +43,15 @@ module_builder!(
       is_lui  = opcode.eq(0b0110111.bits<7>);
       is_addi = opcode.eq(0b0010011.bits<7>);
       is_add  = opcode.eq(0b0110011.bits<7>);
-      is_li   = opcode.eq(0b0000011.bits<7>);
+      is_lw   = opcode.eq(0b0000011.bits<7>);
       is_bne  = opcode.eq(0b1100011.bits<7>);
       is_ret  = opcode.eq(0b1100111.bits<7>);
 
-      supported  = bitwise_or(is_lui, is_addi, is_li, is_add, is_bne, is_ret);
-      write_rd   = bitwise_or(is_lui, is_addi, is_li, is_add);
-      read_rs1   = bitwise_or(is_lui, is_addi, is_li, is_add, is_bne);
+      supported  = bitwise_or(is_lui, is_addi, is_add, is_lw, is_bne, is_ret);
+      write_rd   = bitwise_or(is_lui, is_addi, is_add, is_lw);
+      read_rs1   = bitwise_or(is_lui, is_addi, is_add, is_bne, is_lw);
       read_rs2   = bitwise_or(is_add, is_bne);
-      read_i_imm = bitwise_or(is_li, is_addi);
+      read_i_imm = bitwise_or(is_addi, is_lw);
       read_u_imm = is_lui;
       read_b_imm = is_bne;
 
@@ -74,10 +75,10 @@ module_builder!(
       async_call exec(opcode, value_a, value_b, imm_value, reg_a, reg_b, rd_reg);
 
       when is_lui  { log("lui:  rd: x{}, imm: {:x}", rd, u_imm); }
+      when is_lw   { log("lw:   rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm); }
       when is_addi { log("addi: rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm); }
-      when is_add  { log("add:  rd: x{}, rs1: x{}, rs2: {}", rd, rs1, rs2); }
-      when is_li   { log("li:   rd: x{}, rs1: x{}, imm: {:x}", rd, rs1, i_imm); }
-      when is_bne  { log("bne:  rs1:x{}, rs2: x{}, imm: {}, set on_branch reg", rs1, rs2, b_imm.bitcast(int<32>)); }
+      when is_add  { log("add:  rd: x{}, rs1: x{}, rs2: x{}", rd, rs1, rs2); }
+      when is_bne  { log("bne:  rs1:x{}, rs2: x{}, imm: {}", rs1, rs2, b_imm.bitcast(int<32>)); }
       when is_ret  { log("ret"); }
 
       when supported.flip() {
@@ -151,8 +152,9 @@ module_builder!(
 
       when is_bne {
         new_pc  = pc[0].bitcast(int<32>).sub(4.int<32>).add(c.bitcast(int<32>)).bitcast(bits<32>);
+        log("{} + {} + {}", pc[0].bitcast(int<32>), 4.int<32>, c.bitcast(int<32>));
         br_dest = a.neq(b).select(new_pc, pc[0]);
-        log("if {} != 0: branch to {}; br_dest", a, b);
+        log("if {} != {}: branch to {}; actual: {}", a, b, new_pc, br_dest);
         pc[0] = br_dest;
       }
 
