@@ -129,17 +129,16 @@ module_builder!(
       is_addi = opcode.eq(0b0010011.bits<7>);
       is_add  = opcode.eq(0b0110011.bits<7>);
       is_lui  = opcode.eq(0b0110111.bits<7>);
-      is_li   = opcode.eq(0b0000011.bits<7>);
       is_bne  = opcode.eq(0b1100011.bits<7>);
       // is_ret  = opcode.eq(0b1100111.bits<7>);
 
       // instruction attributes
-      uses_imm = bitwise_or(is_addi, is_lui, is_li, is_bne);
+      uses_imm = bitwise_or(is_addi, is_lui, is_bne);
       is_branch = is_bne;
 
       rhs = uses_imm.select(c, b);
 
-      invoke_adder = bitwise_or(is_addi, is_add, is_li, is_lui);
+      invoke_adder = bitwise_or(is_addi, is_add, is_lui);
 
       result = a.bitcast(int<32>).add(rhs.bitcast(int<32>)).bitcast(bits<32>);
       log("adder: a: {:x}, b: {:x}, res: {:x}", a, b, result);
@@ -159,22 +158,34 @@ module_builder!(
       }
 
       async_call memory { write: 0.bits<1>, addr: result.slice(0, 9).bitcast(uint<10>), wdata: a };
-      wb = bind writeback { rd: rd_reg, result: result };
+      wb = bind writeback { opcode: opcode, rd: rd_reg, result: result };
     }
   }.expose(wb)
 );
 
 module_builder!(
   memory_access(we, data, writeback)() {
-    async_call writeback();
+    async_call writeback { mdata: data };
   }
 );
 
 module_builder!(
-  writeback(reg_file, reg_onwrite)(rd: bits<5>, result: bits<32>) {
+  writeback(reg_file, reg_onwrite)(opcode: bits<7>, rd: bits<5>, result: bits<32>, mdata: bits<32>) {
+    is_addi = opcode.eq(0b0010011.bits<7>);
+    is_add  = opcode.eq(0b0110011.bits<7>);
+    is_lui  = opcode.eq(0b0110111.bits<7>);
+    is_bne  = opcode.eq(0b1100011.bits<7>);
+    is_lw   = opcode.eq(0b0000011.bits<7>);
+
+    is_result = bitwise_or(is_addi, is_add, is_lui, is_bne);
+    is_memory = is_lw;
+    cond = is_memory.concat(is_result);
+    log("opcode: {:b}, cond: {:b}", opcode, cond);
+    data = cond.select_1hot(mdata, result);
+
     when rd.neq(0.bits<5>) {
-      log("writeback: x{} = {:x}", rd, result);
-      reg_file[rd] = result;
+      log("writeback: x{} = {:x}", rd, data);
+      reg_file[rd] = data;
       reg_onwrite[rd] = 0.bits<1>;
     }
   }
