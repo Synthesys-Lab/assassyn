@@ -87,7 +87,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           Ok(quote_spanned! { op.span() => {
             let src = #a.clone();
             #operand_def
-            let res = sys.#method_id(src, #operand_use);
+            let res = sys.#method_id(eir::created_here!(), src, #operand_use);
             res
           }})
         }
@@ -96,14 +96,14 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
     expr::Expr::BinaryReduce((op, operands)) => {
       let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
       let mut res = emit_expr_body(&operands[0])?;
-      res = quote! {{ let value = { #res }.clone(); value }};
+      res = quote_spanned! { op.span()=> { let value = { #res }.clone(); value } };
       for i in 1..operands.len() {
         let operand = emit_expr_body(&operands[i])?;
-        res = quote! {{
+        res = quote_spanned! { op.span() => {
           let value = { #res }.clone();
           let operand = { #operand }.clone();
-          sys.#method_id(value, operand)
-        }};
+          sys.#method_id(eir::created_here!(), value, operand)
+        } };
       }
       Ok(res)
     }
@@ -128,7 +128,7 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           let carry = { #res }.clone();
           let cond = { #cond }.clone();
           let value = { #value }.clone();
-          sys.create_select(cond, value, carry)
+          sys.create_select(eir::created_here!(), cond, value, carry)
         }};
       }
       Ok(res)
