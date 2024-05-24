@@ -337,14 +337,12 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
           let cond = emit_expr_body(cond)?;
           quote! {
             let cond = { #cond }.clone();
-            let block_pred = eir::ir::block::BlockKind::Condition(cond);
-            let block = sys.create_block(block_pred);
+            let block = sys.create_conditional_block(cond);
           }
         }
         BodyPred::Cycle(cycle) => quote! {
           let cycle = #cycle.clone();
-          let block_pred = eir::ir::block::BlockKind::Cycle(cycle);
-          let block = sys.create_block(block_pred);
+          let block = sys.create_cycled_block(cycle);
         },
         _ => panic!("wait_until should only be the root of a module"),
       };

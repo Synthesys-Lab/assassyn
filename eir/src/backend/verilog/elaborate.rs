@@ -1128,6 +1128,8 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     let mut res = String::new();
     match block.get_kind() {
       BlockKind::Condition(cond) => {
+        let cond = cond.as_ref::<Operand>(block.sys).unwrap();
+        let cond = cond.get_value().clone();
         self.pred = Some(format!(
           "({}{})",
           dump_ref!(self.sys, &cond),

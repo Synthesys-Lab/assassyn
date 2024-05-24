@@ -161,7 +161,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         let i_1h = sys.get_const_int(grant_hot_ty.clone(), 1 << i);
         let i = sys.get_const_int(grant_scalar_ty.clone(), i as u64);
         let grant_to = sys.create_slice(grant, i, i);
-        let block = sys.create_block(BlockKind::Condition(grant_to));
+        let block = sys.create_conditional_block(grant_to);
         sys.set_current_block(block);
         sys.create_array_write(created_here!(), last_grant_reg, zero, i_1h);
         let bind = caller.as_expr::<Bind>(sys).unwrap();

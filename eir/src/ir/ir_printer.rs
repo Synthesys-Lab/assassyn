@@ -112,10 +112,9 @@ impl Visitor<String> for IRPrinter {
   }
 
   fn visit_operand(&mut self, operand: OperandRef<'_>) -> Option<String> {
-    let expr = operand.get_user().as_ref::<Expr>(operand.sys).unwrap();
-    let expr = self.visit_expr(expr).unwrap();
+    let expr = operand.get_user().to_string(operand.sys);
     format!(
-      "{} // in {}",
+      "{} /* in {} */",
       operand.get_value().to_string(operand.sys),
       expr
     )

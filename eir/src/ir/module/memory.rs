@@ -119,7 +119,7 @@ impl SysBuilder {
 
     let rdata = self.create_array_read(created_here!(), array, addr);
 
-    let wblock = self.create_block(BlockKind::Condition(write));
+    let wblock = self.create_conditional_block(write);
     self.set_current_block(wblock);
     self.create_array_write(created_here!(), array, addr, wdata);
     let new_ip = self.get_current_ip().next(self).unwrap();

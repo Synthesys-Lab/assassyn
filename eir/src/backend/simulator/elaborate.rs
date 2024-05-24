@@ -419,6 +419,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     let mut res = String::new();
     match block.get_kind() {
       BlockKind::Condition(cond) => {
+        let cond = cond.as_ref::<Operand>(block.sys).unwrap();
+        let cond = cond.get_value();
         res.push_str(&format!(
           "  if {}{} {{\n",
           dump_ref!(self.sys, &cond),
@@ -467,7 +469,6 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
     }
     self.indent -= 2;
-    if let BlockKind::Condition(_) = block.get_kind() {}
     match block.get_kind() {
       BlockKind::Condition(_) | BlockKind::Cycle(_) => {
         res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));

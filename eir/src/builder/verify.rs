@@ -11,14 +11,30 @@ use super::SysBuilder;
 impl Operand {
   fn verify(&self, sys: &SysBuilder) {
     assert!(sys.contains(&self.upcast()));
-    let expr = self
-      .get_user()
-      .as_ref::<Expr>(sys)
-      .expect("User should be an expression!");
-    let operand = expr
-      .operand_iter()
-      .position(|op| self.upcast().eq(&op.upcast()));
-    assert!(operand.is_some());
+    match self.get_user().get_kind() {
+      NodeKind::Expr => {
+        let expr = self
+          .get_user()
+          .as_ref::<Expr>(sys)
+          .expect("User should be an expression!");
+        let operand = expr
+          .operand_iter()
+          .position(|op| self.upcast().eq(&op.upcast()));
+        assert!(operand.is_some());
+      }
+      NodeKind::Block => {
+        let block = self
+          .get_user()
+          .as_ref::<Block>(sys)
+          .expect("User should be a block!");
+        if let BlockKind::Condition(cond) = block.get_kind() {
+          assert!(cond.eq(&self.upcast()));
+        } else {
+          panic!("Invalid block type!");
+        }
+      }
+      _ => panic!("Invalid user type!"),
+    }
   }
 }
 

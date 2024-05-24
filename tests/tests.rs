@@ -37,6 +37,7 @@ register_test!(explicit_pop::explicit_pop);
 register_test!(select::select);
 register_test!(helloworld::helloworld);
 register_test!(common_read::common_read);
+register_test!(cond_cse::cond_cse);
 register_test!(arbiter::arbiter);
 register_test!(spin_lock::spin_lock);
 register_test!(async_call::async_call);

@@ -8,7 +8,7 @@ use crate::{
     instructions,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
-    Array, BlockKind, Expr, IntImm, Opcode,
+    Array, Expr, IntImm, Opcode,
   },
 };
 
@@ -128,7 +128,7 @@ pub fn rewrite_array_partitions(sys: &mut SysBuilder) {
               sys.set_insert_before(user.clone());
               let cur = sys.get_const_int(idx_ty.clone(), x as u64);
               let cond = sys.create_eq(created_here!(), idx.clone(), cur);
-              let block = sys.create_block(BlockKind::Condition(cond));
+              let block = sys.create_conditional_block(cond);
               sys.set_current_block(block);
               sys.create_array_write(created_here!(), partition[x], zero, value.unwrap());
             });

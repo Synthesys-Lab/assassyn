@@ -3,6 +3,7 @@ pub mod array;
 pub mod async_call;
 pub mod back_pressure;
 pub mod bind;
+pub mod cond_cse;
 pub mod common_read;
 pub mod concat;
 pub mod data_type_conversion;
