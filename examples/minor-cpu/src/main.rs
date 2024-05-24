@@ -236,7 +236,7 @@ fn main() {
     32,
     1024,
     1..=1,
-    Some("binaries/0to100.mem".into()),
+    Some("resources/0to100.exe".into()),
     |sys, module, write, rdata| {
       decoder_impl(
         sys,

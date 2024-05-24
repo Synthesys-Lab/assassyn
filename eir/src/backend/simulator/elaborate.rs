@@ -524,19 +524,23 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       }
       pub fn init_vec_by_hex_file<T: Num, const N: usize>(array: &mut [T; N], init_file: &str) {
         let mut idx = 0;
-        for line in read_to_string(init_file).expect("can not open hex file").lines() {
-          let line = if let Some(idx) = line.find("//") {
-            line[..idx].trim()
+        for line in read_to_string(init_file)
+          .expect("can not open hex file")
+          .lines()
+        {
+          let line = if let Some(to_strip) = line.find("//") {
+            line[..to_strip].trim()
           } else {
             line.trim()
           };
           if line.len() == 0 {
             continue;
           }
-          if line.starts_with("@") {
-            todo!();
-          }
           let line = line.replace("_", "");
+          if line.starts_with("@") {
+            let addr = usize::from_str_radix(&line[1..], 16).unwrap();
+            idx = addr;
+          }
           array[idx] = T::from_str_radix(line.as_str(), 16).ok().unwrap();
           idx += 1;
         }
