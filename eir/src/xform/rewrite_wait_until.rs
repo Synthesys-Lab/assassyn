@@ -1,9 +1,11 @@
 use crate::{
-  builder::SysBuilder, created_here, ir::{
+  builder::SysBuilder,
+  created_here,
+  ir::{
     node::{BaseNode, IsElement, ModuleRef},
     visitor::Visitor,
     Block, BlockKind, Module,
-  }
+  },
 };
 
 struct GatherModulesToRewrite {

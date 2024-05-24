@@ -1,13 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  builder::{PortInfo, SysBuilder}, created_here, ir::{
+  builder::{PortInfo, SysBuilder},
+  created_here,
+  ir::{
     instructions::{Bind, FIFOPush},
     module,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
     Block, BlockKind, DataType, Expr, Module,
-  }
+  },
 };
 
 struct GatherBinds {

@@ -1,13 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  builder::SysBuilder, created_here, ir::{
+  builder::SysBuilder,
+  created_here,
+  ir::{
     data::ArrayAttr,
     instructions,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
     Array, BlockKind, Expr, IntImm, Opcode,
-  }
+  },
 };
 
 struct GatherUsage {

@@ -123,11 +123,7 @@ macro_rules! create_arith_op_impl {
   (unary, $func_name:ident, $opcode: expr) => {
     pub fn $func_name(&mut self, site: Filesite, x: BaseNode) -> BaseNode {
       let res_ty = x.get_dtype(self).unwrap_or_else(|| {
-        panic!(
-          "{}{} has no type!",
-          site.to_string(),
-          x.to_string(self)
-        );
+        panic!("{}{} has no type!", site.to_string(), x.to_string(self));
       });
       self.create_expr(res_ty, $opcode, vec![x.clone()], true)
     }
@@ -834,12 +830,7 @@ impl SysBuilder {
   }
 
   /// Create a cast operation.
-  pub fn create_bitcast(
-    &mut self,
-    _: Filesite,
-    src: BaseNode,
-    dest_ty: DataType,
-  ) -> BaseNode {
+  pub fn create_bitcast(&mut self, _: Filesite, src: BaseNode, dest_ty: DataType) -> BaseNode {
     let res = self.create_expr(
       dest_ty,
       Opcode::Cast {
