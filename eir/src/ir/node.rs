@@ -82,10 +82,9 @@ macro_rules! emit_elem_impl {
             }
           }
           Err(format!(
-            "IsElement::downcast: expecting {}, {:?}({})",
+            "IsElement::downcast: expecting {}, but {:?}",
             stringify!($name),
-            node.get_kind(),
-            node.get_key()
+            node,
           ))
         }
 

@@ -140,4 +140,6 @@ pub fn rewrite_array_partitions(sys: &mut SysBuilder) {
     }
     sys.remove_array(array.clone());
   }
+
+  super::erase_metadata::erase_metadata(sys);
 }

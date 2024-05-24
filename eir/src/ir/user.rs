@@ -109,7 +109,9 @@ impl GatherAllUses {
 impl Visitor<()> for GatherAllUses {
   fn visit_operand(&mut self, operand: OperandRef<'_>) -> Option<()> {
     if operand.get_value().eq(&self.src) {
-      self.uses.insert((operand.get_user().clone(), operand.get_idx(), None));
+      self
+        .uses
+        .insert((operand.get_user().clone(), operand.get_idx(), None));
     }
     None
   }

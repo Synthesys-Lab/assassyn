@@ -57,6 +57,9 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
         module.get_body().upcast(),
       )
     };
+    if ports.is_empty() {
+      continue;
+    }
     sys.set_current_module(module);
     sys.set_current_block(body);
     sys.set_current_block_wait_until();
