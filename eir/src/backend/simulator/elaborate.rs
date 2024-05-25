@@ -540,6 +540,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
           if line.starts_with("@") {
             let addr = usize::from_str_radix(&line[1..], 16).unwrap();
             idx = addr;
+            continue;
           }
           array[idx] = T::from_str_radix(line.as_str(), 16).ok().unwrap();
           idx += 1;

@@ -18,7 +18,7 @@ module_builder!(
       pc[0] = pc[0].bitcast(int<32>).add(4.int<32>).bitcast(bits<32>);
     }
     when on_branch[0] {
-      log("on a branch, stall fetching");
+      log("on a branch, stall fetching, pc freeze @ 0x{:x}", pc[0]);
     }
   }
 );
@@ -57,6 +57,7 @@ module_builder!(
       read_b_imm = is_bne;
 
       when is_bne {
+        log("set on-branch!");
         on_branch[0] = 1.bits<1>;
       }
 
@@ -147,23 +148,25 @@ module_builder!(
 
       when is_branch {
         on_branch[0] = 0.bits<1>;
-        log("reset on_branch reg");
+        log("reset on-branch");
       }
 
       when is_bne {
-        new_pc  = pc[0].bitcast(int<32>).sub(4.int<32>).add(imm_value.bitcast(int<32>)).bitcast(bits<32>);
-        log("{} + {} + {}", pc[0].bitcast(int<32>), 4.int<32>, imm_value.bitcast(int<32>));
+        new_pc  = pc[0].bitcast(int<32>).sub(8.int<32>).add(imm_value.bitcast(int<32>)).bitcast(bits<32>);
+        log("{} - {} + {} = {}", pc[0].bitcast(int<32>), 8.int<32>, imm_value.bitcast(int<32>), new_pc);
         br_dest = a.neq(b).select(new_pc, pc[0]);
         log("if {} != {}: branch to {}; actual: {}", a, b, new_pc, br_dest);
         pc[0] = br_dest;
       }
 
       is_memory = is_lw;
+
+      request_addr = is_memory.select(result.slice(2, 19).bitcast(uint<17>), 0.uint<17>);
       when is_memory {
-        log("addr: {:x}", result);
+        log("addr: {:x}, lineno: {:x}", result, request_addr);
       }
 
-      async_call memory { write: 0.bits<1>, addr: result.slice(0, 17).bitcast(uint<17>), wdata: a };
+      async_call memory { write: 0.bits<1>, addr: request_addr, wdata: a };
       wb = bind writeback { opcode: opcode, rd: rd_reg, result: result };
     }
   }.expose(wb)
@@ -171,6 +174,7 @@ module_builder!(
 
 module_builder!(
   memory_access(we, data, writeback)() {
+    log("mem-data: 0x{:x}", data);
     async_call writeback { mdata: data };
   }
 );
@@ -215,7 +219,13 @@ fn main() {
   // Top function
   let writeback = writeback_builder(&mut sys, reg_file, reg_onwrite);
 
-  let memory_access = sys.declare_memory("memory_access", 32, 65536 * 2, 1..=1, None);
+  let memory_access = sys.declare_memory(
+    "memory_access",
+    32,
+    65536 * 2,
+    1..=1,
+    Some("resources/0to100.data".into()),
+  );
 
   let (exec, wb) = execution_builder(
     &mut sys,
@@ -238,15 +248,7 @@ fn main() {
     1..=1,
     Some("resources/0to100.exe".into()),
     |sys, module, write, rdata| {
-      decoder_impl(
-        sys,
-        module,
-        write,
-        rdata,
-        pc,
-        on_branch,
-        exec,
-      );
+      decoder_impl(sys, module, write, rdata, pc, on_branch, exec);
     },
   );
 
@@ -258,11 +260,11 @@ fn main() {
 
   let config = eir::backend::common::Config {
     resource_base: PathBuf::from(env!("CARGO_MANIFEST_DIR")),
-    sim_threshold: 100,
+    sim_threshold: 1000,
     ..Default::default()
   };
 
-  let o1 = eir::xform::Config{
+  let o1 = eir::xform::Config {
     rewrite_wait_until: true,
   };
   xform::basic(&mut sys, &o1);
