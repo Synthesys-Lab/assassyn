@@ -62,8 +62,6 @@ module_builder!(
       }
 
       reg_a   = read_rs1.select(rs1, 0.bits<5>);
-
-
       reg_b   = read_rs2.select(rs2, 0.bits<5>);
 
       no_imm = bitwise_or(read_i_imm, read_u_imm, read_b_imm).flip();
@@ -96,6 +94,10 @@ module_builder!(
     reg_onwrite,
     on_branch,
     pc,
+    exec_bypass_reg,
+    exec_bypass_data,
+    mem_bypass_reg,
+    mem_bypass_data,
     rf,
     memory,
     writeback
@@ -109,13 +111,13 @@ module_builder!(
   ) {
     wait_until {
       // handle read after write
-      a_valid = reg_onwrite[a_reg.peek()].flip();
-      b_valid = reg_onwrite[b_reg.peek()].flip();
-      c_valid = reg_onwrite[rd_reg.peek()].flip();
-      valid = bitwise_and(a_valid, b_valid, c_valid);
+      a_valid = bitwise_or(reg_onwrite[a_reg.peek()].flip(), exec_bypass_reg[0].eq(a_reg.peek()), mem_bypass_reg[0].eq(a_reg.peek()));
+      b_valid = bitwise_or(reg_onwrite[b_reg.peek()].flip(), exec_bypass_reg[0].eq(b_reg.peek()), mem_bypass_reg[0].eq(b_reg.peek()));
+      rd_valid = reg_onwrite[rd_reg.peek()].flip();
+      valid = bitwise_and(a_valid, b_valid, rd_valid);
       when valid.flip() {
         log("operand not ready, stall execution, x{}: {}, x{}: {}, x{}: {}",
-            a_reg.peek(), a_valid, b_reg.peek(), b_valid, rd_reg.peek(), c_valid);
+            a_reg.peek(), a_valid, b_reg.peek(), b_valid, rd_reg.peek(), rd_valid);
       }
       valid
     } {
@@ -135,8 +137,13 @@ module_builder!(
       // instruction attributes
       uses_imm = bitwise_or(is_addi, is_bne);
       is_branch = is_bne;
-      a = rf[a_reg];
-      b = rf[b_reg];
+
+      a = exec_bypass_reg[0].eq(a_reg).select(
+                exec_bypass_data[0],
+                mem_bypass_reg[0].eq(a_reg).select(mem_bypass_data[0], rf[a_reg]));
+      b = exec_bypass_reg[0].eq(b_reg).select(
+                exec_bypass_data[0],
+                mem_bypass_reg[0].eq(b_reg).select(mem_bypass_data[0], rf[b_reg]));
 
       rhs = uses_imm.select(imm_value, b);
 
@@ -146,6 +153,11 @@ module_builder!(
       result = concat(invoke_adder, is_lui, is_branch).select_1hot(result, imm_value, 0.bits<32>);
       log("{:07b}: a: {:x}, b: {:x}, res: {:x}", opcode, a, rhs, result);
 
+      produced_by_exec   = bitwise_or(is_lui, is_addi, is_add);
+
+      exec_bypass_reg[0] = produced_by_exec.select(rd_reg, 0.bits<5>);
+      exec_bypass_data[0] = produced_by_exec.select(result, 0.bits<32>);
+
       when is_branch {
         on_branch[0] = 0.bits<1>;
         log("reset on-branch");
@@ -153,15 +165,18 @@ module_builder!(
 
       when is_bne {
         new_pc  = pc[0].bitcast(int<32>).sub(8.int<32>).add(imm_value.bitcast(int<32>)).bitcast(bits<32>);
-        log("{} - {} + {} = {}", pc[0].bitcast(int<32>), 8.int<32>, imm_value.bitcast(int<32>), new_pc);
         br_dest = a.neq(b).select(new_pc, pc[0]);
         log("if {} != {}: branch to {}; actual: {}", a, b, new_pc, br_dest);
         pc[0] = br_dest;
       }
 
       is_memory = is_lw;
+      is_memory_read = is_lw;
 
       request_addr = is_memory.select(result.slice(2, 19).bitcast(uint<17>), 0.uint<17>);
+
+      mem_bypass_reg[0] = is_memory_read.select(rd_reg, 0.bits<5>);
+
       when is_memory {
         log("addr: {:x}, lineno: {:x}", result, request_addr);
       }
@@ -173,9 +188,13 @@ module_builder!(
 );
 
 module_builder!(
-  memory_access(we, data, writeback)() {
+  memory_access(we, data, writeback, mem_bypass_reg, mem_bypass_data)() {
     log("mem-data: 0x{:x}", data);
     async_call writeback { mdata: data };
+    when mem_bypass_reg[0].neq(0.bits<5>) {
+      log("bypassing memory data: x{} = {}", mem_bypass_reg[0], data);
+    }
+    mem_bypass_data[0] = mem_bypass_reg[0].neq(0.bits<5>).select(data, 0.bits<32>);
   }
 );
 
@@ -227,18 +246,33 @@ fn main() {
     Some("resources/0to100.data".into()),
   );
 
+  let bits5 = eir::ir::DataType::Bits(5);
+  let (exec_bypass_reg, exec_bypass_data) = {
+    (sys.create_array(bits5.clone(), "bypass_reg", 1, None, vec![]),
+    sys.create_array(bits32.clone(), "bypass_data", 1, None, vec![]),)
+  };
+
+  let (mem_bypass_reg, mem_bypass_data) = {
+    (sys.create_array(bits5, "bypass_reg", 1, None, vec![]),
+    sys.create_array(bits32, "bypass_data", 1, None, vec![]),)
+  };
+
   let (exec, wb) = execution_builder(
     &mut sys,
     reg_onwrite,
     on_branch,
     pc,
+    exec_bypass_reg,
+    exec_bypass_data,
+    mem_bypass_reg,
+    mem_bypass_data,
     reg_file,
     memory_access,
     writeback,
   );
 
   sys.impl_memory(memory_access, |sys, module, write, rdata| {
-    memory_access_impl(sys, module, write, rdata, wb);
+    memory_access_impl(sys, module, write, rdata, wb, mem_bypass_reg, mem_bypass_data);
   });
 
   let decoder = sys.create_memory(
