@@ -11,10 +11,9 @@ mod codegen;
 mod parser;
 mod utils;
 
-use ast::node::{self, ParaDecl};
+use ast::node;
 
 use crate::ast::expr::ModuleAttrs;
-use ast::expr::PType;
 
 struct ModuleParser {
   module_name: syn::Ident,
