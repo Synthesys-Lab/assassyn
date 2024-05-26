@@ -7,7 +7,7 @@ pub fn multi_call() {
     log("adder: {} + {} = {}", a, b, c);
   });
 
-  module_builder!(driver(sqr)() {
+  module_builder!(driver(adder)() {
     cnt    = array(int<32>, 1);
     k      = cnt[0.int<32>];
     v      = k.add(1);
@@ -19,8 +19,8 @@ pub fn multi_call() {
     is_odd = v.bitwise_and(1);
     when is_odd {
       // TODO(@were): Enforce the partial call.
-      async_call sqr { a: even, b: even2 };
-      async_call sqr { a: odd,  b: odd2 };
+      async_call adder { a: even, b: even2 };
+      async_call adder { a: odd,  b: odd2 };
     }
   });
 

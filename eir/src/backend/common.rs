@@ -1,42 +1,41 @@
-use crate::{builder::SysBuilder, test_utils};
+use std::{env, path::PathBuf};
+
+use crate::builder::SysBuilder;
 
 pub struct Config {
   /// The name of the file to dump simulation code to a temporary directory.
-  pub temp_dir: bool,
+  pub base_dir: PathBuf,
   /// If true, the elaborator will remove the existing dump file before writing to it.
   pub override_dump: bool,
   /// The number of cycles to simulate
   pub sim_threshold: usize,
   /// The number of cycles allowed to be idle before the simulation is stopped
   pub idle_threshold: usize,
+  /// The base directory of memory initialization files
+  pub resource_base: PathBuf,
 }
 
 impl Default for Config {
   fn default() -> Self {
     Config {
-      temp_dir: true,
+      base_dir: env::temp_dir(),
       override_dump: true,
       sim_threshold: 100,
       idle_threshold: 100,
+      resource_base: PathBuf::new(),
     }
   }
 }
 
 impl Config {
-  pub fn fname(&self, sys: &SysBuilder, suffix: &str) -> String {
+  /// The name of the file to which the elaboration code is dumped.
+  pub fn fname(&self, sys: &SysBuilder, suffix: &str) -> PathBuf {
     let fname = format!("{}.{}", sys.get_name(), suffix);
-    return if self.temp_dir {
-      test_utils::temp_dir(&fname)
-    } else {
-      fname
-    };
+    self.base_dir.join(fname).into()
   }
 
-  pub fn dir_name(&self, sys: &SysBuilder) -> String {
-    return if self.temp_dir {
-      test_utils::temp_dir(&sys.get_name().to_string())
-    } else {
-      sys.get_name().to_string()
-    };
+  /// The name of the directory to which the elaboration code is dumped.
+  pub fn dir_name(&self, sys: &SysBuilder) -> PathBuf {
+    self.base_dir.join(sys.get_name())
   }
 }

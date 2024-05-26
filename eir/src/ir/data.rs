@@ -1,4 +1,4 @@
-use crate::ir::node::*;
+use crate::{builder::SysBuilder, ir::node::*};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum DataType {
@@ -187,12 +187,18 @@ impl IntImm {
   }
 }
 
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum ArrayAttr {
+  FullyPartitioned,
+}
+
 pub struct Array {
   pub(crate) key: usize,
   name: String,
   scalar_ty: DataType,
   size: usize,
   init: Option<Vec<BaseNode>>,
+  attrs: Vec<ArrayAttr>,
 }
 
 impl Typed for Array {
@@ -202,14 +208,25 @@ impl Typed for Array {
 }
 
 impl Array {
-  pub fn new(scalar_ty: DataType, name: String, size: usize, init: Option<Vec<BaseNode>>) -> Array {
+  pub fn new(
+    scalar_ty: DataType,
+    name: String,
+    size: usize,
+    init: Option<Vec<BaseNode>>,
+    attrs: Vec<ArrayAttr>,
+  ) -> Array {
     Self {
       key: 0,
       scalar_ty,
       name,
       size,
       init,
+      attrs,
     }
+  }
+
+  pub fn get_attrs(&self) -> &Vec<ArrayAttr> {
+    &self.attrs
   }
 
   pub fn get_size(&self) -> usize {
@@ -226,6 +243,20 @@ impl Array {
 
   pub fn get_initializer(&self) -> Option<&Vec<BaseNode>> {
     self.init.as_ref()
+  }
+}
+
+impl SysBuilder {
+  pub fn remove_array(&mut self, array: BaseNode) {
+    let key = {
+      let mut iter = self.array_iter().filter(|x| x.get_key() == array.get_key());
+      let array = iter.next().unwrap();
+      assert!(iter.next().is_none());
+      let key = array.get_key();
+      key
+    };
+    self.global_symbols.retain(|_, v| v.get_key() != key);
+    self.dispose(array);
   }
 }
 

@@ -71,37 +71,60 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
         _ => {
           let a = emit_expr_body(self_)?;
           let method_id = syn::Ident::new(format!("create_{}", op).as_str(), op.span());
-          let (b_def, b_use) =
-            if opcode.arity().unwrap() == 2 || matches!(opcode, Opcode::Cast { .. }) {
-              let b = emit_expr_body(&operands[0])?;
-              (Some(quote! { let rhs = #b.clone(); }), Some(quote! { rhs }))
-            } else if opcode.arity().unwrap() == 1 {
-              (None, None)
-            } else {
-              return Err(syn::Error::new(
-                op.span(),
-                format!(
-                  "Unsupported operator: \"{}\" with arity {}",
-                  op,
-                  opcode.arity().unwrap_or(0)
-                ),
-              ));
-            };
+          let (operand_def, operand_use) = {
+            let mut operand_def = Punctuated::new();
+            let mut operand_use = Punctuated::new();
+            for elem in operands.iter() {
+              let value = emit_expr_body(elem)?;
+              let id = syn::Ident::new(&format!("_{}", operand_def.len()), Span::call_site());
+              operand_def.push(quote! { let #id = #value });
+              operand_def.push_punct(Token![;](Span::call_site()));
+              operand_use.push(id);
+              operand_use.push_punct(Token![,](Span::call_site()));
+            }
+            (operand_def, operand_use)
+          };
+          let operand_use = if matches!(
+            Opcode::from_str(&op.to_string()).unwrap(),
+            Opcode::Select1Hot
+          ) {
+            let rev = operand_use
+              .into_iter()
+              .rev()
+              .collect::<Punctuated<_, Token![,]>>();
+            quote! { vec![#rev] }
+          } else {
+            quote! { #operand_use }
+          };
           Ok(quote_spanned! { op.span() => {
             let src = #a.clone();
-            #b_def
-            let res = sys.#method_id(src, #b_use);
+            #operand_def
+            let res = sys.#method_id(eir::created_here!(), src, #operand_use);
             res
           }})
         }
       }
     }
+    expr::Expr::BinaryReduce((op, operands)) => {
+      let method_id = syn::Ident::new(&format!("create_{}", op), op.span());
+      let mut res = emit_expr_body(&operands[0])?;
+      res = quote_spanned! { op.span()=> { let value = { #res }.clone(); value } };
+      for i in 1..operands.len() {
+        let operand = emit_expr_body(&operands[i])?;
+        res = quote_spanned! { op.span() => {
+          let value = { #res }.clone();
+          let operand = { #operand }.clone();
+          sys.#method_id(eir::created_here!(), value, operand)
+        } };
+      }
+      Ok(res)
+    }
     expr::Expr::Term(term) => {
       let res = emit_expr_term(term)?;
       if let ExprTerm::ArrayAccess(_) = term {
         Ok(quote_spanned! { term.span() => {
-          let ptr = { #res };
-          sys.create_array_read(ptr)
+          let (array, idx) = { #res };
+          sys.create_array_read(eir::created_here!(), array, idx)
         }})
       } else {
         Ok(res)
@@ -117,13 +140,13 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           let carry = { #res }.clone();
           let cond = { #cond }.clone();
           let value = { #value }.clone();
-          sys.create_select(cond, value, carry)
+          sys.create_select(eir::created_here!(), cond, value, carry)
         }};
       }
       Ok(res)
     }
-    //(DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)
-    expr::Expr::ArrayAlloc((ty, size, init)) => {
+    //("array", DType, syn::LitInt, Option<Punctuated<ExprTerm, Token![,]>>)
+    expr::Expr::ArrayAlloc((tok, ty, size, init, attrs)) => {
       let ty = emit_type(ty)?;
       let (init_values, init_list) = if let Some(init) = init {
         let mut init_values = Punctuated::new();
@@ -142,19 +165,27 @@ pub(crate) fn emit_expr_body(expr: &ast::expr::Expr) -> syn::Result<proc_macro2:
           quote_spanned! { init_span => Some(vec![#init_list]) },
         )
       } else {
-        (None, quote_spanned! { ty.span() => None })
+        (None, quote_spanned! { tok.span() => None })
       };
+      let mut attr_list: Punctuated<_, Token![,]> = Punctuated::new();
+      attrs.iter().for_each(|attr| {
+        let id = camelize(&attr.to_string());
+        let id = syn::Ident::new(&id, attr.span());
+        attr_list.push_value(quote! { eir::ir::data::ArrayAttr::#id });
+        attr_list.push_punct(Token![,](attr.span()));
+      });
+
       Ok(quote_spanned! {
-        ty.span() => {
+        tok.span() => {
           #init_values
-          sys.create_array(#ty, "array", #size, #init_list)
+          sys.create_array(#ty, "array", #size, #init_list, vec![#attr_list])
         }
       })
     }
     expr::Expr::Bind(call) => {
       let func = &call.func;
       let args = &call.args;
-      let args = emit_arg_binds(func, args);
+      let args = emit_arg_binds(func, args, true);
       Ok(quote! {{ #args; bind }})
     }
   }
@@ -182,13 +213,27 @@ fn emit_array_access(aa: &ArrayAccess) -> syn::Result<proc_macro2::TokenStream> 
   let idx = emit_expr_body(aa.idx.as_ref())?;
   // TODO(@were): Better span handling later.
   Ok(quote_spanned! { aa.id.span() => {
-    let idx = { #idx }.clone();
-    sys.create_array_ptr(#id.clone(), idx)
+    {
+      let array = { #id }.clone();
+      let idx = { #idx }.clone();
+      (array, idx)
+    }
   }})
 }
 
 // TODO(@were): Union the func and arg span to have the span.
-pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2::TokenStream {
+pub(crate) fn emit_arg_binds(
+  func: &syn::Ident,
+  args: &FuncArgs,
+  is_bind: bool,
+) -> proc_macro2::TokenStream {
+  // If it is a bind, give a None to respect the callee's eager.
+  let override_eager = if is_bind {
+    quote! { None }
+  } else {
+    // If it is a function call, give it a false to anyways disable the callee's eager.
+    quote! { Some(false) }
+  };
   let bind = match args {
     FuncArgs::Bound(binds) => binds
       .iter()
@@ -196,7 +241,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
         let value = emit_expr_body(v).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {v}));
         quote! {
           let value = { #value }.clone();
-          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, None);
+          let bind = sys.add_bind(bind, stringify!(#k).to_string(), value, #override_eager);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -206,7 +251,7 @@ pub(crate) fn emit_arg_binds(func: &syn::Ident, args: &FuncArgs) -> proc_macro2:
         let value = emit_expr_body(x).unwrap_or_else(|_| panic!("Failed to emit {}", quote! {x}));
         quote! {
           let value = { #value }.clone();
-          let bind = sys.push_bind(bind, value, None);
+          let bind = sys.push_bind(bind, value, #override_eager);
         }
       })
       .collect::<Vec<proc_macro2::TokenStream>>(),
@@ -239,9 +284,9 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
         let array_ptr = emit_array_access(aa)?;
         let right = emit_expr_body(right)?;
         quote! {{
-          let ptr = #array_ptr;
+          let (array, idx) = #array_ptr;
           let value = #right;
-          sys.create_array_write(ptr, value);
+          sys.create_array_write(eir::created_here!(), array, idx, value);
         }}
       }
       expr::LValue::IdentList(l) => {
@@ -253,17 +298,10 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
     },
     Statement::Call((kind, call)) => match kind {
       CallKind::Async => {
-        let args = emit_arg_binds(&call.func, &call.args);
+        let args = emit_arg_binds(&call.func, &call.args, false);
         quote! {{
           #args;
-          if {
-            !sys
-              .get_current_module()
-              .unwrap()
-              .has_attr(eir::ir::module::Attribute::EagerBind)
-          } {
-            sys.create_async_call(bind);
-          }
+          sys.create_async_call(bind);
         }}
       }
       CallKind::Inline(lval) => match &call.args {
@@ -302,15 +340,16 @@ pub(crate) fn emit_parsed_instruction(inst: &Statement) -> syn::Result<TokenStre
     Statement::BodyScope((pred, body)) => {
       let unwraped_body = emit_body(body)?;
       let block_init = match pred {
-        BodyPred::Condition(ref cond) => quote! {
-          let cond = #cond.clone();
-          let block_pred = eir::ir::block::BlockKind::Condition(cond);
-          let block = sys.create_block(block_pred);
-        },
+        BodyPred::Condition(ref cond) => {
+          let cond = emit_expr_body(cond)?;
+          quote! {
+            let cond = { #cond }.clone();
+            let block = sys.create_conditional_block(cond);
+          }
+        }
         BodyPred::Cycle(cycle) => quote! {
           let cycle = #cycle.clone();
-          let block_pred = eir::ir::block::BlockKind::Cycle(cycle);
-          let block = sys.create_block(block_pred);
+          let block = sys.create_cycled_block(cycle);
         },
         _ => panic!("wait_until should only be the root of a module"),
       };

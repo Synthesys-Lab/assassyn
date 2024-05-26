@@ -2,7 +2,7 @@ use syn::{braced, parenthesized, parse::Parse, punctuated::Punctuated};
 
 use crate::ast::{
   self,
-  expr::{self, LValue, PType},
+  expr::{self, LValue, PType, Expr},
   node::{self, CallKind, FuncArgs, FuncCall, Statement},
   DType, ExprTerm,
 };
@@ -121,7 +121,7 @@ impl Parse for Statement {
           // TODO(@were): To keep it simple, for now, only a ident is allowed.
           input.parse::<syn::Ident>()?; // when
           let pred = match tok_lit.as_str() {
-            "when" => node::BodyPred::Condition(input.parse::<syn::Ident>()?),
+            "when" => node::BodyPred::Condition(input.parse::<Expr>()?),
             "wait_until" => {
               let pred = input.parse::<node::Body>()?;
               assert!(pred.valued);

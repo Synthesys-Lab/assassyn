@@ -67,7 +67,7 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
     let bits = dtype.get_bits();
     return if bits == 1 {
       "bool".to_string()
-    } else if bits.is_power_of_two() && bits < 8 {
+    } else if bits < 8 {
       format!("u8")
     } else {
       format!("u{}", dtype.get_bits().next_power_of_two())

@@ -5,6 +5,7 @@ pub mod back_pressure;
 pub mod bind;
 pub mod common_read;
 pub mod concat;
+pub mod cond_cse;
 pub mod data_type_conversion;
 pub mod eager_bind;
 pub mod explicit_pop;

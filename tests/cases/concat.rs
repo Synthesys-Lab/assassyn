@@ -25,8 +25,7 @@ pub fn concat() {
 
   let config = eir::backend::common::Config::default();
 
-  // FIXME(@boyang): Implement FIFOValid!
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
   run_simulator(
     &sys,

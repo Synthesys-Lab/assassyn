@@ -19,8 +19,8 @@ pub fn fifo_valid() {
     k = cnt[0.int<32>];
     v = k.add(1);
     cnt[0] = v;
-    add = v.add(v);
-    async_call lhs { v: add };
+    vv = v.add(v);
+    async_call lhs { v: vv };
     async_call rhs { b: v };
   });
 

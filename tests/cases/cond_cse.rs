@@ -1,7 +1,9 @@
-use assassyn::module_builder;
-use eir::{builder::SysBuilder, test_utils::run_simulator};
+use eir::xform;
 
-pub fn common_read() {
+pub fn cond_cse() {
+  use assassyn::module_builder;
+  use eir::{builder::SysBuilder, test_utils::run_simulator};
+
   module_builder!(
     adder()(a:int<32>, b:int<32>) {
       c = a.add(b);
@@ -11,29 +13,30 @@ pub fn common_read() {
 
   module_builder!(
     driver(/*external interf*/adder)(/*in-ports*/) {
-      cnt     = array(int<32>, 1);
-      new_cnt = cnt[0].add(1);
-      cnt[0]  = new_cnt;
-      cond    = cnt[0].ilt(100);
-      when cond {
-        async_call adder { a: cnt[0], b: cnt[0] };
+      cnt    = array(int<32>, 1);
+      v      = cnt[0];
+      new_v  = v.add(1);
+      cnt[0] = new_v;
+      when v.ilt(100.int<32>) {
+        async_call adder { a: v, b: v };
+      }
+      when v.ilt(100.int<32>) {
+        log("aaa");
       }
     }
   );
 
-  let mut sys = SysBuilder::new("common_read");
-
+  let mut sys = SysBuilder::new("cond_cse");
   // Create a trivial module.
   let adder = adder_builder(&mut sys);
   // Build the driver module.
   driver_builder(&mut sys, adder);
 
-  println!("{}", sys);
-  let o1 = eir::xform::Config {
+  eir::builder::verify(&sys);
+  let o1 = xform::Config {
     rewrite_wait_until: true,
   };
   eir::xform::basic(&mut sys, &o1);
-  eir::builder::verify(&sys);
   println!("{}", sys);
 
   let config = eir::backend::common::Config {

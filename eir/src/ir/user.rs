@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::builder::SysBuilder;
 
-use super::{node::*, visitor::Visitor, Expr, Module, Opcode, FIFO};
+use super::{node::*, visitor::Visitor, Block, Expr, Module, FIFO};
 
 /// This node defines a def-use relation between the expression nodes.
 /// This is necessary because a node can be used by multiple in other user.
@@ -42,20 +42,26 @@ impl Operand {
 }
 
 impl OperandRef<'_> {
-  pub fn get_idx(&self) -> usize {
-    let expr = self.user.as_ref::<Expr>(self.sys).unwrap();
-    let mut iter = expr.operand_iter();
-    iter.position(|x| x.get_key() == self.get_key()).unwrap()
+  pub fn get_idx(&self) -> Option<usize> {
+    if let Ok(expr) = self.user.as_ref::<Expr>(self.sys) {
+      let mut iter = expr.operand_iter();
+      Some(iter.position(|x| x.get_key() == self.get_key()).unwrap())
+    } else {
+      None
+    }
   }
 }
 
 impl OperandMut<'_> {
   pub fn erase_self(&mut self) {
-    let idx = self.get().get_idx();
-    let user = self.get().user;
-    let mut expr = user.as_mut::<Expr>(self.sys).unwrap();
-    expr.remove_operand(idx);
-    self.sys.dispose(self.get().upcast());
+    if let Some(idx) = self.get().get_idx() {
+      let user = self.get().user;
+      let mut expr = user.as_mut::<Expr>(self.sys).unwrap();
+      expr.remove_operand(idx);
+      self.sys.dispose(self.get().upcast());
+    } else {
+      todo!("The user should be a block?")
+    }
   }
 }
 
@@ -88,7 +94,7 @@ impl_user_methods!(FIFO);
 
 struct GatherAllUses {
   src: BaseNode,
-  uses: HashSet<(BaseNode, usize, Option<BaseNode>)>,
+  uses: HashSet<(BaseNode, Option<usize>, Option<BaseNode>)>,
 }
 
 impl GatherAllUses {
@@ -101,15 +107,11 @@ impl GatherAllUses {
 }
 
 impl Visitor<()> for GatherAllUses {
-  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
-    if let Opcode::AsyncCall = expr.get_opcode() {
-      let bind = expr.get_operand(0).unwrap().get_value().clone();
-      self.dispatch(expr.sys, &bind, vec![]);
-    }
-    for (i, operand) in expr.operand_iter().enumerate() {
-      if operand.get_value().eq(&self.src) {
-        self.uses.insert((expr.upcast(), i, None));
-      }
+  fn visit_operand(&mut self, operand: OperandRef<'_>) -> Option<()> {
+    if operand.get_value().eq(&self.src) {
+      self
+        .uses
+        .insert((operand.get_user().clone(), operand.get_idx(), None));
     }
     None
   }
@@ -166,10 +168,15 @@ impl SysBuilder {
   pub fn replace_all_uses_with(&mut self, src: BaseNode, dst: BaseNode) {
     let mut gather = GatherAllUses::new(src);
     gather.enter(self);
-    for (expr, i, new_value) in gather.uses {
+    for (user, i, new_value) in gather.uses {
       let new_value = new_value.map_or(dst.clone(), |x| x);
-      let mut expr_mut = expr.as_mut::<Expr>(self).unwrap();
-      expr_mut.set_operand(i, new_value);
+      if let Some(i) = i {
+        let mut expr_mut = user.as_mut::<Expr>(self).unwrap();
+        expr_mut.set_operand(i, new_value);
+      } else {
+        let mut block_mut = user.as_mut::<Block>(self).unwrap();
+        block_mut.set_cond(new_value);
+      }
     }
   }
 }

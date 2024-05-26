@@ -1,6 +1,6 @@
-use crate::ir::{expr::subcode, DataType, Opcode, Typed};
+use crate::ir::{expr::subcode, node::BaseNode, DataType, Opcode, Typed};
 
-use super::{Binary, Cast, Compare, Select, Unary};
+use super::{Binary, Cast, Compare, Select, Select1Hot, Unary};
 
 impl Binary<'_> {
   pub fn get_opcode(&self) -> subcode::Binary {
@@ -113,6 +113,32 @@ impl ToString for Select<'_> {
       self.cond().to_string(self.get().sys),
       self.true_value().to_string(self.get().sys),
       self.false_value().to_string(self.get().sys)
+    )
+  }
+}
+
+impl Select1Hot<'_> {
+  pub fn value_iter(&self) -> impl Iterator<Item = BaseNode> + '_ {
+    self
+      .expr
+      .operand_iter()
+      .skip(1)
+      .map(|x| x.get_value().clone())
+  }
+}
+
+impl ToString for Select1Hot<'_> {
+  fn to_string(&self) -> String {
+    let values = self
+      .value_iter()
+      .map(|x| x.to_string(self.expr.sys))
+      .collect::<Vec<_>>()
+      .join(", ");
+    format!(
+      "{} = select1hot {} ({})",
+      self.expr.get_name(),
+      self.cond().to_string(self.get().sys),
+      values
     )
   }
 }

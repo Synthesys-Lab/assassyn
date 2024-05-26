@@ -80,9 +80,8 @@ macro_rules! register_opcode {
 }
 
 register_opcode!(
-  GetElementPtr => { (array, 0, node::Array) (index, 1, BaseNode) },
-  Load => { (pointer, 0, expr::GetElementPtr) },
-  Store => { (pointer, 0, expr::GetElementPtr) (value, 1, BaseNode) },
+  Load => { (array, 0, node::Array) (idx, 1, BaseNode) },
+  Store => { (array, 0, node::Array) (idx, 1, BaseNode) (value, 2, BaseNode) },
   Bind => {  },
   AsyncCall => { (bind, 0, expr::Bind) },
   FIFOPush => { (fifo, 0, node::FIFO) (value, 1, BaseNode) },
@@ -91,6 +90,7 @@ register_opcode!(
   Binary { binop } => { (a, 0, BaseNode) (b, 1, BaseNode) },
   Unary { uop } => { (x, 0, BaseNode) },
   Select => { (cond, 0, BaseNode) (true_value, 1, BaseNode) (false_value, 2, BaseNode) },
+  Select1Hot => { (cond, 0, BaseNode) },
   Compare { cmp } => { (a, 0, BaseNode) (b, 1, BaseNode) },
   Slice => { (x, 0, BaseNode) (l_intimm, 1, node::IntImm) (r_intimm, 2, node::IntImm) },
   Concat => { (msb, 0, BaseNode) (lsb, 1, BaseNode) },

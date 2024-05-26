@@ -2,21 +2,50 @@ use std::collections::HashMap;
 
 use super::node::BaseNode;
 
-pub struct Template {
-  module: BaseNode,
+pub struct TemplateMaster {
+  params: Vec<BaseNode>,
+}
+
+pub struct TemplateInstance {
+  master: BaseNode,
   params: HashMap<BaseNode, BaseNode>,
 }
 
-impl Template {
-  pub fn new(module: BaseNode, params: HashMap<BaseNode, BaseNode>) -> Self {
-    Self { module, params }
+impl TemplateMaster {
+  pub fn new(params: Vec<BaseNode>) -> Self {
+    TemplateMaster { params }
   }
 
-  pub fn get_module(&self) -> &BaseNode {
-    &self.module
+  pub fn get_params(&self) -> &Vec<BaseNode> {
+    &self.params
+  }
+}
+
+impl TemplateInstance {
+  pub fn new(master: BaseNode, params: HashMap<BaseNode, BaseNode>) -> Self {
+    TemplateInstance { master, params }
+  }
+
+  pub fn get_master(&self) -> &BaseNode {
+    &self.master
   }
 
   pub fn get_params(&self) -> &HashMap<BaseNode, BaseNode> {
     &self.params
+  }
+}
+
+impl Default for TemplateMaster {
+  fn default() -> Self {
+    TemplateMaster { params: Vec::new() }
+  }
+}
+
+impl Default for TemplateInstance {
+  fn default() -> Self {
+    TemplateInstance {
+      master: BaseNode::unknown(),
+      params: HashMap::new(),
+    }
   }
 }

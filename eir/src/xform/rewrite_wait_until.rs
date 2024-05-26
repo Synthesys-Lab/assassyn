@@ -1,5 +1,6 @@
 use crate::{
   builder::SysBuilder,
+  created_here,
   ir::{
     node::{BaseNode, IsElement, ModuleRef},
     visitor::Visitor,
@@ -56,6 +57,9 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
         module.get_body().upcast(),
       )
     };
+    if ports.is_empty() {
+      continue;
+    }
     sys.set_current_module(module);
     sys.set_current_block(body);
     sys.set_current_block_wait_until();
@@ -70,7 +74,7 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
         .into_iter()
         .fold(None, |acc, v| match acc {
           None => Some(v),
-          Some(acc) => Some(sys.create_bitwise_and(acc, v)),
+          Some(acc) => Some(sys.create_bitwise_and(created_here!(), acc, v)),
         })
         .unwrap();
       // FIXME: Use the real condition.

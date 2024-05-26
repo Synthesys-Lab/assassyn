@@ -130,11 +130,33 @@ impl BlockMut<'_> {
   pub fn set_value(&mut self, value: BaseNode) {
     self.get_mut().kind = BlockKind::Valued(value);
   }
+
+  /// Set the condition of the block.
+  pub fn set_cond(&mut self, cond: BaseNode) {
+    let operand = Operand::new(cond);
+    let operand_ref = self.sys.insert_element(operand);
+    operand_ref
+      .as_mut::<Operand>(self.sys)
+      .unwrap()
+      .get_mut()
+      .set_user(self.elem.clone());
+    match &self.get().kind {
+      BlockKind::Condition(x) => {
+        self.sys.remove_user(x.clone());
+      }
+      BlockKind::None => {}
+      _ => {
+        panic!("Invalid block kind!");
+      }
+    }
+    self.get_mut().kind = BlockKind::Condition(operand_ref);
+    self.sys.add_user(operand_ref);
+  }
 }
 
 impl SysBuilder {
   /// The implementation of the `create_block` method.
-  pub fn create_block_impl(&mut self, kind: BlockKind, insert: bool) -> BaseNode {
+  fn create_block_impl(&mut self, kind: BlockKind, insert: bool) -> BaseNode {
     let parent = self.get_current_block().unwrap().upcast();
     let instance = Block::new(kind, parent);
     let block = self.insert_element(instance);
@@ -152,14 +174,14 @@ impl SysBuilder {
   }
 
   /// Create a block and insert it to the current module.
-  pub fn create_block(&mut self, kind: BlockKind) -> BaseNode {
-    match kind {
-      BlockKind::WaitUntil(_) => {
-        panic!("Use `set_current_block_wait_until` to have a wait-until block!");
-      }
-      _ => {}
-    }
-    self.create_block_impl(kind, true)
+  pub fn create_conditional_block(&mut self, cond: BaseNode) -> BaseNode {
+    let block = self.create_block_impl(BlockKind::None, true);
+    block.as_mut::<Block>(self).unwrap().set_cond(cond);
+    block
+  }
+
+  pub fn create_cycled_block(&mut self, cycle: usize) -> BaseNode {
+    self.create_block_impl(BlockKind::Cycle(cycle), true)
   }
 
   /// Create a block and DO NOT insert it to the current module.

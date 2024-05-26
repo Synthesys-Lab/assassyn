@@ -10,7 +10,7 @@ use crate::{
   ir::{node::*, visitor::Visitor, *},
 };
 
-use self::expr::subcode;
+use self::{expr::subcode, module::Attribute};
 
 fn namify(name: &str) -> String {
   name.replace(".", "_")
@@ -22,8 +22,9 @@ macro_rules! fifo_name {
   }};
 }
 
-struct VerilogDumper<'a> {
+struct VerilogDumper<'a, 'b> {
   sys: &'a SysBuilder,
+  config: &'b Config,
   indent: usize,
   pred: Option<String>,
   fifo_pushes: HashMap<String, Vec<(String, String)>>, // fifo_name -> [(pred, value)]
@@ -36,10 +37,11 @@ struct VerilogDumper<'a> {
   fifo_drivers: HashMap<String, HashSet<String>>,    // fifo -> {driver module}
 }
 
-impl<'a> VerilogDumper<'a> {
-  fn new(sys: &'a SysBuilder) -> Self {
+impl<'a, 'b> VerilogDumper<'a, 'b> {
+  fn new(sys: &'a SysBuilder, config: &'b Config) -> Self {
     Self {
       sys,
+      config,
       indent: 0,
       pred: None,
       fifo_pushes: HashMap::new(),
@@ -53,7 +55,7 @@ impl<'a> VerilogDumper<'a> {
     }
   }
 
-  fn dump_array(&self, array: &ArrayRef) -> String {
+  fn dump_array(&self, array: &ArrayRef, mem_init_path: Option<&String>) -> String {
     let mut res = String::new();
     let array_name = namify(array.get_name());
     res.push_str(format!("// array: {}[{}]\n", array_name, array.get_size()).as_str());
@@ -165,17 +167,28 @@ impl<'a> VerilogDumper<'a> {
       )
       .as_str(),
     );
-    res.push_str("always_ff @(posedge clk or negedge rst_n)");
-    res.push_str(
-      format!(
-        "if (!rst_n) array_{}_q <= '{{default : {}'d0}};\n",
-        array_name,
-        array.scalar_ty().get_bits()
-      )
-      .as_str(),
-    );
+    res.push_str("always_ff @(posedge clk or negedge rst_n)\n");
+    if mem_init_path.is_some() {
+      res.push_str(
+        format!(
+          "if (!rst_n) $readmemh(\"{}\", array_{}_q);\n",
+          mem_init_path.unwrap(),
+          array_name
+        )
+        .as_str(),
+      );
+    } else {
+      res.push_str(
+        format!(
+          "if (!rst_n) array_{}_q <= '{{default : {}'d0}};\n",
+          array_name,
+          array.scalar_ty().get_bits()
+        )
+        .as_str(),
+      );
+    }
     res.push_str(&format!(
-      " else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
+      "else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
       array_name, array_name, array_name, array_name
     ));
 
@@ -511,7 +524,7 @@ impl<'a> VerilogDumper<'a> {
   }
 
   fn dump_runtime(
-    self: VerilogDumper<'a>,
+    self: VerilogDumper<'a, 'b>,
     mut fd: File,
     sim_threshold: usize,
   ) -> Result<(), Error> {
@@ -523,9 +536,32 @@ impl<'a> VerilogDumper<'a> {
     res.push_str("  input logic rst_n\n");
     res.push_str(");\n\n");
 
+    // memory initializations map
+    let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new(); // array -> init_file_path
+    for module in self.sys.module_iter() {
+      for attr in module.get_attrs() {
+        match attr {
+          Attribute::Memory(param) => {
+            if let Some(init_file) = &param.init_file {
+              let mut init_file_path = self.config.resource_base.clone();
+              init_file_path.push(init_file);
+              let init_file_path = init_file_path.to_str().unwrap();
+              let array = param.array.as_ref::<Array>(self.sys).unwrap();
+              mem_init_map.insert(array.upcast(), init_file_path.to_string());
+            }
+          }
+          _ => {}
+        }
+      }
+    }
+
     // array storage element definitions
     for array in self.sys.array_iter() {
-      res.push_str(self.dump_array(&array).as_str());
+      res.push_str(
+        self
+          .dump_array(&array, mem_init_map.get(&array.upcast()))
+          .as_str(),
+      );
     }
 
     // fifo storage element definitions
@@ -608,6 +644,7 @@ logic rst_n;
 initial begin
   $fsdbDumpfile(\"wave.fsdb\");
   $fsdbDumpvars();
+  $fsdbDumpMDA();
 end
 
 initial begin
@@ -703,7 +740,7 @@ macro_rules! dump_ref {
   };
 }
 
-impl<'a> Visitor<String> for VerilogDumper<'a> {
+impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     if self.current_module == "testbench" {
       self.has_testbench = true;
@@ -1091,6 +1128,8 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
     let mut res = String::new();
     match block.get_kind() {
       BlockKind::Condition(cond) => {
+        let cond = cond.as_ref::<Operand>(block.sys).unwrap();
+        let cond = cond.get_value().clone();
         self.pred = Some(format!(
           "({}{})",
           dump_ref!(self.sys, &cond),
@@ -1233,8 +1272,7 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         let dtype = expr.dtype();
         let name = namify(expr.upcast().to_string(self.sys).as_str());
         let load = expr.as_sub::<instructions::Load>().unwrap();
-        let gep = load.pointer();
-        let (array_ref, array_idx) = { (gep.array(), gep.index()) };
+        let (array_ref, array_idx) = (load.array(), load.idx());
         Some(format!(
           "logic [{}:0] {};\nassign {} = array_{}_q[{}];\n\n",
           dtype.get_bits() - 1,
@@ -1245,12 +1283,9 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         ))
       }
 
-      Opcode::GetElementPtr => Some("".into()),
-
       Opcode::Store => {
         let store = expr.as_sub::<instructions::Store>().unwrap();
-        let gep = store.pointer();
-        let (array_ref, array_idx) = { (gep.array(), gep.index()) };
+        let (array_ref, array_idx) = (store.array(), store.idx());
         let array_name = namify(array_ref.get_name());
         match self.array_drivers.get_mut(&array_name) {
           Some(ads) => {
@@ -1382,6 +1417,18 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
         ))
       }
 
+      Opcode::Concat => {
+        let dbits = expr.dtype().get_bits() - 1;
+        let name = namify(expr.upcast().to_string(self.sys).as_str());
+        let concat = expr.as_sub::<instructions::Concat>().unwrap();
+        let a = dump_ref!(self.sys, &concat.msb());
+        let b = dump_ref!(self.sys, &concat.lsb());
+        Some(format!(
+          "logic [{}:0] {};\nassign {} = {{{}, {}}};\n\n",
+          dbits, name, name, a, b
+        ))
+      }
+
       Opcode::Cast { .. } => {
         let dbits = expr.dtype().get_bits() - 1;
         let name = namify(expr.upcast().to_string(self.sys).as_str());
@@ -1447,9 +1494,9 @@ impl<'a> Visitor<String> for VerilogDumper<'a> {
 
 pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
   let fname = config.fname(sys, "sv");
-  println!("Writing verilog rtl to {}", fname);
+  println!("Writing verilog rtl to {}", fname.to_str().unwrap());
 
-  let mut vd = VerilogDumper::new(sys);
+  let mut vd = VerilogDumper::new(sys, config);
 
   let mut fd = File::create(fname)?;
 

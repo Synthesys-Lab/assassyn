@@ -82,10 +82,9 @@ macro_rules! emit_elem_impl {
             }
           }
           Err(format!(
-            "IsElement::downcast: expecting {}, {:?}({})",
+            "IsElement::downcast: expecting {}, but {:?}",
             stringify!($name),
-            node.get_kind(),
-            node.get_key()
+            node,
           ))
         }
 
@@ -354,7 +353,7 @@ impl BaseNode {
       }
       NodeKind::Block => {
         let block = self.as_ref::<Block>(sys).unwrap();
-        IRPrinter::new(false).visit_block(block).unwrap()
+        format!("block: _{}", block.get_key())
       }
       NodeKind::Expr => {
         let expr = self.as_ref::<Expr>(sys).unwrap();

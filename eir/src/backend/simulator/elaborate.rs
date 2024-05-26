@@ -2,7 +2,7 @@ use std::{
   collections::HashMap,
   fs::{self, File, OpenOptions},
   io::Write,
-  path::Path,
+  path::{Path, PathBuf},
   process::Command,
 };
 
@@ -20,7 +20,7 @@ use super::utils::{
   array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty, user_contains_opcode,
 };
 
-use self::{expr::subcode::Cast, instructions, ir_printer::IRPrinter};
+use self::{expr::subcode::Cast, instructions, ir_printer::IRPrinter, module::Attribute};
 
 use super::analysis;
 
@@ -198,8 +198,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Load => {
         let load = expr.as_sub::<instructions::Load>().unwrap();
-        let gep = load.pointer();
-        let (array, idx) = { (gep.array(), gep.index()) };
+        let (array, idx) = (load.array(), load.idx());
         format!(
           "{}[{} as usize].clone()",
           namify(array.get_name()),
@@ -210,8 +209,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Store => {
         let store = expr.as_sub::<instructions::Store>().unwrap();
-        let gep = store.pointer();
-        let (array, idx) = { (gep.array(), gep.index()) };
+        let (array, idx) = (store.array(), store.idx());
         let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
         let idx = dump_ref!(store.get().sys, &idx);
         let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
@@ -229,12 +227,6 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           }))
         }
         .to_string()
-      }
-      Opcode::GetElementPtr => {
-        format!(
-          "0 /* GEP: {}, to be handled by its load/store user */",
-          IRPrinter::new(false).visit_expr(expr).unwrap()
-        )
       }
       Opcode::AsyncCall => {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
@@ -356,6 +348,26 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           cond, true_value, false_value
         )
       }
+      Opcode::Select1Hot => {
+        let select1hot = expr.as_sub::<instructions::Select1Hot>().unwrap();
+        let cond = select1hot.cond();
+        let mut res = format!(
+          "{{ let cond = {}; assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");",
+          dump_ref!(self.sys, &cond)
+        );
+        for (i, value) in select1hot.value_iter().enumerate() {
+          if i != 0 {
+            res.push_str(" else ");
+          }
+          res.push_str(&format!(
+            "if cond >> {} & 1 != 0 {{ {} }}",
+            i,
+            dump_ref!(self.sys, &value)
+          ));
+        }
+        res.push_str(" else { unreachable!() } }");
+        res
+      }
       Opcode::Cast { .. } => {
         let cast = expr.as_sub::<instructions::Cast>().unwrap();
         let src_dtype = cast.src_type();
@@ -407,6 +419,8 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     let mut res = String::new();
     match block.get_kind() {
       BlockKind::Condition(cond) => {
+        let cond = cond.as_ref::<Operand>(block.sys).unwrap();
+        let cond = cond.get_value();
         res.push_str(&format!(
           "  if {}{} {{\n",
           dump_ref!(self.sys, &cond),
@@ -455,7 +469,6 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
     }
     self.indent -= 2;
-    if let BlockKind::Condition(_) = block.get_kind() {}
     match block.get_kind() {
       BlockKind::Condition(_) | BlockKind::Cycle(_) => {
         res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
@@ -491,6 +504,8 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
       use std::collections::BinaryHeap;
       use std::cmp::{Ord, Reverse};
       use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
+      use num_traits::Num;
+      use std::fs::read_to_string;
     }
     .to_string(),
   );
@@ -506,6 +521,30 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     &quote::quote! {
       pub fn cyclize(stamp: usize) -> String {
         format!("Cycle @{}.{:02}", stamp / 100, stamp % 100)
+      }
+      pub fn init_vec_by_hex_file<T: Num, const N: usize>(array: &mut [T; N], init_file: &str) {
+        let mut idx = 0;
+        for line in read_to_string(init_file)
+          .expect("can not open hex file")
+          .lines()
+        {
+          let line = if let Some(to_strip) = line.find("//") {
+            line[..to_strip].trim()
+          } else {
+            line.trim()
+          };
+          if line.len() == 0 {
+            continue;
+          }
+          let line = line.replace("_", "");
+          if line.starts_with("@") {
+            let addr = usize::from_str_radix(&line[1..], 16).unwrap();
+            idx = addr;
+            continue;
+          }
+          array[idx] = T::from_str_radix(line.as_str(), 16).ok().unwrap();
+          idx += 1;
+        }
       }
       pub trait ValueCastTo<T> {
         fn cast(&self) -> T;
@@ -952,6 +991,45 @@ macro_rules! impl_unwrap_slab {
     );
   }
 
+  // generate memory initializations
+  for module in sys.module_iter() {
+    for attr in module.get_attrs() {
+      match attr {
+        Attribute::Memory(param) => {
+          if let Some(init_file) = &param.init_file {
+            let init_file_path = config.resource_base.join(init_file);
+            let init_file_path = init_file_path.to_str().unwrap();
+            let array = param.array.as_ref::<Array>(sys).unwrap();
+            let slab_idx = slab_cache.get(&param.array).unwrap();
+            let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
+            let scalar_ty = dtype_to_rust_type(&scalar_ty)
+              .parse::<proc_macro2::TokenStream>()
+              .unwrap();
+            res.push_str(
+              format!(
+                "\n// initializing array {}, slab_idx = {}, with file {}\n",
+                array.get_name(),
+                slab_idx,
+                init_file
+              )
+              .as_str(),
+            );
+            res.push_str(
+              &quote::quote! {
+                init_vec_by_hex_file(
+                  data_slab[#slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>(),
+                  #init_file_path
+                );
+              }
+              .to_string(),
+            );
+          }
+        }
+        _ => {}
+      }
+    }
+  }
+
   // generate cycle gatekeeper
   for module in sys.module_iter() {
     let module_gatekeeper = syn::Ident::new(
@@ -1149,51 +1227,61 @@ fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
   fd.write("\n\n\n".as_bytes())
 }
 
-fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
+fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io::Error> {
   let dir_name = config.dir_name(sys);
-  if Path::new(&dir_name).exists() {
-    if config.override_dump {
-      fs::remove_dir_all(&dir_name)?;
-      fs::create_dir_all(&dir_name)?;
-    } else {
-      eprintln!(
-        "Directory {} already exists, may possibly lead to dump failure.",
-        dir_name
-      );
-    }
-  } else {
+  let dir = Path::new(&dir_name);
+  if !dir.exists() {
     fs::create_dir_all(&dir_name)?;
   }
-  eprintln!("Writing simulator code to rust project: {}", dir_name);
+  assert!(dir.is_dir());
+  let files = fs::read_dir(&dir_name)?;
+  if config.override_dump {
+    for elem in files {
+      let path = elem?.path();
+      if path.is_dir() {
+        fs::remove_dir_all(path)?;
+      } else {
+        fs::remove_file(path)?;
+      }
+    }
+  } else {
+    assert!(files.count() == 0);
+  }
+  eprintln!(
+    "Writing simulator code to rust project: {}",
+    dir_name.to_str().unwrap()
+  );
   let output = Command::new("cargo")
     .arg("init")
     .arg(&dir_name)
     .output()
     .expect("Failed to init cargo project");
   assert!(output.status.success());
+  let manifest = dir_name.join("Cargo.toml");
   // Dump the Cargo.toml and rustfmt.toml
   {
     let mut cargo = OpenOptions::new()
       .write(true)
       .append(true)
-      .open(format!("{}/Cargo.toml", dir_name))?;
+      .open(&manifest)?;
     writeln!(cargo, "num-bigint = \"0.4\"")?;
-    let mut fmt = fs::File::create(format!("{}/rustfmt.toml", dir_name))?;
+    writeln!(cargo, "num-traits = \"0.2\"")?;
+    let mut fmt = fs::File::create(dir_name.join("rustfmt.toml"))?;
     writeln!(fmt, "max_width = 100")?;
     writeln!(fmt, "tab_spaces = 2")?;
     fmt.flush()?;
   }
   // eprintln!("Writing simulator source to file: {}", fname);
-  let fname = format!("{}/src/main.rs", dir_name);
+  let fname = dir_name.join("src/main.rs");
   let (rt_src, ri) = dump_runtime(sys, config);
   {
-    let modules_file = format!("{}/src/modules.rs", dir_name);
+    let modules_file = dir_name.join("src/modules.rs");
     let mut fd = fs::File::create(modules_file).expect("Open failure");
     dump_modules(sys, &mut fd, &ri).expect("Dump module failure");
     fd.flush().expect("Flush modules failure");
   }
   {
-    let runtime_file = format!("{}/src/runtime.rs", dir_name);
+    let runtime_file = dir_name.join("src/runtime.rs");
     let mut fruntime = fs::File::create(runtime_file).expect("Open failure");
     fruntime
       .write(rt_src.as_bytes())
@@ -1205,17 +1293,17 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<String, std::io::
     dump_main(&mut fd).expect("Dump head failure");
     fd.flush().expect("Flush main failure");
   }
-  Ok(fname)
+  Ok(manifest)
 }
 
-pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<String, std::io::Error> {
-  let fname = elaborate_impl(sys, config)?;
+pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io::Error> {
+  let manifest = elaborate_impl(sys, config)?;
   let output = Command::new("cargo")
     .arg("fmt")
     .arg("--manifest-path")
-    .arg(&format!("{}/Cargo.toml", config.dir_name(sys)))
+    .arg(&manifest)
     .output()
     .expect("Failed to format");
   assert!(output.status.success(), "Failed to format: {:?}", output);
-  Ok(fname)
+  Ok(manifest)
 }

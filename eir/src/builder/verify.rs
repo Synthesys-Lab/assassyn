@@ -11,14 +11,30 @@ use super::SysBuilder;
 impl Operand {
   fn verify(&self, sys: &SysBuilder) {
     assert!(sys.contains(&self.upcast()));
-    let expr = self
-      .get_user()
-      .as_ref::<Expr>(sys)
-      .expect("User should be an expression!");
-    let operand = expr
-      .operand_iter()
-      .position(|op| self.upcast().eq(&op.upcast()));
-    assert!(operand.is_some());
+    match self.get_user().get_kind() {
+      NodeKind::Expr => {
+        let expr = self
+          .get_user()
+          .as_ref::<Expr>(sys)
+          .expect("User should be an expression!");
+        let operand = expr
+          .operand_iter()
+          .position(|op| self.upcast().eq(&op.upcast()));
+        assert!(operand.is_some());
+      }
+      NodeKind::Block => {
+        let block = self
+          .get_user()
+          .as_ref::<Block>(sys)
+          .expect("User should be a block!");
+        if let BlockKind::Condition(cond) = block.get_kind() {
+          assert!(cond.eq(&self.upcast()));
+        } else {
+          panic!("Invalid block type!");
+        }
+      }
+      _ => panic!("Invalid user type!"),
+    }
   }
 }
 
@@ -58,12 +74,14 @@ impl Visitor<()> for Verifier {
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
-    if self.in_wait_until_cond {
-      assert!(
-        !expr.get_opcode().has_side_effect(),
-        "WaitUntil operations should have no side effects, but {:?} found!",
-        expr.get_opcode()
-      );
+    if !matches!(expr.get_opcode(), Opcode::Log) {
+      if self.in_wait_until_cond {
+        assert!(
+          !expr.get_opcode().has_side_effect(),
+          "WaitUntil operations should have no side effects, but {:?} found!",
+          expr.get_opcode()
+        );
+      }
     }
     for user in expr.users().iter() {
       let operand = user.as_ref::<Operand>(expr.sys).unwrap();

@@ -2,9 +2,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
   builder::{PortInfo, SysBuilder},
+  created_here,
   ir::{
     instructions::{Bind, FIFOPush},
-    ir_printer::IRPrinter,
     module,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
@@ -23,7 +23,6 @@ impl Visitor<()> for GatherBinds {
     let value = expr.upcast();
     let expr = expr.clone();
     if let Ok(bind) = expr.as_sub::<Bind>() {
-      eprintln!("bind: {}", bind.to_string());
       let callee = bind.callee().upcast();
       if !self.binds.contains_key(&callee) {
         self.binds.insert(callee, HashSet::new());
@@ -37,7 +36,7 @@ impl Visitor<()> for GatherBinds {
 fn bits_to_int(sys: &mut SysBuilder, x: &BaseNode) -> BaseNode {
   let dtype = x.get_dtype(sys).unwrap();
   let bits = dtype.get_bits();
-  sys.create_bitcast(x.clone(), DataType::int_ty(bits))
+  sys.create_bitcast(created_here!(), x.clone(), DataType::int_ty(bits))
 }
 
 fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet<BaseNode>> {
@@ -45,7 +44,6 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
     binds: HashMap::new(),
   };
   for m in sys.module_iter() {
-    eprintln!("@module: {}", m.get_name());
     gather_binds.visit_module(m);
   }
   gather_binds.binds.retain(|_, v| v.len() > 1);
@@ -106,20 +104,20 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
           .collect::<Vec<_>>();
         let mut valid_runner = valids[0].clone();
         for valid in valids.iter().skip(1) {
-          valid_runner = sys.create_bitwise_and(valid_runner, valid.clone());
+          valid_runner = sys.create_bitwise_and(created_here!(), valid_runner, valid.clone());
         }
         sub_valids.push(valid_runner);
       }
       let mut valid = sub_valids[0].clone();
       for sub_valid in sub_valids.iter().skip(1) {
-        valid = sys.create_bitwise_or(valid, sub_valid.clone());
+        valid = sys.create_bitwise_or(created_here!(), valid, sub_valid.clone());
       }
       let mut cond_mut = cond.as_mut::<Block>(sys).unwrap();
       cond_mut.set_value(valid);
       sys.set_current_block(restore_block);
       let mut valid_hot = sub_valids[callers.len() - 1].clone();
       for sub_valid in sub_valids.iter().rev().skip(1) {
-        valid_hot = sys.create_concat(valid_hot, sub_valid.clone());
+        valid_hot = sys.create_concat(created_here!(), valid_hot, sub_valid.clone());
       }
 
       let (last_grant_reg, grant_scalar_ty, grant_hot_ty) = {
@@ -127,46 +125,45 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         let bits = usize::BITS - callers.len().next_power_of_two().leading_zeros();
         let one = sys.get_const_int(dtype.clone(), 1);
         (
-          sys.create_array(dtype.clone(), "last_grant", 1, Some(vec![one])),
+          sys.create_array(dtype.clone(), "last_grant", 1, Some(vec![one]), vec![]),
           DataType::int_ty(bits as usize),
           dtype,
         )
       };
 
       let zero = sys.get_const_int(DataType::int_ty(1), 0);
-      let ptr = sys.create_array_ptr(last_grant_reg, zero);
-      let last_grant_1h = sys.create_array_read(ptr);
+      let last_grant_1h = sys.create_array_read(created_here!(), last_grant_reg, zero);
 
       // low_mask = ((last_grant_1h - 1) << 1) + 1
       let one = sys.get_const_int(grant_hot_ty.clone(), 1);
-      let lo = sys.create_sub(last_grant_1h, one);
-      let lo = sys.create_shl(lo, one);
-      let lo = sys.create_add(lo, one);
+      let lo = sys.create_sub(created_here!(), last_grant_1h, one);
+      let lo = sys.create_shl(created_here!(), lo, one);
+      let lo = sys.create_add(created_here!(), lo, one);
       // high_mask = ~low_mask
-      let hi = sys.create_flip(lo);
+      let hi = sys.create_flip(created_here!(), lo);
       // low_valid = valid_hot & low_mask
-      let lo_valid = sys.create_bitwise_and(lo.clone(), valid_hot.clone());
+      let lo_valid = sys.create_bitwise_and(created_here!(), lo.clone(), valid_hot.clone());
       let signed_lo_valid = bits_to_int(sys, &lo_valid);
-      let lo_valid_neg = sys.create_neg(signed_lo_valid);
-      let lo_grant = sys.create_bitwise_and(lo_valid, lo_valid_neg);
+      let lo_valid_neg = sys.create_neg(created_here!(), signed_lo_valid);
+      let lo_grant = sys.create_bitwise_and(created_here!(), lo_valid, lo_valid_neg);
       // high_valid = valid_hot & high_mask
-      let hi_valid = sys.create_bitwise_and(hi.clone(), valid_hot.clone());
+      let hi_valid = sys.create_bitwise_and(created_here!(), hi.clone(), valid_hot.clone());
       let signed_hi_valid = bits_to_int(sys, &hi_valid);
-      let hi_valid_neg = sys.create_neg(signed_hi_valid);
-      let hi_grant = sys.create_bitwise_and(hi_valid, hi_valid_neg);
+      let hi_valid_neg = sys.create_neg(created_here!(), signed_hi_valid);
+      let hi_grant = sys.create_bitwise_and(created_here!(), hi_valid, hi_valid_neg);
       let zero = sys.get_const_int(hi_grant.get_dtype(sys).unwrap(), 0);
-      let hi_nez = sys.create_neq(hi_grant.clone(), zero);
+      let hi_nez = sys.create_neq(created_here!(), hi_grant.clone(), zero);
       // grant = high_valid != 0 ? high_valid : low_valid
-      let grant = sys.create_select(hi_nez, hi_grant, lo_grant);
+      let grant = sys.create_select(created_here!(), hi_nez, hi_grant, lo_grant);
 
       let mut idx = 0;
       for (i, caller) in callers.iter().enumerate() {
         let i_1h = sys.get_const_int(grant_hot_ty.clone(), 1 << i);
         let i = sys.get_const_int(grant_scalar_ty.clone(), i as u64);
         let grant_to = sys.create_slice(grant, i, i);
-        let block = sys.create_block(BlockKind::Condition(grant_to));
+        let block = sys.create_conditional_block(grant_to);
         sys.set_current_block(block);
-        sys.create_array_write(ptr, i_1h);
+        sys.create_array_write(created_here!(), last_grant_reg, zero, i_1h);
         let bind = caller.as_expr::<Bind>(sys).unwrap();
         let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
         let mut new_bind = sys.get_init_bind(callee.clone());
@@ -200,12 +197,5 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         sys.set_current_block(restore_block);
       }
     }
-    eprintln!(
-      "{}",
-      IRPrinter::new(false)
-        .dispatch(sys, &arbiter, vec![])
-        .unwrap()
-    );
   }
-  eprintln!("{}", sys);
 }

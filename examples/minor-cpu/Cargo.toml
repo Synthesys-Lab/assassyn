@@ -1,0 +1,9 @@
+[package]
+name = "minor-cpu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+eir = { path = "../../eir" }
+assassyn = { path = "../../" }

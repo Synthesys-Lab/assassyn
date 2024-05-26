@@ -35,8 +35,10 @@ pub fn select() {
   xform::basic(&mut sys, &o0);
   eir::builder::verify(&sys);
 
-  let mut config = eir::backend::common::Config::default();
-  config.sim_threshold = 101;
+  let config = eir::backend::common::Config {
+    sim_threshold: 101,
+    ..Default::default()
+  };
 
   run_simulator(
     &sys,

@@ -112,10 +112,9 @@ impl Visitor<String> for IRPrinter {
   }
 
   fn visit_operand(&mut self, operand: OperandRef<'_>) -> Option<String> {
-    let expr = operand.get_user().as_ref::<Expr>(operand.sys).unwrap();
-    let expr = self.visit_expr(expr).unwrap();
+    let expr = operand.get_user().to_string(operand.sys);
     format!(
-      "{} // in {}",
+      "{} /* in {} */",
       operand.get_value().to_string(operand.sys),
       expr
     )
@@ -205,28 +204,39 @@ impl Visitor<String> for IRPrinter {
     match block.get_kind() {
       BlockKind::Condition(cond) => {
         res.push_str(&format!(
-          "{}if {} {{\n",
+          "{}if {} {{ // {}\n",
           " ".repeat(self.indent),
-          cond.to_string(block.sys)
+          cond.to_string(block.sys),
+          block.get_key(),
         ));
         self.inc_indent();
       }
       BlockKind::WaitUntil(cond) => {
         let x = self.indent;
-        let cond = self.dispatch(block.sys, &cond, vec![]).unwrap();
+        let cond_str = self.dispatch(block.sys, &cond, vec![]).unwrap();
         res.push_str(&format!(
-          "{}wait_until {} {{\n",
+          "{}wait_until {} {{ // {}\n",
           " ".repeat(self.indent),
-          cond[x..].to_string()
+          cond_str[x..].to_string(),
+          block.get_key(),
         ));
         self.inc_indent();
       }
       BlockKind::Cycle(cycle) => {
-        res.push_str(&format!("{}cycle {} {{\n", " ".repeat(self.indent), cycle));
+        res.push_str(&format!(
+          "{}cycle {} {{ // {}\n",
+          " ".repeat(self.indent),
+          cycle,
+          block.get_key()
+        ));
         self.inc_indent();
       }
       BlockKind::None | BlockKind::Valued(_) => {
-        res.push_str(&format!("{}{{\n", " ".repeat(self.indent)));
+        res.push_str(&format!(
+          "{}{{ // {}\n",
+          " ".repeat(self.indent),
+          block.get_key()
+        ));
         self.inc_indent();
       }
     }

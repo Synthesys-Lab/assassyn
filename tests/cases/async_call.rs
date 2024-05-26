@@ -14,9 +14,8 @@ pub fn async_call() {
       cnt    = array(int<32>, 1);
       v      = cnt[0];
       new_v  = v.add(1);
-      cond   = v.ilt(100);
       cnt[0] = new_v;
-      when cond {
+      when v.ilt(100.int<32>) {
         async_call adder { a: v, b: v };
       }
     }
@@ -31,9 +30,11 @@ pub fn async_call() {
   eir::builder::verify(&sys);
   println!("{}", sys);
 
-  let mut config = eir::backend::common::Config::default();
-  config.sim_threshold = 200;
-  config.idle_threshold = 200;
+  let config = eir::backend::common::Config {
+    sim_threshold: 200,
+    idle_threshold: 200,
+    ..Default::default()
+  };
 
   eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
