@@ -411,6 +411,11 @@ impl Parse for PType {
         let type_ident = attr.parse::<syn::Ident>()?;
 
         match type_ident.to_string().as_str() {
+          "intimm" => {
+            Ok(PType {
+              span, ptype: NodeKind::IntImm, array_attr: None
+            })
+          }
           "int" => {
             attr.parse::<syn::Token![<]>()?;
             let bits = attr.parse::<syn::LitInt>()?;

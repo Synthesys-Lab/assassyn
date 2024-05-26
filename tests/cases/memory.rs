@@ -4,7 +4,7 @@ use assassyn::module_builder;
 use eir::{backend, builder::SysBuilder, ir::node::BaseNode, xform};
 
 module_builder!(
-  reader(k, write, rdata)() {
+  reader(k: [intimm], write: [intimm], rdata: [intimm])() {
     is_read = write.flip();
     when is_read {
       rdata = rdata.bitcast(int<32>);
@@ -16,7 +16,7 @@ module_builder!(
 
 fn sram_sys() -> SysBuilder {
   module_builder!(
-    driver(memory)() {
+    driver(memory: [module])() {
       cnt = array(int<32>, 1);
       v = cnt[0];
       write = v.slice(0, 0);
@@ -76,7 +76,7 @@ pub fn sram() {
 
 fn sram_init_sys() -> SysBuilder {
   module_builder!(
-    driver(memory)() {
+    driver(memory: [module])() {
       cnt = array(int<32>, 1);
       v = cnt[0];
       plused = v.add(1);

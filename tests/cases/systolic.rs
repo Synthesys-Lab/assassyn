@@ -24,7 +24,7 @@ impl ProcElem {
 
 pub fn systolic_array() {
   module_builder!(
-    pe(east, south)(west:int<32>, north:int<32>) #eager_callee {
+    pe(east: [module], south: [module])(west:int<32>, north:int<32>) #eager_callee {
       c = west.mul(north);
       acc = array(int<64>, 1);
       val = acc[0];
@@ -62,7 +62,7 @@ pub fn systolic_array() {
     pe_array[5][i].bound = pe_array[5][i].pe;
   });
 
-  module_builder!(row_pusher(dest)(data: int<32>) {
+  module_builder!(row_pusher(dest: [module])(data: int<32>) {
     log("pushes {}", data);
     bound = bind dest(data);
   }.expose(bound));
@@ -90,7 +90,7 @@ pub fn systolic_array() {
     pe_array[i][1].bound = bound;
   }
 
-  module_builder!(col_pusher(dest)(data: int<32>) {
+  module_builder!(col_pusher(dest: [module])(data: int<32>) {
     log("pushes {}", data);
     async_call dest(data);
   });
@@ -119,7 +119,7 @@ pub fn systolic_array() {
 
   // row [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
   // col [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]]
-  module_builder!(testbench(col1, col2, col3, col4, row1, row2, row3, row4)() {
+  module_builder!(testbench(col1: [module], col2: [module], col3: [module], col4: [module], row1: [module], row2: [module], row3: [module], row4: [module])() {
     cycle 0 {
       // 0 0
       // 0 P P P  P

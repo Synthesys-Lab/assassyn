@@ -10,7 +10,7 @@ pub fn async_call() {
   );
 
   module_builder!(
-    driver(/*external interf*/adder)(/*in-ports*/) {
+    driver(/*external interf*/adder: [module])(/*in-ports*/) {
       cnt    = array(int<32>, 1);
       v      = cnt[0];
       new_v  = v.add(1);

@@ -9,7 +9,7 @@ pub fn array_multi_read() {
   use assassyn::module_builder;
 
   module_builder!(
-    mod_a(arr)(a:int<32>) {
+    mod_a(arr: [int<32>; 1])(a:int<32>) {
       when a.slice(0, 0) {
         arr[0] = a;
       }
@@ -17,7 +17,7 @@ pub fn array_multi_read() {
   );
 
   module_builder!(
-    mod_b(arr)(a:int<32>) {
+    mod_b(arr: [int<32>; 1])(a:int<32>) {
       when a.slice(0, 0).flip() {
         arr[0] = a;
       }
@@ -25,14 +25,14 @@ pub fn array_multi_read() {
   );
 
   module_builder!(
-    mod_c(arr)(a:int<32>) {
+    mod_c(arr: [int<32>; 1])(a:int<32>) {
       v = arr[0];
       log("a = {} arr = {}", a, v);
     }
   );
 
   module_builder!(
-    driver(a, b, c)() {
+    driver(a: [int<32>; 1], b: [int<32>; 1], c: [int<32>; 1])() {
       cnt    = array(int<32>, 1);
       v      = cnt[0];
       new_v  = v.add(1);

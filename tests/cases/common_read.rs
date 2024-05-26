@@ -10,7 +10,7 @@ pub fn common_read() {
   );
 
   module_builder!(
-    driver(/*external interf*/adder)(/*in-ports*/) {
+    driver(/*external interf*/adder: [module])(/*in-ports*/) {
       cnt     = array(int<32>, 1);
       new_cnt = cnt[0].add(1);
       cnt[0]  = new_cnt;

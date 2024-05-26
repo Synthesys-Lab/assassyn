@@ -7,7 +7,7 @@ pub fn multi_call() {
     log("adder: {} + {} = {}", a, b, c);
   });
 
-  module_builder!(driver(adder)() {
+  module_builder!(driver(adder: [module])() {
     cnt    = array(int<32>, 1);
     k      = cnt[0.int<32>];
     v      = k.add(1);

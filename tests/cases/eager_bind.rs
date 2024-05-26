@@ -7,7 +7,7 @@ pub fn eager_bind() {
     log("sub: {} - {} = {}", a, b, c);
   });
 
-  module_builder!(driver(lhs, rhs)() {
+  module_builder!(driver(lhs: [module], rhs: [module])() {
     cnt = array(int<32>, 1);
     k = cnt[0.int<32>];
     v = k.add(1);
@@ -18,13 +18,13 @@ pub fn eager_bind() {
   });
 
   module_builder!(
-    lhs(sub)(v:int<32>) {
+    lhs(sub: [module])(v:int<32>) {
       bound = bind sub { a: v };
     }.expose(bound)
   );
 
   module_builder!(
-    rhs(bound)(v:int<32>) {
+    rhs(bound: [module])(v:int<32>) {
       _bound = bind bound { b: v };
     }
   );

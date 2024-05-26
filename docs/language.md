@@ -98,16 +98,16 @@ the pipeline stages to improve the clock frequency.
 
 To build a module, `module_builder` macro should be used:
 ````Rust
-use eda4eda::module_builder;
+use assassyn::module_builder;
 // ...
-module_builder!(adder(/*parameterizations*/)(/*inputs*/a: int<32>, b: int<32>) {
+module_builder!(adder: [module](/*parameterizations*/)(/*inputs*/a: int<32>, b: int<32>) {
   // The body of the module
   c = a.add(b);
 });
 let adder_module = adder_builder(&mut sys);
 ````
 
-The first parenthesis is for the parameterization of this module, and the 2nd pranthesis is for
+The first parenthesis is for the parameterization of this module, which should be declared as `name-of-array: [data-type<bit-length>; array-length]` for array type, `foo: [module]` for modules, and `bar: [intimm]` for immediate integer; the 2nd pranthesis is for
 the input ports of this module. This design makes the whole programming model feels like
 we first call a function `goo = foo(/*params*/)` to return a function, whose signature is
 `goo(/*inputs*/)`. TODO(@were): Write a document to discuss our design decisions on dynamic
@@ -203,14 +203,14 @@ module_builder!(adder()(a: int<32>, b: int<32>) {
 
 let adder = adder_builder(&mut sys);
 
-module_builder!(add5(adder)() {
+module_builder!(add5(adder: [module])() {
   // bind
   bound_add = bind adder(5);
 }.expose(bound_add));
 
 let (add5, bound_add) = add5_builder(&mut sys, adder);
 
-module_builder!(driver(bound_add)() {
+module_builder!(driver(bound_add: [module])() {
   // The body of the module
   v = read a[0];
   async_call bound_add(v);
@@ -250,8 +250,8 @@ module_builder!(foo()(a: int<32>, b: int<32>) {
 
 ```` Rust
 module_builder!(
-  // `lock` is declared as a global array.
-  foo(lock)(a: int<32>, b: int<32>) {
+  // `lock` is declared as a global array. 
+  foo(lock: [int<1>; 1])(a: int<32>, b: int<32>) {
   // A spin lock always accepts a array value, because an array value is side-effected, which
   // can give different results when invoked multiple times. Wait until will wait the value in
   // the given array to be true to execute the body.

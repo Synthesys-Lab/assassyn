@@ -14,7 +14,7 @@ pub fn spin_lock() {
   );
 
   module_builder!(
-    spin_agent(sqr, lock)(a:int<32>) {
+    spin_agent(sqr: [module], lock: [int<1>; 1])(a:int<32>) {
       wait_until { v = lock[0]; v } {
         async_call sqr { a: a };
         log("agent move on, {}", a);
@@ -23,7 +23,7 @@ pub fn spin_lock() {
   );
 
   module_builder!(
-    driver(spin_agent, lock)() {
+    driver(spin_agent: [module], lock: [int<1>; 1])() {
       cnt = array(int<32>, 1);
       v = cnt[0];
       is_odd = v.slice(0, 0);

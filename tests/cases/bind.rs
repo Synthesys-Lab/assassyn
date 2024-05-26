@@ -7,7 +7,7 @@ pub fn bind() {
     log("sub: {} - {} = {}", a, b, c);
   });
 
-  module_builder!(driver(lhs, rhs)() {
+  module_builder!(driver(lhs: [module], rhs: [module])() {
     cnt = array(int<32>, 1);
     v = cnt[0].add(1);
     cnt[0] = v;
@@ -16,13 +16,13 @@ pub fn bind() {
   });
 
   module_builder!(
-    lhs(sub)(a:int<32>) {
+    lhs(sub: [module])(a:int<32>) {
       aa = bind sub { a: a };
     }.expose(aa)
   );
 
   module_builder!(
-    rhs(sub)(a:int<32>) {
+    rhs(sub: [module])(a:int<32>) {
       async_call sub { b: a };
     }
   );

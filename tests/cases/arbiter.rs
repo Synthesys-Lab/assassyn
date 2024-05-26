@@ -8,7 +8,7 @@ pub fn arbiter() {
   });
 
   module_builder!(
-    arbiter(sqr)(a0:int<32>, a1:int<32>)
+    arbiter(sqr: [module])(a0:int<32>, a1:int<32>)
       #explicit_pop, #allow_partial_call, #no_arbiter {
       wait_until {
         a0_valid = a0.valid();
@@ -43,7 +43,7 @@ pub fn arbiter() {
     }
   );
 
-  module_builder!(driver(arbiter)() {
+  module_builder!(driver(arbiter: [module])() {
     cnt = array(int<32>, 1);
     k = cnt[0.int<32>];
     v = k.add(1);

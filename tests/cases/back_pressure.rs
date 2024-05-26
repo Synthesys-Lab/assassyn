@@ -7,7 +7,7 @@ pub fn back_pressure() {
     log("sub: {} - {} = {}", a, b, c);
   });
 
-  module_builder!(driver(lhs, rhs)() {
+  module_builder!(driver(lhs: [module], rhs: [module])() {
     cnt = array(int<32>, 1);
     v = cnt[0].add(1);
     cnt[0] = v;
@@ -16,7 +16,7 @@ pub fn back_pressure() {
   });
 
   module_builder!(
-    lhs(suber)(a:int<32>) {
+    lhs(suber: [module])(a:int<32>) {
       rhs = bind suber { a: a };
     }.expose(rhs)
   );
