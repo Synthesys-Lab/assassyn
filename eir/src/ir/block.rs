@@ -78,8 +78,18 @@ impl BlockRef<'_> {
   pub fn next(&self) -> Option<BaseNode> {
     let parent = self.get().get_parent();
     if let Ok(block) = self.sys.get::<Block>(&parent) {
-      let idx = block.body.iter().position(|x| *x == self.upcast());
-      block.body.get(idx.unwrap() + 1).map(|x| x.clone())
+      let idx = self.idx().unwrap();
+      block.body.get(idx + 1).map(|x| x.clone())
+    } else {
+      None
+    }
+  }
+
+  /// Get the index of the current node in the parent block.
+  pub fn idx(&self) -> Option<usize> {
+    let parent = self.get().get_parent();
+    if let Ok(block) = self.sys.get::<Block>(&parent) {
+      block.body.iter().position(|x| *x == self.upcast())
     } else {
       None
     }

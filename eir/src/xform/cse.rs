@@ -63,11 +63,24 @@ impl Visitor<()> for FindCommonSubexpression {
   }
 }
 
-enum CommonExpr {
-  Master {
-    master: BaseNode,
-    duplica: Vec<BaseNode>,
-  },
+struct CommonExpr {
+  ip: (BaseNode, usize),
+  duplica: Vec<BaseNode>,
+}
+
+fn idx_of(sys: &SysBuilder, x: &BaseNode) -> Option<usize> {
+  if let Ok(expr) = x.as_ref::<Expr>(sys) {
+    Some(expr.idx())
+  } else if let Ok(block) = x.as_ref::<Block>(sys) {
+    block.idx()
+  } else {
+    None
+  }
+}
+
+fn climb_up(sys: &SysBuilder, x: &BaseNode) -> (BaseNode, Option<usize>) {
+  let parent = x.get_parent(sys).unwrap();
+  (parent, idx_of(sys, x))
 }
 
 fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<CommonExpr> {
@@ -81,20 +94,20 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
       if exprs.len() != 1 {
         let mut parents = exprs
           .iter()
-          .map(|x| x.get_parent(sys).unwrap())
+          .map(|x| climb_up(sys, x))
           .collect::<Vec<_>>();
         // Hoist all parents to the same depth
         while let Some(x) = {
-          let ref_depth = da.get_depth(&parents[0]);
+          let ref_depth = da.get_depth(&parents[0].0);
           if let Some(diff) = parents
             .iter_mut()
             .filter(|x| {
-              let depth = da.get_depth(&x);
+              let depth = da.get_depth(&x.0);
               depth != ref_depth
             })
             .next()
           {
-            if da.get_depth(diff) < ref_depth {
+            if da.get_depth(&diff.0) < ref_depth {
               Some(&mut parents[0])
             } else {
               Some(diff)
@@ -103,31 +116,27 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
             None
           }
         } {
-          *x = x.get_parent(sys).unwrap();
+          *x = climb_up(sys, &x.0);
         }
         // Hoist all the parents to the same node
-        while parents.iter().any(|x| x.ne(&parents[0])) {
+        while parents.iter().any(|x| x.0.ne(&parents[0].0)) {
           parents
             .iter_mut()
-            .for_each(|x| *x = x.get_parent(sys).unwrap());
+            .for_each(|x| *x = climb_up(sys, &x.0));
         }
         // TODO(@were): Support non-block parents
-        if let Ok(block) = parents[0].as_ref::<Block>(sys) {
-          let mut master_idx = None;
-          for expr in exprs.iter() {
-            if expr.get_parent(sys).unwrap() == block.upcast() {
-              let idx = block.iter().position(|x| x.eq(expr)).unwrap();
-              if master_idx.map_or(true, |x| idx < x) {
-                master_idx = Some(idx);
-              }
-            }
+        if let Some((block, idx)) = {
+          if let Ok(block) = parents[0].0.as_ref::<Block>(sys) {
+            let idx = parents.iter().min_by(|x, y| x.1.unwrap().cmp(&y.1.unwrap())).unwrap().1;
+            Some((block, idx.unwrap()))
+          } else {
+            None
           }
-          if let Some(master_idx) = master_idx {
-            let master = block.get().get(master_idx).unwrap().clone();
-            let mut duplica = exprs.clone();
-            duplica.retain(|x| x.ne(&master));
-            res.push(CommonExpr::Master { master, duplica });
-          }
+        } {
+          res.push(CommonExpr {
+            ip: (block.upcast(), idx),
+            duplica: exprs,
+          });
         }
       }
     }
@@ -143,14 +152,14 @@ pub fn common_code_elimination(sys: &mut SysBuilder) {
   depth.enter(sys);
   let ce = find_common_subexpression(sys, &depth);
   for elem in ce {
-    match elem {
-      CommonExpr::Master { master, duplica } => {
-        for dup in duplica {
-          sys.replace_all_uses_with(dup.clone(), master);
-          let mut dup_mut = dup.as_mut::<Expr>(sys).unwrap();
-          dup_mut.erase_from_parent();
-        }
-      }
-    }
+    // match elem {
+    //   CommonExpr::Master { master, duplica } => {
+    //     for dup in duplica {
+    //       sys.replace_all_uses_with(dup.clone(), master);
+    //       let mut dup_mut = dup.as_mut::<Expr>(sys).unwrap();
+    //       dup_mut.erase_from_parent();
+    //     }
+    //   }
+    // }
   }
 }
