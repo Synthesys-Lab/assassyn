@@ -1,5 +1,5 @@
 use std::{
-  collections::{HashMap, HashSet},
+  collections::{HashMap, HashSet, VecDeque},
   fs::File,
   io::{Error, Write},
 };
@@ -26,7 +26,7 @@ struct VerilogDumper<'a, 'b> {
   sys: &'a SysBuilder,
   config: &'b Config,
   indent: usize,
-  pred: Option<String>,
+  pred_stack: VecDeque<String>,
   fifo_pushes: HashMap<String, Vec<(String, String)>>, // fifo_name -> [(pred, value)]
   array_stores: HashMap<String, Vec<(String, String, String)>>, // array_name -> [(pred, idx, value)]
   triggers: HashMap<String, Vec<String>>,                       // module_name -> [pred]
@@ -44,7 +44,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       sys,
       config,
       indent: 0,
-      pred: None,
+      pred_stack: VecDeque::new(),
       fifo_pushes: HashMap::new(),
       array_stores: HashMap::new(),
       triggers: HashMap::new(),
@@ -54,6 +54,21 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       trigger_drivers: HashMap::new(),
       array_drivers: HashMap::new(),
       fifo_drivers: HashMap::new(),
+    }
+  }
+
+  fn get_pred(&self) -> Option<String> {
+    if self.pred_stack.len() == 0 {
+      None
+    } else {
+      Some(
+        self
+          .pred_stack
+          .iter()
+          .cloned()
+          .collect::<Vec<_>>()
+          .join(" && "),
+      )
     }
   }
 
@@ -1186,7 +1201,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       BlockKind::Condition(cond) => {
         let cond = cond.as_ref::<Operand>(block.sys).unwrap();
         let cond = cond.get_value().clone();
-        self.pred = Some(format!(
+        self.pred_stack.push_back(format!(
           "({}{})",
           dump_ref!(self.sys, &cond),
           if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
@@ -1197,7 +1212,9 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         ));
       }
       BlockKind::Cycle(cycle) => {
-        self.pred = Some(format!("(cycle_cnt == {})", cycle));
+        self
+          .pred_stack
+          .push_back(format!("(cycle_cnt == {})", cycle));
       }
       BlockKind::WaitUntil(_) | BlockKind::Valued(_) | BlockKind::None => (),
     }
@@ -1216,7 +1233,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         }
       }
     }
-    self.pred = None;
+    self.pred_stack.pop_back();
     res.into()
   }
 
@@ -1277,7 +1294,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             name,
             fifo_name!(fifo),
             fifo_name!(fifo),
-            (self.pred.clone().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string())
+            (self.get_pred().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string())
           ))
       }
 
@@ -1307,7 +1324,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         res.push_str(
           format!(
             "always_ff @(posedge clk iff trigger{}) ",
-            (self.pred.clone().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string())
+            (self.get_pred().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string())
           )
           .as_str(),
         );
@@ -1354,9 +1371,10 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             );
           }
         }
+        let pred = self.get_pred().unwrap_or("".to_string());
         match self.array_stores.get_mut(&array_name) {
           Some(ass) => ass.push((
-            self.pred.clone().unwrap_or("".to_string()),
+            pred,
             dump_ref!(self.sys, &array_idx),
             dump_ref!(self.sys, &store.value()),
           )),
@@ -1364,7 +1382,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             self.array_stores.insert(
               array_name.clone(),
               vec![(
-                self.pred.clone().unwrap_or("".to_string()),
+                pred,
                 dump_ref!(self.sys, &array_idx),
                 dump_ref!(self.sys, &store.value()),
               )],
@@ -1400,18 +1418,13 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             );
           }
         }
+        let pred = self.get_pred().unwrap_or("".to_string());
         match self.fifo_pushes.get_mut(&fifo_name) {
-          Some(fps) => fps.push((
-            self.pred.clone().unwrap_or("".to_string()),
-            dump_ref!(self.sys, &push.value()),
-          )),
+          Some(fps) => fps.push((pred, dump_ref!(self.sys, &push.value()))),
           None => {
             self.fifo_pushes.insert(
               fifo_name.clone(),
-              vec![(
-                self.pred.clone().unwrap_or("".to_string()),
-                dump_ref!(self.sys, &push.value()),
-              )],
+              vec![(pred, dump_ref!(self.sys, &push.value()))],
             );
           }
         }
@@ -1457,13 +1470,11 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             );
           }
         }
+        let pred = self.get_pred().unwrap_or("".to_string());
         match self.triggers.get_mut(&module_name) {
-          Some(trgs) => trgs.push(self.pred.clone().unwrap_or("".to_string())),
+          Some(trgs) => trgs.push(pred),
           None => {
-            self.triggers.insert(
-              module_name.clone(),
-              vec![self.pred.clone().unwrap_or("".to_string())],
-            );
+            self.triggers.insert(module_name.clone(), vec![pred]);
           }
         }
         Some("".to_string())

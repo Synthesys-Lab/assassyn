@@ -82,6 +82,7 @@ pub fn array_multi_write_in_same_module() {
   module_builder!(
     mod_a(arr)(a:int<32>) {
       when a.slice(0, 0) {
+        when a.slice(1, 1) { }
         arr[0] = a;
       }
       when a.slice(0, 0).flip() {
