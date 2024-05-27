@@ -1,9 +1,9 @@
 // The module of the IR and the IR builder.
 
+pub mod frontend;
 pub(crate) mod symbol_table;
 pub mod system;
 pub mod verify;
-pub mod frontend;
 
 pub use system::{InsertPoint, PortInfo, SysBuilder};
 pub use verify::verify;

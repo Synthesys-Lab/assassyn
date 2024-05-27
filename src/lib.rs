@@ -1,11 +1,11 @@
 use codegen::{emit_attrs, emit_module_body, emit_ports, emit_rets};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
+use syn::parse::Parse;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit_mut::VisitMut;
 use syn::{parenthesized, parse_quote, parse_quote_spanned};
-use syn::parse::Parse;
-use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, Token};
 
 mod ast;
@@ -68,8 +68,6 @@ impl Parse for ModuleParser {
   }
 }
 
-
-
 #[proc_macro_attribute]
 pub fn assassyn_module(_: TokenStream, item: TokenStream) -> TokenStream {
   let mut item_fn = parse_macro_input!(item as syn::ItemFn);
@@ -78,8 +76,10 @@ pub fn assassyn_module(_: TokenStream, item: TokenStream) -> TokenStream {
 
   impl VisitMut for SignatureMutator {
     fn visit_signature_mut(&mut self, sig: &mut syn::Signature) {
-      sig.inputs.insert(0, parse_quote! { sys: &mut eir::builder::SysBuilder });
-      sig.output = parse_quote! { };
+      sig
+        .inputs
+        .insert(0, parse_quote! { sys: &mut eir::builder::SysBuilder });
+      sig.output = parse_quote! {};
     }
     fn visit_expr_method_call_mut(&mut self, mc: &mut syn::ExprMethodCall) {
       let func = &mc.method.to_string();
@@ -91,7 +91,10 @@ pub fn assassyn_module(_: TokenStream, item: TokenStream) -> TokenStream {
         mc.receiver = parse_quote_spanned! { mc.receiver.span() => sys };
         mc.method = syn::Ident::new("create_add", mc.method.span());
         mc.args.insert(0, *arg0);
-        mc.args.insert(0, parse_quote!( eir::builder::system::Filesite { file: "", line: 0 } ));
+        mc.args.insert(
+          0,
+          parse_quote!(eir::builder::system::Filesite { file: "", line: 0 }),
+        );
       }
     }
   }

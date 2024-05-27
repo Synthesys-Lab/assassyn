@@ -92,10 +92,7 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
     finder.visit_module(m);
     for (_, exprs) in finder.common {
       if exprs.len() != 1 {
-        let mut parents = exprs
-          .iter()
-          .map(|x| climb_up(sys, x))
-          .collect::<Vec<_>>();
+        let mut parents = exprs.iter().map(|x| climb_up(sys, x)).collect::<Vec<_>>();
         // Hoist all parents to the same depth
         while let Some(x) = {
           let ref_depth = da.get_depth(&parents[0].0);
@@ -120,14 +117,16 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
         }
         // Hoist all the parents to the same node
         while parents.iter().any(|x| x.0.ne(&parents[0].0)) {
-          parents
-            .iter_mut()
-            .for_each(|x| *x = climb_up(sys, &x.0));
+          parents.iter_mut().for_each(|x| *x = climb_up(sys, &x.0));
         }
         // TODO(@were): Support non-block parents
         if let Some((block, idx)) = {
           if let Ok(block) = parents[0].0.as_ref::<Block>(sys) {
-            let idx = parents.iter().min_by(|x, y| x.1.unwrap().cmp(&y.1.unwrap())).unwrap().1;
+            let idx = parents
+              .iter()
+              .min_by(|x, y| x.1.unwrap().cmp(&y.1.unwrap()))
+              .unwrap()
+              .1;
             Some((block, idx.unwrap()))
           } else {
             None
