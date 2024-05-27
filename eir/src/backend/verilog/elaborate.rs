@@ -28,7 +28,8 @@ struct VerilogDumper<'a, 'b> {
   indent: usize,
   pred: Option<String>,
   fifo_pushes: HashMap<String, Vec<(String, String)>>, // fifo_name -> [(pred, value)]
-  triggers: HashMap<String, Vec<String>>,              // module_name -> [pred]
+  array_stores: HashMap<String, Vec<(String, String, String)>>, // array_name -> [(pred, idx, value)]
+  triggers: HashMap<String, Vec<String>>,                       // module_name -> [pred]
   current_module: String,
   has_testbench: bool,
   has_driver: bool,
@@ -45,6 +46,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       indent: 0,
       pred: None,
       fifo_pushes: HashMap::new(),
+      array_stores: HashMap::new(),
       triggers: HashMap::new(),
       current_module: String::new(),
       has_testbench: false,
@@ -972,6 +974,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     }
 
     self.fifo_pushes.clear();
+    self.array_stores.clear();
     self.triggers.clear();
     for elem in module.get_body().iter() {
       match elem.get_kind() {
@@ -1076,6 +1079,59 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         res.push_str(format!("assign fifo_{}_push_valid = trigger;\n", f).as_str());
       }
       res.push_str(format!("assign fifo_{}_push_data = {};\n\n", f, data_str).as_str());
+    }
+
+    for (a, branches) in self.array_stores.drain() {
+      let mut w_conds = Vec::<String>::new();
+      let mut idx_str = String::new();
+      let mut d_str = String::new();
+      let mut has_unconditional_branch = false;
+      let mut has_conditional_branch = false;
+      for (p, idx, v) in branches {
+        if p == "" {
+          if has_unconditional_branch {
+            panic!("multiple unconditional branches for array {} store", a);
+          }
+          if has_conditional_branch {
+            panic!(
+              "mixed conditional and unconditional branches for array {} store",
+              a
+            );
+          }
+          has_unconditional_branch = true;
+          d_str.push_str(format!("{}", v).as_str());
+          idx_str.push_str(format!("{}", idx).as_str());
+        } else {
+          if has_unconditional_branch {
+            panic!(
+              "mixed conditional and unconditional branches for array {} store",
+              a
+            );
+          }
+          has_conditional_branch = true;
+          w_conds.push(p.clone());
+          d_str.push_str(format!("{} ? {} : ", p, v).as_str());
+          idx_str.push_str(format!("{} ? {} : ", p, idx).as_str());
+        }
+      }
+      if has_conditional_branch {
+        d_str.push_str(format!("'x").as_str());
+        idx_str.push_str(format!("'x").as_str());
+      }
+      if has_conditional_branch {
+        res.push_str(
+          format!(
+            "assign array_{}_w = trigger && ({});\n",
+            a,
+            w_conds.join(" || ")
+          )
+          .as_str(),
+        );
+      } else {
+        res.push_str(format!("assign array_{}_w = trigger;\n", a).as_str());
+      }
+      res.push_str(format!("assign array_{}_d = {};\n", a, d_str).as_str());
+      res.push_str(format!("assign array_{}_widx = {};\n\n", a, idx_str).as_str());
     }
 
     // tie off array store port
@@ -1298,15 +1354,24 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             );
           }
         }
-        Some(format!(
-          "assign array_{}_w = trigger{};\nassign array_{}_d = {};\nassign array_{}_widx = {};\n\n",
-          array_name,
-          (self.pred.clone().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string()),
-          array_name,
-          dump_ref!(self.sys, &store.value()),
-          array_name,
-          dump_ref!(self.sys, &array_idx)
-        ))
+        match self.array_stores.get_mut(&array_name) {
+          Some(ass) => ass.push((
+            self.pred.clone().unwrap_or("".to_string()),
+            dump_ref!(self.sys, &array_idx),
+            dump_ref!(self.sys, &store.value()),
+          )),
+          None => {
+            self.array_stores.insert(
+              array_name.clone(),
+              vec![(
+                self.pred.clone().unwrap_or("".to_string()),
+                dump_ref!(self.sys, &array_idx),
+                dump_ref!(self.sys, &store.value()),
+              )],
+            );
+          }
+        }
+        Some("".to_string())
       }
 
       Opcode::FIFOPush => {

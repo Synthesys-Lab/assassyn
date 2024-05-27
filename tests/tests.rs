@@ -20,7 +20,7 @@ macro_rules! register_test {
 
 }
 
-register_test!(array::{array_multi_read, array_partition0, array_partition1});
+register_test!(array::{array_multi_read, array_multi_write_in_same_module, array_partition0, array_partition1});
 register_test!(back_pressure::back_pressure);
 register_test!(fifo_valid::fifo_valid);
 register_test!(fib::fib);

@@ -6,8 +6,6 @@ use eir::{
 };
 
 pub fn array_multi_read() {
-  use assassyn::module_builder;
-
   module_builder!(
     mod_a(arr)(a:int<32>) {
       when a.slice(0, 0) {
@@ -78,6 +76,44 @@ pub fn array_multi_read() {
       /*Expected Lines*/ Some(100),
     )),
   );
+}
+
+pub fn array_multi_write_in_same_module() {
+  module_builder!(
+    mod_a(arr)(a:int<32>) {
+      when a.slice(0, 0) {
+        arr[0] = a;
+      }
+      when a.slice(0, 0).flip() {
+        arr[0] = a.add(1);
+      }
+    }
+  );
+
+  module_builder!(
+    driver(a)() {
+      cnt    = array(int<32>, 1);
+      v      = cnt[0];
+      new_v  = v.add(1);
+      cnt[0] = new_v;
+      async_call a { a : v };
+    }
+  );
+
+  let mut sys = SysBuilder::new("array_multi_write_in_same_module");
+  let arr = sys.create_array(eir::ir::DataType::Int(32), "arr", 1, None, vec![]);
+  let mod_a = mod_a_builder(&mut sys, arr);
+  // Build the driver module.
+  driver_builder(&mut sys, mod_a);
+
+  eir::builder::verify(&sys);
+  println!("{}", sys);
+
+  let config = eir::backend::common::Config::default();
+
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+
+  run_simulator(&sys, &config, None);
 }
 
 pub fn array_partition0() {
