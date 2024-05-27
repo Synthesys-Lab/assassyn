@@ -739,7 +739,11 @@ impl Visitor<String> for NodeRefDumper {
       NodeKind::FIFO => namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into(),
       NodeKind::IntImm => {
         let int_imm = node.as_ref::<IntImm>(sys).unwrap();
-        Some(format!("{}", int_imm.get_value()))
+        Some(format!(
+          "{}'d{}",
+          int_imm.dtype().get_bits(),
+          int_imm.get_value()
+        ))
       }
       NodeKind::StrImm => {
         let str_imm = node.as_ref::<StrImm>(sys).unwrap();
