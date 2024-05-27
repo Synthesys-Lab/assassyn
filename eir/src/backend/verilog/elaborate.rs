@@ -61,14 +61,15 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     if self.pred_stack.len() == 0 {
       None
     } else {
-      Some(
+      Some(format!(
+        "({})",
         self
           .pred_stack
           .iter()
           .cloned()
           .collect::<Vec<_>>()
           .join(" && "),
-      )
+      ))
     }
   }
 
@@ -1201,15 +1202,13 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       BlockKind::Condition(cond) => {
         let cond = cond.as_ref::<Operand>(block.sys).unwrap();
         let cond = cond.get_value().clone();
-        self.pred_stack.push_back(format!(
-          "({}{})",
-          dump_ref!(self.sys, &cond),
-          if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
-            "".into()
+        self
+          .pred_stack
+          .push_back(if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
+            dump_ref!(self.sys, &cond)
           } else {
-            format!(" != 0")
-          }
-        ));
+            format!("({} != '0)", dump_ref!(self.sys, &cond))
+          });
       }
       BlockKind::Cycle(cycle) => {
         self
