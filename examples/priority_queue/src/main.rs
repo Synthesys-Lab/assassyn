@@ -1,3 +1,4 @@
+use assassyn::module_builder;
 use eir::{builder::SysBuilder, test_utils::run_simulator};
 
 fn main() {
@@ -15,7 +16,7 @@ fn main() {
       cl_nodes
     ) (
       op: bits<2>,
-      position: uint<3>,
+      position: uint<2>,
       enq_value: uint<32>
     ) #no_arbiter {
       _a = cl_nodes[0];
@@ -37,18 +38,18 @@ fn main() {
       nl
     ) (
       op: bits<2>,
-      position: uint<3>,
+      position: uint<1>,
       enq_value: uint<32>
     ) #no_arbiter {
       target_node_active = cl_nodes[position].slice(35, 35);
       target_node_occupied = cl_nodes[position].slice(32, 34).bitcast(uint<3>);
       target_node_value = cl_nodes[position].slice(0, 31).bitcast(uint<32>);
 
-      nl_position_left = position.slice(0, 1).concat(0.uint<1>).bitcast(uint<3>);
-      nl_position_right = position.slice(0, 1).concat(1.uint<1>).bitcast(uint<3>);
+      nl_position_left = position.concat(0.uint<1>).bitcast(uint<2>);
+      nl_position_right = position.concat(1.uint<1>).bitcast(uint<2>);
 
       when op.eq(0.bits<2>) {
-        async_call nl { op: 0.bits<2>, position: 0.uint<3>, enq_value: 0.uint<32> };
+        async_call nl { op: 0.bits<2>, position: 0.uint<2>, enq_value: 0.uint<32> };
       }
 
       when op.eq(1.bits<2>) { // ENQ
@@ -77,7 +78,7 @@ fn main() {
         }
         when target_node_active.flip() {
           cl_nodes[position] = 1.bits<1>.concat(target_node_occupied.add(1.uint<3>)).concat(enq_value);
-          async_call nl { op: 0.bits<2>, position: 0.uint<3>, enq_value: 0.uint<32> };
+          async_call nl { op: 0.bits<2>, position: 0.uint<2>, enq_value: 0.uint<32> };
         }
       }
 
@@ -128,9 +129,9 @@ fn main() {
       target_node_active = cl_nodes[0].slice(35, 35);
       target_node_occupied = cl_nodes[0].slice(32, 34).bitcast(uint<3>);
       target_node_value = cl_nodes[0].slice(0, 31).bitcast(uint<32>);
-  
+
       when op.eq(0.bits<2>) {
-        async_call nl { op: 0.bits<2>, position: 0.uint<3>, enq_value: 0.uint<32> };
+        async_call nl { op: 0.bits<2>, position: 0.uint<1>, enq_value: 0.uint<32> };
       }
 
       when op.eq(1.bits<2>) { // ENQ
@@ -140,26 +141,26 @@ fn main() {
           left_child_full = left_child.slice(32, 34).eq(3.uint<3>);
           when replace {
             when left_child_full {
-              async_call nl { op: 1.bits<2>, position: 1.uint<3>, enq_value: target_node_value };
+              async_call nl { op: 1.bits<2>, position: 1.uint<1>, enq_value: target_node_value };
             }
             when left_child_full.flip() {
-              async_call nl { op: 1.bits<2>, position: 0.uint<3>, enq_value: target_node_value };
+              async_call nl { op: 1.bits<2>, position: 0.uint<1>, enq_value: target_node_value };
             }
             cl_nodes[0] = 1.bits<1>.concat(target_node_occupied.add(1.uint<3>)).concat(enq_value);
           }
           when replace.flip() {
             when left_child_full {
-              async_call nl { op: 1.bits<2>, position: 1.uint<3>, enq_value: enq_value };
+              async_call nl { op: 1.bits<2>, position: 1.uint<1>, enq_value: enq_value };
             }
             when left_child_full.flip() {
-              async_call nl { op: 1.bits<2>, position: 0.uint<3>, enq_value: enq_value };
+              async_call nl { op: 1.bits<2>, position: 0.uint<1>, enq_value: enq_value };
             }
             cl_nodes[0] = 1.bits<1>.concat(target_node_occupied.add(1.uint<3>)).concat(target_node_value);
           }
         }
         when target_node_active.flip() {
           cl_nodes[0] = 1.bits<1>.concat(target_node_occupied.add(1.uint<3>)).concat(enq_value);
-          async_call nl { op: 0.bits<2>, position: 0.uint<3>, enq_value: 0.uint<32> };
+          async_call nl { op: 0.bits<2>, position: 0.uint<1>, enq_value: 0.uint<32> };
         }
       }
 
@@ -173,25 +174,25 @@ fn main() {
         when target_node_active {
           when left_child_active.flip().bitwise_and(right_child_active.flip()) {
             cl_nodes[0] = 0.bits<1>.concat(target_node_occupied.sub(1.uint<3>)).concat(0.uint<32>);
-            async_call nl { op: 0.bits<2>, position: 0.uint<3>, enq_value: 0.uint<32> };
+            async_call nl { op: 0.bits<2>, position: 0.uint<1>, enq_value: 0.uint<32> };
           }
           when left_child_active.flip().bitwise_and(right_child_active) {
             cl_nodes[0] = 1.bits<1>.concat(target_node_occupied.sub(1.uint<3>)).concat(right_child_value);
-            async_call nl { op: 2.bits<2>, position: 1.uint<3>, enq_value: 0.uint<32> };
+            async_call nl { op: 2.bits<2>, position: 1.uint<1>, enq_value: 0.uint<32> };
           }
           when left_child_active.bitwise_and(right_child_active.flip()) {
             cl_nodes[0] = 1.bits<1>.concat(target_node_occupied.sub(1.uint<3>)).concat(left_child_value);
-            async_call nl { op: 2.bits<2>, position: 0.uint<3>, enq_value: 0.uint<32> };
+            async_call nl { op: 2.bits<2>, position: 0.uint<1>, enq_value: 0.uint<32> };
           }
           when left_child_active.bitwise_and(right_child_active) {
             pop_left = left_child_value.ige(right_child_value);
             when pop_left {
               cl_nodes[0] = 1.bits<1>.concat(target_node_occupied.sub(1.uint<3>)).concat(left_child_value);
-              async_call nl { op: 2.bits<2>, position: 0.uint<3>, enq_value: 0.uint<32> };
+              async_call nl { op: 2.bits<2>, position: 0.uint<1>, enq_value: 0.uint<32> };
             }
             when pop_left.flip() {
               cl_nodes[0] = 1.bits<1>.concat(target_node_occupied.sub(1.uint<3>)).concat(right_child_value);
-              async_call nl { op: 2.bits<2>, position: 1.uint<3>, enq_value: 0.uint<32> };
+              async_call nl { op: 2.bits<2>, position: 1.uint<1>, enq_value: 0.uint<32> };
             }
           }
         }
@@ -253,11 +254,7 @@ fn main() {
   config.sim_threshold = 40;
   config.idle_threshold = 10;
 
-  // eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config).unwrap();
 
-  run_simulator(
-    &sys,
-    &config,
-    None,
-  );
+  run_simulator(&sys, &config, None);
 }
