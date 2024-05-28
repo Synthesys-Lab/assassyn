@@ -1520,14 +1520,26 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       }
 
       Opcode::Cast { .. } => {
-        let dbits = expr.dtype().get_bits() - 1;
+        let dbits = expr.dtype().get_bits();
         let name = namify(expr.upcast().to_string(self.sys).as_str());
         let cast = expr.as_sub::<instructions::Cast>().unwrap();
         let a = dump_ref!(self.sys, &cast.x());
+        let pad = dbits - cast.x().get_dtype(self.sys).unwrap().get_bits();
         match cast.get_opcode() {
-          subcode::Cast::BitCast | subcode::Cast::ZExt => Some(format!(
+          subcode::Cast::BitCast => Some(format!(
             "logic [{}:0] {};\nassign {} = {};\n\n",
-            dbits, name, name, a
+            dbits - 1,
+            name,
+            name,
+            a
+          )),
+          subcode::Cast::ZExt => Some(format!(
+            "logic [{}:0] {};\nassign {} = {{{}'b0, {}}};\n\n",
+            dbits - 1,
+            name,
+            name,
+            pad,
+            a
           )),
           subcode::Cast::SExt => {
             let src_dtype = cast.src_type();
@@ -1551,8 +1563,12 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
               ))
             } else {
               Some(format!(
-                "logic [{}:0] {};\nassign {} = {};\n\n",
-                dbits, name, name, a
+                "logic [{}:0] {};\nassign {} = {{{}'b0, {}}};\n\n",
+                dbits - 1,
+                name,
+                name,
+                pad,
+                a
               ))
             }
           }

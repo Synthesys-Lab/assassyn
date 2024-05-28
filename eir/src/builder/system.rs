@@ -920,7 +920,7 @@ impl SysBuilder {
       _ => self.create_expr(
         dest_ty,
         Opcode::Cast {
-          cast: subcode::Cast::SExt,
+          cast: subcode::Cast::ZExt,
         },
         vec![src],
         true,
