@@ -727,38 +727,49 @@ fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
   triggered_modules
 }
 
-struct NodeRefDumper;
-
-impl Visitor<String> for NodeRefDumper {
-  fn dispatch(&mut self, sys: &SysBuilder, node: &BaseNode, _: Vec<NodeKind>) -> Option<String> {
-    match node.get_kind() {
-      NodeKind::Array => {
-        let array = node.as_ref::<Array>(sys).unwrap();
-        namify(array.get_name()).into()
-      }
-      NodeKind::FIFO => namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into(),
-      NodeKind::IntImm => {
-        let int_imm = node.as_ref::<IntImm>(sys).unwrap();
+fn node_dump_ref(
+  sys: &SysBuilder,
+  node: &BaseNode,
+  _: Vec<NodeKind>,
+  immwidth: bool,
+) -> Option<String> {
+  match node.get_kind() {
+    NodeKind::Array => {
+      let array = node.as_ref::<Array>(sys).unwrap();
+      namify(array.get_name()).into()
+    }
+    NodeKind::FIFO => namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into(),
+    NodeKind::IntImm => {
+      let int_imm = node.as_ref::<IntImm>(sys).unwrap();
+      if immwidth {
         Some(format!(
           "{}'d{}",
           int_imm.dtype().get_bits(),
           int_imm.get_value()
         ))
+      } else {
+        Some(format!("{}", int_imm.get_value()))
       }
-      NodeKind::StrImm => {
-        let str_imm = node.as_ref::<StrImm>(sys).unwrap();
-        let value = str_imm.get_value();
-        quote::quote!(#value).to_string().into()
-      }
-      NodeKind::Expr => Some(namify(node.to_string(sys).as_str())),
-      _ => panic!("Unknown node of kind {:?}", node.get_kind()),
     }
+    NodeKind::StrImm => {
+      let str_imm = node.as_ref::<StrImm>(sys).unwrap();
+      let value = str_imm.get_value();
+      quote::quote!(#value).to_string().into()
+    }
+    NodeKind::Expr => Some(namify(node.to_string(sys).as_str())),
+    _ => panic!("Unknown node of kind {:?}", node.get_kind()),
   }
 }
 
 macro_rules! dump_ref {
   ($sys:expr, $value:expr) => {
-    NodeRefDumper.dispatch($sys, $value, vec![]).unwrap()
+    node_dump_ref($sys, $value, vec![], false).unwrap()
+  };
+}
+
+macro_rules! dump_ref_immwidth {
+  ($sys:expr, $value:expr) => {
+    node_dump_ref($sys, $value, vec![], true).unwrap()
   };
 }
 
@@ -1500,8 +1511,8 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         let dbits = expr.dtype().get_bits() - 1;
         let name = namify(expr.upcast().to_string(self.sys).as_str());
         let concat = expr.as_sub::<instructions::Concat>().unwrap();
-        let a = dump_ref!(self.sys, &concat.msb());
-        let b = dump_ref!(self.sys, &concat.lsb());
+        let a = dump_ref_immwidth!(self.sys, &concat.msb());
+        let b = dump_ref_immwidth!(self.sys, &concat.lsb());
         Some(format!(
           "logic [{}:0] {};\nassign {} = {{{}, {}}};\n\n",
           dbits, name, name, a, b
