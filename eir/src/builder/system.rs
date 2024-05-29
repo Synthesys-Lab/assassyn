@@ -439,7 +439,9 @@ impl SysBuilder {
     // Wrap all the operands into Operand instances.
     let operands = operands
       .into_iter()
-      .map(|x| self.insert_element(Operand::new(x)))
+      .map(|x| {
+        self.insert_element(Operand::new(x))
+      })
       .collect();
     let instance = Expr::new(
       dtype.clone(),
@@ -459,22 +461,18 @@ impl SysBuilder {
       .collect::<Vec<_>>();
     operands.into_iter().for_each(|x| {
       let mut operand = x.as_mut::<Operand>(self).unwrap();
+      let value = operand.get().get_value().clone();
       operand.get_mut().set_user(res);
       self.add_user(x.clone());
+
+      if matches!(value.get_kind(), NodeKind::Array | NodeKind::FIFO) {
+        let ext = value;
+        let cur_mod = self.get_current_module().unwrap().upcast();
+        let mut mod_mut = self.get_mut::<Module>(&cur_mod).unwrap();
+        mod_mut.insert_external_interface(ext, x);
+      }
     });
     res
-  }
-
-  fn insert_external_interface(&mut self, ext: BaseNode, expr: BaseNode, operand_idx: usize) {
-    let cur_mod = self.get_current_module().unwrap().upcast();
-    let operand = expr
-      .as_ref::<Expr>(self)
-      .unwrap()
-      .get_operand(operand_idx)
-      .unwrap()
-      .upcast();
-    let mut mod_mut = self.get_mut::<Module>(&cur_mod).unwrap();
-    mod_mut.insert_external_interface(ext, operand);
   }
 
   /// The helper function to insert an element into the current insert point.
@@ -676,9 +674,6 @@ impl SysBuilder {
     // Create the expression.
     let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
 
-    // Maintain the external interface redundancy when it is determined.
-    self.insert_external_interface(port, res.clone(), 0);
-
     res
   }
 
@@ -711,7 +706,6 @@ impl SysBuilder {
     assert!(matches!(array.get_kind(), NodeKind::Array));
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
     let res = self.create_expr(dtype, Opcode::Load, vec![array, idx], true);
-    self.insert_external_interface(array.clone(), res.clone(), 0);
     res
   }
 
@@ -752,7 +746,6 @@ impl SysBuilder {
     );
     let operands = vec![array, idx, value];
     let res = self.create_expr(DataType::void(), Opcode::Store, operands, true);
-    self.insert_external_interface(array, res.clone(), 0);
     res
   }
 

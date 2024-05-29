@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use crate::{
-  builder::SysBuilder,
+  builder::{InsertPoint, SysBuilder},
   ir::{
     node::{BaseNode, BlockRef, ExprRef, IsElement, ModuleRef},
     visitor::Visitor,
-    Block, BlockKind, Expr, Opcode,
+    Block, BlockKind, Expr, Opcode, Typed,
   },
 };
 
@@ -64,7 +64,7 @@ impl Visitor<()> for FindCommonSubexpression {
 }
 
 struct CommonExpr {
-  ip: (BaseNode, usize),
+  ip: (BaseNode, BaseNode, BaseNode),
   duplica: Vec<BaseNode>,
 }
 
@@ -78,11 +78,6 @@ fn idx_of(sys: &SysBuilder, x: &BaseNode) -> Option<usize> {
   }
 }
 
-fn climb_up(sys: &SysBuilder, x: &BaseNode) -> (BaseNode, Option<usize>) {
-  let parent = x.get_parent(sys).unwrap();
-  (parent, idx_of(sys, x))
-}
-
 fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<CommonExpr> {
   let mut res = Vec::new();
   for m in sys.module_iter() {
@@ -92,7 +87,10 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
     finder.visit_module(m);
     for (_, exprs) in finder.common {
       if exprs.len() != 1 {
-        let mut parents = exprs.iter().map(|x| climb_up(sys, x)).collect::<Vec<_>>();
+        let mut parents = exprs
+          .iter()
+          .map(|x| (x.get_parent(sys).unwrap(), x.clone()))
+          .collect::<Vec<_>>();
         // Hoist all parents to the same depth
         while let Some(x) = {
           let ref_depth = da.get_depth(&parents[0].0);
@@ -113,29 +111,28 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
             None
           }
         } {
-          *x = climb_up(sys, &x.0);
+          *x = (x.0.get_parent(sys).unwrap(), x.0);
         }
         // Hoist all the parents to the same node
         while parents.iter().any(|x| x.0.ne(&parents[0].0)) {
-          parents.iter_mut().for_each(|x| *x = climb_up(sys, &x.0));
+          parents
+            .iter_mut()
+            .for_each(|x| *x = (x.0.get_parent(sys).unwrap(), x.0.clone()));
         }
+
         // TODO(@were): Support non-block parents
-        if let Some((block, idx)) = {
+        if let Some(ip) = {
           if let Ok(block) = parents[0].0.as_ref::<Block>(sys) {
             let idx = parents
               .iter()
-              .min_by(|x, y| x.1.unwrap().cmp(&y.1.unwrap()))
-              .unwrap()
-              .1;
-            Some((block, idx.unwrap()))
+              .min_by(|x, y| idx_of(sys, &x.1).cmp(&idx_of(sys, &y.1)))
+              .unwrap();
+            Some((block.get_module().upcast(), idx.0, idx.1))
           } else {
             None
           }
         } {
-          res.push(CommonExpr {
-            ip: (block.upcast(), idx),
-            duplica: exprs,
-          });
+          res.push(CommonExpr { ip, duplica: exprs });
         }
       }
     }
@@ -151,14 +148,25 @@ pub fn common_code_elimination(sys: &mut SysBuilder) {
   depth.enter(sys);
   let ce = find_common_subexpression(sys, &depth);
   for elem in ce {
-    // match elem {
-    //   CommonExpr::Master { master, duplica } => {
-    //     for dup in duplica {
-    //       sys.replace_all_uses_with(dup.clone(), master);
-    //       let mut dup_mut = dup.as_mut::<Expr>(sys).unwrap();
-    //       dup_mut.erase_from_parent();
-    //     }
-    //   }
-    // }
+    let duplica = elem.duplica;
+    let ip = elem.ip;
+    let idx = idx_of(sys, &ip.2);
+    let ip = InsertPoint(ip.0, ip.1, idx);
+    sys.set_current_ip(ip);
+    let (dtype, opcode, operands) = {
+      let expr = duplica[0].as_ref::<Expr>(sys).unwrap();
+      let ty = expr.dtype();
+      let operands = expr
+        .operand_iter()
+        .map(|x| x.get_value().clone())
+        .collect::<Vec<_>>();
+      (ty, expr.get_opcode(), operands)
+    };
+    let master = sys.create_expr(dtype, opcode, operands, true);
+    for dup in duplica {
+      sys.replace_all_uses_with(dup.clone(), master);
+      let mut dup_mut = dup.as_mut::<Expr>(sys).unwrap();
+      dup_mut.erase_from_parent();
+    }
   }
 }
