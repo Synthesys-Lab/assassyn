@@ -62,7 +62,6 @@ impl Parented for Block {
 }
 
 impl BlockRef<'_> {
-
   pub fn get_module(&self) -> ModuleRef<'_> {
     let mut runner = self.upcast().clone();
     while runner.get_kind() != NodeKind::Module {

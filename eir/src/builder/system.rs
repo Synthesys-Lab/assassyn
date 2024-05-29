@@ -439,9 +439,7 @@ impl SysBuilder {
     // Wrap all the operands into Operand instances.
     let operands = operands
       .into_iter()
-      .map(|x| {
-        self.insert_element(Operand::new(x))
-      })
+      .map(|x| self.insert_element(Operand::new(x)))
       .collect();
     let instance = Expr::new(
       dtype.clone(),
