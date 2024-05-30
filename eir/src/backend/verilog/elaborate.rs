@@ -697,17 +697,17 @@ fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
   match node.get_kind() {
     NodeKind::Module => {
       let module = node.as_ref::<Module>(sys).unwrap();
-      for elem in module.get_body().iter() {
+      for elem in module.get_body().body_iter() {
         if elem.get_kind() == NodeKind::Expr || elem.get_kind() == NodeKind::Block {
-          triggered_modules.append(get_triggered_modules(elem, sys).as_mut());
+          triggered_modules.append(get_triggered_modules(&elem, sys).as_mut());
         }
       }
     }
     NodeKind::Block => {
       let block = node.as_ref::<Block>(sys).unwrap();
-      for elem in block.iter() {
+      for elem in block.body_iter() {
         if elem.get_kind() == NodeKind::Expr || elem.get_kind() == NodeKind::Block {
-          triggered_modules.append(get_triggered_modules(elem, sys).as_mut());
+          triggered_modules.append(get_triggered_modules(&elem, sys).as_mut());
         }
       }
     }
@@ -961,39 +961,46 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
 
     let mut wait_until: Option<String> = None;
 
-    if let BlockKind::WaitUntil(cond) = module.get_body().get_kind() {
-      let cond_block = cond.as_ref::<Block>(self.sys).unwrap();
-      match cond_block.get_kind() {
-        BlockKind::Valued(value_node) => {
-          for elem in cond_block.iter() {
-            match elem.get_kind() {
-              NodeKind::Expr => {
-                let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-                res.push_str(self.visit_expr(expr).unwrap().as_str());
-              }
-              NodeKind::Block => {
-                let block = elem.as_ref::<Block>(self.sys).unwrap();
-                res.push_str(self.visit_block(block).unwrap().as_str());
-              }
-              _ => {
-                panic!("Unexpected reference type: {:?}", elem);
-              }
-            }
-          }
-          let value = value_node.as_ref::<Expr>(self.sys).unwrap();
-          wait_until = Some(format!(
-            " && ({}{})",
-            namify(value_node.to_string(self.sys).as_str()),
-            if value.dtype().get_bits() == 1 {
-              "".into()
-            } else {
-              format!(" != 0")
-            }
-          ));
+    let skip = if let Some(wu_intrin) = module.get_body().get_wait_until() {
+      let mut skip = 0;
+      let body = module.get_body();
+      let body_iter = body.body_iter();
+      for (i, elem) in body_iter.enumerate() {
+        if elem == wu_intrin {
+          skip = i + 1;
+          break;
         }
-        _ => panic!("Expect valued block for wait_until condition"),
+        match elem.get_kind() {
+          NodeKind::Expr => {
+            let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+            res.push_str(self.visit_expr(expr).unwrap().as_str());
+          }
+          NodeKind::Block => {
+            let block = elem.as_ref::<Block>(self.sys).unwrap();
+            res.push_str(self.visit_block(block).unwrap().as_str());
+          }
+          _ => {
+            panic!("Unexpected reference type: {:?}", elem);
+          }
+        }
       }
-    }
+      let bi = wu_intrin
+        .as_expr::<instructions::BlockIntrinsic>(self.sys)
+        .unwrap();
+      let value = bi.value();
+      wait_until = Some(format!(
+        " && ({}{})",
+        namify(value.to_string(self.sys).as_str()),
+        if value.get_dtype(self.sys).unwrap().get_bits() == 1 {
+          "".into()
+        } else {
+          format!(" != 0")
+        }
+      ));
+      skip
+    } else {
+      0
+    };
 
     res.push_str(format!("logic trigger;\n").as_str());
     res.push_str(format!("assign trigger_pop_ready = trigger;\n\n").as_str());
@@ -1007,7 +1014,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     self.fifo_pushes.clear();
     self.array_stores.clear();
     self.triggers.clear();
-    for elem in module.get_body().iter() {
+    for elem in module.get_body().body_iter().skip(skip) {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
@@ -1213,26 +1220,24 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
 
   fn visit_block(&mut self, block: BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    match block.get_kind() {
-      BlockKind::Condition(cond) => {
-        let cond = cond.as_ref::<Operand>(block.sys).unwrap();
-        let cond = cond.get_value().clone();
-        self
-          .pred_stack
-          .push_back(if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
-            dump_ref!(self.sys, &cond)
-          } else {
-            format!("({} != '0)", dump_ref!(self.sys, &cond))
-          });
-      }
-      BlockKind::Cycle(cycle) => {
-        self
-          .pred_stack
-          .push_back(format!("(cycle_cnt == {})", cycle));
-      }
-      BlockKind::WaitUntil(_) | BlockKind::Valued(_) | BlockKind::None => (),
-    }
-    for elem in block.iter() {
+    let skip = if let Some(cond) = block.get_condition() {
+      self
+        .pred_stack
+        .push_back(if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
+          dump_ref!(self.sys, &cond)
+        } else {
+          format!("({} != '0)", dump_ref!(self.sys, &cond))
+        });
+      1
+    } else if let Some(cycle) = block.get_cycle() {
+      self
+        .pred_stack
+        .push_back(format!("(cycle_cnt == {})", cycle));
+      1
+    } else {
+      0
+    };
+    for elem in block.body_iter().skip(skip) {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();

@@ -5,7 +5,7 @@ use crate::{
   ir::{
     node::{BaseNode, BlockRef, ExprRef, IsElement, ModuleRef},
     visitor::Visitor,
-    Block, BlockKind, Expr, Opcode, Typed,
+    Block, Expr, Opcode, Typed,
   },
 };
 
@@ -29,11 +29,8 @@ impl Visitor<()> for DepthAnalysis {
   fn visit_block(&mut self, block: BlockRef<'_>) -> Option<()> {
     self.depth.insert(block.upcast(), self.cur);
     self.cur += 1;
-    if let BlockKind::WaitUntil(cond) = block.get_kind() {
-      self.dispatch(block.sys, cond, vec![]);
-    }
-    for elem in block.iter() {
-      self.dispatch(block.sys, elem, vec![]);
+    for elem in block.body_iter() {
+      self.dispatch(block.sys, &elem, vec![]);
     }
     self.cur -= 1;
     None

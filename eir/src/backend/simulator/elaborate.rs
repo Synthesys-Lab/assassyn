@@ -162,6 +162,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     } else {
       None
     };
+    let mut open_scope = false;
     let res = match expr.get_opcode() {
       Opcode::Binary { .. } => {
         let bin = expr.as_sub::<instructions::Binary>().unwrap();
@@ -397,13 +398,35 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         let module = bind.callee();
         format!("EventKind::Module{}", camelize(&namify(module.get_name())))
       }
+      Opcode::BlockIntrinsic { intrinsic } => {
+        let bi = expr.as_sub::<instructions::BlockIntrinsic>().unwrap();
+        match intrinsic {
+          subcode::BlockIntrinsic::Value => {
+            bi.value().to_string(self.sys)
+          }
+          subcode::BlockIntrinsic::Cycled => {
+            open_scope = true;
+            format!("if stamp / 100 == {} {{", bi.value().to_string(self.sys))
+          }
+          subcode::BlockIntrinsic::WaitUntil => {
+            format!("if !{} {{ return; }}", bi.value().to_string(self.sys))
+          }
+          subcode::BlockIntrinsic::Condition => {
+            open_scope = true;
+            format!("if {} {{", bi.value().to_string(self.sys))
+          }
+        }
+      }
     };
-    if let Some(id) = id {
+    let res = if let Some(id) = id {
       format!("{}let {} = {};\n", " ".repeat(self.indent), id, res)
     } else {
       format!("{}{};\n", " ".repeat(self.indent), res)
+    };
+    if open_scope {
+      self.indent += 2;
     }
-    .into()
+    res.into()
   }
 
   fn visit_int_imm(&mut self, int_imm: IntImmRef<'_>) -> Option<String> {
@@ -417,43 +440,9 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
 
   fn visit_block(&mut self, block: BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    match block.get_kind() {
-      BlockKind::Condition(cond) => {
-        let cond = cond.as_ref::<Operand>(block.sys).unwrap();
-        let cond = cond.get_value();
-        res.push_str(&format!(
-          "  if {}{} {{\n",
-          dump_ref!(self.sys, &cond),
-          if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
-            "".into()
-          } else {
-            format!(" != 0")
-          }
-        ));
-      }
-      BlockKind::Cycle(cycle) => {
-        res.push_str(&format!("  if stamp / 100 == {} {{\n", cycle));
-      }
-      BlockKind::WaitUntil(cond) => {
-        let value = {
-          let cond = cond.as_ref::<Block>(block.sys).unwrap();
-          let value = cond.get_value().unwrap().clone();
-          value
-        };
-        let cond_block = self.dispatch(block.sys, &cond, vec![]).unwrap();
-        let cond_block = cond_block[1..cond_block.len() - 1].to_string();
-        res.push_str(&format!(
-          "{}  if {} {{\n",
-          cond_block,
-          dump_ref!(self.sys, &value)
-        ));
-      }
-      BlockKind::Valued(_) | BlockKind::None => {
-        res.push('{');
-      }
-    }
-    self.indent += 2;
-    for elem in block.iter() {
+    // TODO(@were): Later we support sub-types for blocks.
+    let restore_indent = self.indent;
+    for elem in block.body_iter() {
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
@@ -468,29 +457,12 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         }
       }
     }
-    self.indent -= 2;
-    match block.get_kind() {
-      BlockKind::Condition(_) | BlockKind::Cycle(_) => {
-        res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
-      }
-      BlockKind::WaitUntil(_) => {
-        res.push_str(&format!("{}}} else {{\n", " ".repeat(self.indent)));
-        let module_eventkind_id = self.current_module_id();
-        res.push_str(
-          &quote::quote! {
-            // retry at next cycle
-            q.push(Reverse(Event {
-              stamp: stamp + 100,
-              kind: EventKind::#module_eventkind_id,
-            }));
-          }
-          .to_string(),
-        );
-        res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
-      }
-      BlockKind::Valued(_) | BlockKind::None => {
-        res.push('}');
-      }
+    if restore_indent != self.indent {
+      self.indent -= 2;
+      res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
+    }
+    if block.get_value().is_some() {
+      res = format!("{{ {} }}", res);
     }
     res.into()
   }
@@ -959,26 +931,18 @@ macro_rules! impl_unwrap_slab {
       .to_string(),
     );
   }
-  if sys.has_testbench() {
-    let testbench_vec = sys
-      .module_iter()
-      .filter(|m| m.get_name() == "testbench")
-      .collect::<Vec<ModuleRef>>();
-    let cycles = testbench_vec[0]
+  if let Some(testbench) = sys.get_module("testbench") {
+    let cycles = testbench
       .get_body()
-      .iter()
-      .filter_map(|n| -> Option<usize> {
-        if n.get_kind() == NodeKind::Block {
-          let block = n.as_ref::<Block>(sys).unwrap();
-          match block.get_kind() {
-            BlockKind::Cycle(cycle) => Some(*cycle),
-            _ => None,
-          }
+      .body_iter()
+      .filter_map(|n| {
+        if let Ok(block) = n.as_ref::<Block>(sys) {
+          block.get_cycle()
         } else {
           None
         }
       })
-      .collect::<Vec<usize>>();
+      .collect::<Vec<_>>();
     // Push the initial events.
     res.push_str(
       &quote::quote! {
@@ -1001,7 +965,7 @@ macro_rules! impl_unwrap_slab {
             let init_file_path = init_file_path.to_str().unwrap();
             let array = param.array.as_ref::<Array>(sys).unwrap();
             let slab_idx = slab_cache.get(&param.array).unwrap();
-            let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
+            let (scalar_ty, size) = unwrap_array_ty(&array.dtype()); 
             let scalar_ty = dtype_to_rust_type(&scalar_ty)
               .parse::<proc_macro2::TokenStream>()
               .unwrap();

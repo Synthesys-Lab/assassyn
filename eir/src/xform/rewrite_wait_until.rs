@@ -1,10 +1,10 @@
 use crate::{
-  builder::SysBuilder,
+  builder::{InsertPoint, SysBuilder},
   created_here,
   ir::{
     node::{BaseNode, IsElement, ModuleRef},
     visitor::Visitor,
-    Block, BlockKind, Module,
+    Module,
   },
 };
 
@@ -17,22 +17,15 @@ impl Visitor<()> for GatherModulesToRewrite {
     match module.get_name() {
       "driver" | "testbench" => {} // Both driver and testbench are unconditionally executed, skip!
       _ => {
-        let body = module.get_body();
-        match body.get_kind() {
-          BlockKind::None => {
-            if module.get_num_inputs() == 0 {
-              eprintln!(
-                "Warning: module {} has no inputs, but is neither the driver nor testbench.",
-                module.get_name()
-              );
-            }
-            // All the unconditional root block should be rewritten.
-            self.to_rewrite.push(module.upcast());
+        if module.get_body().get_wait_until().is_none() {
+          if module.get_num_inputs() == 0 {
+            eprintln!(
+              "Warning: module {} has no inputs, but is neither the driver nor testbench.",
+              module.get_name()
+            );
           }
-          BlockKind::WaitUntil(_) => {} // We respect existing wait_until blocks.
-          _ => {
-            unreachable!()
-          }
+          // All the unconditional root block should be rewritten.
+          self.to_rewrite.push(module.upcast());
         }
       }
     }
@@ -60,25 +53,19 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
     if ports.is_empty() {
       continue;
     }
-    sys.set_current_module(module);
-    sys.set_current_block(body);
-    sys.set_current_block_wait_until();
-    if let BlockKind::WaitUntil(cond) = sys.get_current_block().unwrap().get_kind() {
-      let cond = cond.clone();
-      sys.set_current_block(cond.clone());
-      let valids = ports
-        .into_iter()
-        .map(|port| sys.create_fifo_valid(port))
-        .collect::<Vec<_>>();
-      let valid = valids
-        .into_iter()
-        .fold(None, |acc, v| match acc {
-          None => Some(v),
-          Some(acc) => Some(sys.create_bitwise_and(created_here!(), acc, v)),
-        })
-        .unwrap();
-      // FIXME: Use the real condition.
-      cond.as_mut::<Block>(sys).unwrap().set_value(valid);
-    }
+    sys.set_current_ip(InsertPoint(module, body, 0.into()));
+
+    let valids = ports
+      .into_iter()
+      .map(|port| sys.create_fifo_valid(port))
+      .collect::<Vec<_>>();
+    let valid = valids
+      .into_iter()
+      .fold(None, |acc, v| match acc {
+        None => Some(v),
+        Some(acc) => Some(sys.create_bitwise_and(created_here!(), acc, v)),
+      })
+      .unwrap();
+    sys.create_wait_until(valid);
   }
 }

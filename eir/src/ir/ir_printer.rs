@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use expr::subcode;
+
 use crate::builder::InsertPoint;
 use crate::ir::{node::*, *};
 
@@ -195,54 +197,24 @@ impl Visitor<String> for IRPrinter {
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
-    format!("{}{}", " ".repeat(self.indent), expr.to_string()).into()
+    let res = format!("{}{}", " ".repeat(self.indent), expr.to_string()).into();
+    if let Ok(bi) = expr.as_sub::<instructions::BlockIntrinsic>() {
+      if matches!(
+        bi.get_subcode(),
+        subcode::BlockIntrinsic::Condition | subcode::BlockIntrinsic::Cycled
+      ) {
+        self.inc_indent();
+      }
+    }
+    res
   }
 
   fn visit_block(&mut self, block: BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    // Scope begins
-    match block.get_kind() {
-      BlockKind::Condition(cond) => {
-        res.push_str(&format!(
-          "{}if {} {{ // {}\n",
-          " ".repeat(self.indent),
-          cond.to_string(block.sys),
-          block.get_key(),
-        ));
-        self.inc_indent();
-      }
-      BlockKind::WaitUntil(cond) => {
-        let x = self.indent;
-        let cond_str = self.dispatch(block.sys, &cond, vec![]).unwrap();
-        res.push_str(&format!(
-          "{}wait_until {} {{ // {}\n",
-          " ".repeat(self.indent),
-          cond_str[x..].to_string(),
-          block.get_key(),
-        ));
-        self.inc_indent();
-      }
-      BlockKind::Cycle(cycle) => {
-        res.push_str(&format!(
-          "{}cycle {} {{ // {}\n",
-          " ".repeat(self.indent),
-          cycle,
-          block.get_key()
-        ));
-        self.inc_indent();
-      }
-      BlockKind::None | BlockKind::Valued(_) => {
-        res.push_str(&format!(
-          "{}{{ // {}\n",
-          " ".repeat(self.indent),
-          block.get_key()
-        ));
-        self.inc_indent();
-      }
-    }
     let InsertPoint(cur_mod, cur_block, at) = block.sys.get_insert_point();
     let here = cur_mod == block.get_module().upcast() && cur_block == block.upcast();
-    for (i, elem) in block.iter().enumerate() {
+    let restore_ident = self.indent;
+    for (i, elem) in block.body_iter().enumerate() {
       if here && at.map_or(false, |x| x == i) {
         res.push_str(&format!(
           "{}-----{{Insert Here}}-----\n",
@@ -269,21 +241,13 @@ impl Visitor<String> for IRPrinter {
         " ".repeat(self.indent)
       ));
     }
-    // Scope ends
-    match block.get_kind() {
-      BlockKind::Condition(_) | BlockKind::WaitUntil(_) | BlockKind::Cycle(_) | BlockKind::None => {
-        self.dec_indent();
-        res.push_str(&format!("{}}}", " ".repeat(self.indent)));
-      }
-      BlockKind::Valued(value) => {
-        res.push_str(&format!(
-          "{}{}\n",
-          " ".repeat(self.indent),
-          value.to_string(block.sys)
-        ));
-        self.dec_indent();
-        res.push_str(&format!("{}}}", " ".repeat(self.indent)));
-      }
+    if restore_ident != self.indent {
+      self.indent -= 2;
+      res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
+    }
+    if block.get_value().is_some() {
+      let indent = " ".repeat(self.indent);
+      res = format!("{}{{{}\n{}}}", indent, res, indent);
     }
     res.into()
   }

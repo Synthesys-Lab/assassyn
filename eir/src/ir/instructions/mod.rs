@@ -8,6 +8,7 @@ pub mod call;
 pub mod data;
 pub mod fifo;
 pub mod log;
+pub mod block;
 
 pub trait AsExpr<'a>: Sized {
   fn downcast(expr: ExprRef<'a>) -> Result<Self, String>;
@@ -95,5 +96,6 @@ register_opcode!(
   Slice => { (x, 0, BaseNode) (l_intimm, 1, node::IntImm) (r_intimm, 2, node::IntImm) },
   Concat => { (msb, 0, BaseNode) (lsb, 1, BaseNode) },
   Cast { cast } => { (x, 0, BaseNode) }, // NOTE: This "," cannot be omitted!
+  BlockIntrinsic { intrinsic } => { (value, 0, BaseNode) },
   Log => { },
 );

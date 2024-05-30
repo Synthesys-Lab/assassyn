@@ -8,7 +8,7 @@ use crate::{
     module,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
-    Block, BlockKind, DataType, Expr, Module,
+    DataType, Expr, Module,
   },
 };
 
@@ -84,36 +84,30 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
     let mut arbiter_mut = arbiter.as_mut::<Module>(sys).unwrap();
     arbiter_mut.add_attr(module::Attribute::NoArbiter);
     sys.set_current_module(arbiter);
-    sys.set_current_block_wait_until();
-    if let BlockKind::WaitUntil(cond) = sys.get_current_block().unwrap().get_kind() {
-      let cond = cond.clone();
-      let restore_block = sys.get_current_block().unwrap().upcast();
-      sys.set_current_block(cond.clone());
-      let mut idx = 0;
-      let mut sub_valids = Vec::new();
-      for caller in callers.iter() {
-        let bind = caller.as_expr::<Bind>(sys).unwrap();
-        let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
-        let valids = (0..n_args)
-          .map(|_| {
-            let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
-            let port = arbiter.get_port(idx).unwrap().upcast();
-            idx += 1;
-            sys.create_fifo_valid(port)
-          })
-          .collect::<Vec<_>>();
-        let mut valid_runner = valids[0].clone();
-        for valid in valids.iter().skip(1) {
-          valid_runner = sys.create_bitwise_and(created_here!(), valid_runner, valid.clone());
-        }
-        sub_valids.push(valid_runner);
+    let restore_block = sys.get_current_block().unwrap().upcast();
+    let mut idx = 0;
+    let mut sub_valids = Vec::new();
+    for caller in callers.iter() {
+      let bind = caller.as_expr::<Bind>(sys).unwrap();
+      let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
+      let valids = (0..n_args)
+        .map(|_| {
+          let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
+          let port = arbiter.get_port(idx).unwrap().upcast();
+          idx += 1;
+          sys.create_fifo_valid(port)
+        })
+        .collect::<Vec<_>>();
+      let mut valid_runner = valids[0].clone();
+      for valid in valids.iter().skip(1) {
+        valid_runner = sys.create_bitwise_and(created_here!(), valid_runner, valid.clone());
       }
+      sub_valids.push(valid_runner);
       let mut valid = sub_valids[0].clone();
       for sub_valid in sub_valids.iter().skip(1) {
         valid = sys.create_bitwise_or(created_here!(), valid, sub_valid.clone());
       }
-      let mut cond_mut = cond.as_mut::<Block>(sys).unwrap();
-      cond_mut.set_value(valid);
+      sys.create_wait_until(valid);
       sys.set_current_block(restore_block);
       let mut valid_hot = sub_valids[callers.len() - 1].clone();
       for sub_valid in sub_valids.iter().rev().skip(1) {

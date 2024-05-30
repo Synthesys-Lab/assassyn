@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use node::NodeKind;
+
 use crate::ir::node::IsElement;
 use crate::ir::*;
 
@@ -113,6 +115,15 @@ macro_rules! register_opcodes {
         }
       }
     }
+
+    $($(
+      impl From<$subty> for Opcode {
+        fn from(s: $subty) -> Self {
+          Opcode::$var_id {  $subcode: s }
+        }
+      }
+    )?)*
+
   };
 }
 
@@ -147,6 +158,8 @@ register_opcodes!(
   Slice(slice, 3 /*op [lo, hi]*/) => { valued },
   Cast({ cast: subcode::Cast }, 1 /*value*/) => { valued },
   Concat(concat, 2/*msb lsb*/) => { valued },
+  // Block intrinsics
+  BlockIntrinsic({ intrinsic: subcode::BlockIntrinsic }, -1 /*N/A*/) => { side_effect },
   // Non-synthesizable operations
   Log(log, -1 /*N/A*/) => { side_effect }
 );
@@ -271,39 +284,24 @@ impl ExprRef<'_> {
   pub fn idx(&self) -> usize {
     let parent = self.get().get_parent();
     let block = self.sys.get::<Block>(&parent).unwrap();
-    let mut iter = block.iter();
-    iter.position(|x| *x == self.upcast()).unwrap()
+    let mut iter = block.body_iter();
+    iter
+      .position(|x| self.get_key() == x.get_key() && matches!(x.get_kind(), NodeKind::Expr))
+      .unwrap()
   }
 }
 
 impl ExprMut<'_> {
-  pub fn move_to_new_parent(&mut self, new_parent: BaseNode, at: Option<usize>) {
-    let old_parent = self.get().get_parent();
-    let expr = self.get().upcast();
-    let mut block_mut = self.sys.get_mut::<Block>(&old_parent).unwrap();
-    block_mut.erase(&expr);
-    let mut new_parent_mut = self.sys.get_mut::<Block>(&new_parent).unwrap();
-    new_parent_mut.insert_at(at, expr);
-    self.get_mut().set_parent(new_parent)
-  }
-
   /// Erase the expression from its parent block
   pub fn erase_from_parent(&mut self) {
     assert!(self.get().users().is_empty());
     let parent = self.get().get_parent();
     let expr = self.get().upcast();
-    let block = self.sys.get::<Block>(&parent).unwrap();
     let operands = self.get().operands.clone();
 
     // Remove all the external interfaces related to this instruction.
-    let module = block.get_module().upcast();
-    let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
-    module_mut.remove_related_externals(expr);
     for operand in operands.iter() {
-      module_mut.remove_related_externals(operand.clone());
-    }
-    for operand in operands.iter() {
-      self.sys.remove_user(operand.clone());
+      self.sys.cut_operand(operand.clone());
     }
 
     let mut block_mut = self.sys.get_mut::<Block>(&parent).unwrap();
@@ -311,42 +309,6 @@ impl ExprMut<'_> {
 
     // Recycle the memory.
     self.sys.dispose(expr);
-  }
-
-  /// Unify the implementation of setting and removing an operand.
-  fn set_operand_impl(&mut self, i: usize, value: Option<BaseNode>) {
-    let block = self.sys.get::<Block>(&self.get().get_parent()).unwrap();
-    let module = block.get_module();
-    // Remove all the external interfaces related to this instruction.
-    let module = module.upcast();
-    let expr = self.get().upcast();
-    let old = self.get().get_operand(i).unwrap().upcast();
-    let operand = value.map(|x| self.sys.insert_element(Operand::new(x)));
-    self.sys.remove_user(old);
-    let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
-    module_mut.remove_related_externals(expr);
-    if let Some(operand) = operand {
-      module_mut.add_related_externals(operand);
-      self.get_mut().operands[i] = operand;
-      operand
-        .as_mut::<Operand>(self.sys)
-        .unwrap()
-        .get_mut()
-        .set_user(expr);
-      self.sys.add_user(operand);
-    } else {
-      self.get_mut().operands.remove(i);
-    }
-  }
-
-  /// Set the i-th operand to the given value.
-  /// NOTE: Just the raw value is given, not the operand wrapper.
-  pub fn set_operand(&mut self, i: usize, value: BaseNode) {
-    self.set_operand_impl(i, Some(value));
-  }
-
-  pub fn remove_operand(&mut self, i: usize) {
-    self.set_operand_impl(i, None);
   }
 
   pub fn set_name(&mut self, name: String) {

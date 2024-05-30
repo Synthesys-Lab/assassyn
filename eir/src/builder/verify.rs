@@ -27,10 +27,10 @@ impl Operand {
           .get_user()
           .as_ref::<Block>(sys)
           .expect("User should be a block!");
-        if let BlockKind::Condition(cond) = block.get_kind() {
-          assert!(cond.eq(&self.upcast()));
-        } else {
-          panic!("Invalid block type!");
+        if let Some(condition) = block.get_condition() {
+          assert!(block.idx_of(&condition).unwrap() == 0);
+        } else if let Some(value) = block.get_value() {
+          assert!(block.idx_of(&value).unwrap() == block.get_num_exprs() - 1);
         }
       }
       _ => panic!("Invalid user type!"),
@@ -52,25 +52,10 @@ impl Verifier {
 
 impl Visitor<()> for Verifier {
   fn visit_block(&mut self, block: BlockRef<'_>) -> Option<()> {
-    if let BlockKind::WaitUntil(cond) = block.get_kind() {
-      if let Ok(cond) = cond.as_ref::<Block>(block.sys) {
-        assert!(
-          cond.get_value().is_some(),
-          "WaitUntil condition must be a valued block!"
-        );
-        self.in_wait_until_cond = true;
-        for elem in cond.iter() {
-          self.dispatch(block.sys, &elem, vec![]);
-        }
-        self.in_wait_until_cond = false;
-      } else {
-        panic!("WaitUntil condition must be a valued block!");
-      }
-    }
-    for expr in block.iter() {
+    for expr in block.body_iter() {
       self.dispatch(block.sys, &expr, vec![]);
     }
-    ().into()
+    None
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {

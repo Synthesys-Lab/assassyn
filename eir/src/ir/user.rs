@@ -117,7 +117,149 @@ impl Visitor<()> for GatherAllUses {
   }
 }
 
+impl ModuleRef<'_> {
+  /// Gather all the related external interfaces with the given operand. This is typically used to
+  /// maintain the redundant information when modifying this IR.
+  /// If the given operand is an operand, gather just this specific operand.
+  /// If the given operand is a value reference, gather all the operands that `get_value == this
+  /// operand`.
+  ///
+  /// # Arguments
+  ///
+  /// * `operand` - The operand to gather the related external interfaces.
+  pub(crate) fn gather_related_externals(&self, operand: BaseNode) -> Vec<(BaseNode, BaseNode)> {
+    // Remove all the external interfaces related to this instruction.
+    let tmp = self
+      .get()
+      .external_interfaces
+      .iter()
+      .map(|(ext, users)| {
+        (
+          ext.clone(),
+          users
+            .iter()
+            .filter(|x| {
+              (*x).eq(&operand) || {
+                let user = (*x).as_ref::<Operand>(self.sys).unwrap();
+                user.get_value().eq(&operand)
+              }
+            })
+            .cloned()
+            .collect::<Vec<_>>(),
+        )
+      })
+      .filter(|(_, users)| !users.is_empty())
+      .collect::<Vec<_>>();
+    tmp
+      .iter()
+      .map(|(ext, users)| users.iter().map(|x| (ext.clone(), x.clone())))
+      .flatten()
+      .collect()
+  }
+}
+
+impl ModuleMut<'_> {
+
+  /// Remove a specific external interface's usage. If this usage set is empty after the removal,
+  /// remove the external interface from the module, too.
+  ///
+  /// # Arguments
+  ///
+  /// * `ext_node` - The external interface node.
+  /// * `operand` - The operand node that uses this external interface.
+  fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
+    if let Some(operations) = self.get_mut().external_interfaces.get_mut(&ext_node) {
+      assert!(operations.contains(&operand));
+      operations.remove(&operand);
+      if operations.is_empty() {
+        self.get_mut().external_interfaces.remove(&ext_node);
+      }
+    }
+  }
+
+  /// Remove all the related external interfaces with the given condition.
+  fn remove_related_externals(&mut self, operand: BaseNode) {
+    let to_remove = self.get().gather_related_externals(operand);
+    to_remove.into_iter().for_each(|(ext, operand)| {
+      self.remove_external_interface(ext, operand);
+    });
+  }
+
+  /// Add related external interfaces to the module.
+  fn add_related_externals(&mut self, operand: BaseNode) {
+    // Reconnect the external interfaces if applicable.
+    // TODO(@were): Maybe later unify a common interface for this.
+    let operand_ref = operand.as_ref::<Operand>(self.sys).unwrap();
+    let value = operand_ref.get_value().clone();
+    match value.get_kind() {
+      NodeKind::Array => {
+        self.insert_external_interface(value, operand);
+      }
+      NodeKind::FIFO => {
+        self.insert_external_interface(value.clone(), operand);
+      }
+      _ => {}
+    }
+  }
+}
+
+impl ExprMut<'_> {
+  /// Unify the implementation of setting and removing an operand.
+  fn set_operand_impl(&mut self, i: usize, value: Option<BaseNode>) {
+    let block = self.sys.get::<Block>(&self.get().get_parent()).unwrap();
+    let module = block.get_module();
+    // Remove all the external interfaces related to this instruction.
+    let module = module.upcast();
+    let expr = self.get().upcast();
+    let old = self.get().get_operand(i).unwrap().upcast();
+    self.sys.cut_operand(old);
+    let operand = value.map(|x| self.sys.insert_element(Operand::new(x)));
+    let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
+    if let Some(operand) = operand {
+      module_mut.add_related_externals(operand);
+      self.get_mut().operands[i] = operand;
+      operand
+        .as_mut::<Operand>(self.sys)
+        .unwrap()
+        .get_mut()
+        .set_user(expr);
+      self.sys.add_user(operand);
+    } else {
+      self.get_mut().operands.remove(i);
+    }
+  }
+
+  /// Set the i-th operand to the given value.
+  /// NOTE: Just the raw value is given, not the operand wrapper.
+  pub fn set_operand(&mut self, i: usize, value: BaseNode) {
+    self.set_operand_impl(i, Some(value));
+  }
+
+  pub fn remove_operand(&mut self, i: usize) {
+    self.set_operand_impl(i, None);
+  }
+}
+
 impl SysBuilder {
+  pub(crate) fn cut_operand(&mut self, operand: BaseNode) {
+    let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+    // TODO(@were): Make this a unified interface.
+    let module = match operand_ref.get_user().get_kind() {
+      NodeKind::Block => {
+        let block = operand_ref.get_user().as_ref::<Block>(self).unwrap();
+        block.get_parent()
+      }
+      NodeKind::Expr => {
+        let expr = operand_ref.get_user().as_ref::<Expr>(self).unwrap();
+        expr.get_parent().as_ref::<Block>(self).unwrap().get_module().upcast()
+      }
+      _ => unreachable!()
+    };
+    let mut module_mut = self.get_mut::<Module>(&module).unwrap();
+    module_mut.remove_related_externals(operand);
+    self.remove_user(operand);
+  }
+
   pub(crate) fn remove_user(&mut self, operand: BaseNode) {
     if operand.is_unknown() {
       return;
@@ -173,9 +315,6 @@ impl SysBuilder {
       if let Some(i) = i {
         let mut expr_mut = user.as_mut::<Expr>(self).unwrap();
         expr_mut.set_operand(i, new_value);
-      } else {
-        let mut block_mut = user.as_mut::<Block>(self).unwrap();
-        block_mut.set_cond(new_value);
       }
     }
   }

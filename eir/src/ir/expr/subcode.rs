@@ -1,5 +1,3 @@
-use super::Opcode;
-
 macro_rules! register_subcode {
 
   ($namespace:ident { $($opcode:ident ( $method:ident $op:literal )),* $(,)? } ) => {
@@ -43,24 +41,12 @@ register_subcode!(
   }
 );
 
-impl From<Binary> for Opcode {
-  fn from(s: Binary) -> Self {
-    Opcode::Binary { binop: s }
-  }
-}
-
 register_subcode!(
   Unary {
     Flip(flip "!"),
     Neg(neg "-"),
   }
 );
-
-impl From<Unary> for Opcode {
-  fn from(s: Unary) -> Self {
-    Opcode::Unary { uop: s }
-  }
-}
 
 register_subcode!(
   Compare {
@@ -73,12 +59,6 @@ register_subcode!(
   }
 );
 
-impl From<Compare> for Opcode {
-  fn from(s: Compare) -> Self {
-    Opcode::Compare { cmp: s }
-  }
-}
-
 register_subcode!(
   FIFO {
     Peek(peek "peek"),
@@ -86,12 +66,6 @@ register_subcode!(
     AlmostFull(almost_full "almost_full"),
   }
 );
-
-impl From<FIFO> for Opcode {
-  fn from(s: FIFO) -> Self {
-    Opcode::FIFOField { field: s }
-  }
-}
 
 register_subcode!(
   Cast {
@@ -101,8 +75,11 @@ register_subcode!(
   }
 );
 
-impl From<Cast> for Opcode {
-  fn from(s: Cast) -> Self {
-    Opcode::Cast { cast: s }
+register_subcode!(
+  BlockIntrinsic {
+    Value(value "value"),
+    Condition(condition "condition"),
+    Cycled(cycled "cycled"),
+    WaitUntil(wait_until "wait_until"),
   }
-}
+);

@@ -418,20 +418,8 @@ pub(crate) fn emit_module_body(
       assert!(lock.valued);
       let unwraped_body = emit_body(body)?;
       return Ok(quote! {
-        sys.set_current_block_wait_until();
-        let block_restored = sys.get_current_block().unwrap().upcast();
-        let valued_block = {
-          let master = sys.get_current_block().unwrap().upcast();
-          let master = master.as_ref::<eir::ir::block::Block>(sys).unwrap();
-          match master.get_kind() {
-            eir::ir::block::BlockKind::WaitUntil(valued_block) => valued_block.clone(),
-            _ => unreachable!(),
-          }
-        };
-        sys.set_current_block(valued_block.clone());
         #lock_emission
-        valued_block.as_mut::<eir::ir::block::Block>(sys).unwrap().set_value(#value_id);
-        sys.set_current_block(block_restored);
+        sys.create_wait_until(#value_id);
         #implicit_pops
         #unwraped_body
       });

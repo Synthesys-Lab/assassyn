@@ -9,7 +9,7 @@ pub mod port;
 pub mod user;
 pub mod visitor;
 
-pub use block::{Block, BlockKind};
+pub use block::Block;
 pub use data::{Array, DataType, IntImm, StrImm, Typed};
 pub use expr::{Expr, Opcode};
 pub use module::Module;

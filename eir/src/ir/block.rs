@@ -1,34 +1,22 @@
+use expr::subcode;
+
 use crate::builder::{InsertPoint, SysBuilder};
 use crate::ir::node::*;
 use crate::ir::*;
 
-pub enum BlockKind {
-  Condition(BaseNode),
-  Cycle(usize),
-  WaitUntil(BaseNode), // The base node is a valued-block as condition.
-  Valued(BaseNode),
-  None,
-}
-
 pub struct Block {
   pub(crate) key: usize,
-  kind: BlockKind,
   body: Vec<BaseNode>,
   parent: BaseNode,
 }
 
 impl Block {
-  pub(crate) fn new(pred: BlockKind, parent: BaseNode) -> Block {
+  pub(in super::super) fn new(parent: BaseNode) -> Block {
     Block {
       key: 0,
-      kind: pred,
       body: Vec::new(),
       parent,
     }
-  }
-
-  pub fn get_kind(&self) -> &BlockKind {
-    &self.kind
   }
 
   pub fn get_num_exprs(&self) -> usize {
@@ -39,15 +27,8 @@ impl Block {
     self.body.get(idx)
   }
 
-  pub fn get_value(&self) -> Option<&BaseNode> {
-    match &self.kind {
-      BlockKind::Valued(x) => Some(x),
-      _ => None,
-    }
-  }
-
-  pub fn iter<'a>(&'a self) -> impl Iterator<Item = &BaseNode> + 'a {
-    self.body.iter()
+  pub fn idx_of(&self, node: &BaseNode) -> Option<usize> {
+    self.body.iter().position(|x| x.eq(node))
   }
 }
 
@@ -74,6 +55,55 @@ impl BlockRef<'_> {
     runner.as_ref::<Module>(self.sys).unwrap()
   }
 
+  fn get_block_intrinsic(
+    &self,
+    idx: usize,
+    subcode: subcode::BlockIntrinsic,
+  ) -> Option<instructions::BlockIntrinsic<'_>> {
+    if let Some(bi) = self
+      .body
+      .get(idx)
+      .map(|x| x.as_expr::<instructions::BlockIntrinsic>(self.sys))
+    {
+      if let Ok(bi) = bi {
+        if bi.get_subcode() == subcode {
+          return Some(bi);
+        }
+      }
+    }
+    None
+  }
+
+  pub fn get_value(&self) -> Option<BaseNode> {
+    self
+      .get_block_intrinsic(self.get_num_exprs() - 1, subcode::BlockIntrinsic::Value)
+      .map(|x| x.value().clone())
+  }
+
+  pub fn get_cycle(&self) -> Option<u32> {
+    self
+      .get_block_intrinsic(0, subcode::BlockIntrinsic::Cycled)
+      .map(|x| x.value().as_ref::<IntImm>(self.sys).unwrap().get_value() as u32)
+  }
+
+  pub fn get_condition(&self) -> Option<BaseNode> {
+    self
+      .get_block_intrinsic(0, subcode::BlockIntrinsic::Condition)
+      .map(|x| x.value().clone())
+  }
+
+  pub fn get_wait_until(&self) -> Option<BaseNode> {
+    self
+      .body_iter()
+      .filter(|x| {
+        x.as_expr::<instructions::BlockIntrinsic>(self.sys)
+          .map_or(false, |x| {
+            x.get_subcode() == subcode::BlockIntrinsic::WaitUntil
+          })
+      })
+      .next()
+  }
+
   /// Get the next node in the IR tree.
   pub fn next(&self) -> Option<BaseNode> {
     let parent = self.get().get_parent();
@@ -93,6 +123,12 @@ impl BlockRef<'_> {
     } else {
       None
     }
+  }
+}
+
+impl BlockRef<'_> {
+  pub fn body_iter<'a>(&'a self) -> impl Iterator<Item = BaseNode> + 'a {
+    self.body.iter().skip(1).cloned()
   }
 }
 
@@ -130,94 +166,60 @@ impl BlockMut<'_> {
       .elem
       .as_ref::<Block>(self.sys)
       .unwrap()
-      .iter()
-      .position(|x| *x == *expr)
+      .body_iter()
+      .position(|x| expr.eq(&x))
       .expect("Element not found");
     self.get_mut().body.remove(idx);
-  }
-
-  /// Set the return value of the block.
-  pub fn set_value(&mut self, value: BaseNode) {
-    self.get_mut().kind = BlockKind::Valued(value);
-  }
-
-  /// Set the condition of the block.
-  pub fn set_cond(&mut self, cond: BaseNode) {
-    let operand = Operand::new(cond);
-    let operand_ref = self.sys.insert_element(operand);
-    operand_ref
-      .as_mut::<Operand>(self.sys)
-      .unwrap()
-      .get_mut()
-      .set_user(self.elem.clone());
-    match &self.get().kind {
-      BlockKind::Condition(x) => {
-        self.sys.remove_user(x.clone());
-      }
-      BlockKind::None => {}
-      _ => {
-        panic!("Invalid block kind!");
-      }
-    }
-    self.get_mut().kind = BlockKind::Condition(operand_ref);
-    self.sys.add_user(operand_ref);
   }
 }
 
 impl SysBuilder {
-  /// The implementation of the `create_block` method.
-  fn create_block_impl(&mut self, kind: BlockKind, insert: bool) -> BaseNode {
-    let parent = self.get_current_block().unwrap().upcast();
-    let instance = Block::new(kind, parent);
-    let block = self.insert_element(instance);
-    if !insert {
-      block
-    } else {
-      let InsertPoint(_, insert_block, at) = &self.get_insert_point();
-      let (block, new_at) = self
-        .get_mut::<Block>(insert_block)
-        .unwrap()
-        .insert_at(at.clone(), block.clone());
-      self.inesert_point.2 = new_at;
-      block
-    }
+  fn create_block_intrinsic(
+    &mut self,
+    dtype: DataType,
+    subcode: subcode::BlockIntrinsic,
+    value: BaseNode,
+  ) -> BaseNode {
+    self.create_expr(dtype, subcode.into(), vec![value], true)
   }
 
-  /// Create a block and insert it to the current module.
-  pub fn create_conditional_block(&mut self, cond: BaseNode) -> BaseNode {
-    let block = self.create_block_impl(BlockKind::None, true);
-    block.as_mut::<Block>(self).unwrap().set_cond(cond);
+  pub fn create_wait_until(&mut self, cond: BaseNode) -> BaseNode {
+    self.create_block_intrinsic(DataType::void(), subcode::BlockIntrinsic::WaitUntil, cond)
+  }
+
+  pub fn create_cycled_block(&mut self, cycle: u32) -> BaseNode {
+    let block = self.create_block();
+    let ip = self.get_current_ip();
+    self.set_current_block(block);
+    let dtype = DataType::int_ty(32);
+    let cycle = self.get_const_int(dtype, cycle as u64);
+    let void_ty = DataType::void();
+    self.create_block_intrinsic(void_ty, subcode::BlockIntrinsic::Cycled, cycle);
+    self.set_insert_point(ip);
     block
   }
 
-  pub fn create_cycled_block(&mut self, cycle: usize) -> BaseNode {
-    self.create_block_impl(BlockKind::Cycle(cycle), true)
+  pub fn create_conditional_block(&mut self, cond: BaseNode) -> BaseNode {
+    let block = self.create_block();
+    let ip = self.get_current_ip();
+    self.set_current_block(block);
+    let dtype = cond.get_dtype(self).unwrap();
+    self.create_block_intrinsic(dtype, subcode::BlockIntrinsic::Condition, cond);
+    self.set_insert_point(ip);
+    block
   }
 
-  /// Create a block and DO NOT insert it to the current module.
-  pub fn create_none_block(&mut self) -> BaseNode {
-    self.create_block_impl(BlockKind::None, false)
-  }
-
-  /// Make the current block a wait-until block.
-  /// This method maintains the assumption that a wait-until block should only be the root block of
-  /// a module.
-  pub fn set_current_block_wait_until(&mut self) {
-    let cond = self.create_none_block();
-    let cur_block = {
-      let block = self.get_current_block().expect("No current block");
-      assert_eq!(
-        block.get_parent().get_kind(),
-        NodeKind::Module,
-        "Only root block can be set to wait-until!"
-      );
-      block.upcast()
-    };
-    cur_block.as_mut::<Block>(self).unwrap().get_mut().kind = BlockKind::WaitUntil(cond.clone());
-    cond
-      .as_mut::<Block>(self)
+  /// Create a block in the IR.
+  pub fn create_block(&mut self) -> BaseNode {
+    let parent = self.get_current_block().unwrap().upcast();
+    let instance = Block::new(parent);
+    let block = self.insert_element(instance);
+    let InsertPoint(_, insert_block, at) = &self.get_insert_point();
+    let (block, new_at) = self
+      .get_mut::<Block>(insert_block)
       .unwrap()
-      .get_mut()
-      .set_parent(cur_block);
+      .insert_at(at.clone(), block.clone());
+    self.inesert_point.2 = new_at;
+    block
   }
 }

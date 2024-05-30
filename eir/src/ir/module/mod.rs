@@ -10,7 +10,6 @@ use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
-use self::user::Operand;
 pub use attrs::Attribute;
 
 /// The data structure for a module.
@@ -22,7 +21,7 @@ pub struct Module {
   /// The input ports of this module.
   ports: Vec<BaseNode>,
   /// The body of the module.
-  body: BaseNode,
+  pub(crate) body: BaseNode,
   /// The set of external interfaces used by the module.
   pub(crate) external_interfaces: HashMap<BaseNode, HashSet<BaseNode>>,
   /// The metadata of this module. The pointer to the module builder.
@@ -156,44 +155,6 @@ impl<'sys> ModuleRef<'sys> {
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
 
-  /// Gather all the related external interfaces with the given operand. This is typically used to
-  /// maintain the redundant information when modifying this IR.
-  /// If the given operand is an operand, gather just this specific operand.
-  /// If the given operand is a value reference, gather all the operands that `get_value == this
-  /// operand`.
-  ///
-  /// # Arguments
-  ///
-  /// * `operand` - The operand to gather the related external interfaces.
-  pub(crate) fn gather_related_externals(&self, operand: BaseNode) -> Vec<(BaseNode, BaseNode)> {
-    // Remove all the external interfaces related to this instruction.
-    let tmp = self
-      .get()
-      .external_interfaces
-      .iter()
-      .map(|(ext, users)| {
-        (
-          ext.clone(),
-          users
-            .iter()
-            .filter(|x| {
-              (*x).eq(&operand) || {
-                let user = (*x).as_ref::<Operand>(self.sys).unwrap();
-                user.get_value().eq(&operand)
-              }
-            })
-            .cloned()
-            .collect::<Vec<_>>(),
-        )
-      })
-      .filter(|(_, users)| !users.is_empty())
-      .collect::<Vec<_>>();
-    tmp
-      .iter()
-      .map(|(ext, users)| users.iter().map(|x| (ext.clone(), x.clone())))
-      .flatten()
-      .collect()
-  }
 }
 
 impl<'a> ModuleMut<'a> {
@@ -229,48 +190,6 @@ impl<'a> ModuleMut<'a> {
 
   pub fn set_attrs(&mut self, attr: HashSet<Attribute>) {
     self.get_mut().attr = attr;
-  }
-
-  /// Remove a specific external interface's usage. If this usage set is empty after the removal,
-  /// remove the external interface from the module, too.
-  ///
-  /// # Arguments
-  ///
-  /// * `ext_node` - The external interface node.
-  /// * `operand` - The operand node that uses this external interface.
-  pub(crate) fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    if let Some(operations) = self.get_mut().external_interfaces.get_mut(&ext_node) {
-      assert!(operations.contains(&operand));
-      operations.remove(&operand);
-      if operations.is_empty() {
-        self.get_mut().external_interfaces.remove(&ext_node);
-      }
-    }
-  }
-
-  /// Remove all the related external interfaces with the given condition.
-  pub(crate) fn remove_related_externals(&mut self, operand: BaseNode) {
-    let to_remove = self.get().gather_related_externals(operand);
-    to_remove.into_iter().for_each(|(ext, operand)| {
-      self.remove_external_interface(ext, operand);
-    });
-  }
-
-  /// Add related external interfaces to the module.
-  pub(crate) fn add_related_externals(&mut self, operand: BaseNode) {
-    // Reconnect the external interfaces if applicable.
-    // TODO(@were): Maybe later unify a common interface for this.
-    let operand_ref = operand.as_ref::<Operand>(self.sys).unwrap();
-    let value = operand_ref.get_value().clone();
-    match value.get_kind() {
-      NodeKind::Array => {
-        self.insert_external_interface(value, operand);
-      }
-      NodeKind::FIFO => {
-        self.insert_external_interface(value.clone(), operand);
-      }
-      _ => {}
-    }
   }
 
   /// Set the name of a module. Override the name given by the module builder.
@@ -346,7 +265,7 @@ impl SysBuilder {
       fifo_mut.get_mut().set_idx(i);
     }
     self.global_symbols.insert(module_name, module.clone());
-    let body = Block::new(BlockKind::None, module.clone());
+    let body = Block::new(module.clone());
     let body = self.insert_element(body);
     self.get_mut::<Module>(&module).unwrap().get_mut().body = body.clone();
     module
