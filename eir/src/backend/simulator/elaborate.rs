@@ -400,18 +400,19 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::BlockIntrinsic { intrinsic } => {
         let bi = expr.as_sub::<instructions::BlockIntrinsic>().unwrap();
+        let value = dump_ref!(self.sys, &bi.value());
         match intrinsic {
-          subcode::BlockIntrinsic::Value => bi.value().to_string(self.sys),
+          subcode::BlockIntrinsic::Value => value,
           subcode::BlockIntrinsic::Cycled => {
             open_scope = true;
-            format!("if stamp / 100 == {} {{", bi.value().to_string(self.sys))
+            format!("if stamp / 100 == ({} as usize) {{", value)
           }
           subcode::BlockIntrinsic::WaitUntil => {
-            format!("if !{} {{ return; }}", bi.value().to_string(self.sys))
+            format!("if !{} {{ return; }}", value)
           }
           subcode::BlockIntrinsic::Condition => {
             open_scope = true;
-            format!("if {} {{", bi.value().to_string(self.sys))
+            format!("if {} {{", value)
           }
         }
       }
@@ -946,7 +947,7 @@ macro_rules! impl_unwrap_slab {
       &quote::quote! {
         let tb_cycles = vec![#(#cycles, )*];
         for cycle in tb_cycles {
-          q.push(Reverse(Event{stamp: cycle * 100, kind: EventKind::ModuleTestbench}));
+          q.push(Reverse(Event{stamp: (cycle as usize) * 100, kind: EventKind::ModuleTestbench}));
         }
       }
       .to_string(),

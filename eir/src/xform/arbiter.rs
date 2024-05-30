@@ -103,93 +103,92 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         valid_runner = sys.create_bitwise_and(created_here!(), valid_runner, valid.clone());
       }
       sub_valids.push(valid_runner);
-      let mut valid = sub_valids[0].clone();
-      for sub_valid in sub_valids.iter().skip(1) {
-        valid = sys.create_bitwise_or(created_here!(), valid, sub_valid.clone());
-      }
-      sys.create_wait_until(valid);
-      sys.set_current_block(restore_block);
-      let mut valid_hot = sub_valids[callers.len() - 1].clone();
-      for sub_valid in sub_valids.iter().rev().skip(1) {
-        valid_hot = sys.create_concat(created_here!(), valid_hot, sub_valid.clone());
-      }
+    }
+    let mut valid = sub_valids[0].clone();
+    for sub_valid in sub_valids.iter().skip(1) {
+      valid = sys.create_bitwise_or(created_here!(), valid, sub_valid.clone());
+    }
+    sys.create_wait_until(valid);
+    let mut valid_hot = sub_valids[callers.len() - 1].clone();
+    for sub_valid in sub_valids.iter().rev().skip(1) {
+      valid_hot = sys.create_concat(created_here!(), valid_hot, sub_valid.clone());
+    }
 
-      let (last_grant_reg, grant_scalar_ty, grant_hot_ty) = {
-        let dtype = DataType::int_ty(callers.len());
-        let bits = usize::BITS - callers.len().next_power_of_two().leading_zeros();
-        let one = sys.get_const_int(dtype.clone(), 1);
-        (
-          sys.create_array(dtype.clone(), "last_grant", 1, Some(vec![one]), vec![]),
-          DataType::int_ty(bits as usize),
-          dtype,
-        )
-      };
+    let (last_grant_reg, grant_scalar_ty, grant_hot_ty) = {
+      let dtype = DataType::int_ty(callers.len());
+      let bits = usize::BITS - callers.len().next_power_of_two().leading_zeros();
+      let one = sys.get_const_int(dtype.clone(), 1);
+      (
+        sys.create_array(dtype.clone(), "last_grant", 1, Some(vec![one]), vec![]),
+        DataType::int_ty(bits as usize),
+        dtype,
+      )
+    };
 
-      let zero = sys.get_const_int(DataType::int_ty(1), 0);
-      let last_grant_1h = sys.create_array_read(created_here!(), last_grant_reg, zero);
+    let zero = sys.get_const_int(DataType::int_ty(1), 0);
+    let last_grant_1h = sys.create_array_read(created_here!(), last_grant_reg, zero);
 
-      // low_mask = ((last_grant_1h - 1) << 1) + 1
-      let one = sys.get_const_int(grant_hot_ty.clone(), 1);
-      let lo = sys.create_sub(created_here!(), last_grant_1h, one);
-      let lo = sys.create_shl(created_here!(), lo, one);
-      let lo = sys.create_add(created_here!(), lo, one);
-      // high_mask = ~low_mask
-      let hi = sys.create_flip(created_here!(), lo);
-      // low_valid = valid_hot & low_mask
-      let lo_valid = sys.create_bitwise_and(created_here!(), lo.clone(), valid_hot.clone());
-      let signed_lo_valid = bits_to_int(sys, &lo_valid);
-      let lo_valid_neg = sys.create_neg(created_here!(), signed_lo_valid);
-      let lo_grant = sys.create_bitwise_and(created_here!(), lo_valid, lo_valid_neg);
-      // high_valid = valid_hot & high_mask
-      let hi_valid = sys.create_bitwise_and(created_here!(), hi.clone(), valid_hot.clone());
-      let signed_hi_valid = bits_to_int(sys, &hi_valid);
-      let hi_valid_neg = sys.create_neg(created_here!(), signed_hi_valid);
-      let hi_grant = sys.create_bitwise_and(created_here!(), hi_valid, hi_valid_neg);
-      let zero = sys.get_const_int(hi_grant.get_dtype(sys).unwrap(), 0);
-      let hi_nez = sys.create_neq(created_here!(), hi_grant.clone(), zero);
-      // grant = high_valid != 0 ? high_valid : low_valid
-      let grant = sys.create_select(created_here!(), hi_nez, hi_grant, lo_grant);
+    // low_mask = ((last_grant_1h - 1) << 1) + 1
+    let one = sys.get_const_int(grant_hot_ty.clone(), 1);
+    let lo = sys.create_sub(created_here!(), last_grant_1h, one);
+    let lo = sys.create_shl(created_here!(), lo, one);
+    let lo = sys.create_add(created_here!(), lo, one);
+    // high_mask = ~low_mask
+    let hi = sys.create_flip(created_here!(), lo);
+    // low_valid = valid_hot & low_mask
+    let lo_valid = sys.create_bitwise_and(created_here!(), lo.clone(), valid_hot.clone());
+    let signed_lo_valid = bits_to_int(sys, &lo_valid);
+    let lo_valid_neg = sys.create_neg(created_here!(), signed_lo_valid);
+    let lo_grant = sys.create_bitwise_and(created_here!(), lo_valid, lo_valid_neg);
+    // high_valid = valid_hot & high_mask
+    let hi_valid = sys.create_bitwise_and(created_here!(), hi.clone(), valid_hot.clone());
+    let signed_hi_valid = bits_to_int(sys, &hi_valid);
+    let hi_valid_neg = sys.create_neg(created_here!(), signed_hi_valid);
+    let hi_grant = sys.create_bitwise_and(created_here!(), hi_valid, hi_valid_neg);
+    let zero = sys.get_const_int(hi_grant.get_dtype(sys).unwrap(), 0);
+    let hi_nez = sys.create_neq(created_here!(), hi_grant.clone(), zero);
+    // grant = high_valid != 0 ? high_valid : low_valid
+    let grant = sys.create_select(created_here!(), hi_nez, hi_grant, lo_grant);
 
-      let mut idx = 0;
-      for (i, caller) in callers.iter().enumerate() {
-        let i_1h = sys.get_const_int(grant_hot_ty.clone(), 1 << i);
-        let i = sys.get_const_int(grant_scalar_ty.clone(), i as u64);
-        let grant_to = sys.create_slice(grant, i, i);
-        let block = sys.create_conditional_block(grant_to);
-        sys.set_current_block(block);
-        sys.create_array_write(created_here!(), last_grant_reg, zero, i_1h);
+    let mut idx = 0;
+    for (i, caller) in callers.iter().enumerate() {
+      let i_1h = sys.get_const_int(grant_hot_ty.clone(), 1 << i);
+      let i = sys.get_const_int(grant_scalar_ty.clone(), i as u64);
+      let grant_to = sys.create_slice(grant, i, i);
+      let block = sys.create_conditional_block(grant_to);
+      sys.set_current_block(block);
+      sys.create_array_write(created_here!(), last_grant_reg, zero, i_1h);
+      let bind = caller.as_expr::<Bind>(sys).unwrap();
+      let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
+      let mut new_bind = sys.get_init_bind(callee.clone());
+      for i in 0..n_args {
+        let key = {
+          let module = callee.as_ref::<Module>(sys).unwrap();
+          module.get_port(i).unwrap().get_name().clone()
+        };
+        let port = {
+          let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
+          arbiter.get_port(idx).unwrap().upcast()
+        };
+
+        // Push to new arbiter
         let bind = caller.as_expr::<Bind>(sys).unwrap();
-        let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
-        let mut new_bind = sys.get_init_bind(callee.clone());
-        for i in 0..n_args {
-          let key = {
-            let module = callee.as_ref::<Module>(sys).unwrap();
-            module.get_port(i).unwrap().get_name().clone()
-          };
-          let port = {
-            let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
-            arbiter.get_port(idx).unwrap().upcast()
-          };
+        let callee_idx = bind.get_num_args();
+        let push = bind.get_arg(i).unwrap();
+        let mut push_mut = push.as_mut::<Expr>(sys).unwrap();
+        push_mut.set_operand(0, port);
 
-          // Push to new arbiter
-          let bind = caller.as_expr::<Bind>(sys).unwrap();
-          let callee_idx = bind.get_num_args();
-          let push = bind.get_arg(i).unwrap();
-          let mut push_mut = push.as_mut::<Expr>(sys).unwrap();
-          push_mut.set_operand(0, port);
+        // Set to new callee
+        let mut caller = caller.as_mut::<Expr>(sys).unwrap();
+        caller.set_operand(callee_idx, arbiter);
 
-          // Set to new callee
-          let mut caller = caller.as_mut::<Expr>(sys).unwrap();
-          caller.set_operand(callee_idx, arbiter);
-
-          // Arbiter calls origin
-          idx += 1;
-          let pop = sys.create_fifo_pop(port);
-          new_bind = sys.add_bind(new_bind, key, pop, Some(false));
-        }
-        sys.create_async_call(new_bind);
-        sys.set_current_block(restore_block);
+        // Arbiter calls origin
+        idx += 1;
+        let pop = sys.create_fifo_pop(port);
+        new_bind = sys.add_bind(new_bind, key, pop, Some(false));
       }
+      sys.create_async_call(new_bind);
+      sys.set_current_block(restore_block);
     }
   }
 }

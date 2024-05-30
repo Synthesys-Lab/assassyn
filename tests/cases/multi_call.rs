@@ -16,7 +16,7 @@ pub fn multi_call() {
     odd    = even.add(1);
     odd2   = odd.mul(2).slice(0, 31).bitcast(int<32>);
     cnt[0] = v;
-    is_odd = v.bitwise_and(1);
+    is_odd = v.slice(0, 0);
     when is_odd {
       // TODO(@were): Enforce the partial call.
       async_call adder { a: even, b: even2 };

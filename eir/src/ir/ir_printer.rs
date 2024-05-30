@@ -243,7 +243,7 @@ impl Visitor<String> for IRPrinter {
     }
     if restore_ident != self.indent {
       self.indent -= 2;
-      res.push_str(&format!("{}}}\n", " ".repeat(self.indent)));
+      res.push_str(&format!("{}}}", " ".repeat(self.indent)));
     }
     if block.get_value().is_some() {
       let indent = " ".repeat(self.indent);

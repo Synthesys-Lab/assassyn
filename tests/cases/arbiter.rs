@@ -52,7 +52,7 @@ pub fn arbiter() {
     even = even.bitcast(int<32>);
     odd = even.add(1);
     cnt[0] = v;
-    is_odd = v.bitwise_and(1);
+    is_odd = v.slice(0, 0);
     when is_odd {
       async_call arbiter { a0: even };
       async_call arbiter { a1: odd };
