@@ -154,7 +154,6 @@ impl<'sys> ModuleRef<'sys> {
       .iter()
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
-
 }
 
 impl<'a> ModuleMut<'a> {

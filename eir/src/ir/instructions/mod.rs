@@ -4,11 +4,11 @@ use crate::{ir, ir::node::BaseNode};
 
 pub mod arith;
 pub mod bits;
+pub mod block;
 pub mod call;
 pub mod data;
 pub mod fifo;
 pub mod log;
-pub mod block;
 
 pub trait AsExpr<'a>: Sized {
   fn downcast(expr: ExprRef<'a>) -> Result<Self, String>;

@@ -401,9 +401,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::BlockIntrinsic { intrinsic } => {
         let bi = expr.as_sub::<instructions::BlockIntrinsic>().unwrap();
         match intrinsic {
-          subcode::BlockIntrinsic::Value => {
-            bi.value().to_string(self.sys)
-          }
+          subcode::BlockIntrinsic::Value => bi.value().to_string(self.sys),
           subcode::BlockIntrinsic::Cycled => {
             open_scope = true;
             format!("if stamp / 100 == {} {{", bi.value().to_string(self.sys))
@@ -965,7 +963,7 @@ macro_rules! impl_unwrap_slab {
             let init_file_path = init_file_path.to_str().unwrap();
             let array = param.array.as_ref::<Array>(sys).unwrap();
             let slab_idx = slab_cache.get(&param.array).unwrap();
-            let (scalar_ty, size) = unwrap_array_ty(&array.dtype()); 
+            let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
             let scalar_ty = dtype_to_rust_type(&scalar_ty)
               .parse::<proc_macro2::TokenStream>()
               .unwrap();

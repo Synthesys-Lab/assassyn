@@ -899,10 +899,18 @@ impl SysBuilder {
     new_parent_mut.insert_at(at, node);
     match node.get_kind() {
       NodeKind::Block => {
-        node.as_mut::<Block>(self).unwrap().get_mut().set_parent(new_parent);
+        node
+          .as_mut::<Block>(self)
+          .unwrap()
+          .get_mut()
+          .set_parent(new_parent);
       }
       NodeKind::Expr => {
-        node.as_mut::<Expr>(self).unwrap().get_mut().set_parent(new_parent);
+        node
+          .as_mut::<Expr>(self)
+          .unwrap()
+          .get_mut()
+          .set_parent(new_parent);
       }
       _ => panic!("Unsupported node kind!"),
     }

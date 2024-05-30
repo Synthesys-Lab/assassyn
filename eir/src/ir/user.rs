@@ -159,7 +159,6 @@ impl ModuleRef<'_> {
 }
 
 impl ModuleMut<'_> {
-
   /// Remove a specific external interface's usage. If this usage set is empty after the removal,
   /// remove the external interface from the module, too.
   ///
@@ -251,9 +250,14 @@ impl SysBuilder {
       }
       NodeKind::Expr => {
         let expr = operand_ref.get_user().as_ref::<Expr>(self).unwrap();
-        expr.get_parent().as_ref::<Block>(self).unwrap().get_module().upcast()
+        expr
+          .get_parent()
+          .as_ref::<Block>(self)
+          .unwrap()
+          .get_module()
+          .upcast()
       }
-      _ => unreachable!()
+      _ => unreachable!(),
     };
     let mut module_mut = self.get_mut::<Module>(&module).unwrap();
     module_mut.remove_related_externals(operand);
