@@ -122,6 +122,8 @@ module_builder!(
       valid
     } {
 
+      log("executing: {:07b}", opcode);
+
       when rd_reg.neq(0.bits<5>) {
         reg_onwrite[rd_reg] = 1.bits<1>;
         log("set x{} onwrite", rd_reg);

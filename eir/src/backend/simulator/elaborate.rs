@@ -408,7 +408,17 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             format!("if stamp / 100 == ({} as usize) {{", value)
           }
           subcode::BlockIntrinsic::WaitUntil => {
-            format!("if !{} {{ return; }}", value)
+            let module_eventkind_id = self.current_module_id().to_string();
+            format!(
+              "if !{} {{
+                q.push(Reverse(Event {{
+                  stamp: stamp + 100,
+                  kind: EventKind::{},
+                }}));
+                return;
+              }}",
+              value, module_eventkind_id,
+            )
           }
           subcode::BlockIntrinsic::Condition => {
             open_scope = true;
