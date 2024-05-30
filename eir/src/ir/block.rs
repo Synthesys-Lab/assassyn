@@ -128,7 +128,7 @@ impl BlockRef<'_> {
 
 impl BlockRef<'_> {
   pub fn body_iter<'a>(&'a self) -> impl Iterator<Item = BaseNode> + 'a {
-    self.body.iter().skip(1).cloned()
+    self.body.iter().cloned()
   }
 }
 

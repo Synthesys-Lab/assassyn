@@ -301,7 +301,7 @@ impl ExprMut<'_> {
 
     // Remove all the external interfaces related to this instruction.
     for operand in operands.iter() {
-      self.sys.cut_operand(operand.clone());
+      self.sys.cut_operand(operand);
     }
 
     let mut block_mut = self.sys.get_mut::<Block>(&parent).unwrap();
