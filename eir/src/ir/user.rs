@@ -195,7 +195,10 @@ impl ModuleMut<'_> {
         self.insert_external_interface(value, operand);
       }
       NodeKind::FIFO => {
-        self.insert_external_interface(value.clone(), operand);
+        let fifo = value.as_ref::<FIFO>(self.sys).unwrap();
+        if fifo.get_parent().get_key() != self.get().get_key() {
+          self.insert_external_interface(value.clone(), operand);
+        }
       }
       _ => {}
     }
