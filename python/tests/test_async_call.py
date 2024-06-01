@@ -1,5 +1,9 @@
 from assassyn import *
 
+sys = SysBuilder('async_call')
+with sys:
+    pass
+
 #class Adder(Module):
 #
 #    def __init__(self):
