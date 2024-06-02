@@ -1,18 +1,29 @@
+from decorator import decorator
 
-_sys_builder = None
+class Singleton(type):
+    builder = None
+
+@decorator
+def ir_builder(func, node_type='', *args):
+    assert(node_type)
+    res = func(*args)
+    Singleton.builder.insert_point[node_type].append(res)
+    return res
 
 class SysBuilder(object):
 
     def __init__(self, name):
         self.name = name
+        self.modules = []
+        self.arrays = []
+        self.insert_point = {}
 
     def __enter__(self):
-        global _sys_builder
-        assert _sys_builder is None
-        _sys_builder = self
+        assert Singleton.builder is None
+        Singleton.builder = self
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        _sys_builder = None
-        pass
+        assert Singleton.builder is self
+        Singleton.builder = None
 
