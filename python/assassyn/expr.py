@@ -2,11 +2,6 @@ from .builder import ir_builder
 
 class Expr(object):
 
-    FIFO_PUSH = 32
-    # Array operations
-    ARRAY_READ = 40
-    ARRAY_WRITE = 41
-
     def __init__(self, opcode):
         self.opcode = opcode
 
@@ -28,11 +23,11 @@ class Expr(object):
 
     @ir_builder(node_type='expr')
     def __rxor__(self, other):
-        return BinaryOp(Expr.BIT_XOR, self, other)
+        return BinaryOp(BinaryOp.BIT_XOR, self, other)
 
     @ir_builder(node_type='expr')
     def __rand__(self, other):
-        return BinaryOp(Expr.BIT_AND, self, other)
+        return BinaryOp(BinaryOp.BIT_AND, self, other)
 
 class BinaryOp(Expr):
 
@@ -45,11 +40,28 @@ class BinaryOp(Expr):
     BIT_AND = 26
     BIT_OR = 27
     BIT_XOR = 28
+    # Array operations
+    ARRAY_READ = 40
 
     def __init__(self, opcode, lhs, rhs):
         super().__init__(opcode)
         self.lhs = lhs
         self.rhs = rhs
+
+class SideEffect(Expr):
+
+    # Side effects
+    FIFO_PUSH = 32
+    ARRAY_WRITE = 41
+    LOG = 60
+
+    def __init__(self, opcode, *args):
+        super().__init__(opcode)
+        self.args = args
+
+def log(*args):
+    assert isinstance(args[0], str)
+    return SideEffect(SideEffect.LOG, *args)
 
 class UnaryOp(Expr):
     # Unary operations

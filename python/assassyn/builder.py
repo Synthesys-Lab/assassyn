@@ -27,3 +27,6 @@ class SysBuilder(object):
         assert Singleton.builder is self
         Singleton.builder = None
 
+    def __repr__(self):
+        return f'system {self.name} {{\n}}'
+

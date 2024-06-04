@@ -3,7 +3,7 @@
 from .data import *
 from .dtype import *
 from .builder import *
-from .node import Expr
+from .expr import Expr, log
 from .module import Module, Port
 
 from . import module

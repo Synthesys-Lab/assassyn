@@ -1,6 +1,6 @@
 from .builder import ir_builder, Singleton
 from .dtype import DType
-from .expr import Expr
+from .expr import Expr, BinaryOp, SideEffect
 
 class Array(object):
 
@@ -11,9 +11,9 @@ class Array(object):
 
     @ir_builder(node_type='expr')
     def __getitem__(self, index):
-        return Expr(Expr.ARRAY_READ, self, index)
+        return BinaryOp(BinaryOp.ARRAY_READ, self, index)
 
     @ir_builder(node_type='expr')
     def __setitem__(self, index, value):
-        return Expr(Expr.ARRAY_WRITE, self, index, value)
+        return SideEffect(SideEffect.ARRAY_WRITE, self, index, value)
 
