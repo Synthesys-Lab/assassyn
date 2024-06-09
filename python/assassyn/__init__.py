@@ -1,6 +1,6 @@
 """Assassyn's python frontend."""
 
-from .data import *
+from .data import RegArray
 from .dtype import *
 from .builder import *
 from .expr import Expr, log
