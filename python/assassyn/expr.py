@@ -77,7 +77,7 @@ class BinaryOp(Expr):
             return f'{lval} = {self.lhs.as_operand()}[{self.rhs.as_operand()}]'
         lhs = self.lhs.as_operand()
         rhs = self.rhs.as_operand()
-        return f'{lval} = {lhs} {self.OPERATORS[self.opcode]} {rhs})'
+        return f'{lval} = {lhs} {self.OPERATORS[self.opcode]} {rhs}'
 
 class SideEffect(Expr):
 

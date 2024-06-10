@@ -30,6 +30,9 @@ class Array(object):
         self.size = size
         self._id = None
 
+    def __repr__(self):
+        return f'array {self.name}[{self.scalar_ty}; {self.size}]'
+
     @ir_builder(node_type='expr')
     def __getitem__(self, index):
         if isinstance(index, int):

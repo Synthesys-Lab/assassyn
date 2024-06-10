@@ -1,4 +1,6 @@
-from assassyn import *
+from assassyn.frontend import *
+from assassyn.backend import build
+from assassyn import utils
 
 class Driver(Module):
 
@@ -17,4 +19,5 @@ with sys:
     driver = Driver()
     driver.build()
 
-print(sys)
+build(sys)
+
