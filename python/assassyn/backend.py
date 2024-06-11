@@ -39,3 +39,5 @@ def elaborate(sys: SysBuilder, path=tempfile.gettempdir(), **kwargs):
     with open(os.path.join(sys_dir, 'src/main.rs'), 'w') as fd:
         fd.write(codegen.codegen(sys))
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir)
+
+    return os.path.join(sys_dir, 'simulator/%s' % sys.name)
