@@ -15,7 +15,13 @@ class Array(object):
 
     @property
     def name(self):
+        if self._name is not None:
+            return self._name
         return f'array_{self.id}'
+
+    @name.setter
+    def name(self, val):
+        self._name = val
 
     @property
     def id(self):
@@ -29,6 +35,7 @@ class Array(object):
         self.scalar_ty = scalar_ty
         self.size = size
         self._id = None
+        self._name = None
 
     def __repr__(self):
         return f'array {self.name}[{self.scalar_ty}; {self.size}]'

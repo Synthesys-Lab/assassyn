@@ -1,4 +1,3 @@
-import functools
 from decorator import decorator
 import inspect
 
@@ -7,17 +6,16 @@ from .dtype import DType
 from .block import Block
 from .expr import Expr, BindInst
 
+@decorator
 def combinational(func, *args, **kwargs):
+    args[0].body = Block(Block.MODULE_ROOT)
+    Singleton.builder.insert_point['expr'] = args[0].body.body
+    Singleton.builder.cur_module = args[0]
+    Singleton.builder.builder_func = func
+    res = func(*args, **kwargs)
+    Singleton.builder.cleanup_symtab()
+    return res
 
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        args[0].body = Block()
-        Singleton.builder.insert_point['expr'] = args[0].body.body
-        Singleton.builder.cur_module = args[0]
-        res = func(*args, **kwargs)
-        return res
-
-    return wrapper
 
 @decorator
 def wait_until(func, *args, **kwargs):

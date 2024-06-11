@@ -39,6 +39,13 @@ class Float(DType):
     def __repr__(self):
         return f'f32'
 
+class Bits(DType):
+    def __init__(self, bits: int):
+        super().__init__(bits)
+
+    def __repr__(self):
+        return f'b{self.bits}'
+
 def to_uint(value, bits=None):
     if bits is None:
         bits = value.bit_length()

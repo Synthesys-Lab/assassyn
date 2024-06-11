@@ -25,7 +25,6 @@ class Driver(Module):
         cnt = Array(UInt(32), 1)
         cnt[0] = cnt[0] + UInt(32)(1)
         adder.async_called(a = cnt[0], b = cnt[0])
-        cond = balah
 
 
 sys = SysBuilder('async_call')

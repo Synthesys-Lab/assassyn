@@ -1,5 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import build
+from assassyn.backend import elaborate
 from assassyn import utils
 
 class Driver(Module):
@@ -14,10 +14,11 @@ class Driver(Module):
         cnt[0] = cnt[0] + UInt(32)(1)
         log('cnt: {}', cnt[0]);
 
-sys = SysBuilder('async_call')
+sys = SysBuilder('driver')
 with sys:
     driver = Driver()
     driver.build()
 
-build(sys)
+print(sys)
+elaborate(sys)
 
