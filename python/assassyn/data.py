@@ -4,9 +4,7 @@ from .expr import Expr, BinaryOp, SideEffect
 
 @ir_builder(node_type='array')
 def RegArray(scalar_ty: DType, size: int):
-    res = Array(scalar_ty, size)
-    res.id = Singleton.builder.inc_id()
-    return res
+    return Array(scalar_ty, size)
 
 class Array(object):
 
@@ -17,24 +15,15 @@ class Array(object):
     def name(self):
         if self._name is not None:
             return self._name
-        return f'array_{self.id}'
+        return f'array_{id(self)}'
 
     @name.setter
-    def name(self, val):
-        self._name = val
-
-    @property
-    def id(self):
-        return self._id
-
-    @id.setter
-    def id(self, val):
-        self._id = val
+    def name(self, name):
+        self._name = name
 
     def __init__(self, scalar_ty: DType, size: int):
         self.scalar_ty = scalar_ty
         self.size = size
-        self._id = None
         self._name = None
 
     def __repr__(self):

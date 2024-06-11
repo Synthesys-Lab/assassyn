@@ -4,12 +4,12 @@ import types
 
 class Singleton(type):
     builder = None
+    linearize_ptr = None
 
 @decorator
 def ir_builder(func, node_type=None, *args, **kwargs):
     res = func(*args, **kwargs)
     module_symtab = Singleton.builder.is_direct_call(inspect.currentframe())
-    res.id = Singleton.builder.inc_id()
     Singleton.builder.insert_point[node_type].append(res)
     # This is to have a symbol table for the module currently being built,
     # so that we can name those named expressions.
@@ -19,11 +19,6 @@ def ir_builder(func, node_type=None, *args, **kwargs):
     return res
 
 class SysBuilder(object):
-
-    def inc_id(self):
-        res = self.cur_module.node_cnt
-        self.cur_module.node_cnt += 1
-        return res 
 
     def cleanup_symtab(self):
         value_dict = { id(v): v for v in self.named_expr }
