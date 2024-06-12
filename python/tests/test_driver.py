@@ -21,13 +21,13 @@ def test_driver():
     with sys:
         driver = Driver()
         driver.build()
-    
+
     print(sys)
-    
+
     simulator_path = elaborate(sys)
-    
+
     raw = utils.run_simulator(simulator_path)
-    
+
     expected = 0
     for i in raw.split('\n'):
         if '[driver]' in i:

@@ -190,6 +190,10 @@ class Bind(Expr):
         self._push(**kwargs)
         return self
 
+    @ir_builder(node_type='expr')
+    def async_called(self):
+        return AsyncCall(self)
+
     def __init__(self, callee, **kwargs):
         super().__init__(Bind.BIND)
         self.callee = callee
