@@ -88,9 +88,11 @@ class FIFOPush(Expr):
         super().__init__(FIFOPush.FIFO_PUSH)
         self.fifo = fifo
         self.val = val
+        self.bind = None
 
     def __repr__(self):
-        return f'{self.fifo.as_operand()}.push({self.val.as_operand()})'
+        handle = self.as_operand()
+        return f'{self.fifo.as_operand()}.push({self.val.as_operand()}) // handle = {handle}'
 
 class FIFOPop(Expr):
 
@@ -177,20 +179,28 @@ class FIFOField(Expr):
 class Bind(Expr):
     BIND = 501
 
+    def _push(self, **kwargs):
+        for k, v in kwargs.items():
+            push = getattr(self.callee, k).push(v)
+            push.bind = self
+            self.pushes.append(push)
+
+    @ir_builder(node_type='expr')
     def bind(self, **kwargs):
-        self.kwargs.update(kwargs)
+        self._push(**kwargs)
         return self
 
     def __init__(self, callee, **kwargs):
         super().__init__(Bind.BIND)
         self.callee = callee
-        self.kwargs = kwargs
+        self.pushes = []
+        self._push(**kwargs)
 
     def __repr__(self):
-        kwargs = ', '.join(f'{k}={v.as_operand()}' for k, v in self.kwargs.items())
+        args = ', '.join(f'{v.as_operand()} /* {v.fifo.as_operand()}={v.val.as_operand()} */' for v in self.pushes)
         callee = self.callee.as_operand()
         lval = self.as_operand()
-        return f'{lval} = {callee}.bind{{ {kwargs} }}'
+        return f'{lval} = {callee}.bind[ {args} ]'
 
 class AsyncCall(Expr):
     # Call operations

@@ -49,7 +49,7 @@ class CodeGen(visitor.Visitor):
 
     def visit_module(self, node: Module):
         self.code.append('  // Fill in the body of %s' % node.name)
-        self.code.append('  sys.set_current_module(%s);' % node.name.lower())
+        self.code.append('  sys.set_current_module(%s);' % self.generate_rval(node))
         self.visit_block(node.body)
 
     def visit_block(self, node: Block):
@@ -64,7 +64,7 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'  let imm_{id(node)} = sys.get_const_int({ty}, {node.value}); // {node}')
             return f'imm_{id(node)}'
         if isinstance(node, module.Port):
-            module_name = node.module.as_operand().lower()
+            module_name = self.generate_rval(node.module)
             port_name = f'{module_name}_{node.name}'
             self.code.append(f'''  // Get port {node.name}
   let {port_name} = {{
@@ -72,6 +72,8 @@ class CodeGen(visitor.Visitor):
     module.get_port_by_name("{node.name}").unwrap().upcast()
   }};''')
             return port_name 
+        if isinstance(node, module.Module):
+            return node.as_operand().lower()
         else:
             return node.as_operand()
 
@@ -88,10 +90,6 @@ class CodeGen(visitor.Visitor):
         elif isinstance(node, expr.FIFOField):
             fifo = self.generate_rval(node.fifo)
             res = f'sys.{ib_method}({fifo});'
-        elif isinstance(node, expr.FIFOPush):
-            fifo = self.generate_rval(node.fifo)
-            val = self.generate_rval(node.val)
-            res = f'sys.{ib_method}({fifo}, {val});'
         elif isinstance(node, expr.FIFOPop):
             fifo = self.generate_rval(node.fifo)
             res = f'sys.{ib_method}({fifo});'
@@ -109,8 +107,22 @@ class CodeGen(visitor.Visitor):
             idx = self.generate_rval(node.idx)
             val = self.generate_rval(node.val)
             res = f'sys.{ib_method}(created_here!(), {arr}, {idx}, {val});'
+        elif isinstance(node, expr.FIFOPush):
+            bind_var = self.generate_rval(node.bind)
+            if node.bind not in self.emitted_bind:
+                self.emitted_bind.add(node.bind)
+                module = self.generate_rval(node.bind.callee)
+                self.code.append(f'  let {bind_var} = sys.get_init_bind({module});')
+            fifo_name = node.fifo.name
+            val = self.generate_rval(node.val)
+            res = f'sys.add_bind({bind_var}, "{fifo_name}".into(), {val}, Some(false));'
+        elif isinstance(node, expr.Bind):
+            res = '// Already handled in the initial push'
+        elif isinstance(node, expr.AsyncCall):
+            bind_var = self.generate_rval(node.bind)
+            res = 'sys.create_async_call(%s);' % bind_var
         else:
-            length = len(repr(node))
+            length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'
 
         if 'Support the instruction above' in res:
@@ -132,6 +144,7 @@ class CodeGen(visitor.Visitor):
     def __init__(self):
         self.code = []
         self.header = []
+        self.emitted_bind = set()
 
     def get_source(self):
         return '\n'.join(self.header) + '\n' + '\n'.join(self.code)

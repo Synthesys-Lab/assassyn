@@ -29,7 +29,9 @@ class Module(object):
     EXPLICIT_POP = 1
 
     def __init__(self):
-        self.name = type(self).__name__ + hex(id(self))[-5:-1]
+        self.name = type(self).__name__
+        if self.name != 'Driver':
+            self.name = self.name + hex(id(self))[-5:-1]
         self.body = None
         self.linearize_ptr = {}
 
@@ -76,8 +78,8 @@ class Port(object):
         return FIFOPop(self)
 
     @ir_builder(node_type='expr')
-    def push(self):
-        return FIFIPush(Expr.FIFO_PUSH, self)
+    def push(self, v):
+        return FIFOPush(self, v)
 
     def __repr__(self):
         return f'{self.name}: port<{self.dtype}>'

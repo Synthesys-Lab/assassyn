@@ -33,6 +33,7 @@ def test_driver():
         if '[driver]' in i:
             assert int(i.split()[-1]) == expected
             expected += 1
+    assert expected == 100, f'{expected} != 100'
 
 if __name__ == '__main__':
     test_driver()

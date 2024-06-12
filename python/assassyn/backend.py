@@ -16,6 +16,7 @@ def dump_cargo_toml(path, name):
         f.write('edition = "2021"\n')
         f.write('[dependencies]\n')
         f.write('eir = { path = \"%s/eir\" }' % utils.repo_path())
+    return toml
 
 def make_existing_dir(path):
     try:
@@ -25,19 +26,21 @@ def make_existing_dir(path):
     except Exception as e:
         raise e
 
-def elaborate(sys: SysBuilder, path=tempfile.gettempdir(), **kwargs):
+def elaborate(sys: SysBuilder, path=tempfile.gettempdir(), pretty_printer=True, **kwargs):
 
     sys_dir = os.path.join(path, sys.name)
 
     make_existing_dir(sys_dir)
 
     # Dump the Cargo.toml file
-    dump_cargo_toml(sys_dir, sys.name)
+    toml = dump_cargo_toml(sys_dir, sys.name)
     # Dump the src directory
     make_existing_dir(os.path.join(sys_dir, 'src'))
     # Dump the assassyn IR builder
     with open(os.path.join(sys_dir, 'src/main.rs'), 'w') as fd:
         fd.write(codegen.codegen(sys))
+    if pretty_printer:
+        subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir)
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir)
 
     return os.path.join(sys_dir, 'simulator/%s' % sys.name)
