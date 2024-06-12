@@ -33,6 +33,19 @@ class Expr(object):
     def __rand__(self, other):
         return BinaryOp(BinaryOp.BITWISE_AND, self, other)
 
+    def is_fifo_related(self):
+        return self.opcode // 100 == 3
+
+    def is_binary(self):
+        return self.opcode // 100 == 2
+
+    def is_unary(self):
+        return self.opcode // 100 == 1
+
+    def is_valued(self):
+        other = isinstance(self, (FIFOField, FIFOPop, ArrayRead))
+        return other or self.is_binary() or self.is_unary()
+
 class BinaryOp(Expr):
 
     # Binary operations
@@ -84,11 +97,11 @@ class FIFOPop(Expr):
     FIFO_POP = 301
 
     def __init__(self, fifo):
-        super().__init__(FIFOPop.FIFOPOP)
+        super().__init__(FIFOPop.FIFO_POP)
         self.fifo = fifo
 
     def __repr__(self):
-        return f'{self.fifo.as_operand()}.pop()'
+        return f'{self.as_operand()} = {self.fifo.as_operand()}.pop()'
 
 
 class ArrayWrite(Expr):
@@ -138,8 +151,6 @@ class UnaryOp(Expr):
     # Unary operations
     NEG  = 100
     FLIP = 101
-    # Call operations
-    ASYNC_CALL = 500
 
     OPERATORS = {
         NEG: '-',
@@ -162,33 +173,36 @@ class FIFOField(Expr):
         super().__init__(opcode)
         self.fifo = fifo
 
-class BindInst(Expr):
 
+class Bind(Expr):
     BIND = 501
 
-    def bind(self, *args, **kwargs):
-        if not len(args):
-            self.args.update(kwargs)
-        elif not len(kwargs):
-            self.args.update(args)
+    def bind(self, **kwargs):
+        self.kwargs.update(kwargs)
+        return self
 
-    def __init__(self, callee, *args, **kwargs):
-        super().__init__(BindInst.BIND)
+    def __init__(self, callee, **kwargs):
+        super().__init__(Bind.BIND)
         self.callee = callee
-        self.args = dict(kwargs)
+        self.kwargs = kwargs
 
-def is_fifo_related(opcode):
-    return opcode // 100 == 3
+    def __repr__(self):
+        kwargs = ', '.join(f'{k}={v.as_operand()}' for k, v in self.kwargs.items())
+        callee = self.callee.as_operand()
+        lval = self.as_operand()
+        return f'{lval} = {callee}.bind{{ {kwargs} }}'
 
-def is_binary(opcode):
-    return opcode // 100 == 2
+class AsyncCall(Expr):
+    # Call operations
+    ASYNC_CALL = 500
 
-def is_unary(opcode):
-    return opcode // 100 == 1
+    def __init__(self, bind: Bind):
+        super().__init__(AsyncCall.ASYNC_CALL)
+        self.bind = bind
 
-def is_valued(opcode):
-    other = [FIFOField.FIFO_PEEK, FIFOField.FIFO_VALID, ArrayRead.ARRAY_READ, FIFOPop.FIFO_POP]
-    return is_binary(opcode) or is_binary(opcode) or opcode in other
+    def __repr__(self):
+        bind = self.bind.as_operand()
+        return f'async_call {bind}'
 
 CG_OPCODE = {
     BinaryOp.ADD: 'add',
@@ -212,11 +226,16 @@ CG_OPCODE = {
     ArrayRead.ARRAY_READ: 'array_read',
     ArrayWrite.ARRAY_WRITE: 'array_write',
 
+    AsyncCall.ASYNC_CALL: 'async_call',
+
     Log.LOG: 'log',
 }
 
-def opcode_to_ib(opcode):
-    if is_fifo_related(opcode):
+def opcode_to_ib(node: Expr):
+    opcode = node.opcode
+    if node.opcode == Bind.BIND:
+        return ''
+    if node.is_fifo_related():
         return f'create_fifo_{CG_OPCODE[opcode]}'
     return f'create_{CG_OPCODE[opcode]}'
 

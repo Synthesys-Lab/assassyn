@@ -48,10 +48,10 @@ class Bits(DType):
 
 def to_uint(value, bits=None):
     if bits is None:
-        bits = value.bit_length()
+        bits = max(value.bit_length(), 1)
     return UInt(bits)(value)
 
 def to_int(value, bits=None):
     if bits is None:
-        bits = value.bit_length()
+        bits = max(value.bit_length(), 1)
     return Int(bits)(value)
