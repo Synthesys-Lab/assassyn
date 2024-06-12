@@ -44,8 +44,6 @@ class BinaryOp(Expr):
     BITWISE_AND = 206
     BITWISE_OR  = 207
     BITWISE_XOR = 208
-    # Array operations
-    ARRAY_READ = 400
 
     OPERATORS = {
       ADD: '+',
@@ -65,47 +63,76 @@ class BinaryOp(Expr):
 
     def __repr__(self):
         lval = self.as_operand()
-        if self.opcode == self.ARRAY_READ:
-            return f'{lval} = {self.lhs.as_operand()}[{self.rhs.as_operand()}]'
         lhs = self.lhs.as_operand()
         rhs = self.rhs.as_operand()
         return f'{lval} = {lhs} {self.OPERATORS[self.opcode]} {rhs}'
 
-class SideEffect(Expr):
+class FIFOPush(Expr):
 
-    # Side effects
     FIFO_PUSH  = 302
-    FIFO_POP   = 301
+
+    def __init__(self, fifo, val):
+        super().__init__(FIFOPush.FIFO_PUSH)
+        self.fifo = fifo
+        self.val = val
+
+    def __repr__(self):
+        return f'{self.fifo.as_operand()}.push({self.val.as_operand()})'
+
+class FIFOPop(Expr):
+
+    FIFO_POP = 301
+
+    def __init__(self, fifo):
+        super().__init__(FIFOPop.FIFOPOP)
+        self.fifo = fifo
+
+    def __repr__(self):
+        return f'{self.fifo.as_operand()}.pop()'
+
+
+class ArrayWrite(Expr):
+
     ARRAY_WRITE = 401
+
+    def __init__(self, arr, idx, val):
+        super().__init__(ArrayWrite.ARRAY_WRITE)
+        self.arr = arr
+        self.idx = idx
+        self.val = val
+
+    def __repr__(self):
+        return f'{self.arr.as_operand()}[{self.idx.as_operand()}] = {self.val.as_operand()}'
+
+
+class ArrayRead(Expr):
+
+    ARRAY_READ = 400
+
+    def __init__(self, arr, idx):
+        super().__init__(ArrayRead.ARRAY_READ)
+        self.arr = arr
+        self.idx = idx
+
+    def __repr__(self):
+        return f'{self.as_operand()} = {self.arr.as_operand()}[{self.idx.as_operand()}]'
+
+class Log(Expr):
+
     LOG = 600
 
-    def __init__(self, opcode, *args):
-        super().__init__(opcode)
+    def __init__(self, *args):
+        super().__init__(Log.LOG)
         self.args = args
 
     def __repr__(self):
-        if self.opcode == self.LOG:
-            fmt = repr(self.args[0])
-            return f'log({fmt}, {", ".join(i.as_operand() for i in self.args[1:])})'
-        elif self.opcode == self.ARRAY_WRITE:
-            arr = self.args[0].as_operand()
-            idx = self.args[1].as_operand()
-            val = self.args[2].as_operand()
-            return f'{arr}[{idx}] = {val}'
-        # FIFO_PUSH
-        elif self.opcode == self.FIFO_PUSH:
-            fifo = self.args[0].as_operand()
-            val = self.args[1].as_operand()
-            return f'{fifo}.push({val})'
-        # FIFO_POP
-        assert self.opcode == self.FIFO_POP
-        fifo = self.args[0].as_operand()
-        return f'{fifo}.pop()'
+        fmt = repr(self.args[0])
+        return f'log({fmt}, {", ".join(i.as_operand() for i in self.args[1:])})'
 
 @ir_builder(node_type='expr')
 def log(*args):
     assert isinstance(args[0], str)
-    return SideEffect(SideEffect.LOG, *args)
+    return Log(*args)
 
 class UnaryOp(Expr):
     # Unary operations
@@ -114,9 +141,17 @@ class UnaryOp(Expr):
     # Call operations
     ASYNC_CALL = 500
 
+    OPERATORS = {
+        NEG: '-',
+        FLIP: '~',
+    }
+
     def __init__(self, opcode, x):
         super().__init__(opcode)
         self.x = x
+
+    def __repr__(self):
+        return f'{self.as_operand()} = {self.OPERATORS[self.opcode]}{self.x.as_operand()}'
 
 class FIFOField(Expr):
     # FIFO operations
@@ -129,13 +164,16 @@ class FIFOField(Expr):
 
 class BindInst(Expr):
 
-    BIND = 51
+    BIND = 501
 
-    def bind(self, **kwargs):
-        self.args.update(kwargs)
+    def bind(self, *args, **kwargs):
+        if not len(args):
+            self.args.update(kwargs)
+        elif not len(kwargs):
+            self.args.update(args)
 
-    def __init__(self, callee, **kwargs):
-        super().__init__(0)
+    def __init__(self, callee, *args, **kwargs):
+        super().__init__(BindInst.BIND)
         self.callee = callee
         self.args = dict(kwargs)
 
@@ -149,7 +187,7 @@ def is_unary(opcode):
     return opcode // 100 == 1
 
 def is_valued(opcode):
-    other = [FIFOField.FIFO_PEEK, FIFOField.FIFO_VALID, BinaryOp.ARRAY_READ, SideEffect.FIFO_POP]
+    other = [FIFOField.FIFO_PEEK, FIFOField.FIFO_VALID, ArrayRead.ARRAY_READ, FIFOPop.FIFO_POP]
     return is_binary(opcode) or is_binary(opcode) or opcode in other
 
 CG_OPCODE = {
@@ -161,7 +199,6 @@ CG_OPCODE = {
     BinaryOp.BITWISE_AND: 'bitwise_and',
     BinaryOp.BITWISE_OR: 'bitwise_or',
     BinaryOp.BITWISE_XOR: 'bitwise_xor',
-    BinaryOp.ARRAY_READ: 'array_read',
 
     UnaryOp.FLIP: 'flip',
     UnaryOp.NEG: 'neg',
@@ -169,10 +206,13 @@ CG_OPCODE = {
     FIFOField.FIFO_PEEK: 'peek',
     FIFOField.FIFO_VALID: 'valid',
 
-    SideEffect.FIFO_POP: 'pop',
-    SideEffect.FIFO_PUSH: 'push',
-    SideEffect.ARRAY_WRITE: 'array_write',
-    SideEffect.LOG: 'log',
+    FIFOPop.FIFO_POP: 'pop',
+    FIFOPush.FIFO_PUSH: 'push',
+
+    ArrayRead.ARRAY_READ: 'array_read',
+    ArrayWrite.ARRAY_WRITE: 'array_write',
+
+    Log.LOG: 'log',
 }
 
 def opcode_to_ib(opcode):

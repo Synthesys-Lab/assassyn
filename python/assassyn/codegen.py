@@ -69,34 +69,35 @@ class CodeGen(visitor.Visitor):
         elif expr.is_unary(node.opcode):
             x = self.generate_rval(node.x)
             res = f'  sys.{ib_method}(created_here!(), {x});'
-        elif expr.is_fifo_related(node.opcode) and isinstance(node, expr.FIFOField):
+        elif isinstance(node, expr.FIFOField):
             fifo = self.generate_rval(node.fifo)
             res = f'  sys.{ib_method}({fifo});'
-        elif node.opcode == expr.SideEffect.FIFO_PUSH:
-            fifo = node.generate_rval(node.args[0])
-            val = node.generate_rval(node.args[1])
+        elif isinstance(node, expr.FIFOPush):
+            fifo = node.generate_rval(node.fifo)
+            val = node.generate_rval(node.val)
             res = f'  sys.{ib_method}({fifo}, {val});'
-        elif node.opcode == expr.SideEffect.FIFO_POP:
+        elif isinstance(node, expr.FIFOPop):
             fifo = node.generate_rval(node.args[0])
             res = f'  sys.{ib_method}({fifo});'
-        elif node.opcode == expr.SideEffect.LOG:
+        elif isinstance(node, expr.Log):
             fmt = '"' + node.args[0] + '"'
             self.code.append('  let fmt = sys.get_str_literal(%s.into());' % fmt)
             args = ', '.join(self.generate_rval(i) for i in node.args[1:])
             res = f'  sys.{ib_method}(fmt, vec![{args}]);'
-        elif node.opcode == expr.BinaryOp.ARRAY_READ:
-            array = node.lhs.name
-            idx = self.generate_rval(node.rhs)
-            res = f'  sys.{ib_method}(created_here!(), {array}, {idx});'
-        elif node.opcode == expr.SideEffect.ARRAY_WRITE:
-            array = node.args[0].name
-            idx = self.generate_rval(node.args[1])
-            val = self.generate_rval(node.args[2])
-            res = f'  sys.{ib_method}(created_here!(), {array}, {idx}, {val});'
+        elif isinstance(node, expr.ArrayRead):
+            arr = node.arr.name
+            idx = self.generate_rval(node.idx)
+            res = f'  sys.{ib_method}(created_here!(), {arr}, {idx});'
+        elif isinstance(node, expr.ArrayWrite):
+            arr = node.arr.name
+            idx = self.generate_rval(node.idx)
+            val = self.generate_rval(node.val)
+            res = f'  sys.{ib_method}(created_here!(), {arr}, {idx}, {val});'
         else:
-            res = f'  // TODO ^'
+            length = len(repr(node)) - 5
+            res = f'  // TODO: ^{"~" * length} Support the instruction above'
 
-        if expr.is_valued(node.opcode):
+        if '// TODO(^)' not in res and expr.is_valued(node.opcode):
             res = f'  let {node.as_operand()} = {res}'
 
         self.code.append(res)

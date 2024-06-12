@@ -4,7 +4,7 @@ import inspect
 from .builder import Singleton, ir_builder
 from .dtype import DType
 from .block import Block
-from .expr import Expr, BindInst, SideEffect, FIFOField
+from .expr import Expr, BindInst, FIFOPop, FIFOField, FIFOPush
 
 
 @decorator
@@ -60,11 +60,11 @@ class Port(object):
 
     @ir_builder(node_type='expr')
     def pop(self):
-        return SideEffect(Expr.FIFO_POP, self)
+        return FIFOPop(self)
 
     @ir_builder(node_type='expr')
     def push(self):
-        return SideEffect(Expr.FIFO_PUSH, self)
+        return FIFIPush(Expr.FIFO_PUSH, self)
 
 @decorator
 def combinational(func, port=Module.IMPLICIT_POP, *args, **kwargs):

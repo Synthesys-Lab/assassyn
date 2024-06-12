@@ -1,5 +1,4 @@
-from assassyn import *
-
+from assassyn.frontend import *
 
 class Adder(Module):
 
@@ -9,11 +8,11 @@ class Adder(Module):
         self.a = Port(Int(32))
         self.b = Port(Int(32))
 
-    @module.combinational
+    @module.combinational(port=Module.EXPLICIT_POP)
     def build(self):
         a = self.a.pop()
         b = self.b.pop()
-        a + b
+        c = a + b
 
 class Driver(Module):
 
