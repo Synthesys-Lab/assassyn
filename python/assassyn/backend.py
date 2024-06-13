@@ -38,7 +38,7 @@ def elaborate(sys: SysBuilder, path=tempfile.gettempdir(), pretty_printer=True, 
     make_existing_dir(os.path.join(sys_dir, 'src'))
     # Dump the assassyn IR builder
     with open(os.path.join(sys_dir, 'src/main.rs'), 'w') as fd:
-        fd.write(codegen.codegen(sys))
+        fd.write(codegen.codegen(sys, **kwargs))
     if pretty_printer:
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir)
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir)

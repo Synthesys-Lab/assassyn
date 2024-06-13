@@ -217,7 +217,7 @@ impl Visitor<String> for IRPrinter {
     for (i, elem) in block.body_iter().enumerate() {
       if here && at.map_or(false, |x| x == i) {
         res.push_str(&format!(
-          "{}-----{{Insert Here}}-----\n",
+          "{}-----{{Insert Here}}-----",
           " ".repeat(self.indent)
         ));
       }
@@ -237,7 +237,7 @@ impl Visitor<String> for IRPrinter {
     }
     if here && at.is_none() {
       res.push_str(&format!(
-        "{}-----{{Insert Here}}-----\n",
+        "{}-----{{Insert Here}}-----",
         " ".repeat(self.indent)
       ));
     }

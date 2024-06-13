@@ -5,6 +5,7 @@ import types
 class Singleton(type):
     builder = None
     linearize_ptr = None
+    repr_ident = None
 
 @decorator
 def ir_builder(func, node_type=None, *args, **kwargs):

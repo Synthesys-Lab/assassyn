@@ -56,7 +56,8 @@ class Module(object):
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
             ports = f'{{\n    {ports}\n  }} '
-        body = '    ' + '\n    '.join(repr(elem) for elem in self.body.body)
+        Singleton.repr_ident = 2
+        body = self.body.__repr__()
         return f'  module {self.name} {ports}{{\n{body}\n  }}'
 
 class Port(object):

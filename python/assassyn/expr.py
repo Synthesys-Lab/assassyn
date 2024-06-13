@@ -33,6 +33,30 @@ class Expr(object):
     def __rand__(self, other):
         return BinaryOp(BinaryOp.BITWISE_AND, self, other)
 
+    @ir_builder(node_type='expr')
+    def __get_slice__(self, l, r):
+        return Slice(self, l, r)
+
+    @ir_builder(node_type='expr')
+    def __lt__(self, other):
+        return BinaryOp(BinaryOp.ILT, self, other)
+
+    @ir_builder(node_type='expr')
+    def __gt__(self, other):
+        return BinaryOp(BinaryOp.IGT, self, other)
+
+    @ir_builder(node_type='expr')
+    def __le__(self, other):
+        return BinaryOp(BinaryOp.ILE, self, other)
+
+    @ir_builder(node_type='expr')
+    def __ge__(self, other):
+        return BinaryOp(BinaryOp.IGE, self, other)
+
+    @ir_builder(node_type='expr')
+    def concat(self, other):
+        return Concat(self, other)
+
     def is_fifo_related(self):
         return self.opcode // 100 == 3
 
@@ -49,14 +73,19 @@ class Expr(object):
 class BinaryOp(Expr):
 
     # Binary operations
-    ADD     = 200
-    SUB     = 201
-    MUL     = 202
-    DIV     = 203
-    MOD     = 204
+    ADD         = 200
+    SUB         = 201
+    MUL         = 202
+    DIV         = 203
+    MOD         = 204
     BITWISE_AND = 206
     BITWISE_OR  = 207
     BITWISE_XOR = 208
+    ILT         = 209
+    IGT         = 210
+    ILE         = 211
+    IGE         = 212
+    EQ          = 213
 
     OPERATORS = {
       ADD: '+',
@@ -64,8 +93,15 @@ class BinaryOp(Expr):
       MUL: '*',
       DIV: '/',
       MOD: '%',
+
+      ILT: '<',
+      IGT: '>',
+      ILE: '<=',
+      IGE: '>=',
+      EQ:  '==',
+
       BITWISE_AND: '&',
-      BITWISE_OR: '|',
+      BITWISE_OR:  '|',
       BITWISE_XOR: '^',
     }
 
@@ -144,6 +180,32 @@ class Log(Expr):
         fmt = repr(self.args[0])
         return f'log({fmt}, {", ".join(i.as_operand() for i in self.args[1:])})'
 
+class Slice(Expr):
+
+    SLICE = 700
+
+    def __init__(self, x, l: int, r: int):
+        assert isinstance(l, int) and isinstance(r, int) and l <= r
+        super().__init__(Slice.SLICE)
+        self.x = arr
+        self.l = l
+        self.r = r
+
+    def __repr__(self):
+        return f'{self.as_operand()} = {self.x.as_operand()}[{self.l}:{self.r}]'
+
+class Concat(Expr):
+
+    CONCAT = 701
+
+    def __init__(self, msb, lsb):
+        super().__init__(Concat.CONCAT)
+        self.msb = msb
+        self.lsb = lsb
+
+    def __repr__(self):
+        return f'{self.as_operand()} = {self.msb.as_operand()} |.| {self.lsb.as_operand()}'
+
 @ir_builder(node_type='expr')
 def log(*args):
     assert isinstance(args[0], str)
@@ -217,39 +279,4 @@ class AsyncCall(Expr):
     def __repr__(self):
         bind = self.bind.as_operand()
         return f'async_call {bind}'
-
-CG_OPCODE = {
-    BinaryOp.ADD: 'add',
-    BinaryOp.SUB: 'sub',
-    BinaryOp.MUL: 'mul',
-    BinaryOp.DIV: 'div',
-    BinaryOp.MOD: 'mod',
-    BinaryOp.BITWISE_AND: 'bitwise_and',
-    BinaryOp.BITWISE_OR: 'bitwise_or',
-    BinaryOp.BITWISE_XOR: 'bitwise_xor',
-
-    UnaryOp.FLIP: 'flip',
-    UnaryOp.NEG: 'neg',
-
-    FIFOField.FIFO_PEEK: 'peek',
-    FIFOField.FIFO_VALID: 'valid',
-
-    FIFOPop.FIFO_POP: 'pop',
-    FIFOPush.FIFO_PUSH: 'push',
-
-    ArrayRead.ARRAY_READ: 'array_read',
-    ArrayWrite.ARRAY_WRITE: 'array_write',
-
-    AsyncCall.ASYNC_CALL: 'async_call',
-
-    Log.LOG: 'log',
-}
-
-def opcode_to_ib(node: Expr):
-    opcode = node.opcode
-    if node.opcode == Bind.BIND:
-        return ''
-    if node.is_fifo_related():
-        return f'create_fifo_{CG_OPCODE[opcode]}'
-    return f'create_{CG_OPCODE[opcode]}'
 

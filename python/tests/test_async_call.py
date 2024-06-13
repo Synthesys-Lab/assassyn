@@ -25,7 +25,9 @@ class Driver(Module):
     def build(self, adder: Adder):
         cnt = RegArray(Int(32), 1)
         cnt[0] = cnt[0] + Int(32)(1)
-        adder.async_called(a = cnt[0], b = cnt[0])
+        cond = cnt[0] < Int(32)(100)
+        with Condition(cond):
+            adder.async_called(a = cnt[0], b = cnt[0])
 
 def test_async_call():
     sys = SysBuilder('async_call')
@@ -38,9 +40,11 @@ def test_async_call():
 
     print(sys)
 
-    simulator_path = elaborate(sys)
+    simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200)
 
     raw = utils.run_simulator(simulator_path)
+
+    print(raw)
 
     cnt = 0
     for i in raw.split('\n'):
@@ -51,7 +55,7 @@ def test_async_call():
             b = line_toks[-5]
             assert int(a) + int(b) == int(c)
             cnt += 1
-    assert cnt == 100, f'{cnt} != 100'
+    assert cnt == 100, f'cnt: {cnt} != 100'
 
 
 if __name__ == '__main__':
