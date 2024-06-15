@@ -59,7 +59,7 @@ jobs:
       - name: Generate python frontend test result
         env:
           PYTHONPATH: python
-          ASSASSYN_HOME: ${GITHUB_WORKSPACE}
+          ASSASSYN_HOME: ${{ github.workspace }}
         run: |
           pytest python/tests;
       - name: Generate test result
