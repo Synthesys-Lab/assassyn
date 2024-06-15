@@ -3,6 +3,7 @@ from . import dtype
 from . import expr
 from . import module
 from . import block
+from . import const
 from .builder import SysBuilder
 from .data import Array
 from .module import Module, Port
@@ -42,6 +43,8 @@ CG_OPCODE = {
     expr.ArrayWrite.ARRAY_WRITE: 'array_write',
 
     expr.AsyncCall.ASYNC_CALL: 'async_call',
+
+    expr.Cast.BITCAST: 'bitcast',
 
     expr.Log.LOG: 'log',
 }
@@ -83,7 +86,7 @@ class CodeGen(visitor.Visitor):
         self.header.append('use eir::ir::node::IsElement;')
         self.code.append('fn main() {')
         self.code.append('  let mut sys = SysBuilder::new(\"%s\");' % node.name)
-        self.code.append('  let mut block_stack = Vec::new();\n')
+        self.code.append('  let mut block_stack : Vec<eir::ir::node::BaseNode> = Vec::new();\n')
         self.code.append('  // TODO: Support initial values')
         self.code.append('  // TODO: Support array attributes')
         for elem in node.arrays:
@@ -197,9 +200,17 @@ class CodeGen(visitor.Visitor):
             res = f'sys.{ib_method}(created_here!(), {msb}, {lsb});'
         elif isinstance(node, expr.Slice):
             x = self.generate_rval(node.x)
-            l = self.generate_rval(node.l)
-            r = self.generate_rval(node.r)
+            slice_length = node.r - node.l + 1
+            slice_length = slice_length.bit_length()
+            l = const.Const(dtype.UInt(slice_length), node.l)
+            l = self.generate_rval(l)
+            r = const.Const(dtype.UInt(slice_length), node.r)
+            r = self.generate_rval(r)
             res = f'sys.{ib_method}({x}, {l}, {r});'
+        elif isinstance(node, expr.Cast):
+            x = self.generate_rval(node.x)
+            ty = generate_dtype(node.dtype)
+            res = f'sys.{ib_method}(created_here!(), {x}, {ty});'
         else:
             length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'
