@@ -19,7 +19,7 @@ class Expr(Value):
         return self.opcode // 100 == 1
 
     def is_valued(self):
-        other = isinstance(self, (FIFOField, FIFOPop, ArrayRead, Slice, Cast))
+        other = isinstance(self, (FIFOField, FIFOPop, ArrayRead, Slice, Cast, Concat))
         return other or self.is_binary() or self.is_unary()
 
 class BinaryOp(Expr):
