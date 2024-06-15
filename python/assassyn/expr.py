@@ -34,8 +34,11 @@ class Expr(object):
         return BinaryOp(BinaryOp.BITWISE_AND, self, other)
 
     @ir_builder(node_type='expr')
-    def __get_slice__(self, l, r):
-        return Slice(self, l, r)
+    def __getitem__(self, x):
+        if isinstance(x, slice):
+            return Slice(self, int(x.start), int(x.stop))
+        else:
+            assert False, "Expecting a slice object"
 
     @ir_builder(node_type='expr')
     def __lt__(self, other):
@@ -67,7 +70,7 @@ class Expr(object):
         return self.opcode // 100 == 1
 
     def is_valued(self):
-        other = isinstance(self, (FIFOField, FIFOPop, ArrayRead))
+        other = isinstance(self, (FIFOField, FIFOPop, ArrayRead, Slice))
         return other or self.is_binary() or self.is_unary()
 
 class BinaryOp(Expr):
@@ -188,10 +191,8 @@ class Slice(Expr):
         assert isinstance(l, int) and isinstance(r, int) and l <= r
         super().__init__(Slice.SLICE)
         self.x = x
-        bits = r - l + 1
-        bit_length = max(1, bits.bit_length())
-        self.l = UInt(bit_length)(l)
-        self.r = UInt(bit_length)(r)
+        self.l = l
+        self.r = r
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.x.as_operand()}[{self.l}:{self.r}]'
