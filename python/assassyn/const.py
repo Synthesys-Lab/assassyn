@@ -1,6 +1,6 @@
-from .expr import Expr
+from .value import Value
 
-class Const(Expr):
+class Const(Value):
     def __init__(self, dtype, value):
         self.dtype = dtype
         self.value = value
