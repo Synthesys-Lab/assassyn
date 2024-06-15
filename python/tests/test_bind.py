@@ -36,7 +36,7 @@ class Rhs(Module):
 
     @module.combinational
     def build(self, sub: Sub):
-        sub.async_called(sub_a = self.rhs_b)
+        sub.async_called(sub_b = self.rhs_b)
 
 class Driver(Module):
 
@@ -50,7 +50,7 @@ class Driver(Module):
         cnt[0] = cnt[0] + Int(32)(1)
         v = cnt[0] * cnt[0]
 
-        lhs.async_called(lhs_a = v.__get_slice__(0, 31))
+        lhs.async_called(lhs_a = v[0: 31].bitcast(Int(32)))
         rhs.async_called(rhs_b = cnt[0])
 
 def test_bind():
@@ -73,7 +73,18 @@ def test_bind():
 
     raw = utils.run_simulator(simulator_path)
 
-    # print(raw)
+    print(raw)
+
+    cnt = 0
+    for i in raw.split('\n'):
+        if f'[{sub.as_operand().lower()}]' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(b) - int(a) == int(c)
+            cnt += 1
+    assert cnt == 100 - 1, f'cnt: {cnt} != 100'
 
 if __name__ == '__main__':
     test_bind()
