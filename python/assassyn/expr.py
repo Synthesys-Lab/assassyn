@@ -57,6 +57,10 @@ class Expr(object):
         return BinaryOp(BinaryOp.IGE, self, other)
 
     @ir_builder(node_type='expr')
+    def bitcast(self, dtype):
+        return Cast(Cast.BITCAST, self, dtype)
+
+    @ir_builder(node_type='expr')
     def concat(self, other):
         return Concat(self, other)
 
@@ -70,8 +74,10 @@ class Expr(object):
         return self.opcode // 100 == 1
 
     def is_valued(self):
-        other = isinstance(self, (FIFOField, FIFOPop, ArrayRead, Slice))
+        other = isinstance(self, (FIFOField, FIFOPop, ArrayRead, Slice, Cast))
         return other or self.is_binary() or self.is_unary()
+
+
 
 class BinaryOp(Expr):
 
@@ -208,6 +214,15 @@ class Concat(Expr):
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.msb.as_operand()} |.| {self.lsb.as_operand()}'
+
+class Cast(Expr):
+
+    BITCAST = 800
+
+    def __init__(self, subcode, x, dtype):
+        super().__init__(subcode)
+        self.x = x
+        self.dtype = dtype
 
 @ir_builder(node_type='expr')
 def log(*args):
