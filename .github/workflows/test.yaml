@@ -60,6 +60,8 @@ jobs:
         run: |
           cargo test;
       - name: Generate python frontend test result
+        env:
+          PYTHONPATH: python
         run: |
           pytest python/tests;
       - name: Lint the generated sv codes
