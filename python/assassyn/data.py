@@ -1,6 +1,7 @@
 from .builder import ir_builder, Singleton
 from .dtype import DType, UInt, to_uint
 from .expr import Expr, BinaryOp, ArrayRead, ArrayWrite
+from .value import Value
 
 @ir_builder(node_type='array')
 def RegArray(scalar_ty: DType, size: int):
@@ -33,13 +34,13 @@ class Array(object):
     def __getitem__(self, index):
         if isinstance(index, int):
             index = to_uint(index)
-        assert isinstance(index, Expr)
+        assert isinstance(index, Value)
         return ArrayRead(self, index)
 
     @ir_builder(node_type='expr')
     def __setitem__(self, index, value):
         if isinstance(index, int):
             index = to_uint(index)
-        assert isinstance(index, Expr)
+        assert isinstance(index, Value)
         return ArrayWrite(self, index, value)
 

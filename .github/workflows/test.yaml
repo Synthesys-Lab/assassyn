@@ -32,6 +32,9 @@ jobs:
             libunwind-dev libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev;
           git clone https://github.com/verilator/verilator && cd verilator && git checkout $VERILATOR_VERSION;
           autoconf && ./configure && make -j `nproc`;
+      - name: Install python dependencies
+        run: |
+          pip install -r python/requirements.txt;
       - name: Install verilator
         run: |
           cd verilator && sudo make install;
@@ -53,6 +56,12 @@ jobs:
             ~/.cargo/registry/cache
             target
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+      - name: Generate python frontend test result
+        env:
+          PYTHONPATH: python
+          ASSASSYN_HOME: ${{ github.workspace }}
+        run: |
+          pytest python/tests;
       - name: Generate test result
         run: |
           cargo test;
