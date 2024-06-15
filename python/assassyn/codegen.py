@@ -197,8 +197,8 @@ class CodeGen(visitor.Visitor):
             res = f'sys.{ib_method}(created_here!(), {msb}, {lsb});'
         elif isinstance(node, expr.Slice):
             x = self.generate_rval(node.x)
-            l = node.l
-            r = node.r
+            l = self.generate_rval(node.l)
+            r = self.generate_rval(node.r)
             res = f'sys.{ib_method}({x}, {l}, {r});'
         else:
             length = len(repr(node)) - 1

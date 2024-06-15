@@ -187,9 +187,11 @@ class Slice(Expr):
     def __init__(self, x, l: int, r: int):
         assert isinstance(l, int) and isinstance(r, int) and l <= r
         super().__init__(Slice.SLICE)
-        self.x = arr
-        self.l = l
-        self.r = r
+        self.x = x
+        bits = r - l + 1
+        bit_length = max(1, bits.bit_length())
+        self.l = UInt(bit_length)(l)
+        self.r = UInt(bit_length)(r)
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.x.as_operand()}[{self.l}:{self.r}]'
