@@ -35,12 +35,14 @@ class Bits(DType):
     def __repr__(self):
         return f'b{self.bits}'
 
-def to_uint(value, bits=None):
+def to_uint(value: int, bits=None):
+    assert isinstance(value, int)
     if bits is None:
         bits = max(value.bit_length(), 1)
     return UInt(bits)(value)
 
-def to_int(value, bits=None):
+def to_int(value: int, bits=None):
+    assert isinstance(value, int)
     if bits is None:
         bits = max(value.bit_length(), 1)
     return Int(bits)(value)

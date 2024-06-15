@@ -1,68 +1,13 @@
 from .builder import ir_builder, Singleton
+from .value import Value
 
-
-class Expr(object):
+class Expr(Value):
 
     def __init__(self, opcode):
         self.opcode = opcode
 
     def as_operand(self):
         return f'_{hex(id(self))[-5:-1]}'
-
-    @ir_builder(node_type='expr')
-    def __add__(self, other):
-        return BinaryOp(BinaryOp.ADD, self, other)
-
-    @ir_builder(node_type='expr')
-    def __sub__(self, other):
-        return BinaryOp(BinaryOp.SUB, self, other)
-
-    @ir_builder(node_type='expr')
-    def __mul__(self, other):
-        return BinaryOp(BinaryOp.MUL, self, other)
-
-    @ir_builder(node_type='expr')
-    def __ror__(self, other):
-        return BinaryOp(BinaryOp.BITWISE_OR, self, other)
-
-    @ir_builder(node_type='expr')
-    def __rxor__(self, other):
-        return BinaryOp(BinaryOp.BITWISE_XOR, self, other)
-
-    @ir_builder(node_type='expr')
-    def __rand__(self, other):
-        return BinaryOp(BinaryOp.BITWISE_AND, self, other)
-
-    @ir_builder(node_type='expr')
-    def __getitem__(self, x):
-        if isinstance(x, slice):
-            return Slice(self, int(x.start), int(x.stop))
-        else:
-            assert False, "Expecting a slice object"
-
-    @ir_builder(node_type='expr')
-    def __lt__(self, other):
-        return BinaryOp(BinaryOp.ILT, self, other)
-
-    @ir_builder(node_type='expr')
-    def __gt__(self, other):
-        return BinaryOp(BinaryOp.IGT, self, other)
-
-    @ir_builder(node_type='expr')
-    def __le__(self, other):
-        return BinaryOp(BinaryOp.ILE, self, other)
-
-    @ir_builder(node_type='expr')
-    def __ge__(self, other):
-        return BinaryOp(BinaryOp.IGE, self, other)
-
-    @ir_builder(node_type='expr')
-    def bitcast(self, dtype):
-        return Cast(Cast.BITCAST, self, dtype)
-
-    @ir_builder(node_type='expr')
-    def concat(self, other):
-        return Concat(self, other)
 
     def is_fifo_related(self):
         return self.opcode // 100 == 3
@@ -76,8 +21,6 @@ class Expr(object):
     def is_valued(self):
         other = isinstance(self, (FIFOField, FIFOPop, ArrayRead, Slice, Cast))
         return other or self.is_binary() or self.is_unary()
-
-
 
 class BinaryOp(Expr):
 
@@ -197,8 +140,9 @@ class Slice(Expr):
         assert isinstance(l, int) and isinstance(r, int) and l <= r
         super().__init__(Slice.SLICE)
         self.x = x
-        self.l = l
-        self.r = r
+        from .dtype import to_uint
+        self.l = to_uint(l)
+        self.r = to_uint(r)
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.x.as_operand()}[{self.l}:{self.r}]'

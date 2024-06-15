@@ -73,8 +73,6 @@ def test_bind():
 
     raw = utils.run_simulator(simulator_path)
 
-    print(raw)
-
     cnt = 0
     for i in raw.split('\n'):
         if f'[{sub.as_operand().lower()}]' in i:

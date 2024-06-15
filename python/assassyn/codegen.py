@@ -200,12 +200,8 @@ class CodeGen(visitor.Visitor):
             res = f'sys.{ib_method}(created_here!(), {msb}, {lsb});'
         elif isinstance(node, expr.Slice):
             x = self.generate_rval(node.x)
-            slice_length = node.r - node.l + 1
-            slice_length = slice_length.bit_length()
-            l = const.Const(dtype.UInt(slice_length), node.l)
-            l = self.generate_rval(l)
-            r = const.Const(dtype.UInt(slice_length), node.r)
-            r = self.generate_rval(r)
+            l = self.generate_rval(node.l)
+            r = self.generate_rval(node.r)
             res = f'sys.{ib_method}({x}, {l}, {r});'
         elif isinstance(node, expr.Cast):
             x = self.generate_rval(node.x)
