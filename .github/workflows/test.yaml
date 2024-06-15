@@ -56,15 +56,15 @@ jobs:
             ~/.cargo/registry/cache
             target
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
-      - name: Generate test result
-        run: |
-          cargo test;
       - name: Generate python frontend test result
         env:
           PYTHONPATH: python
           ASSASSYN_HOME: ${GITHUB_WORKSPACE}
         run: |
           pytest python/tests;
+      - name: Generate test result
+        run: |
+          cargo test;
       - name: Lint the generated sv codes
         run: |
           find /tmp/*.sv -print0 | xargs -0 -n1 sh -c 'verilator --lint-only --bbox-sys --timing $0 || exit 255';
