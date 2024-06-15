@@ -62,6 +62,7 @@ jobs:
       - name: Generate python frontend test result
         env:
           PYTHONPATH: python
+          ASSASSYN_HOME: ${GITHUB_WORKSPACE}
         run: |
           pytest python/tests;
       - name: Lint the generated sv codes
