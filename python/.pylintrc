@@ -1,2 +1,2 @@
 [TYPECHECK]
-signature-mutators = decorator
+signature-mutators = decorator,ir_builder,combinational,constructor
