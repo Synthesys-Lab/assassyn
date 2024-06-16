@@ -48,8 +48,6 @@ def test_cond_cse():
 
     raw = utils.run_simulator(simulator_path)
 
-    print(raw)
-
     assert "Adder:" in raw
 
 

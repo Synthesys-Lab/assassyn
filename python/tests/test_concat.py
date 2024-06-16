@@ -44,8 +44,6 @@ def test_concat():
 
     raw = utils.run_simulator(simulator_path)
 
-    print(raw)
-
     cnt = 0
     for i in raw.split('\n'):
         if f'[{adder.as_operand().lower()}]' in i:
