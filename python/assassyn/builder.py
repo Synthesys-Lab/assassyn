@@ -7,6 +7,7 @@ class Singleton(type):
     linearize_ptr = None
     repr_ident = None
 
+#pylint: function-mutator
 @decorator
 def ir_builder(func, node_type=None, *args, **kwargs):
     res = func(*args, **kwargs)
@@ -60,4 +61,3 @@ class SysBuilder(object):
         body = '\n\n'.join(map(repr, self.modules))
         array = '  ' + '\n  '.join(repr(elem) for elem in self.arrays)
         return f'system {self.name} {{\n{array}\n\n{body}\n}}'
-

@@ -1,6 +1,8 @@
+'''The module provides the Array class for representing register arrays in the IR.'''
+
 from .builder import ir_builder, Singleton
-from .dtype import DType, UInt, to_uint
-from .expr import Expr, BinaryOp, ArrayRead, ArrayWrite
+from .dtype import DType, to_uint
+from .expr import ArrayRead, ArrayWrite
 from .value import Value
 
 @ir_builder(node_type='array')
@@ -43,4 +45,3 @@ class Array(object):
             index = to_uint(index)
         assert isinstance(index, Value)
         return ArrayWrite(self, index, value)
-

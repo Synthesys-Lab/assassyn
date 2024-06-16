@@ -1,28 +1,40 @@
-from .builder import ir_builder, Singleton
+'''The AST node data structure for the expressions'''
+
+#pylint: disable=cyclic-import,import-outside-toplevel
+
+from .builder import ir_builder
 from .value import Value
 
 class Expr(Value):
+    '''The frontend base node for expressions'''
 
     def __init__(self, opcode):
+        '''Initialize the expression with an opcode'''
         self.opcode = opcode
 
     def as_operand(self):
+        '''Dump the expression as an operand'''
         return f'_{hex(id(self))[-5:-1]}'
 
     def is_fifo_related(self):
+        '''If the opcode is FIFO related'''
         return self.opcode // 100 == 3
 
     def is_binary(self):
+        '''If the opcode is a binary operator'''
         return self.opcode // 100 == 2
 
     def is_unary(self):
+        '''If the opcode is a unary operator'''
         return self.opcode // 100 == 1
 
     def is_valued(self):
+        '''If this operation has a return value'''
         other = isinstance(self, (FIFOField, FIFOPop, ArrayRead, Slice, Cast, Concat))
         return other or self.is_binary() or self.is_unary()
 
 class BinaryOp(Expr):
+    '''The class for binary operations'''
 
     # Binary operations
     ADD         = 200
@@ -69,6 +81,7 @@ class BinaryOp(Expr):
         return f'{lval} = {lhs} {self.OPERATORS[self.opcode]} {rhs}'
 
 class FIFOPush(Expr):
+    '''The class for FIFO push operation'''
 
     FIFO_PUSH  = 302
 
@@ -83,6 +96,7 @@ class FIFOPush(Expr):
         return f'{self.fifo.as_operand()}.push({self.val.as_operand()}) // handle = {handle}'
 
 class FIFOPop(Expr):
+    '''The class for FIFO pop operation'''
 
     FIFO_POP = 301
 
@@ -95,6 +109,7 @@ class FIFOPop(Expr):
 
 
 class ArrayWrite(Expr):
+    '''The class for array write operation, where arr[idx] = val'''
 
     ARRAY_WRITE = 401
 
@@ -109,6 +124,7 @@ class ArrayWrite(Expr):
 
 
 class ArrayRead(Expr):
+    '''The class for array read operation, where arr[idx] as a right value'''
 
     ARRAY_READ = 400
 
@@ -121,6 +137,8 @@ class ArrayRead(Expr):
         return f'{self.as_operand()} = {self.arr.as_operand()}[{self.idx.as_operand()}]'
 
 class Log(Expr):
+    '''The class for log operation. NOTE: This operation is just like verilog $display, which is
+    non-synthesizable. It is used for debugging purpose only.'''
 
     LOG = 600
 
@@ -133,6 +151,7 @@ class Log(Expr):
         return f'log({fmt}, {", ".join(i.as_operand() for i in self.args[1:])})'
 
 class Slice(Expr):
+    '''The class for slice operation, where x[l:r] as a right value'''
 
     SLICE = 700
 
@@ -148,6 +167,7 @@ class Slice(Expr):
         return f'{self.as_operand()} = {self.x.as_operand()}[{self.l}:{self.r}]'
 
 class Concat(Expr):
+    '''The class for concatenation operation, where {msb, lsb} as a right value'''
 
     CONCAT = 701
 
@@ -157,9 +177,10 @@ class Concat(Expr):
         self.lsb = lsb
 
     def __repr__(self):
-        return f'{self.as_operand()} = {self.msb.as_operand()} |.| {self.lsb.as_operand()}'
+        return f'{self.as_operand()} = {{ {self.msb.as_operand()} {self.lsb.as_operand()} }}'
 
 class Cast(Expr):
+    '''The class for casting operation.'''
 
     BITCAST = 800
 
@@ -170,10 +191,13 @@ class Cast(Expr):
 
 @ir_builder(node_type='expr')
 def log(*args):
+    '''The exposed frontend function to instantiate a log operation'''
     assert isinstance(args[0], str)
     return Log(*args)
 
 class UnaryOp(Expr):
+    '''The class for unary operations'''
+
     # Unary operations
     NEG  = 100
     FLIP = 101
@@ -191,6 +215,8 @@ class UnaryOp(Expr):
         return f'{self.as_operand()} = {self.OPERATORS[self.opcode]}{self.x.as_operand()}'
 
 class FIFOField(Expr):
+    '''The class for accessing FIFO fields, valid, and peek'''
+
     # FIFO operations
     FIFO_VALID = 300
     FIFO_PEEK  = 303
@@ -201,6 +227,9 @@ class FIFOField(Expr):
 
 
 class Bind(Expr):
+    '''The class for binding operations. Function bind is a functional programming concept like
+    Python's `functools.partial`.'''
+
     BIND = 501
 
     def _push(self, **kwargs):
@@ -211,11 +240,13 @@ class Bind(Expr):
 
     @ir_builder(node_type='expr')
     def bind(self, **kwargs):
+        '''The exposed frontend function to instantiate a bind operation'''
         self._push(**kwargs)
         return self
 
     @ir_builder(node_type='expr')
     def async_called(self):
+        '''The exposed frontend function to instantiate an async call operation'''
         return AsyncCall(self)
 
     def __init__(self, callee, **kwargs):
@@ -225,12 +256,16 @@ class Bind(Expr):
         self._push(**kwargs)
 
     def __repr__(self):
-        args = ', '.join(f'{v.as_operand()} /* {v.fifo.as_operand()}={v.val.as_operand()} */' for v in self.pushes)
+        args = []
+        for v in self.pushes:
+            args.append(f'{v.as_operand()} /* {v.fifo.as_operand()}={v.val.as_operand()} */')
+        args = ', '.join(args)
         callee = self.callee.as_operand()
         lval = self.as_operand()
         return f'{lval} = {callee}.bind[ {args} ]'
 
 class AsyncCall(Expr):
+    '''The class for async call operations. It is used to call a function asynchronously.'''
     # Call operations
     ASYNC_CALL = 500
 
@@ -241,4 +276,3 @@ class AsyncCall(Expr):
     def __repr__(self):
         bind = self.bind.as_operand()
         return f'async_call {bind}'
-

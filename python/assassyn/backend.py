@@ -1,5 +1,6 @@
+'''The programming interfaces involing assassyn backends'''
+
 import os
-import shutil
 import subprocess
 import tempfile
 
@@ -8,25 +9,45 @@ from . import utils
 from . import codegen
 
 def dump_cargo_toml(path, name):
+    '''
+    Dump the Cargo.toml file for the Rust-implemented simulator
+
+    Args:
+        path (Path): The path to the directory where the Cargo.toml file will be dumped
+        name (str): The name of the project
+    '''
     toml = os.path.join(path, 'Cargo.toml')
-    with open(toml, 'w') as f:
+    with open(toml, 'w', encoding='utf-8') as f:
         f.write('[package]\n')
-        f.write('name = "%s"\n' % name)
+        f.write(f'name = "{name}"\n')
         f.write('version = "0.0.0"\n')
         f.write('edition = "2021"\n')
         f.write('[dependencies]\n')
-        f.write('eir = { path = \"%s/eir\" }' % utils.repo_path())
+        f.write(f'eir = {{ path = \"{utils.repo_path()}/eir\" }}')
     return toml
 
 def make_existing_dir(path):
+    '''
+    The helper function to create a directory if it does not exist.
+    If it exists, it will print a warning message.
+    '''
     try:
         os.makedirs(path)
     except FileExistsError:
-        print('[WARN] %s already exists, please make sure we did not override anything.' % path)
+        print(f'[WARN] {path} already exists, please make sure we did not override anything.')
     except Exception as e:
         raise e
 
 def elaborate(sys: SysBuilder, path=tempfile.gettempdir(), pretty_printer=True, **kwargs):
+    '''
+    Invoke the elaboration process of the given system.
+
+    Args:
+        sys (SysBuilder): The assassyn system to be elaborated.
+        path (Path): The directory where the Rust project will be dumped
+        pretty_printer (bool): Whether to run the Rust code formatter
+        **kwargs: The optional arguments that will be passed to the code generator
+    '''
 
     sys_dir = os.path.join(path, sys.name)
 
@@ -37,10 +58,10 @@ def elaborate(sys: SysBuilder, path=tempfile.gettempdir(), pretty_printer=True, 
     # Dump the src directory
     make_existing_dir(os.path.join(sys_dir, 'src'))
     # Dump the assassyn IR builder
-    with open(os.path.join(sys_dir, 'src/main.rs'), 'w') as fd:
+    with open(os.path.join(sys_dir, 'src/main.rs'), 'w', encoding='utf-8') as fd:
         fd.write(codegen.codegen(sys, **kwargs))
     if pretty_printer:
-        subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir)
-    subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir)
+        subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)
+    subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir, check=True)
 
-    return os.path.join(sys_dir, 'simulator/%s' % sys.name)
+    return os.path.join(sys_dir, f'simulator/{sys.name}')

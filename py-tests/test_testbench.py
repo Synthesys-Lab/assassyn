@@ -1,7 +1,10 @@
+import pytest
+
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
 
+@pytest.mark.skip(reason='Testbench is intentionally skipped!')
 class Testbench(Module):
 
     @module.constructor

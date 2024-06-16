@@ -5,7 +5,7 @@ from . import module
 from . import block
 from . import const
 from .builder import SysBuilder
-from .data import Array
+from .array import Array
 from .module import Module, Port
 from .block import Block
 from .expr import Expr
@@ -139,7 +139,7 @@ class CodeGen(visitor.Visitor):
             self.code.append('  sys.set_current_block(restore);')
 
     def generate_rval(self, node):
-        if isinstance(node, dtype.Const):
+        if isinstance(node, const.Const):
             ty = generate_dtype(node.dtype)
             self.code.append(f'  let imm_{id(node)} = sys.get_const_int({ty}, {node.value}); // {node}')
             return f'imm_{id(node)}'
