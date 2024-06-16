@@ -61,7 +61,7 @@ jobs:
           PYTHONPATH: python
           ASSASSYN_HOME: ${{ github.workspace }}
         run: |
-          pytest python/tests;
+          pytest py-tests;
       - name: Generate test result
         run: |
           cargo test;
