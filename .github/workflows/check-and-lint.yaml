@@ -24,6 +24,19 @@ jobs:
         with:
           command: check
 
+  python:
+    name: Python Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with: 
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      - run: pip install pylint
+      - run: pylint --rcfile python/.pylintrc python
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest

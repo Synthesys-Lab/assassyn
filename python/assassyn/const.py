@@ -1,6 +1,10 @@
+'''The AST node module for constant values.'''
+
 from .value import Value
 
 class Const(Value):
+    '''The AST node data structure for constant values.'''
+
     def __init__(self, dtype, value):
         self.dtype = dtype
         self.value = value
@@ -9,4 +13,5 @@ class Const(Value):
         return f'({self.value}:{self.dtype})'
 
     def as_operand(self):
-        return self.__repr__()
+        '''Dump the constant as an operand.'''
+        return repr(self)
