@@ -4,10 +4,12 @@ class Block(object):
 
     MODULE_ROOT = 0
     CONDITIONAL = 1
+    CYCLE       = 2
 
     def __init__(self, kind: int):
         self.kind = kind
         self.body = []
+        self.restore = None
 
     def __repr__(self):
         Singleton.repr_ident += 2
@@ -19,13 +21,6 @@ class Block(object):
     def as_operand(self):
         return f'_{hex(id(self))[-5:-1]}'
 
-class CondBlock(Block):
-
-    def __init__(self, cond):
-        super().__init__(Block.CONDITIONAL)
-        self.cond = cond
-        self.restore = None
-
     def __enter__(self):
         assert self.restore is None, "A block cannot be used twice!"
         self.restore = Singleton.builder.insert_point['expr']
@@ -35,6 +30,12 @@ class CondBlock(Block):
     def __exit__(self, exc_type, exc_value, traceback):
         Singleton.builder.insert_point['expr'] = self.restore
 
+class CondBlock(Block):
+
+    def __init__(self, cond):
+        super().__init__(Block.CONDITIONAL)
+        self.cond = cond
+
     def __repr__(self):
         ident = Singleton.repr_ident * ' '
         res = f'when {self.cond.as_operand()} {{\n'
@@ -42,7 +43,23 @@ class CondBlock(Block):
         res = res + f'\n{ident}}}'
         return res 
 
+class CycledBlock(Block):
+
+    def __init__(self, cycle: int):
+        super().__init__(Block.CYCLE)
+        self.cycle = cycle
+
+    def __repr__(self):
+        ident = Singleton.repr_ident * ' '
+        res = f'cycle {self.cycle} {{\n'
+        res = res + super().__repr__()
+        res = res + f'\n{ident}}}'
+        return res
 
 @ir_builder(node_type='expr')
 def Condition(cond):
     return CondBlock(cond)
+
+@ir_builder(node_type='expr')
+def Cycle(cycle: int):
+    return CycledBlock(cycle)

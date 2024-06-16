@@ -237,7 +237,7 @@ impl Visitor<String> for IRPrinter {
     }
     if here && at.is_none() {
       res.push_str(&format!(
-        "{}-----{{Insert Here}}-----",
+        "{}-----{{Insert Here}}-----\n",
         " ".repeat(self.indent)
       ));
     }

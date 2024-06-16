@@ -1,5 +1,3 @@
-import pytest
-
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
