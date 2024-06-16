@@ -1,6 +1,9 @@
+'''The module for the block AST node related implementations.'''
+
 from .builder import ir_builder, Singleton
 
-class Block(object):
+class Block:
+    '''The base node of a block.'''
 
     MODULE_ROOT = 0
     CONDITIONAL = 1
@@ -19,18 +22,22 @@ class Block(object):
         return body
 
     def as_operand(self):
+        '''Dump the block as an operand.'''
         return f'_{hex(id(self))[-5:-1]}'
 
     def __enter__(self):
+        '''Designate the scope of entering the block.'''
         assert self.restore is None, "A block cannot be used twice!"
         self.restore = Singleton.builder.insert_point['expr']
         Singleton.builder.insert_point['expr'] = self.body
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        '''Designate the scope of exiting the block.'''
         Singleton.builder.insert_point['expr'] = self.restore
 
 class CondBlock(Block):
+    '''The inherited class of the block for conditional block.'''
 
     def __init__(self, cond):
         super().__init__(Block.CONDITIONAL)
@@ -41,9 +48,10 @@ class CondBlock(Block):
         res = f'when {self.cond.as_operand()} {{\n'
         res = res + super().__repr__()
         res = res + f'\n{ident}}}'
-        return res 
+        return res
 
 class CycledBlock(Block):
+    '''The inherited class of the block for cycled block used for testbench generation.'''
 
     def __init__(self, cycle: int):
         super().__init__(Block.CYCLE)
@@ -57,9 +65,11 @@ class CycledBlock(Block):
         return res
 
 @ir_builder(node_type='expr')
-def Condition(cond):
+def Condition(cond): # pylint: disable=invalid-name
+    '''Frontend API for creating a conditional block.'''
     return CondBlock(cond)
 
 @ir_builder(node_type='expr')
-def Cycle(cycle: int):
+def Cycle(cycle: int): # pylint: disable=invalid-name
+    '''Frontend API for creating a cycled block.'''
     return CycledBlock(cycle)

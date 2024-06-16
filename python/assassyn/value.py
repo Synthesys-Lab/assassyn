@@ -1,6 +1,11 @@
+'''The base node module for the overloaded frontend'''
+
 from .builder import ir_builder
 
-class Value(object):
+#pylint: disable=import-outside-toplevel
+
+class Value:
+    '''Base class for overloading arithmetic operations in the frontend'''
 
     @ir_builder(node_type='expr')
     def __add__(self, other):
@@ -37,8 +42,7 @@ class Value(object):
         from .expr import Slice
         if isinstance(x, slice):
             return Slice(self, int(x.start), int(x.stop))
-        else:
-            assert False, "Expecting a slice object"
+        assert False, "Expecting a slice object"
 
     @ir_builder(node_type='expr')
     def __lt__(self, other):
@@ -62,10 +66,12 @@ class Value(object):
 
     @ir_builder(node_type='expr')
     def bitcast(self, dtype):
+        '''The frontend API to create a bitcast operation'''
         from .expr import Cast
         return Cast(Cast.BITCAST, self, dtype)
 
     @ir_builder(node_type='expr')
     def concat(self, other):
+        '''The frontend API to create a bitwise-concat operation'''
         from .expr import Concat
         return Concat(self, other)

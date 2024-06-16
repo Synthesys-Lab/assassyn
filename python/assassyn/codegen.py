@@ -65,7 +65,7 @@ def generate_dtype(ty: dtype.DType):
     prefix = 'eir::ir::DataType'
     if isinstance(ty, dtype.Int):
         return f'{prefix}::int_ty({ty.bits})'
-    elif isinstance(ty, dtype.UInt):
+    if isinstance(ty, dtype.UInt):
         return f'{prefix}::uint_ty({ty.bits})'
     assert isinstance(ty, dtype.Bits)
     return f'{prefix}::bits_ty({ty.bits})'
