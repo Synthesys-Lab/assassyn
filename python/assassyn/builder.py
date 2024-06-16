@@ -11,7 +11,8 @@ class Singleton(type):
     repr_ident = None
 
 @decorator
-def ir_builder(func, *args, node_type=None, **kwargs):
+#pylint: disable=keyword-arg-before-vararg
+def ir_builder(func, node_type=None, *args, **kwargs):
     '''The decorator annotates the function whose return value will be inserted into the AST.'''
     res = func(*args, **kwargs)
     module_symtab = Singleton.builder.is_direct_call(inspect.currentframe())

@@ -105,12 +105,14 @@ class Port:
         return f'{self.module.name}.{self.name}'
 
 @decorator
-def combinational(func, *args, port=Module.IMPLICIT_POP, **kwargs):
+#pylint: disable=keyword-arg-before-vararg
+def combinational(func, port=Module.IMPLICIT_POP, *args, **kwargs):
     '''A decorator for marking a function as combinational logic description.'''
     args[0].body = Block(Block.MODULE_ROOT)
     Singleton.builder.insert_point['expr'] = args[0].body.body
     Singleton.builder.cur_module = args[0]
     Singleton.builder.builder_func = func
+
     if port == Module.IMPLICIT_POP:
         restore = {}
         for k, v in args[0].__dict__.items():
