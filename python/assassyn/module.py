@@ -30,7 +30,7 @@ class Module(object):
 
     def __init__(self):
         self.name = type(self).__name__
-        if self.name != 'Driver':
+        if self.name not in ['Driver', 'Testbench']:
             self.name = self.name + hex(id(self))[-5:-1]
         self.body = None
         self.linearize_ptr = {}

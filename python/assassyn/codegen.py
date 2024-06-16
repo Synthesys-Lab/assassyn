@@ -116,18 +116,25 @@ class CodeGen(visitor.Visitor):
     def visit_block(self, node: Block):
         if node.kind == Block.MODULE_ROOT:
             self.code.append('  // module root block')
-        if isinstance(node, block.CondBlock):
-            self.code.append('  // conditional block')
-            cond = self.generate_rval(node.cond)
-            block_var = self.generate_rval(node)
+        else:
+            self.code.append('  // restore current block')
             self.code.append('  block_stack.push(sys.get_current_block().unwrap().upcast());')
-            self.code.append(f'  let {block_var} = sys.create_conditional_block({cond});')
-            self.code.append(f'  sys.set_current_block({block_var});')
+
+            block_var = self.generate_rval(node)
+            if isinstance(node, block.CondBlock):
+                self.code.append('  // conditional block')
+                cond = self.generate_rval(node.cond)
+                self.code.append(f'  let {block_var} = sys.create_conditional_block({cond});')
+                self.code.append(f'  sys.set_current_block({block_var});')
+            elif isinstance(node, block.CycledBlock):
+                self.code.append('  // cycled block')
+                self.code.append(f'  let {block_var} = sys.create_cycled_block({node.cycle});')
+                self.code.append(f'  sys.set_current_block({block_var});')
 
         for elem in node.body:
             self.dispatch(elem)
 
-        if isinstance(node, block.CondBlock):
+        if isinstance(node, (block.CondBlock, block.CycledBlock)):
             self.code.append('  let restore = block_stack.pop().unwrap();')
             self.code.append('  sys.set_current_block(restore);')
 
