@@ -71,7 +71,7 @@ def generate_dtype(ty: dtype.DType):
         return f'{prefix}::int_ty({ty.bits})'
     if isinstance(ty, dtype.UInt):
         return f'{prefix}::uint_ty({ty.bits})'
-    assert isinstance(ty, dtype.Bits)
+    assert isinstance(ty, dtype.Bits), f'{ty} is given'
     return f'{prefix}::bits_ty({ty.bits})'
 
 def generate_port(port: Port):
@@ -103,6 +103,19 @@ class CodeGen(visitor.Visitor):
             return f'idle_threshold: {idle_threshold}, sim_threshold: {sim_threshold},'
         return ''
 
+    def generate_init_value(self, init_value, ty: str):
+        if init_value is None:
+            return 'None'
+    
+        vec = []
+        for i, j in enumerate(init_value):
+            self.code.append(f'let init_{i} = sys.get_const_int({ty}, {j});')
+            vec.append(f'init_{i}')
+
+        self.code.append(f'let init = vec![{", ".join(vec)}];')
+
+        return 'Some(init)'
+
 
     def visit_system(self, node: SysBuilder):
         self.header.append('use eir::{builder::SysBuilder, created_here};')
@@ -129,11 +142,12 @@ class CodeGen(visitor.Visitor):
             self.visit_module(elem)
         config = self.emit_config()
         self.code.append(f'''
-  let config = eir::backend::common::Config{{
-     base_dir: (env!("CARGO_MANIFEST_DIR").to_string() + "/simulator").into(),
-     {config}
-     ..Default::default()
-  }};''')
+            let config = eir::backend::common::Config{{
+               base_dir: (env!("CARGO_MANIFEST_DIR").to_string() + "/simulator").into(),
+               {config}
+               ..Default::default()
+            }};
+        ''')
         self.code.append('  println!("{}", sys);')
         self.code.append('  eir::backend::simulator::elaborate(&sys, &config).unwrap();')
         self.code.append('}\n')
@@ -180,10 +194,11 @@ class CodeGen(visitor.Visitor):
             module_name = self.generate_rval(node.module)
             port_name = f'{module_name}_{node.name}'
             self.code.append(f'''  // Get port {node.name}
-  let {port_name} = {{
-    let module = {module_name}.as_ref::<eir::ir::Module>(&sys).unwrap();
-    module.get_port_by_name("{node.name}").unwrap().upcast()
-  }};''')
+                let {port_name} = {{
+                  let module = {module_name}.as_ref::<eir::ir::Module>(&sys).unwrap();
+                  module.get_port_by_name("{node.name}").unwrap().upcast()
+                }};
+            ''')
             return port_name
         if isinstance(node, module.Module):
             return node.as_operand().lower()
@@ -261,10 +276,11 @@ class CodeGen(visitor.Visitor):
         name = node.name
         size = node.size
         ty = generate_dtype(node.scalar_ty)
+        init = self.generate_init_value(node.initializer, ty)
         self.code.append(f'  // {node}')
         attrs = ', '.join(f'eir::ir::data::ArrayAttr::{CG_ARRAY_ATTR[i]}' for i in node.attr)
         attrs = f'vec![{attrs}]'
-        array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, None, {attrs});'
+        array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         self.code.append(array_decl)
 
     def __init__(self, **kwargs):
