@@ -6,15 +6,16 @@ from .expr import ArrayRead, ArrayWrite
 from .value import Value
 
 @ir_builder(node_type='array')
-def RegArray(scalar_ty: DType, size: int): #pylint: disable=invalid-name
+def RegArray(scalar_ty: DType, size: int, init_val=None): #pylint: disable=invalid-name
     '''
     The frontend API to declare a register array.
 
     Args:
         scalar_ty: The data type of the array elements.
         size: The size of the array. MUST be a compilation time constant.
+        init_val: The value of the register array. If not set, the array is initialized as 0.
     '''
-    return Array(scalar_ty, size)
+    return Array(scalar_ty, size, init_val)
 
 class Array:
     '''The class represents a register array in the AST IR.'''
@@ -34,10 +35,11 @@ class Array:
     def name(self, name):
         self._name = name
 
-    def __init__(self, scalar_ty: DType, size: int):
+    def __init__(self, scalar_ty: DType, size: int, init_val=None):
         self.scalar_ty = scalar_ty
         self.size = size
         self._name = None
+        self.init_val = init_val
 
     def __repr__(self):
         return f'array {self.name}[{self.scalar_ty}; {self.size}]'

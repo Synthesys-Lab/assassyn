@@ -70,6 +70,15 @@ def generate_dtype(ty: dtype.DType):
     assert isinstance(ty, dtype.Bits)
     return f'{prefix}::bits_ty({ty.bits})'
 
+def generate_init_value(init_value, ty: dtype.DType):
+    if init_value is None:
+        return ("\n", "None")
+
+    str1 = f'let init_val = sys.get_const_int({ty}, {init_value});'
+    str2 = 'Some(vec![init_val])'
+
+    return (str1, str2)
+
 def generate_port(port: Port):
     '''Generate the port information for the given port for module construction'''
     ty = f'{generate_dtype(port.dtype)}'
@@ -106,11 +115,12 @@ class CodeGen(visitor.Visitor):
             self.visit_module(elem)
         config = self.emit_config()
         self.code.append(f'''
-  let config = eir::backend::common::Config{{
-     base_dir: (env!("CARGO_MANIFEST_DIR").to_string() + "/simulator").into(),
-     {config}
-     ..Default::default()
-  }};''')
+            let config = eir::backend::common::Config{{
+               base_dir: (env!("CARGO_MANIFEST_DIR").to_string() + "/simulator").into(),
+               {config}
+               ..Default::default()
+            }};
+        ''')
         self.code.append('  println!("{}", sys);')
         self.code.append('  eir::backend::simulator::elaborate(&sys, &config).unwrap();')
         self.code.append('}\n')
@@ -157,10 +167,11 @@ class CodeGen(visitor.Visitor):
             module_name = self.generate_rval(node.module)
             port_name = f'{module_name}_{node.name}'
             self.code.append(f'''  // Get port {node.name}
-  let {port_name} = {{
-    let module = {module_name}.as_ref::<eir::ir::Module>(&sys).unwrap();
-    module.get_port_by_name("{node.name}").unwrap().upcast()
-  }};''')
+                let {port_name} = {{
+                  let module = {module_name}.as_ref::<eir::ir::Module>(&sys).unwrap();
+                  module.get_port_by_name("{node.name}").unwrap().upcast()
+                }};
+            ''')
             return port_name
         if isinstance(node, module.Module):
             return node.as_operand().lower()
@@ -242,8 +253,10 @@ class CodeGen(visitor.Visitor):
         name = node.name
         size = node.size
         ty = generate_dtype(node.scalar_ty)
+        init = generate_init_value(node.init_val, ty)
         self.code.append(f'  // {node}')
-        array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, None, vec![]);'
+        self.code.append('  %s' % init[0])
+        array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init[1]}, vec![]);'
         self.code.append(array_decl)
 
     def __init__(self, **kwargs):
