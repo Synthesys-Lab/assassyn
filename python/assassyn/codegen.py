@@ -72,7 +72,6 @@ def generate_init_value(init_value, ty: dtype.DType):
     if init_value is None:
         return ("\n", "None")
 
-    print(ty)
     str1 = f'let init_val = sys.get_const_int({ty}, {init_value});'
     str2 = 'Some(vec![init_val])'
 

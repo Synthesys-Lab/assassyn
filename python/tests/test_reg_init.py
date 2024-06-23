@@ -1,3 +1,5 @@
+import pytest
+
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
@@ -24,6 +26,7 @@ def test_driver():
 
     raw = utils.run_simulator(simulator_path)
 
+    print(raw)
 
 if __name__ == '__main__':
     test_driver()
