@@ -46,3 +46,13 @@ def to_int(value: int, bits=None):
     if bits is None:
         bits = max(value.bit_length(), 1)
     return Int(bits)(value)
+
+def to_float(value: float):
+    assert isinstance(value, float)
+    return Float()(value)
+
+def to_bits(value: int, bits=None):
+    assert isinstance(value, int)
+    if bits is None:
+        bits = max(value.bit_length(), 1)
+    return Bits(bits)(value)
