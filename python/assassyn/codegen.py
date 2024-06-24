@@ -71,6 +71,7 @@ def generate_dtype(ty: dtype.DType):
     return f'{prefix}::bits_ty({ty.bits})'
 
 def generate_init_value(init_value, ty: dtype.DType):
+    '''Generate the initial value for the given array'''
     if init_value is None:
         return ("\n", "None")
 
@@ -255,8 +256,10 @@ class CodeGen(visitor.Visitor):
         ty = generate_dtype(node.scalar_ty)
         init = generate_init_value(node.init_val, ty)
         self.code.append(f'  // {node}')
-        self.code.append('  %s' % init[0])
-        array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init[1]}, vec![]);'
+        self.code.append(f'  {init[0]}')
+        array_decl = (f'  let {name} = sys.create_array('
+            f'{ty}, \"{name}\", {size}, {init[1]}, vec![]);')
+
         self.code.append(array_decl)
 
     def __init__(self, **kwargs):
