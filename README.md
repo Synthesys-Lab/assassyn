@@ -12,6 +12,7 @@ is implemented in Python. You can initialize this package by running the command
 
 ````sh
 $ source setup.sh # Add assassyn's python package to your PYTHONPATH
+$ cargo build # Build the Rust backend
 ````
 
 After that, you can try our Python frontend.
