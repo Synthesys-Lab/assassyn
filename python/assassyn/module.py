@@ -39,6 +39,7 @@ class Module:
             self.name = self.name + hex(id(self))[-5:-1]
         self.body = None
         self.linearize_ptr = {}
+        self.binds = 0
 
     @property
     def ports(self):
@@ -52,9 +53,16 @@ class Module:
         return AsyncCall(bind)
 
     @ir_builder(node_type='expr')
-    def bind(self, **kwargs):
+    def bind(self, eager=False, **kwargs):
         '''The frontend API for creating a bind operation to this `self` module.'''
-        return Bind(self, **kwargs)
+        bound = Bind(self, **kwargs)
+        self.binds += 1
+        is_fully_bound = sum(1 for v in self.__dict__.values() if isinstance(v, Port)) == self.binds
+
+        if eager and is_fully_bound:
+            return bound.async_called()
+         
+        return bound
 
     def as_operand(self):
         '''Dump the module as a right-hand side reference.'''
