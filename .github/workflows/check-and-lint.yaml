@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
+          token: ${{ secrets.ACCESS_TOKEN }}
           ref: ${{ github.head_ref }}
       - uses: actions-rs/toolchain@v1
         with:
@@ -30,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
+          token: ${{ secrets.ACCESS_TOKEN }}
           ref: ${{ github.head_ref }}
       - uses: actions/setup-python@v2
         with:
@@ -43,6 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
+          token: ${{ secrets.ACCESS_TOKEN }}
           ref: ${{ github.head_ref }}
       - uses: actions-rs/toolchain@v1
         with:
@@ -64,6 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
+          token: ${{ secrets.ACCESS_TOKEN }}
           ref: ${{ github.head_ref }}
       - uses: actions-rs/toolchain@v1
         with:

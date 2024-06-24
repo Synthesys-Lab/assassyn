@@ -1,5 +1,7 @@
 on:
   pull_request:
+    branches
+      - master
   push:
     branches:
       - master
@@ -16,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with: 
+          token: ${{ secrets.ACCESS_TOKEN }}
           ref: ${{ github.head_ref }}
       - name: Cache verilator build
         id: cache-verilator-build
