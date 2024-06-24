@@ -28,7 +28,10 @@ def test_driver():
 
     raw = utils.run_simulator(simulator_path)
 
-    print(raw)
+    for i in raw.split('\n'):
+        if '[driver]' in i:
+            print(i)
+            assert '1234' in i
 
 
 if __name__ == '__main__':
