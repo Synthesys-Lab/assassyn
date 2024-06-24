@@ -75,6 +75,18 @@ def generate_port(port: Port):
     ty = f'{generate_dtype(port.dtype)}'
     return f'eir::builder::PortInfo::new("{port.name}", {ty})'
 
+class EmitBinds(visitor.Visitor):
+
+    def __init__(self, cg):
+        self.cg = cg
+
+    def visit_expr(self, node):
+        if isinstance(node, expr.Bind):
+            bind_var = self.cg.generate_rval(node)
+            module_var = self.cg.generate_rval(node.callee)
+            self.cg.code.append(f'  // Gathered bind')
+            self.cg.code.append(f'  let {bind_var} = sys.get_init_bind({module_var});')
+
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
 
@@ -102,6 +114,9 @@ class CodeGen(visitor.Visitor):
             name = elem.name.lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
             self.code.append(f'  let {name} = sys.create_module("{name}", vec![{ports}]);')
+        for elem in node.modules:
+            bind_emitter = EmitBinds(self)
+            bind_emitter.visit_module(elem)
         for elem in node.modules:
             self.visit_module(elem)
         config = self.emit_config()
@@ -168,7 +183,7 @@ class CodeGen(visitor.Visitor):
 
     #pylint: disable=too-many-branches, too-many-locals, too-many-statements
     def visit_expr(self, node):
-        self.code.append('  // {node}')
+        self.code.append(f'  // {node}')
         ib_method = opcode_to_ib(node)
         if node.is_binary():
             lhs = self.generate_rval(node.lhs)
@@ -199,15 +214,11 @@ class CodeGen(visitor.Visitor):
             res = f'sys.{ib_method}(created_here!(), {arr}, {idx}, {val});'
         elif isinstance(node, expr.FIFOPush):
             bind_var = self.generate_rval(node.bind)
-            if node.bind not in self.emitted_bind:
-                self.emitted_bind.add(node.bind)
-                module_var = self.generate_rval(node.bind.callee)
-                self.code.append(f'  let {bind_var} = sys.get_init_bind({module_var});')
             fifo_name = node.fifo.name
             val = self.generate_rval(node.val)
             res = f'sys.add_bind({bind_var}, "{fifo_name}".into(), {val}, Some(false));'
         elif isinstance(node, expr.Bind):
-            res = '// Already handled in the initial push'
+            res = '// Already handled by `EmitBinds`'
         elif isinstance(node, expr.AsyncCall):
             bind_var = self.generate_rval(node.bind)
             res = f'sys.create_async_call({bind_var});'
