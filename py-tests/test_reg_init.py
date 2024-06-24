@@ -32,6 +32,5 @@ def test_driver():
             assert int(i.split()[-1]) == 10
 
 
-
 if __name__ == '__main__':
     test_driver()
