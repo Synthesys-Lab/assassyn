@@ -11,7 +11,7 @@ and verfication.
 is implemented in Python. You can initialize this package by running the command below.
 
 ````sh
-source setup.sh # Add assassyn's python package to your PYTHONPATH
+$ source setup.sh # Add assassyn's python package to your PYTHONPATH
 ````
 
 Because of the nature of Rust toolchain, rust backend will be built along with your designs.
@@ -20,7 +20,7 @@ Because of the nature of Rust toolchain, rust backend will be built along with y
 all other Python scripts.
 
 ````sh
-python python/tests/test_driver.py 
+$ python python/tests/test_driver.py 
 ````
 
 Refer our [developer doc](./docs/developers.md) for more details.
