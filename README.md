@@ -15,13 +15,11 @@ $ source setup.sh # Add assassyn's python package to your PYTHONPATH
 $ cargo build # Build the Rust backend
 ````
 
-After that, you can try our Python frontend.
+After that, you can try our Python frontend. Refer `examples` and `tests` for more usage examples.
 ````sh
 $ python
 >>> import assassyn
 ````
-
-Refer `examples` and `tests` for more usage examples.
 
 **Developers**: All the test cases are located in `python/tests`, you can just run them like
 all other Python scripts.
