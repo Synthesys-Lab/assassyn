@@ -4,6 +4,7 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
 
+
 class Driver(Module):
 
     @module.constructor
@@ -12,8 +13,9 @@ class Driver(Module):
 
     @module.combinational
     def build(self):
-        cnt = RegArray(UInt(32), 1, 10)
-        log('cnt: {}', cnt[0]);
+        cnt = RegArray(UInt(32), 1, 1234)
+        log('cnt: {}', cnt[0])
+
 
 def test_driver():
     sys = SysBuilder('driver')
@@ -27,6 +29,7 @@ def test_driver():
     raw = utils.run_simulator(simulator_path)
 
     print(raw)
+
 
 if __name__ == '__main__':
     test_driver()
