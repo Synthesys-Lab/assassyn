@@ -46,6 +46,10 @@ class Module:
         '''The helper function to get all the ports in the module.'''
         return [v for _, v in self.__dict__.items() if isinstance(v, Port)]
 
+    def is_fully_bound(self):
+        '''The helper function to check if all the ports are bound.'''
+        return int(sum(1 for v in self.__dict__.values() if isinstance(v, Port)) == self.binds)
+
     @ir_builder(node_type='expr')
     def async_called(self, **kwargs):
         '''The frontend API for creating an async call operation to this `self` module.'''
@@ -57,11 +61,6 @@ class Module:
         '''The frontend API for creating a bind operation to this `self` module.'''
         bound = Bind(self, **kwargs)
         self.binds += 1
-        is_fully_bound = sum(1 for v in self.__dict__.values() if isinstance(v, Port)) == self.binds
-
-        if eager and is_fully_bound:
-            return bound.async_called()
-         
         return bound
 
     def as_operand(self):
