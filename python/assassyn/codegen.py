@@ -74,6 +74,19 @@ def generate_dtype(ty: dtype.DType):
     assert isinstance(ty, dtype.Bits), f'{ty} is given'
     return f'{prefix}::bits_ty({ty.bits})'
 
+<<<<<<< HEAD
+=======
+def generate_init_value(init_value, ty: dtype.DType):
+    '''Generate the initial value for the given array'''
+    if init_value is None:
+        return ("\n", "None")
+
+    str1 = f'let init_val = sys.get_const_int({ty}, {init_value});'
+    str2 = 'Some(vec![init_val])'
+
+    return (str1, str2)
+
+>>>>>>> 581c5c3 (Format)
 def generate_port(port: Port):
     '''Generate the port information for the given port for module construction'''
     ty = f'{generate_dtype(port.dtype)}'
