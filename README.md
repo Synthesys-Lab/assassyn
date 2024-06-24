@@ -14,7 +14,11 @@ is implemented in Python. You can initialize this package by running the command
 $ source setup.sh # Add assassyn's python package to your PYTHONPATH
 ````
 
-Because of the nature of Rust toolchain, rust backend will be built along with your designs.
+After that, you can try our Python frontend.
+````sh
+$ python
+>>> import assassyn
+````
 
 **Developers**: All the test cases are located in `python/tests`, you can just run them like
 all other Python scripts.
