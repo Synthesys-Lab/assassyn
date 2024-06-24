@@ -21,6 +21,8 @@ $ python
 >>> import assassyn
 ````
 
+Refer `examples` and `tests` for more usage examples.
+
 **Developers**: All the test cases are located in `python/tests`, you can just run them like
 all other Python scripts.
 
