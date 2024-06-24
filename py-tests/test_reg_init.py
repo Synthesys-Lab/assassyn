@@ -4,6 +4,7 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
 
+
 class Driver(Module):
 
     @module.constructor
@@ -29,6 +30,7 @@ def test_driver():
     for i in raw.split('\n'):
         if '[driver]' in i:
             assert int(i.split()[-1]) == 10
+
 
 
 if __name__ == '__main__':
