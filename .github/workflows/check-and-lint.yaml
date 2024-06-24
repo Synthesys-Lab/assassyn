@@ -14,8 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
-          token: ${{ secrets.ACCESS_TOKEN }}
-          ref: ${{ github.head_ref }}
+          ref: ${{github.event.pull_request.head.ref}}
+          repository: ${{github.event.pull_request.head.repo.full_name}}
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -31,8 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
-          token: ${{ secrets.ACCESS_TOKEN }}
-          ref: ${{ github.head_ref }}
+          ref: ${{github.event.pull_request.head.ref}}
+          repository: ${{github.event.pull_request.head.repo.full_name}}
       - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
@@ -45,8 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
-          token: ${{ secrets.ACCESS_TOKEN }}
-          ref: ${{ github.head_ref }}
+          ref: ${{github.event.pull_request.head.ref}}
+          repository: ${{github.event.pull_request.head.repo.full_name}}
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -67,8 +67,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with: 
-          token: ${{ secrets.ACCESS_TOKEN }}
-          ref: ${{ github.head_ref }}
+          ref: ${{github.event.pull_request.head.ref}}
+          repository: ${{github.event.pull_request.head.repo.full_name}}
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
