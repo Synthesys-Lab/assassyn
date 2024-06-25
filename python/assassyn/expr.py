@@ -251,8 +251,9 @@ class Bind(Expr):
         return cnt == len(ports)
 
     @ir_builder(node_type='expr')
-    def async_called(self):
+    def async_called(self, **kwargs):
         '''The exposed frontend function to instantiate an async call operation'''
+        self._push(**kwargs)
         return AsyncCall(self)
 
     def __init__(self, callee, **kwargs):

@@ -1,6 +1,7 @@
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
+from assassyn.expr import Bind
 
 class Sub(Module):
 
@@ -35,7 +36,7 @@ class Rhs(Module):
         self.rhs_b = Port(Int(32))
 
     @module.combinational
-    def build(self, sub: Sub):
+    def build(self, sub: Bind):
         sub.async_called(sub_b = self.rhs_b)
 
 class Driver(Module):
