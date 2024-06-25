@@ -24,8 +24,8 @@ class Lhs(Module):
 
     @module.combinational
     def build(self, sub: Sub):
-        sub.bind(sub_a = self.lhs_a)
-        return sub
+        bound = sub.bind(sub_a = self.lhs_a)
+        return bound
 
 class Rhs(Module):
 

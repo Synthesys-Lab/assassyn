@@ -80,18 +80,17 @@ def test_bind():
 
     raw = utils.run_simulator(simulator_path)
 
-    # print(raw)
-    # print(raw)
-    # cnt = 0
-    # for i in raw.split('\n'):
-    #     if f'[{sub.as_operand().lower()}]' in i:
-    #         line_toks = i.split()
-    #         c = line_toks[-1]
-    #         a = line_toks[-3]
-    #         b = line_toks[-5]
-    #         assert int(b) - int(a) == int(c)
-    #         cnt += 1
-    # assert cnt == 100 - 1, f'cnt: {cnt} != 100'
+    print(raw)
+    cnt = 0
+    for i in raw.split('\n'):
+        if f'[{sub.as_operand().lower()}]' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(b) - int(a) == int(c)
+            cnt += 1
+    assert cnt == 100 - 1, f'cnt: {cnt} != 100'
 
 if __name__ == '__main__':
     test_bind()
