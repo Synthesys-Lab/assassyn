@@ -116,6 +116,9 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'  let {name} = sys.create_module("{name}", vec![{ports}]);')
         for elem in node.modules:
             bind_emitter = EmitBinds(self)
+            name = elem.name.lower()
+            self.code.append('  // Set the current module redundantly to emit related binds')
+            self.code.append(f'  sys.set_current_module({name});')
             bind_emitter.visit_module(elem)
         for elem in node.modules:
             self.visit_module(elem)

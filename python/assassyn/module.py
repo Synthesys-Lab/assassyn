@@ -46,10 +46,6 @@ class Module:
         '''The helper function to get all the ports in the module.'''
         return [v for _, v in self.__dict__.items() if isinstance(v, Port)]
 
-    def is_fully_bound(self):
-        '''The helper function to check if all the ports are bound.'''
-        return int(sum(1 for v in self.__dict__.values() if isinstance(v, Port)) == self.binds)
-
     @ir_builder(node_type='expr')
     def async_called(self, **kwargs):
         '''The frontend API for creating an async call operation to this `self` module.'''

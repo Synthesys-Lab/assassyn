@@ -238,11 +238,17 @@ class Bind(Expr):
             push.bind = self
             self.pushes.append(push)
 
-    @ir_builder(node_type='expr')
     def bind(self, **kwargs):
         '''The exposed frontend function to instantiate a bind operation'''
         self._push(**kwargs)
         return self
+
+    def is_fully_bound(self):
+        '''The helper function to check if all the ports are bound.'''
+        fifo_names = set(push.fifo.name for push in self.pushes)
+        ports = self.callee.ports
+        cnt = sum(i.name in fifo_names for i in ports)
+        return cnt == len(ports)
 
     @ir_builder(node_type='expr')
     def async_called(self):

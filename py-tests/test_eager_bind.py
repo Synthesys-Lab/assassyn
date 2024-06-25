@@ -3,7 +3,7 @@ import pytest
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
-from assassyn.dtype import to_int
+from assassyn.expr import Bind
 
 class Sub(Module):
 
@@ -27,8 +27,8 @@ class Lhs(Module):
 
     @module.combinational
     def build(self, sub: Sub):
-        sub.bind(sub_a = self.lhs_a)
-        return sub
+        bound = sub.bind(sub_a = self.lhs_a)
+        return bound
 
 class Rhs(Module):
 
@@ -38,11 +38,10 @@ class Rhs(Module):
         self.rhs_b = Port(Int(32))
 
     @module.combinational
-    def build(self, sub: Sub):
-        sub.bind(sub_b = self.rhs_b)
-        cond = to_int(sub.is_fully_bound())
-        with Condition(cond):
-            sub.async_called()
+    def build(self, sub: Bind):
+        bound = sub.bind(sub_b = self.rhs_b)
+        if bound.is_fully_bound():
+            bound.async_called()
 
 class Driver(Module):
 
@@ -76,7 +75,6 @@ def test_bind():
         driver.build(lhs, rhs)
 
     print(sys)
-
 
     simulator_path = elaborate(sys)
 
