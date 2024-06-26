@@ -76,6 +76,7 @@ def generate_port(port: Port):
     return f'eir::builder::PortInfo::new("{port.name}", {ty})'
 
 class EmitBinds(visitor.Visitor):
+    '''Gather all the binds and emit them in advance'''
 
     def __init__(self, cg):
         self.cg = cg
@@ -84,7 +85,6 @@ class EmitBinds(visitor.Visitor):
         if isinstance(node, expr.Bind):
             bind_var = self.cg.generate_rval(node)
             module_var = self.cg.generate_rval(node.callee)
-            self.cg.code.append(f'  // Gathered bind')
             self.cg.code.append(f'  let {bind_var} = sys.get_init_bind({module_var});')
 
 class CodeGen(visitor.Visitor):
@@ -114,6 +114,7 @@ class CodeGen(visitor.Visitor):
             name = elem.name.lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
             self.code.append(f'  let {name} = sys.create_module("{name}", vec![{ports}]);')
+        self.code.append('  // Gathered binds')
         for elem in node.modules:
             bind_emitter = EmitBinds(self)
             name = elem.name.lower()

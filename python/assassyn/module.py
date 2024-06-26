@@ -53,7 +53,7 @@ class Module:
         return AsyncCall(bind)
 
     @ir_builder(node_type='expr')
-    def bind(self, eager=False, **kwargs):
+    def bind(self, **kwargs):
         '''The frontend API for creating a bind operation to this `self` module.'''
         bound = Bind(self, **kwargs)
         self.binds += 1
