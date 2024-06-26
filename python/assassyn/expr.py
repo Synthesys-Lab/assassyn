@@ -180,9 +180,11 @@ class Concat(Expr):
         return f'{self.as_operand()} = {{ {self.msb.as_operand()} {self.lsb.as_operand()} }}'
 
 class Cast(Expr):
-    '''The class for casting operation.'''
+    '''The class for casting operation, including bitcast, zext, and sext.'''
 
     BITCAST = 800
+    ZEXT = 801
+    SEXT = 802
 
     def __init__(self, subcode, x, dtype):
         super().__init__(subcode)
