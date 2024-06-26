@@ -74,8 +74,6 @@ class Value:
     def zext(self, dtyle):
         '''The frontend API to create a zero-extend operation'''
         from .expr import Cast
-        from .dtype import Int, UInt
-
         assert self.dtype.bits < dtyle.bits, "Unsigned extension must increase the bit width"
         return Cast(Cast.ZEXT, self, dtyle)
 
@@ -83,8 +81,6 @@ class Value:
     def sext(self, dtyle):
         '''The frontend API to create a sign-extend operation'''
         from .expr import Cast
-        from .dtype import Int, UInt
-
         assert self.dtype.bits < dtyle.bits, "Sign extension must increase the bit width"
         return Cast(Cast.SEXT, self, dtyle)
 

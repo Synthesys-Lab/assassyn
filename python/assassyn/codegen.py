@@ -241,15 +241,6 @@ class CodeGen(visitor.Visitor):
             x = self.generate_rval(node.x)
             ty = generate_dtype(node.dtype)
             res = f'sys.{ib_method}(created_here!(), {x}, {ty});'
-        elif isinstance(node, expr.Zext):
-            x = self.generate_rval(node.x)
-            ty = self.generate_rval(node.ty)
-            print(ib_method + "\n\n\n\n\n\n\n")
-            res = f'sys.{ib_method}(created_here!(), {x}, {ty});'
-        elif isinstance(node, expr.Sext):
-            x = self.generate_rval(node.x)
-            ty = self.generate_rval(node.ty)
-            res = f'sys.{ib_method}(created_here!(), {x}, {ty});'
         else:
             length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'
