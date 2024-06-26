@@ -51,6 +51,10 @@ CG_OPCODE = {
     expr.Log.LOG: 'log',
 }
 
+CG_ARRAY_ATTR = {
+    Array.FULLY_PARTITIONED: 'FullyPartitioned',
+}
+
 def opcode_to_ib(node: Expr):
     '''Convert the opcode to the corresponding IR builder method'''
     opcode = node.opcode
@@ -258,7 +262,9 @@ class CodeGen(visitor.Visitor):
         size = node.size
         ty = generate_dtype(node.scalar_ty)
         self.code.append(f'  // {node}')
-        array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, None, vec![]);'
+        attrs = ', '.join(f'eir::ir::data::ArrayAttr::{CG_ARRAY_ATTR[i]}' for i in node.attr)
+        attrs = f'vec![{attrs}]'
+        array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, None, {attrs});'
         self.code.append(array_decl)
 
     def __init__(self, **kwargs):
