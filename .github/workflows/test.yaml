@@ -45,6 +45,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+        run: |
+          cargo install sccache;
       - name: Cache dependencies
         uses: actions/cache@v2
         env:
