@@ -71,16 +71,16 @@ class Value:
         return Cast(Cast.BITCAST, self, dtype)
 
     @ir_builder(node_type='expr')
-    def zext(self, dtyle):
+    def zext(self, dtype):
         '''The frontend API to create a zero-extend operation'''
         from .expr import Cast
-        return Cast(Cast.ZEXT, self, dtyle)
+        return Cast(Cast.ZEXT, self, dtype)
 
     @ir_builder(node_type='expr')
-    def sext(self, dtyle):
+    def sext(self, dtype):
         '''The frontend API to create a sign-extend operation'''
         from .expr import Cast
-        return Cast(Cast.SEXT, self, dtyle)
+        return Cast(Cast.SEXT, self, dtype)
 
     @ir_builder(node_type='expr')
     def concat(self, other):
