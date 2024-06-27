@@ -65,7 +65,8 @@ class CycledBlock(Block):
         return res
 
 @ir_builder(node_type='expr')
-def Condition(cond): # pylint: disable=invalid-name,import-outside-toplevel
+def Condition(cond): # pylint: disable=invalid-name
+    #pylint: disable=import-outside-toplevel
     '''Frontend API for creating a conditional block.'''
     from .value import Value
     assert isinstance(cond, Value)
@@ -76,4 +77,3 @@ def Cycle(cycle: int): # pylint: disable=invalid-name
     '''Frontend API for creating a cycled block.'''
     assert isinstance(cycle, int)
     return CycledBlock(cycle)
-

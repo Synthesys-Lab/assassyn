@@ -1,5 +1,7 @@
-from ..builder import ir_builder, Singleton
-from ..value import Value
+'''The module for intrinsic expressions'''
+#pylint: disable=cyclic-import
+
+from ..builder import ir_builder
 from .expr import Expr
 
 INTRIN_INFO = {
@@ -20,7 +22,7 @@ class Intrinsic(Expr):
         self.args = args
 
     def __repr__(self):
-        args = ({", ".join(i.as_operand() for i in self.args[0:])})
+        args = {", ".join(i.as_operand() for i in self.args[0:])}
         mn, _, side_effect = INTRIN_INFO[self.opcode]
         side_effect = ['', 'side effect '][side_effect]
         return f'{self.as_operand()} = {side_effect}intrinsic.{mn}({args})'
@@ -32,7 +34,9 @@ class Intrinsic(Expr):
         return False
 
 @ir_builder(node_type='expr')
-def _wait_until(cond: Value): #pylint: disable=invalid-name
+def _wait_until(cond): #pylint: disable=invalid-name
     '''Frontend API for creating a wait-until block.'''
+    #pylint: disable=import-outside-toplevel
+    from ..value import Value
     assert isinstance(cond, Value)
     return Intrinsic(Intrinsic.WAIT_UNTIL, cond)

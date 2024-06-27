@@ -25,6 +25,7 @@ def constructor(func, *args, **kwargs):
 @decorator
 def wait_until(func, *args, **kwargs):
     '''A decorator for marking a module with wait-until logic.'''
+    #pylint: disable=protected-access
     module_self = args[0]
     assert isinstance(module_self, Module)
     assert Singleton.builder.cur_module is module_self
@@ -56,7 +57,7 @@ class Module:
         if self.name not in ['Driver', 'Testbench']:
             self.name = self.name + hex(id(self))[-5:-1]
         self.body = None
-        self.linearize_ptr = {}
+        self._restore_ports = {}
         self.binds = 0
         self.attrs = set()
 
@@ -83,7 +84,6 @@ class Module:
         return self.name
 
     def __repr__(self):
-        Singleton.linearize_ptr = self.linearize_ptr
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
             ports = f'{{\n    {ports}\n  }} '
@@ -106,7 +106,6 @@ class Module:
 
     def _implicit_pop(self):
         if self.implicit_fifo:
-            self._restore_ports = {}
             for port in self.ports:
                 self._restore_ports[port.name] = port
                 setattr(self, port.name, port.pop())
@@ -114,7 +113,7 @@ class Module:
     def _flip_restore(self):
         '''The helper function swaps FIFO.pop's and the original ports.'''
         if self.implicit_fifo:
-            to_restore = [(k, v) for k, v in self._restore_ports.items()]
+            to_restore = list(self._restore_ports.items())
             for k, v in to_restore:
                 self._restore_ports[k] = getattr(self, k)
                 setattr(self, k, v)
@@ -166,6 +165,7 @@ def combinational(func, implicit_fifo=True, *args, **kwargs):
     Singleton.builder.cur_module = module_self
     Singleton.builder.builder_func = func
 
+    #pylint: disable=protected-access
     module_self._implicit_pop()
 
     res = func(*args, **kwargs)
