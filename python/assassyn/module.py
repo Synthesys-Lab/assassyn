@@ -90,7 +90,9 @@ class Module:
             ports = f'{{\n    {ports}\n  }} '
         Singleton.repr_ident = 2
         body = self.body.__repr__()
-        return f'  module {self.name} {ports}{{\n{body}\n  }}'
+        attrs = ', '.join(self.attrs)
+        attrs = f'#[{attrs}] ' if attrs else ''
+        return f'  {attrs}\n  module {self.name} {ports}{{\n{body}\n  }}'
 
     @property
     def implicit_fifo(self):

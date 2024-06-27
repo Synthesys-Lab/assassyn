@@ -54,7 +54,7 @@ jobs:
             ~/.cargo/.crates.toml
             ~/.cargo/.crates2.json
             ~/.cargo/bin
-            ~/.cargo/bin/sscache
+            ~/.cargo/bin/sccache
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             target
