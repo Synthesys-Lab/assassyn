@@ -38,12 +38,18 @@ def test_fib():
 
     print(raw)
 
+    expect_a = 0
+    expect_b = 1
     for i in raw.split('\n'):
         if f'[{driver.as_operand().lower()}]' in i:
             line_toks = i.split()
             c = line_toks[-1]
-            a = line_toks[-3]
-            b = line_toks[-5]
+            b = line_toks[-3]
+            a = line_toks[-5]
+            assert int(a) == expect_a
+            assert int(b) == expect_b
+            expect_a = int(b)
+            expect_b = int(c)
             assert int(a) + int(b) == int(c)
 
 

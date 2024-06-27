@@ -22,7 +22,6 @@ def test_driver():
         driver = Driver()
         driver.build()
 
-    print(sys)
     simulator_path = elaborate(sys)
 
     raw = utils.run_simulator(simulator_path)
