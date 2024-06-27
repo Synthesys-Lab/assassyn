@@ -20,10 +20,11 @@ class Driver(Module):
 
         b32_array = RegArray(Bits(32), 1)
         b32_array[0] = b32
-        i64_array = RegArray(Int(64), 2)
-        i64_array[0] = i64z
-        i64_array[1] = i64s
-        log("{} {} {}", b32_array[0], i64_array[0], i64s);
+        i64z_array = RegArray(Int(64), 1)
+        i64s_array = RegArray(Int(64), 1)
+        i64z_array[0] = i64z
+        i64s_array[0] = i64s
+        log("{} {} {}", b32_array[0], i64z_array[0], i64s_array[0]);
 
 
         
