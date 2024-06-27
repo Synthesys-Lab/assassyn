@@ -57,11 +57,14 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             target
+          run: |
+            cargo install sccache;
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
       - name: Generate python frontend test result
         env:
           PYTHONPATH: python
           ASSASSYN_HOME: ${{ github.workspace }}
+          RUSTC_WRAPPER: sccache
         run: |
           pytest py-tests;
       - name: Generate test result
