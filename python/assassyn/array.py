@@ -6,12 +6,12 @@ from .expr import ArrayRead, ArrayWrite
 from .value import Value
 
 @ir_builder(node_type='array')
-def RegArray(
+def RegArray( #pylint: disable=invalid-name
         scalar_ty: DType,
         size: int,
         attr: list = None,
         initializer: list = None,
-        name: str = None): #pylint: disable=invalid-name
+        name: str = None):
     '''
     The frontend API to declare a register array.
 
@@ -23,7 +23,7 @@ def RegArray(
     '''
     if attr is None:
         attr = []
-    res = Array(scalar_ty, size, attr)
+    res = Array(scalar_ty, size, attr, initializer)
     if name is not None:
         res.name = name
     return res
