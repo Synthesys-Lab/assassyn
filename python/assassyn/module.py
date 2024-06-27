@@ -28,10 +28,19 @@ def wait_until(func, *args, **kwargs):
     module_self = args[0]
     assert isinstance(module_self, Module)
     assert Singleton.builder.cur_module is module_self
+    # Prepare for wait-until logic.
+    pops = []
+    for elem in module_self.body.body:
+        assert isinstance(elem, FIFOPop)
+        pops.append(elem)
     module_self._flip_restore()
+    module_self.body.body.clear()
     cond = func(*args, **kwargs)
     res = _wait_until(cond)
     module_self._flip_restore()
+    # Restore the FIFO.pop operations.
+    for elem in pops:
+        module_self.body.body.append(elem)
     Singleton.builder.cur_module.attrs.add(Module.ATTR_WAIT_UNTIL)
     return res
 
@@ -164,4 +173,6 @@ def combinational(func, implicit_fifo=True, *args, **kwargs):
     module_self._flip_restore()
 
     Singleton.builder.cleanup_symtab()
+    Singleton.builder.cur_module = None
+    Singleton.builder.insert_point['expr'] = None
     return res

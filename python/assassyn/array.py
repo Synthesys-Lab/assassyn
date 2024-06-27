@@ -6,7 +6,12 @@ from .expr import ArrayRead, ArrayWrite
 from .value import Value
 
 @ir_builder(node_type='array')
-def RegArray(scalar_ty: DType, size: int, attr: list = None, initializer : list = None): #pylint: disable=invalid-name
+def RegArray(
+        scalar_ty: DType,
+        size: int,
+        attr: list = None,
+        initializer: list = None,
+        name: str = None): #pylint: disable=invalid-name
     '''
     The frontend API to declare a register array.
 
@@ -18,7 +23,10 @@ def RegArray(scalar_ty: DType, size: int, attr: list = None, initializer : list 
     '''
     if attr is None:
         attr = []
-    return Array(scalar_ty, size, attr, initializer)
+    res = Array(scalar_ty, size, attr)
+    if name is not None:
+        res.name = name
+    return res
 
 class Array:
     '''The class represents a register array in the AST IR.'''

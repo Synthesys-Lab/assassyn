@@ -50,13 +50,12 @@ class Driver(Module):
             lock[0] = flip
 
 def test_wait_until():
-    sys = SysBuilder('async_call')
+    sys = SysBuilder('wait_until')
     with sys:
         sqr = Squarer()
         sqr.build()
 
         lock = RegArray(UInt(1), 1)
-        lock[0] = UInt(1)(0)
 
         agent = Agent()
         agent.build(lock, sqr)
