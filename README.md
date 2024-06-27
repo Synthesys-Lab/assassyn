@@ -11,6 +11,9 @@ and verfication.
 is implemented in Python. You can initialize this package by running the command below.
 
 ````sh
+# Install the required dpendences for Rust and Python
+# Make sure you have: zsh, Rust toolchain, and pip
+$ ./init.sh
 $ source setup.sh # Add assassyn's python package to your PYTHONPATH
 ````
 

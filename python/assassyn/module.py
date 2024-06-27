@@ -51,6 +51,7 @@ class Module:
 
     ATTR_EXPLICIT_FIFO = 'explicit_fifo'
     ATTR_WAIT_UNTIL = 'wait_until'
+    ATTR_NO_ARBITER = 'no_arbiter'
 
     def __init__(self):
         self.name = type(self).__name__
