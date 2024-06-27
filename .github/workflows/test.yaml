@@ -45,6 +45,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: Install sccache
         run: |
           cargo install sccache;
       - name: Cache dependencies
