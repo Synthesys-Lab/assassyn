@@ -143,10 +143,10 @@ class CodeGen(visitor.Visitor):
         for elem in node.arrays:
             self.visit_array(elem)
         for elem in node.modules:
-            id = elem.as_operand()
+            lval = elem.as_operand()
             name = elem.synthesis_name().lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
-            self.code.append(f'  let {id} = sys.create_module("{name}", vec![{ports}]);')
+            self.code.append(f'  let {lval} = sys.create_module("{name}", vec![{ports}]);')
         self.code.append('  // Gathered binds')
         for elem in node.modules:
             bind_emitter = EmitBinds(self)
