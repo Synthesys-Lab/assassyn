@@ -45,9 +45,6 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      - name: Install sccache
-        run: |
-          cargo install sccache;
       - name: Cache dependencies
         uses: actions/cache@v2
         env:
@@ -57,10 +54,17 @@ jobs:
             ~/.cargo/.crates.toml
             ~/.cargo/.crates2.json
             ~/.cargo/bin
+            ~/.cargo/bin/sscache
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             target
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
+      - name: Install sccache
+        run: |
+          if ! command -v sccache &> /dev/null
+          then
+            cargo install sccache
+          fi;
       - name: Generate python frontend test result
         env:
           PYTHONPATH: python
