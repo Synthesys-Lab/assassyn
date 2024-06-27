@@ -65,6 +65,11 @@ class Value:
         return BinaryOp(BinaryOp.IGE, self, other)
 
     @ir_builder(node_type='expr')
+    def __invert__(self):
+        from .expr import UnaryOp
+        return UnaryOp(UnaryOp.FLIP, self)
+
+    @ir_builder(node_type='expr')
     def bitcast(self, dtype):
         '''The frontend API to create a bitcast operation'''
         from .expr import Cast

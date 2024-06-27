@@ -35,6 +35,12 @@ class SysBuilder:
             if id(v) in value_dict:
                 value_dict[id(v)].name = k
 
+    def get_current_module(self):
+        '''Get the current module being built.'''
+        from .module import Module
+        assert isinstance(self.cur_module, Module)
+        return self.cur_module
+
     def is_direct_call(self, frame: types.FrameType):
         '''If this function call is directly from the module.constructor'''
         upper_frame = frame.f_back.f_back

@@ -2,8 +2,8 @@
 
 #pylint: disable=cyclic-import,import-outside-toplevel
 
-from .builder import ir_builder
-from .value import Value
+from ..builder import ir_builder
+from ..value import Value
 
 class Expr(Value):
     '''The frontend base node for expressions'''
@@ -159,7 +159,7 @@ class Slice(Expr):
         assert isinstance(l, int) and isinstance(r, int) and l <= r
         super().__init__(Slice.SLICE)
         self.x = x
-        from .dtype import to_uint
+        from ..dtype import to_uint
         self.l = to_uint(l)
         self.r = to_uint(r)
 
@@ -269,7 +269,7 @@ class Bind(Expr):
         args = ', '.join(args)
         callee = self.callee.as_operand()
         lval = self.as_operand()
-        return f'{lval} = {callee}.bind[ {args} ]'
+        return f'{lval} = {callee}.bind([{args}])'
 
 class AsyncCall(Expr):
     '''The class for async call operations. It is used to call a function asynchronously.'''
@@ -283,3 +283,4 @@ class AsyncCall(Expr):
     def __repr__(self):
         bind = self.bind.as_operand()
         return f'async_call {bind}'
+

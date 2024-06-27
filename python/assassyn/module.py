@@ -6,12 +6,7 @@ from .builder import Singleton, ir_builder
 from .dtype import DType
 from .block import Block
 from .expr import Bind, FIFOPop, FIFOField, FIFOPush, AsyncCall
-
-@decorator
-# pylint: disable=unused-argument
-def wait_until(func, *args, **kwargs):
-    '''A decorator for marking a function as a wait_until block.'''
-    # TODO(@were): Implement this function.
+from .expr.intrinsic import _wait_until
 
 @decorator
 def constructor(func, *args, **kwargs):
@@ -27,11 +22,25 @@ def constructor(func, *args, **kwargs):
             v.name = k
             v.module = args[0]
 
+@decorator
+def wait_until(func, *args, **kwargs):
+    '''A decorator for marking a module with wait-until logic.'''
+    module_self = args[0]
+    assert isinstance(module_self, Module)
+    assert Singleton.builder.cur_module is module_self
+    module_self._flip_restore()
+    cond = func(*args, **kwargs)
+    res = _wait_until(cond)
+    module_self._flip_restore()
+    Singleton.builder.cur_module.attrs.add(Module.ATTR_WAIT_UNTIL)
+    return res
+
+
 class Module:
     '''The AST node for defining a module.'''
 
-    IMPLICIT_POP = 0
-    EXPLICIT_POP = 1
+    ATTR_EXPLICIT_FIFO = 'explicit_fifo'
+    ATTR_WAIT_UNTIL = 'wait_until'
 
     def __init__(self):
         self.name = type(self).__name__
@@ -40,6 +49,7 @@ class Module:
         self.body = None
         self.linearize_ptr = {}
         self.binds = 0
+        self.attrs = set()
 
     @property
     def ports(self):
@@ -71,6 +81,34 @@ class Module:
         Singleton.repr_ident = 2
         body = self.body.__repr__()
         return f'  module {self.name} {ports}{{\n{body}\n  }}'
+
+    @property
+    def implicit_fifo(self):
+        '''The helper function to get the implicit FIFO setting.'''
+        return self.ATTR_EXPLICIT_FIFO not in self.attrs
+
+    @implicit_fifo.setter
+    def implicit_fifo(self, value):
+        '''The helper function to set the implicit FIFO setting.'''
+        if value:
+            self.attrs.discard(self.ATTR_EXPLICIT_FIFO)
+        else:
+            self.attrs.add(self.ATTR_EXPLICIT_FIFO)
+
+    def _implicit_pop(self):
+        if self.implicit_fifo:
+            self._restore_ports = {}
+            for port in self.ports:
+                self._restore_ports[port.name] = port
+                setattr(self, port.name, port.pop())
+
+    def _flip_restore(self):
+        '''The helper function swaps FIFO.pop's and the original ports.'''
+        if self.implicit_fifo:
+            to_restore = [(k, v) for k, v in self._restore_ports.items()]
+            for k, v in to_restore:
+                self._restore_ports[k] = getattr(self, k)
+                setattr(self, k, v)
 
 class Port:
     '''The AST node for defining a port in modules.'''
@@ -109,22 +147,21 @@ class Port:
 
 @decorator
 #pylint: disable=keyword-arg-before-vararg
-def combinational(func, port=Module.IMPLICIT_POP, *args, **kwargs):
+def combinational(func, implicit_fifo=True, *args, **kwargs):
     '''A decorator for marking a function as combinational logic description.'''
-    args[0].body = Block(Block.MODULE_ROOT)
-    Singleton.builder.insert_point['expr'] = args[0].body.body
-    Singleton.builder.cur_module = args[0]
+    module_self = args[0]
+    assert isinstance(module_self, Module)
+    module_self.implicit_fifo = implicit_fifo
+    module_self.body = Block(Block.MODULE_ROOT)
+    Singleton.builder.insert_point['expr'] = module_self.body.body
+    Singleton.builder.cur_module = module_self
     Singleton.builder.builder_func = func
 
-    if port == Module.IMPLICIT_POP:
-        restore = {}
-        for k, v in args[0].__dict__.items():
-            if isinstance(v, Port):
-                restore[k] = v
-                setattr(args[0], k, v.pop())
+    module_self._implicit_pop()
+
     res = func(*args, **kwargs)
-    if port == Module.IMPLICIT_POP:
-        for k, v in restore.items():
-            setattr(args[0], k, v)
+
+    module_self._flip_restore()
+
     Singleton.builder.cleanup_symtab()
     return res

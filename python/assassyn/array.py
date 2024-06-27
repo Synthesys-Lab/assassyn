@@ -54,7 +54,7 @@ class Array:
     def __getitem__(self, index):
         if isinstance(index, int):
             index = to_uint(index)
-        assert isinstance(index, Value)
+        assert isinstance(index, Value), f'Invalid index given: {index}'
         return ArrayRead(self, index)
 
     @ir_builder(node_type='expr')

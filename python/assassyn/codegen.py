@@ -49,6 +49,8 @@ CG_OPCODE = {
     expr.Cast.BITCAST: 'bitcast',
 
     expr.Log.LOG: 'log',
+
+    expr.intrinsic.Intrinsic.WAIT_UNTIL: 'wait_until',
 }
 
 CG_ARRAY_ATTR = {
@@ -269,6 +271,13 @@ class CodeGen(visitor.Visitor):
             x = self.generate_rval(node.x)
             ty = generate_dtype(node.dtype)
             res = f'sys.{ib_method}(created_here!(), {x}, {ty});'
+        elif isinstance(node, expr.Intrinsic):
+            if node.opcode == expr.Intrinsic.WAIT_UNTIL:
+                cond = self.generate_rval(node.args[0])
+                res = f'sys.{ib_method}({cond});'
+            else:
+                length = len(repr(node)) - 1
+                res = f'  // ^{"~" * length}: Support the instruction above'
         else:
             length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'
