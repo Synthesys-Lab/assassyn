@@ -12,8 +12,8 @@ class Driver(Module):
 
     @module.combinational
     def build(self):
-        a = RegArray(Int(256), 1, 0)
-        b = RegArray(Int(256), 1, 1)
+        a = RegArray(Int(256), 1, initializer=[0])
+        b = RegArray(Int(256), 1, initializer=[1])
 
         aa = a[0]
         bb = b[0]

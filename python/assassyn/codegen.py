@@ -74,8 +74,6 @@ def generate_dtype(ty: dtype.DType):
     assert isinstance(ty, dtype.Bits), f'{ty} is given'
     return f'{prefix}::bits_ty({ty.bits})'
 
-<<<<<<< HEAD
-=======
 def generate_init_value(init_value, ty: dtype.DType):
     '''Generate the initial value for the given array'''
     if init_value is None:
@@ -86,7 +84,6 @@ def generate_init_value(init_value, ty: dtype.DType):
 
     return (str1, str2)
 
->>>>>>> 581c5c3 (Format)
 def generate_port(port: Port):
     '''Generate the port information for the given port for module construction'''
     ty = f'{generate_dtype(port.dtype)}'
@@ -117,9 +114,10 @@ class CodeGen(visitor.Visitor):
         return ''
 
     def generate_init_value(self, init_value, ty: str):
+        '''Generate the initializer vector. NOTE: ty is already generated in an str!'''
         if init_value is None:
             return 'None'
-    
+
         vec = []
         for i, j in enumerate(init_value):
             self.code.append(f'let init_{i} = sys.get_const_int({ty}, {j});')
