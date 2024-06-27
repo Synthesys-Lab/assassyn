@@ -7,7 +7,6 @@ from decorator import decorator
 class Singleton(type):
     '''The class maintains the global singleton instance of the system builder.'''
     builder = None
-    linearize_ptr = None
     repr_ident = None
 
 @decorator
@@ -34,6 +33,10 @@ class SysBuilder:
         for k, v in self.module_symtab.items():
             if id(v) in value_dict:
                 value_dict[id(v)].name = k
+
+    def get_current_module(self):
+        '''Get the current module being built.'''
+        return self.cur_module
 
     def is_direct_call(self, frame: types.FrameType):
         '''If this function call is directly from the module.constructor'''

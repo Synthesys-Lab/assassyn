@@ -42,13 +42,20 @@ def test_cond_cse():
         driver = Driver()
         driver.build(adder)
 
-    print(sys)
-
     simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200)
 
     raw = utils.run_simulator(simulator_path)
 
-    assert "Adder:" in raw
+    cnt = 0
+    for i in raw.split('\n'):
+        if f'[{adder.as_operand().lower()}]' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(a) + int(b) == int(c)
+            cnt += 1
+    assert cnt == 100, f'cnt: {cnt} != 100'
 
 
 if __name__ == '__main__':

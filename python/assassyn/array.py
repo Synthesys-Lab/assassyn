@@ -6,18 +6,32 @@ from .expr import ArrayRead, ArrayWrite
 from .value import Value
 
 @ir_builder(node_type='array')
-def RegArray(scalar_ty: DType, size: int): #pylint: disable=invalid-name
+def RegArray( #pylint: disable=invalid-name
+        scalar_ty: DType,
+        size: int,
+        attr: list = None,
+        initializer: list = None,
+        name: str = None):
     '''
     The frontend API to declare a register array.
 
     Args:
         scalar_ty: The data type of the array elements.
         size: The size of the array. MUST be a compilation time constant.
+        attr: The attribute list of the array.
+        initializer: The initializer of the register array. If not set, it is 0-initialized.
     '''
-    return Array(scalar_ty, size)
+    if attr is None:
+        attr = []
+    res = Array(scalar_ty, size, attr, initializer)
+    if name is not None:
+        res.name = name
+    return res
 
 class Array:
     '''The class represents a register array in the AST IR.'''
+
+    FULLY_PARTITIONED = 1
 
     def as_operand(self):
         '''Dump the array as an operand.'''
@@ -34,19 +48,21 @@ class Array:
     def name(self, name):
         self._name = name
 
-    def __init__(self, scalar_ty: DType, size: int):
+    def __init__(self, scalar_ty: DType, size: int, attr: list, initializer: list):
         self.scalar_ty = scalar_ty
         self.size = size
+        self.attr = attr
         self._name = None
+        self.initializer = initializer
 
     def __repr__(self):
-        return f'array {self.name}[{self.scalar_ty}; {self.size}]'
+        return f'array {self.name}[{self.scalar_ty}; {self.size}] = {self.initializer}'
 
     @ir_builder(node_type='expr')
     def __getitem__(self, index):
         if isinstance(index, int):
             index = to_uint(index)
-        assert isinstance(index, Value)
+        assert isinstance(index, Value), f'Invalid index given: {index}'
         return ArrayRead(self, index)
 
     @ir_builder(node_type='expr')
