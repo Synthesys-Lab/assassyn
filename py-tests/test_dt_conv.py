@@ -14,10 +14,16 @@ class Driver(Module):
     @module.combinational
     def build(self):
         i32 = Int(32)(1)
-        b32 = i32.bitcast(Int(32))
+        b32 = i32.bitcast(Bits(32))
         i64z = i32.zext(Int(64))
         i64s = i32.sext(Int(64))
-        log("{} {} {}", i32, i64z, i64s);
+
+        b32_array = RegArray(Bits(32), 1)
+        b32_array[0] = b32
+        i64_array = RegArray(Int(64), 2)
+        i64_array[0] = i64z
+        i64_array[1] = i64s
+        log("{} {} {}", b32_array[0], i64_array[0], i64s);
 
 
         
