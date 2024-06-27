@@ -76,7 +76,7 @@ def test_bind():
 
     cnt = 0
     for i in raw.split('\n'):
-        if f'[{sub.as_operand().lower()}]' in i:
+        if f'[{sub.synthesis_name().lower()}]' in i:
             line_toks = i.split()
             c = line_toks[-1]
             a = line_toks[-3]

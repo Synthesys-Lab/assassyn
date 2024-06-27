@@ -143,13 +143,14 @@ class CodeGen(visitor.Visitor):
         for elem in node.arrays:
             self.visit_array(elem)
         for elem in node.modules:
-            name = elem.name.lower()
+            id = elem.as_operand()
+            name = elem.synthesis_name().lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
-            self.code.append(f'  let {name} = sys.create_module("{name}", vec![{ports}]);')
+            self.code.append(f'  let {id} = sys.create_module("{name}", vec![{ports}]);')
         self.code.append('  // Gathered binds')
         for elem in node.modules:
             bind_emitter = EmitBinds(self)
-            name = elem.name.lower()
+            name = self.generate_rval(elem)
             self.code.append('  // Set the current module redundantly to emit related binds')
             self.code.append(f'  sys.set_current_module({name});')
             bind_emitter.visit_module(elem)
@@ -168,7 +169,7 @@ class CodeGen(visitor.Visitor):
         self.code.append('}\n')
 
     def visit_module(self, node: Module):
-        self.code.append(f'  // Fill in the body of {node.name}')
+        self.code.append(f'  // Fill in the body of {node.as_operand()}')
         self.code.append(f'  sys.set_current_module({self.generate_rval(node)});')
         self.visit_block(node.body)
 
@@ -215,8 +216,6 @@ class CodeGen(visitor.Visitor):
                 }};
             ''')
             return port_name
-        if isinstance(node, module.Module):
-            return node.as_operand().lower()
         return node.as_operand()
 
     #pylint: disable=too-many-branches, too-many-locals, too-many-statements

@@ -54,9 +54,6 @@ class Module:
     ATTR_NO_ARBITER = 'no_arbiter'
 
     def __init__(self):
-        self.name = type(self).__name__
-        if self.name not in ['Driver', 'Testbench']:
-            self.name = self.name + hex(id(self))[-5:-1]
         self.body = None
         self._restore_ports = {}
         self.binds = 0
@@ -82,7 +79,12 @@ class Module:
 
     def as_operand(self):
         '''Dump the module as a right-hand side reference.'''
-        return self.name
+        return f'_{hex(id(self))[-5:-1]}'
+
+    def synthesis_name(self):
+        '''The helper function to get the synthesized name of the module.'''
+        return type(self).__name__
+
 
     def __repr__(self):
         ports = '\n    '.join(repr(v) for v in self.ports)
@@ -92,7 +94,9 @@ class Module:
         body = self.body.__repr__()
         attrs = ', '.join(self.attrs)
         attrs = f'#[{attrs}] ' if attrs else ''
-        return f'  {attrs}\n  module {self.name} {ports}{{\n{body}\n  }}'
+        name = self.as_operand()
+        synthe_name = self.synthesis_name()
+        return f'  {attrs}\n  {name} = module {synthe_name} {ports}{{\n{body}\n  }}'
 
     @property
     def implicit_fifo(self):
@@ -154,7 +158,7 @@ class Port:
 
     def as_operand(self):
         '''Dump the port as a right-hand side reference.'''
-        return f'{self.module.name}.{self.name}'
+        return f'{self.module.as_operand()}.{self.name}'
 
 @decorator
 #pylint: disable=keyword-arg-before-vararg

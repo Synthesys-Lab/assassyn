@@ -186,10 +186,20 @@ class Cast(Expr):
     ZEXT = 801
     SEXT = 802
 
+    SUBCODES = {
+      BITCAST: 'bitcast',
+      ZEXT: 'zext',
+      SEXT: 'sext',
+    }
+
     def __init__(self, subcode, x, dtype):
         super().__init__(subcode)
         self.x = x
         self.dtype = dtype
+
+    def __repr__(self):
+        method = Cast.SUBCODES[self.opcode]
+        return f'{self.as_operand()} = {method} {self.x.as_operand()} to {self.dtype}'
 
 @ir_builder(node_type='expr')
 def log(*args):

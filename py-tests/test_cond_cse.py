@@ -48,7 +48,7 @@ def test_cond_cse():
 
     cnt = 0
     for i in raw.split('\n'):
-        if f'[{adder.as_operand().lower()}]' in i:
+        if f'[{adder.synthesis_name().lower()}]' in i:
             line_toks = i.split()
             c = line_toks[-1]
             a = line_toks[-3]
