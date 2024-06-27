@@ -57,8 +57,6 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             target
-          run: |
-            cargo install sccache;
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('Cargo.lock') }}
       - name: Generate python frontend test result
         env:
