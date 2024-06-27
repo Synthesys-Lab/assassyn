@@ -69,6 +69,17 @@ def test_wait_until():
 
     raw = utils.run_simulator(simulator_path)
 
+    print(raw)
+
+    for i in raw.split('\n'):
+        if 'squarer' in i:
+            toks = i.split()
+            cycle = int(toks[2][1:-4])
+            assert cycle % 4 in [2, 3], cycle
+            value = int(toks[-5])
+            res = int(toks[-1])
+            assert res == value * value
+
 
 if __name__ == '__main__':
     test_wait_until()
