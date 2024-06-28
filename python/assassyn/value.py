@@ -23,17 +23,17 @@ class Value:
         return BinaryOp(BinaryOp.MUL, self, other)
 
     @ir_builder(node_type='expr')
-    def __ror__(self, other):
+    def __or__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.BITWISE_OR, self, other)
 
     @ir_builder(node_type='expr')
-    def __rxor__(self, other):
+    def __xor__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.BITWISE_XOR, self, other)
 
     @ir_builder(node_type='expr')
-    def __rand__(self, other):
+    def __and__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.BITWISE_AND, self, other)
 

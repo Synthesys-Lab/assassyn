@@ -23,7 +23,7 @@ class Sub(Module):
     @module.combinational
     def build(self):
         with self.wait_until():
-            c = self.sub_a + self.sub_b
+            c = self.sub_a - self.sub_b
             log("sub: {} - {} = {}", self.sub_a, self.sub_b, c);
 
 
@@ -63,7 +63,7 @@ def test_fifo_valid():
         sub.build()
         
         lhs = Lhs()
-        rhs = lhs.build()
+        rhs = lhs.build(sub)
 
         driver = Driver()
         driver.build(rhs, lhs)
