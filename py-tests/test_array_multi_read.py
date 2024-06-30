@@ -4,7 +4,7 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
 
-class Mod_a(Module):
+class ModA(Module):
 
     @module.constructor
     def __init__(self):
@@ -17,7 +17,7 @@ class Mod_a(Module):
             arr[0] = self.a
 
 
-class Mod_b(Module):
+class ModB(Module):
     
     @module.constructor
     def __init__(self):
@@ -29,7 +29,7 @@ class Mod_b(Module):
         with Condition(~self.a[0: 0]):
             arr[0] = self.a
 
-class Mod_c(Module):
+class ModC(Module):
     
     @module.constructor
     def __init__(self):
@@ -48,7 +48,7 @@ class Driver(Module):
         pass
 
     @module.combinational
-    def build(self, mod_a: Mod_a, mod_b: Mod_b, mod_c: Mod_c):
+    def build(self, mod_a: ModA, mod_b: ModB, mod_c: ModC):
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         new_v = v + Int(32)(1)
@@ -64,13 +64,13 @@ def test_array_multi_read():
     with sys:
         arr = RegArray(Int(32), 1)
         
-        mod_a = Mod_a()
+        mod_a = ModA()
         mod_a.build(arr)
 
-        mod_b = Mod_b()
+        mod_b = ModB()
         mod_b.build(arr)
 
-        mod_c = Mod_c()
+        mod_c = ModC()
         mod_c.build(arr)
 
         driver = Driver()
@@ -82,6 +82,16 @@ def test_array_multi_read():
     raw = utils.run_simulator(simulator_path)
 
     print(raw)
+
+    for i in raw.split('\n'):
+        if f'[{mod_c.synthesis_name().lower()}]' in i:
+            line_toks = i.split()
+            a = line_toks[-4]
+            arr = line_toks[-1]
+            if a == '0':
+                assert int(arr) == 0
+                continue
+            assert int(arr) == (int(a) - 1)
         
         
 
