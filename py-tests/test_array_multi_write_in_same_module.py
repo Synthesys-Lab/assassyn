@@ -21,6 +21,17 @@ class Mod_a(Module):
         with Condition(~self.a[0: 0]):
             arr[0] = self.a + Int(32)(1)
 
+class Mod_c(Module):
+    
+    @module.constructor
+    def __init__(self):
+        super().__init__()
+        self.a = Port(Int(32))
+
+    @module.combinational
+    def build(self, arr: Array):
+        v = arr[0]
+        log("a = {} arr = {}", self.a, v)
 
 class Driver(Module):
     
@@ -29,12 +40,13 @@ class Driver(Module):
         pass
     
     @module.combinational
-    def build(self, mod_a: Mod_a):
+    def build(self, mod_a: Mod_a, mod_c: Mod_c):
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         new_v = v + Int(32)(1)
         cnt[0] = new_v
         mod_a.async_called(a = v)
+        mod_c.async_called(a = v)
 
 
 def test_array_multi_write_in_same_module():
@@ -46,8 +58,11 @@ def test_array_multi_write_in_same_module():
         mod_a = Mod_a()
         mod_a.build(arr)
 
+        mod_c = Mod_c()
+        mod_c.build(arr)
+
         driver = Driver()
-        driver.build(mod_a)
+        driver.build(mod_a, mod_c)
 
     print(sys)
 
