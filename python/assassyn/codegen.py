@@ -165,6 +165,8 @@ class CodeGen(visitor.Visitor):
             }};
         ''')
         self.code.append('  println!("{}", sys);')
+        config = 'eir::xform::Config{ rewrite_wait_until: true }'
+        self.code.append(f'  eir::xform::basic(&mut sys, &{config});')
         self.code.append('  eir::backend::simulator::elaborate(&sys, &config).unwrap();')
         self.code.append('}\n')
 
