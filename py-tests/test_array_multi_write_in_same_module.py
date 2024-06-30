@@ -5,7 +5,7 @@ from assassyn.backend import elaborate
 from assassyn import utils
 
 
-class Mod_a(Module):
+class ModA(Module):
 
     @module.constructor
     def __init__(self):
@@ -21,7 +21,7 @@ class Mod_a(Module):
         with Condition(~self.a[0: 0]):
             arr[0] = self.a + Int(32)(1)
 
-class Mod_c(Module):
+class ModC(Module):
     
     @module.constructor
     def __init__(self):
@@ -40,7 +40,7 @@ class Driver(Module):
         pass
     
     @module.combinational
-    def build(self, mod_a: Mod_a, mod_c: Mod_c):
+    def build(self, mod_a: ModA, mod_c: ModC):
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         new_v = v + Int(32)(1)
@@ -55,10 +55,10 @@ def test_array_multi_write_in_same_module():
 
         arr = RegArray(Int(32), 1)
 
-        mod_a = Mod_a()
+        mod_a = ModA()
         mod_a.build(arr)
 
-        mod_c = Mod_c()
+        mod_c = ModC()
         mod_c.build(arr)
 
         driver = Driver()
