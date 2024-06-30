@@ -12,15 +12,28 @@ from .expr.intrinsic import _wait_until
 def constructor(func, *args, **kwargs):
     '''A decorator for marking a function as a constructor of a module.'''
     builder = Singleton.builder
-    super(type(args[0]), args[0]).__init__()
+    module_self = args[0]
+    from .memory import Memory
+    if isinstance(module_self, Memory):
+        width = kwargs.get('width', None)
+        depth = kwargs.get('depth', None)
+        latency = kwargs.get('latency', None)
+        assert width is not None, "width must be specified"
+        assert width & -width == width, "width must be a power of 2"
+        assert depth is not None, "depth must be specified"
+        assert depth & -depth == depth, "depth must be a power of 2"
+        assert latency is not None, "latency must be specified"
+        super(type(module_self), module_self, width, depth, latency).__init__()
+    else:
+        super(type(module_self), module_self).__init__()
+    builder.insert_point['module'].append(module_self)
     func(*args, **kwargs)
-    builder.insert_point['module'].append(args[0])
-    builder.insert_point['expr'] = args[0].body
     # Set the name of the ports.
     for k, v in args[0].__dict__.items():
         if isinstance(v, Port):
             v.name = k
             v.module = args[0]
+
 
 @decorator
 def wait_until(func, *args, **kwargs):
@@ -52,11 +65,11 @@ class Module:
     ATTR_EXPLICIT_FIFO = 'explicit_fifo'
     ATTR_WAIT_UNTIL = 'wait_until'
     ATTR_NO_ARBITER = 'no_arbiter'
+    ATTR_MEMORY = 'memory'
 
     def __init__(self):
         self.body = None
         self._restore_ports = {}
-        self.binds = 0
         self.attrs = set()
 
     @property
@@ -74,7 +87,6 @@ class Module:
     def bind(self, **kwargs):
         '''The frontend API for creating a bind operation to this `self` module.'''
         bound = Bind(self, **kwargs)
-        self.binds += 1
         return bound
 
     def as_operand(self):
