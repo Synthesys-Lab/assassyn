@@ -1,7 +1,5 @@
 '''The module for the block AST node related implementations.'''
 
-from typing import Optional
-
 from .builder import ir_builder, Singleton
 
 class Block:
@@ -12,7 +10,7 @@ class Block:
     CYCLE       = 2
 
     def __init__(self, kind: int):
-        self._kind = kind
+        self.kind = kind
         self._body = []
         self._restore = None
         self.parent = None
@@ -34,8 +32,7 @@ class Block:
 
     def iter(self):
         '''Iterate over the block.'''
-        for i in self._body:
-            yield i
+        yield from self._body
 
     def __enter__(self):
         '''Designate the scope of entering the block.'''

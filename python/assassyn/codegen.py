@@ -109,12 +109,13 @@ class EmitBinds(visitor.Visitor):
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
 
-    def emit_module_attrs(self, module: Module, var_id: str):
-        module_mut = f'{lval}.as_mut::<eir::ir::Module>(&mut sys).unwrap()'
+    def emit_module_attrs(self, m: Module, var_id: str):
+        '''Generate module attributes.'''
+        module_mut = f'{var_id}.as_mut::<eir::ir::Module>(&mut sys).unwrap()'
         path = 'eir::ir::module::Attribute'
-        if module.is_systolic:
+        if m.is_systolic:
             self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
-        if module.disable_arbiter_rewrite:
+        if m.disable_arbiter_rewrite:
             self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
 
     def emit_config(self):
@@ -185,7 +186,7 @@ class CodeGen(visitor.Visitor):
         self.visit_block(node.body)
 
     def visit_block(self, node: Block):
-        if node._kind == Block.MODULE_ROOT:
+        if node.kind == Block.MODULE_ROOT:
             self.code.append('  // module root block')
         else:
             self.code.append('  // restore current block')

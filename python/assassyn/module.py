@@ -13,7 +13,6 @@ def constructor(func, *args, **kwargs):
     '''A decorator for marking a function as a constructor of a module.'''
     builder = Singleton.builder
     module_self = args[0]
-    attrs = kwargs.get('attrs', [])
     builder.insert_point['module'].append(module_self)
     func(*args, **kwargs)
     name_ports_of_module(module_self)
@@ -47,7 +46,9 @@ def wait_until(func, *args, **kwargs):
 
     return module_self._wait_until
 
+#pylint: disable=too-few-public-methods
 class Timing:
+    '''The enum class for the timing policy of a module.'''
     UNDEFINED = 0
     SYSTOLIC = 1
     BACKPRESSURE = 2
@@ -102,7 +103,8 @@ class Module:
     def finalized(self, value):
         if value:
             self._finalized = True
-            concat = self._wait_until + [v for v in self.fifo_pops.values()] + self.body._body
+            concat = self._wait_until + list(self.fifo_pops.values()) + list(self.body.iter())
+            #pylint: disable=protected-access
             self.body._body = concat
         elif self._finalized:
             assert False, 'Finalization cannot be reverted!'
@@ -149,21 +151,22 @@ class Module:
 {body}
   }}
 '''
-        else:
-            Singleton.repr_ident = 4
-            body = self.body.__repr__()
-            wait_until = '\n      '.join(repr(v) for v in self._wait_until)
-            wait_until = f'''
+        Singleton.repr_ident = 4
+        body = self.body.__repr__()
+        precond = '\n      '.join(repr(v) for v in self._wait_until)
+        if precond:
+            precond = f'''
      "wait_until": {{
-       {wait_until}
-    }}''' if wait_until else ''
-            pops = '\n      '.join(repr(v) for v in self.fifo_pops.values())
+       {precond}
+     }}'''
+        pops = '\n      '.join(repr(v) for v in self.fifo_pops.values())
+        if pops:
             pops = f'''
     "pops": {{
       {pops}
-    }}''' if pops else ''
-            return f'''  {attrs}
-  {name} = module {synthe_name} {ports}{{{wait_until}{pops}
+    }}'''
+        return f'''  {attrs}
+  {name} = module {synthe_name} {ports}{{{precond}{pops}
     "body": {{
 {body}
     }}
@@ -172,9 +175,10 @@ class Module:
 
     @property
     def fifo_pops(self):
+        '''Handle implicit FIFO pop and cache them in a dict.'''
         if self.is_explicit_fifo:
             return {}
-        elif not self._pop_cache:
+        if not self._pop_cache:
             self._pop_cache = { port: FIFOPop(port) for port in self.ports }
         return self._pop_cache
 

@@ -1,11 +1,17 @@
-from .module import Module, name_ports_of_module, implicit_fifo, combinational, wait_until
+'''Memory module, a special and subclass of Module.'''
+
+from .module import Module, combinational, wait_until, Port
+from .dtype import Int
 from .array import RegArray
 from .block import Condition
 
+# pylint: disable=too-many-instance-attributes
 class Memory(Module):
+    '''The memory class, a subclass of Module.
+    This class is aimed at emulate an external module with memory behavior.'''
 
     def __init__(
-            func,
+            self,
             width,
             depth,
             latency,
@@ -38,5 +44,5 @@ class Memory(Module):
     def build(self):
         '''Build the memory logic.'''
         with Condition(self.we):
-            self.payload[self.addr] = func.data
-        self.rdata = func.payload[func.addr]
+            self.payload[self.addr] = self.wdata
+        self.rdata = self.payload[self.addr]

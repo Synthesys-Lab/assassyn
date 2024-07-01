@@ -39,6 +39,7 @@ class SysBuilder:
         return self.cur_module
 
     def get_current_block(self):
+        '''Get the current block being built.'''
         return self.cur_block
 
     def is_direct_call(self, frame: types.FrameType):
@@ -53,6 +54,7 @@ class SysBuilder:
         return None
 
     def finalize(self):
+        '''Finalize the modules underneath this system builder.'''
         for module in self.modules:
             module.finalized = True
 
