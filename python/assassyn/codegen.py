@@ -111,9 +111,11 @@ class CodeGen(visitor.Visitor):
 
     def emit_module_attrs(self, module: Module, var_id: str):
         module_mut = f'{lval}.as_mut::<eir::ir::Module>(&mut sys).unwrap()'
+        path = 'eir::ir::module::Attribute'
         if module.is_systolic:
-            self.code.append(f'{module_mut}.add_attr(eir::ir::module::Attribute::Systolic);')
-
+            self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
+        if module.disable_arbiter_rewrite:
+            self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''
