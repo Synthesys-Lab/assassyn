@@ -9,7 +9,6 @@ class Sub(Module):
     
     @module.constructor
     def __init__(self):
-        super().__init__()
         self.sub_a = Port(Int(32))
         self.sub_b = Port(Int(32))
 
@@ -31,7 +30,6 @@ class Lhs(Module):
     
     @module.constructor
     def __init__(self):
-        super().__init__()
         self.v = Port(Int(32))
 
     @module.combinational

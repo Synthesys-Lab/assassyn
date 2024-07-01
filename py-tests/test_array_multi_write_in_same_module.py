@@ -9,7 +9,6 @@ class ModA(Module):
 
     @module.constructor
     def __init__(self):
-        super().__init__()
         self.a = Port(Int(32))
 
     @module.combinational
@@ -25,7 +24,6 @@ class ModC(Module):
     
     @module.constructor
     def __init__(self):
-        super().__init__()
         self.a = Port(Int(32))
 
     @module.combinational

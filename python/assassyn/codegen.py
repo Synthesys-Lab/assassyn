@@ -176,7 +176,7 @@ class CodeGen(visitor.Visitor):
         self.visit_block(node.body)
 
     def visit_block(self, node: Block):
-        if node.kind == Block.MODULE_ROOT:
+        if node._kind == Block.MODULE_ROOT:
             self.code.append('  // module root block')
         else:
             self.code.append('  // restore current block')
@@ -193,7 +193,7 @@ class CodeGen(visitor.Visitor):
                 self.code.append(f'  let {block_var} = sys.create_cycled_block({node.cycle});')
                 self.code.append(f'  sys.set_current_block({block_var});')
 
-        for elem in node.body:
+        for elem in node.iter():
             self.dispatch(elem)
 
         if isinstance(node, (block.CondBlock, block.CycledBlock)):

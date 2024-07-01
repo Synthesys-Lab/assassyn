@@ -9,7 +9,6 @@ class Adder(Module):
     
     @module.constructor
     def __init__(self):
-        super().__init__()
         self.add_a = Port(Int(32))
         self.add_b = Port(Int(32))
 

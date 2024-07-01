@@ -6,7 +6,6 @@ class Squarer(Module):
 
     @module.constructor
     def __init__(self):
-        super().__init__()
         self.a = Port(Int(32))
 
     @module.combinational
@@ -18,7 +17,6 @@ class Agent(Module):
 
     @module.constructor
     def __init__(self):
-        super().__init__()
         self.a = Port(Int(32))
 
     @module.wait_until

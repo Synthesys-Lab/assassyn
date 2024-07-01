@@ -8,7 +8,6 @@ from assassyn import utils
 class Adder(Module):
     @module.constructor
     def __init__(self):
-        super().__init__()
         self.msb = Port(Int(32))
         self.lsb = Port(Int(32))
     

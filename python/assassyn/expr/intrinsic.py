@@ -40,3 +40,8 @@ def _wait_until(cond): #pylint: disable=invalid-name
     from ..value import Value
     assert isinstance(cond, Value)
     return Intrinsic(Intrinsic.WAIT_UNTIL, cond)
+
+
+def is_wait_until(expr):
+    '''Check if the expression is a wait-until intrinsic.'''
+    return isinstance(expr, Intrinsic) and expr.opcode == Intrinsic.WAIT_UNTIL

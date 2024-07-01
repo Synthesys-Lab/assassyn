@@ -38,7 +38,12 @@ def make_existing_dir(path):
     except Exception as e:
         raise e
 
-def elaborate(sys: SysBuilder, path=tempfile.gettempdir(), pretty_printer=True, **kwargs):
+def elaborate(
+        sys: SysBuilder,
+        path=tempfile.gettempdir(),
+        pretty_printer=True,
+        verbose=True,
+        **kwargs):
     '''
     Invoke the elaboration process of the given system.
 
@@ -48,6 +53,11 @@ def elaborate(sys: SysBuilder, path=tempfile.gettempdir(), pretty_printer=True, 
         pretty_printer (bool): Whether to run the Rust code formatter
         **kwargs: The optional arguments that will be passed to the code generator
     '''
+
+    sys.finalize()
+
+    if verbose:
+        print(sys)
 
     sys_dir = os.path.join(path, sys.name)
 
