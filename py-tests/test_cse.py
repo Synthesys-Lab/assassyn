@@ -6,36 +6,35 @@ from assassyn import utils
 
 
 class Adder(Module):
-    
     @module.constructor
     def __init__(self):
-        self.a = Port(Int(32))
-        self.b = Port(Int(32))
-        
+        super().__init__()
+        self.add_a = Port(Int(32))
+        self.add_b = Port(Int(32))
+    
     @module.combinational
     def build(self):
-        c = self.a + self.b
-        log("adder: {} + {} = {}", self.a, self.b, c)
+        c = self.add_a + self.add_b
+        log("Adder: {} + {} = {}", self.add_a, self.add_b, c)
 
 
 class Driver(Module):
-    
     @module.constructor
     def __init__(self):
-        pass
-
+        super().__init__()
+    
     @module.combinational
-    def build(self, adder: Adder):
+    def build(self, add: Adder):
         cnt = RegArray(Int(32), 1)
-        new_cnt = cnt[0] + Int(32)(1)
-        cnt[0] = new_cnt
+        cnt[0] = cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(100)
         with Condition(cond):
-            adder.async_called(a = cnt[0], b = cnt[0])
+            add.async_called(add_a = cnt[0], add_b = cnt[0])
+        with Condition(cond):
+            log("Done")
 
-
-def test_common_read():
-    sys = SysBuilder('common_read')
+def test_cond_cse():
+    sys = SysBuilder('cond_cse')
     with sys:
         adder = Adder()
         adder.build()
@@ -60,4 +59,4 @@ def test_common_read():
 
 
 if __name__ == '__main__':
-    test_common_read()
+    test_cond_cse()

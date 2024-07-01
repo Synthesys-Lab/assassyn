@@ -37,7 +37,7 @@ class Driver(Module):
     
     @module.constructor
     def __init__(self):
-        pass
+        super().__init__()
     
     @module.combinational
     def build(self, mod_a: ModA, mod_c: ModC):

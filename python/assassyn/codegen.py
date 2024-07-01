@@ -105,8 +105,18 @@ class EmitBinds(visitor.Visitor):
             module_var = self.cg.generate_rval(node.callee)
             self.cg.code.append(f'  let {bind_var} = sys.get_init_bind({module_var});')
 
+
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
+
+    def emit_module_attrs(self, m: Module, var_id: str):
+        '''Generate module attributes.'''
+        module_mut = f'{var_id}.as_mut::<eir::ir::Module>(&mut sys).unwrap()'
+        path = 'eir::ir::module::Attribute'
+        if m.is_systolic:
+            self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
+        if m.disable_arbiter_rewrite:
+            self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''
@@ -193,7 +203,7 @@ class CodeGen(visitor.Visitor):
                 self.code.append(f'  let {block_var} = sys.create_cycled_block({node.cycle});')
                 self.code.append(f'  sys.set_current_block({block_var});')
 
-        for elem in node.body:
+        for elem in node.iter():
             self.dispatch(elem)
 
         if isinstance(node, (block.CondBlock, block.CycledBlock)):

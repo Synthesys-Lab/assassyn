@@ -11,13 +11,14 @@ class Block:
 
     def __init__(self, kind: int):
         self.kind = kind
-        self.body = []
-        self.restore = None
+        self._body = []
+        self._restore = None
+        self.parent = None
 
     def __repr__(self):
         Singleton.repr_ident += 2
         ident = ' ' * Singleton.repr_ident
-        body = ident + ('\n' + ident).join(repr(elem) for elem in self.body)
+        body = ident + ('\n' + ident).join(repr(elem) for elem in self.iter())
         Singleton.repr_ident -= 2
         return body
 
@@ -25,16 +26,29 @@ class Block:
         '''Dump the block as an operand.'''
         return f'_{hex(id(self))[-5:-1]}'
 
+    def insert(self, x, elem):
+        '''Insert an instruction at the specified position.'''
+        self._body.insert(x, elem)
+
+    def iter(self):
+        '''Iterate over the block.'''
+        yield from self._body
+
     def __enter__(self):
         '''Designate the scope of entering the block.'''
-        assert self.restore is None, "A block cannot be used twice!"
-        self.restore = Singleton.builder.insert_point['expr']
-        Singleton.builder.insert_point['expr'] = self.body
+        assert self._restore is None, "A block cannot be used twice!"
+        parent = Singleton.builder.get_current_block()
+        if parent is None:
+            parent = Singleton.builder.get_current_module()
+        assert parent is not None
+        self.parent = parent
+        self._restore = Singleton.builder.insert_point['expr']
+        Singleton.builder.insert_point['expr'] = self._body
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         '''Designate the scope of exiting the block.'''
-        Singleton.builder.insert_point['expr'] = self.restore
+        Singleton.builder.insert_point['expr'] = self._restore
 
 class CondBlock(Block):
     '''The inherited class of the block for conditional block.'''

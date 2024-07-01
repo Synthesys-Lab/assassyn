@@ -31,12 +31,12 @@ impl Module {
 }
 
 define_attrs!(
-  ExplicitPop,      // In this module, FIFO pops are explicitly defined.
+  ExplicitPop,      // In this module, FIFO pops are explicitly defined. TODO: remove this.
   OptNone,          // Avoid optimization on this module.
-  EagerCallee,      // All the binds in this module will be called after arguments are fully bound.
+  EagerCallee, // All the binds in this module will be called after arguments are fully bound. TODO: remove this.
   AllowPartialCall, // Allow some arguments are not given to call this module.
-  NoArbiter,        // The compiler will skip to generate an arbiter for this module,
+  NoArbiter,   // The compiler will skip to generate an arbiter for this module,
   // even if it has multiple callers.
-  Systolic, // The module is a systolic array.
+  Systolic, // This module's timing is systolic.
   Memory(MemoryParams),
 );

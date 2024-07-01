@@ -38,6 +38,10 @@ class SysBuilder:
         '''Get the current module being built.'''
         return self.cur_module
 
+    def get_current_block(self):
+        '''Get the current block being built.'''
+        return self.cur_block
+
     def is_direct_call(self, frame: types.FrameType):
         '''If this function call is directly from the module.constructor'''
         upper_frame = frame.f_back.f_back
@@ -49,12 +53,18 @@ class SysBuilder:
             return frame.f_back.f_back.f_locals
         return None
 
+    def finalize(self):
+        '''Finalize the modules underneath this system builder.'''
+        for module in self.modules:
+            module.finalized = True
+
     def __init__(self, name):
         self.name = name
         self.modules = []
         self.arrays = []
         self.insert_point = { 'array': self.arrays, 'expr': None, 'module': self.modules }
         self.cur_module = None
+        self.cur_block = None
         self.builder_func = None
         self.module_symtab = None
         self.named_expr = []

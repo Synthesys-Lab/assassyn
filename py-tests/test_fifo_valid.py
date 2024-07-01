@@ -22,9 +22,8 @@ class Sub(Module):
 
     @module.combinational
     def build(self):
-        with self.wait_until():
-            c = self.sub_a - self.sub_b
-            log("sub: {} - {} = {}", self.sub_a, self.sub_b, c);
+        c = self.sub_a - self.sub_b
+        log("sub: {} - {} = {}", self.sub_a, self.sub_b, c);
 
 
 class Lhs(Module):
@@ -43,8 +42,8 @@ class Driver(Module):
     
         @module.constructor
         def __init__(self):
-            pass
-    
+            super().__init__()
+
         @module.combinational
         def build(self, rhs: Bind, lhs: Lhs):
             cnt = RegArray(Int(32), 1)
@@ -60,6 +59,7 @@ def test_fifo_valid():
     sys = SysBuilder('fifo_valid')
     with sys:
         sub = Sub()
+        sub.wait_until()
         sub.build()
         
         lhs = Lhs()

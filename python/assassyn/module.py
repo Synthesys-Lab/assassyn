@@ -12,15 +12,18 @@ from .expr.intrinsic import _wait_until
 def constructor(func, *args, **kwargs):
     '''A decorator for marking a function as a constructor of a module.'''
     builder = Singleton.builder
-    super(type(args[0]), args[0]).__init__()
+    module_self = args[0]
+    builder.insert_point['module'].append(module_self)
     func(*args, **kwargs)
-    builder.insert_point['module'].append(args[0])
-    builder.insert_point['expr'] = args[0].body
-    # Set the name of the ports.
-    for k, v in args[0].__dict__.items():
+    name_ports_of_module(module_self)
+
+
+def name_ports_of_module(module):
+    '''The helper function to name the ports of a module.'''
+    for k, v in module.__dict__.items():
         if isinstance(v, Port):
             v.name = k
-            v.module = args[0]
+            v.module = module
 
 @decorator
 def wait_until(func, *args, **kwargs):
@@ -28,36 +31,84 @@ def wait_until(func, *args, **kwargs):
     #pylint: disable=protected-access
     module_self = args[0]
     assert isinstance(module_self, Module)
-    assert Singleton.builder.cur_module is module_self
-    # Prepare for wait-until logic.
-    pops = []
-    for elem in module_self.body.body:
-        assert isinstance(elem, FIFOPop)
-        pops.append(elem)
-    module_self._flip_restore()
-    module_self.body.body.clear()
-    cond = func(*args, **kwargs)
-    res = _wait_until(cond)
-    module_self._flip_restore()
-    # Restore the FIFO.pop operations.
-    for elem in pops:
-        module_self.body.body.append(elem)
-    Singleton.builder.cur_module.attrs.add(Module.ATTR_WAIT_UNTIL)
-    return res
+    Singleton.builder.cur_module = module_self
+    module_self._attrs[Module.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
 
+    module_self.implicit_restore()
+    restore = Singleton.builder.insert_point['expr']
+    Singleton.builder.insert_point['expr'] = module_self._wait_until
+    cond = func(*args, **kwargs)
+    _wait_until(cond)
+    module_self.implicit_pop()
+
+    Singleton.builder.insert_point['expr'] = restore
+    Singleton.builder.cur_module = None
+
+    return module_self._wait_until
+
+#pylint: disable=too-few-public-methods
+class Timing:
+    '''The enum class for the timing policy of a module.'''
+    UNDEFINED = 0
+    SYSTOLIC = 1
+    BACKPRESSURE = 2
+
+    def __init__(self, ty):
+        self.ty = ty
+
+    def __repr__(self):
+        return ['undefined', 'systolic', 'backpressure'][self.ty]
 
 class Module:
     '''The AST node for defining a module.'''
 
-    ATTR_EXPLICIT_FIFO = 'explicit_fifo'
-    ATTR_WAIT_UNTIL = 'wait_until'
-    ATTR_NO_ARBITER = 'no_arbiter'
+    ATTR_EXPLICIT_FIFO = 0
+    ATTR_DISABLE_ARBITER = 1
+    ATTR_MEMORY = 2
+    ATTR_TIMING = 3
 
-    def __init__(self):
+    MODULE_ATTR_STR = {
+      ATTR_EXPLICIT_FIFO: 'explicit_fifo',
+      ATTR_DISABLE_ARBITER: 'no_arbiter',
+      ATTR_MEMORY: 'memory',
+      ATTR_TIMING: 'timing',
+    }
+
+    def __init__(
+            self,
+            explicit_fifo=False,
+            timing=Timing.UNDEFINED,
+            disable_arbiter_rewrite=False):
+        '''Construct the module with the given attributes.
+        
+        Args:
+          - explicit_fifo(bool): If this module explicitly pops FIFO values.
+          - timing(Timing): The timing policy of this module.
+          - disable_arbiter_rewrite(bool): When there are multiple callers, if this module
+          should be rewritten by the compiler.
+        '''
         self.body = None
-        self._restore_ports = {}
-        self.binds = 0
-        self.attrs = set()
+        self._attrs = {}
+        self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite)
+        self._pop_cache = {}
+        self._wait_until = []
+        self._finalized = False
+
+    @property
+    def finalized(self):
+        '''The helper function to finalize the module.'''
+        return self._finalized
+
+    @finalized.setter
+    def finalized(self, value):
+        if value:
+            self._finalized = True
+            concat = self._wait_until + list(self.fifo_pops.values()) + list(self.body.iter())
+            #pylint: disable=protected-access
+            self.body._body = concat
+        elif self._finalized:
+            assert False, 'Finalization cannot be reverted!'
+
 
     @property
     def ports(self):
@@ -74,7 +125,6 @@ class Module:
     def bind(self, **kwargs):
         '''The frontend API for creating a bind operation to this `self` module.'''
         bound = Bind(self, **kwargs)
-        self.binds += 1
         return bound
 
     def as_operand(self):
@@ -85,45 +135,88 @@ class Module:
         '''The helper function to get the synthesized name of the module.'''
         return type(self).__name__
 
-
     def __repr__(self):
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
             ports = f'{{\n    {ports}\n  }} '
-        Singleton.repr_ident = 2
-        body = self.body.__repr__()
-        attrs = ', '.join(self.attrs)
+        attrs = ', '.join(f'{Module.MODULE_ATTR_STR[i]}: {j}' for i, j in self._attrs.items())
         attrs = f'#[{attrs}] ' if attrs else ''
         name = self.as_operand()
         synthe_name = self.synthesis_name()
-        return f'  {attrs}\n  {name} = module {synthe_name} {ports}{{\n{body}\n  }}'
+        if self.finalized:
+            Singleton.repr_ident = 2
+            body = self.body.__repr__()
+            return f'''  {attrs}
+  {name} = module {synthe_name} {ports}{{
+{body}
+  }}
+'''
+        Singleton.repr_ident = 4
+        body = self.body.__repr__()
+        precond = '\n      '.join(repr(v) for v in self._wait_until)
+        if precond:
+            precond = f'''
+     "wait_until": {{
+       {precond}
+     }}'''
+        pops = '\n      '.join(repr(v) for v in self.fifo_pops.values())
+        if pops:
+            pops = f'''
+    "pops": {{
+      {pops}
+    }}'''
+        return f'''  {attrs}
+  {name} = module {synthe_name} {ports}{{{precond}{pops}
+    "body": {{
+{body}
+    }}
+  }}
+'''
 
     @property
-    def implicit_fifo(self):
+    def fifo_pops(self):
+        '''Handle implicit FIFO pop and cache them in a dict.'''
+        if self.is_explicit_fifo:
+            return {}
+        if not self._pop_cache:
+            self._pop_cache = { port: FIFOPop(port) for port in self.ports }
+        return self._pop_cache
+
+    def implicit_pop(self):
+        '''Implicitly replace all the ports with FIFO.pop operations.'''
+        if not self.is_explicit_fifo:
+            cache = self.fifo_pops
+            for k, v in self.__dict__.items():
+                if isinstance(v, Port):
+                    setattr(self, k, cache[v])
+
+    def implicit_restore(self):
+        '''Implicitly restore all the FIFO.pop back to FIFOs.'''
+        if not self.is_explicit_fifo:
+            for k, v in self.__dict__.items():
+                if isinstance(v, FIFOPop):
+                    setattr(self, k, v.fifo)
+
+    @property
+    def is_systolic(self):
+        '''The helper function to get if this module is systolic.'''
+        return self._attrs.get(Module.ATTR_TIMING, Timing(Timing.UNDEFINED)).ty == Timing.SYSTOLIC
+
+    @property
+    def disable_arbiter_rewrite(self):
+        '''The helper function to get the no-arbiter setting.'''
+        return self._attrs.get(Module.ATTR_DISABLE_ARBITER, False)
+
+    @property
+    def is_explicit_fifo(self):
         '''The helper function to get the implicit FIFO setting.'''
-        return self.ATTR_EXPLICIT_FIFO not in self.attrs
+        return self._attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
 
-    @implicit_fifo.setter
-    def implicit_fifo(self, value):
-        '''The helper function to set the implicit FIFO setting.'''
-        if value:
-            self.attrs.discard(self.ATTR_EXPLICIT_FIFO)
-        else:
-            self.attrs.add(self.ATTR_EXPLICIT_FIFO)
-
-    def _implicit_pop(self):
-        if self.implicit_fifo:
-            for port in self.ports:
-                self._restore_ports[port.name] = port
-                setattr(self, port.name, port.pop())
-
-    def _flip_restore(self):
-        '''The helper function swaps FIFO.pop's and the original ports.'''
-        if self.implicit_fifo:
-            to_restore = list(self._restore_ports.items())
-            for k, v in to_restore:
-                self._restore_ports[k] = getattr(self, k)
-                setattr(self, k, v)
+    def parse_attrs(self, is_explicit_fifo, timing, disable_arbiter_rewrite):
+        '''The helper function to parse the attributes.'''
+        self._attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
+        self._attrs[Module.ATTR_TIMING] = Timing(timing)
+        self._attrs[Module.ATTR_DISABLE_ARBITER] = disable_arbiter_rewrite
 
 class Port:
     '''The AST node for defining a port in modules.'''
@@ -162,24 +255,20 @@ class Port:
 
 @decorator
 #pylint: disable=keyword-arg-before-vararg
-def combinational(func, implicit_fifo=True, *args, **kwargs):
+def combinational(
+        func,
+        *args,
+        **kwargs):
     '''A decorator for marking a function as combinational logic description.'''
     module_self = args[0]
     assert isinstance(module_self, Module)
-    module_self.implicit_fifo = implicit_fifo
-    module_self.body = Block(Block.MODULE_ROOT)
-    Singleton.builder.insert_point['expr'] = module_self.body.body
     Singleton.builder.cur_module = module_self
     Singleton.builder.builder_func = func
-
-    #pylint: disable=protected-access
-    module_self._implicit_pop()
-
-    res = func(*args, **kwargs)
-
-    module_self._flip_restore()
-
+    module_self.body = Block(Block.MODULE_ROOT)
+    with module_self.body:
+        module_self.implicit_pop()
+        res = func(*args, **kwargs)
+        module_self.implicit_restore()
     Singleton.builder.cleanup_symtab()
     Singleton.builder.cur_module = None
-    Singleton.builder.insert_point['expr'] = None
     return res

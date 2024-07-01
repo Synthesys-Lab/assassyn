@@ -30,7 +30,7 @@ class Visitor:
 
     def visit_block(self, node: Block):
         '''Enter a block'''
-        for elem in node.body:
+        for elem in node.iter():
             self.dispatch(elem)
 
     def dispatch(self, node):
