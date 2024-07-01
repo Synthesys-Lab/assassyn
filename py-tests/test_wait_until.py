@@ -6,6 +6,7 @@ class Squarer(Module):
 
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.a = Port(Int(32))
 
     @module.combinational
@@ -17,6 +18,7 @@ class Agent(Module):
 
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.a = Port(Int(32))
 
     @module.wait_until
@@ -24,15 +26,14 @@ class Agent(Module):
         return lock[0]
 
     @module.combinational
-    def build(self, lock: Array, sqr: Squarer):
-        with self.wait_until(lock):
-            sqr.async_called(a = self.a)
+    def build(self, sqr: Squarer):
+        sqr.async_called(a = self.a)
 
 class Driver(Module):
 
     @module.constructor
     def __init__(self):
-        pass
+        super().__init__()
 
     @module.combinational
     def build(self, agent: Agent, lock: Array):
@@ -56,7 +57,8 @@ def test_wait_until():
         lock = RegArray(UInt(1), 1)
 
         agent = Agent()
-        agent.build(lock, sqr)
+        agent.wait_until(lock)
+        agent.build(sqr)
 
         driver = Driver()
         driver.build(agent, lock)

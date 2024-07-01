@@ -105,8 +105,15 @@ class EmitBinds(visitor.Visitor):
             module_var = self.cg.generate_rval(node.callee)
             self.cg.code.append(f'  let {bind_var} = sys.get_init_bind({module_var});')
 
+
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
+
+    def emit_module_attrs(self, module: Module, var_id: str):
+        module_mut = f'{lval}.as_mut::<eir::ir::Module>(&mut sys).unwrap()'
+        if module.is_systolic:
+            self.code.append(f'{module_mut}.add_attr(eir::ir::module::Attribute::Systolic);')
+
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''

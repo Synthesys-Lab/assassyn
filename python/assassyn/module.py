@@ -14,7 +14,6 @@ def constructor(func, *args, **kwargs):
     builder = Singleton.builder
     module_self = args[0]
     attrs = kwargs.get('attrs', [])
-    super(type(module_self), module_self).__init__(attrs)
     builder.insert_point['module'].append(module_self)
     func(*args, **kwargs)
     name_ports_of_module(module_self)
@@ -33,18 +32,20 @@ def wait_until(func, *args, **kwargs):
     #pylint: disable=protected-access
     module_self = args[0]
     assert isinstance(module_self, Module)
-    assert Singleton.builder.cur_module is module_self
-    module_self.attrs[Module.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
+    Singleton.builder.cur_module = module_self
+    module_self._attrs[Module.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
 
     module_self.implicit_restore()
     restore = Singleton.builder.insert_point['expr']
     Singleton.builder.insert_point['expr'] = module_self._wait_until
     cond = func(*args, **kwargs)
-    res = _wait_until(cond)
-    Singleton.builder.insert_point['expr'] = restore
+    _wait_until(cond)
     module_self.implicit_pop()
 
-    return res
+    Singleton.builder.insert_point['expr'] = restore
+    Singleton.builder.cur_module = None
+
+    return module_self._wait_until
 
 class Timing:
     UNDEFINED = 0
@@ -61,20 +62,33 @@ class Module:
     '''The AST node for defining a module.'''
 
     ATTR_EXPLICIT_FIFO = 0
-    ATTR_NO_ARBITER = 1
+    ATTR_DISABLE_ARBITER = 1
     ATTR_MEMORY = 2
     ATTR_TIMING = 3
 
     MODULE_ATTR_STR = {
       ATTR_EXPLICIT_FIFO: 'explicit_fifo',
-      ATTR_NO_ARBITER: 'no_arbiter',
+      ATTR_DISABLE_ARBITER: 'no_arbiter',
       ATTR_MEMORY: 'memory',
       ATTR_TIMING: 'timing',
     }
 
-    def __init__(self, attrs):
+    def __init__(
+            self,
+            explicit_fifo=False,
+            timing=Timing.UNDEFINED,
+            disable_arbiter_rewrite=False):
+        '''Construct the module with the given attributes.
+        
+        Args:
+          - explicit_fifo(bool): If this module explicitly pops FIFO values.
+          - timing(Timing): The timing policy of this module.
+          - disable_arbiter_rewrite(bool): When there are multiple callers, if this module
+          should be rewritten by the compiler.
+        '''
         self.body = None
-        self.attrs = {}
+        self._attrs = {}
+        self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite)
         self._pop_cache = {}
         self._wait_until = []
         self._finalized = False
@@ -123,7 +137,7 @@ class Module:
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
             ports = f'{{\n    {ports}\n  }} '
-        attrs = ', '.join(f'{Module.MODULE_ATTR_STR[i]}: {j}' for i, j in self.attrs.items())
+        attrs = ', '.join(f'{Module.MODULE_ATTR_STR[i]}: {j}' for i, j in self._attrs.items())
         attrs = f'#[{attrs}] ' if attrs else ''
         name = self.as_operand()
         synthe_name = self.synthesis_name()
@@ -182,17 +196,23 @@ class Module:
     @property
     def is_systolic(self):
         '''The helper function to get if this module is systolic.'''
-        return self.attrs.get(Module.ATTR_TIMING, Timing(Timing.UNDEFINED)).ty == Timing.SYSTOLIC
+        return self._attrs.get(Module.ATTR_TIMING, Timing(Timing.UNDEFINED)).ty == Timing.SYSTOLIC
+
+    @property
+    def disable_arbiter_rewrite(self):
+        '''The helper function to get the no-arbiter setting.'''
+        return self._attrs.get(Module.ATTR_DISABLE_ARBITER, False)
 
     @property
     def is_explicit_fifo(self):
         '''The helper function to get the implicit FIFO setting.'''
-        return self.attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
+        return self._attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
 
-    def parse_attrs(self, is_explicit_fifo, timing):
+    def parse_attrs(self, is_explicit_fifo, timing, disable_arbiter_rewrite):
         '''The helper function to parse the attributes.'''
-        self.attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
-        self.attrs[Module.ATTR_TIMING] = Timing(timing)
+        self._attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
+        self._attrs[Module.ATTR_TIMING] = Timing(timing)
+        self._attrs[Module.ATTR_DISABLE_ARBITER] = disable_arbiter_rewrite
 
 class Port:
     '''The AST node for defining a port in modules.'''
@@ -231,15 +251,16 @@ class Port:
 
 @decorator
 #pylint: disable=keyword-arg-before-vararg
-def combinational(func, is_explicit_fifo=False, timing=Timing.UNDEFINED, *args, **kwargs):
+def combinational(
+        func,
+        *args,
+        **kwargs):
     '''A decorator for marking a function as combinational logic description.'''
     module_self = args[0]
     assert isinstance(module_self, Module)
-    module_self.parse_attrs(is_explicit_fifo, timing)
-    module_self.body = Block(Block.MODULE_ROOT)
-
     Singleton.builder.cur_module = module_self
     Singleton.builder.builder_func = func
+    module_self.body = Block(Block.MODULE_ROOT)
     with module_self.body:
         module_self.implicit_pop()
         res = func(*args, **kwargs)

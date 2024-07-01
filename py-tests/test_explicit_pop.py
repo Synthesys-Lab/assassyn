@@ -10,10 +10,11 @@ class Adder(Module):
     
     @module.constructor
     def __init__(self):
+        super().__init__(explicit_fifo=True)
         self.a = Port(Int(32))
         self.b = Port(Int(32))
 
-    @module.combinational(is_explicit_fifo=True)
+    @module.combinational
     def build(self):
         a = self.a.pop()
         b = self.b.pop()
@@ -24,7 +25,7 @@ class Driver(Module):
     
     @module.constructor
     def __init__(self):
-        pass
+        super().__init__()
 
     @module.combinational
     def build(self, adder: Adder):

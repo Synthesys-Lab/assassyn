@@ -9,6 +9,7 @@ class Sub(Module):
 
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.sub_a = Port(Int(32))
         self.sub_b = Port(Int(32))
 
@@ -21,6 +22,7 @@ class Lhs(Module):
 
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.lhs_a = Port(Int(32))
 
     @module.combinational
@@ -32,6 +34,7 @@ class Rhs(Module):
 
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.rhs_b = Port(Int(32))
 
     @module.combinational
@@ -44,7 +47,7 @@ class Driver(Module):
 
     @module.constructor
     def __init__(self):
-        pass
+        super().__init__()
 
     @module.combinational
     def build(self, lhs: Lhs, rhs: Rhs):

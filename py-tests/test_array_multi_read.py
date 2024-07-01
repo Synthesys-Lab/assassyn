@@ -8,6 +8,7 @@ class ModA(Module):
 
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.a = Port(Int(32))
 
     @module.combinational
@@ -20,6 +21,7 @@ class ModB(Module):
     
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.a = Port(Int(32))
 
     @module.combinational
@@ -31,6 +33,7 @@ class ModC(Module):
     
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.a = Port(Int(32))
 
     @module.combinational
@@ -42,7 +45,7 @@ class Driver(Module):
     
     @module.constructor
     def __init__(self):
-        pass
+        super().__init__()
 
     @module.combinational
     def build(self, mod_a: ModA, mod_b: ModB, mod_c: ModC):

@@ -8,6 +8,7 @@ from assassyn import utils
 class Adder(Module):
     @module.constructor
     def __init__(self):
+        super().__init__()
         self.add_a = Port(Int(32))
         self.add_b = Port(Int(32))
     
@@ -20,7 +21,7 @@ class Adder(Module):
 class Driver(Module):
     @module.constructor
     def __init__(self):
-        pass
+        super().__init__()
     
     @module.combinational
     def build(self, add: Adder):
