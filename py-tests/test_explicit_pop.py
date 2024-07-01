@@ -13,7 +13,7 @@ class Adder(Module):
         self.a = Port(Int(32))
         self.b = Port(Int(32))
 
-    @module.combinational(implicit_fifo=False)
+    @module.combinational(is_explicit_fifo=True)
     def build(self):
         a = self.a.pop()
         b = self.b.pop()

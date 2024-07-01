@@ -36,13 +36,13 @@ def wait_until(func, *args, **kwargs):
     assert Singleton.builder.cur_module is module_self
     module_self.attrs[Module.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
 
-    self.implicit_restore()
+    module_self.implicit_restore()
     restore = Singleton.builder.insert_point['expr']
     Singleton.builder.insert_point['expr'] = module_self._wait_until
     cond = func(*args, **kwargs)
     res = _wait_until(cond)
     Singleton.builder.insert_point['expr'] = restore
-    self.implicit_pop()
+    module_self.implicit_pop()
 
     return res
 
