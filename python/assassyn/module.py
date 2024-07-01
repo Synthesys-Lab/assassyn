@@ -34,12 +34,28 @@ def wait_until(func, *args, **kwargs):
     module_self = args[0]
     assert isinstance(module_self, Module)
     assert Singleton.builder.cur_module is module_self
+    module_self.attrs[Module.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
+
     self.implicit_restore()
+    restore = Singleton.builder.insert_point['expr']
+    Singleton.builder.insert_point['expr'] = module_self._wait_until
     cond = func(*args, **kwargs)
     res = _wait_until(cond)
+    Singleton.builder.insert_point['expr'] = restore
     self.implicit_pop()
+
     return res
 
+class Timing:
+    UNDEFINED = 0
+    SYSTOLIC = 1
+    BACKPRESSURE = 2
+
+    def __init__(self, ty):
+        self.ty = ty
+
+    def __repr__(self):
+        return ['undefined', 'systolic', 'backpressure'][self.ty]
 
 class Module:
     '''The AST node for defining a module.'''
@@ -47,26 +63,36 @@ class Module:
     ATTR_EXPLICIT_FIFO = 0
     ATTR_NO_ARBITER = 1
     ATTR_MEMORY = 2
-    ATTR_SYSTOLIC = 3
+    ATTR_TIMING = 3
 
     MODULE_ATTR_STR = {
       ATTR_EXPLICIT_FIFO: 'explicit_fifo',
       ATTR_NO_ARBITER: 'no_arbiter',
       ATTR_MEMORY: 'memory',
-      ATTR_SYSTOLIC: 'systolic',
+      ATTR_TIMING: 'timing',
     }
 
     def __init__(self, attrs):
         self.body = None
-        self.attrs = set()
+        self.attrs = {}
         self._pop_cache = {}
+        self._wait_until = []
+        self._finalized = False
 
-    def finalize(self):
+    @property
+    def finalized(self):
         '''The helper function to finalize the module.'''
-        x = self.body.has_wait_until()
-        x = x + 1 if x is not None else 0
-        for i in self.fifo_pops.values():
-            self.body.insert(x, i)
+        return self._finalized
+
+    @finalized.setter
+    def finalized(self, value):
+        if value:
+            self._finalized = True
+            concat = self._wait_until + [v for v in self.fifo_pops.values()] + self.body._body
+            self.body._body = concat
+        elif self._finalized:
+            assert False, 'Finalization cannot be reverted!'
+
 
     @property
     def ports(self):
@@ -97,13 +123,38 @@ class Module:
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
             ports = f'{{\n    {ports}\n  }} '
-        Singleton.repr_ident = 2
-        body = self.body.__repr__()
-        attrs = ', '.join(Module.MODULE_ATTR_STR[i] for i in self.attrs)
+        attrs = ', '.join(f'{Module.MODULE_ATTR_STR[i]}: {j}' for i, j in self.attrs.items())
         attrs = f'#[{attrs}] ' if attrs else ''
         name = self.as_operand()
         synthe_name = self.synthesis_name()
-        return f'  {attrs}\n  {name} = module {synthe_name} {ports}{{\n{body}\n  }}'
+        if self.finalized:
+            Singleton.repr_ident = 2
+            body = self.body.__repr__()
+            return f'''  {attrs}
+  {name} = module {synthe_name} {ports}{{
+{body}
+  }}
+'''
+        else:
+            Singleton.repr_ident = 4
+            body = self.body.__repr__()
+            wait_until = '\n      '.join(repr(v) for v in self._wait_until)
+            wait_until = f'''
+     "wait_until": {{
+       {wait_until}
+    }}''' if wait_until else ''
+            pops = '\n      '.join(repr(v) for v in self.fifo_pops.values())
+            pops = f'''
+    "pops": {{
+      {pops}
+    }}''' if pops else ''
+            return f'''  {attrs}
+  {name} = module {synthe_name} {ports}{{{wait_until}{pops}
+    "body": {{
+{body}
+    }}
+  }}
+'''
 
     @property
     def fifo_pops(self):
@@ -131,19 +182,17 @@ class Module:
     @property
     def is_systolic(self):
         '''The helper function to get if this module is systolic.'''
-        return Module.ATTR_SYSTOLIC in self.attrs or self.body.has_wait_until is None
+        return self.attrs.get(Module.ATTR_TIMING, Timing(Timing.UNDEFINED)).ty == Timing.SYSTOLIC
 
     @property
     def is_explicit_fifo(self):
         '''The helper function to get the implicit FIFO setting.'''
-        return self.ATTR_EXPLICIT_FIFO in self.attrs
+        return self.attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
 
-    def parse_attrs(self, is_explicit_fifo, is_systolic):
+    def parse_attrs(self, is_explicit_fifo, timing):
         '''The helper function to parse the attributes.'''
-        if is_explicit_fifo:
-            self.attrs.add(Module.ATTR_EXPLICIT_FIFO)
-        if is_systolic:
-            self.attrs.add(Module.ATTR_SYSTOLIC)
+        self.attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
+        self.attrs[Module.ATTR_TIMING] = Timing(timing)
 
 class Port:
     '''The AST node for defining a port in modules.'''
@@ -182,11 +231,11 @@ class Port:
 
 @decorator
 #pylint: disable=keyword-arg-before-vararg
-def combinational(func, is_explicit_fifo=False, is_systolic=False, *args, **kwargs):
+def combinational(func, is_explicit_fifo=False, timing=Timing.UNDEFINED, *args, **kwargs):
     '''A decorator for marking a function as combinational logic description.'''
     module_self = args[0]
     assert isinstance(module_self, Module)
-    module_self.parse_attrs(is_explicit_fifo, is_systolic)
+    module_self.parse_attrs(is_explicit_fifo, timing)
     module_self.body = Block(Block.MODULE_ROOT)
 
     Singleton.builder.cur_module = module_self

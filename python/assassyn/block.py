@@ -28,16 +28,6 @@ class Block:
         '''Dump the block as an operand.'''
         return f'_{hex(id(self))[-5:-1]}'
 
-    def has_wait_until(self) -> Optional[int]:
-        '''Check if the block has a wait_until intrinsic.'''
-        if self._kind != Block.MODULE_ROOT:
-            return None
-        from .expr.intrinsic import is_wait_until
-        for i, elem in enumerate(self._body):
-            if is_wait_until(elem):
-                return i
-        return None
-
     def insert(self, x, elem):
         '''Insert an instruction at the specified position.'''
         self._body.insert(x, elem)

@@ -54,7 +54,7 @@ class SysBuilder:
 
     def finalize(self):
         for module in self.modules:
-            module.finalize()
+            module.finalized = True
 
     def __init__(self, name):
         self.name = name

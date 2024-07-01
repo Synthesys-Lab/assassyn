@@ -37,6 +37,8 @@ def test_async_call():
         driver = Driver()
         driver.build(adder)
 
+    print(sys)
+
     simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200)
 
     raw = utils.run_simulator(simulator_path)

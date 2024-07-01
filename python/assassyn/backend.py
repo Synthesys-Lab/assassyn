@@ -43,18 +43,22 @@ def elaborate(
         path=tempfile.gettempdir(),
         pretty_printer=True,
         verbose=True,
+        finalized=False,
         **kwargs):
     '''
     Invoke the elaboration process of the given system.
 
     Args:
         sys (SysBuilder): The assassyn system to be elaborated.
-        path (Path): The directory where the Rust project will be dumped
-        pretty_printer (bool): Whether to run the Rust code formatter
-        **kwargs: The optional arguments that will be passed to the code generator
+        path (Path): The directory where the Rust project will be dumped.
+        pretty_printer (bool): Whether to run the Rust code formatter.
+        verbose (bool): Whether dump the IR of the system to be elaborated.
+        finalized (bool): Whether the system is finalized before feeding to this API.
+        **kwargs: The optional arguments that will be passed to the code generator.
     '''
 
-    sys.finalize()
+    if not finalized:
+        sys.finalize()
 
     if verbose:
         print(sys)

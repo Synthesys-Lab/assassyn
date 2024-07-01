@@ -34,7 +34,7 @@ class Intrinsic(Expr):
         return False
 
 @ir_builder(node_type='expr')
-def _wait_until(cond): #pylint: disable=invalid-name
+def _wait_until(cond):
     '''Frontend API for creating a wait-until block.'''
     #pylint: disable=import-outside-toplevel
     from ..value import Value
