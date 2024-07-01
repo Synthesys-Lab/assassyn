@@ -9,7 +9,7 @@ class Driver(Module):
     
     @module.constructor
     def __init__(self):
-        pass
+        super().__init__(explicit_fifo=True)
     
     @module.combinational
     def build(self):
