@@ -41,7 +41,9 @@ def test_array_partition0():
     for i in raw.split('\n'):
         if 'sum(a[:])' in i:
             line_toks = i.split()
+            cycle = int(float(line_toks[2].split('@')[1].replace(':', '')))
             assert (int(line_toks[-1]) % 4) == 0
+            assert max(cycle - 1, 0) * 4 == int(line_toks[-1])
 
 if __name__ == '__main__':
     test_array_partition0()
