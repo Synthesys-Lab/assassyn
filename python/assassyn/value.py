@@ -92,3 +92,9 @@ class Value:
         '''The frontend API to create a bitwise-concat operation'''
         from .expr import Concat
         return Concat(self, other)
+
+    @ir_builder(node_type='expr')
+    def select(self, true_value, false_value):
+        '''The frontend API to create a select operation'''
+        from .expr import Select
+        return Select(self, true_value, false_value)

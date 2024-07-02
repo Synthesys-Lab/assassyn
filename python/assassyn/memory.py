@@ -14,7 +14,8 @@ class Memory(Module):
             self,
             width,
             depth,
-            latency,
+            latency=(1, 1),
+            init_file=None,
             **kwargs):
         '''A decorator for marking a module with memory logic.'''
         super().__init__(**kwargs)
@@ -22,6 +23,7 @@ class Memory(Module):
         self.width = width
         self.depth = depth
         self.latency = latency
+        self.init_file = init_file
         self.we = Port(Int(1))
         dtype = Int(width)
         self.addr = Port(Int(depth.bit_length()))

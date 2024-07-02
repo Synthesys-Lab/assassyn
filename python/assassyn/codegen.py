@@ -50,6 +50,8 @@ CG_OPCODE = {
     expr.Cast.ZEXT: 'zext',
     expr.Cast.SEXT: 'sext',
 
+    expr.Select.SELECT: 'select',
+
     expr.Log.LOG: 'log',
 
     expr.intrinsic.Intrinsic.WAIT_UNTIL: 'wait_until',
@@ -291,6 +293,11 @@ class CodeGen(visitor.Visitor):
             else:
                 length = len(repr(node)) - 1
                 res = f'  // ^{"~" * length}: Support the instruction above'
+        elif isinstance(node, expr.Select):
+            cond = self.generate_rval(node.cond)
+            true_value = self.generate_rval(node.true_value)
+            false_value = self.generate_rval(node.false_value)
+            res = f'sys.{ib_method}(created_here!(), {cond}, {true_value}, {false_value});'
         else:
             length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'

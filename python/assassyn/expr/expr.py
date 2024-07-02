@@ -30,7 +30,8 @@ class Expr(Value):
 
     def is_valued(self):
         '''If this operation has a return value'''
-        other = isinstance(self, (FIFOField, FIFOPop, ArrayRead, Slice, Cast, Concat))
+        valued = (FIFOField, FIFOPop, ArrayRead, Slice, Cast, Concat, Select)
+        other = isinstance(self, valued)
         return other or self.is_binary() or self.is_unary()
 
 class BinaryOp(Expr):
@@ -295,3 +296,22 @@ class AsyncCall(Expr):
     def __repr__(self):
         bind = self.bind.as_operand()
         return f'async_call {bind}'
+
+class Select(Expr):
+    '''The class for the select operation'''
+
+    # Triary operations
+    SELECT = 1000
+
+    def __init__(self, opcode, cond, true_val, false_val):
+        super().__init__(opcode)
+        self.cond = cond
+        self.true_val = true_val
+        self.false_val = false_val
+
+    def __repr__(self):
+        lval = self.as_operand()
+        cond = self.cond.as_operand()
+        true_val = self.true_val.as_operand()
+        false_val = self.false_val.as_operand()
+        return f'{lval} = {cond} ? {true_val} : {false_val}'
