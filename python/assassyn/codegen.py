@@ -160,6 +160,7 @@ class CodeGen(visitor.Visitor):
             name = elem.synthesis_name().lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
             self.code.append(f'  let {lval} = sys.create_module("{name}", vec![{ports}]);')
+            self.emit_module_attrs(elem, lval)
         self.code.append('  // Gathered binds')
         for elem in node.modules:
             bind_emitter = EmitBinds(self)
