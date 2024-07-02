@@ -43,7 +43,7 @@ def test_array_partition1():
     for i in raw.split('\n'):
         if "a[idx0] + a[idx1]" in i:
             line_toks = i.split()
-            cycle = int(float(line_toks[2].split('@')[1].replace(':', '')))
+            cycle = int(line_toks[2][1:-4])
             idx0 = cycle % 4
             idx1 = (cycle + 1) % 4
             expect = a[idx0] + a[idx1]

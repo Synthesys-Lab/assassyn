@@ -241,7 +241,7 @@ class FIFOField(Expr):
 
 class Bind(Expr):
     '''The class for binding operations. Function bind is a functional programming concept like
-    Python's `functools.partibitwiseal`.'''
+    Python's `functools.partial`.'''
 
     BIND = 501
 
