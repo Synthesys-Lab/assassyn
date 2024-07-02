@@ -306,12 +306,12 @@ class Select(Expr):
     def __init__(self, opcode, cond, true_val, false_val):
         super().__init__(opcode)
         self.cond = cond
-        self.true_val = true_val
-        self.false_val = false_val
+        self.true_value = true_val
+        self.false_value = false_val
 
     def __repr__(self):
         lval = self.as_operand()
         cond = self.cond.as_operand()
-        true_val = self.true_val.as_operand()
-        false_val = self.false_val.as_operand()
+        true_val = self.true_value.as_operand()
+        false_val = self.false_value.as_operand()
         return f'{lval} = {cond} ? {true_val} : {false_val}'
