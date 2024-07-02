@@ -5,7 +5,7 @@ from assassyn.backend import elaborate
 from assassyn import utils
 
 
-class Square(Module):
+class Squarer(Module):
     
     @module.constructor
     def __init__(self):
@@ -34,7 +34,7 @@ class Arbiter(Module):
         return valid
 
     @module.combinational
-    def build(self):
+    def build(self, sqr: Squarer):
         a0_valid = self.a0.valid()
         a1_valid = self.a1.valid()
         hot_valid = a1_valid.concat(a0_valid)
@@ -43,5 +43,71 @@ class Arbiter(Module):
         gv_flip = ~gv
         hi = gv_flip & hot_valid
         lo = gv & hot_valid
-        hi_nez = (hi != 0)
-        # new_grant = 
+        hi_nez = ~(hi == Bits(2)(0))
+        new_grant = hi_nez.select(hi, lo)
+        grant0 = new_grant == Bits(2)(1)
+        grant1 = new_grant == Bits(2)(2)
+        with Condition(grant0):
+            log("grants even")
+            self.a0 = a0.pop()
+            sqr.async_called(a = self.a0)
+            grant_1h[0] = Bits(2)(1)
+        with Condition(grant1):
+            log("grants odd")
+            self.a1 = a1.pop()
+            sqr.async_called(a = self.a1)
+            grant_1h[0] = Bits(2)(2)
+            
+class Driver(Module):
+    
+        @module.constructor
+        def __init__(self):
+            super().__init__(disable_arbiter_rewrite=True)
+
+        @module.combinational
+        def build(self, arb: Arbiter):
+            cnt = RegArray(Int(32), 1)
+            k = cnt[0]
+            v = k + Int(32)(1)
+            even = v * Int(32)(2)
+            even = even[0: 31]
+            even = even.bitcast(Int(32))
+            odd = even + Int(32)(1)
+            cnt[0] = v
+            is_odd = v[0: 0]
+            with Condition(is_odd):
+                arb.async_called(a0 = even)
+                arb.async_called(a1 = odd)
+
+def test_arbiter():
+    sys = SysBuilder('arbiter')
+    with sys:
+        sqr = Squarer()
+        sqr.build()
+
+        arb = Arbiter()
+        arb.wait_until()
+        arb.build(sqr)
+        
+        driver = Driver()
+        driver.build(arb)
+
+    print(sys)
+
+    # simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200)
+
+    # raw = utils.run_simulator(simulator_path)
+
+    # cnt = 0
+    # for i in raw.split('\n'):
+    #     if f'[{sqr.synthesis_name().lower()}]' in i:
+    #         line_toks = i.split()
+    #         c = line_toks[-1]
+    #         a = line_toks[-3]
+    #         b = line_toks[-7]
+    #         cnt += 1
+    #         assert int(a) * int(a) == int(c)
+    # assert cnt == 200, f'cnt:{cnt} != 200'
+
+if __name__ == '__main__':
+    test_arbiter()

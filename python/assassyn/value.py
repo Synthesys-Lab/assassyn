@@ -97,4 +97,5 @@ class Value:
     def select(self, true_value, false_value):
         '''The frontend API to create a select operation'''
         from .expr import Select
-        return Select(self, true_value, false_value)
+        print(self)
+        return Select(Select.SELECT, self, true_value, false_value)
