@@ -44,6 +44,10 @@ def elaborate(
         pretty_printer=True,
         verbose=True,
         finalized=False,
+        simulator=True,
+        verilog=True,
+        idle_threshold=100,
+        sim_threshold=100,
         **kwargs):
     '''
     Invoke the elaboration process of the given system.
@@ -54,6 +58,10 @@ def elaborate(
         pretty_printer (bool): Whether to run the Rust code formatter.
         verbose (bool): Whether dump the IR of the system to be elaborated.
         finalized (bool): Whether the system is finalized before feeding to this API.
+        simulator (bool): Whether to generate the Rust code for the simulator.
+        verilog (bool): Whether to generate the SystemVerilog code.
+        idle_threshold (int): The threshold for the idle state to terminate the simulation.
+        sim_threshold (int): The threshold for the simulation to terminate.
         **kwargs: The optional arguments that will be passed to the code generator.
     '''
 
@@ -73,7 +81,7 @@ def elaborate(
     make_existing_dir(os.path.join(sys_dir, 'src'))
     # Dump the assassyn IR builder
     with open(os.path.join(sys_dir, 'src/main.rs'), 'w', encoding='utf-8') as fd:
-        fd.write(codegen.codegen(sys, **kwargs))
+        fd.write(codegen.codegen(sys, simulator, verilog, idle_threshold, sim_threshold))
     if pretty_printer:
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir, check=True)

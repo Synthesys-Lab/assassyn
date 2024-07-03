@@ -69,7 +69,7 @@ pub fn sram() {
     ..Default::default()
   };
 
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, backend::verilog::Simulator::VCS).unwrap();
 
   eir::test_utils::run_simulator(&sys, &config, None);
 }
@@ -134,7 +134,7 @@ pub fn sram_init() {
     ..Default::default()
   };
 
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, backend::verilog::Simulator::VCS).unwrap();
 
   eir::test_utils::run_simulator(&sys, &config, None);
 }

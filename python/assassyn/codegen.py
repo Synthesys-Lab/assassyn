@@ -123,12 +123,7 @@ class CodeGen(visitor.Visitor):
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''
-        if self.kwargs:
-            config = self.kwargs
-            idle_threshold = config.get('idle_threshold', 100)
-            sim_threshold = config.get('sim_threshold', 100)
-            return f'idle_threshold: {idle_threshold}, sim_threshold: {sim_threshold},'
-        return ''
+        return f'idle_threshold: {self.idle_threshold}, sim_threshold: {self.sim_threshold},'
 
     def generate_init_value(self, init_value, ty: str):
         '''Generate the initializer vector. NOTE: ty is already generated in an str!'''
@@ -181,7 +176,10 @@ class CodeGen(visitor.Visitor):
         self.code.append('  println!("{}", sys);')
         config = 'eir::xform::Config{ rewrite_wait_until: true }'
         self.code.append(f'  eir::xform::basic(&mut sys, &{config});')
-        self.code.append('  eir::backend::simulator::elaborate(&sys, &config).unwrap();')
+        if 'simulator' in self.targets:
+            self.code.append('  eir::backend::simulator::elaborate(&sys, &config).unwrap();')
+        if 'verilog' in self.targets:
+            self.code.append('  eir::backend::verilog::elaborate(&sys, &config).unwrap();')
         self.code.append('}\n')
 
     def visit_module(self, node: Module):
@@ -325,17 +323,23 @@ class CodeGen(visitor.Visitor):
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         self.code.append(array_decl)
 
-    def __init__(self, **kwargs):
+    def __init__(self, simulator, verilog, idle_threshold, sim_threshold):
         self.code = []
         self.header = []
         self.emitted_bind = set()
-        self.kwargs = kwargs
+        self.targets = []
+        if simulator:
+            self.targets.append('simulator')
+        if verilog:
+            self.targets.append('verilog')
+        self.idle_threshold = idle_threshold
+        self.sim_threshold = sim_threshold
 
     def get_source(self):
         '''Concatenate the generated source code for the given system'''
         return '\n'.join(self.header) + '\n' + '\n'.join(self.code)
 
-def codegen(sys: SysBuilder, **kwargs):
+def codegen(sys: SysBuilder, simulator, verilog, idle_threshold, sim_threshold):
     '''
     The help function to generate the assassyn IR builder for the given system
 
@@ -343,6 +347,6 @@ def codegen(sys: SysBuilder, **kwargs):
         sys (SysBuilder): The system to generate the builder for
         kwargs: Additional arguments to pass to the code
     '''
-    cg = CodeGen(**kwargs)
+    cg = CodeGen(simulator, verilog, idle_threshold, sim_threshold)
     cg.visit_system(sys)
     return cg.get_source()

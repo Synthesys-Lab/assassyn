@@ -33,7 +33,7 @@ pub fn dt_conv() {
 
   let config = eir::backend::common::Config::default();
 
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, eir::backend::verilog::Simulator::VCS).unwrap();
 
   eir::test_utils::run_simulator(&sys, &config, None);
 }

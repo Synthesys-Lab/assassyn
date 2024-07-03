@@ -104,3 +104,24 @@ class Value:
         from .expr import Select
         print(self)
         return Select(Select.SELECT, self, true_value, false_value)
+
+
+class Optional:
+    '''The class for a predicated value'''
+
+    def __init__(self, value: Value, pred: Value):
+        self.value = value
+        self.pred = pred
+
+    def unwrap(self):
+        return self.value
+
+    @ir_builder(node_type='expr')
+    def unwrap_or(self, default):
+        from .expr import Select
+        return Select(Select.SELECT, self.pred, self.value, default)
+
+    @ir_builder(node_type='expr')
+    def map_or(self, f, default):
+        from .expr import Select
+        return Select(Select.SELECT, self.pred, f(self.value), default)

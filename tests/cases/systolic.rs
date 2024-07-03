@@ -219,7 +219,7 @@ pub fn systolic_array() {
   eir::builder::verify(&sys);
 
   let config = eir::backend::common::Config::default();
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, eir::backend::verilog::Simulator::VCS).unwrap();
 
   let output = run_simulator(&sys, &config, None);
 

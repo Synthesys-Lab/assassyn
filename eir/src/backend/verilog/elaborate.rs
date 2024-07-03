@@ -12,6 +12,8 @@ use crate::{
 
 use self::{expr::subcode, module::Attribute};
 
+use super::Simulator;
+
 fn namify(name: &str) -> String {
   name.replace(".", "_")
 }
@@ -36,10 +38,11 @@ struct VerilogDumper<'a, 'b> {
   trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
   array_drivers: HashMap<String, HashSet<String>>,   // array -> {driver module}
   fifo_drivers: HashMap<String, HashSet<String>>,    // fifo -> {driver module}
+  simulator: Simulator,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
-  fn new(sys: &'a SysBuilder, config: &'b Config) -> Self {
+  fn new(sys: &'a SysBuilder, config: &'b Config, simulator: Simulator) -> Self {
     Self {
       sys,
       config,
@@ -54,6 +57,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       trigger_drivers: HashMap::new(),
       array_drivers: HashMap::new(),
       fifo_drivers: HashMap::new(),
+      simulator,
     }
   }
 
@@ -610,6 +614,29 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     fd.write(res.as_bytes()).unwrap();
 
+    let init = match self.simulator {
+      Simulator::VCS => format!(
+        "initial begin
+  $fsdbDumpfile(\"wave.fsdb\");
+  $fsdbDumpvars();
+  $fsdbDumpMDA();
+end
+
+initial begin
+  clk = 1'b1;
+  rst_n = 1'b0;
+  #1;
+  rst_n = 1'b1;
+  #{}00;
+  $finish();
+end
+
+always #50 clk <= !clk;",
+        sim_threshold
+      ),
+      Simulator::Verilator => "".into(),
+    };
+
     fd.write(
       format!(
         "
@@ -659,22 +686,7 @@ module tb;
 logic clk;
 logic rst_n;
 
-initial begin
-  $fsdbDumpfile(\"wave.fsdb\");
-  $fsdbDumpvars();
-  $fsdbDumpMDA();
-end
-
-initial begin
-  clk = 1'b1;
-  rst_n = 1'b0;
-  #1;
-  rst_n = 1'b1;
-  #{}00;
-  $finish();
-end
-
-always #50 clk <= !clk;
+{}
 
 top top_i (
   .clk(clk),
@@ -683,7 +695,7 @@ top top_i (
 
 endmodule
 ",
-        sim_threshold
+        init
       )
       .as_bytes(),
     )?;
@@ -1603,11 +1615,11 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   }
 }
 
-pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
+pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Result<(), Error> {
   let fname = config.fname(sys, "sv");
   println!("Writing verilog rtl to {}", fname.to_str().unwrap());
 
-  let mut vd = VerilogDumper::new(sys, config);
+  let mut vd = VerilogDumper::new(sys, config, simulator);
 
   let mut fd = File::create(fname)?;
 

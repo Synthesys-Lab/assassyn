@@ -1,5 +1,5 @@
 use assassyn::module_builder;
-use eir::builder::SysBuilder;
+use eir::{builder::SysBuilder, backend::verilog};
 
 pub fn fifo_valid() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
@@ -39,7 +39,7 @@ pub fn fifo_valid() {
 
   let config = eir::backend::common::Config::default();
 
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  verilog::elaborate(&sys, &config, verilog::Simulator::VCS).unwrap();
 
   eir::test_utils::run_simulator(
     &sys,

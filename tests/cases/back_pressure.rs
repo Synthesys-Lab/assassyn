@@ -1,5 +1,5 @@
 use assassyn::module_builder;
-use eir::{builder::SysBuilder, test_utils::run_simulator};
+use eir::{builder::SysBuilder, test_utils::run_simulator, backend::verilog};
 
 pub fn back_pressure() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
@@ -35,7 +35,7 @@ pub fn back_pressure() {
 
   let config = eir::backend::common::Config::default();
 
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  verilog::elaborate(&sys, &config, verilog::Simulator::VCS).unwrap();
 
   run_simulator(
     &sys,

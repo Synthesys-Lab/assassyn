@@ -42,7 +42,7 @@ pub fn common_read() {
     ..Default::default()
   };
 
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, eir::backend::verilog::Simulator::VCS).unwrap();
 
   run_simulator(
     &sys,

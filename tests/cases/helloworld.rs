@@ -11,7 +11,7 @@ pub fn helloworld() {
   println!("{}", sys);
 
   let config = eir::backend::common::Config::default();
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, eir::backend::verilog::Simulator::VCS).unwrap();
 
   eir::builder::verify(&sys);
   eir::test_utils::run_simulator(

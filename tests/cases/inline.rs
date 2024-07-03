@@ -22,7 +22,7 @@ pub fn inline0() {
   eprintln!("{}", sys);
 
   let config = eir::backend::common::Config::default();
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, eir::backend::verilog::Simulator::VCS).unwrap();
 
   run_simulator(
     &sys,
@@ -69,7 +69,7 @@ pub fn inline1() {
   eprintln!("{}", sys);
 
   let config = eir::backend::common::Config::default();
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, eir::backend::verilog::Simulator::VCS).unwrap();
 
   run_simulator(
     &sys,

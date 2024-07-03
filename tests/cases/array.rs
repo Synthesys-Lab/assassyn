@@ -54,7 +54,7 @@ pub fn array_multi_read() {
 
   let config = eir::backend::common::Config::default();
 
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, eir::backend::verilog::Simulator::VCS).unwrap();
 
   run_simulator(
     &sys,
@@ -112,7 +112,7 @@ pub fn array_multi_write_in_same_module() {
 
   let config = eir::backend::common::Config::default();
 
-  eir::backend::verilog::elaborate(&sys, &config).unwrap();
+  eir::backend::verilog::elaborate(&sys, &config, eir::backend::verilog::Simulator::VCS).unwrap();
 
   run_simulator(&sys, &config, None);
 }
