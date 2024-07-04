@@ -19,6 +19,15 @@ $ source setup.sh # Add assassyn's python package to your PYTHONPATH
 
 Because of the nature of Rust toolchain, rust backend will be built along with your designs.
 
+**Advanced Users**: If you would like to simulate the generated RTL, you can use
+[verilator](https://github.com/verilator/verilator). To simply setup verilator, you can run
+the following command.
+
+````sh
+$ ./utils/build-verilator.sh
+$ source setup.sh # Re-run the script since it has a different environment variable for verilator
+````
+
 **Developers**: All the test cases are located in `python/tests`, you can just run them like
 all other Python scripts.
 

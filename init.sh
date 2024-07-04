@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
+# Install sccache
 cargo install --list | grep sccache > /dev/null
-
 if [ $? -eq 0 ]; then
   echo "\"sccache\" already installed, you can manually update it with \"cargo install sccache\"."
 else
@@ -9,6 +9,7 @@ else
   cargo install sccache
 fi
 
+# Install Python Dependences
 REPO_DIR=`dirname $0`
-
 pip install --user -r $REPO_DIR/python/requirements.txt
+

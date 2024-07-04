@@ -1,3 +1,4 @@
 target
 .vim/*
 .DS_Store
+verilator
