@@ -70,7 +70,7 @@ def test_bind():
         driver.build(lhs, rhs)
 
     print(sys)
-    simulator_path = elaborate(sys)
+    simulator_path = elaborate(sys, verilog='vcs')
 
     raw = utils.run_simulator(simulator_path)
 

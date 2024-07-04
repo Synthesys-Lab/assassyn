@@ -62,6 +62,11 @@ CG_ARRAY_ATTR = {
     Array.FULLY_PARTITIONED: 'FullyPartitioned',
 }
 
+CG_SIMULATOR = {
+        'verilator': 'Verilator',
+        'vcs': 'VCS',
+}
+
 def opcode_to_ib(node: Expr):
     '''Convert the opcode to the corresponding IR builder method'''
     opcode = node.opcode
@@ -167,8 +172,7 @@ class CodeGen(visitor.Visitor):
             self.visit_module(elem)
         config = self.emit_config()
         self.code.append(f'''
-            let config = eir::backend::common::Config{{
-               base_dir: (env!("CARGO_MANIFEST_DIR").to_string() + "/simulator").into(),
+            let mut config = eir::backend::common::Config{{
                {config}
                ..Default::default()
             }};
@@ -176,10 +180,18 @@ class CodeGen(visitor.Visitor):
         self.code.append('  println!("{}", sys);')
         config = 'eir::xform::Config{ rewrite_wait_until: true }'
         self.code.append(f'  eir::xform::basic(&mut sys, &{config});')
-        if 'simulator' in self.targets:
-            self.code.append('  eir::backend::simulator::elaborate(&sys, &config).unwrap();')
+        be_path = 'eir::backend'
+        if self.targets['simulator']:
+            base_dir = '(env!("CARGO_MANIFEST_DIR").to_string() + "/simulator").into()'
+            self.code.append(f'  config.base_dir = {base_dir};')
+            self.code.append(f'  {be_path}::simulator::elaborate(&sys, &config).unwrap();')
         if 'verilog' in self.targets:
-            self.code.append('  eir::backend::verilog::elaborate(&sys, &config).unwrap();')
+            base_dir = '(env!("CARGO_MANIFEST_DIR").to_string() + "/verilog").into()'
+            self.code.append(f'  config.base_dir = {base_dir};')
+            verilog_target = self.targets['verilog']
+            simulator = f'{be_path}::verilog::Simulator::{CG_SIMULATOR[verilog_target]}'
+            self.code.append(
+                    f'  {be_path}::verilog::elaborate(&sys, &config, {simulator}).unwrap();')
         self.code.append('}\n')
 
     def visit_module(self, node: Module):
@@ -327,11 +339,11 @@ class CodeGen(visitor.Visitor):
         self.code = []
         self.header = []
         self.emitted_bind = set()
-        self.targets = []
+        self.targets = {}
         if simulator:
-            self.targets.append('simulator')
+            self.targets['simulator'] = True
         if verilog:
-            self.targets.append('verilog')
+            self.targets['verilog'] = verilog
         self.idle_threshold = idle_threshold
         self.sim_threshold = sim_threshold
 

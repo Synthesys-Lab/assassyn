@@ -2,7 +2,7 @@ use std::{
   collections::HashMap,
   fs::{self, File, OpenOptions},
   io::Write,
-  path::{Path, PathBuf},
+  path::PathBuf,
   process::Command,
 };
 
@@ -11,7 +11,7 @@ use quote::quote;
 use syn::Ident;
 
 use crate::{
-  backend::common::Config,
+  backend::common::{create_and_clean_dir, Config},
   builder::system::SysBuilder,
   ir::{expr::subcode, instructions::Bind, node::*, visitor::Visitor, *},
 };
@@ -1202,24 +1202,7 @@ fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
 
 fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io::Error> {
   let dir_name = config.dir_name(sys);
-  let dir = Path::new(&dir_name);
-  if !dir.exists() {
-    fs::create_dir_all(&dir_name)?;
-  }
-  assert!(dir.is_dir());
-  let files = fs::read_dir(&dir_name)?;
-  if config.override_dump {
-    for elem in files {
-      let path = elem?.path();
-      if path.is_dir() {
-        fs::remove_dir_all(path)?;
-      } else {
-        fs::remove_file(path)?;
-      }
-    }
-  } else {
-    assert!(files.count() == 0);
-  }
+  create_and_clean_dir(dir_name.clone().into(), config.override_dump);
   eprintln!(
     "Writing simulator code to rust project: {}",
     dir_name.to_str().unwrap()

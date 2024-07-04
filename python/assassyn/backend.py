@@ -45,7 +45,7 @@ def elaborate(
         verbose=True,
         finalized=False,
         simulator=True,
-        verilog=True,
+        verilog=False,
         idle_threshold=100,
         sim_threshold=100,
         **kwargs):

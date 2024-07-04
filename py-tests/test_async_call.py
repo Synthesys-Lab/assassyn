@@ -40,7 +40,7 @@ def test_async_call():
 
     print(sys)
 
-    simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200)
+    simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
 
