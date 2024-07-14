@@ -1,5 +1,5 @@
 use assassyn::module_builder;
-use eir::{builder::SysBuilder, backend::verilog};
+use eir::{backend::verilog, builder::SysBuilder};
 
 pub fn fifo_valid() {
   module_builder!(sub()(a:int<32>, b:int<32>) {

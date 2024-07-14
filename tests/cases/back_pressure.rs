@@ -1,5 +1,5 @@
 use assassyn::module_builder;
-use eir::{builder::SysBuilder, test_utils::run_simulator, backend::verilog};
+use eir::{backend::verilog, builder::SysBuilder, test_utils::run_simulator};
 
 pub fn back_pressure() {
   module_builder!(sub()(a:int<32>, b:int<32>) {
