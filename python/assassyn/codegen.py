@@ -8,10 +8,9 @@ from . import block
 from . import const
 from .builder import SysBuilder
 from .array import Array
-from .module import Module, Port
+from .module import Module, Port, Memory
 from .block import Block
 from .expr import Expr
-from .memory import Memory
 
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
@@ -131,7 +130,7 @@ class CodeGen(visitor.Visitor):
             depth = f'depth: {m.depth}'
             lat = f'lat: {m.latency[0]}..={m.latency[1]}'
             if m.init_file is not None:
-                init_file = f'init_file: Some("{m.init_file}")'
+                init_file = f'init_file: Some("{m.init_file}".into())'
             else:
                 init_file = 'init_file: None'
             array = f'array: {m.payload.name}'
@@ -145,7 +144,7 @@ class CodeGen(visitor.Visitor):
         sim_threshold = f'sim_threshold: {self.sim_threshold}'
         config = [idle_threshold, sim_threshold]
         if self.resource_base is not None:
-            resource_base = f'resource_base: "{self.resource_base}"'
+            resource_base = f'resource_base: PathBuf::from("{self.resource_base}")'
             config.append(resource_base)
         return ', '.join(config)
 

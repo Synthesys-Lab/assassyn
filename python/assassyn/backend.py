@@ -8,18 +8,27 @@ from .builder import SysBuilder
 from . import utils
 from . import codegen
 
-def default_config():
+def config( # pylint: disable=too-many-arguments
+        path=tempfile.gettempdir(),
+        resource_base=None,
+        pretty_printer=True,
+        verbose=True,
+        finalized=False,
+        simulator=True,
+        verilog=False,
+        sim_threshold=100,
+        idle_threshold=100):
     '''The helper function to dump the default configuration of elaboration.'''
     res = {
-        'path': tempfile.gettempdir(),
-        'resource_base': None,
-        'pretty_printer': True,
-        'verbose': True,
-        'finalized': False,
-        'simulator': True,
-        'verilog': False,
-        'idle_threshold': 100,
-        'sim_threshold': 100
+        'path': path,
+        'resource_base': resource_base,
+        'pretty_printer': pretty_printer,
+        'verbose': verbose,
+        'finalized': finalized,
+        'simulator': simulator,
+        'verilog': verilog,
+        'sim_threshold': sim_threshold,
+        'idle_threshold': idle_threshold
     }
     return res.copy()
 
