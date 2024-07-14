@@ -11,6 +11,7 @@ from .array import Array
 from .module import Module, Port
 from .block import Block
 from .expr import Expr
+from .memory import Memory
 
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
@@ -125,6 +126,18 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
         if m.disable_arbiter_rewrite:
             self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
+        if isinstance(m, Memory):
+            width = f'width: {m.width}'
+            depth = f'depth: {m.depth}'
+            lat = f'lat: {m.latency[0]}..={m.latency[1]}'
+            if m.init_file is not None:
+                init_file = f'init_file: Some("{m.init_file}")'
+            else:
+                init_file = 'init_file: None'
+            array = f'array: {m.payload.name}'
+            params = ', '.join([width, depth, lat, init_file, array])
+            params = f'eir::ir::module::memory::MemoryParams{{ {params} }}'
+            self.code.append(f'{module_mut}.add_attr({path}::Memory({params}));')
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''
@@ -239,8 +252,7 @@ class CodeGen(visitor.Visitor):
                 let {port_name} = {{
                   let module = {module_name}.as_ref::<eir::ir::Module>(&sys).unwrap();
                   module.get_port_by_name("{node.name}").unwrap().upcast()
-                }};
-            ''')
+                }};''')
             return port_name
         return node.as_operand()
 

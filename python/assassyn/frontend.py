@@ -7,4 +7,5 @@ from .builder import SysBuilder, ir_builder, Singleton
 from .expr import Expr, log
 from .module import Module, Port
 from .block import Condition, Cycle
+from .memory import Memory
 from . import module

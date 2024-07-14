@@ -38,7 +38,7 @@ def make_existing_dir(path):
     except Exception as e:
         raise e
 
-def elaborate(
+def elaborate( # pylint: disable=too-many-arguments
         sys: SysBuilder,
         path=tempfile.gettempdir(),
         pretty_printer=True,
@@ -47,8 +47,7 @@ def elaborate(
         simulator=True,
         verilog=False,
         idle_threshold=100,
-        sim_threshold=100,
-        **kwargs):
+        sim_threshold=100):
     '''
     Invoke the elaboration process of the given system.
 

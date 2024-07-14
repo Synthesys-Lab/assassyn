@@ -234,9 +234,17 @@ class FIFOField(Expr):
     FIFO_VALID = 300
     FIFO_PEEK  = 303
 
+    OPERATORS = {
+        FIFO_VALID: 'valid',
+        FIFO_PEEK: 'peek',
+    }
+
     def __init__(self, opcode, fifo):
         super().__init__(opcode)
         self.fifo = fifo
+
+    def __repr__(self):
+        return f'{self.as_operand()} = {self.fifo.as_operand()}.{self.OPERATORS[self.opcode]}()'
 
 
 class Bind(Expr):

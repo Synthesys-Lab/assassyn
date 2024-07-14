@@ -102,7 +102,6 @@ class Value:
     def select(self, true_value, false_value):
         '''The frontend API to create a select operation'''
         from .expr import Select
-        print(self)
         return Select(Select.SELECT, self, true_value, false_value)
 
 
@@ -113,15 +112,14 @@ class Optional:
         self.value = value
         self.pred = pred
 
-    def unwrap(self):
-        return self.value
-
     @ir_builder(node_type='expr')
     def unwrap_or(self, default):
+        '''The frontend API to get the value of an optional value with a given default'''
         from .expr import Select
         return Select(Select.SELECT, self.pred, self.value, default)
 
     @ir_builder(node_type='expr')
     def map_or(self, f, default):
+        '''The frontend API to get the map of an optional value with a given default'''
         from .expr import Select
         return Select(Select.SELECT, self.pred, f(self.value), default)

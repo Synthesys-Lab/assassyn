@@ -15,6 +15,8 @@ def constructor(func, *args, **kwargs):
     module_self = args[0]
     builder.insert_point['module'].append(module_self)
     func(*args, **kwargs)
+    for key in ['body', '_pop_cache', '_wait_until', '_finalized']:
+        assert hasattr(module_self, key), 'Did you forget to call `super().__init__?`'
     name_ports_of_module(module_self)
 
 
@@ -93,6 +95,13 @@ class Module:
         self._pop_cache = {}
         self._wait_until = []
         self._finalized = False
+
+    def validate_all_ports(self):
+        '''A syntactic sugar for checking the validity of all the ports in this module.'''
+        valid = None
+        for port in self.ports:
+            valid = port.valid() if valid is None else valid & port.valid()
+        return valid
 
     @property
     def finalized(self):
