@@ -193,7 +193,7 @@ class CodeGen(visitor.Visitor):
         config = self.emit_config()
         self.code.append(f'''
             let mut config = eir::backend::common::Config{{
-               {config}
+               {config},
                ..Default::default()
             }};
         ''')
