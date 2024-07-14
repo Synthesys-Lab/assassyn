@@ -4,12 +4,13 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
 
+def ae(a, b):
+    c = a + b
+    eq = (a == b)
+    return (c, eq)
+
 class Driver(Module):
 
-    def ae(self, a, b):
-        c = a + b
-        eq = (a == b)
-        return (c, eq)
 
     @module.constructor
     def __init__(self):
@@ -21,7 +22,7 @@ class Driver(Module):
         k = cnt[0]
         v = k + Int(32)(1)
         cnt[0] = v
-        a, e = self.ae(v, v)
+        a, e = ae(v, v)
         log("add: {} + {} = {}", v, v, a)
         log("eq: {} == {} ? {}", v, v, e)
 

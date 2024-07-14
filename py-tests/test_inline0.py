@@ -5,11 +5,12 @@ from assassyn.backend import elaborate
 from assassyn import utils
 
 
+def adder(a, b):
+    c = a + b
+    log("adder: {} + {} = {}", a, b, c)
+
 class Driver(Module):
 
-    def adder(self, a, b):
-        c = a + b
-        log("adder: {} + {} = {}", a, b, c)
 
     @module.constructor
     def __init__(self):
@@ -21,7 +22,7 @@ class Driver(Module):
         k = cnt[0]
         v = k + Int(32)(1)
         cnt[0] = v
-        self.adder(v, v)
+        adder(v, v)
 
 def test_inline0():
     sys = SysBuilder('inline0')
