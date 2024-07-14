@@ -60,7 +60,7 @@ def test_imbalance():
 
     print(sys)
 
-    simulator_path = elaborate(sys)
+    simulator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
 

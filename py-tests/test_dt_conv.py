@@ -37,7 +37,7 @@ def test_dt_conv():
 
     print(sys)
 
-    simulator_path = elaborate(sys)
+    simulator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
 

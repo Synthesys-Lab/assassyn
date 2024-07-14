@@ -66,7 +66,7 @@ def test_array_multi_write_in_same_module():
 
     print(sys)
 
-    simulator_path = elaborate(sys)
+    simulator_path = elaborate(sys, verilog='verilator')
     raw = utils.run_simulator(simulator_path)
 
     print(raw)

@@ -22,7 +22,7 @@ def test_driver():
         driver = Driver()
         driver.build()
 
-    simulator_path = elaborate(sys)
+    simulator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
 
