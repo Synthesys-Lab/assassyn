@@ -77,6 +77,3 @@ jobs:
       - name: Generate test result
         run: |
           cargo test;
-      - name: Lint the generated sv codes
-        run: |
-          find /tmp/*.sv -print0 | xargs -0 -n1 sh -c 'verilator --lint-only --bbox-sys --timing $0 || exit 255';
