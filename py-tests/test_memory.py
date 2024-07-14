@@ -1,6 +1,6 @@
 import assassyn
 from assassyn.frontend import *
-from assassyn.backend import elaborate
+from assassyn import backend
 from assassyn import utils
 
 
@@ -55,7 +55,12 @@ def test_memory():
         driver = Driver()
         driver.build(memory)
 
-    simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200)
+    config = backend.default_config()
+    config['sim_threshold'] = 200
+    config['idle_threshold'] = 200
+
+    simulator_path = backend.elaborate(sys, **config)
+
     raw = utils.run_simulator(simulator_path)
 
     for line in raw.splitlines():

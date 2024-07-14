@@ -141,7 +141,13 @@ class CodeGen(visitor.Visitor):
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''
-        return f'idle_threshold: {self.idle_threshold}, sim_threshold: {self.sim_threshold},'
+        idle_threshold = f'idle_threshold: {self.idle_threshold}'
+        sim_threshold = f'sim_threshold: {self.sim_threshold}'
+        config = [idle_threshold, sim_threshold]
+        if self.resource_base is not None:
+            resource_base = f'resource_base: "{self.resource_base}"'
+            config.append(resource_base)
+        return ', '.join(config)
 
     def generate_init_value(self, init_value, ty: str):
         '''Generate the initializer vector. NOTE: ty is already generated in an str!'''
@@ -159,6 +165,7 @@ class CodeGen(visitor.Visitor):
 
 
     def visit_system(self, node: SysBuilder):
+        self.header.append('use std::path::PathBuf;')
         self.header.append('use eir::{builder::SysBuilder, created_here};')
         self.header.append('use eir::ir::node::IsElement;')
         self.code.append('fn main() {')
@@ -347,11 +354,12 @@ class CodeGen(visitor.Visitor):
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         self.code.append(array_decl)
 
-    def __init__(self, simulator, verilog, idle_threshold, sim_threshold):
+    def __init__(self, simulator, verilog, idle_threshold, sim_threshold, resource_base): #pylint: disable=too-many-arguments
         self.code = []
         self.header = []
         self.emitted_bind = set()
         self.targets = {}
+        self.resource_base = resource_base
         if simulator:
             self.targets['simulator'] = True
         if verilog:
@@ -363,7 +371,13 @@ class CodeGen(visitor.Visitor):
         '''Concatenate the generated source code for the given system'''
         return '\n'.join(self.header) + '\n' + '\n'.join(self.code)
 
-def codegen(sys: SysBuilder, simulator, verilog, idle_threshold, sim_threshold):
+def codegen( #pylint: disable=too-many-arguments
+        sys: SysBuilder,
+        simulator,
+        verilog,
+        idle_threshold,
+        sim_threshold,
+        resource_base):
     '''
     The help function to generate the assassyn IR builder for the given system
 
@@ -371,6 +385,6 @@ def codegen(sys: SysBuilder, simulator, verilog, idle_threshold, sim_threshold):
         sys (SysBuilder): The system to generate the builder for
         kwargs: Additional arguments to pass to the code
     '''
-    cg = CodeGen(simulator, verilog, idle_threshold, sim_threshold)
+    cg = CodeGen(simulator, verilog, idle_threshold, sim_threshold, resource_base)
     cg.visit_system(sys)
     return cg.get_source()
