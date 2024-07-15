@@ -1,9 +1,9 @@
 '''Memory module, a special and subclass of Module.'''
 
 from .module import Module, Port
-from .dtype import Int, Bits
-from .array import RegArray
-from .block import Condition
+from ..dtype import Int, Bits
+from ..array import RegArray
+from ..block import Condition
 
 # pylint: disable=too-many-instance-attributes
 class Memory(Module):

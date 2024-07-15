@@ -1,12 +1,12 @@
-'''The module for defining the AST nodes for the module and ports.'''
+'''The module AST implementation.'''
 
 from decorator import decorator
 
-from .builder import Singleton, ir_builder
-from .dtype import DType
-from .block import Block
-from .expr import Bind, FIFOPop, FIFOField, FIFOPush, AsyncCall
-from .expr.intrinsic import _wait_until
+from ..builder import Singleton, ir_builder
+from ..dtype import DType
+from ..block import Block
+from ..expr import Bind, FIFOPop, FIFOField, FIFOPush, AsyncCall
+from ..expr.intrinsic import _wait_until
 
 @decorator
 def constructor(func, *args, **kwargs):

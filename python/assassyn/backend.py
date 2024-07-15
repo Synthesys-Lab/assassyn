@@ -8,6 +8,30 @@ from .builder import SysBuilder
 from . import utils
 from . import codegen
 
+def config( # pylint: disable=too-many-arguments
+        path=tempfile.gettempdir(),
+        resource_base=None,
+        pretty_printer=True,
+        verbose=True,
+        finalized=False,
+        simulator=True,
+        verilog=False,
+        sim_threshold=100,
+        idle_threshold=100):
+    '''The helper function to dump the default configuration of elaboration.'''
+    res = {
+        'path': path,
+        'resource_base': resource_base,
+        'pretty_printer': pretty_printer,
+        'verbose': verbose,
+        'finalized': finalized,
+        'simulator': simulator,
+        'verilog': verilog,
+        'sim_threshold': sim_threshold,
+        'idle_threshold': idle_threshold
+    }
+    return res.copy()
+
 def dump_cargo_toml(path, name):
     '''
     Dump the Cargo.toml file for the Rust-implemented simulator
@@ -41,6 +65,7 @@ def make_existing_dir(path):
 def elaborate( # pylint: disable=too-many-arguments
         sys: SysBuilder,
         path=tempfile.gettempdir(),
+        resource_base=None,
         pretty_printer=True,
         verbose=True,
         finalized=False,
@@ -80,7 +105,8 @@ def elaborate( # pylint: disable=too-many-arguments
     make_existing_dir(os.path.join(sys_dir, 'src'))
     # Dump the assassyn IR builder
     with open(os.path.join(sys_dir, 'src/main.rs'), 'w', encoding='utf-8') as fd:
-        fd.write(codegen.codegen(sys, simulator, verilog, idle_threshold, sim_threshold))
+        raw = codegen.codegen(sys, simulator, verilog, idle_threshold, sim_threshold, resource_base)
+        fd.write(raw)
     if pretty_printer:
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir, check=True)

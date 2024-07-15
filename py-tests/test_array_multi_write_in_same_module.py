@@ -14,11 +14,10 @@ class ModA(Module):
 
     @module.combinational
     def build(self, arr: Array):
-        with Condition(self.a[0: 0]):
-            with Condition(self.a[1: 1]):
-                pass
+        v = self.a[0: 0]
+        with Condition(v):
             arr[0] = self.a
-        with Condition(~self.a[0: 0]):
+        with Condition(~v):
             arr[0] = self.a + Int(32)(1)
 
 class ModC(Module):

@@ -1,14 +1,14 @@
 import assassyn
 from assassyn.frontend import *
-from assassyn.backend import elaborate
+from assassyn import backend
 from assassyn import utils
 
 
 class SRAM(Memory):
 
     @module.constructor
-    def __init__(self):
-        super().__init__(width=32, depth=1024, latency=(1, 1), init_file=None)
+    def __init__(self, init_file):
+        super().__init__(width=32, depth=1024, latency=(1, 1), init_file=init_file)
 
     @module.combinational
     def build(self):
@@ -44,18 +44,21 @@ class Driver(Module):
         cnt[0] = plused
 
 
-def test_memory():
-    sys = SysBuilder('memory')
+def impl(sys_name, init_file, resource_base):
+    sys = SysBuilder(sys_name)
     with sys:
         # Build the SRAM module
-        memory = SRAM()
+        memory = SRAM(init_file)
         memory.wait_until()
         memory.build()
         # Build the driver
         driver = Driver()
         driver.build(memory)
 
-    simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200, verilog='verilator')
+    config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base)
+
+    simulator_path = backend.elaborate(sys, **config, verilog='verilator')
+
     raw = utils.run_simulator(simulator_path)
 
     for line in raw.splitlines():
@@ -67,6 +70,12 @@ def test_memory():
             assert c % 2 == 1 or a == 0, f'Expected odd number or zero, got {line}'
             assert c == a + b, f'{a} + {b} = {c}'
 
+def test_memory():
+    impl('memory', None, None)
+
+def test_memory_init():
+    impl('memory_init', 'init.hex', f'{utils.repo_path()}/tests/resources')
 
 if __name__ == "__main__":
     test_memory()
+    test_memory_init()
