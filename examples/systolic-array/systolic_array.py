@@ -13,12 +13,10 @@ from assassyn.expr import Bind
 #           [Sink]        [Sink]        [Sink]        [Sink]
 
 class ProcElem():
-    def __init__(self, pe, bound, accumulator):
+    def __init__(self, pe=None, bound=None, accumulator=None):
         self.pe = pe
         self.bound = bound
         self.accumulator = accumulator
-
-
 
 class Sink(Module):
 
@@ -29,8 +27,7 @@ class Sink(Module):
 
     @module.combinational
     def build(self):
-        pass
-
+        log("Hello")
 
 class ComputePE(Module):
 
@@ -54,6 +51,64 @@ class ComputePE(Module):
         south.async_called(north=self.north)
         return feast, acc
 
+class RowPusher(Module):
+    
+    @module.constructor
+    def __init__(self):
+        super().__init__()
+        self.data = Port(Int(32))
+
+    @module.combinational
+    def build(self, dest: ComputePE):
+        log("pushes {}", self.data)
+        bound = dest.bind(north=self.data)
+        return bound
+
+class ColPusher(Module):
+
+    @module.constructor
+    def __init__(self):
+        super().__init__()
+        self.data = Port(Int(32))
+
+    @module.combinational
+    def build(self, dest: Bind):
+        log("pushes {}", self.data)
+        dest.async_called(west=self.data)
 
 def systolic_array():
     sys = SysBuilder('systolic-array')
+    pe_array = [[ProcElem() for _ in range(6)] for _ in range(6)]
+    
+    with sys:
+        # Column-wise Sinker
+        for i in range(1, 5):
+            pe_array[i][5].pe = Sink()
+            pe_array[i][5].pe.build()
+            pe_array[i][5].bound = pe_array[i][5].pe
+
+        # Row-wise Sinker
+        for i in range(1, 5):
+            pe_array[5][i].pe = Sink()
+            pe_array[5][i].pe.build()
+            pe_array[5][i].bound = pe_array[5][i].pe
+
+        for i in range(4, 0, -1):
+            for j in range(4, 0, -1):
+                peeast = pe_array[i][j + 1].pe
+                fsouth = pe_array[i + 1][j].bound
+                pe = ComputePE()
+                print(f'i = {i}; j = {j}')
+                feast, acc = pe.build(peeast, fsouth)
+                #TODO: Set name of each ComputePE
+                pe_array[i][j].pe = pe
+                pe_array[i][j].bound = pe
+                pe_array[i][j + 1].bound = feast
+                pe_array[i][j].accumulator = acc
+                pe_array[i + 1][j].bound = fsouth
+
+
+    print(sys)
+
+if __name__ == '__main__':
+    systolic_array()
