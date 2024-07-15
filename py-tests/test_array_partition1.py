@@ -34,9 +34,9 @@ def test_array_partition1():
 
     print(sys)
 
-    simulator_path = elaborate(sys)
+    simulator_path = elaborate(sys, verilog='verilator')
     
-    raw = utils.run_simulator(simulator_path, verilog='verilator')
+    raw = utils.run_simulator(simulator_path)
     print(raw)
 
     a = [1, 2, 3, 4]
