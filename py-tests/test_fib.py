@@ -32,7 +32,7 @@ def test_fib():
         driver = Driver()
         driver.build()
 
-    simulator_path = elaborate(sys)
+    simulator_path = elaborate(sys, simulator='verilator')
 
     raw = utils.run_simulator(simulator_path)
 
