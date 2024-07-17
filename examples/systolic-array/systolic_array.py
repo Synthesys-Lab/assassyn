@@ -1,7 +1,7 @@
 import pytest
-from dataclasses import dataclass
 from assassyn.frontend import *
 from assassyn.backend import elaborate
+from assassyn import utils
 from assassyn.expr import Bind
 
 #  # PE Array (4 + 1) x (4 + 1)
@@ -235,8 +235,14 @@ def systolic_array():
                         pe_array[3][0].pe, \
                         pe_array[4][0].pe)
 
-
     print(sys)
+
+    simulator_path = elaborate(sys)
+
+    raw = utils.run_simulator(simulator_path)
+
+    print(raw)
+
 
 if __name__ == '__main__':
     systolic_array()
