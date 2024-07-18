@@ -17,7 +17,7 @@ def run_verilator(path):
     restore = os.getcwd()
     os.chdir(path)
     print(path)
-    cmd = ['make', 'main']
+    cmd = ['make', 'main', '-j']
     subprocess.check_output(cmd).decode('utf-8')
     # TODO(@were): Fix this hardcoded Vtb later.
     cmd = ['./obj_dir/Vtb']
