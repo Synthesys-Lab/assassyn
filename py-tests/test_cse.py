@@ -1,5 +1,6 @@
 import pytest
 
+import assassyn
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
@@ -33,6 +34,19 @@ class Driver(Module):
         with Condition(cond):
             log("Done")
 
+def check(raw):
+    cnt = 0
+    for i in raw.split('\n'):
+        if f'Adder' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(a) + int(b) == int(c)
+            cnt += 1
+    assert cnt == 100, f'cnt: {cnt} != 100 - 1'
+
+
 def test_cond_cse():
     sys = SysBuilder('cond_cse')
     with sys:
@@ -42,20 +56,15 @@ def test_cond_cse():
         driver = Driver()
         driver.build(adder)
 
-    simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200, verilog='verilator')
+    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog='verilator')
+    simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    cnt = 0
-    for i in raw.split('\n'):
-        if f'[{adder.synthesis_name().lower()}]' in i:
-            line_toks = i.split()
-            c = line_toks[-1]
-            a = line_toks[-3]
-            b = line_toks[-5]
-            assert int(a) + int(b) == int(c)
-            cnt += 1
-    assert cnt == 100, f'cnt: {cnt} != 100'
+    raw = utils.run_verilator(verilator_path)
+    check(raw)
+
 
 
 if __name__ == '__main__':
