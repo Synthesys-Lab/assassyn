@@ -57,7 +57,7 @@ def impl(sys_name, init_file, resource_base):
 
     config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog='verilator')
 
-    simulator_path = backend.elaborate(sys, **config)
+    simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
 

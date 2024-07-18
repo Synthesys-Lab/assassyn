@@ -29,15 +29,13 @@ def check(raw, parser):
             line_toks = i.split()
             cycle = parser(line_toks)
             assert (int(line_toks[-1]) % 4) == 0
-            assert max(cycle - 1, 0) * 4 == int(line_toks[-1])
+            assert max(cycle - 2, 0) * 4 == int(line_toks[-1])
 
 def test_array_partition0():
     sys = SysBuilder('array_partition0')
     with sys:
         driver = Driver()
         driver.build()
-
-    print(sys)
 
     simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 

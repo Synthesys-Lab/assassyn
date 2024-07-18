@@ -26,7 +26,7 @@ def run_verilator(path):
     return res
 
 def parse_verilator_cycle(toks):
-    return int(toks[0])
+    return int(toks[0]) // 100
 
 def parse_simulator_cycle(toks):
-    return int(toks[1][2:-4])
+    return int(toks[2][1:-4])
