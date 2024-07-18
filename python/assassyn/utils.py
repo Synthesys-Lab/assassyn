@@ -24,4 +24,3 @@ def run_verilator(path):
     res = subprocess.check_output(cmd).decode('utf-8')
     os.chdir(restore)
     return res
-
