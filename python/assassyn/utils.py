@@ -18,7 +18,11 @@ def run_verilator(path):
     os.chdir(path)
     print(path)
     cmd = ['make', 'main', '-j']
-    subprocess.check_output(cmd).decode('utf-8')
+    try:
+        subprocess.check_output(cmd).decode('utf-8')
+    except subprocess.CalledProcessError as e:
+        print(e.output)
+        assert False
     # TODO(@were): Fix this hardcoded Vtb later.
     cmd = ['./obj_dir/Vtb']
     res = subprocess.check_output(cmd).decode('utf-8')
