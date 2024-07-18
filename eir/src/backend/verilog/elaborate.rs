@@ -696,7 +696,8 @@ top top_i (
 
 endmodule
 ",
-        (sim_threshold + 1) * 100, init
+        (sim_threshold + 1) * 100,
+        init
       )
       .as_bytes(),
     )?;
