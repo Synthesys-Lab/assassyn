@@ -35,8 +35,9 @@ impl Config {
   }
 
   /// The name of the directory to which the elaboration code is dumped.
-  pub fn dir_name(&self, sys: &SysBuilder) -> PathBuf {
-    self.base_dir.join(sys.get_name())
+  pub fn simulator_name(&self, sys: &SysBuilder) -> PathBuf {
+    let name_with_suffix = format!("{}_simulator",sys.get_name());
+    self.base_dir.join(name_with_suffix)
   }
 }
 

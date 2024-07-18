@@ -201,7 +201,7 @@ class CodeGen(visitor.Visitor):
         self.code.append(f'  eir::xform::basic(&mut sys, &{config});')
         be_path = 'eir::backend'
         if self.targets['simulator']:
-            base_dir = '(env!("CARGO_MANIFEST_DIR").to_string() + "/simulator").into()'
+            base_dir = '(env!("CARGO_MANIFEST_DIR").to_string()).into()'
             self.code.append(f'  config.base_dir = {base_dir};')
             self.code.append(f'  {be_path}::simulator::elaborate(&sys, &config).unwrap();')
         if 'verilog' in self.targets:

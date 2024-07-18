@@ -1201,19 +1201,19 @@ fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
 }
 
 fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io::Error> {
-  let dir_name = config.dir_name(sys);
-  create_and_clean_dir(dir_name.clone().into(), config.override_dump);
+  let simulator_name = config.simulator_name(sys);
+  create_and_clean_dir(simulator_name.clone().into(), config.override_dump);
   eprintln!(
     "Writing simulator code to rust project: {}",
-    dir_name.to_str().unwrap()
+    simulator_name.to_str().unwrap()
   );
   let output = Command::new("cargo")
     .arg("init")
-    .arg(&dir_name)
+    .arg(&simulator_name)
     .output()
     .expect("Failed to init cargo project");
   assert!(output.status.success());
-  let manifest = dir_name.join("Cargo.toml");
+  let manifest = simulator_name.join("Cargo.toml");
   // Dump the Cargo.toml and rustfmt.toml
   {
     let mut cargo = OpenOptions::new()
@@ -1222,22 +1222,22 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
       .open(&manifest)?;
     writeln!(cargo, "num-bigint = \"0.4\"")?;
     writeln!(cargo, "num-traits = \"0.2\"")?;
-    let mut fmt = fs::File::create(dir_name.join("rustfmt.toml"))?;
+    let mut fmt = fs::File::create(simulator_name.join("rustfmt.toml"))?;
     writeln!(fmt, "max_width = 100")?;
     writeln!(fmt, "tab_spaces = 2")?;
     fmt.flush()?;
   }
   // eprintln!("Writing simulator source to file: {}", fname);
-  let fname = dir_name.join("src/main.rs");
+  let fname = simulator_name.join("src/main.rs");
   let (rt_src, ri) = dump_runtime(sys, config);
   {
-    let modules_file = dir_name.join("src/modules.rs");
+    let modules_file = simulator_name.join("src/modules.rs");
     let mut fd = fs::File::create(modules_file).expect("Open failure");
     dump_modules(sys, &mut fd, &ri).expect("Dump module failure");
     fd.flush().expect("Flush modules failure");
   }
   {
-    let runtime_file = dir_name.join("src/runtime.rs");
+    let runtime_file = simulator_name.join("src/runtime.rs");
     let mut fruntime = fs::File::create(runtime_file).expect("Open failure");
     fruntime
       .write(rt_src.as_bytes())

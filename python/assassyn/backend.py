@@ -111,4 +111,4 @@ def elaborate( # pylint: disable=too-many-arguments
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir, check=True)
 
-    return os.path.join(sys_dir, f'simulator/{sys.name}')
+    return os.path.join(sys_dir, f'{sys.name}_simulator')
