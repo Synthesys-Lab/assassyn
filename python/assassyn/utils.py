@@ -26,7 +26,9 @@ def run_verilator(path):
     return res
 
 def parse_verilator_cycle(toks):
+    '''Helper function to parse verilator dumped cycle'''
     return int(toks[0]) // 100
 
 def parse_simulator_cycle(toks):
+    '''Helper function to parse rust-simulator dumped cycle'''
     return int(toks[2][1:-4])
