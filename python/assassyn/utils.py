@@ -11,3 +11,17 @@ def run_simulator(path):
     '''The helper function to run the simulator'''
     cmd = ['cargo', 'run', '--manifest-path', path + '/Cargo.toml', '--release']
     return subprocess.check_output(cmd).decode('utf-8')
+
+def run_verilator(path):
+    '''The helper function to run the verilator'''
+    restore = os.getcwd()
+    os.chdir(path)
+    print(path)
+    cmd = ['make', 'main']
+    subprocess.check_output(cmd).decode('utf-8')
+    # TODO(@were): Fix this hardcoded Vtb later.
+    cmd = ['./obj_dir/Vtb']
+    res = subprocess.check_output(cmd).decode('utf-8')
+    os.chdir(restore)
+    return res
+
