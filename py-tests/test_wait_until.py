@@ -50,10 +50,12 @@ class Driver(Module):
             lock[0] = flip
 
 def parse_simulator_log(toks):
-    return int(toks[2][1:-4]), int(toks[-5]), int(toks[-1])
+    cycle = utils.parse_simulator_cycle(toks)
+    return cycle, int(toks[-5]), int(toks[-1])
 
 def parse_verilator_log(toks):
-    return int(toks[0]), int(toks[-5]), int(toks[-1])
+    cycle = utils.parse_verilator_cycle(toks)
+    return cycle, int(toks[-5]), int(toks[-1])
 
 def check(raw, cycle_parser):
     for i in raw.splitlines():

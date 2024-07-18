@@ -24,3 +24,9 @@ def run_verilator(path):
     res = subprocess.check_output(cmd).decode('utf-8')
     os.chdir(restore)
     return res
+
+def parse_verilator_cycle(toks):
+    return int(toks[0])
+
+def parse_simulator_cycle(toks):
+    return int(toks[1][2:-4])

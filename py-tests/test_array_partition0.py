@@ -23,6 +23,13 @@ class Driver(Module):
         a_sum = a[0] + a[1] + a[2] + a[3]
         log("sum(a[:]) = {}", a_sum)
 
+def check(raw, parser):
+    for i in raw.split('\n'):
+        if 'sum(a[:])' in i:
+            line_toks = i.split()
+            cycle = parser(line_toks)
+            assert (int(line_toks[-1]) % 4) == 0
+            assert max(cycle - 1, 0) * 4 == int(line_toks[-1])
 
 def test_array_partition0():
     sys = SysBuilder('array_partition0')
@@ -32,18 +39,15 @@ def test_array_partition0():
 
     print(sys)
 
-    simulator_path = elaborate(sys, verilog='verilator')
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
+    check(raw, utils.parse_simulator_cycle)
 
-    print(raw)
+    raw = utils.run_verilator(verilator_path)
+    check(raw, utils.parse_verilator_cycle)
 
-    for i in raw.split('\n'):
-        if 'sum(a[:])' in i:
-            line_toks = i.split()
-            cycle = int(line_toks[2][1:-4])
-            assert (int(line_toks[-1]) % 4) == 0
-            assert max(cycle - 1, 0) * 4 == int(line_toks[-1])
+
 
 if __name__ == '__main__':
     test_array_partition0()

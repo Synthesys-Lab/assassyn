@@ -48,8 +48,8 @@ class Driver(Module):
         mod_c.async_called(a = v)
 
 
-def test_array_multi_write_in_same_module():
-    sys =  SysBuilder('array_multi_write_in_same_module')
+def test_array_multi_write():
+    sys =  SysBuilder('array_multi_write')
     with sys:
 
         arr = RegArray(Int(32), 1)
@@ -63,12 +63,9 @@ def test_array_multi_write_in_same_module():
         driver = Driver()
         driver.build(mod_a, mod_c)
 
-    print(sys)
-
-    simulator_path = elaborate(sys, verilog='verilator')
-    raw = utils.run_simulator(simulator_path)
-
-    print(raw)
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
+    utils.run_simulator(simulator_path)
+    utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
-    test_array_multi_write_in_same_module()
+    test_array_multi_write()

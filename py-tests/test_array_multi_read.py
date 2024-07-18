@@ -58,6 +58,17 @@ class Driver(Module):
         mod_c.async_called(a = v)
 
 
+def check(raw):
+    for i in raw.split('\n'):
+        if 'a =' in i and 'arr =' in i:
+            line_toks = i.split()
+            a = line_toks[-4]
+            arr = line_toks[-1]
+            if a == '0':
+                assert int(arr) == 0
+                continue
+            assert int(arr) == (int(a) - 1)
+
 def test_array_multi_read():
 
     sys = SysBuilder('array_multi_read')
@@ -76,24 +87,14 @@ def test_array_multi_read():
         driver = Driver()
         driver.build(mod_a, mod_b, mod_c)
 
-    print(sys)
-
-    simulator_path = elaborate(sys, verilog='verilator')
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    print(raw)
+    raw = utils.run_verilator(verilator_path)
+    check(raw)
 
-    for i in raw.split('\n'):
-        if f'[{mod_c.synthesis_name().lower()}]' in i:
-            line_toks = i.split()
-            a = line_toks[-4]
-            arr = line_toks[-1]
-            if a == '0':
-                assert int(arr) == 0
-                continue
-            assert int(arr) == (int(a) - 1)
-        
-        
+
 
 if __name__ == '__main__':
     test_array_multi_read()
