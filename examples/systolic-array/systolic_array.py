@@ -51,7 +51,7 @@ class ComputePE(Module):
         south.async_called(north=self.north)
         return feast, acc
 
-class RowPusher(Module):
+class ColPusher(Module):
     
     @module.constructor
     def __init__(self):
@@ -64,7 +64,7 @@ class RowPusher(Module):
         bound = dest.bind(north=self.data)
         return bound
 
-class ColPusher(Module):
+class RowPusher(Module):
 
     @module.constructor
     def __init__(self):
