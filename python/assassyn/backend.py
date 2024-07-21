@@ -114,8 +114,9 @@ def elaborate( # pylint: disable=too-many-arguments
 
     paths = []
     if simulator:
-        paths.append(os.path.join(sys_dir, f'simulator/{sys.name}'))
+        paths.append(os.path.join(sys_dir, f'{sys.name}_simulator'))
     if verilog:
-        paths.append(os.path.join(sys_dir, f'verilog/{sys.name}'))
+        paths.append(os.path.join(sys_dir, f'{sys.name}_verilog'))
 
     return paths[0] if len(paths) == 1 else paths
+
