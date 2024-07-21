@@ -11,3 +11,10 @@ def run_simulator(path):
     '''The helper function to run the simulator'''
     cmd = ['cargo', 'run', '--manifest-path', path + '/Cargo.toml', '--release']
     return subprocess.check_output(cmd).decode('utf-8')
+
+def run_verilator(path):
+    '''The helper function to run the verilator in the given path'''
+    cmd = ['make', 'main']
+    return subprocess.check_output(cmd, cwd=path, stderr=subprocess.STDOUT).decode('utf-8')
+
+    

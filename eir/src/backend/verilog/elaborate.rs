@@ -1694,13 +1694,13 @@ pub fn generate_cpp_testbench(dir: &PathBuf, sys: &SysBuilder, simulator: &Simul
 }
 
 pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Result<(), Error> {
-  create_and_clean_dir(config.simulator_name(sys), config.override_dump);
-  let simulator_name = config.simulator_name(sys);
-  let fname = simulator_name.join(format!("{}.sv", sys.get_name()));
+  create_and_clean_dir(config.verilog_name(sys), config.override_dump);
+  let verilog_name = config.verilog_name(sys);
+  let fname = verilog_name.join(format!("{}.sv", sys.get_name()));
 
   println!("Writing verilog rtl to {}", fname.to_str().unwrap());
 
-  generate_cpp_testbench(&simulator_name, sys, &simulator);
+  generate_cpp_testbench(&verilog_name, sys, &simulator);
 
   let mut vd = VerilogDumper::new(sys, config, simulator);
 
