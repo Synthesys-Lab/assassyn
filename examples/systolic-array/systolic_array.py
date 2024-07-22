@@ -13,21 +13,21 @@ from assassyn.expr import Bind
 #           [Sink]        [Sink]        [Sink]        [Sink]
 
 class ProcElem():
-    def __init__(self, pe=None, bound=None, accumulator=None):
+    def __init__(self, pe=None, bound=None):
         self.pe = pe
         self.bound = bound
-        self.accumulator = accumulator
 
 class Sink(Module):
-
+    
     @module.constructor
     def __init__(self, port_name='_v'):
         super().__init__()
         setattr(self, port_name, Port(Int(32)))
+        self.port_name = port_name
 
     @module.combinational
     def build(self):
-        log("Hello")
+        log("Sink: {}", getattr(self, self.port_name))
 
 class ComputePE(Module):
 
@@ -39,42 +39,34 @@ class ComputePE(Module):
 
     @module.combinational
     def build(self, east: Bind, south: Bind):
-        c = self.west * self.north
-        acc = RegArray(Int(64), 1)
-        val = acc[0]
-        mac = val + c
-        log("Mac value: {} * {} + {} = {}", self.west, self.north, val, mac)
+        acc = RegArray(Int(32), 1)
+        mac = (self.west * self.north).bitcast(Int(32)) + acc[0]
+        log("Mac value: {} * {} + {} = {}", self.west, self.north, acc[0], mac)
         acc[0] = mac
-        feast = east.bind(west=self.west)
-        if feast.is_fully_bound():
-            feast.async_called()
-        south.async_called(north=self.north)
-        return feast, acc
 
-class ColPusher(Module):
-    
-    @module.constructor
-    def __init__(self):
-        super().__init__()
-        self.data = Port(Int(32))
+        bound_east = east.bind(west = self.west)
+        bound_south = south.bind(north = self.north)
+        if bound_east.is_fully_bound():
+            bound_east.async_called()
+        if bound_south.is_fully_bound():
+            bound_south.async_called()
 
-    @module.combinational
-    def build(self, dest: ComputePE):
-        log("pushes {}", self.data)
-        bound = dest.bind(north=self.data)
-        return bound
-
-class RowPusher(Module):
+class Pusher(Module):
 
     @module.constructor
-    def __init__(self):
+    def __init__(self, dest_port=''):
         super().__init__()
         self.data = Port(Int(32))
+        self.dest_port = dest_port
 
     @module.combinational
     def build(self, dest: Bind):
-        log("pushes {}", self.data)
-        dest.async_called(west=self.data)
+        log("Pushes {}", self.data)
+        bound = dest.bind(**{self.dest_port: self.data})
+        if bound.is_fully_bound():
+            bound.async_called()
+        return bound
+
 
 class Testbench(Module):
     
@@ -99,8 +91,8 @@ class Testbench(Module):
     # col [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]]
 
     @module.combinational
-    def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
-                    row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
+    def build(self, col1: Pusher, col2: Pusher, col3: Pusher, col4: Pusher, \
+                    row1: Pusher, row2: Pusher, row3: Pusher, row4: Pusher):
         with Cycle(0):
             # 0 0
             # 0 P P P  P
@@ -187,43 +179,39 @@ def systolic_array():
     pe_array = [[ProcElem() for _ in range(6)] for _ in range(6)]
     
     with sys:
-        # Column-wise Sinker
+        # Init ComputePE
+        for i in range(1, 5):
+            for j in range(1, 5):
+                pe_array[i][j].pe = ComputePE()
+
+        # Last Column Sink
         for i in range(1, 5):
             pe_array[i][5].pe = Sink('west')
             pe_array[i][5].pe.build()
             pe_array[i][5].bound = pe_array[i][5].pe
 
-        # Row-wise Sinker
+        # Last Row Sink
         for i in range(1, 5):
             pe_array[5][i].pe = Sink('north')
             pe_array[5][i].pe.build()
             pe_array[5][i].bound = pe_array[5][i].pe
 
+        # Build ComputePEs
         for i in range(4, 0, -1):
             for j in range(4, 0, -1):
-                peeast = pe_array[i][j + 1].pe
-                fsouth = pe_array[i + 1][j].bound
-                pe = ComputePE()
-                print(f'i = {i}; j = {j}')
-                feast, acc = pe.build(peeast, fsouth)
-                #TODO: Set name of each ComputePE to pe_{i}_{j}
-                pe_array[i][j].pe = pe
-                pe_array[i][j].bound = pe
-                pe_array[i][j + 1].bound = feast
-                pe_array[i][j].accumulator = acc
-                pe_array[i + 1][j].bound = fsouth
+                pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
+                pe_array[i][j].bound = pe_array[i][j].pe
 
-            pusher_pe = RowPusher()
-            bound = pusher_pe.build(pe_array[i][1].bound)
-            # set the pushe_pe's name into row_pusher_{i}
-            pe_array[i][0].pe = pusher_pe
-            pe_array[i][1].bound = bound
-
+        # First Row Pushers
         for i in range(1, 5):
-            pusher_pe = ColPusher()
-            pusher_pe.build(pe_array[1][i].bound)
-            #TODO: set the pusher_pe's name into col_pusher_{i}
-            pe_array[0][i].pe = pusher_pe
+            pe_array[0][i].pe = Pusher('north')
+            pe_array[0][i].pe.build(pe_array[1][i].bound)
+
+        # First Column Pushers
+        for i in range(1, 5):
+            pe_array[i][0].pe = Pusher('west')
+            pe_array[i][0].pe.build(pe_array[i][1].bound)
+
 
         testbench = Testbench()
         testbench.build(pe_array[0][1].pe, \
