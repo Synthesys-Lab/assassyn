@@ -285,11 +285,11 @@ class CodeGen(visitor.Visitor):
             args = ', '.join(self.generate_rval(i) for i in node.args[1:])
             res = f'sys.{ib_method}(fmt, vec![{args}]);'
         elif isinstance(node, expr.ArrayRead):
-            arr = node.arr.name
+            arr = self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             res = f'sys.{ib_method}(created_here!(), {arr}, {idx});'
         elif isinstance(node, expr.ArrayWrite):
-            arr = node.arr.name
+            arr = self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             val = self.generate_rval(node.val)
             res = f'sys.{ib_method}(created_here!(), {arr}, {idx}, {val});'
@@ -343,7 +343,7 @@ class CodeGen(visitor.Visitor):
 
 
     def visit_array(self, node: Array):
-        name = node.name
+        name = self.generate_rval(node)
         size = node.size
         ty = generate_dtype(node.scalar_ty)
         init = self.generate_init_value(node.initializer, ty)

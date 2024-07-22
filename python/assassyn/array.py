@@ -35,7 +35,7 @@ class Array:
 
     def as_operand(self):
         '''Dump the array as an operand.'''
-        return self.name
+        return f'{self.name}_{id(self)}'
 
     @property
     def name(self):
