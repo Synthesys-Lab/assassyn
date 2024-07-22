@@ -41,8 +41,10 @@ class ComputePE(Module):
     @module.combinational
     def build(self, east: Bind, south: Bind):
         acc = RegArray(Int(32), 1)
-        mac = (self.west * self.north).bitcast(Int(32)) + acc[0]
-        log("Mac value: {} * {} + {} = {}", self.west, self.north, acc[0], mac)
+        val = acc[0]
+        c = (self.west * self.north).bitcast(Int(32))
+        mac = val + c
+        log("Mac value: {} * {} + {} = {}", self.west, self.north, val, mac)
         acc[0] = mac
 
         bound_east = east.bind(west = self.west)
@@ -238,30 +240,30 @@ def systolic_array():
 
     print(raw)
 
-    # a = [[0 for _ in range(4)] for _ in range(4)]
-    # b = [[0 for _ in range(4)] for _ in range(4)]
-    # c = [[0 for _ in range(4)] for _ in range(4)]
+    a = [[0 for _ in range(4)] for _ in range(4)]
+    b = [[0 for _ in range(4)] for _ in range(4)]
+    c = [[0 for _ in range(4)] for _ in range(4)]
     
-    # for i in range(4):
-    #     for j in range(4):
-    #         a[i][j] = i * 4 + j
-    #         b[j][i] = i * 4 + j
+    for i in range(4):
+        for j in range(4):
+            a[i][j] = i * 4 + j
+            b[j][i] = i * 4 + j
     
-    # for i in range(4):
-    #     for j in range(4):
-    #         for k in range(4):
-    #             c[i][j] += a[i][k] * b[k][j]
+    for i in range(4):
+        for j in range(4):
+            for k in range(4):
+                c[i][j] += a[i][k] * b[k][j]
     
-    # for i in range(4):
-    #     for j in range(4):
-    #         expected = c[i][j]
-    #         pattern = rf"pe_{i+1}_{j+1}"
-    #         matching_lines = [line for line in raw.split('\n') if re.search(pattern, line)]
-    #         if matching_lines:
-    #             actual_line = matching_lines[-1]  
-    #             print(actual_line)
-    #             actual = int(actual_line.split()[-1])
-    #             assert expected == actual, f"Mismatch at position ({i}, {j}): expected {expected}, got {actual}"
+    for i in range(4):
+        for j in range(4):
+            expected = c[i][j]
+            pattern = rf"pe_{i+1}_{j+1}"
+            matching_lines = [line for line in raw.split('\n') if re.search(pattern, line)]
+            if matching_lines:
+                actual_line = matching_lines[-1]  
+                print(actual_line)
+                actual = int(actual_line.split()[-1])
+                assert expected == actual
 
 
 if __name__ == '__main__':
