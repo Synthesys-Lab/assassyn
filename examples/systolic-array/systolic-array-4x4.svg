@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <style>
+    .pe { fill: lightblue; stroke: black; }
+    .pusher { fill: lightgreen; stroke: black; }
+    .sink { fill: pink; stroke: black; }
+    .text { font-size: 12px; text-anchor: middle; }
+    .arrow { stroke: black; stroke-width: 1; marker-end: url(#arrowhead); }
+  </style>
+  
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" />
+    </marker>
+  </defs>
+
+  <!-- ComputePEs -->
+  <rect x="200" y="100" width="60" height="60" class="pe"/>
+  <text x="230" y="135" class="text">PE 0</text>
+  <rect x="300" y="100" width="60" height="60" class="pe"/>
+  <text x="330" y="135" class="text">PE 1</text>
+  <rect x="400" y="100" width="60" height="60" class="pe"/>
+  <text x="430" y="135" class="text">PE 2</text>
+  <rect x="500" y="100" width="60" height="60" class="pe"/>
+  <text x="530" y="135" class="text">PE 3</text>
+  
+  <rect x="200" y="200" width="60" height="60" class="pe"/>
+  <text x="230" y="235" class="text">PE 4</text>
+  <rect x="300" y="200" width="60" height="60" class="pe"/>
+  <text x="330" y="235" class="text">PE 5</text>
+  <rect x="400" y="200" width="60" height="60" class="pe"/>
+  <text x="430" y="235" class="text">PE 6</text>
+  <rect x="500" y="200" width="60" height="60" class="pe"/>
+  <text x="530" y="235" class="text">PE 7</text>
+  
+  <rect x="200" y="300" width="60" height="60" class="pe"/>
+  <text x="230" y="335" class="text">PE 8</text>
+  <rect x="300" y="300" width="60" height="60" class="pe"/>
+  <text x="330" y="335" class="text">PE 9</text>
+  <rect x="400" y="300" width="60" height="60" class="pe"/>
+  <text x="430" y="335" class="text">PE 10</text>
+  <rect x="500" y="300" width="60" height="60" class="pe"/>
+  <text x="530" y="335" class="text">PE 11</text>
+  
+  <rect x="200" y="400" width="60" height="60" class="pe"/>
+  <text x="230" y="435" class="text">PE 12</text>
+  <rect x="300" y="400" width="60" height="60" class="pe"/>
+  <text x="330" y="435" class="text">PE 13</text>
+  <rect x="400" y="400" width="60" height="60" class="pe"/>
+  <text x="430" y="435" class="text">PE 14</text>
+  <rect x="500" y="400" width="60" height="60" class="pe"/>
+  <text x="530" y="435" class="text">PE 15</text>
+
+  <!-- Pushers -->
+  <rect x="100" y="100" width="60" height="60" class="pusher"/>
+  <text x="130" y="135" class="text">Pusher 3</text>
+  <rect x="100" y="200" width="60" height="60" class="pusher"/>
+  <text x="130" y="235" class="text">Pusher 4</text>
+  <rect x="100" y="300" width="60" height="60" class="pusher"/>
+  <text x="130" y="335" class="text">Pusher 5</text>
+  <rect x="100" y="400" width="60" height="60" class="pusher"/>
+  <text x="130" y="435" class="text">Pusher 6</text>
+  
+  <rect x="200" y="0" width="60" height="60" class="pusher"/>
+  <text x="230" y="35" class="text">Pusher</text>
+  <rect x="300" y="0" width="60" height="60" class="pusher"/>
+  <text x="330" y="35" class="text">Pusher 0</text>
+  <rect x="400" y="0" width="60" height="60" class="pusher"/>
+  <text x="430" y="35" class="text">Pusher 1</text>
+  <rect x="500" y="0" width="60" height="60" class="pusher"/>
+  <text x="530" y="35" class="text">Pusher 2</text>
+
+  <!-- Sinks -->
+  <rect x="600" y="100" width="60" height="60" class="sink"/>
+  <text x="630" y="135" class="text">Sink</text>
+  <rect x="600" y="200" width="60" height="60" class="sink"/>
+  <text x="630" y="235" class="text">Sink 0</text>
+  <rect x="600" y="300" width="60" height="60" class="sink"/>
+  <text x="630" y="335" class="text">Sink 1</text>
+  <rect x="600" y="400" width="60" height="60" class="sink"/>
+  <text x="630" y="435" class="text">Sink 2</text>
+  
+  <rect x="200" y="500" width="60" height="60" class="sink"/>
+  <text x="230" y="535" class="text">Sink 3</text>
+  <rect x="300" y="500" width="60" height="60" class="sink"/>
+  <text x="330" y="535" class="text">Sink 4</text>
+  <rect x="400" y="500" width="60" height="60" class="sink"/>
+  <text x="430" y="535" class="text">Sink 5</text>
+  <rect x="500" y="500" width="60" height="60" class="sink"/>
+  <text x="530" y="535" class="text">Sink 6</text>
+
+  <!-- Connections -->
+  <!-- Horizontal connections -->
+  <line x1="160" y1="130" x2="200" y2="130" class="arrow"/>
+  <line x1="260" y1="130" x2="300" y2="130" class="arrow"/>
+  <line x1="360" y1="130" x2="400" y2="130" class="arrow"/>
+  <line x1="460" y1="130" x2="500" y2="130" class="arrow"/>
+  <line x1="560" y1="130" x2="600" y2="130" class="arrow"/>
+  
+  <line x1="160" y1="230" x2="200" y2="230" class="arrow"/>
+  <line x1="260" y1="230" x2="300" y2="230" class="arrow"/>
+  <line x1="360" y1="230" x2="400" y2="230" class="arrow"/>
+  <line x1="460" y1="230" x2="500" y2="230" class="arrow"/>
+  <line x1="560" y1="230" x2="600" y2="230" class="arrow"/>
+  
+  <line x1="160" y1="330" x2="200" y2="330" class="arrow"/>
+  <line x1="260" y1="330" x2="300" y2="330" class="arrow"/>
+  <line x1="360" y1="330" x2="400" y2="330" class="arrow"/>
+  <line x1="460" y1="330" x2="500" y2="330" class="arrow"/>
+  <line x1="560" y1="330" x2="600" y2="330" class="arrow"/>
+  
+  <line x1="160" y1="430" x2="200" y2="430" class="arrow"/>
+  <line x1="260" y1="430" x2="300" y2="430" class="arrow"/>
+  <line x1="360" y1="430" x2="400" y2="430" class="arrow"/>
+  <line x1="460" y1="430" x2="500" y2="430" class="arrow"/>
+  <line x1="560" y1="430" x2="600" y2="430" class="arrow"/>
+
+  <!-- Vertical connections -->
+  <line x1="230" y1="60" x2="230" y2="100" class="arrow"/>
+  <line x1="230" y1="160" x2="230" y2="200" class="arrow"/>
+  <line x1="230" y1="260" x2="230" y2="300" class="arrow"/>
+  <line x1="230" y1="360" x2="230" y2="400" class="arrow"/>
+  <line x1="230" y1="460" x2="230" y2="500" class="arrow"/>
+  
+  <line x1="330" y1="60" x2="330" y2="100" class="arrow"/>
+  <line x1="330" y1="160" x2="330" y2="200" class="arrow"/>
+  <line x1="330" y1="260" x2="330" y2="300" class="arrow"/>
+  <line x1="330" y1="360" x2="330" y2="400" class="arrow"/>
+  <line x1="330" y1="460" x2="330" y2="500" class="arrow"/>
+  
+  <line x1="430" y1="60" x2="430" y2="100" class="arrow"/>
+  <line x1="430" y1="160" x2="430" y2="200" class="arrow"/>
+  <line x1="430" y1="260" x2="430" y2="300" class="arrow"/>
+  <line x1="430" y1="360" x2="430" y2="400" class="arrow"/>
+  <line x1="430" y1="460" x2="430" y2="500" class="arrow"/>
+  
+  <line x1="530" y1="60" x2="530" y2="100" class="arrow"/>
+  <line x1="530" y1="160" x2="530" y2="200" class="arrow"/>
+  <line x1="530" y1="260" x2="530" y2="300" class="arrow"/>
+  <line x1="530" y1="360" x2="530" y2="400" class="arrow"/>
+  <line x1="530" y1="460" x2="530" y2="500" class="arrow"/>
+</svg>
