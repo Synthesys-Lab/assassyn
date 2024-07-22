@@ -285,11 +285,11 @@ class CodeGen(visitor.Visitor):
             args = ', '.join(self.generate_rval(i) for i in node.args[1:])
             res = f'sys.{ib_method}(fmt, vec![{args}]);'
         elif isinstance(node, expr.ArrayRead):
-            arr = self.generate_rval(node.arr)
+            arr = node.arr.name if f'{id(node.arr)}' in node.arr.name else self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             res = f'sys.{ib_method}(created_here!(), {arr}, {idx});'
         elif isinstance(node, expr.ArrayWrite):
-            arr = self.generate_rval(node.arr)
+            arr = node.arr.name if f'{id(node.arr)}' in node.arr.name else self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             val = self.generate_rval(node.val)
             res = f'sys.{ib_method}(created_here!(), {arr}, {idx}, {val});'
@@ -343,7 +343,10 @@ class CodeGen(visitor.Visitor):
 
 
     def visit_array(self, node: Array):
-        name = self.generate_rval(node)
+        name = node.name if f'{id(node)}' in node.name else self.generate_rval(node)
+        print('\n\n\n\n\n\n\n\n\n\n')
+        print(name)
+        print('\n\n\n\n\n\n\n\n\n\n')
         size = node.size
         ty = generate_dtype(node.scalar_ty)
         init = self.generate_init_value(node.initializer, ty)
