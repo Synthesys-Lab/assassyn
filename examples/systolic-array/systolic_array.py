@@ -1,4 +1,5 @@
 import pytest
+import re
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
@@ -50,6 +51,8 @@ class ComputePE(Module):
             bound_east.async_called()
         if bound_south.is_fully_bound():
             bound_south.async_called()
+
+        return bound_east, bound_south
 
 class Pusher(Module):
 
@@ -199,13 +202,17 @@ def systolic_array():
         # Build ComputePEs
         for i in range(4, 0, -1):
             for j in range(4, 0, -1):
-                pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
+                feast, fsouth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
                 pe_array[i][j].bound = pe_array[i][j].pe
+                pe_array[i][j+1].bound = feast
+                pe_array[i+1][j].bound = fsouth
 
         # First Row Pushers
         for i in range(1, 5):
             pe_array[0][i].pe = Pusher('north')
-            pe_array[0][i].pe.build(pe_array[1][i].bound)
+            bound = pe_array[0][i].pe.build(pe_array[1][i].bound)
+            pe_array[1][i].bound = bound
+
 
         # First Column Pushers
         for i in range(1, 5):
@@ -230,6 +237,31 @@ def systolic_array():
     raw = utils.run_simulator(simulator_path)
 
     print(raw)
+
+    # a = [[0 for _ in range(4)] for _ in range(4)]
+    # b = [[0 for _ in range(4)] for _ in range(4)]
+    # c = [[0 for _ in range(4)] for _ in range(4)]
+    
+    # for i in range(4):
+    #     for j in range(4):
+    #         a[i][j] = i * 4 + j
+    #         b[j][i] = i * 4 + j
+    
+    # for i in range(4):
+    #     for j in range(4):
+    #         for k in range(4):
+    #             c[i][j] += a[i][k] * b[k][j]
+    
+    # for i in range(4):
+    #     for j in range(4):
+    #         expected = c[i][j]
+    #         pattern = rf"pe_{i+1}_{j+1}"
+    #         matching_lines = [line for line in raw.split('\n') if re.search(pattern, line)]
+    #         if matching_lines:
+    #             actual_line = matching_lines[-1]  
+    #             print(actual_line)
+    #             actual = int(actual_line.split()[-1])
+    #             assert expected == actual, f"Mismatch at position ({i}, {j}): expected {expected}, got {actual}"
 
 
 if __name__ == '__main__':
