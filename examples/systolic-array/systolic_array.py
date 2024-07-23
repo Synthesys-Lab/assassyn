@@ -98,7 +98,7 @@ class Testbench(Module):
     @module.combinational
     def build(self, col1: Pusher, col2: Pusher, col3: Pusher, col4: Pusher, \
                     row1: Pusher, row2: Pusher, row3: Pusher, row4: Pusher):
-        with Cycle(0):
+        with Cycle(1):
             # 0 0
             # 0 P P P  P
             #   P P P  P
@@ -107,7 +107,7 @@ class Testbench(Module):
             col1.async_called(data = Int(32)(0))
             row1.async_called(data = Int(32)(0))
 
-        with Cycle(1):
+        with Cycle(2):
             # 1 1 4
             # 1 P P P  P
             # 4 P P P  P
@@ -118,7 +118,7 @@ class Testbench(Module):
             row2.async_called(data = Int(32)(4))
             col2.async_called(data = Int(32)(4))
 
-        with Cycle(2):
+        with Cycle(3):
             # 2 2 5 8
             # 2 P P P  P
             # 5 P P P  P
@@ -131,7 +131,7 @@ class Testbench(Module):
             row3.async_called(data = Int(32)(8))
             col3.async_called(data = Int(32)(8))
 
-        with Cycle(3):
+        with Cycle(4):
             # 3  3 6 9  12
             # 3  P P P  P
             # 6  P P P  P
@@ -146,7 +146,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(12))
             col4.async_called(data = Int(32)(12))
         
-        with Cycle(4):
+        with Cycle(5):
             # 4    7 10 13
             #    P P P  P
             # 7  P P P  P
@@ -159,7 +159,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(13))
             col4.async_called(data = Int(32)(13))
 
-        with Cycle(5):
+        with Cycle(6):
             #  5    11 14
             #    P P P  P
             #    P P P  P
@@ -170,7 +170,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(14))
             col4.async_called(data = Int(32)(14))
             
-        with Cycle(6):
+        with Cycle(7):
             #   6      15
             #    P P P  P
             #    P P P  P
