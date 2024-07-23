@@ -5,6 +5,7 @@
     .sink { fill: pink; stroke: black; }
     .text { font-size: 12px; text-anchor: middle; }
     .arrow { stroke: black; stroke-width: 1; marker-end: url(#arrowhead); }
+    .pusher-text {font-size: 10px; text-anchor: middle;}
   </style>
   
   <defs>
@@ -52,22 +53,22 @@
 
   <!-- Pushers -->
   <rect x="100" y="100" width="60" height="60" class="pusher"/>
-  <text x="130" y="135" class="text">Pusher 3</text>
+  <text x="130" y="135" class="pusher-text">RowPusher 0</text>
   <rect x="100" y="200" width="60" height="60" class="pusher"/>
-  <text x="130" y="235" class="text">Pusher 4</text>
+  <text x="130" y="235" class="pusher-text">RowPusher 1</text>
   <rect x="100" y="300" width="60" height="60" class="pusher"/>
-  <text x="130" y="335" class="text">Pusher 5</text>
+  <text x="130" y="335" class="pusher-text">RowPusher 2</text>
   <rect x="100" y="400" width="60" height="60" class="pusher"/>
-  <text x="130" y="435" class="text">Pusher 6</text>
+  <text x="130" y="435" class="pusher-text">RowPusher 3</text>
   
   <rect x="200" y="0" width="60" height="60" class="pusher"/>
-  <text x="230" y="35" class="text">Pusher</text>
+  <text x="230" y="35" class="pusher-text">ColPusher 0</text>
   <rect x="300" y="0" width="60" height="60" class="pusher"/>
-  <text x="330" y="35" class="text">Pusher 0</text>
+  <text x="330" y="35" class="pusher-text">ColPusher 1</text>
   <rect x="400" y="0" width="60" height="60" class="pusher"/>
-  <text x="430" y="35" class="text">Pusher 1</text>
+  <text x="430" y="35" class="pusher-text">ColPusher 2</text>
   <rect x="500" y="0" width="60" height="60" class="pusher"/>
-  <text x="530" y="35" class="text">Pusher 2</text>
+  <text x="530" y="35" class="pusher-text">ColPusher 3</text>
 
   <!-- Sinks -->
   <rect x="600" y="100" width="60" height="60" class="sink"/>
