@@ -56,22 +56,35 @@ class ComputePE(Module):
 
         return bound_east, bound_south
 
-class Pusher(Module):
+class RowPusher(Module):
 
     @module.constructor
-    def __init__(self, dest_port=''):
+    def __init__(self):
         super().__init__()
         self.data = Port(Int(32))
-        self.dest_port = dest_port
 
     @module.combinational
     def build(self, dest: Bind):
         log("Pushes {}", self.data)
-        bound = dest.bind(**{self.dest_port: self.data})
+        bound = dest.bind(north = self.data)
         if bound.is_fully_bound():
             bound.async_called()
         return bound
 
+class ColPusher(Module):
+
+    @module.constructor
+    def __init__(self):
+        super().__init__()
+        self.data = Port(Int(32))
+
+    @module.combinational
+    def build(self, dest: Bind):
+        log("Pushes {}", self.data)
+        bound = dest.bind(west = self.data)
+        if bound.is_fully_bound():
+            bound.async_called()
+        return bound
 
 class Testbench(Module):
     
@@ -96,8 +109,8 @@ class Testbench(Module):
     # col [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]]
 
     @module.combinational
-    def build(self, col1: Pusher, col2: Pusher, col3: Pusher, col4: Pusher, \
-                    row1: Pusher, row2: Pusher, row3: Pusher, row4: Pusher):
+    def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
+                    row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
         with Cycle(1):
             # 0 0
             # 0 P P P  P
@@ -211,14 +224,14 @@ def systolic_array():
 
         # First Row Pushers
         for i in range(1, 5):
-            pe_array[0][i].pe = Pusher('north')
+            pe_array[0][i].pe = RowPusher()
             bound = pe_array[0][i].pe.build(pe_array[1][i].bound)
             pe_array[1][i].bound = bound
 
 
         # First Column Pushers
         for i in range(1, 5):
-            pe_array[i][0].pe = Pusher('west')
+            pe_array[i][0].pe = ColPusher()
             pe_array[i][0].pe.build(pe_array[i][1].bound)
 
 
