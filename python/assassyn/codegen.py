@@ -344,9 +344,6 @@ class CodeGen(visitor.Visitor):
 
     def visit_array(self, node: Array):
         name = node.name if f'{id(node)}' in node.name else self.generate_rval(node)
-        print('\n\n\n\n\n\n\n\n\n\n')
-        print(name)
-        print('\n\n\n\n\n\n\n\n\n\n')
         size = node.size
         ty = generate_dtype(node.scalar_ty)
         init = self.generate_init_value(node.initializer, ty)
