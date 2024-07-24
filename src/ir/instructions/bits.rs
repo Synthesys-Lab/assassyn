@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::{Concat, Slice};
 use crate::ir::Typed;
 
@@ -11,12 +13,13 @@ impl Slice<'_> {
   }
 }
 
-impl ToString for Slice<'_> {
-  fn to_string(&self) -> String {
+impl Display for Slice<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let a = self.x().to_string(self.expr.sys);
     let l = self.l();
     let r = self.r();
-    format!(
+    write!(
+      f,
       "{} = {}[{}:{}] // {}",
       self.expr.get_name(),
       a,
@@ -27,8 +30,8 @@ impl ToString for Slice<'_> {
   }
 }
 
-impl ToString for Concat<'_> {
-  fn to_string(&self) -> String {
+impl Display for Concat<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let a = self.msb().to_string(self.expr.sys);
     let (b, b_bits) = {
       let b = self.lsb();
@@ -37,7 +40,8 @@ impl ToString for Concat<'_> {
         b.get_dtype(self.expr.sys).unwrap().get_bits(),
       )
     };
-    format!(
+    write!(
+      f,
       "{} = concat({}, {}) // {} << {} | {}",
       self.expr.get_name(),
       a,

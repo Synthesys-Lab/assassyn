@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::ir::{
   node::{BaseNode, IsElement, ModuleRef},
   Module,
@@ -42,8 +44,8 @@ impl Bind<'_> {
   }
 }
 
-impl ToString for Bind<'_> {
-  fn to_string(&self) -> String {
+impl Display for Bind<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let callee = self.callee();
     let arg_list = self
       .arg_iter()
@@ -59,13 +61,13 @@ impl ToString for Bind<'_> {
       })
       .collect::<Vec<String>>()
       .join(", ");
-    format!("bind {} {{ {} }}", callee.get_name(), arg_list)
+    write!(f, "bind {} {{ {} }}", callee.get_name(), arg_list)
   }
 }
 
-impl ToString for AsyncCall<'_> {
-  fn to_string(&self) -> String {
+impl Display for AsyncCall<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let bind = self.bind().get().upcast().to_string(self.expr.sys);
-    format!("async_call {}", bind)
+    write!(f, "async_call {}", bind)
   }
 }

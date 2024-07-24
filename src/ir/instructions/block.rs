@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::ir::{expr::subcode, Opcode};
 
 use super::BlockIntrinsic;
@@ -14,9 +16,10 @@ impl BlockIntrinsic<'_> {
   }
 }
 
-impl ToString for BlockIntrinsic<'_> {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for BlockIntrinsic<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
       "{} {} {}",
       match self.get_subcode() {
         subcode::BlockIntrinsic::Value => "value",

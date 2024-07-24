@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use crate::ir::{expr::subcode, node::BaseNode, DataType, Opcode, Typed};
 
 use super::{Binary, Cast, Compare, Select, Select1Hot, Unary};
@@ -14,9 +16,10 @@ impl Binary<'_> {
   }
 }
 
-impl ToString for Binary<'_> {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for Binary<'_> {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    write!(
+      f,
       "{} = {} {} {}",
       self.expr.get_name(),
       self.a().to_string(self.get().sys),
@@ -38,9 +41,10 @@ impl Unary<'_> {
   }
 }
 
-impl ToString for Unary<'_> {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for Unary<'_> {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    write!(
+      f,
       "{} = {}{}",
       self.expr.get_name(),
       self.get_opcode().to_string(),
@@ -61,9 +65,10 @@ impl Compare<'_> {
   }
 }
 
-impl ToString for Compare<'_> {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for Compare<'_> {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    write!(
+      f,
       "{} = {} {} {}",
       self.expr.get_name(),
       self.a().to_string(self.get().sys),
@@ -93,9 +98,10 @@ impl Cast<'_> {
   }
 }
 
-impl ToString for Cast<'_> {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for Cast<'_> {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    write!(
+      f,
       "{} = {} {}({})",
       self.expr.get_name(),
       self.get_opcode().to_string(),
@@ -105,9 +111,10 @@ impl ToString for Cast<'_> {
   }
 }
 
-impl ToString for Select<'_> {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for Select<'_> {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    write!(
+      f,
       "{} = select {} ? {} : {}",
       self.expr.get_name(),
       self.cond().to_string(self.get().sys),
@@ -123,14 +130,15 @@ impl Select1Hot<'_> {
   }
 }
 
-impl ToString for Select1Hot<'_> {
-  fn to_string(&self) -> String {
+impl Display for Select1Hot<'_> {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
     let values = self
       .value_iter()
       .map(|x| x.to_string(self.expr.sys))
       .collect::<Vec<_>>()
       .join(", ");
-    format!(
+    write!(
+      f,
       "{} = select1hot {} ({})",
       self.expr.get_name(),
       self.cond().to_string(self.get().sys),

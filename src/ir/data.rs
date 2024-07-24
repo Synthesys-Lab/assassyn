@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{builder::SysBuilder, ir::node::*};
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -113,17 +115,17 @@ impl DataType {
   }
 }
 
-impl ToString for DataType {
-  fn to_string(&self) -> String {
+impl Display for DataType {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match &self {
-      &DataType::Int(_) => format!("i{}", self.get_bits()),
-      &DataType::UInt(_) => format!("u{}", self.get_bits()),
-      &DataType::Bits(bits) => format!("b{}", bits),
-      &DataType::Fp32 => format!("f{}", self.get_bits()),
-      &DataType::Str => "Str".to_string(),
-      &DataType::Void => String::from("()"),
-      &DataType::ArrayType(ty, size) => format!("array[{} x {}]", ty.to_string(), size),
-      &DataType::Module(args) => format!(
+      &DataType::Int(_) => write!(f, "i{}", self.get_bits()),
+      &DataType::UInt(_) => write!(f, "u{}", self.get_bits()),
+      &DataType::Bits(bits) => write!(f, "b{}", bits),
+      &DataType::Fp32 => write!(f, "f{}", self.get_bits()),
+      &DataType::Str => write!(f, "Str"),
+      &DataType::Void => write!(f, "void"),
+      &DataType::ArrayType(ty, size) => write!(f, "array[{} x {}]", ty.to_string(), size),
+      &DataType::Module(args) => write!(f, 
         "module[{}]",
         args
           .iter()
