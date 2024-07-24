@@ -37,9 +37,6 @@ jobs:
       - name: Install python dependencies
         run: |
           pip install -r python/requirements.txt;
-      - name: Install verilator
-        run: |
-          cd verilator && sudo make install;
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -72,7 +69,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/python
           ASSASSYN_HOME: ${{ github.workspace }}
           RUSTC_WRAPPER: sccache
-          VERILATOR_ROOT: /usr/local/share/verilator
+          VERILATOR_ROOT: ${{ github.workspace }}/verilator
         run: |
           pytest python/unit-tests;
       - name: Test Examples
@@ -80,6 +77,6 @@ jobs:
           PYTHONPATH: python
           ASSASSYN_HOME: ${{ github.workspace }}
           RUSTC_WRAPPER: sccache
-          VERILATOR_ROOT: /usr/local/share/verilator
+          VERILATOR_ROOT: ${{ github.workspace }}/verilator
         run: |
           python3 examples/systolic-array/systolic_array.py;
