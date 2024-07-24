@@ -45,7 +45,6 @@ impl Config {
     let name_with_suffix = format!("{}_verilog", sys.get_name());
     self.base_dir.join(name_with_suffix)
   }
-
 }
 
 pub(super) fn create_and_clean_dir(dir: PathBuf, override_dir: bool) {
