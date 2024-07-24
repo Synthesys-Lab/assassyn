@@ -9,7 +9,7 @@ on:
 name: Test
 
 env:
-  VERILATOR_VERSION: v5.026
+  VERILATOR_VERSION: v5.024
 
 jobs:
   test:
@@ -81,4 +81,4 @@ jobs:
           ASSASSYN_HOME: ${{ github.workspace }}
           RUSTC_WRAPPER: sccache
         run: |
-          python3 python/examples/systolic-array/systolic_array.py;
+          python3 examples/systolic-array/systolic_array.py;
