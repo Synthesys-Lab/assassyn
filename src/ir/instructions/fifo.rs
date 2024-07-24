@@ -38,7 +38,7 @@ impl Display for FIFOField<'_> {
       "{}.{}",
       FIFODumper.visit_input(self.fifo()).unwrap(),
       self.get_field().to_string()
-   )
+    )
   }
 }
 
