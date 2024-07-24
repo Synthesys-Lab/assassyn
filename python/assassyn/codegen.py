@@ -169,7 +169,8 @@ class CodeGen(visitor.Visitor):
         self.header.append('use assassyn::ir::node::IsElement;')
         self.code.append('fn main() {')
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
-        self.code.append('  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
+        self.code.append(
+                '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
         self.code.append('  // TODO: Support initial values')
         self.code.append('  // TODO: Support array attributes')
         for elem in node.arrays:
