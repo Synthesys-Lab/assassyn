@@ -34,7 +34,7 @@ class ComputePE(Module):
 
     @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(disable_arbiter_rewrite=True)
         self.west = Port(Int(32))
         self.north = Port(Int(32))
 
@@ -61,7 +61,7 @@ class RowPusher(Module):
 
     @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(disable_arbiter_rewrite=True)
         self.data = Port(Int(32))
 
     @module.combinational
@@ -73,7 +73,7 @@ class ColPusher(Module):
 
     @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(disable_arbiter_rewrite=True)
         self.data = Port(Int(32))
 
     @module.combinational
@@ -271,7 +271,7 @@ def systolic_array():
                 actual = int(actual_line.split()[-1])
                 assert expected == actual
 
-    #raw = utils.run_verilator(verilator_path)
+    raw = utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
     systolic_array()
