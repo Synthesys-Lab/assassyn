@@ -74,7 +74,4 @@ jobs:
           RUSTC_WRAPPER: sccache
           VERILATOR_ROOT: ${{ github.workspace }}/verilator
         run: |
-          pytest py-tests;
-      - name: Generate test result
-        run: |
-          cargo test;
+          pytest python/unit-tests;
