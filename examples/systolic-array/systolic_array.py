@@ -67,10 +67,7 @@ class RowPusher(Module):
     @module.combinational
     def build(self, dest: Bind):
         log("Pushes {}", self.data)
-        bound = dest.bind(north = self.data)
-        if bound.is_fully_bound():
-            bound.async_called()
-        return bound
+        dest.async_called(north = self.data)
 
 class ColPusher(Module):
 
@@ -223,18 +220,16 @@ def systolic_array():
                 pe_array[i][j+1].bound = feast
                 pe_array[i+1][j].bound = fsouth
 
-        # First Row Pushers
-        for i in range(1, 5):
-            pe_array[0][i].pe = RowPusher()
-            bound = pe_array[0][i].pe.build(pe_array[1][i].bound)
-            pe_array[1][i].bound = bound
-
-
         # First Column Pushers
         for i in range(1, 5):
             pe_array[i][0].pe = ColPusher()
-            pe_array[i][0].pe.build(pe_array[i][1].bound)
+            bound = pe_array[i][0].pe.build(pe_array[i][1].bound)
+            pe_array[i][0].bound = bound
 
+        # First Row Pushers
+        for i in range(1, 5):
+            pe_array[0][i].pe = RowPusher()
+            pe_array[0][i].pe.build(pe_array[1][i].bound)
 
         testbench = Testbench()
         testbench.build(pe_array[0][1].pe, \
