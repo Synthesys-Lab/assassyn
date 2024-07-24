@@ -125,7 +125,8 @@ impl Display for DataType {
       &DataType::Str => write!(f, "Str"),
       &DataType::Void => write!(f, "void"),
       &DataType::ArrayType(ty, size) => write!(f, "array[{} x {}]", ty.to_string(), size),
-      &DataType::Module(args) => write!(f, 
+      &DataType::Module(args) => write!(
+        f,
         "module[{}]",
         args
           .iter()
