@@ -22,7 +22,7 @@ pub fn run_simulator(
   cond: Option<(fn(&&str) -> bool, Option<usize>)>,
 ) -> String {
   backend::simulator::elaborate(&sys, &config).unwrap();
-  let simulator_name = config.simulator_name(sys);
+  let simulator_name = config.dirname(sys, "simualtor");
   let manifest = simulator_name.join("Cargo.toml");
   let output = Command::new("cargo")
     .arg("run")

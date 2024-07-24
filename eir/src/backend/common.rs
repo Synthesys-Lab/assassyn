@@ -34,15 +34,9 @@ impl Config {
     self.base_dir.join(fname).into()
   }
 
-  /// The name of the directory to which the simulator elaboration code is dumped.
-  pub fn simulator_name(&self, sys: &SysBuilder) -> PathBuf {
-    let name_with_suffix = format!("{}_simulator", sys.get_name());
-    self.base_dir.join(name_with_suffix)
-  }
-
-  /// The name of the directory to which the verilog elaboration code is dumped.
-  pub fn verilog_name(&self, sys: &SysBuilder) -> PathBuf {
-    let name_with_suffix = format!("{}_verilog", sys.get_name());
+  /// The name of the directory with a custom suffix.
+  pub fn dirname(&self, sys: &SysBuilder, suf: &str) -> PathBuf {
+    let name_with_suffix = format!("{}_{}", sys.get_name(), suf);
     self.base_dir.join(name_with_suffix)
   }
 }

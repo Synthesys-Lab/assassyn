@@ -1695,8 +1695,8 @@ pub fn generate_cpp_testbench(dir: &PathBuf, sys: &SysBuilder, simulator: &Simul
 }
 
 pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Result<(), Error> {
-  create_and_clean_dir(config.verilog_name(sys), config.override_dump);
-  let verilog_name = config.verilog_name(sys);
+  create_and_clean_dir(config.dirname(sys, "verilog"), config.override_dump);
+  let verilog_name = config.dirname(sys, "verilog");
   let fname = verilog_name.join(format!("{}.sv", sys.get_name()));
 
   println!("Writing verilog rtl to {}", fname.to_str().unwrap());

@@ -1201,7 +1201,7 @@ fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
 }
 
 fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io::Error> {
-  let simulator_name = config.simulator_name(sys);
+  let simulator_name = config.dirname(sys, "simulator");
   create_and_clean_dir(simulator_name.clone().into(), config.override_dump);
   eprintln!(
     "Writing simulator code to rust project: {}",
