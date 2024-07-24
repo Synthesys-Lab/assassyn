@@ -72,9 +72,10 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/python
           ASSASSYN_HOME: ${{ github.workspace }}
           RUSTC_WRAPPER: sccache
+          VERILATOR_ROOT: /usr/local/share/verilator
         run: |
           pytest python/unit-tests;
-      - name: Test Example Systolic Array
+      - name: Test Examples
         env:
           PYTHONPATH: python
           ASSASSYN_HOME: ${{ github.workspace }}
