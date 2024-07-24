@@ -1216,10 +1216,7 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
   let manifest = simulator_name.join("Cargo.toml");
   // Dump the Cargo.toml and rustfmt.toml
   {
-    let mut cargo = OpenOptions::new()
-      
-      .append(true)
-      .open(&manifest)?;
+    let mut cargo = OpenOptions::new().append(true).open(&manifest)?;
     writeln!(cargo, "num-bigint = \"0.4\"")?;
     writeln!(cargo, "num-traits = \"0.2\"")?;
     let mut fmt = fs::File::create(simulator_name.join("rustfmt.toml"))?;

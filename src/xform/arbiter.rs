@@ -55,7 +55,8 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       let module = callee.as_ref::<Module>(sys).unwrap();
       module.get_attrs().contains(&module::Attribute::NoArbiter)
         || module.get_attrs().contains(&module::Attribute::OptNone)
-    }; if res {
+    };
+    if res {
       continue;
     }
     let module_name = callee.as_ref::<Module>(sys).unwrap().get_name().to_string();

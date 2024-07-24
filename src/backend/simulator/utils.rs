@@ -73,9 +73,7 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
     };
   }
   match dtype {
-    DataType::Module(_) => {
-      "Box<EventKind>".to_string()
-    }
+    DataType::Module(_) => "Box<EventKind>".to_string(),
     DataType::ArrayType(ty, size) => {
       format!("[{}; {}]", dtype_to_rust_type(ty), size)
     }

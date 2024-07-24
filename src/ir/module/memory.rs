@@ -92,7 +92,8 @@ impl SysBuilder {
       .as_ref::<Module>(self)
       .unwrap()
       .get_attrs()
-      .iter().find(|x| matches!(x, Attribute::Memory(_)))
+      .iter()
+      .find(|x| matches!(x, Attribute::Memory(_)))
     {
       params.array
     } else {

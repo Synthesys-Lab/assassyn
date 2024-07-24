@@ -119,11 +119,7 @@ impl ToString for Select<'_> {
 
 impl Select1Hot<'_> {
   pub fn value_iter(&self) -> impl Iterator<Item = BaseNode> + '_ {
-    self
-      .expr
-      .operand_iter()
-      .skip(1)
-      .map(|x| *x.get_value())
+    self.expr.operand_iter().skip(1).map(|x| *x.get_value())
   }
 }
 

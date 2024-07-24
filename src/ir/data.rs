@@ -252,7 +252,7 @@ impl SysBuilder {
       let mut iter = self.array_iter().filter(|x| x.get_key() == array.get_key());
       let array = iter.next().unwrap();
       assert!(iter.next().is_none());
-      
+
       array.get_key()
     };
     self.global_symbols.retain(|_, v| v.get_key() != key);

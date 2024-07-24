@@ -1017,7 +1017,11 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     };
 
     res.push_str("logic trigger;\n".to_string().as_str());
-    res.push_str("assign trigger_pop_ready = trigger;\n\n".to_string().as_str());
+    res.push_str(
+      "assign trigger_pop_ready = trigger;\n\n"
+        .to_string()
+        .as_str(),
+    );
 
     if self.current_module == "testbench" {
       res.push_str("int cycle_cnt;\n");
@@ -1357,7 +1361,10 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         res.push_str(
           format!(
             "always_ff @(posedge clk iff trigger{}) ",
-            self.get_pred().map(|p| format!(" && {}", p)).unwrap_or("".to_string())
+            self
+              .get_pred()
+              .map(|p| format!(" && {}", p))
+              .unwrap_or("".to_string())
           )
           .as_str(),
         );

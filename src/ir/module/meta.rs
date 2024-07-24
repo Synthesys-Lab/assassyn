@@ -36,7 +36,6 @@ impl TemplateInstance {
   }
 }
 
-
 impl Default for TemplateInstance {
   fn default() -> Self {
     TemplateInstance {

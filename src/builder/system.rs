@@ -152,7 +152,6 @@ impl SysBuilder {
   ///
   /// * `name` - The name of the system.
   pub fn new(name: &str) -> Self {
-    
     Self {
       name: name.into(),
       global_symbols: HashMap::new(),
@@ -353,7 +352,7 @@ impl SysBuilder {
 
   pub fn get_str_literal(&mut self, value: String) -> BaseNode {
     let instance = StrImm::new(value);
-    
+
     self.insert_element(instance)
   }
 
@@ -400,12 +399,9 @@ impl SysBuilder {
     let t_ty = true_val.get_dtype(self).unwrap();
     let f_ty = false_val.get_dtype(self).unwrap();
     assert_eq!(
-      t_ty,
-      f_ty,
+      t_ty, f_ty,
       "{}Select value type mismatch: {:?} and {:?}",
-      site,
-      t_ty,
-      f_ty
+      site, t_ty, f_ty
     );
     self.create_expr(f_ty, Opcode::Select, vec![cond, true_val, false_val], true)
   }
@@ -467,7 +463,7 @@ impl SysBuilder {
     });
     let args = vec![bind];
     self.insert_at_ip(bind);
-    
+
     self.create_expr(DataType::void(), Opcode::AsyncCall, args, true)
   }
 
@@ -569,10 +565,14 @@ impl SysBuilder {
   ) -> BaseNode {
     let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
     let module = bind.callee();
-    let port = module.get_port_by_name(&key).unwrap_or_else(|| panic!("\"{}\" is NOT a FIFO of \"{}\" ({:?})",
-      key,
-      module.get_name(),
-      module.upcast()));
+    let port = module.get_port_by_name(&key).unwrap_or_else(|| {
+      panic!(
+        "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
+        key,
+        module.get_name(),
+        module.upcast()
+      )
+    });
     assert_eq!(
       port.scalar_ty(),
       value.get_dtype(self).unwrap(),
@@ -644,7 +644,6 @@ impl SysBuilder {
     assert_eq!(ptype, vtype, "Port type mismatch!");
 
     // Create the expression.
-    
 
     self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true)
   }
@@ -677,7 +676,7 @@ impl SysBuilder {
     );
     assert!(matches!(array.get_kind(), NodeKind::Array));
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
-    
+
     self.create_expr(dtype, Opcode::Load, vec![array, idx], true)
   }
 
@@ -717,7 +716,7 @@ impl SysBuilder {
       site, dtype, vtype
     );
     let operands = vec![array, idx, value];
-    
+
     self.create_expr(DataType::void(), Opcode::Store, operands, true)
   }
 
@@ -794,7 +793,7 @@ impl SysBuilder {
   /// * `cond` - The condition of popping the FIFO. If None is given, the pop is unconditional.
   pub fn create_fifo_pop(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-    
+
     self.create_expr(ty, Opcode::FIFOPop, vec![fifo], true)
   }
 
@@ -802,7 +801,7 @@ impl SysBuilder {
   /// FIFO.
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-    
+
     self.create_expr(ty, subcode::FIFO::Peek.into(), vec![fifo], true)
   }
 
@@ -812,7 +811,7 @@ impl SysBuilder {
       NodeKind::FIFO,
       "Expect FIFO as the operand"
     );
-    
+
     self.create_expr(
       DataType::int_ty(1),
       subcode::FIFO::Valid.into(),
@@ -837,7 +836,7 @@ impl SysBuilder {
     } else {
       panic!("Start is NOT a constant!");
     };
-    
+
     self.create_expr(ty, Opcode::Slice, vec![src, start, end], true)
   }
 
