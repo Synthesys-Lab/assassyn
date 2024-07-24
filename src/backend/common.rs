@@ -31,7 +31,7 @@ impl Config {
   /// The name of the file to which the elaboration code is dumped.
   pub fn fname(&self, sys: &SysBuilder, suffix: &str) -> PathBuf {
     let fname = format!("{}.{}", sys.get_name(), suffix);
-    self.base_dir.join(fname).into()
+    self.base_dir.join(fname)
   }
 
   /// The name of the directory with a custom suffix.

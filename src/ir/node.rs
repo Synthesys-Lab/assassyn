@@ -251,7 +251,7 @@ impl BaseNode {
   }
 
   pub fn get_kind(&self) -> NodeKind {
-    self.kind.clone()
+    self.kind
   }
 
   pub fn is_unknown(&self) -> bool {
@@ -301,11 +301,10 @@ impl BaseNode {
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_parent().into(),
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
-      NodeKind::Operand => self
+      NodeKind::Operand => (*self
         .as_ref::<Operand>(sys)
         .unwrap()
-        .get_user()
-        .clone()
+        .get_user())
         .into(),
       NodeKind::Unknown => {
         panic!("Unknown reference")
@@ -317,14 +316,14 @@ impl BaseNode {
     &self,
     sys: &'sys SysBuilder,
   ) -> Result<T::Reference, String> {
-    T::reference(sys, self.clone())
+    T::reference(sys, *self)
   }
 
   pub fn as_mut<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys> + Mutable<'elem, 'sys, T>>(
     &self,
     sys: &'sys mut SysBuilder,
   ) -> Result<T::Mutator, String> {
-    T::mutator(sys, self.clone())
+    T::mutator(sys, *self)
   }
 
   pub fn as_expr<'elem, 'sys: 'elem, T: AsExpr<'elem>>(
@@ -344,7 +343,7 @@ impl BaseNode {
       NodeKind::Module => self.as_ref::<Module>(sys).unwrap().get_name().to_string(),
       NodeKind::Array => {
         let array = self.as_ref::<Array>(sys).unwrap();
-        format!("{}", array.get_name())
+        array.get_name().to_string()
       }
       NodeKind::IntImm => IRPrinter::new(false).dispatch(sys, self, vec![]).unwrap(),
       NodeKind::FIFO => self.as_ref::<FIFO>(sys).unwrap().get_name().to_string(),
@@ -365,7 +364,7 @@ impl BaseNode {
       }
       NodeKind::Operand => {
         let operand = self.as_ref::<Operand>(sys).unwrap();
-        format!("{}", operand.get_value().to_string(sys))
+        operand.get_value().to_string(sys)
       }
     }
   }

@@ -95,7 +95,7 @@ impl<'sys> ModuleRef<'sys> {
     self
       .ports
       .get(i)
-      .map(|x| x.as_ref::<FIFO>(&self.sys).unwrap())
+      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
 
   /// Get the input by name.
@@ -173,7 +173,7 @@ impl<'a> ModuleMut<'a> {
       self
         .get_mut()
         .external_interfaces
-        .insert(ext_node.clone(), HashSet::new());
+        .insert(ext_node, HashSet::new());
     }
     let users = self
       .get_mut()
@@ -260,13 +260,13 @@ impl SysBuilder {
         "The names of the ports should be unique! Otherwise, `Module::get_port_by_name` will not work!"
       );
       let mut fifo_mut = self.get_mut::<FIFO>(&input).unwrap();
-      fifo_mut.get_mut().set_parent(module.clone());
+      fifo_mut.get_mut().set_parent(module);
       fifo_mut.get_mut().set_idx(i);
     }
-    self.global_symbols.insert(module_name, module.clone());
-    let body = Block::new(module.clone());
+    self.global_symbols.insert(module_name, module);
+    let body = Block::new(module);
     let body = self.insert_element(body);
-    self.get_mut::<Module>(&module).unwrap().get_mut().body = body.clone();
+    self.get_mut::<Module>(&module).unwrap().get_mut().body = body;
     module
   }
 }

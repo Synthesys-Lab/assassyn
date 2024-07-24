@@ -216,7 +216,7 @@ impl Expr {
   }
 
   pub fn get_opcode(&self) -> Opcode {
-    self.opcode.clone()
+    self.opcode
   }
 
   pub fn get_num_operands(&self) -> usize {
@@ -240,7 +240,7 @@ impl Typed for Expr {
 
 impl Parented for Expr {
   fn get_parent(&self) -> BaseNode {
-    self.parent.clone()
+    self.parent
   }
 
   fn set_parent(&mut self, parent: BaseNode) {
@@ -256,7 +256,7 @@ impl<'a> ExprRef<'a> {
 
 impl ExprRef<'_> {
   pub fn get_operand_value(&self, i: usize) -> Option<BaseNode> {
-    self.get_operand(i).map(|x| x.get_value().clone())
+    self.get_operand(i).map(|x| *x.get_value())
   }
 
   pub fn get_operand(&self, i: usize) -> Option<OperandRef<'_>> {
@@ -277,7 +277,7 @@ impl ExprRef<'_> {
   pub fn next(&self) -> Option<BaseNode> {
     let idx = self.idx();
     let block = self.get_parent().as_ref::<Block>(self.sys).unwrap();
-    block.get().get(idx).map(|x| x.clone())
+    block.get().get(idx).copied()
   }
 
   // The index of the instruction in its parent block

@@ -99,7 +99,7 @@ impl Visitor<String> for NodeRefDumper {
         let module_name = namify(node.as_ref::<Module>(sys).unwrap().get_name());
         format!("Box::new(EventKind::Module{})", module_name).into()
       }
-      _ => Some(format!("{}", namify(node.to_string(sys).as_str()))),
+      _ => Some(namify(node.to_string(sys).as_str()).to_string()),
     }
   }
 }
@@ -315,7 +315,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
               ValueCastTo::<{}>::cast(&res)
             }}",
           a,
-          "1".repeat((r - l + 1) as usize),
+          "1".repeat(r - l + 1),
           l,
           dtype_to_rust_type(&slice.get().dtype()),
         )
@@ -380,7 +380,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             format!(
               "ValueCastTo::<{}>::cast(&ValueCastTo::<{}>::cast(&{}))",
               dtype_to_rust_type(&dest_dtype),
-              dtype_to_rust_type(&src_dtype).replace("i", "u"),
+              dtype_to_rust_type(&src_dtype).replace('i', "u"),
               a,
             )
           }
@@ -677,7 +677,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   let fifo_types = analysis::types::fifo_types_used(sys);
   for (_, dtypes) in fifo_types.iter() {
     let fty = dtypes.iter().next().unwrap();
-    let ty = dtype_to_rust_type(&fty);
+    let ty = dtype_to_rust_type(fty);
     res.push_str(&format!(
       "  FIFO{}Push((Box<EventKind>, usize, {})),\n",
       ty, ty
@@ -701,14 +701,14 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   res.push_str("\n\nfn is_push(&self) -> bool { match self {\n");
   for (_, dtypes) in fifo_types.iter() {
     let fty = dtypes.iter().next().unwrap();
-    let ty = dtype_to_rust_type(&fty);
+    let ty = dtype_to_rust_type(fty);
     res.push_str(&format!("  EventKind::FIFO{}Push(_) => true,\n", ty,));
   }
   res.push_str("_ => false, }}\n\n");
   res.push_str("fn is_pop(&self) -> bool { match self {\n");
   for (_, dtypes) in fifo_types.iter() {
     let fty = dtypes.iter().next().unwrap();
-    let ty = dtype_to_rust_type(&fty);
+    let ty = dtype_to_rust_type(fty);
     res.push_str(&format!("  EventKind::FIFO{}Pop(_) => true,\n", ty,));
   }
   res.push_str("_ => false, }}\n");
@@ -722,15 +722,15 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     res.push_str(&format!(
       "  Array{}(Box<{}>),\n",
       array_ty_to_id(&scalar_ty, size),
-      dtype_to_rust_type(&array),
+      dtype_to_rust_type(array),
     ));
   }
   for (_, dtypes) in fifo_types.iter() {
     let fifo = dtypes.iter().next().unwrap();
     res.push_str(&format!(
       "  FIFO{}(Box<VecDeque<{}>>),\n",
-      dtype_to_rust_type(&fifo),
-      dtype_to_rust_type(&fifo)
+      dtype_to_rust_type(fifo),
+      dtype_to_rust_type(fifo)
     ));
   }
   res.push_str("}\n\n");
@@ -1038,7 +1038,7 @@ macro_rules! impl_unwrap_slab {
       &format!("{}_triggered", namify(module.get_name())),
       Span::call_site(),
     );
-    let module_eventkind_id = syn::Ident::new(&module_eventkind, Span::call_site());
+    let module_eventkind_id = syn::Ident::new(module_eventkind, Span::call_site());
     res.push_str(
       &quote::quote! {
         if #module_gatekeeper.map_or(false, |v| v == event.0.stamp) {
@@ -1069,7 +1069,7 @@ macro_rules! impl_unwrap_slab {
       })
       .map(|(elem, _)| {
         let id = dump_ref!(sys, elem);
-        let slab_idx = *slab_cache.get(&elem).unwrap();
+        let slab_idx = *slab_cache.get(elem).unwrap();
         res.push_str(&format!(
           "let {} = data_slab[{}].unwrap_payload();",
           id, slab_idx,
@@ -1168,7 +1168,7 @@ fn dump_modules(
   slab_cache: &HashMap<BaseNode, usize>,
 ) -> Result<(), std::io::Error> {
   fd.write(
-    &quote! {
+    quote! {
       use super::runtime::*;
       use std::collections::VecDeque;
       use std::collections::BinaryHeap;
@@ -1217,7 +1217,7 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
   // Dump the Cargo.toml and rustfmt.toml
   {
     let mut cargo = OpenOptions::new()
-      .write(true)
+      
       .append(true)
       .open(&manifest)?;
     writeln!(cargo, "num-bigint = \"0.4\"")?;

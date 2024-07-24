@@ -42,19 +42,17 @@ impl InsertPoint {
     let block = block.as_ref::<Block>(sys).unwrap();
     if let Some(cur_at) = at {
       if cur_at + 1 < block.get_num_exprs() {
-        return InsertPoint(module.clone(), block.upcast(), Some(cur_at + 1)).into();
+        InsertPoint(*module, block.upcast(), Some(cur_at + 1)).into()
       } else {
-        return InsertPoint(module.clone(), block.upcast(), None).into();
+        InsertPoint(*module, block.upcast(), None).into()
       }
+    } else if let Some(nxt_block) = block.next() {
+      InsertPoint(*module, nxt_block, Some(0)).into()
+    } else if let Ok(block_parent) = block.get_parent().as_ref::<Block>(sys) {
+      return InsertPoint(*module, block_parent.upcast(), None).into();
     } else {
-      if let Some(nxt_block) = block.next() {
-        return InsertPoint(module.clone(), nxt_block, Some(0)).into();
-      } else if let Ok(block_parent) = block.get_parent().as_ref::<Block>(sys) {
-        return InsertPoint(module.clone(), block_parent.upcast(), None).into();
-      } else {
-        return None;
-      }
-    };
+      return None;
+    }
   }
 }
 
@@ -131,7 +129,7 @@ macro_rules! impl_typed_iter {
   ($func_name:ident, $ty: ident) => {
     paste::paste! {
       /// Iterate over all the modules of the system.
-      pub fn $func_name<'a>(&'a self) -> impl Iterator<Item = [<$ty Ref>]<'a>> {
+      pub fn $func_name(&self) -> impl Iterator<Item = [<$ty Ref>]<'_>> {
         self
           .global_symbols
           .iter()
@@ -154,15 +152,15 @@ impl SysBuilder {
   ///
   /// * `name` - The name of the system.
   pub fn new(name: &str) -> Self {
-    let res = Self {
+    
+    Self {
       name: name.into(),
       global_symbols: HashMap::new(),
       slab: slab::Slab::new(),
       cached_nodes: HashMap::new(),
       inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
       symbol_table: SymbolTable::new(),
-    };
-    res
+    }
   }
 
   pub fn get_name(&self) -> &str {
@@ -189,7 +187,7 @@ impl SysBuilder {
     &'sys self,
     key: &BaseNode,
   ) -> Result<T::Reference, String> {
-    T::reference(self, key.clone())
+    T::reference(self, *key)
   }
 
   impl_typed_iter!(module_iter, Module);
@@ -201,15 +199,15 @@ impl SysBuilder {
     &'sys mut self,
     key: &BaseNode,
   ) -> Result<T::Mutator, String> {
-    T::mutator(self, key.clone())
+    T::mutator(self, *key)
   }
 
   /// Get the current module to be built.
-  pub fn get_current_module<'a>(&'a self) -> Result<ModuleRef<'a>, String> {
+  pub fn get_current_module(&self) -> Result<ModuleRef<'_>, String> {
     self.get::<Module>(&self.inesert_point.0)
   }
 
-  pub fn get_current_block<'a>(&'a self) -> Result<BlockRef<'a>, String> {
+  pub fn get_current_block(&self) -> Result<BlockRef<'_>, String> {
     self.get::<Block>(&self.inesert_point.1)
   }
 
@@ -345,18 +343,18 @@ impl SysBuilder {
   pub fn get_const_int(&mut self, dtype: DataType, value: u64) -> BaseNode {
     let cache_key = CacheKey::IntImm((dtype.clone(), value));
     if let Some(cached) = self.cached_nodes.get(&cache_key) {
-      return cached.clone();
+      return *cached;
     }
     let instance = IntImm::new(dtype.clone(), value);
     let key = self.insert_element(instance);
-    self.cached_nodes.insert(cache_key, key.clone());
+    self.cached_nodes.insert(cache_key, key);
     key
   }
 
   pub fn get_str_literal(&mut self, value: String) -> BaseNode {
     let instance = StrImm::new(value);
-    let key = self.insert_element(instance);
-    key
+    
+    self.insert_element(instance)
   }
 
   pub fn create_log(&mut self, fmt: BaseNode, mut args: Vec<BaseNode>) -> BaseNode {
@@ -405,7 +403,7 @@ impl SysBuilder {
       t_ty,
       f_ty,
       "{}Select value type mismatch: {:?} and {:?}",
-      site.to_string(),
+      site,
       t_ty,
       f_ty
     );
@@ -438,7 +436,7 @@ impl SysBuilder {
       dtype.clone(),
       opcode,
       vec![BaseNode::unknown(); operands.len()],
-      self.inesert_point.1.clone(),
+      self.inesert_point.1,
     );
     let res = self.insert_element(instance);
     if insert {
@@ -454,7 +452,7 @@ impl SysBuilder {
   /// The helper function to insert an element into the current insert point.
   fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
     let InsertPoint(_, block, _) = &self.inesert_point;
-    let block = block.clone();
+    let block = *block;
     self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 
@@ -469,8 +467,8 @@ impl SysBuilder {
     });
     let args = vec![bind];
     self.insert_at_ip(bind);
-    let res = self.create_expr(DataType::void(), Opcode::AsyncCall, args, true);
-    res
+    
+    self.create_expr(DataType::void(), Opcode::AsyncCall, args, true)
   }
 
   create_arith_op_impl!(binary, create_add, Binary::Add.into());
@@ -518,7 +516,7 @@ impl SysBuilder {
     }
     let instance = Array::new(ty.clone(), array_name.clone(), size, init, attrs);
     let key = self.insert_element(instance);
-    self.global_symbols.insert(array_name, key.clone());
+    self.global_symbols.insert(array_name, key);
     key
   }
 
@@ -571,12 +569,10 @@ impl SysBuilder {
   ) -> BaseNode {
     let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
     let module = bind.callee();
-    let port = module.get_port_by_name(&key).expect(&format!(
-      "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
+    let port = module.get_port_by_name(&key).unwrap_or_else(|| panic!("\"{}\" is NOT a FIFO of \"{}\" ({:?})",
       key,
       module.get_name(),
-      module.upcast()
-    ));
+      module.upcast()));
     assert_eq!(
       port.scalar_ty(),
       value.get_dtype(self).unwrap(),
@@ -648,9 +644,9 @@ impl SysBuilder {
     assert_eq!(ptype, vtype, "Port type mismatch!");
 
     // Create the expression.
-    let res = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
+    
 
-    res
+    self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true)
   }
 
   fn indexable(&self, idx: BaseNode) -> bool {
@@ -681,8 +677,8 @@ impl SysBuilder {
     );
     assert!(matches!(array.get_kind(), NodeKind::Array));
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
-    let res = self.create_expr(dtype, Opcode::Load, vec![array, idx], true);
-    res
+    
+    self.create_expr(dtype, Opcode::Load, vec![array, idx], true)
   }
 
   /// Create a write operation on an array.
@@ -721,8 +717,8 @@ impl SysBuilder {
       site, dtype, vtype
     );
     let operands = vec![array, idx, value];
-    let res = self.create_expr(DataType::void(), Opcode::Store, operands, true);
-    res
+    
+    self.create_expr(DataType::void(), Opcode::Store, operands, true)
   }
 
   /// The helper function to combine the data types of two references.
@@ -798,16 +794,16 @@ impl SysBuilder {
   /// * `cond` - The condition of popping the FIFO. If None is given, the pop is unconditional.
   pub fn create_fifo_pop(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-    let res = self.create_expr(ty, Opcode::FIFOPop, vec![fifo.clone()], true);
-    res
+    
+    self.create_expr(ty, Opcode::FIFOPop, vec![fifo], true)
   }
 
   /// Create a FIFO peek operation. This is similar to pop, but does not remove the value from the
   /// FIFO.
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-    let res = self.create_expr(ty, subcode::FIFO::Peek.into(), vec![fifo], true);
-    res
+    
+    self.create_expr(ty, subcode::FIFO::Peek.into(), vec![fifo], true)
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
@@ -816,13 +812,13 @@ impl SysBuilder {
       NodeKind::FIFO,
       "Expect FIFO as the operand"
     );
-    let res = self.create_expr(
+    
+    self.create_expr(
       DataType::int_ty(1),
       subcode::FIFO::Valid.into(),
       vec![fifo],
       true,
-    );
-    res
+    )
   }
 
   /// Create a slice operation.
@@ -841,8 +837,8 @@ impl SysBuilder {
     } else {
       panic!("Start is NOT a constant!");
     };
-    let res = self.create_expr(ty, Opcode::Slice, vec![src, start, end], true);
-    res
+    
+    self.create_expr(ty, Opcode::Slice, vec![src, start, end], true)
   }
 
   fn retype_imm(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
@@ -918,9 +914,9 @@ impl SysBuilder {
 impl Display for SysBuilder {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let mut printer = IRPrinter::new(false);
-    write!(f, "system {} {{\n", self.name)?;
+    writeln!(f, "system {} {{", self.name)?;
     for elem in self.array_iter() {
-      write!(f, "  {};\n", printer.visit_array(elem).unwrap())?;
+      writeln!(f, "  {};", printer.visit_array(elem).unwrap())?;
     }
     printer.inc_indent();
     for elem in self.module_iter() {

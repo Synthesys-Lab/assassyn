@@ -8,9 +8,8 @@ use crate::{
 pub(super) fn namify(name: &str) -> String {
   name
     .chars()
-    .into_iter()
     .map(|x| {
-      if x.is_alphabetic() || x.is_digit(10) || x == '_' {
+      if x.is_alphabetic() || x.is_ascii_digit() || x == '_' {
         x
       } else {
         '_'
@@ -46,7 +45,7 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
   if dtype.is_int() {
     let prefix = if dtype.is_signed() { "i" } else { "u" };
     let bits = dtype.get_bits();
-    return if bits >= 8 && bits <= 64 {
+    return if (8..=64).contains(&bits) {
       let bits = bits.next_power_of_two();
       format!("{}{}", prefix, bits)
     } else if bits == 1 {
@@ -55,9 +54,9 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
       format!("{}8", prefix)
     } else if bits > 64 {
       if dtype.is_signed() {
-        format!("BigInt")
+        "BigInt".to_string()
       } else {
-        format!("BigUint")
+        "BigUint".to_string()
       }
     } else {
       panic!("Not implemented yet, {:?}", dtype)
@@ -68,14 +67,14 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
     return if bits == 1 {
       "bool".to_string()
     } else if bits < 8 {
-      format!("u8")
+      "u8".to_string()
     } else {
       format!("u{}", dtype.get_bits().next_power_of_two())
     };
   }
   match dtype {
     DataType::Module(_) => {
-      format!("Box<EventKind>",)
+      "Box<EventKind>".to_string()
     }
     DataType::ArrayType(ty, size) => {
       format!("[{}; {}]", dtype_to_rust_type(ty), size)

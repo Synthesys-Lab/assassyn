@@ -111,7 +111,7 @@ impl Visitor<()> for GatherAllUses {
     if operand.get_value().eq(&self.src) {
       self
         .uses
-        .insert((operand.get_user().clone(), operand.get_idx(), None));
+        .insert((*operand.get_user(), operand.get_idx(), None));
     }
     None
   }
@@ -135,13 +135,13 @@ impl ModuleRef<'_> {
       .iter()
       .map(|(ext, users)| {
         (
-          ext.clone(),
+          *ext,
           users
             .iter()
             .filter(|x| {
-              (*x).eq(&operand) || {
+              (*x).eq(operand) || {
                 let user = (*x).as_ref::<Operand>(self.sys).unwrap();
-                user.get_value().eq(&operand)
+                user.get_value().eq(operand)
               }
             })
             .cloned()
@@ -152,8 +152,7 @@ impl ModuleRef<'_> {
       .collect::<Vec<_>>();
     tmp
       .iter()
-      .map(|(ext, users)| users.iter().map(|x| (ext.clone(), x.clone())))
-      .flatten()
+      .flat_map(|(ext, users)| users.iter().map(|x| (*ext, *x)))
       .collect()
   }
 }
@@ -189,7 +188,7 @@ impl ModuleMut<'_> {
     // Reconnect the external interfaces if applicable.
     // TODO(@were): Maybe later unify a common interface for this.
     let operand_ref = operand.as_ref::<Operand>(self.sys).unwrap();
-    let value = operand_ref.get_value().clone();
+    let value = *operand_ref.get_value();
     match value.get_kind() {
       NodeKind::Array => {
         self.insert_external_interface(value, operand);
@@ -197,7 +196,7 @@ impl ModuleMut<'_> {
       NodeKind::FIFO => {
         let fifo = value.as_ref::<FIFO>(self.sys).unwrap();
         if fifo.get_parent().get_key() != self.get().get_key() {
-          self.insert_external_interface(value.clone(), operand);
+          self.insert_external_interface(value, operand);
         }
       }
       _ => {}
@@ -214,7 +213,7 @@ impl ExprMut<'_> {
     let module = module.upcast();
     let expr = self.get().upcast();
     if let Some(old) = self.get().operands.get(i) {
-      let old = old.clone();
+      let old = *old;
       self.sys.cut_operand(&old);
       let operand = value.map(|x| self.sys.insert_element(Operand::new(x)));
       let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
@@ -273,19 +272,19 @@ impl SysBuilder {
       return;
     }
     let operand_ref = operand.as_ref::<Operand>(self).unwrap();
-    let def_value = operand_ref.get_value().clone();
+    let def_value = *operand_ref.get_value();
     match def_value.get_kind() {
       NodeKind::Module => {
         let mut module_mut = self.get_mut::<Module>(&def_value).unwrap();
-        module_mut.remove_user(&operand);
+        module_mut.remove_user(operand);
       }
       NodeKind::FIFO => {
         let mut fifo_mut = self.get_mut::<FIFO>(&def_value).unwrap();
-        fifo_mut.remove_user(&operand);
+        fifo_mut.remove_user(operand);
       }
       NodeKind::Expr => {
         let mut expr_mut = self.get_mut::<Expr>(&def_value).unwrap();
-        expr_mut.remove_user(&operand);
+        expr_mut.remove_user(operand);
       }
       _ => {}
     }
@@ -296,7 +295,7 @@ impl SysBuilder {
       return;
     }
     let operand_ref = operand.as_ref::<Operand>(self).unwrap();
-    let value = operand_ref.get_value().clone();
+    let value = *operand_ref.get_value();
     match value.get_kind() {
       NodeKind::Module => {
         let mut module_mut = self.get_mut::<Module>(&value).unwrap();
@@ -319,7 +318,7 @@ impl SysBuilder {
     let mut gather = GatherAllUses::new(src);
     gather.enter(self);
     for (user, i, new_value) in gather.uses {
-      let new_value = new_value.map_or(dst.clone(), |x| x);
+      let new_value = new_value.map_or(dst, |x| x);
       if let Some(i) = i {
         let mut expr_mut = user.as_mut::<Expr>(self).unwrap();
         expr_mut.set_operand(i, new_value);

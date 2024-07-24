@@ -27,7 +27,7 @@ impl DataType {
   }
 
   pub fn module(inputs: Vec<DataType>) -> Self {
-    DataType::Module(inputs.into_iter().map(|x| Box::new(x)).collect())
+    DataType::Module(inputs.into_iter().map(Box::new).collect())
   }
 
   pub fn int_ty(bits: usize) -> Self {
@@ -252,8 +252,8 @@ impl SysBuilder {
       let mut iter = self.array_iter().filter(|x| x.get_key() == array.get_key());
       let array = iter.next().unwrap();
       assert!(iter.next().is_none());
-      let key = array.get_key();
-      key
+      
+      array.get_key()
     };
     self.global_symbols.retain(|_, v| v.get_key() != key);
     self.dispose(array);

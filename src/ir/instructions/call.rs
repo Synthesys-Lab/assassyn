@@ -9,7 +9,7 @@ impl Bind<'_> {
   /// Get the arguments of this bind expression.
   pub fn get_arg(&self, i: usize) -> Option<BaseNode> {
     if i < self.expr.get_num_operands() - 1 {
-      self.expr.get_operand(i).map(|x| x.get_value().clone())
+      self.expr.get_operand(i).map(|x| *x.get_value())
     } else {
       None
     }
@@ -59,7 +59,7 @@ impl ToString for Bind<'_> {
       })
       .collect::<Vec<String>>()
       .join(", ");
-    format!("bind {} {{ {} }}", callee.get_name(), arg_list).into()
+    format!("bind {} {{ {} }}", callee.get_name(), arg_list)
   }
 }
 

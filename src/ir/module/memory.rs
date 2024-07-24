@@ -92,11 +92,9 @@ impl SysBuilder {
       .as_ref::<Module>(self)
       .unwrap()
       .get_attrs()
-      .iter()
-      .filter(|x| matches!(x, Attribute::Memory(_)))
-      .next()
+      .iter().find(|x| matches!(x, Attribute::Memory(_)))
     {
-      params.array.clone()
+      params.array
     } else {
       panic!("Memory module should have MemoryParams attribute");
     };

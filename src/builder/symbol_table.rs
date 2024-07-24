@@ -7,7 +7,7 @@ pub(crate) struct SymbolTable {
 impl SymbolTable {
   pub(crate) fn identifier(&mut self, id: &str) -> String {
     // If the identifier is already in the symbol table, we append a number to it.
-    if let Some(x) = self.unique_ids.get_mut(id.into()) {
+    if let Some(x) = self.unique_ids.get_mut(id) {
       // Append a number after.
       let res = format!("{}_{}", id, x);
       *x += 1;

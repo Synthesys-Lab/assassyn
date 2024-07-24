@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use super::node::BaseNode;
 
+#[derive(Default)]
 pub struct TemplateMaster {
   params: Vec<BaseNode>,
 }
@@ -35,11 +36,6 @@ impl TemplateInstance {
   }
 }
 
-impl Default for TemplateMaster {
-  fn default() -> Self {
-    TemplateMaster { params: Vec::new() }
-  }
-}
 
 impl Default for TemplateInstance {
   fn default() -> Self {

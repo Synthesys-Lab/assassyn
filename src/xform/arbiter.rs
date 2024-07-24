@@ -24,9 +24,7 @@ impl Visitor<()> for GatherBinds {
     let expr = expr.clone();
     if let Ok(bind) = expr.as_sub::<Bind>() {
       let callee = bind.callee().upcast();
-      if !self.binds.contains_key(&callee) {
-        self.binds.insert(callee, HashSet::new());
-      }
+      self.binds.entry(callee).or_default();
       self.binds.get_mut(&callee).unwrap().insert(value);
     }
     None
@@ -36,7 +34,7 @@ impl Visitor<()> for GatherBinds {
 fn bits_to_int(sys: &mut SysBuilder, x: &BaseNode) -> BaseNode {
   let dtype = x.get_dtype(sys).unwrap();
   let bits = dtype.get_bits();
-  sys.create_bitcast(created_here!(), x.clone(), DataType::int_ty(bits))
+  sys.create_bitcast(created_here!(), *x, DataType::int_ty(bits))
 }
 
 fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet<BaseNode>> {
@@ -47,17 +45,17 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
     gather_binds.visit_module(m);
   }
   gather_binds.binds.retain(|_, v| v.len() > 1);
-  return gather_binds.binds;
+  gather_binds.binds
 }
 
 pub fn inject_arbiter(sys: &mut SysBuilder) {
   let module_with_multi_caller = find_module_with_multi_callers(sys);
   for (callee, callers) in module_with_multi_caller.iter() {
-    if {
+    let res = {
       let module = callee.as_ref::<Module>(sys).unwrap();
       module.get_attrs().contains(&module::Attribute::NoArbiter)
         || module.get_attrs().contains(&module::Attribute::OptNone)
-    } {
+    }; if res {
       continue;
     }
     let module_name = callee.as_ref::<Module>(sys).unwrap().get_name().to_string();
@@ -98,7 +96,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
           sys.create_fifo_valid(port)
         })
         .collect::<Vec<_>>();
-      let mut valid_runner = valids[0].clone();
+      let mut valid_runner = valids[0];
       for valid in valids.iter().skip(1) {
         valid_runner = sys.create_bitwise_and(created_here!(), valid_runner, *valid);
       }

@@ -34,7 +34,7 @@ impl Block {
 
 impl Parented for Block {
   fn get_parent(&self) -> BaseNode {
-    self.parent.clone()
+    self.parent
   }
 
   fn set_parent(&mut self, parent: BaseNode) {
@@ -44,7 +44,7 @@ impl Parented for Block {
 
 impl BlockRef<'_> {
   pub fn get_module(&self) -> ModuleRef<'_> {
-    let mut runner = self.upcast().clone();
+    let mut runner = self.upcast();
     while runner.get_kind() != NodeKind::Module {
       let parent: BaseNode = match runner.get_kind() {
         NodeKind::Block => runner.as_ref::<Block>(self.sys).unwrap().get_parent(),
@@ -77,7 +77,7 @@ impl BlockRef<'_> {
   pub fn get_value(&self) -> Option<BaseNode> {
     self
       .get_block_intrinsic(self.get_num_exprs() - 1, subcode::BlockIntrinsic::Value)
-      .map(|x| x.value().clone())
+      .map(|x| x.value())
   }
 
   pub fn get_cycle(&self) -> Option<u32> {
@@ -89,7 +89,7 @@ impl BlockRef<'_> {
   pub fn get_condition(&self) -> Option<BaseNode> {
     self
       .get_block_intrinsic(0, subcode::BlockIntrinsic::Condition)
-      .map(|x| x.value().clone())
+      .map(|x| x.value())
   }
 
   pub fn get_wait_until(&self) -> Option<BaseNode> {
@@ -109,7 +109,7 @@ impl BlockRef<'_> {
     let parent = self.get().get_parent();
     if let Ok(block) = self.sys.get::<Block>(&parent) {
       let idx = self.idx().unwrap();
-      block.body.get(idx + 1).map(|x| x.clone())
+      block.body.get(idx + 1).copied()
     } else {
       None
     }
@@ -127,7 +127,7 @@ impl BlockRef<'_> {
 }
 
 impl BlockRef<'_> {
-  pub fn body_iter<'a>(&'a self) -> impl Iterator<Item = BaseNode> + 'a {
+  pub fn body_iter(&self) -> impl Iterator<Item = BaseNode> + '_ {
     self.body.iter().cloned()
   }
 }
@@ -144,7 +144,7 @@ impl BlockMut<'_> {
   /// * The new position to insert the next expression.
   pub fn insert_at(&mut self, at: Option<usize>, expr: BaseNode) -> (BaseNode, Option<usize>) {
     let idx = at.unwrap_or_else(|| self.elem.as_ref::<Block>(self.sys).unwrap().get_num_exprs());
-    self.get_mut().body.insert(idx, expr.clone());
+    self.get_mut().body.insert(idx, expr);
     (expr, at.map(|x| x + 1))
   }
 
@@ -155,7 +155,7 @@ impl BlockMut<'_> {
   /// * `expr` - The expression to insert.
   pub fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
     let InsertPoint(_, _, at) = self.sys.inesert_point;
-    let (expr, new_at) = self.insert_at(at.clone(), expr.clone());
+    let (expr, new_at) = self.insert_at(at, expr);
     self.sys.inesert_point.2 = new_at;
     expr
   }
@@ -218,7 +218,7 @@ impl SysBuilder {
     let (block, new_at) = self
       .get_mut::<Block>(insert_block)
       .unwrap()
-      .insert_at(at.clone(), block.clone());
+      .insert_at(*at, block);
     self.inesert_point.2 = new_at;
     block
   }

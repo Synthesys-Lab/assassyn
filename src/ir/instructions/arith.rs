@@ -123,7 +123,7 @@ impl Select1Hot<'_> {
       .expr
       .operand_iter()
       .skip(1)
-      .map(|x| x.get_value().clone())
+      .map(|x| *x.get_value())
   }
 }
 

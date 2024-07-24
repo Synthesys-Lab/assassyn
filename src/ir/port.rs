@@ -66,7 +66,7 @@ impl Typed for FIFO {
 
 impl Parented for FIFO {
   fn get_parent(&self) -> BaseNode {
-    self.parent.clone()
+    self.parent
   }
   fn set_parent(&mut self, parent: BaseNode) {
     self.parent = parent;

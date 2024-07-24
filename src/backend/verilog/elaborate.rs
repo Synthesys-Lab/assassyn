@@ -16,7 +16,7 @@ use self::{expr::subcode, module::Attribute};
 use super::Simulator;
 
 fn namify(name: &str) -> String {
-  name.replace(".", "_")
+  name.replace('.', "_")
 }
 
 macro_rules! fifo_name {
@@ -63,7 +63,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   }
 
   fn get_pred(&self) -> Option<String> {
-    if self.pred_stack.len() == 0 {
+    if self.pred_stack.is_empty() {
       None
     } else {
       Some(format!(
@@ -92,7 +92,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       .as_str(),
     );
 
-    for driver in self.array_drivers.get(&array_name).unwrap().into_iter() {
+    for driver in self.array_drivers.get(&array_name).unwrap().iter() {
       res.push_str(
         format!(
           "logic [{}:0] array_{}_driver_{}_d;\n",
@@ -130,7 +130,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .array_drivers
           .get(&array_name)
           .unwrap()
-          .into_iter()
+          .iter()
           .map(|driver| format!(
             "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_d)",
             array.scalar_ty().get_bits(),
@@ -160,7 +160,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .array_drivers
           .get(&array_name)
           .unwrap()
-          .into_iter()
+          .iter()
           .map(|driver| format!(
             "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_widx)",
             (array.get_size() + 1).ilog2(),
@@ -183,7 +183,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .array_drivers
           .get(&array_name)
           .unwrap()
-          .into_iter()
+          .iter()
           .map(|driver| format!("array_{}_driver_{}_w", array_name, driver))
           .collect::<Vec<String>>()
           .join(" | ")
@@ -215,7 +215,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       array_name, array_name, array_name, array_name
     ));
 
-    res.push_str("\n");
+    res.push('\n');
 
     res
   }
@@ -236,7 +236,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     );
     let fifo_width = fifo.scalar_ty().get_bits();
     res.push_str(format!("// fifo: {}\n", fifo_name).as_str());
-    for driver in self.fifo_drivers.get(&fifo_name).unwrap().into_iter() {
+    for driver in self.fifo_drivers.get(&fifo_name).unwrap().iter() {
       res.push_str(format!("logic fifo_{}_driver_{}_push_valid;\n", fifo_name, driver).as_str());
       res.push_str(
         format!(
@@ -258,7 +258,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .fifo_drivers
           .get(&fifo_name)
           .unwrap()
-          .into_iter()
+          .iter()
           .map(|driver| format!("fifo_{}_driver_{}_push_valid", fifo_name, driver))
           .collect::<Vec<String>>()
           .join(" | ")
@@ -281,7 +281,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .fifo_drivers
           .get(&fifo_name)
           .unwrap()
-          .into_iter()
+          .iter()
           .map(|driver| format!(
             "  ({{{}{{fifo_{}_driver_{}_push_valid}}}} & fifo_{}_driver_{}_push_data)",
             fifo_width, fifo_name, driver, fifo_name, driver
@@ -292,7 +292,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       .as_str(),
     );
     res.push_str(format!("logic fifo_{}_push_ready;\n", fifo_name).as_str());
-    for driver in self.fifo_drivers.get(&fifo_name).unwrap().into_iter() {
+    for driver in self.fifo_drivers.get(&fifo_name).unwrap().iter() {
       res.push_str(
         format!(
           "assign fifo_{}_driver_{}_push_ready = fifo_{}_push_ready;\n",
@@ -312,15 +312,15 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     );
     res.push_str(format!("logic fifo_{}_pop_ready;\n", fifo_name).as_str());
     res.push_str(format!("fifo #({}) fifo_{}_i (\n", fifo_width, fifo_name).as_str());
-    res.push_str(format!("  .clk(clk),\n").as_str());
-    res.push_str(format!("  .rst_n(rst_n),\n").as_str());
+    res.push_str("  .clk(clk),\n".to_string().as_str());
+    res.push_str("  .rst_n(rst_n),\n".to_string().as_str());
     res.push_str(format!("  .push_valid(fifo_{}_push_valid),\n", fifo_name).as_str());
     res.push_str(format!("  .push_data(fifo_{}_push_data),\n", fifo_name).as_str());
     res.push_str(format!("  .push_ready(fifo_{}_push_ready),\n", fifo_name).as_str());
     res.push_str(format!("  .pop_valid(fifo_{}_pop_valid),\n", fifo_name).as_str());
     res.push_str(format!("  .pop_data(fifo_{}_pop_data),\n", fifo_name).as_str());
     res.push_str(format!("  .pop_ready(fifo_{}_pop_ready)\n", fifo_name).as_str());
-    res.push_str(format!(");\n\n").as_str());
+    res.push_str(");\n\n".to_string().as_str());
 
     res
   }
@@ -334,7 +334,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         .trigger_drivers
         .get(&module_name)
         .unwrap_or_else(|| panic!("{} not found!", module_name))
-        .into_iter()
+        .iter()
       {
         res.push_str(
           format!(
@@ -362,7 +362,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
             .trigger_drivers
             .get(&module_name)
             .unwrap()
-            .into_iter()
+            .iter()
             .map(|driver| format!("  {}_driver_{}_trigger_push_valid", module_name, driver))
             .collect::<Vec<String>>()
             .join(" |\n")
@@ -373,7 +373,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     }
     res.push_str(format!("logic {}_trigger_push_ready;\n", module_name).as_str());
     if module_name != "driver" && module_name != "testbench" {
-      for driver in self.trigger_drivers.get(&module_name).unwrap().into_iter() {
+      for driver in self.trigger_drivers.get(&module_name).unwrap().iter() {
         res.push_str(
           format!(
             "assign {}_driver_{}_trigger_push_ready = {}_trigger_push_ready;\n",
@@ -386,15 +386,15 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(format!("logic {}_trigger_pop_valid;\n", module_name).as_str());
     res.push_str(format!("logic {}_trigger_pop_ready;\n", module_name).as_str());
     res.push_str(format!("fifo #(1) {}_trigger_i (\n", module_name).as_str());
-    res.push_str(format!("  .clk(clk),\n").as_str());
-    res.push_str(format!("  .rst_n(rst_n),\n").as_str());
+    res.push_str("  .clk(clk),\n".to_string().as_str());
+    res.push_str("  .rst_n(rst_n),\n".to_string().as_str());
     res.push_str(format!("  .push_valid({}_trigger_push_valid),\n", module_name).as_str());
-    res.push_str(format!("  .push_data(1'b1),\n").as_str());
+    res.push_str("  .push_data(1'b1),\n".to_string().as_str());
     res.push_str(format!("  .push_ready({}_trigger_push_ready),\n", module_name).as_str());
     res.push_str(format!("  .pop_valid({}_trigger_pop_valid),\n", module_name).as_str());
-    res.push_str(format!("  .pop_data(),\n").as_str());
+    res.push_str("  .pop_data(),\n".to_string().as_str());
     res.push_str(format!("  .pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
-    res.push_str(format!(");\n\n").as_str());
+    res.push_str(");\n\n".to_string().as_str());
     res
   }
 
@@ -403,8 +403,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let module_name = namify(module.get_name());
     res.push_str(format!("// {}\n", module_name).as_str());
     res.push_str(format!("{} {}_i (\n", module_name, module_name).as_str());
-    res.push_str(format!("  .clk(clk),\n").as_str());
-    res.push_str(format!("  .rst_n(rst_n),\n").as_str());
+    res.push_str("  .clk(clk),\n".to_string().as_str());
+    res.push_str("  .rst_n(rst_n),\n".to_string().as_str());
     for port in module.port_iter() {
       let fifo_name = namify(
         format!(
@@ -542,7 +542,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     }
     res.push_str(format!("  .trigger_pop_valid({}_trigger_pop_valid),\n", module_name).as_str());
     res.push_str(format!("  .trigger_pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
-    res.push_str(format!(");\n\n").as_str());
+    res.push_str(");\n\n".to_string().as_str());
     res
   }
 
@@ -804,7 +804,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     self.indent += 2;
     res.push_str(format!("{}input logic clk,\n", " ".repeat(self.indent)).as_str());
     res.push_str(format!("{}input logic rst_n,\n", " ".repeat(self.indent)).as_str());
-    res.push_str("\n");
+    res.push('\n');
     for port in module.port_iter() {
       res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name!(port)).as_str());
       res.push_str(
@@ -924,7 +924,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       } else {
         panic!("Unknown interf kind {:?}", interf.get_kind());
       }
-      res.push_str("\n");
+      res.push('\n');
     }
 
     let mut trigger_modules = get_triggered_modules(&module.upcast(), self.sys);
@@ -952,7 +952,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     }
 
     if has_trigger_modules {
-      res.push_str("\n");
+      res.push('\n');
     }
 
     res.push_str(format!("{}// trigger\n", " ".repeat(self.indent)).as_str());
@@ -1008,7 +1008,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         if value.get_dtype(self.sys).unwrap().get_bits() == 1 {
           "".into()
         } else {
-          format!(" != 0")
+          " != 0".to_string()
         }
       ));
       skip
@@ -1016,8 +1016,8 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       0
     };
 
-    res.push_str(format!("logic trigger;\n").as_str());
-    res.push_str(format!("assign trigger_pop_ready = trigger;\n\n").as_str());
+    res.push_str("logic trigger;\n".to_string().as_str());
+    res.push_str("assign trigger_pop_ready = trigger;\n\n".to_string().as_str());
 
     if self.current_module == "testbench" {
       res.push_str("int cycle_cnt;\n");
@@ -1049,7 +1049,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       let mut has_unconditional_branch = false;
       let mut has_conditional_branch = false;
       for p in preds {
-        if p == "" {
+        if p.is_empty() {
           if has_unconditional_branch {
             panic!("multiple unconditional branches for trigger {}", m);
           }
@@ -1091,7 +1091,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       let mut has_unconditional_branch = false;
       let mut has_conditional_branch = false;
       for (p, v) in branches {
-        if p == "" {
+        if p.is_empty() {
           if has_unconditional_branch {
             panic!("multiple unconditional branches for fifo {}", f);
           }
@@ -1102,7 +1102,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             );
           }
           has_unconditional_branch = true;
-          data_str.push_str(format!("{}", v).as_str());
+          data_str.push_str(v.to_string().as_str());
         } else {
           if has_unconditional_branch {
             panic!(
@@ -1116,7 +1116,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         }
       }
       if has_conditional_branch {
-        data_str.push_str(format!("'x").as_str());
+        data_str.push_str("'x".to_string().as_str());
       }
       if has_conditional_branch {
         res.push_str(
@@ -1140,7 +1140,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       let mut has_unconditional_branch = false;
       let mut has_conditional_branch = false;
       for (p, idx, v) in branches {
-        if p == "" {
+        if p.is_empty() {
           if has_unconditional_branch {
             panic!("multiple unconditional branches for array {} store", a);
           }
@@ -1151,8 +1151,8 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             );
           }
           has_unconditional_branch = true;
-          d_str.push_str(format!("{}", v).as_str());
-          idx_str.push_str(format!("{}", idx).as_str());
+          d_str.push_str(v.to_string().as_str());
+          idx_str.push_str(idx.to_string().as_str());
         } else {
           if has_unconditional_branch {
             panic!(
@@ -1167,8 +1167,8 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         }
       }
       if has_conditional_branch {
-        d_str.push_str(format!("'x").as_str());
-        idx_str.push_str(format!("'x").as_str());
+        d_str.push_str("'x".to_string().as_str());
+        idx_str.push_str("'x".to_string().as_str());
       }
       if has_conditional_branch {
         res.push_str(
@@ -1189,7 +1189,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     // tie off array store port
     for (interf, _ops) in module.ext_interf_iter() {
       if interf.get_kind() == NodeKind::Array {
-        let array_ref = interf.as_ref::<Array>(&self.sys).unwrap();
+        let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
         let array_name = namify(array_ref.get_name());
         let mut read_only = false;
         match self.array_drivers.get_mut(&array_name) {
@@ -1327,7 +1327,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             name,
             fifo_name!(fifo),
             fifo_name!(fifo),
-            (self.get_pred().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string())
+            self.get_pred().map(|p| format!(" && {}", p)).unwrap_or("".to_string())
           ))
       }
 
@@ -1352,12 +1352,12 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             1,
           );
         }
-        format_str = format_str.replace("\"", "");
+        format_str = format_str.replace('"', "");
         let mut res = String::new();
         res.push_str(
           format!(
             "always_ff @(posedge clk iff trigger{}) ",
-            (self.get_pred().and_then(|p| Some(format!(" && {}", p)))).unwrap_or("".to_string())
+            self.get_pred().map(|p| format!(" && {}", p)).unwrap_or("".to_string())
           )
           .as_str(),
         );
@@ -1370,7 +1370,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         res.pop();
         res.pop();
         res.push_str(");\n");
-        res.push_str("\n");
+        res.push('\n');
         Some(res)
       }
 
@@ -1624,7 +1624,7 @@ pub fn generate_cpp_testbench(dir: &PathBuf, sys: &SysBuilder, simulator: &Simul
   let main_fname = dir.join("main.cpp");
   let mut main_fd = File::create(main_fname).unwrap();
   main_fd
-    .write(format!("#include \"Vtb.h\"\n").as_bytes())
+    .write("#include \"Vtb.h\"\n".to_string().as_bytes())
     .unwrap();
   main_fd
     .write("#include \"verilated.h\"\n".as_bytes())
@@ -1645,7 +1645,7 @@ pub fn generate_cpp_testbench(dir: &PathBuf, sys: &SysBuilder, simulator: &Simul
     .write("  Verilated::commandArgs(argc, argv);\n".as_bytes())
     .unwrap();
   main_fd
-    .write(format!("  auto* top = new Vtb;\n").as_bytes())
+    .write("  auto* top = new Vtb;\n".to_string().as_bytes())
     .unwrap();
   main_fd
     .write("  Verilated::traceEverOn(true);\n".as_bytes())

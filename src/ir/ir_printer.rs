@@ -135,7 +135,7 @@ impl Visitor<String> for IRPrinter {
           redundancy: self.redundancy
         }
         .dispatch(module.sys, elem, vec![])
-        .expect(&format!("Failed to dump: {:?}", elem).as_str())
+        .unwrap_or_else(|| panic!("Failed to dump: {:?}", elem))
       ));
     }
     if let Some(param) = module.get_parameterizable() {
@@ -144,7 +144,7 @@ impl Visitor<String> for IRPrinter {
         res.push_str("// Parameters: ");
         for (i, elem) in param.iter().enumerate() {
           res.push_str(if i == 0 { " " } else { ", " });
-          res.push_str(&format!("{}", elem.to_string(module.sys)));
+          res.push_str(&elem.to_string(module.sys));
         }
         res.push('\n');
       }
@@ -158,7 +158,7 @@ impl Visitor<String> for IRPrinter {
     res.push_str(&" ".repeat(self.indent));
     res.push_str(&format!(
       "#{:?}\n",
-      module.get_attrs().into_iter().collect::<Vec<_>>()
+      module.get_attrs().iter().collect::<Vec<_>>()
     ));
     res.push_str(&format!(
       "{}module {}(",

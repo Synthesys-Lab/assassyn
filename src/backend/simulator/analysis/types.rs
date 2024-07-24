@@ -20,14 +20,14 @@ fn type_gather_impl(types: Vec<DataType>) -> HashMap<String, HashSet<DataType>> 
     };
     value_mut.insert(ty);
   }
-  return res;
+  res
 }
 
 pub(in crate::backend::simulator) fn array_types_used(
   sys: &SysBuilder,
 ) -> HashMap<String, HashSet<DataType>> {
   let types = sys.array_iter().map(|x| x.dtype()).collect();
-  return type_gather_impl(types);
+  type_gather_impl(types)
 }
 
 struct FIFOTypesUsedVisitor {
@@ -46,5 +46,5 @@ pub(in crate::backend::simulator) fn fifo_types_used(
 ) -> HashMap<String, HashSet<DataType>> {
   let mut visitor = FIFOTypesUsedVisitor { res: Vec::new() };
   visitor.enter(sys);
-  return type_gather_impl(visitor.res);
+  type_gather_impl(visitor.res)
 }
