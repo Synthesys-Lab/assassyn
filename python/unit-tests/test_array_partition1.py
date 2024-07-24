@@ -25,6 +25,18 @@ class Driver(Module):
         a_sum = a[idx0] + a[idx1]
         log("a[idx0] + a[idx1] = {}", a_sum)
 
+def check(raw, parse_cycle):
+    a = [1, 2, 3, 4]
+    for i in raw.split('\n'):
+        if "a[idx0] + a[idx1]" in i:
+            line_toks = i.split()
+            cycle = parse_cycle(line_toks) - 1
+            idx0 = cycle % 4
+            idx1 = (cycle + 1) % 4
+            expect = a[idx0] + a[idx1]
+            assert expect == int(line_toks[-1]), f"@cycle: {cycle}: expect {expect}, got {line_toks[-1]}"
+            a[idx0] = cycle * cycle
+            a[idx1] = (cycle + 1) * 2
         
 def test_array_partition1():
     sys = SysBuilder('array_partition1')
@@ -34,22 +46,14 @@ def test_array_partition1():
 
     print(sys)
 
-    simulator_path = elaborate(sys)
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
     
     raw = utils.run_simulator(simulator_path)
-    print(raw)
+    check(raw, utils.parse_simulator_cycle)
 
-    a = [1, 2, 3, 4]
-    for i in raw.split('\n'):
-        if "a[idx0] + a[idx1]" in i:
-            line_toks = i.split()
-            cycle = int(line_toks[2][1:-4])
-            idx0 = cycle % 4
-            idx1 = (cycle + 1) % 4
-            expect = a[idx0] + a[idx1]
-            assert expect == int(line_toks[-1]), f"@cycle: {cycle}"
-            a[idx0] = cycle * cycle
-            a[idx1] = (cycle + 1) * 2
+    #raw = utils.run_verilator(verilator_path)
+    #check(raw, parse_verilator_cycle)
+
     
 if __name__ == '__main__':
     test_array_partition1()

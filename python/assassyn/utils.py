@@ -13,6 +13,24 @@ def run_simulator(path):
     return subprocess.check_output(cmd).decode('utf-8')
 
 def run_verilator(path):
-    '''The helper function to run the verilator in the given path'''
-    cmd = ['make', 'main']
-    return subprocess.check_output(cmd, cwd=path, stderr=subprocess.STDOUT).decode('utf-8')
+    '''The helper function to run the verilator'''
+    restore = os.getcwd()
+    os.chdir(path)
+    print(path)
+    cmd = ['make', 'verilator', '-j']
+    subprocess.check_output(cmd).decode('utf-8')
+    cmd = ['make', 'main', '-j']
+    subprocess.check_output(cmd).decode('utf-8')
+    # TODO(@were): Fix this hardcoded Vtb later.
+    cmd = ['./obj_dir/Vtb']
+    res = subprocess.check_output(cmd).decode('utf-8')
+    os.chdir(restore)
+    return res
+
+def parse_verilator_cycle(toks):
+    '''Helper function to parse verilator dumped cycle'''
+    return int(toks[0]) // 100
+
+def parse_simulator_cycle(toks):
+    '''Helper function to parse rust-simulator dumped cycle'''
+    return int(toks[2][1:-4])

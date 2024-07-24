@@ -681,7 +681,7 @@ initial begin
   rst_n = 1'b0;
   #1;
   rst_n = 1'b1;
-  #{}00;
+  #{};
   $finish();
 end
 
@@ -696,7 +696,8 @@ top top_i (
 
 endmodule
 ",
-        sim_threshold, init
+        (sim_threshold + 1) * 100,
+        init
       )
       .as_bytes(),
     )?;
@@ -1362,7 +1363,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         );
         res.push_str("$display(\"%t\\t");
         res.push_str(format_str.as_str());
-        res.push_str("\", $time, ");
+        res.push_str("\", $time - 100, ");
         for elem in expr.operand_iter().skip(1) {
           res.push_str(format!("{}, ", dump_ref!(self.sys, elem.get_value())).as_str());
         }

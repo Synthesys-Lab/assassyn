@@ -933,7 +933,7 @@ macro_rules! impl_unwrap_slab {
     // Push the initial events.
     res.push_str(
       &quote::quote! {
-        for i in 0..#sim_threshold {
+        for i in 1..=#sim_threshold {
           q.push(Reverse(Event{stamp: i * 100, kind: EventKind::ModuleDriver}));
         }
       }

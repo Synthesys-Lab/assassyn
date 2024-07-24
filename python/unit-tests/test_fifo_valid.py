@@ -53,7 +53,20 @@ class Driver(Module):
             vv = v + v
             lhs.async_called(v = vv)
             rhs.async_called(sub_b = v)
-            
+ 
+
+def check(raw):
+    cnt = 0
+    for i in raw.split('\n'):
+        if f'sub:' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(b) - int(a) == int(c)
+            cnt += 1
+    assert cnt == 100 - 2, f'cnt: {cnt} != 100 - 2'
+
 
 def test_fifo_valid():
     sys = SysBuilder('fifo_valid')
@@ -70,20 +83,14 @@ def test_fifo_valid():
 
     print(sys)
 
-    simulator_path = elaborate(sys)
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    cnt = 0
-    for i in raw.split('\n'):
-        if f'[{sub.synthesis_name().lower()}]' in i:
-            line_toks = i.split()
-            c = line_toks[-1]
-            a = line_toks[-3]
-            b = line_toks[-5]
-            assert int(b) - int(a) == int(c)
-            cnt += 1
-    assert cnt == 100 - 1, f'cnt: {cnt} != 100'
+    raw = utils.run_verilator(verilator_path)
+    check(raw)
+
 
 if __name__ == '__main__':
     test_fifo_valid()

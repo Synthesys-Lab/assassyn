@@ -1,3 +1,4 @@
+import assassyn
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
@@ -48,6 +49,22 @@ class Driver(Module):
             log('flip to {}', flip)
             lock[0] = flip
 
+def parse_simulator_log(toks):
+    cycle = utils.parse_simulator_cycle(toks)
+    return cycle, int(toks[-5]), int(toks[-1])
+
+def parse_verilator_log(toks):
+    cycle = utils.parse_verilator_cycle(toks)
+    return cycle, int(toks[-5]), int(toks[-1])
+
+def check(raw, cycle_parser):
+    for i in raw.splitlines():
+        if 'Multiplier' in i:
+            toks = i.split()
+            cycle, value, res = cycle_parser(toks)
+            assert (cycle - 1) % 4 in [2, 3], cycle
+            assert res == value * value
+
 def test_wait_until():
     sys = SysBuilder('wait_until')
     with sys:
@@ -63,22 +80,15 @@ def test_wait_until():
         driver = Driver()
         driver.build(agent, lock)
 
-    print(sys)
 
-    simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200)
+    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog='verilator')
+    simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
+    check(raw, parse_simulator_log)
 
-    print(raw)
-
-    for i in raw.split('\n'):
-        if 'squarer' in i:
-            toks = i.split()
-            cycle = int(toks[2][1:-4])
-            assert cycle % 4 in [2, 3], cycle
-            value = int(toks[-5])
-            res = int(toks[-1])
-            assert res == value * value
+    raw = utils.run_verilator(verilator_path)
+    check(raw, parse_verilator_log)
 
 
 if __name__ == '__main__':

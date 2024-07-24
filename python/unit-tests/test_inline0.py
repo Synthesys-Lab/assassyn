@@ -24,26 +24,29 @@ class Driver(Module):
         cnt[0] = v
         adder(v, v)
 
+def check(raw):
+    for i in raw.split('\n'):
+        if f'adder:' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(a) + int(b) == int(c)
+
 def test_inline0():
     sys = SysBuilder('inline0')
     with sys:
         driver = Driver()
         driver.build()
 
-    print(sys)
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 
-    simulator_path = elaborate(sys)
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    print(raw)
-    
-    for i in raw.split('\n'):
-        if f'[{driver.synthesis_name().lower()}]' in i:
-            line_toks = i.split()
-            c = line_toks[-1]
-            a = line_toks[-3]
-            b = line_toks[-5]
-            assert int(a) + int(b) == int(c)
+    raw = utils.run_verilator(verilator_path)
+    check(raw)
+
 
 if __name__ == '__main__':
     test_inline0()

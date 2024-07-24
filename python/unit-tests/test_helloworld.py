@@ -15,6 +15,13 @@ class Driver(Module):
         log("Hello, World!")
 
 
+def check_raw(raw):
+    cnt = 0
+    for i in raw.split('\n'):
+        cnt += "Hello, World!" in i
+    assert cnt == 100, "Hello, World! not found in raw output"
+
+
 def test_helloworld():
     
     sys = SysBuilder('helloworld')
@@ -23,17 +30,14 @@ def test_helloworld():
         driver = Driver()
         driver.build()
 
-    print(sys)
-
-    simulator_path = elaborate(sys)
+    simulator_path, verilog_path = elaborate(sys, verilog='verilator')
     
     raw = utils.run_simulator(simulator_path)
+    check_raw(raw)
 
-    print(raw)
+    raw = utils.run_verilator(verilog_path)
+    check_raw(raw)
 
-    for i in raw.split('\n'):
-        if f'[{driver.synthesis_name().lower()}]' in i:
-            assert "Hello, World!" in i
 
 if __name__ == '__main__':
     test_helloworld()

@@ -46,6 +46,18 @@ class Driver(Module):
         rhs.async_called(sub_b = v) 
 
 
+def check(raw):
+    cnt = 0
+    for i in raw.split('\n'):
+        if f'Subtractor:' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(b) - int(a) == int(c)
+            cnt += 1
+    assert cnt == 100 - 2, f'cnt: {cnt} != 100'
+
 def test_imbalance():
     sys =  SysBuilder('imbalance')
     with sys:
@@ -58,24 +70,16 @@ def test_imbalance():
         driver = Driver()
         driver.build(lhs, rhs)
 
-    print(sys)
 
-    simulator_path = elaborate(sys)
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    print(raw)
+    raw = utils.run_verilator(verilator_path)
+    check(raw)
 
-    cnt = 0
-    for i in raw.split('\n'):
-        if f'[{sub.synthesis_name().lower()}]' in i:
-            line_toks = i.split()
-            c = line_toks[-1]
-            a = line_toks[-3]
-            b = line_toks[-5]
-            assert int(b) - int(a) == int(c)
-            cnt += 1
-    assert cnt == 100 - 1, f'cnt: {cnt} != 100'
+
 
     
 if __name__ == '__main__':

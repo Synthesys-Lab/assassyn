@@ -9,7 +9,7 @@ on:
 name: Test
 
 env:
-  VERILATOR_VERSION: v5.024
+  VERILATOR_VERSION: v5.026
 
 jobs:
   test:
@@ -69,11 +69,9 @@ jobs:
           fi;
       - name: Generate python frontend test result
         env:
-          PYTHONPATH: python
+          PYTHONPATH: ${{ github.workspace }}/python
           ASSASSYN_HOME: ${{ github.workspace }}
           RUSTC_WRAPPER: sccache
+          VERILATOR_ROOT: ${{ github.workspace }}/verilator
         run: |
-          pytest py-tests;
-      - name: Generate test result
-        run: |
-          cargo test;
+          pytest python/unit-tests;

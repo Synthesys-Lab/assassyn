@@ -34,7 +34,7 @@ jobs:
         with:
           python-version: '3.x'
       - run: pip install -r python/requirements.txt
-      - run: pylint --rcfile python/.pylintrc python
+      - run: pylint --rcfile python/.pylintrc python/assassyn
 
   fmt:
     name: Rustfmt

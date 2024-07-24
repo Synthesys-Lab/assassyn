@@ -16,19 +16,22 @@ class Driver(Module):
         cnt = RegArray(UInt(32), 1, initializer=[10])
         log('cnt: {}', cnt[0]);
 
+def check(raw):
+    for i in raw.split('\n'):
+        if 'cnt:' in i:
+            assert int(i.split()[-1]) == 10
+
 def test_driver():
     sys = SysBuilder('driver')
     with sys:
         driver = Driver()
         driver.build()
 
-    simulator_path = elaborate(sys)
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    for i in raw.split('\n'):
-        if '[driver]' in i:
-            assert int(i.split()[-1]) == 10
 
 
 if __name__ == '__main__':

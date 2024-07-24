@@ -30,8 +30,17 @@ class Driver(Module):
         gt = rand0 > rand1
         mux = gt.select(rand0, rand1)
 
-        log("{} >? {} = {}", rand0, rand1, mux)
-        
+        log("select: {} >? {} = {}", rand0, rand1, mux)
+ 
+
+def check(raw: str):
+    for i in raw.splitlines():
+        if 'select:' in i:
+            a = i.split()[-5]
+            b = i.split()[-3]
+            c = i.split()[-1]
+            assert max(int(a), int(b)) == int(c)
+
         
 def test_select():
     sys = SysBuilder('select')
@@ -39,13 +48,14 @@ def test_select():
         driver = Driver()
         driver.build()
 
-    print(sys)
-
-    simulator_path = elaborate(sys)
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    print(raw)
+    raw = utils.run_verilator(verilator_path)
+    check(raw)
+
 
 if __name__ == '__main__':
     test_select()

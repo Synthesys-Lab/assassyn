@@ -26,19 +26,7 @@ class Driver(Module):
         log("add: {} + {} = {}", v, v, a)
         log("eq: {} == {} ? {}", v, v, e)
 
-def test_inline1():
-    sys = SysBuilder('inline1')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    print(sys)
-
-    simulator_path = elaborate(sys)
-    raw = utils.run_simulator(simulator_path)
-
-    print(raw)
-    
+def check(raw):
     for i in raw.split('\n'):
         line_toks = i.split()
         if 'add' in i:
@@ -51,6 +39,21 @@ def test_inline1():
             b = line_toks[-3]
             c = line_toks[-1]
             assert bool(c) == (a == b)
+
+def test_inline1():
+    sys = SysBuilder('inline1')
+    with sys:
+        driver = Driver()
+        driver.build()
+
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
+
+    raw = utils.run_simulator(simulator_path)
+    check(raw)
+
+    raw = utils.run_verilator(verilator_path)
+    check(raw)
+
 
 if __name__ == '__main__':
     test_inline1()
