@@ -182,11 +182,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       }
       Opcode::Unary { .. } => {
         let uop = expr.as_sub::<instructions::Unary>().unwrap();
-        format!(
-          "{}{}",
-          uop.get_opcode(),
-          dump_ref!(self.sys, &uop.x())
-        )
+        format!("{}{}", uop.get_opcode(), dump_ref!(self.sys, &uop.x()))
       }
       Opcode::Compare { .. } => {
         let cmp = expr.as_sub::<instructions::Compare>().unwrap();

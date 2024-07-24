@@ -60,15 +60,13 @@ impl BlockRef<'_> {
     idx: usize,
     subcode: subcode::BlockIntrinsic,
   ) -> Option<instructions::BlockIntrinsic<'_>> {
-    if let Some(bi) = self
+    if let Some(Ok(bi)) = self
       .body
       .get(idx)
       .map(|x| x.as_expr::<instructions::BlockIntrinsic>(self.sys))
     {
-      if let Ok(bi) = bi {
-        if bi.get_subcode() == subcode {
-          return Some(bi);
-        }
+      if bi.get_subcode() == subcode {
+        return Some(bi);
       }
     }
     None
@@ -93,15 +91,12 @@ impl BlockRef<'_> {
   }
 
   pub fn get_wait_until(&self) -> Option<BaseNode> {
-    self
-      .body_iter()
-      .filter(|x| {
-        x.as_expr::<instructions::BlockIntrinsic>(self.sys)
-          .map_or(false, |x| {
-            x.get_subcode() == subcode::BlockIntrinsic::WaitUntil
-          })
-      })
-      .next()
+    self.body_iter().find(|x| {
+      x.as_expr::<instructions::BlockIntrinsic>(self.sys)
+        .map_or(false, |x| {
+          x.get_subcode() == subcode::BlockIntrinsic::WaitUntil
+        })
+    })
   }
 
   /// Get the next node in the IR tree.

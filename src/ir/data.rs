@@ -53,10 +53,7 @@ impl DataType {
   }
 
   pub fn is_scalar(&self) -> bool {
-    match self {
-      DataType::Bits(_) | DataType::Int(_) | DataType::UInt(_) | DataType::Fp32 => true,
-      _ => false,
-    }
+    matches!(self, DataType::Bits(_) | DataType::Int(_) | DataType::UInt(_) | DataType::Fp32)
   }
 
   pub fn get_bits(&self) -> usize {
@@ -73,59 +70,41 @@ impl DataType {
   }
 
   pub fn is_signed(&self) -> bool {
-    match self {
-      DataType::Int(_) | DataType::Fp32 => true,
-      _ => false,
-    }
+    matches!(self, DataType::Int(_) | DataType::Fp32)
   }
 
   pub fn is_fp(&self) -> bool {
-    match self {
-      DataType::Fp32 => true,
-      _ => false,
-    }
+    matches!(self, DataType::Fp32)
   }
 
   pub fn is_int(&self) -> bool {
-    match self {
-      DataType::Int(_) | DataType::UInt(_) => true,
-      _ => false,
-    }
+    matches!(self, DataType::Int(_) | DataType::UInt(_))
   }
 
   pub fn is_raw(&self) -> bool {
-    match self {
-      DataType::Bits(_) => true,
-      _ => false,
-    }
+    matches!(self, DataType::Bits(_))
   }
 
   pub fn is_void(&self) -> bool {
-    match self {
-      DataType::Void => true,
-      _ => false,
-    }
+    matches!(self, DataType::Void)
   }
 
   pub fn is_module(&self) -> bool {
-    match self {
-      DataType::Module(_) => true,
-      _ => false,
-    }
+    matches!(self, DataType::Module(_))
   }
 }
 
 impl Display for DataType {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match &self {
-      &DataType::Int(_) => write!(f, "i{}", self.get_bits()),
-      &DataType::UInt(_) => write!(f, "u{}", self.get_bits()),
-      &DataType::Bits(bits) => write!(f, "b{}", bits),
-      &DataType::Fp32 => write!(f, "f{}", self.get_bits()),
-      &DataType::Str => write!(f, "Str"),
-      &DataType::Void => write!(f, "void"),
-      &DataType::ArrayType(ty, size) => write!(f, "array[{} x {}]", ty, size),
-      &DataType::Module(args) => write!(
+    match self {
+      DataType::Int(_) => write!(f, "i{}", self.get_bits()),
+      DataType::UInt(_) => write!(f, "u{}", self.get_bits()),
+      DataType::Bits(bits) => write!(f, "b{}", bits),
+      DataType::Fp32 => write!(f, "f{}", self.get_bits()),
+      DataType::Str => write!(f, "Str"),
+      DataType::Void => write!(f, "void"),
+      DataType::ArrayType(ty, size) => write!(f, "array[{} x {}]", ty, size),
+      DataType::Module(args) => write!(
         f,
         "module[{}]",
         args
