@@ -34,4 +34,3 @@ def parse_verilator_cycle(toks):
 def parse_simulator_cycle(toks):
     '''Helper function to parse rust-simulator dumped cycle'''
     return int(toks[2][1:-4])
-
