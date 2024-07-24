@@ -67,7 +67,7 @@ jobs:
           then
             cargo install sccache
           fi;
-      - name: Generate python frontend test result
+      - name: Python Frontend Unit Tests
         env:
           PYTHONPATH: ${{ github.workspace }}/python
           ASSASSYN_HOME: ${{ github.workspace }}
@@ -75,3 +75,10 @@ jobs:
           VERILATOR_ROOT: ${{ github.workspace }}/verilator
         run: |
           pytest python/unit-tests;
+      - name: Test Example Systolic Array
+        env:
+          PYTHONPATH: python
+          ASSASSYN_HOME: ${{ github.workspace }}
+          RUSTC_WRAPPER: sccache
+        run: |
+          python3 python/examples/systolic-array/systolic_array.py;
