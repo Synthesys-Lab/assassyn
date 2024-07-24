@@ -91,12 +91,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
 
 impl Visitor<String> for IRPrinter {
   fn visit_input(&mut self, input: FIFORef<'_>) -> Option<String> {
-    format!(
-      "{}: fifo<{}>",
-      input.get_name(),
-      input.scalar_ty()
-    )
-    .into()
+    format!("{}: fifo<{}>", input.get_name(), input.scalar_ty()).into()
   }
 
   fn visit_array(&mut self, array: ArrayRef<'_>) -> Option<String> {

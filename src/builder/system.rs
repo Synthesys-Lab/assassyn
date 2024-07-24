@@ -733,9 +733,7 @@ impl SysBuilder {
       if aty.get_bits() != bty.get_bits() {
         return Err(format!(
           "Cannot compare types {} and {} for {:?}",
-          aty,
-          bty,
-          op
+          aty, bty, op
         ));
       }
       return Ok(DataType::uint_ty(1));
@@ -777,9 +775,7 @@ impl SysBuilder {
     } else {
       Err(format!(
         "Cannot combine types {} and {} for {:?}",
-        aty,
-        bty,
-        op
+        aty, bty, op
       ))
     }
   }

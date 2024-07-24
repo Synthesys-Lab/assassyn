@@ -1,16 +1,18 @@
+use std::fmt::{Display, Formatter};
+
 macro_rules! register_subcode {
 
-  ($namespace:ident { $($opcode:ident ( $method:ident $op:literal )),* $(,)? } ) => {
+  ($namespace:ident { $($opcode:ident ( $method:ident $op_lit:literal )),* $(,)? } ) => {
 
     #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
     pub enum $namespace {
       $( $opcode ),*
     }
 
-    impl ToString for $namespace {
-      fn to_string(&self) -> String {
+    impl Display for $namespace {
+      fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-          $( $namespace::$opcode => $op.into() ),*
+          $( $namespace::$opcode => write!(f, $op_lit) ),*
         }
       }
     }

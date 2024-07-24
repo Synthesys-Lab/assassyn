@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
 
 use node::NodeKind;
 
@@ -45,24 +46,24 @@ macro_rules! register_opcodes {
       $( $var_id $( { $subcode : $subty } )? ),*
     }
 
-    impl ToString for Opcode {
-      fn to_string(&self) -> String {
+    impl Display for Opcode {
+      fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
           $( Opcode::$var_id $( { $subcode } )?  => {
-            $( $subcode.to_string() )?
-            $( stringify!($mn).to_string() )?
+            $( $subcode.fmt(f) )?
+            $( stringify!($mn).fmt(f) )?
           }),*
         }
       }
     }
 
-    impl ToString for ExprRef<'_> {
-      fn to_string(&self) -> String {
+    impl Display for ExprRef<'_> {
+      fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self.get_opcode() {
           $( Opcode::$var_id $( { $subcode } )? => {
             $( let _ = $subcode; )?
             let sub = self.clone().as_sub::<instructions::$var_id>().unwrap();
-            sub.to_string()
+            sub.fmt(f)
           })*
         }
       }
@@ -153,24 +154,15 @@ register_opcodes!(
 
 impl Opcode {
   pub fn is_binary(&self) -> bool {
-    match self {
-      &Opcode::Binary { .. } => true,
-      _ => false,
-    }
+    matches!(self, Opcode::Binary { .. })
   }
 
   pub fn is_cmp(&self) -> bool {
-    match self {
-      &Opcode::Compare { .. } => true,
-      _ => false,
-    }
+    matches!(self, Opcode::Compare { .. })
   }
 
   pub fn is_unary(&self) -> bool {
-    match self {
-      &Opcode::Unary { .. } => true,
-      _ => false,
-    }
+    matches!(self, Opcode::Unary { .. })
   }
 }
 
