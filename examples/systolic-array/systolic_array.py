@@ -276,8 +276,7 @@ def systolic_array():
                 actual = int(actual_line.split()[-1])
                 assert expected == actual
 
-    raw = utils.run_verilator(verilator_path)
-    print(raw)
+    #raw = utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
     systolic_array()
