@@ -93,7 +93,7 @@ impl Visitor<()> for Verifier {
           assert!(
             imm_value < (1 << (imm_dtype_width - if imm_dtype.is_signed() { 1 } else { 0 })),
             "Datatype {} can not hold immediate {}",
-            imm_dtype.to_string(),
+            imm_dtype,
             imm_value
           )
         }

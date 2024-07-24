@@ -105,7 +105,7 @@ impl Display for Cast<'_> {
       "{} = {} {}({})",
       self.expr.get_name(),
       self.get_opcode().to_string(),
-      self.dest_type().to_string(),
+      self.dest_type(),
       self.x().to_string(self.get().sys)
     )
   }

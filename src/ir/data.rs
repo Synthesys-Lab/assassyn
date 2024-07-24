@@ -124,7 +124,7 @@ impl Display for DataType {
       &DataType::Fp32 => write!(f, "f{}", self.get_bits()),
       &DataType::Str => write!(f, "Str"),
       &DataType::Void => write!(f, "void"),
-      &DataType::ArrayType(ty, size) => write!(f, "array[{} x {}]", ty.to_string(), size),
+      &DataType::ArrayType(ty, size) => write!(f, "array[{} x {}]", ty, size),
       &DataType::Module(args) => write!(
         f,
         "module[{}]",

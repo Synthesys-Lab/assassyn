@@ -578,7 +578,7 @@ impl SysBuilder {
       value.get_dtype(self).unwrap(),
       "Port \"{}\" requires {}",
       key,
-      port.scalar_ty().to_string()
+      port.scalar_ty()
     );
     self.bind_arg(bind.get().upcast(), port.idx(), value, eager)
   }
@@ -733,8 +733,8 @@ impl SysBuilder {
       if aty.get_bits() != bty.get_bits() {
         return Err(format!(
           "Cannot compare types {} and {} for {:?}",
-          aty.to_string(),
-          bty.to_string(),
+          aty,
+          bty,
           op
         ));
       }
@@ -777,8 +777,8 @@ impl SysBuilder {
     } else {
       Err(format!(
         "Cannot combine types {} and {} for {:?}",
-        aty.to_string(),
-        bty.to_string(),
+        aty,
+        bty,
         op
       ))
     }

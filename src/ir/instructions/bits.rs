@@ -25,7 +25,7 @@ impl Display for Slice<'_> {
       a,
       l,
       r,
-      self.expr.dtype().to_string()
+      self.expr.dtype()
     )
   }
 }

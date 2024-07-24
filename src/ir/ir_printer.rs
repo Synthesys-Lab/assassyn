@@ -43,7 +43,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
       "{}.{}: fifo<{}> {{\n",
       module.get_name(),
       input.get_name(),
-      input.scalar_ty().to_string()
+      input.scalar_ty()
     );
     for op in self.users.iter() {
       let expr = IRPrinter::new(self.redundancy)
@@ -66,7 +66,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
       "Array: {}[{} x {}] {{\n",
       array.get_name(),
       array.get_size(),
-      array.scalar_ty().to_string(),
+      array.scalar_ty(),
     );
     for op in self.users.iter() {
       let expr = IRPrinter::new(self.redundancy)
@@ -94,7 +94,7 @@ impl Visitor<String> for IRPrinter {
     format!(
       "{}: fifo<{}>",
       input.get_name(),
-      input.scalar_ty().to_string()
+      input.scalar_ty()
     )
     .into()
   }
@@ -104,13 +104,13 @@ impl Visitor<String> for IRPrinter {
       "Array: {}[{} x {}]",
       array.get_name(),
       array.get_size(),
-      array.scalar_ty().to_string(),
+      array.scalar_ty(),
     )
     .into()
   }
 
   fn visit_int_imm(&mut self, int_imm: IntImmRef<'_>) -> Option<String> {
-    format!("({}:{})", int_imm.get_value(), int_imm.dtype().to_string()).into()
+    format!("({}:{})", int_imm.get_value(), int_imm.dtype()).into()
   }
 
   fn visit_operand(&mut self, operand: OperandRef<'_>) -> Option<String> {
