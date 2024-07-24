@@ -658,12 +658,7 @@ impl SysBuilder {
   /// # Arguments
   /// * `ptr` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
-  pub fn create_array_read(
-    &mut self,
-    site: Filesite,
-    array: BaseNode,
-    idx: BaseNode,
-  ) -> BaseNode {
+  pub fn create_array_read(&mut self, site: Filesite, array: BaseNode, idx: BaseNode) -> BaseNode {
     assert!(
       self.indexable(idx),
       "{} {}'s type, {:?}, is not indexable!",
