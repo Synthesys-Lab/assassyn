@@ -53,7 +53,10 @@ impl DataType {
   }
 
   pub fn is_scalar(&self) -> bool {
-    matches!(self, DataType::Bits(_) | DataType::Int(_) | DataType::UInt(_) | DataType::Fp32)
+    matches!(
+      self,
+      DataType::Bits(_) | DataType::Int(_) | DataType::UInt(_) | DataType::Fp32
+    )
   }
 
   pub fn get_bits(&self) -> usize {
