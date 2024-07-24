@@ -23,7 +23,7 @@ impl Display for Binary<'_> {
       "{} = {} {} {}",
       self.expr.get_name(),
       self.a().to_string(self.get().sys),
-      self.get_opcode().to_string(),
+      self.get_opcode(),
       self.b().to_string(self.get().sys)
     )
   }
@@ -47,7 +47,7 @@ impl Display for Unary<'_> {
       f,
       "{} = {}{}",
       self.expr.get_name(),
-      self.get_opcode().to_string(),
+      self.get_opcode(),
       self.x().to_string(self.get().sys)
     )
   }
@@ -72,7 +72,7 @@ impl Display for Compare<'_> {
       "{} = {} {} {}",
       self.expr.get_name(),
       self.a().to_string(self.get().sys),
-      self.get_opcode().to_string(),
+      self.get_opcode(),
       self.b().to_string(self.get().sys)
     )
   }
@@ -104,7 +104,7 @@ impl Display for Cast<'_> {
       f,
       "{} = {} {}({})",
       self.expr.get_name(),
-      self.get_opcode().to_string(),
+      self.get_opcode(),
       self.dest_type(),
       self.x().to_string(self.get().sys)
     )

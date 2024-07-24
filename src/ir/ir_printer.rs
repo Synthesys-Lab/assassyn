@@ -192,7 +192,7 @@ impl Visitor<String> for IRPrinter {
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
-    let res = format!("{}{}", " ".repeat(self.indent), expr.to_string()).into();
+    let res = format!("{}{}", " ".repeat(self.indent), expr).into();
     if let Ok(bi) = expr.as_sub::<instructions::BlockIntrinsic>() {
       if matches!(
         bi.get_subcode(),

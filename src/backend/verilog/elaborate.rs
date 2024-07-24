@@ -1286,7 +1286,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           name,
           name,
           dump_ref!(self.sys, &bin.a()),
-          bin.get_opcode().to_string(),
+          bin.get_opcode(),
           dump_ref!(self.sys, &bin.b())
         ))
       }
@@ -1300,7 +1300,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           dbits,
           name,
           name,
-          uop.get_opcode().to_string(),
+          uop.get_opcode(),
           dump_ref!(self.sys, &uop.x())
         ))
       }
@@ -1315,7 +1315,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           name,
           name,
           dump_ref!(self.sys, &cmp.a()),
-          cmp.get_opcode().to_string(),
+          cmp.get_opcode(),
           dump_ref!(self.sys, &cmp.b())
         ))
       }

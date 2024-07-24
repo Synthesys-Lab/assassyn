@@ -178,13 +178,13 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           ty,
           dump_ref!(self.sys, &bin.b())
         );
-        format!("{} {} {}", lhs, bin.get_opcode().to_string(), rhs)
+        format!("{} {} {}", lhs, bin.get_opcode(), rhs)
       }
       Opcode::Unary { .. } => {
         let uop = expr.as_sub::<instructions::Unary>().unwrap();
         format!(
           "{}{}",
-          uop.get_opcode().to_string(),
+          uop.get_opcode(),
           dump_ref!(self.sys, &uop.x())
         )
       }
@@ -193,7 +193,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         format!(
           "{} {} {}",
           dump_ref!(self.sys, &cmp.a()),
-          cmp.get_opcode().to_string(),
+          cmp.get_opcode(),
           dump_ref!(self.sys, &cmp.b()),
         )
       }
