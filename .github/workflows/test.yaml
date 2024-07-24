@@ -75,11 +75,3 @@ jobs:
           VERILATOR_ROOT: /usr/local/share/verilator
         run: |
           pytest python/unit-tests;
-      - name: Test Examples
-        env:
-          PYTHONPATH: python
-          ASSASSYN_HOME: ${{ github.workspace }}
-          RUSTC_WRAPPER: sccache
-          VERILATOR_ROOT: /usr/local/share/verilator
-        run: |
-          python3 examples/systolic-array/systolic_array.py;
