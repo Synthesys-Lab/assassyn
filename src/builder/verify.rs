@@ -100,29 +100,26 @@ impl Visitor<()> for Verifier {
         _ => {}
       }
     }
-    match expr.get_opcode() {
-      Opcode::Cast { .. } => {
-        let cast = expr.as_sub::<instructions::Cast>().unwrap();
-        let src_ty = cast.src_type();
-        let dest_ty = cast.dest_type();
-        match cast.get_opcode() {
-          subcode::Cast::BitCast => {
-            assert!(
-              // only support same-width data type conversions
-              dest_ty.get_bits() == src_ty.get_bits(),
-              "Only support bitcast between types of the same width"
-            );
-          }
-          subcode::Cast::SExt | subcode::Cast::ZExt => {
-            assert!(
-              // disallow trimming or "extend" to same width
-              dest_ty.get_bits() > src_ty.get_bits(),
-              "Dest type must be wider than src type for extension"
-            );
-          }
+    if matches!(expr.get_opcode(), Opcode::Cast { .. }) {
+      let cast = expr.as_sub::<instructions::Cast>().unwrap();
+      let src_ty = cast.src_type();
+      let dest_ty = cast.dest_type();
+      match cast.get_opcode() {
+        subcode::Cast::BitCast => {
+          assert!(
+            // only support same-width data type conversions
+            dest_ty.get_bits() == src_ty.get_bits(),
+            "Only support bitcast between types of the same width"
+          );
+        }
+        subcode::Cast::SExt | subcode::Cast::ZExt => {
+          assert!(
+            // disallow trimming or "extend" to same width
+            dest_ty.get_bits() > src_ty.get_bits(),
+            "Dest type must be wider than src type for extension"
+          );
         }
       }
-      _ => {}
     }
     None
   }

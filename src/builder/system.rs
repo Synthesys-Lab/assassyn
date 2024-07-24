@@ -376,8 +376,8 @@ impl SysBuilder {
       site
     );
     let v0type = values[0].get_dtype(self).unwrap();
-    for i in 1..values.len() {
-      let vitype = values[i].get_dtype(self).unwrap();
+    for elem in values.iter().skip(1) {
+      let vitype = elem.get_dtype(self).unwrap();
       assert_eq!(
         v0type, vitype,
         "{} Select1Hot value type mismatch {:?} != {:?}",
@@ -456,10 +456,7 @@ impl SysBuilder {
   pub fn create_async_call(&mut self, bind: BaseNode) -> BaseNode {
     assert!({
       let expr = self.get::<Expr>(&bind).unwrap();
-      match expr.get_opcode() {
-        Opcode::Bind => true,
-        _ => false,
-      }
+      matches!(expr.get_opcode(), Opcode::Bind)
     });
     let args = vec![bind];
     self.insert_at_ip(bind);
@@ -650,10 +647,10 @@ impl SysBuilder {
 
   fn indexable(&self, idx: BaseNode) -> bool {
     let dtype = idx.get_dtype(self).unwrap();
-    match dtype {
-      DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => true,
-      _ => false,
-    }
+    matches!(
+      dtype,
+      DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_)
+    )
   }
 
   /// Create a read operation on an array.
