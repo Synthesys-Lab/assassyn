@@ -46,11 +46,6 @@ impl Config {
     self.base_dir.join(name_with_suffix)
   }
 
-  /// The name of the directory to which the verilog elaboration code is dumped.
-  pub fn verilog_name(&self, sys: &SysBuilder) -> PathBuf {
-    let name_with_suffix = format!("{}_verilog",sys.get_name());
-    self.base_dir.join(name_with_suffix)
-  }
 }
 
 pub(super) fn create_and_clean_dir(dir: PathBuf, override_dir: bool) {
