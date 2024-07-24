@@ -190,6 +190,32 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(15))
             col4.async_called(data = Int(32)(15))
 
+def check_raw(raw):
+    a = [[0 for _ in range(4)] for _ in range(4)]
+    b = [[0 for _ in range(4)] for _ in range(4)]
+    c = [[0 for _ in range(4)] for _ in range(4)]
+    
+    for i in range(4):
+        for j in range(4):
+            a[i][j] = i * 4 + j
+            b[j][i] = i * 4 + j
+    
+    for i in range(4):
+        for j in range(4):
+            for k in range(4):
+                c[i][j] += a[i][k] * b[k][j]
+    
+    for i in range(4):
+        for j in range(4):
+            expected = c[i][j]
+            pattern = rf"pe_{i+1}_{j+1}"
+            matching_lines = [line for line in raw.split('\n') if re.search(pattern, line)]
+            if matching_lines:
+                actual_line = matching_lines[-1]  
+                print(actual_line)
+                actual = int(actual_line.split()[-1])
+                assert expected == actual
+
 def systolic_array():
     sys = SysBuilder('systolic_array')
     pe_array = [[ProcElem() for _ in range(6)] for _ in range(6)]
@@ -244,34 +270,10 @@ def systolic_array():
     simulator_path, verilator_path = elaborate(sys, verilog="verilator")
 
     raw = utils.run_simulator(simulator_path)
-
-
-    a = [[0 for _ in range(4)] for _ in range(4)]
-    b = [[0 for _ in range(4)] for _ in range(4)]
-    c = [[0 for _ in range(4)] for _ in range(4)]
-    
-    for i in range(4):
-        for j in range(4):
-            a[i][j] = i * 4 + j
-            b[j][i] = i * 4 + j
-    
-    for i in range(4):
-        for j in range(4):
-            for k in range(4):
-                c[i][j] += a[i][k] * b[k][j]
-    
-    for i in range(4):
-        for j in range(4):
-            expected = c[i][j]
-            pattern = rf"pe_{i+1}_{j+1}"
-            matching_lines = [line for line in raw.split('\n') if re.search(pattern, line)]
-            if matching_lines:
-                actual_line = matching_lines[-1]  
-                print(actual_line)
-                actual = int(actual_line.split()[-1])
-                assert expected == actual
+    check_raw(raw)
 
     raw = utils.run_verilator(verilator_path)
+    check_raw(raw)
 
 if __name__ == '__main__':
     systolic_array()
