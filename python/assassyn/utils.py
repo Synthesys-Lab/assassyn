@@ -16,10 +16,7 @@ def run_verilator(path):
     '''The helper function to run the verilator'''
     restore = os.getcwd()
     os.chdir(path)
-    print(path)
-    cmd = ['make', 'verilator', '-j']
-    subprocess.check_output(cmd).decode('utf-8')
-    cmd = ['make', 'main', '-j']
+    cmd = ['make', 'main', 'VERBOSE=1', '-j']
     subprocess.check_output(cmd).decode('utf-8')
     # TODO(@were): Fix this hardcoded Vtb later.
     cmd = ['./obj_dir/Vtb']
