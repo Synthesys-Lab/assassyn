@@ -19,6 +19,10 @@ jobs:
       - uses: actions/checkout@v3
         with: 
           ref: ${{ github.head_ref }}
+      - name: Install Verilator Depencences
+        run: |
+          sudo apt-get install -y git help2man perl python3 make autoconf g++ flex bison ccache \
+            libunwind-dev libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev;
       - name: Cache verilator build
         id: cache-verilator-build
         uses: actions/cache@v2
@@ -30,8 +34,6 @@ jobs:
       - if: ${{ steps.cache-verilator-build.outputs.cache-hit != 'true' }}
         name: Build verilator
         run: |
-          sudo apt-get install -y git help2man perl python3 make autoconf g++ flex bison ccache \
-            libunwind-dev libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev;
           git clone https://github.com/verilator/verilator && cd verilator && git checkout $VERILATOR_VERSION;
           autoconf && ./configure && make -j `nproc`;
       - name: Install python dependencies
