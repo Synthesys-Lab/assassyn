@@ -16,5 +16,3 @@ def run_verilator(path):
     '''The helper function to run the verilator in the given path'''
     cmd = ['make', 'main']
     return subprocess.check_output(cmd, cwd=path, stderr=subprocess.STDOUT).decode('utf-8')
-
-    

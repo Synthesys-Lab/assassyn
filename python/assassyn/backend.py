@@ -63,6 +63,7 @@ def make_existing_dir(path):
         raise e
 
 def elaborate( # pylint: disable=too-many-arguments
+               # pylint: disable=too-many-locals
         sys: SysBuilder,
         path=tempfile.gettempdir(),
         resource_base=None,
