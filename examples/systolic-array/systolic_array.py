@@ -42,7 +42,8 @@ class ComputePE(Module):
     def build(self, east: Bind, south: Bind):
         acc = RegArray(Int(32), 1)
         val = acc[0]
-        c = (self.west * self.north).bitcast(Int(32))
+        mul = (self.west * self.north)
+        c = mul[0:31].bitcast(Int(32))
         mac = val + c
         log("Mac value: {} * {} + {} = {}", self.west, self.north, val, mac)
         acc[0] = mac
@@ -193,7 +194,7 @@ class Testbench(Module):
             col4.async_called(data = Int(32)(15))
 
 def systolic_array():
-    sys = SysBuilder('systolic-array')
+    sys = SysBuilder('systolic_array')
     pe_array = [[ProcElem() for _ in range(6)] for _ in range(6)]
     
     with sys:
@@ -245,13 +246,10 @@ def systolic_array():
                         pe_array[3][0].pe, \
                         pe_array[4][0].pe)
 
-    print(sys)
-
-    simulator_path = elaborate(sys, verilog="verilator")
+    simulator_path, verilator_path = elaborate(sys, verilog="verilator")
 
     raw = utils.run_simulator(simulator_path)
 
-    print(raw)
 
     a = [[0 for _ in range(4)] for _ in range(4)]
     b = [[0 for _ in range(4)] for _ in range(4)]
@@ -278,6 +276,8 @@ def systolic_array():
                 actual = int(actual_line.split()[-1])
                 assert expected == actual
 
+    raw = utils.run_verilator(verilator_path)
+    print(raw)
 
 if __name__ == '__main__':
     systolic_array()

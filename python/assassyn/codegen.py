@@ -176,7 +176,7 @@ class CodeGen(visitor.Visitor):
             self.visit_array(elem)
         for elem in node.modules:
             lval = elem.as_operand()
-            name = elem.synthesis_name().lower()
+            name = elem.name.lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
             self.code.append(f'  let {lval} = sys.create_module("{name}", vec![{ports}]);')
             self.emit_module_attrs(elem, lval)

@@ -27,6 +27,9 @@ def name_ports_of_module(module):
             v.name = k
             v.module = module
 
+def _reserved_module_name(name):
+    return name in ['Driver', 'Testbench']
+
 @decorator
 def wait_until(func, *args, **kwargs):
     '''A decorator for marking a module with wait-until logic.'''
@@ -95,6 +98,9 @@ class Module:
         self._pop_cache = {}
         self._wait_until = []
         self._finalized = False
+        self.name = type(self).__name__
+        if not _reserved_module_name(self.name):
+            self.name = self.name + '_' + self.as_operand()
 
     def validate_all_ports(self):
         '''A syntactic sugar for checking the validity of all the ports in this module.'''
@@ -140,23 +146,18 @@ class Module:
         '''Dump the module as a right-hand side reference.'''
         return f'_{hex(id(self))[-5:-1]}'
 
-    def synthesis_name(self):
-        '''The helper function to get the synthesized name of the module.'''
-        return type(self).__name__
-
     def __repr__(self):
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
             ports = f'{{\n    {ports}\n  }} '
         attrs = ', '.join(f'{Module.MODULE_ATTR_STR[i]}: {j}' for i, j in self._attrs.items())
         attrs = f'#[{attrs}] ' if attrs else ''
-        name = self.as_operand()
-        synthe_name = self.synthesis_name()
+        var_id = self.as_operand()
         if self.finalized:
             Singleton.repr_ident = 2
             body = self.body.__repr__()
             return f'''  {attrs}
-  {name} = module {synthe_name} {ports}{{
+  {var_id} = module {self.name} {ports}{{
 {body}
   }}
 '''
@@ -175,7 +176,7 @@ class Module:
       {pops}
     }}'''
         return f'''  {attrs}
-  {name} = module {synthe_name} {ports}{{{precond}{pops}
+  {var_id} = module {self.name} {ports}{{{precond}{pops}
     "body": {{
 {body}
     }}

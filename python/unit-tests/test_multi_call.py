@@ -60,7 +60,7 @@ def test_multi_call():
     print(raw)
 
     for i in raw.split('\n'):
-        if f'[{adder.synthesis_name().lower()}]' in i:
+        if f'adder: ' in i:
             line_toks = i.split()
             c = line_toks[-1]
             a = line_toks[-3]
