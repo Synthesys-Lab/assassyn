@@ -47,7 +47,7 @@ def dump_cargo_toml(path, name):
         f.write('version = "0.0.0"\n')
         f.write('edition = "2021"\n')
         f.write('[dependencies]\n')
-        f.write(f'eir = {{ path = \"{utils.repo_path()}/eir\" }}')
+        f.write(f'assassyn = {{ path = \"{utils.repo_path()}\" }}')
     return toml
 
 def make_existing_dir(path):

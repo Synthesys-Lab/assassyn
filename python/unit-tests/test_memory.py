@@ -74,7 +74,7 @@ def test_memory():
     impl('memory', None, None)
 
 def test_memory_init():
-    impl('memory_init', 'init.hex', f'{utils.repo_path()}/tests/resources')
+    impl('memory_init', 'init.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 if __name__ == "__main__":
     test_memory()

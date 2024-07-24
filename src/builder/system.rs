@@ -49,12 +49,10 @@ impl InsertPoint {
     } else {
       if let Some(nxt_block) = block.next() {
         return InsertPoint(module.clone(), nxt_block, Some(0)).into();
+      } else if let Ok(block_parent) = block.get_parent().as_ref::<Block>(sys) {
+        return InsertPoint(module.clone(), block_parent.upcast(), None).into();
       } else {
-        if let Ok(block_parent) = block.get_parent().as_ref::<Block>(sys) {
-          return InsertPoint(module.clone(), block_parent.upcast(), None).into();
-        } else {
-          return None;
-        }
+        return None;
       }
     };
   }

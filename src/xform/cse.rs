@@ -45,10 +45,10 @@ impl Visitor<()> for FindCommonSubexpression {
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     if !expr.get_opcode().has_side_effect() {
       let key = (
-        expr.get_opcode().clone(),
+        expr.get_opcode(),
         expr
           .operand_iter()
-          .map(|x| x.get_value().clone())
+          .map(|x| *x.get_value())
           .collect::<Vec<_>>(),
       );
       if !self.common.contains_key(&key) {
@@ -86,19 +86,15 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
       if exprs.len() != 1 {
         let mut parents = exprs
           .iter()
-          .map(|x| (x.get_parent(sys).unwrap(), x.clone()))
+          .map(|x| (x.get_parent(sys).unwrap(), *x))
           .collect::<Vec<_>>();
         // Hoist all parents to the same depth
         while let Some(x) = {
           let ref_depth = da.get_depth(&parents[0].0);
-          if let Some(diff) = parents
-            .iter_mut()
-            .filter(|x| {
-              let depth = da.get_depth(&x.0);
-              depth != ref_depth
-            })
-            .next()
-          {
+          if let Some(diff) = parents.iter_mut().find(|x| {
+            let depth = da.get_depth(&x.0);
+            depth != ref_depth
+          }) {
             if da.get_depth(&diff.0) < ref_depth {
               Some(&mut parents[0])
             } else {
@@ -114,7 +110,7 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
         while parents.iter().any(|x| x.0.ne(&parents[0].0)) {
           parents
             .iter_mut()
-            .for_each(|x| *x = (x.0.get_parent(sys).unwrap(), x.0.clone()));
+            .for_each(|x| *x = (x.0.get_parent(sys).unwrap(), x.0));
         }
 
         // TODO(@were): Support non-block parents
@@ -155,13 +151,13 @@ pub fn common_code_elimination(sys: &mut SysBuilder) {
       let ty = expr.dtype();
       let operands = expr
         .operand_iter()
-        .map(|x| x.get_value().clone())
+        .map(|x| *x.get_value())
         .collect::<Vec<_>>();
       (ty, expr.get_opcode(), operands)
     };
     let master = sys.create_expr(dtype, opcode, operands, true);
     for dup in duplica {
-      sys.replace_all_uses_with(dup.clone(), master);
+      sys.replace_all_uses_with(dup, master);
       let mut dup_mut = dup.as_mut::<Expr>(sys).unwrap();
       dup_mut.erase_from_parent();
     }

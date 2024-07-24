@@ -100,18 +100,18 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         .collect::<Vec<_>>();
       let mut valid_runner = valids[0].clone();
       for valid in valids.iter().skip(1) {
-        valid_runner = sys.create_bitwise_and(created_here!(), valid_runner, valid.clone());
+        valid_runner = sys.create_bitwise_and(created_here!(), valid_runner, *valid);
       }
       sub_valids.push(valid_runner);
     }
-    let mut valid = sub_valids[0].clone();
+    let mut valid = sub_valids[0];
     for sub_valid in sub_valids.iter().skip(1) {
-      valid = sys.create_bitwise_or(created_here!(), valid, sub_valid.clone());
+      valid = sys.create_bitwise_or(created_here!(), valid, *sub_valid);
     }
     sys.create_wait_until(valid);
-    let mut valid_hot = sub_valids[callers.len() - 1].clone();
+    let mut valid_hot = sub_valids[callers.len() - 1];
     for sub_valid in sub_valids.iter().rev().skip(1) {
-      valid_hot = sys.create_concat(created_here!(), valid_hot, sub_valid.clone());
+      valid_hot = sys.create_concat(created_here!(), valid_hot, *sub_valid);
     }
 
     let (last_grant_reg, grant_scalar_ty, grant_hot_ty) = {
@@ -136,17 +136,17 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
     // high_mask = ~low_mask
     let hi = sys.create_flip(created_here!(), lo);
     // low_valid = valid_hot & low_mask
-    let lo_valid = sys.create_bitwise_and(created_here!(), lo.clone(), valid_hot.clone());
+    let lo_valid = sys.create_bitwise_and(created_here!(), lo, valid_hot);
     let signed_lo_valid = bits_to_int(sys, &lo_valid);
     let lo_valid_neg = sys.create_neg(created_here!(), signed_lo_valid);
     let lo_grant = sys.create_bitwise_and(created_here!(), lo_valid, lo_valid_neg);
     // high_valid = valid_hot & high_mask
-    let hi_valid = sys.create_bitwise_and(created_here!(), hi.clone(), valid_hot.clone());
+    let hi_valid = sys.create_bitwise_and(created_here!(), hi, valid_hot);
     let signed_hi_valid = bits_to_int(sys, &hi_valid);
     let hi_valid_neg = sys.create_neg(created_here!(), signed_hi_valid);
     let hi_grant = sys.create_bitwise_and(created_here!(), hi_valid, hi_valid_neg);
     let zero = sys.get_const_int(hi_grant.get_dtype(sys).unwrap(), 0);
-    let hi_nez = sys.create_neq(created_here!(), hi_grant.clone(), zero);
+    let hi_nez = sys.create_neq(created_here!(), hi_grant, zero);
     // grant = high_valid != 0 ? high_valid : low_valid
     let grant = sys.create_select(created_here!(), hi_nez, hi_grant, lo_grant);
 
@@ -160,7 +160,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       sys.create_array_write(created_here!(), last_grant_reg, zero, i_1h);
       let bind = caller.as_expr::<Bind>(sys).unwrap();
       let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
-      let mut new_bind = sys.get_init_bind(callee.clone());
+      let mut new_bind = sys.get_init_bind(*callee);
       for i in 0..n_args {
         let key = {
           let module = callee.as_ref::<Module>(sys).unwrap();

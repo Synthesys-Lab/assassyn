@@ -78,7 +78,7 @@ def opcode_to_ib(node: Expr):
 
 def generate_dtype(ty: dtype.DType):
     '''Generate AST data type representation into assassyn data type representation'''
-    prefix = 'eir::ir::DataType'
+    prefix = 'assassyn::ir::DataType'
     if isinstance(ty, dtype.Int):
         return f'{prefix}::int_ty({ty.bits})'
     if isinstance(ty, dtype.UInt):
@@ -99,7 +99,7 @@ def generate_init_value(init_value, ty: dtype.DType):
 def generate_port(port: Port):
     '''Generate the port information for the given port for module construction'''
     ty = f'{generate_dtype(port.dtype)}'
-    return f'eir::builder::PortInfo::new("{port.name}", {ty})'
+    return f'assassyn::builder::PortInfo::new("{port.name}", {ty})'
 
 class EmitBinds(visitor.Visitor):
     '''Gather all the binds and emit them in advance'''
@@ -119,8 +119,8 @@ class CodeGen(visitor.Visitor):
 
     def emit_module_attrs(self, m: Module, var_id: str):
         '''Generate module attributes.'''
-        module_mut = f'{var_id}.as_mut::<eir::ir::Module>(&mut sys).unwrap()'
-        path = 'eir::ir::module::Attribute'
+        module_mut = f'{var_id}.as_mut::<assassyn::ir::Module>(&mut sys).unwrap()'
+        path = 'assassyn::ir::module::Attribute'
         if m.is_systolic:
             self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
         if m.disable_arbiter_rewrite:
@@ -135,7 +135,7 @@ class CodeGen(visitor.Visitor):
                 init_file = 'init_file: None'
             array = f'array: {m.payload.name}'
             params = ', '.join([width, depth, lat, init_file, array])
-            params = f'eir::ir::module::memory::MemoryParams{{ {params} }}'
+            params = f'assassyn::ir::module::memory::MemoryParams{{ {params} }}'
             self.code.append(f'{module_mut}.add_attr({path}::Memory({params}));')
 
     def emit_config(self):
@@ -165,11 +165,11 @@ class CodeGen(visitor.Visitor):
 
     def visit_system(self, node: SysBuilder):
         self.header.append('use std::path::PathBuf;')
-        self.header.append('use eir::{builder::SysBuilder, created_here};')
-        self.header.append('use eir::ir::node::IsElement;')
+        self.header.append('use assassyn::{builder::SysBuilder, created_here};')
+        self.header.append('use assassyn::ir::node::IsElement;')
         self.code.append('fn main() {')
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
-        self.code.append('  let mut block_stack : Vec<eir::ir::node::BaseNode> = Vec::new();\n')
+        self.code.append('  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
         self.code.append('  // TODO: Support initial values')
         self.code.append('  // TODO: Support array attributes')
         for elem in node.arrays:
@@ -191,15 +191,15 @@ class CodeGen(visitor.Visitor):
             self.visit_module(elem)
         config = self.emit_config()
         self.code.append(f'''
-            let mut config = eir::backend::common::Config{{
+            let mut config = assassyn::backend::common::Config{{
                {config},
                ..Default::default()
             }};
         ''')
         self.code.append('  println!("{}", sys);')
-        config = 'eir::xform::Config{ rewrite_wait_until: true }'
-        self.code.append(f'  eir::xform::basic(&mut sys, &{config});')
-        be_path = 'eir::backend'
+        config = 'assassyn::xform::Config{ rewrite_wait_until: true }'
+        self.code.append(f'  assassyn::xform::basic(&mut sys, &{config});')
+        be_path = 'assassyn::backend'
         if self.targets['simulator']:
             base_dir = '(env!("CARGO_MANIFEST_DIR").to_string()).into()'
             self.code.append(f'  config.base_dir = {base_dir};')
@@ -256,7 +256,7 @@ class CodeGen(visitor.Visitor):
             port_name = f'{module_name}_{node.name}'
             self.code.append(f'''  // Get port {node.name}
                 let {port_name} = {{
-                  let module = {module_name}.as_ref::<eir::ir::Module>(&sys).unwrap();
+                  let module = {module_name}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
                   module.get_port_by_name("{node.name}").unwrap().upcast()
                 }};''')
             return port_name
@@ -350,7 +350,7 @@ class CodeGen(visitor.Visitor):
         ty = generate_dtype(node.scalar_ty)
         init = self.generate_init_value(node.initializer, ty)
         self.code.append(f'  // {node}')
-        attrs = ', '.join(f'eir::ir::data::ArrayAttr::{CG_ARRAY_ATTR[i]}' for i in node.attr)
+        attrs = ', '.join(f'assassyn::ir::data::ArrayAttr::{CG_ARRAY_ATTR[i]}' for i in node.attr)
         attrs = f'vec![{attrs}]'
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         self.code.append(array_decl)
