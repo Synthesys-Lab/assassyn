@@ -1,5 +1,3 @@
-use crate::backend::simulator::camelize;
-
 use super::memory::MemoryParams;
 use super::Module;
 
@@ -9,16 +7,6 @@ macro_rules! define_attrs {
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub enum Attribute {
       $($attrs $( ( $vty ) )? ),*
-    }
-
-    impl Attribute {
-      pub fn from_string(s: &str) -> Option<Attribute> {
-        let s = camelize(s);
-        match s.as_str() {
-          $(stringify!($attrs) => Some(Attribute::$attrs $( ( <$vty>::default() ) )? ),)*
-          _ => None,
-        }
-      }
     }
 
   };

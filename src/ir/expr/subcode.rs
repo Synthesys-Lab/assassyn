@@ -15,15 +15,6 @@ macro_rules! register_subcode {
       }
     }
 
-    impl $namespace {
-      pub fn from_str(s: &str) -> Option<$namespace> {
-        match s {
-          $( stringify!($method) => Some($namespace::$opcode), )*
-          _ => None
-        }
-      }
-    }
-
   };
 
 }

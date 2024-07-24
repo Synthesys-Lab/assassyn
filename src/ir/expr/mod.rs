@@ -71,19 +71,6 @@ macro_rules! register_opcodes {
 
     paste::paste!{
       impl Opcode {
-        pub fn from_str(s: &str) -> Option<Opcode> {
-          if let Some(general) = match s {
-            $( $( stringify!($mn) => Some(Opcode::$var_id), )? )*
-            _ => None,
-          } {
-            return Some(general)
-          }
-          $( $(if let Some(sub) = $subty::from_str(s) {
-            return Some(sub.into())
-          })? )*
-          None
-        }
-
         pub fn is_valued(&self) -> bool {
           match self {
             $( Opcode::$var_id $( { $subcode } )? => {

@@ -16,7 +16,7 @@ pub trait IsElement<'elem, 'sys: 'elem> {
   fn set_key(&mut self, key: usize);
   fn get_key(&self) -> usize;
   fn into_reference(key: usize) -> BaseNode;
-  fn downcast(slab: &'sys slab::Slab<Element>, key: &BaseNode) -> Result<&'elem Box<Self>, String>;
+  fn downcast(slab: &'sys slab::Slab<Element>, key: &BaseNode) -> Result<&'elem Self, String>;
   fn downcast_mut(
     slab: &'sys mut slab::Slab<Element>,
     key: &BaseNode,
@@ -41,9 +41,10 @@ pub trait Referencable<'elem, 'sys: 'elem, T: IsElement<'elem, 'sys>> {
 macro_rules! emit_elem_impl {
   ($name:ident) => {
     paste! {
-      impl Into<Element> for $name {
-        fn into(self) -> Element {
-          Element::$name(Box::new(self))
+
+      impl From<$name> for Element {
+        fn from(x: $name) -> Element {
+          Element::$name(Box::new(x))
         }
       }
 
@@ -67,7 +68,7 @@ macro_rules! emit_elem_impl {
         fn downcast(
           slab: &'sys slab::Slab<Element>,
           node: &BaseNode,
-        ) -> Result<&'elem Box<$name>, String> {
+        ) -> Result<&'elem $name, String> {
           if let NodeKind::$name = node.get_kind() {
             let key = node.get_key();
             let x = slab.get(key);
@@ -115,13 +116,14 @@ macro_rules! emit_elem_impl {
         pub(crate) elem: BaseNode,
       }
 
+      #[derive(Clone)]
       pub struct [<$name Ref>] <'a> {
         pub(crate) sys: &'a SysBuilder,
         pub(crate) elem: BaseNode,
       }
 
       impl<'sys> [<$name Ref>] <'sys> {
-        pub fn get<'borrow, 'res>(&'borrow self) -> &'res Box<$name>
+        pub fn get<'borrow, 'res>(&'borrow self) -> &'res $name
         where
           'sys: 'borrow,
           'sys: 'res,
@@ -130,13 +132,10 @@ macro_rules! emit_elem_impl {
           <$name>::downcast(&self.sys.slab, &self.elem).unwrap()
         }
 
-        pub fn clone(&self) -> [<$name Ref>] <'sys> {
-          [<$name Ref>] { sys: self.sys, elem: self.elem }
-        }
       }
 
       impl Deref for [<$name Ref>]<'_> {
-        type Target = Box<$name>;
+        type Target = $name;
 
         fn deref(&self) -> &Self::Target {
           self.get()

@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::ops::RangeInclusive;
 
 use crate::builder::{PortInfo, SysBuilder};
@@ -45,9 +46,10 @@ impl MemoryParams {
   }
 }
 
-impl ToString for MemoryParams {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for MemoryParams {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
       "width: {} depth: {} lat: [{:?}], file: {}",
       self.width,
       self.depth,

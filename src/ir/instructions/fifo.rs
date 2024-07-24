@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::ir::{
   expr::subcode,
   node::{FIFORef, IsElement, Parented},
@@ -29,19 +31,21 @@ impl Visitor<String> for FIFODumper {
   }
 }
 
-impl ToString for FIFOField<'_> {
-  fn to_string(&self) -> String {
-    format!(
-      "{}.{}()",
+impl Display for FIFOField<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{}.{}",
       FIFODumper.visit_input(self.fifo()).unwrap(),
       self.get_field().to_string()
-    )
+   )
   }
 }
 
-impl ToString for FIFOPop<'_> {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for FIFOPop<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
       "{} = {}.pop()",
       self.expr.get_name(),
       FIFODumper.visit_input(self.fifo()).unwrap()
@@ -49,9 +53,10 @@ impl ToString for FIFOPop<'_> {
   }
 }
 
-impl ToString for FIFOPush<'_> {
-  fn to_string(&self) -> String {
-    format!(
+impl Display for FIFOPush<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
       "{}.push({}) // handle: _{}",
       FIFODumper.visit_input(self.fifo()).unwrap(),
       self.value().to_string(self.expr.sys),
