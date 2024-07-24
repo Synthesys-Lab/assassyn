@@ -9,7 +9,7 @@ on:
 name: Test
 
 env:
-  VERILATOR_VERSION: v5.024
+  VERILATOR_VERSION: v5.026
 
 jobs:
   test:
