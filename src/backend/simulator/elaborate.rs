@@ -578,8 +578,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
           }}\n",
         src_ty, src_ty
       ));
-      for idx in 0..2 {
-        let bigint = bigints[idx];
+      for bigint in bigints {
         res.push_str(&format!(
           "impl ValueCastTo<{}> for {} {{ fn cast(&self) -> {} {{ self.to_{}().unwrap() }} }}\n",
           bigint,
@@ -963,38 +962,35 @@ macro_rules! impl_unwrap_slab {
   // generate memory initializations
   for module in sys.module_iter() {
     for attr in module.get_attrs() {
-      match attr {
-        Attribute::Memory(param) => {
-          if let Some(init_file) = &param.init_file {
-            let init_file_path = config.resource_base.join(init_file);
-            let init_file_path = init_file_path.to_str().unwrap();
-            let array = param.array.as_ref::<Array>(sys).unwrap();
-            let slab_idx = slab_cache.get(&param.array).unwrap();
-            let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
-            let scalar_ty = dtype_to_rust_type(&scalar_ty)
-              .parse::<proc_macro2::TokenStream>()
-              .unwrap();
-            res.push_str(
-              format!(
-                "\n// initializing array {}, slab_idx = {}, with file {}\n",
-                array.get_name(),
-                slab_idx,
-                init_file
-              )
-              .as_str(),
-            );
-            res.push_str(
-              &quote::quote! {
-                init_vec_by_hex_file(
-                  data_slab[#slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>(),
-                  #init_file_path
-                );
-              }
-              .to_string(),
-            );
-          }
+      if let Attribute::Memory(param) = attr {
+        if let Some(init_file) = &param.init_file {
+          let init_file_path = config.resource_base.join(init_file);
+          let init_file_path = init_file_path.to_str().unwrap();
+          let array = param.array.as_ref::<Array>(sys).unwrap();
+          let slab_idx = slab_cache.get(&param.array).unwrap();
+          let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
+          let scalar_ty = dtype_to_rust_type(&scalar_ty)
+            .parse::<proc_macro2::TokenStream>()
+            .unwrap();
+          res.push_str(
+            format!(
+              "\n// initializing array {}, slab_idx = {}, with file {}\n",
+              array.get_name(),
+              slab_idx,
+              init_file
+            )
+            .as_str(),
+          );
+          res.push_str(
+            &quote::quote! {
+              init_vec_by_hex_file(
+                data_slab[#slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>(),
+                #init_file_path
+              );
+            }
+            .to_string(),
+          );
         }
-        _ => {}
       }
     }
   }
@@ -1163,7 +1159,7 @@ fn dump_modules(
   fd: &mut File,
   slab_cache: &HashMap<BaseNode, usize>,
 ) -> Result<(), std::io::Error> {
-  fd.write(
+  fd.write_all(
     quote! {
       use super::runtime::*;
       use std::collections::VecDeque;
@@ -1177,13 +1173,13 @@ fn dump_modules(
   let mut em = ElaborateModule::new(sys, slab_cache);
   for module in em.sys.module_iter() {
     if let Some(buffer) = em.visit_module(module) {
-      fd.write(buffer.as_bytes())?;
+      fd.write_all(buffer.as_bytes())?;
     }
   }
   Ok(())
 }
 
-fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
+fn dump_main(fd: &mut File) -> Result<(), std::io::Error> {
   let src = quote::quote! {
     mod runtime;
     mod modules;
@@ -1192,8 +1188,8 @@ fn dump_main(fd: &mut File) -> Result<usize, std::io::Error> {
       runtime::simulate();
     }
   };
-  fd.write(src.to_string().as_bytes())?;
-  fd.write("\n\n\n".as_bytes())
+  fd.write_all(src.to_string().as_bytes())?;
+  fd.write_all("\n\n\n".as_bytes())
 }
 
 fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io::Error> {
@@ -1233,7 +1229,7 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
     let runtime_file = simulator_name.join("src/runtime.rs");
     let mut fruntime = fs::File::create(runtime_file).expect("Open failure");
     fruntime
-      .write(rt_src.as_bytes())
+      .write_all(rt_src.as_bytes())
       .expect("Dump runtime failure");
     fruntime.flush().expect("Flush runtime failure");
   }

@@ -2,7 +2,7 @@ use std::{
   collections::{HashMap, HashSet, VecDeque},
   fs::File,
   io::{Error, Write},
-  path::PathBuf,
+  path::Path,
 };
 
 use crate::{
@@ -563,17 +563,14 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new(); // array -> init_file_path
     for module in self.sys.module_iter() {
       for attr in module.get_attrs() {
-        match attr {
-          Attribute::Memory(param) => {
-            if let Some(init_file) = &param.init_file {
-              let mut init_file_path = self.config.resource_base.clone();
-              init_file_path.push(init_file);
-              let init_file_path = init_file_path.to_str().unwrap();
-              let array = param.array.as_ref::<Array>(self.sys).unwrap();
-              mem_init_map.insert(array.upcast(), init_file_path.to_string());
-            }
+        if let Attribute::Memory(param) = attr {
+          if let Some(init_file) = &param.init_file {
+            let mut init_file_path = self.config.resource_base.clone();
+            init_file_path.push(init_file);
+            let init_file_path = init_file_path.to_str().unwrap();
+            let array = param.array.as_ref::<Array>(self.sys).unwrap();
+            mem_init_map.insert(array.upcast(), init_file_path.to_string());
           }
-          _ => {}
         }
       }
     }
@@ -613,7 +610,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     res.push_str("endmodule // top\n\n");
 
-    fd.write(res.as_bytes()).unwrap();
+    fd.write_all(res.as_bytes()).unwrap();
 
     let init = match self.simulator {
       Simulator::VCS => {
@@ -627,7 +624,7 @@ end"
       Simulator::Verilator => "",
     };
 
-    fd.write(
+    fd.write_all(
       format!(
         "
 module fifo #(
@@ -1624,70 +1621,70 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   }
 }
 
-pub fn generate_cpp_testbench(dir: &PathBuf, sys: &SysBuilder, simulator: &Simulator) {
+pub fn generate_cpp_testbench(dir: &Path, sys: &SysBuilder, simulator: &Simulator) {
   if !matches!(simulator, Simulator::Verilator) {
     return;
   }
   let main_fname = dir.join("main.cpp");
   let mut main_fd = File::create(main_fname).unwrap();
   main_fd
-    .write("#include \"Vtb.h\"\n".to_string().as_bytes())
+    .write_all("#include \"Vtb.h\"\n".to_string().as_bytes())
     .unwrap();
   main_fd
-    .write("#include \"verilated.h\"\n".as_bytes())
+    .write_all("#include \"verilated.h\"\n".as_bytes())
     .unwrap();
   main_fd
-    .write("#include \"verilated_vcd_c.h\"\n".as_bytes())
+    .write_all("#include \"verilated_vcd_c.h\"\n".as_bytes())
     .unwrap();
   main_fd
-    .write("vluint64_t main_time = 0;\n".as_bytes())
+    .write_all("vluint64_t main_time = 0;\n".as_bytes())
     .unwrap();
   main_fd
-    .write("double sc_time_stamp() { return main_time; }\n".as_bytes())
+    .write_all("double sc_time_stamp() { return main_time; }\n".as_bytes())
     .unwrap();
   main_fd
-    .write("int main(int argc, char **argv) {\n".as_bytes())
+    .write_all("int main(int argc, char **argv) {\n".as_bytes())
     .unwrap();
   main_fd
-    .write("  Verilated::commandArgs(argc, argv);\n".as_bytes())
+    .write_all("  Verilated::commandArgs(argc, argv);\n".as_bytes())
     .unwrap();
   main_fd
-    .write("  auto* top = new Vtb;\n".to_string().as_bytes())
+    .write_all("  auto* top = new Vtb;\n".to_string().as_bytes())
     .unwrap();
   main_fd
-    .write("  Verilated::traceEverOn(true);\n".as_bytes())
+    .write_all("  Verilated::traceEverOn(true);\n".as_bytes())
     .unwrap();
   main_fd
-    .write("  auto* tfp = new VerilatedVcdC;\n".as_bytes())
+    .write_all("  auto* tfp = new VerilatedVcdC;\n".as_bytes())
     .unwrap();
   main_fd
-    .write("  top->trace(tfp, 99);\n".as_bytes())
+    .write_all("  top->trace(tfp, 99);\n".as_bytes())
     .unwrap();
   main_fd
-    .write("  tfp->open(\"wave.vcd\");\n".as_bytes())
+    .write_all("  tfp->open(\"wave.vcd\");\n".as_bytes())
     .unwrap();
   main_fd
-    .write("  while (!Verilated::gotFinish()) {\n".as_bytes())
+    .write_all("  while (!Verilated::gotFinish()) {\n".as_bytes())
     .unwrap();
-  main_fd.write("    top->eval();\n".as_bytes()).unwrap();
+  main_fd.write_all("    top->eval();\n".as_bytes()).unwrap();
   main_fd
-    .write("    tfp->dump(main_time);\n".as_bytes())
+    .write_all("    tfp->dump(main_time);\n".as_bytes())
     .unwrap();
-  main_fd.write("    main_time++;\n".as_bytes()).unwrap();
-  main_fd.write("  }\n".as_bytes()).unwrap();
-  main_fd.write("  tfp->close();\n".as_bytes()).unwrap();
-  main_fd.write("  delete top;\n".as_bytes()).unwrap();
-  main_fd.write("  delete tfp;\n".as_bytes()).unwrap();
-  main_fd.write("  return 0;\n".as_bytes()).unwrap();
-  main_fd.write("}\n".as_bytes()).unwrap();
+  main_fd.write_all("    main_time++;\n".as_bytes()).unwrap();
+  main_fd.write_all("  }\n".as_bytes()).unwrap();
+  main_fd.write_all("  tfp->close();\n".as_bytes()).unwrap();
+  main_fd.write_all("  delete top;\n".as_bytes()).unwrap();
+  main_fd.write_all("  delete tfp;\n".as_bytes()).unwrap();
+  main_fd.write_all("  return 0;\n".as_bytes()).unwrap();
+  main_fd.write_all("}\n".as_bytes()).unwrap();
   let make_fname = dir.join("Makefile");
   let mut make_fd = File::create(make_fname).unwrap();
   make_fd
-    .write(".PHONY: verilator main\n".as_bytes())
+    .write_all(".PHONY: verilator main\n".as_bytes())
     .unwrap();
-  make_fd.write("verilator:\n".as_bytes()).unwrap();
+  make_fd.write_all("verilator:\n".as_bytes()).unwrap();
   make_fd
-    .write(
+    .write_all(
       format!(
         "\t$(VERILATOR_ROOT)/bin/verilator --cc {}.sv --exe main.cpp --top tb --timing --trace\n",
         sys.get_name()
@@ -1695,9 +1692,9 @@ pub fn generate_cpp_testbench(dir: &PathBuf, sys: &SysBuilder, simulator: &Simul
       .as_bytes(),
     )
     .unwrap();
-  make_fd.write("main: verilator\n".as_bytes()).unwrap();
+  make_fd.write_all("main: verilator\n".as_bytes()).unwrap();
   make_fd
-    .write("\tmake -C obj_dir -f Vtb.mk\n".as_bytes())
+    .write_all("\tmake -C obj_dir -f Vtb.mk\n".as_bytes())
     .unwrap();
 }
 
@@ -1716,7 +1713,8 @@ pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Res
 
   for module in vd.sys.module_iter() {
     vd.current_module = namify(module.get_name()).to_string();
-    fd.write(vd.visit_module(module).unwrap().as_bytes())?;
+    fd.write_all(vd.visit_module(module).unwrap().as_bytes())
+      .unwrap();
   }
 
   vd.dump_runtime(fd, config.sim_threshold)?;
