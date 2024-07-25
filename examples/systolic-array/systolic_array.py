@@ -92,13 +92,13 @@ class Testbench(Module):
 
     # what if i do this?
     # Cycle:
-    #    6                    15
-    #      5               11 14
-    #        4           7 10 13
-    #          3       3 6 9  12
-    #            2     2 5 8
-    #              1   1 4
-    #                0 0
+    #    7                    15
+    #      6               11 14
+    #        5           7 10 13
+    #          4       3 6 9  12
+    #            3     2 5 8
+    #              2   1 4
+    #                1 0
     #          3 2 1 0 P P P  P
     #        7 6 5 4   P P P  P
     #    11 10 9 8     P P P  P
@@ -110,7 +110,7 @@ class Testbench(Module):
     def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
                     row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
         with Cycle(1):
-            # 0 0
+            # 1 0
             # 0 P P P  P
             #   P P P  P
             #   P P P  P
@@ -119,7 +119,7 @@ class Testbench(Module):
             row1.async_called(data = Int(32)(0))
 
         with Cycle(2):
-            # 1 1 4
+            # 2 1 4
             # 1 P P P  P
             # 4 P P P  P
             #   P P P  P
@@ -130,7 +130,7 @@ class Testbench(Module):
             col2.async_called(data = Int(32)(4))
 
         with Cycle(3):
-            # 2 2 5 8
+            # 3 2 5 8
             # 2 P P P  P
             # 5 P P P  P
             # 8 P P P  P
@@ -143,7 +143,7 @@ class Testbench(Module):
             col3.async_called(data = Int(32)(8))
 
         with Cycle(4):
-            # 3  3 6 9  12
+            # 4  3 6 9  12
             # 3  P P P  P
             # 6  P P P  P
             # 9  P P P  P
@@ -158,7 +158,7 @@ class Testbench(Module):
             col4.async_called(data = Int(32)(12))
         
         with Cycle(5):
-            # 4    7 10 13
+            # 5    7 10 13
             #    P P P  P
             # 7  P P P  P
             # 10 P P P  P
@@ -171,7 +171,7 @@ class Testbench(Module):
             col4.async_called(data = Int(32)(13))
 
         with Cycle(6):
-            #  5    11 14
+            #  6    11 14
             #    P P P  P
             #    P P P  P
             # 11 P P P  P
@@ -182,7 +182,7 @@ class Testbench(Module):
             col4.async_called(data = Int(32)(14))
             
         with Cycle(7):
-            #   6      15
+            #   7      15
             #    P P P  P
             #    P P P  P
             #    P P P  P
