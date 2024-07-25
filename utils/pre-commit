@@ -7,3 +7,7 @@ set -euxo pipefail
 cargo check --all-targets
 cargo fmt --all
 cargo clippy -- -Dclippy::all
+
+ASSASSYN_REPO=`git rev-parse --show-toplevel`
+
+pylint --rcfile $ASSASSYN_REPO/python/.pylintrc $ASSASSYN_REPO/python/assassyn
