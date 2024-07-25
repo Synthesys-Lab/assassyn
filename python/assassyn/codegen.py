@@ -11,6 +11,7 @@ from .array import Array
 from .module import Module, Port, Memory
 from .block import Block
 from .expr import Expr
+from .utils import identifierize
 
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
@@ -252,7 +253,7 @@ class CodeGen(visitor.Visitor):
         '''Generate the value reference on as the right-hand side of an assignment'''
         if isinstance(node, const.Const):
             ty = generate_dtype(node.dtype)
-            imm_var = f'imm_{hex(id(node))[-5:-1]}'
+            imm_var = f'imm_{identifierize(node)}'
             imm_decl = f'  let {imm_var} = sys.get_const_int({ty}, {node.value}); // {node}'
             self.code.append(imm_decl)
             return imm_var
@@ -290,13 +291,11 @@ class CodeGen(visitor.Visitor):
             args = ', '.join(self.generate_rval(i) for i in node.args[1:])
             res = f'sys.{ib_method}(fmt, vec![{args}]);'
         elif isinstance(node, expr.ArrayRead):
-            arr = node.arr.name if f'{id(node.arr)}' in node.arr.name \
-                                else self.generate_rval(node.arr)
+            arr = self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             res = f'sys.{ib_method}({arr}, {idx});'
         elif isinstance(node, expr.ArrayWrite):
-            arr = node.arr.name if f'{id(node.arr)}' in node.arr.name \
-                                else self.generate_rval(node.arr)
+            arr = self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             val = self.generate_rval(node.val)
             res = f'sys.{ib_method}({arr}, {idx}, {val});'

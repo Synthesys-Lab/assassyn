@@ -4,6 +4,7 @@
 
 from ..builder import ir_builder
 from ..value import Value
+from ..utils import identifierize
 
 class Expr(Value):
     '''The frontend base node for expressions'''
@@ -14,7 +15,7 @@ class Expr(Value):
 
     def as_operand(self):
         '''Dump the expression as an operand'''
-        return f'_{hex(id(self))[-5:-1]}'
+        return f'_{identifierize(self)}'
 
     def is_fifo_related(self):
         '''If the opcode is FIFO related'''
