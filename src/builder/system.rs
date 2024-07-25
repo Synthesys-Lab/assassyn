@@ -76,11 +76,11 @@ impl PortInfo {
 ///
 /// # Arguments
 /// * `ty` - The result's data type of the expression. If None is given, the data type will be
-///   inferred from the operands.
+///    inferred from the operands.
 /// * `a` - The first operand.
 /// * `b` - The second operand.
 /// * `pred` - The condition of executing this expression. If the condition is not `None`, this
-///   is always executed.
+///    is always executed.
 macro_rules! create_arith_op_impl {
   (binary, $func_name:ident, $opcode: expr) => {
     pub fn $func_name(&mut self, a: BaseNode, b: BaseNode) -> BaseNode {
@@ -242,8 +242,8 @@ impl SysBuilder {
   /// # Arguments
   ///
   /// * `expr` - The reference of the expression to be set as the insert point. NOTE: This expr
-  ///   should be a part of the current module to be built. Ohterwise, an assertion failure will be
-  ///   raised.
+  ///    should be a part of the current module to be built. Ohterwise, an assertion failure will
+  ///    be raised.
   pub fn set_insert_before(&mut self, node: BaseNode) {
     // Make this more general, the insert before point can also be a block.
     // Which leads to something like this:
