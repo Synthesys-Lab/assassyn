@@ -71,19 +71,22 @@ class Module:
     ATTR_DISABLE_ARBITER = 1
     ATTR_MEMORY = 2
     ATTR_TIMING = 3
+    ATTR_DOWNSTREAM = 4
 
     MODULE_ATTR_STR = {
       ATTR_EXPLICIT_FIFO: 'explicit_fifo',
       ATTR_DISABLE_ARBITER: 'no_arbiter',
       ATTR_MEMORY: 'memory',
       ATTR_TIMING: 'timing',
+      ATTR_DOWNSTREAM: 'downstream'
     }
 
     def __init__(
             self,
             explicit_fifo=False,
             timing=Timing.UNDEFINED,
-            disable_arbiter_rewrite=False):
+            disable_arbiter_rewrite=False,
+            is_downstream=False):
         '''Construct the module with the given attributes.
         
         Args:
@@ -94,7 +97,7 @@ class Module:
         '''
         self.body = None
         self._attrs = {}
-        self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite)
+        self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite, is_downstream)
         self._pop_cache = {}
         self._wait_until = []
         self._finalized = False
@@ -222,11 +225,17 @@ class Module:
         '''The helper function to get the implicit FIFO setting.'''
         return self._attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
 
-    def parse_attrs(self, is_explicit_fifo, timing, disable_arbiter_rewrite):
+    @property
+    def is_downstream(self):
+        '''The helper function to get the downstream setting.'''
+        return self._attrs.get(Module.ATTR_DOWNSTREAM, False)
+
+    def parse_attrs(self, is_explicit_fifo, timing, disable_arbiter_rewrite, is_downstream):
         '''The helper function to parse the attributes.'''
         self._attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
         self._attrs[Module.ATTR_TIMING] = Timing(timing)
         self._attrs[Module.ATTR_DISABLE_ARBITER] = disable_arbiter_rewrite
+        self._attrs[Module.ATTR_DOWNSTREAM] = is_downstream
 
 class Port:
     '''The AST node for defining a port in modules.'''
