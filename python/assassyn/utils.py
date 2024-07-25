@@ -3,6 +3,13 @@
 import os
 import subprocess
 
+def identifierize(obj):
+    '''The helper function to get the identifier of the given object. You can change `id_slice`
+    to tune the length of the identifier. The default is slice(-5:-1).'''
+    # pylint: disable=import-outside-toplevel
+    from .builder import Singleton
+    return hex(id(obj))[Singleton.id_slice]
+
 def repo_path():
     '''Get the path to assassyn repository'''
     return os.environ['ASSASSYN_HOME']

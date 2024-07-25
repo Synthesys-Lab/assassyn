@@ -7,6 +7,7 @@ from ..dtype import DType
 from ..block import Block
 from ..expr import Bind, FIFOPop, FIFOField, FIFOPush, AsyncCall
 from ..expr.intrinsic import _wait_until
+from ..utils import identifierize
 
 @decorator
 def constructor(func, *args, **kwargs):
@@ -147,7 +148,7 @@ class Module:
 
     def as_operand(self):
         '''Dump the module as a right-hand side reference.'''
-        return f'_{hex(id(self))[-5:-1]}'
+        return f'_{identifierize(self)}'
 
     def __repr__(self):
         ports = '\n    '.join(repr(v) for v in self.ports)

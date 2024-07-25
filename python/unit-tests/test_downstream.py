@@ -54,6 +54,8 @@ def test_driver():
         b = Optional(rhs.build(), true)
         downstream.build(a, b)
         
-
     print(sys)
 
+
+if __name__ == '__main__':
+    test_driver()

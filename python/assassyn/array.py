@@ -4,6 +4,7 @@ from .builder import ir_builder
 from .dtype import DType, to_uint
 from .expr import ArrayRead, ArrayWrite
 from .value import Value
+from .utils import identifierize
 
 @ir_builder(node_type='array')
 def RegArray( #pylint: disable=invalid-name
@@ -35,14 +36,13 @@ class Array:
 
     def as_operand(self):
         '''Dump the array as an operand.'''
-        return f'{self.name}_{id(self)}'
+        return self.name
 
     @property
     def name(self):
         '''The name of the array. If not set, a default name is generated.'''
-        if self._name is not None:
-            return self._name
-        return f'array_{id(self)}'
+        prefix = self._name if self._name is not None else 'array'
+        return f'{prefix}_{identifierize(self)}'
 
     @name.setter
     def name(self, name):
