@@ -17,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with: 
-          ref: ${{ github.head_ref }}
       - name: Install Verilator Depencences
         run: |
           sudo apt-get install -y git help2man perl python3 make autoconf g++ flex bison ccache \
