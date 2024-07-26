@@ -14,7 +14,13 @@ fi
 # Build Verilator
 cd verilator
 git checkout ca4858eb7f6142a0da367e0c299762d0922f1a6c
-git apply ../utils/5222-gnu-20.patch
+
+# Check if it is Mac OS
+if [ `uname` = "Darwin" ]; then
+  echo "Patching Verilator for Mac OS"
+  # Apply the patch for Mac OS
+  git apply ../utils/5222-gnu-20.patch
+fi
 autoconf
 ./configure
 make -j

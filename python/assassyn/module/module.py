@@ -7,7 +7,7 @@ from ..dtype import DType
 from ..block import Block
 from ..expr import Bind, FIFOPop, FIFOField, FIFOPush, AsyncCall
 from ..expr.intrinsic import _wait_until
-from .base import ModuleBase, Timing
+from .base import ModuleBase, name_ports_of_module
 
 @decorator
 def constructor(func, *args, **kwargs):
@@ -18,15 +18,7 @@ def constructor(func, *args, **kwargs):
     func(*args, **kwargs)
     for key in ['body', '_pop_cache', '_wait_until', '_finalized']:
         assert hasattr(module_self, key), 'Did you forget to call `super().__init__?`'
-    name_ports_of_module(module_self)
-
-
-def name_ports_of_module(module):
-    '''The helper function to name the ports of a module.'''
-    for k, v in module.__dict__.items():
-        if isinstance(v, Port):
-            v.name = k
-            v.module = module
+    name_ports_of_module(module_self, Port)
 
 def _reserved_module_name(name):
     return name in ['Driver', 'Testbench']
@@ -38,23 +30,48 @@ def wait_until(func, *args, **kwargs):
     module_self = args[0]
     assert isinstance(module_self, Module)
     Singleton.builder.cur_module = module_self
-    module_self._attrs[ModuleBase.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
+    module_self._attrs[Module.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
 
-    module_self.implicit_restore()
+    restored = module_self.implicit_restore()
     restore = Singleton.builder.insert_point['expr']
     Singleton.builder.insert_point['expr'] = module_self._wait_until
     cond = func(*args, **kwargs)
     _wait_until(cond)
-    module_self.implicit_pop()
+    if restored:
+        module_self.implicit_pop()
 
     Singleton.builder.insert_point['expr'] = restore
     Singleton.builder.cur_module = None
 
     return module_self._wait_until
 
+#pylint: disable=too-few-public-methods
+class Timing:
+    '''The enum class for the timing policy of a module.'''
+    UNDEFINED = 0
+    SYSTOLIC = 1
+    BACKPRESSURE = 2
+
+    def __init__(self, ty):
+        self.ty = ty
+
+    def __repr__(self):
+        return ['undefined', 'systolic', 'backpressure'][self.ty]
 
 class Module(ModuleBase):
     '''The AST node for defining a module.'''
+
+    ATTR_EXPLICIT_FIFO = 0
+    ATTR_DISABLE_ARBITER = 1
+    ATTR_MEMORY = 2
+    ATTR_TIMING = 3
+
+    MODULE_ATTR_STR = {
+      ATTR_EXPLICIT_FIFO: 'explicit_fifo',
+      ATTR_DISABLE_ARBITER: 'no_arbiter',
+      ATTR_MEMORY: 'memory',
+      ATTR_TIMING: 'timing',
+    }
 
     def __init__(
             self,
@@ -69,12 +86,14 @@ class Module(ModuleBase):
           - disable_arbiter_rewrite(bool): When there are multiple callers, if this module
           should be rewritten by the compiler.
         '''
-        super().__init__(explicit_fifo, timing, disable_arbiter_rewrite)
+        super().__init__()
         self.body = None
         self._pop_cache = {}
         self._wait_until = []
         self._finalized = False
         self.name = type(self).__name__
+        self._attrs = {}
+        self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite)
         if not _reserved_module_name(self.name):
             self.name = self.name + '_' + self.as_operand()
 
@@ -121,7 +140,7 @@ class Module(ModuleBase):
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
             ports = f'{{\n    {ports}\n  }} '
-        attrs = ', '.join(f'{ModuleBase.MODULE_ATTR_STR[i]}: {j}' for i, j in self._attrs.items())
+        attrs = ', '.join(f'{Module.MODULE_ATTR_STR[i]}: {j}' for i, j in self._attrs.items())
         attrs = f'#[{attrs}] ' if attrs else ''
         var_id = self.as_operand()
         if self.finalized:
@@ -133,7 +152,7 @@ class Module(ModuleBase):
   }}
 '''
         Singleton.repr_ident = 4
-        body = self.body.__repr__()
+        body = self.body.__repr__() if self.body is not None else ''
         precond = '\n      '.join(repr(v) for v in self._wait_until)
         if precond:
             precond = f'''
@@ -173,10 +192,35 @@ class Module(ModuleBase):
 
     def implicit_restore(self):
         '''Implicitly restore all the FIFO.pop back to FIFOs.'''
+        restored = False
         if not self.is_explicit_fifo:
             for k, v in self.__dict__.items():
                 if isinstance(v, FIFOPop):
                     setattr(self, k, v.fifo)
+                    restored = True
+        return restored
+
+    def parse_attrs(self, is_explicit_fifo, timing, disable_arbiter_rewrite):
+        '''The helper function to parse the attributes.'''
+        self._attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
+        self._attrs[Module.ATTR_TIMING] = Timing(timing)
+        self._attrs[Module.ATTR_DISABLE_ARBITER] = disable_arbiter_rewrite
+
+    @property
+    def is_systolic(self):
+        '''The helper function to get if this module is systolic.'''
+        value = self._attrs.get(Module.ATTR_TIMING, Timing(Timing.UNDEFINED)).ty
+        return value == Timing.SYSTOLIC
+
+    @property
+    def disable_arbiter_rewrite(self):
+        '''The helper function to get the no-arbiter setting.'''
+        return self._attrs.get(Module.ATTR_DISABLE_ARBITER, False)
+
+    @property
+    def is_explicit_fifo(self):
+        '''The helper function to get the implicit FIFO setting.'''
+        return self._attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
 
 class Port:
     '''The AST node for defining a port in modules.'''

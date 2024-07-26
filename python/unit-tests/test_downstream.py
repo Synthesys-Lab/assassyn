@@ -32,28 +32,30 @@ class ForwardData(Module):
 
 class Adder(Downstream):
 
-    @module.constructor
+    @downstream.constructor
     def __init__(self, a, b):
-        super().__init__(is_downstream=True)
+        super().__init__()
         true = UInt(1)(1)
         self.a = Optional(a, true)
         self.b = Optional(b, true)
 
-    @module.combinational
-    def build(self, a: Optional, b: Optional):
+    @downstream.combinational
+    def build(self):
+        a = self.a
+        b = self.b
         c = a.unwrap_or(Int(32)(0)) + b.unwrap_or(Int(32)(0))
 
 def test_driver():
     sys = SysBuilder('driver')
     with sys:
         driver = Driver()
-        adder = Adder()
         lhs = ForwardData()
         rhs = ForwardData()
+        adder = Adder(lhs.data, rhs.data)
 
         driver.build(lhs, rhs)
-        adder.build(a, b)
-        
+        adder.build()
+
     print(sys)
 
 
