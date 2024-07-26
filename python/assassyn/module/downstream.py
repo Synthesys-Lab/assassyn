@@ -1,7 +1,7 @@
 '''Downstream class is a special module that is combinational across multiple different
 chronological modules.'''
 
-from .module import Module
+from .base import ModuleBase
 
-class Downstream(Module):
+class Downstream(ModuleBase):
     '''Downstream class implementation.'''
