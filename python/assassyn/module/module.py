@@ -7,7 +7,7 @@ from ..dtype import DType
 from ..block import Block
 from ..expr import Bind, FIFOPop, FIFOField, FIFOPush, AsyncCall
 from ..expr.intrinsic import _wait_until
-from ..utils import identifierize
+from .base import ModuleBase, Timing
 
 @decorator
 def constructor(func, *args, **kwargs):
@@ -38,7 +38,7 @@ def wait_until(func, *args, **kwargs):
     module_self = args[0]
     assert isinstance(module_self, Module)
     Singleton.builder.cur_module = module_self
-    module_self._attrs[Module.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
+    module_self._attrs[ModuleBase.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
 
     module_self.implicit_restore()
     restore = Singleton.builder.insert_point['expr']
@@ -52,42 +52,15 @@ def wait_until(func, *args, **kwargs):
 
     return module_self._wait_until
 
-#pylint: disable=too-few-public-methods
-class Timing:
-    '''The enum class for the timing policy of a module.'''
-    UNDEFINED = 0
-    SYSTOLIC = 1
-    BACKPRESSURE = 2
 
-    def __init__(self, ty):
-        self.ty = ty
-
-    def __repr__(self):
-        return ['undefined', 'systolic', 'backpressure'][self.ty]
-
-class Module:
+class Module(ModuleBase):
     '''The AST node for defining a module.'''
-
-    ATTR_EXPLICIT_FIFO = 0
-    ATTR_DISABLE_ARBITER = 1
-    ATTR_MEMORY = 2
-    ATTR_TIMING = 3
-    ATTR_DOWNSTREAM = 4
-
-    MODULE_ATTR_STR = {
-      ATTR_EXPLICIT_FIFO: 'explicit_fifo',
-      ATTR_DISABLE_ARBITER: 'no_arbiter',
-      ATTR_MEMORY: 'memory',
-      ATTR_TIMING: 'timing',
-      ATTR_DOWNSTREAM: 'downstream'
-    }
 
     def __init__(
             self,
             explicit_fifo=False,
             timing=Timing.UNDEFINED,
-            disable_arbiter_rewrite=False,
-            is_downstream=False):
+            disable_arbiter_rewrite=False):
         '''Construct the module with the given attributes.
         
         Args:
@@ -96,9 +69,8 @@ class Module:
           - disable_arbiter_rewrite(bool): When there are multiple callers, if this module
           should be rewritten by the compiler.
         '''
+        super().__init__(explicit_fifo, timing, disable_arbiter_rewrite)
         self.body = None
-        self._attrs = {}
-        self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite, is_downstream)
         self._pop_cache = {}
         self._wait_until = []
         self._finalized = False
@@ -128,7 +100,6 @@ class Module:
         elif self._finalized:
             assert False, 'Finalization cannot be reverted!'
 
-
     @property
     def ports(self):
         '''The helper function to get all the ports in the module.'''
@@ -146,15 +117,11 @@ class Module:
         bound = Bind(self, **kwargs)
         return bound
 
-    def as_operand(self):
-        '''Dump the module as a right-hand side reference.'''
-        return f'_{identifierize(self)}'
-
     def __repr__(self):
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
             ports = f'{{\n    {ports}\n  }} '
-        attrs = ', '.join(f'{Module.MODULE_ATTR_STR[i]}: {j}' for i, j in self._attrs.items())
+        attrs = ', '.join(f'{ModuleBase.MODULE_ATTR_STR[i]}: {j}' for i, j in self._attrs.items())
         attrs = f'#[{attrs}] ' if attrs else ''
         var_id = self.as_operand()
         if self.finalized:
@@ -210,33 +177,6 @@ class Module:
             for k, v in self.__dict__.items():
                 if isinstance(v, FIFOPop):
                     setattr(self, k, v.fifo)
-
-    @property
-    def is_systolic(self):
-        '''The helper function to get if this module is systolic.'''
-        return self._attrs.get(Module.ATTR_TIMING, Timing(Timing.UNDEFINED)).ty == Timing.SYSTOLIC
-
-    @property
-    def disable_arbiter_rewrite(self):
-        '''The helper function to get the no-arbiter setting.'''
-        return self._attrs.get(Module.ATTR_DISABLE_ARBITER, False)
-
-    @property
-    def is_explicit_fifo(self):
-        '''The helper function to get the implicit FIFO setting.'''
-        return self._attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
-
-    @property
-    def is_downstream(self):
-        '''The helper function to get the downstream setting.'''
-        return self._attrs.get(Module.ATTR_DOWNSTREAM, False)
-
-    def parse_attrs(self, is_explicit_fifo, timing, disable_arbiter_rewrite, is_downstream):
-        '''The helper function to parse the attributes.'''
-        self._attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
-        self._attrs[Module.ATTR_TIMING] = Timing(timing)
-        self._attrs[Module.ATTR_DISABLE_ARBITER] = disable_arbiter_rewrite
-        self._attrs[Module.ATTR_DOWNSTREAM] = is_downstream
 
 class Port:
     '''The AST node for defining a port in modules.'''
