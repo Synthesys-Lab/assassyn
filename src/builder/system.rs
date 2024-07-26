@@ -100,11 +100,11 @@ impl PortInfo {
 ///
 /// # Arguments
 /// * `ty` - The result's data type of the expression. If None is given, the data type will be
-/// inferred from the operands.
+///   inferred from the operands.
 /// * `a` - The first operand.
 /// * `b` - The second operand.
 /// * `pred` - The condition of executing this expression. If the condition is not `None`, this
-/// is always executed.
+///   is always executed.
 macro_rules! create_arith_op_impl {
   (binary, $func_name:ident, $opcode: expr) => {
     pub fn $func_name(&mut self, site: Filesite, a: BaseNode, b: BaseNode) -> BaseNode {
@@ -267,8 +267,8 @@ impl SysBuilder {
   /// # Arguments
   ///
   /// * `expr` - The reference of the expression to be set as the insert point. NOTE: This expr
-  /// should be a part of the current module to be built. Ohterwise, an assertion failure will be
-  /// raised.
+  ///   should be a part of the current module to be built. Ohterwise, an assertion failure will be
+  ///   raised.
   pub fn set_insert_before(&mut self, node: BaseNode) {
     // Make this more general, the insert before point can also be a block.
     // Which leads to something like this:
@@ -414,11 +414,8 @@ impl SysBuilder {
   /// * `opcode` - The operation code of the expression.
   /// * `operands` - The operands of the expression.
   /// * `cond` - The condition of executing this expression. If the condition is not `None`, the is
-  /// always executed.
+  ///    always executed.
   /// * `insert` - If this created node is inserted into the current insert point.
-  // TODO(@were): Should I rearrange the insert point based on the predication?
-  // If the predication is deeper than the current insert point, the inserted point should be
-  // inserted to the deepest predication block.
   pub fn create_expr(
     &mut self,
     dtype: DataType,
@@ -426,6 +423,9 @@ impl SysBuilder {
     operands: Vec<BaseNode>,
     insert: bool,
   ) -> BaseNode {
+    // TODO(@were): Should I rearrange the insert point based on the predication?
+    // If the predication is deeper than the current insert point, the inserted point should be
+    // inserted to the deepest predication block.
     self.get_current_module().unwrap();
     // Wrap all the operands into Operand instances.
     let instance = Expr::new(
@@ -777,7 +777,7 @@ impl SysBuilder {
   /// # Arguments
   /// * `fifo` - The FIFO to be popped.
   /// * `num_elems` - The number of elements to be popped. If None is given, the number of elements
-  /// is one.
+  ///   is one.
   /// * `cond` - The condition of popping the FIFO. If None is given, the pop is unconditional.
   pub fn create_fifo_pop(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
