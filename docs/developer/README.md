@@ -1,3 +1,5 @@
 # Developer Guide
 
-* [Tooling](./tooling.md)
+* [Github](./github.md)
+* [Git](./git.md)
+* [Format](./format.md)
