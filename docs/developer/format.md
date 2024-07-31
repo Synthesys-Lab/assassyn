@@ -12,13 +12,20 @@ For formatting Rust code, use a standardized tool to make the modifications dire
 cargo fmt
 ```
 
-This will automatically format the rust code.
+This will automatically format the rust code according to the `rustfmt.toml` in this repo.
 
 You can also use cargo clippy to get potential suggestions from static analysis.
 
 ```
 cargo clippy -- -Dclippy::all
 ```
+
+And you may also use cargo clippy fix to fix these suggestions.
+```
+cargo clippy -- fix 
+```
+
+However, this does not fix everything. Too aggressive rewritings are still required to be done by the developers.
 
 ## Python format
 

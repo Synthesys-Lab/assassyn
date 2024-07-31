@@ -22,8 +22,7 @@ way to write a toy example to play with this framework, and sanity-check the bui
 ## Git & Github Usage
 
 **Formatting:** To ensure consistent code style, copy `assassyn/utils/pre-commit` to your
-`.git/hooks/pre-commit`. This setup automatically formats your code and checks coding
-style with each commit.ls
+`.git/hooks/pre-commit`. This setup automatically formats your code and checks coding style with each commit.
 
 **Adding New Features:**
 
