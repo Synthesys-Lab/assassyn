@@ -119,7 +119,8 @@ These IR nodes will be implicitly pushed into the module by the `module.combinat
 ````Python
 class Adder(Module):
     @module.constructor
-    def __init__(self, a, b):
+    def __init__(self):
+        super().__init__()
         self.a = Port(Int(32))
         self.b = Port(Int(32))
 
@@ -130,13 +131,14 @@ class Adder(Module):
 class Driver(Module):
     @module.constructor
     def __init__(self):
+        super().__init__()
 
     @module.combinational
     def build(self, adder: Adder):
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         cnt[0] = cnt[0] + 1
-        adder.async_called(v, v)
+        adder.async_called(a=v, b=v)
 ````
 
 A Driver module is a special module, like a `main` function in software programming, which serves
