@@ -99,8 +99,8 @@ class Testbench(Module):
             #  P  P P P
             #  P  P P P
             #  P  P P P
-            col1.async_called(data = Int(32)(0))
-            row1.async_called(data = Int(32)(0))
+            col4.async_called(data = Int(32)(0))
+            row4.async_called(data = Int(32)(0))
 
         with Cycle(2):
             #       4 1 2
@@ -108,10 +108,10 @@ class Testbench(Module):
             #  P  P P P 4
             #  P  P P P
             #  P  P P P
-            row1.async_called(data = Int(32)(1))
-            col1.async_called(data = Int(32)(1))
-            row2.async_called(data = Int(32)(4))
-            col2.async_called(data = Int(32)(4))
+            row4.async_called(data = Int(32)(1))
+            col4.async_called(data = Int(32)(1))
+            row3.async_called(data = Int(32)(4))
+            col3.async_called(data = Int(32)(4))
 
         with Cycle(3):
             #     8 5 2 3
@@ -119,12 +119,12 @@ class Testbench(Module):
             #  P  P P P 5
             #  P  P P P 8
             #  P  P P P
-            row1.async_called(data = Int(32)(2))
-            col1.async_called(data = Int(32)(2))
-            row2.async_called(data = Int(32)(5))
-            col2.async_called(data = Int(32)(5))
-            row3.async_called(data = Int(32)(8))
-            col3.async_called(data = Int(32)(8))
+            row4.async_called(data = Int(32)(2))
+            col4.async_called(data = Int(32)(2))
+            row3.async_called(data = Int(32)(5))
+            col3.async_called(data = Int(32)(5))
+            row2.async_called(data = Int(32)(8))
+            col2.async_called(data = Int(32)(8))
 
         with Cycle(4):
             #  12 9 6 3 4
@@ -132,14 +132,14 @@ class Testbench(Module):
             #  P  P P P 6
             #  P  P P P 9
             #  P  P P P 12
-            row1.async_called(data = Int(32)(3))
-            col1.async_called(data = Int(32)(3))
-            row2.async_called(data = Int(32)(6))
-            col2.async_called(data = Int(32)(6))
-            row3.async_called(data = Int(32)(9))
-            col3.async_called(data = Int(32)(9))
-            row4.async_called(data = Int(32)(12))
-            col4.async_called(data = Int(32)(12))
+            row4.async_called(data = Int(32)(3))
+            col4.async_called(data = Int(32)(3))
+            row3.async_called(data = Int(32)(6))
+            col3.async_called(data = Int(32)(6))
+            row2.async_called(data = Int(32)(9))
+            col2.async_called(data = Int(32)(9))
+            row1.async_called(data = Int(32)(12))
+            col1.async_called(data = Int(32)(12))
 
         with Cycle(5):
             # 13 10 7   5
@@ -147,12 +147,12 @@ class Testbench(Module):
             #  P  P P P 7
             #  P  P P P 10
             #  P  P P P 13
-            row2.async_called(data = Int(32)(7))
-            col2.async_called(data = Int(32)(7))
-            row3.async_called(data = Int(32)(10))
-            col3.async_called(data = Int(32)(10))
-            row4.async_called(data = Int(32)(13))
-            col4.async_called(data = Int(32)(13))
+            row3.async_called(data = Int(32)(7))
+            col3.async_called(data = Int(32)(7))
+            row2.async_called(data = Int(32)(10))
+            col2.async_called(data = Int(32)(10))
+            row1.async_called(data = Int(32)(13))
+            col1.async_called(data = Int(32)(13))
 
         with Cycle(6):
             # 14 11     6
@@ -160,10 +160,10 @@ class Testbench(Module):
             #  P  P P P 7
             #  P  P P P 11
             #  P  P P P 14
-            row3.async_called(data = Int(32)(11))
-            col3.async_called(data = Int(32)(11))
-            row4.async_called(data = Int(32)(14))
-            col4.async_called(data = Int(32)(14))
+            row2.async_called(data = Int(32)(11))
+            col2.async_called(data = Int(32)(11))
+            row1.async_called(data = Int(32)(14))
+            col1.async_called(data = Int(32)(14))
 
         with Cycle(7):
             # 15        7
@@ -171,8 +171,8 @@ class Testbench(Module):
             #  P  P P P
             #  P  P P P
             #  P  P P P 15
-            row4.async_called(data = Int(32)(15))
-            col4.async_called(data = Int(32)(15))
+            row1.async_called(data = Int(32)(15))
+            col1.async_called(data = Int(32)(15))
 
 def check_raw(raw):
     a = [[0 for _ in range(4)] for _ in range(4)]
