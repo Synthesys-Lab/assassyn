@@ -28,6 +28,7 @@ register_subcode!(
     Mul(mul "*"),
     Shl(shl "<<"),
     Shr(shr ">>"),
+    Mod(mod "%"),
     BitwiseOr(bitwise_or "|"),
     BitwiseAnd(bitwise_and "&"),
     BitwiseXor(bitwise_xor "^"),

@@ -70,6 +70,11 @@ class Value:
         return BinaryOp(BinaryOp.EQ, self, other)
 
     @ir_builder(node_type='expr')
+    def __mod__(self, other):
+        from .expr import BinaryOp
+        return BinaryOp(BinaryOp.MOD, self, other)
+
+    @ir_builder(node_type='expr')
     def __invert__(self):
         from .expr import UnaryOp
         return UnaryOp(UnaryOp.FLIP, self)

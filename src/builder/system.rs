@@ -471,6 +471,7 @@ impl SysBuilder {
   create_arith_op_impl!(binary, create_bitwise_and, Binary::BitwiseAnd.into());
   create_arith_op_impl!(binary, create_bitwise_or, Binary::BitwiseOr.into());
   create_arith_op_impl!(binary, create_bitwise_xor, Binary::BitwiseXor.into());
+  create_arith_op_impl!(binary, create_mod, Binary::Mod.into());
   create_arith_op_impl!(binary, create_mul, subcode::Binary::Mul.into());
   create_arith_op_impl!(binary, create_igt, subcode::Compare::IGT.into());
   create_arith_op_impl!(binary, create_ige, subcode::Compare::IGE.into());
@@ -751,6 +752,11 @@ impl SysBuilder {
           Binary::Mul => match (&aty, &bty) {
             (DataType::Int(a), DataType::Int(b)) => Some(DataType::Int(a + b)),
             (DataType::UInt(a), DataType::UInt(b)) => Some(DataType::UInt(a + b)),
+            _ => None,
+          },
+          Binary::Mod => match (&aty, &bty) {
+            (DataType::Int(a), DataType::Int(b)) => Some(DataType::Int(*a.min(b))),
+            (DataType::UInt(a), DataType::UInt(b)) => Some(DataType::UInt(*a.min(b))),
             _ => None,
           },
         }

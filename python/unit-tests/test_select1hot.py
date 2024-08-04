@@ -12,18 +12,19 @@ class Driver(Module):
         
     @module.combinational
     def build(self):
-        cond = RegArray(Int(5), 1, initializer=[1])
+        cond = RegArray(Int(5), 1, initializer=[0])
         values = RegArray(Int(32), 5, initializer = [1, 2, 4, 8, 16])
 
-        gt = cond[0]
+        gt = Int(5)(1) << cond[0]
         mux = gt.select1hot(values[0], values[1], values[2], values[3], values[4])
 
-        log("onehot select {:b} : {}", gt, mux)
+        log("onehot select 0b{:b} from [1,2,4,8,16]: {}", gt, mux)
+        cond[0] = (cond[0] + Int(5)(1)) % Int(5)(5)
 
 def check(raw: str):
     for i in raw.splitlines():
         if 'onehot select' in i:
-            a = i.split()[-3]
+            a = i.split()[-4]
             b = i.split()[-1]
             assert int(a, 2) == int(b)
 
@@ -35,8 +36,8 @@ def test_select1hot():
 
     #TODO: verilator simulation for Select1Hot
 
-    # simulator_path, verilator_path = elaborate(sys, verilog='verilator', idle_threshold=5, sim_threshold=5)
-    simulator_path = elaborate(sys, verilog=None, idle_threshold=5, sim_threshold=5)
+    # simulator_path, verilator_path = elaborate(sys, verilog='verilator')
+    simulator_path = elaborate(sys, verilog=None)
 
     raw = utils.run_simulator(simulator_path)
     check(raw)
