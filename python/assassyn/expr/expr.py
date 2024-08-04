@@ -339,4 +339,4 @@ class Select1Hot(Expr):
         lval = self.as_operand()
         cond = self.cond.as_operand()
         values = ', '.join(i.as_operand() for i in self.values)
-        return f'{lval} = select_1hot({cond}, [{values}])'
+        return f'{lval} = select_1hot {cond} ({values})'

@@ -8,18 +8,17 @@ class Driver(Module):
     
     @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(disable_arbiter_rewrite=True)
         self.cond = Port(Int(5))
         
     @module.combinational
     def build(self):
-        cond = RegArray(Int(5), 1, initializer = [0b00001])
         values = RegArray(Int(32), 5, initializer = [1, 2, 4, 8, 16])
 
         gt = self.cond
         mux = gt.select1hot(values[0], values[1], values[2], values[3], values[4])
 
-        log("onehot select {:b}: {}", cond, mux)
+        log("onehot select {:b}: {}", gt, mux)
 
 class Testbench(Module):
     
@@ -52,10 +51,10 @@ def test_select1hot():
         testbench.build(driver)
         
 
-    print(sys)
-    # simulator_path, verilator_path = elaborate(sys, verilog='verilator')
+    # print(sys)
+    simulator_path = elaborate(sys, verilog=None)
 
-    # raw = utils.run_simulator(simulator_path)
+    raw = utils.run_simulator(simulator_path)
     # check(raw)
 
 if __name__ == '__main__':
