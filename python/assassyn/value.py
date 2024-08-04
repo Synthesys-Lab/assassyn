@@ -75,6 +75,16 @@ class Value:
         return UnaryOp(UnaryOp.FLIP, self)
 
     @ir_builder(node_type='expr')
+    def __lshift__(self, other):
+        from .expr import BinaryOp
+        return BinaryOp(BinaryOp.SHL, self, other)
+
+    @ir_builder(node_type='expr')
+    def __rshift__(self, other):
+        from .expr import BinaryOp
+        return BinaryOp(BinaryOp.SHR, self, other)
+
+    @ir_builder(node_type='expr')
     def bitcast(self, dtype):
         '''The frontend API to create a bitcast operation'''
         from .expr import Cast

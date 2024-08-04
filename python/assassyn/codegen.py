@@ -30,6 +30,9 @@ CG_OPCODE = {
     expr.BinaryOp.BITWISE_AND: 'bitwise_and',
     expr.BinaryOp.BITWISE_XOR: 'bitwise_xor',
 
+    expr.BinaryOp.SHL: 'shl',
+    expr.BinaryOp.SHR: 'shr',
+
     expr.UnaryOp.FLIP: 'flip',
     expr.UnaryOp.NEG: 'neg',
 

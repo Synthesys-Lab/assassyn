@@ -51,6 +51,8 @@ class BinaryOp(Expr):
     ILE         = 211
     IGE         = 212
     EQ          = 213
+    SHL         = 214
+    SHR         = 215
 
     OPERATORS = {
       ADD: '+',
@@ -68,6 +70,9 @@ class BinaryOp(Expr):
       BITWISE_AND: '&',
       BITWISE_OR:  '|',
       BITWISE_XOR: '^',
+
+      SHL: '<<',
+      SHR: '>>',
     }
 
     def __init__(self, opcode, lhs, rhs):
