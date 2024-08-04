@@ -334,11 +334,9 @@ class Select1Hot(Expr):
         super().__init__(opcode)
         self.cond = cond
         self.values = list(values)
-        print(self.values)
 
     def __repr__(self):
-        # lval = self.as_operand()
-        # cond = self.cond.as_operand()
-        # values = ', '.join(i.as_operand() for i in self.values)
-        # return f'{lval} = select_1hot({cond}, [{values}])'
-        pass
+        lval = self.as_operand()
+        cond = self.cond.as_operand()
+        values = ', '.join(i.as_operand() for i in self.values)
+        return f'{lval} = select_1hot({cond}, [{values}])'

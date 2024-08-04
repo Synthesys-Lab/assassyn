@@ -31,7 +31,8 @@ class Testbench(Module):
     def build(self, driver: Module):
         for i in range(1, 201):
             with Cycle(i):
-                driver.async_called(cond = Int(5)(i % 5))
+                cond = 1 << (i % 5)
+                driver.async_called(cond = Int(5)(cond))
 
 
 def check(raw: str):
@@ -51,7 +52,7 @@ def test_select1hot():
         testbench.build(driver)
         
 
-    # print(sys)
+    print(sys)
     # simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 
     # raw = utils.run_simulator(simulator_path)

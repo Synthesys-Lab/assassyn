@@ -108,7 +108,6 @@ class Value:
     def select1hot(self, *args):
         '''The frontend API to create a select1hot operation'''
         from .expr import Select1Hot
-        print(args)
         return Select1Hot(Select1Hot.SELECT_1HOT, self, args)
 
 
