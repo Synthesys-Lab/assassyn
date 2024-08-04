@@ -52,6 +52,7 @@ CG_OPCODE = {
     expr.Cast.SEXT: 'sext',
 
     expr.Select.SELECT: 'select',
+    expr.Select1Hot.SELECT_1HOT: 'select_1hot',
 
     expr.Log.LOG: 'log',
 

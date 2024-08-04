@@ -104,6 +104,13 @@ class Value:
         from .expr import Select
         return Select(Select.SELECT, self, true_value, false_value)
 
+    @ir_builder(node_type='expr')
+    def select1hot(self, *args):
+        '''The frontend API to create a select1hot operation'''
+        from .expr import Select1Hot
+        print(args)
+        return Select1Hot(Select1Hot.SELECT_1HOT, self, args)
+
 
 class Optional:
     '''The class for a predicated value'''
