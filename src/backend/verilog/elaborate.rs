@@ -5,6 +5,8 @@ use std::{
   path::Path,
 };
 
+use regex::Regex;
+
 use crate::{
   backend::common::{create_and_clean_dir, Config},
   builder::system::SysBuilder,
@@ -1334,26 +1336,69 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
 
       Opcode::Log => {
         let mut format_str = dump_ref!(
-          self.sys,
-          expr
-            .operand_iter()
-            .collect::<Vec<OperandRef>>()
-            .first()
-            .unwrap()
-            .get_value()
+            self.sys,
+            expr
+                .operand_iter()
+                .collect::<Vec<OperandRef>>()
+                .first()
+                .unwrap()
+                .get_value()
         );
-        for elem in expr.operand_iter().skip(1) {
-          format_str = format_str.replacen(
-            "{}",
-            match elem.get_value().get_dtype(self.sys).unwrap() {
-              DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "%d",
-              DataType::Str => "%s",
-              _ => "?",
-            },
-            1,
-          );
-        }
+
+        println!("Initial format_str: {}", format_str);
+
+        let re = Regex::new(r"\{(:.[bxXo]?)?\}").unwrap();
+
+        let dtypes: Vec<_> = expr.operand_iter().skip(1)
+            .map(|elem| elem.get_value().get_dtype(self.sys).unwrap())
+            .collect();
+
+        println!("Datatypes: {:?}", dtypes);
+
+        let mut dtype_index = 0;
+        format_str = re.replace_all(&format_str, |caps: &regex::Captures| {
+            let full_match = caps.get(0).unwrap().as_str();
+            println!("Matched: {}", full_match);
+
+            let result = if let Some(format_spec) = caps.get(1) {
+                match format_spec.as_str() {
+                    ":b" => "%b",
+                    ":x" => "%x",
+                    ":X" => "%X",
+                    ":o" => "%o",
+                    ":" => {
+                        if let Some(dtype) = dtypes.get(dtype_index) {
+                            match dtype {
+                                DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "%d",
+                                DataType::Str => "%s",
+                                _ => "?"
+                            }
+                        } else {
+                            "?"
+                        }
+                    },
+                    _ => {
+                        println!("Unrecognized format specifier: {}", format_spec.as_str());
+                        "?"
+                    }
+                }
+            } else {
+                if let Some(dtype) = dtypes.get(dtype_index) {
+                    match dtype {
+                        DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "%d",
+                        DataType::Str => "%s",
+                        _ => "?"
+                    }
+                } else {
+                    "?"
+                }
+            };
+
+            dtype_index += 1;
+            result
+        }).into_owned();
         format_str = format_str.replace('"', "");
+
         let mut res = String::new();
         res.push_str(
           format!(
@@ -1614,6 +1659,35 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       Opcode::Bind => {
         // currently handled in AsyncCall
         Some("".to_string())
+      }
+
+      Opcode::Select1Hot => {
+        let dtype = expr.dtype().get_bits() - 1;
+        let name = namify(expr.upcast().to_string(self.sys).as_str());
+        let select1hot = expr.as_sub::<instructions::Select1Hot>().unwrap();
+        let cond = dump_ref!(self.sys, &select1hot.cond());
+        let mut result = format!("logic [{}:0] {};\n", dtype, name);
+        result += &format!("assign {} = ", name);
+
+        let mut first = true;
+        for (i, elem) in select1hot.value_iter().enumerate() {
+            let str_elem = dump_ref!(self.sys, &elem);
+            if !first {
+                result += " |\n    ";
+            }
+            result += &format!(
+                "({{{}{{{}[{}] == 1'b1}}}} & {})",
+                dtype + 1,
+                cond,
+                i,
+                str_elem
+            );
+            first = false;
+        }
+
+        result += ";";
+
+        Some(result)
       }
 
       _ => panic!("Unknown OP: {:?}", expr.get_opcode()),
