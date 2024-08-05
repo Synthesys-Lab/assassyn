@@ -223,12 +223,12 @@ def systolic_array():
             pe_array[5][i].bound = pe_array[5][i].pe
 
         # Build ComputePEs
-        for i in range(4, 0, -1):
-            for j in range(5, 1, -1):
-                fwest, fsouth = pe_array[i][j].pe.build(pe_array[i][j-1].bound, pe_array[i+1][j].bound)
-                pe_array[i][j].bound = pe_array[i][j].pe
-                pe_array[i][j-1].bound = fwest
-                pe_array[i+1][j].bound = fsouth
+        # for i in range(4, 0, -1):
+        #     for j in range(5, 1, -1):
+        #         fwest, fsouth = pe_array[i][j].pe.build(pe_array[i][j-1].bound, pe_array[i+1][j].bound)
+        #         pe_array[i][j].bound = pe_array[i][j].pe
+        #         pe_array[i][j-1].bound = fwest
+        #         pe_array[i+1][j].bound = fsouth
 
         # Last Column Pushers
         for i in range(1, 5):
