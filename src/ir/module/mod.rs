@@ -1,7 +1,6 @@
 pub mod attrs;
 pub mod memory;
 pub mod meta;
-pub mod downstream;
 
 use std::collections::{HashMap, HashSet};
 
