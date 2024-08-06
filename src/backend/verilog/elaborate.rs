@@ -107,7 +107,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(
         format!(
           "logic [{}:0] array_{}_driver_{}_widx;\n",
-          (array.get_size() + 1).ilog2() - 1,
+          array.get_size().ilog2(),
           array_name,
           driver
         )
@@ -149,7 +149,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(
       format!(
         "logic [{}:0] array_{}_widx;\n",
-        (array.get_size() + 1).ilog2() - 1,
+        array.get_size().ilog2(),
         array_name
       )
       .as_str(),
