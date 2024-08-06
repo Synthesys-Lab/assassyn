@@ -8,6 +8,7 @@ pub mod node;
 pub mod port;
 pub mod user;
 pub mod visitor;
+pub mod downstream;
 
 pub use block::Block;
 pub use data::{Array, DataType, IntImm, StrImm, Typed};
