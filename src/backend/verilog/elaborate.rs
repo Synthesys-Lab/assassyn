@@ -194,28 +194,36 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     );
     res.push_str("always_ff @(posedge clk or negedge rst_n)\n");
     if mem_init_path.is_some() {
-      res.push_str(
-        format!(
-          "if (!rst_n) $readmemh(\"{}\", array_{}_q);\n",
-          mem_init_path.unwrap(),
-          array_name
-        )
-        .as_str(),
-      );
+        res.push_str(
+            format!(
+                "if (!rst_n) $readmemh(\"{}\", array_{}_q);\n",
+                mem_init_path.unwrap(),
+                array_name
+            )
+            .as_str(),
+        );
+    } else if let Some(initializer) = array.get_initializer() {
+        res.push_str("if (!rst_n) begin\n");
+        for (idx, _) in initializer.iter().enumerate() {
+            let elem_init = initializer[idx].as_ref::<IntImm>(self.sys).unwrap().get_value();
+            res.push_str(&format!("    array_{}_q[{}] <= {};\n", array_name, idx, elem_init));
+        }
+        res.push_str("end\n");
     } else {
-      res.push_str(
-        format!(
-          "if (!rst_n) array_{}_q <= '{{default : {}'d0}};\n",
-          array_name,
-          array.scalar_ty().get_bits()
-        )
-        .as_str(),
-      );
+        res.push_str(
+            format!(
+                "if (!rst_n) array_{}_q <= '{{default : {}'d0}};\n",
+                array_name,
+                array.scalar_ty().get_bits()
+            )
+            .as_str(),
+        );
     }
     res.push_str(&format!(
-      "else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
-      array_name, array_name, array_name, array_name
+        "else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
+        array_name, array_name, array_name, array_name
     ));
+
 
     res.push('\n');
 
@@ -678,7 +686,7 @@ logic rst_n;
 initial begin
   clk = 1'b1;
   rst_n = 1'b0;
-  #1;
+  #150;
   rst_n = 1'b1;
   #{};
   $finish();
@@ -1345,21 +1353,14 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
                 .get_value()
         );
 
-        println!("Initial format_str: {}", format_str);
-
         let re = Regex::new(r"\{(:.[bxXo]?)?\}").unwrap();
 
         let dtypes: Vec<_> = expr.operand_iter().skip(1)
             .map(|elem| elem.get_value().get_dtype(self.sys).unwrap())
             .collect();
 
-        println!("Datatypes: {:?}", dtypes);
-
         let mut dtype_index = 0;
         format_str = re.replace_all(&format_str, |caps: &regex::Captures| {
-            let full_match = caps.get(0).unwrap().as_str();
-            println!("Matched: {}", full_match);
-
             let result = if let Some(format_spec) = caps.get(1) {
                 match format_spec.as_str() {
                     ":b" => "%b",
@@ -1412,7 +1413,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         );
         res.push_str("$display(\"%t\\t");
         res.push_str(format_str.as_str());
-        res.push_str("\", $time - 100, ");
+        res.push_str("\", $time - 200, ");
         for elem in expr.operand_iter().skip(1) {
           res.push_str(format!("{}, ", dump_ref!(self.sys, elem.get_value())).as_str());
         }
