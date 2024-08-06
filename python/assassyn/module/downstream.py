@@ -4,19 +4,19 @@ chronological modules.'''
 from decorator import decorator
 
 from .base import ModuleBase, name_ports_of_module
+from ..block import Block
 from ..value import Optional
+from ..builder import Singleton
 
+@decorator
 def constructor(func, *args, **kwargs):
     '''Constructor decorator for the Downstream class.'''
+    func(*args, **kwargs)
     builder = Singleton.builder
     module_self = args[0]
     builder.insert_point['module'].append(module_self)
-    func(*args, **kwargs)
     name_ports_of_module(module_self, Optional)
 
-def combinatorial(func, *args, **kwargs):
-    '''Combinatorial decorator for the Downstream class.'''
-    return func(*args, **kwargs)
 
 @decorator
 #pylint: disable=keyword-arg-before-vararg
@@ -41,3 +41,24 @@ class Downstream(ModuleBase):
 
     def __init__(self):
         super().__init__()
+        self.name = type(self).__name__
+        self.name = self.name + '_' + self.as_operand()
+        self.body = None
+
+    @property
+    def ports(self):
+        '''The helper function to get all the ports in the module.'''
+        return [v for _, v in self.__dict__.items() if isinstance(v, Optional)]
+
+    def __repr__(self):
+        var_id = self.as_operand()
+        ports = ',\n    '.join(f'{p.name}: {p}' for p in self.ports)
+        body = self.body.__repr__() if self.body is not None else ''
+        return f'''  #[downstream]
+  {var_id} = module {self.name} {{
+    {ports}
+  }} {{
+{body}
+  }}
+'''
+

@@ -251,7 +251,7 @@ class Port:
         return FIFOPush(self, v)
 
     def __repr__(self):
-        return f'{self.name}: port<{self.dtype}>'
+        return f'{self.name}: Port<{self.dtype}>'
 
     def as_operand(self):
         '''Dump the port as a right-hand side reference.'''

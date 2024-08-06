@@ -144,3 +144,6 @@ class Optional:
         '''The frontend API to get the map of an optional value with a given default'''
         from .expr import Select
         return Select(Select.SELECT, self.pred, f(self.value), default)
+
+    def __repr__(self):
+        return f'Optional{{ value: {self.value.as_operand()}, pred: {self.pred} }}'
