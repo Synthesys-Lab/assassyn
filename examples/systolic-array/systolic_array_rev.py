@@ -127,7 +127,7 @@ class Testbench(Module):
             col2.async_called(data = Int(32)(8))
 
         with Cycle(4):
-            #  12 9 6 3 4
+            # 12  9 6 3 4
             #  P  P P P 3
             #  P  P P P 6
             #  P  P P P 9
@@ -223,12 +223,12 @@ def systolic_array():
             pe_array[5][i].bound = pe_array[5][i].pe
 
         # Build ComputePEs
-        # for i in range(4, 0, -1):
-        #     for j in range(5, 1, -1):
-        #         fwest, fsouth = pe_array[i][j].pe.build(pe_array[i][j-1].bound, pe_array[i+1][j].bound)
-        #         pe_array[i][j].bound = pe_array[i][j].pe
-        #         pe_array[i][j-1].bound = fwest
-        #         pe_array[i+1][j].bound = fsouth
+        for i in range(4, 0, -1):
+            for j in range(4, 0, -1):
+                fwest, fsouth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
+                pe_array[i][j].bound = pe_array[i][j].pe
+                pe_array[i][j+1].bound = fwest
+                pe_array[i+1][j].bound = fsouth
 
         # Last Column Pushers
         for i in range(1, 5):
@@ -246,10 +246,10 @@ def systolic_array():
                         pe_array[0][2].pe, \
                         pe_array[0][3].pe, \
                         pe_array[0][4].pe, \
-                        pe_array[1][0].pe, \
-                        pe_array[2][0].pe, \
-                        pe_array[3][0].pe, \
-                        pe_array[4][0].pe)
+                        pe_array[1][5].pe, \
+                        pe_array[2][5].pe, \
+                        pe_array[3][5].pe, \
+                        pe_array[4][5].pe)
 
     simulator_path, verilator_path = elaborate(sys, verilog="verilator")
 
