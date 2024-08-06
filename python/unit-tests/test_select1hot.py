@@ -36,14 +36,13 @@ def test_select1hot():
 
     #TODO: verilator simulation for Select1Hot
 
-    # simulator_path, verilator_path = elaborate(sys, verilog='verilator')
-    simulator_path = elaborate(sys, verilog=None)
+    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
 
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    # raw = utils.run_verilator(verilator_path)
-    # print(raw)
+    raw = utils.run_verilator(verilator_path)
+    print(raw)
 
 if __name__ == '__main__':
     test_select1hot()

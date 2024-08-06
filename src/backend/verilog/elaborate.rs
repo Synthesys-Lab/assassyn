@@ -165,7 +165,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .iter()
           .map(|driver| format!(
             "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_widx)",
-            (array.get_size() + 1).ilog2(),
+            array.get_size().ilog2() + 1,
             array_name,
             driver,
             array_name,
@@ -914,7 +914,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           format!(
             "{}output logic [{}:0] array_{}_widx,\n",
             " ".repeat(self.indent),
-            (array_ref.get_size() + 1).ilog2() - 1,
+            (array_ref.get_size()).ilog2(),
             namify(array_ref.get_name())
           )
           .as_str(),
