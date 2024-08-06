@@ -1391,18 +1391,15 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
                   "?"
                 }
               }
-            } else {
-              if let Some(dtype) = dtypes.get(dtype_index) {
-                match dtype {
-                  DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "%d",
-                  DataType::Str => "%s",
-                  _ => "?",
-                }
-              } else {
-                "?"
+            } else if let Some(dtype) = dtypes.get(dtype_index) {
+              match dtype {
+                DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "%d",
+                DataType::Str => "%s",
+                _ => "?",
               }
+            } else {
+              "?"
             };
-
             dtype_index += 1;
             result
           })
