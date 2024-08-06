@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::builder::SysBuilder;
+use crate::{builder::SysBuilder, ir::module::Attribute};
 
 use super::{node::*, visitor::Visitor, Block, Expr, Module, FIFO};
 
@@ -196,6 +196,14 @@ impl ModuleMut<'_> {
       NodeKind::FIFO => {
         let fifo = value.as_ref::<FIFO>(self.sys).unwrap();
         if fifo.get_parent().get_key() != self.get().get_key() {
+          self.insert_external_interface(value, operand);
+        }
+      }
+      NodeKind::Expr => {
+        let expr = value.as_ref::<Expr>(self.sys).unwrap();
+        let block = expr.get_parent().as_ref::<Block>(self.sys).unwrap();
+        if block.get_module().get_key() != self.get().get_key() {
+          assert!(self.get().has_attr(Attribute::Downstream));
           self.insert_external_interface(value, operand);
         }
       }

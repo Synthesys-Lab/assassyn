@@ -45,13 +45,13 @@ class Adder(Downstream):
         b = self.b
         c = a.unwrap_or(Int(32)(0)) + b.unwrap_or(Int(32)(0))
 
-def test_driver():
+def test_downstream():
     sys = SysBuilder('driver')
     with sys:
         driver = Driver()
         lhs = ForwardData()
         rhs = ForwardData()
-        adder = Adder(lhs.data, rhs.data)
+        adder = Adder(lhs.build(), rhs.build())
 
         driver.build(lhs, rhs)
         adder.build()
@@ -60,4 +60,4 @@ def test_driver():
 
 
 if __name__ == '__main__':
-    test_driver()
+    test_downstream()

@@ -31,9 +31,11 @@ class SysBuilder:
     def cleanup_symtab(self):
         '''Clean up the symbol table. Assign those named values to its identifier.'''
         value_dict = { id(v): v for v in self.named_expr }
-        for k, v in self.module_symtab.items():
-            if id(v) in value_dict:
-                value_dict[id(v)].name = k
+        if self.module_symtab is not None:
+            for k, v in self.module_symtab.items():
+                if id(v) in value_dict:
+                    value_dict[id(v)].name = k
+            self.module_symtab = None
 
     def get_current_module(self):
         '''Get the current module being built.'''
