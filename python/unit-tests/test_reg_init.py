@@ -32,6 +32,9 @@ def test_driver():
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
+    raw = utils.run_verilator(verilator_path)
+    check(raw)
+
 
 
 if __name__ == '__main__':
