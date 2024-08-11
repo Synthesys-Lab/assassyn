@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
-use crate::ir::{ir_printer::IRPrinter, module::Attribute, node::*, visitor::Visitor, *};
+use crate::ir::{ir_printer::IRPrinter, node::*, visitor::Visitor, *};
 
 use self::{
   data::ArrayAttr,
@@ -486,136 +486,51 @@ impl SysBuilder {
     key
   }
 
+  /// Get an empty bind for the given module.
+  ///
+  /// # Arguments
+  /// * `module` - A `BaseNode` reference to a module.
+  ///
+  /// # Returns
+  /// * A `BaseNode` reference to the returned empty bind.
   pub fn get_init_bind(&mut self, node: BaseNode) -> BaseNode {
-    let failure = || {
-      panic!(
-        "[Bind Init] Either a Module or a Bind is expected, but {:?} got!",
-        node
-      )
-    };
     match node.get_kind() {
       // A module is an empty bind.
       NodeKind::Module => {
-        let module = node.as_ref::<Module>(self).unwrap();
-        let mut args = vec![BaseNode::unknown(); module.get_num_inputs()];
-        args.push(module.upcast());
-        self.create_expr(DataType::void(), Opcode::Bind, args, false)
+        node.as_ref::<Module>(self).unwrap();
+        self.create_expr(DataType::void(), Opcode::Bind, vec![node], false)
       }
-      // An expression should be a module type.
-      NodeKind::Expr => {
-        let expr = node.as_ref::<Expr>(self).unwrap();
-        match expr.get_opcode() {
-          Opcode::FIFOPop => {
-            let n = {
-              let dtype = expr.dtype();
-              match dtype {
-                DataType::Module(ports) => ports.len(),
-                _ => panic!("Invalid data type"),
-              }
-            };
-            let mut args = vec![BaseNode::unknown(); n];
-            args.push(node);
-            self.create_expr(DataType::void(), Opcode::Bind, args, false)
-          }
-          Opcode::Bind => node,
-          _ => failure(),
-        }
-      }
-      _ => failure(),
+      _ => panic!("Only a module can be bound!"),
     }
   }
 
-  /// Add a bind to the current module.
-  pub fn add_bind(
-    &mut self,
-    bind: BaseNode,
-    key: String,
-    value: BaseNode,
-    eager: Option<bool>,
-  ) -> BaseNode {
-    let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
-    let module = bind.callee();
-    let port = module.get_port_by_name(&key).unwrap_or_else(|| {
-      panic!(
-        "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
+  /// Add a bound argument to the given bind.
+  pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) {
+    let port = {
+      let bind = bind.as_expr::<Bind>(self).unwrap();
+      let module = bind.callee();
+      assert!(bind.get_arg(&key).is_none(), "Argument {} already exists!", key);
+      let port = module.get_port(&key).unwrap_or_else(|| {
+        panic!(
+          "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
+          key,
+          bind.callee().get_name(),
+          bind.callee().upcast()
+        )
+      });
+      assert_eq!(
+        port.scalar_ty(),
+        value.get_dtype(self).unwrap(),
+        "Port \"{}\" requires {}",
         key,
-        module.get_name(),
-        module.upcast()
-      )
-    });
-    assert_eq!(
-      port.scalar_ty(),
-      value.get_dtype(self).unwrap(),
-      "Port \"{}\" requires {}",
-      key,
-      port.scalar_ty()
-    );
-    self.bind_arg(bind.get().upcast(), port.idx(), value, eager)
-  }
-
-  /// Add a bind to the current module.
-  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
-    let bind = bind.as_expr::<Bind>(self).unwrap();
-    let port_idx = {
-      let mut idx = None;
-      for i in 0..bind.get_num_args() {
-        let arg = bind.get_arg(i).unwrap();
-        if arg.is_unknown() && idx.is_none() {
-          idx = Some(i);
-        } else if idx.is_some() {
-          assert!(arg.is_unknown());
-        }
-      }
-      idx.expect("All arguments bound!")
+        port.scalar_ty()
+      );
+      port.upcast()
     };
-    self.bind_arg(bind.get().upcast(), port_idx, value, eager)
-  }
-
-  fn bind_arg(
-    &mut self,
-    bind: BaseNode,
-    idx: usize,
-    value: BaseNode,
-    eager: Option<bool>,
-  ) -> BaseNode {
-    let bind_expr = bind.as_expr::<Bind>(self).unwrap();
-    assert!(
-      bind_expr.get_arg(idx).unwrap().is_unknown(),
-      "Argument {} is already bound!",
-      idx
-    );
-    let callee = bind_expr.callee();
-    let eager = eager.unwrap_or(callee.get_attrs().contains(&Attribute::EagerCallee));
-    let callee = callee.upcast();
-    let fifo_push = self.create_fifo_push(callee, idx, value);
+    let push = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
     let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
-    bind_mut.set_operand(idx, fifo_push);
-
-    if eager && bind.as_expr::<Bind>(self).unwrap().fully_bound() {
-      self.create_async_call(bind)
-    } else {
-      bind
-    }
-  }
-
-  /// A helper function to create a FIFO push.
-  pub(crate) fn create_fifo_push(
-    &mut self,
-    module: BaseNode,
-    idx: usize,
-    value: BaseNode,
-  ) -> BaseNode {
-    let (ptype, port) = {
-      let module = module.as_ref::<Module>(self).unwrap();
-      let port = module.get_port(idx).unwrap();
-      (port.scalar_ty().clone(), port.upcast())
-    };
-    let vtype = value.get_dtype(self).unwrap();
-    assert_eq!(ptype, vtype, "Port type mismatch!");
-
-    // Create the expression.
-
-    self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true)
+    let n = bind_mut.get().get_num_operands();
+    bind_mut.insert_operand(n - 1, push);
   }
 
   fn indexable(&self, idx: BaseNode) -> bool {

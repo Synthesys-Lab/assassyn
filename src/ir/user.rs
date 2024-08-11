@@ -233,13 +233,35 @@ impl ExprMut<'_> {
   }
 
   /// Set the i-th operand to the given value.
-  /// NOTE: Just the raw value is given, not the operand wrapper.
+  ///
+  /// Arguments
+  /// * `i` - The index of the operand.
+  /// * `value` - The value to set. NOTE: This is the raw value, not the operand wrapper.
   pub fn set_operand(&mut self, i: usize, value: BaseNode) {
     self.set_operand_impl(i, Some(value));
   }
 
   pub fn remove_operand(&mut self, i: usize) {
     self.set_operand_impl(i, None);
+  }
+
+  /// Push an operand to the end of the operand list.
+  ///
+  /// Arguments
+  /// * `value` - The value to set. NOTE: This is the raw value, not the operand wrapper.
+  pub fn push_operand(&mut self, value: BaseNode) {
+    self.get_mut().operands.push(BaseNode::unknown());
+    self.set_operand(self.get().operands.len() - 1, value);
+  }
+
+  /// Insert an operand to the i-th position.
+  ///
+  /// Arguments
+  /// * `i` - The index of the operand.
+  /// * `value` - The value to set. NOTE: This is the raw value, not the operand wrapper.
+  pub fn insert_operand(&mut self, i: usize, value: BaseNode) {
+    self.get_mut().operands.insert(i, BaseNode::unknown());
+    self.set_operand(i, value);
   }
 }
 
