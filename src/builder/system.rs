@@ -15,27 +15,6 @@ use super::symbol_table::SymbolTable;
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
 
-#[macro_export]
-macro_rules! created_here {
-  () => {
-    $crate::builder::system::Filesite {
-      file: file!(),
-      line: line!() as usize,
-    }
-  };
-}
-
-pub struct Filesite {
-  pub file: &'static str,
-  pub line: usize,
-}
-
-impl Display for Filesite {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "@{}:{}: ", self.file, self.line)
-  }
-}
-
 impl InsertPoint {
   pub fn next(&self, sys: &SysBuilder) -> Option<Self> {
     let InsertPoint(module, block, at) = self;
@@ -107,18 +86,18 @@ impl PortInfo {
 ///   is always executed.
 macro_rules! create_arith_op_impl {
   (binary, $func_name:ident, $opcode: expr) => {
-    pub fn $func_name(&mut self, site: Filesite, a: BaseNode, b: BaseNode) -> BaseNode {
+    pub fn $func_name(&mut self, a: BaseNode, b: BaseNode) -> BaseNode {
       match self.combine_types($opcode, &a, &b) {
         Ok(res_ty) => self.create_expr(res_ty, $opcode, vec![a, b], true),
-        Err(msg) => panic!("{} {}", site, msg),
+        Err(msg) => panic!("{}", msg),
       }
     }
   };
 
   (unary, $func_name:ident, $opcode: expr) => {
-    pub fn $func_name(&mut self, site: Filesite, x: BaseNode) -> BaseNode {
+    pub fn $func_name(&mut self, x: BaseNode) -> BaseNode {
       let res_ty = x.get_dtype(self).unwrap_or_else(|| {
-        panic!("{}{} has no type!", site.to_string(), x.to_string(self));
+        panic!("{} has no type!", x.to_string(self));
       });
       self.create_expr(res_ty, $opcode, vec![x.clone()], true)
     }
@@ -364,7 +343,6 @@ impl SysBuilder {
 
   pub fn create_select_1hot(
     &mut self,
-    site: Filesite,
     cond: BaseNode,
     values: Vec<BaseNode>,
   ) -> BaseNode {
@@ -372,16 +350,15 @@ impl SysBuilder {
     assert_eq!(
       cond_ty.get_bits(),
       values.len(),
-      "{} Select1Hot value count mismatch!",
-      site
+      "Select1Hot value count mismatch!",
     );
     let v0type = values[0].get_dtype(self).unwrap();
     for elem in values.iter().skip(1) {
       let vitype = elem.get_dtype(self).unwrap();
       assert_eq!(
         v0type, vitype,
-        "{} Select1Hot value type mismatch {:?} != {:?}",
-        site, v0type, vitype,
+        "Select1Hot value type mismatch {:?} != {:?}",
+        v0type, vitype,
       );
     }
     let mut args = vec![cond];
@@ -391,7 +368,6 @@ impl SysBuilder {
 
   pub fn create_select(
     &mut self,
-    site: Filesite,
     cond: BaseNode,
     true_val: BaseNode,
     false_val: BaseNode,
@@ -400,8 +376,8 @@ impl SysBuilder {
     let f_ty = false_val.get_dtype(self).unwrap();
     assert_eq!(
       t_ty, f_ty,
-      "{}Select value type mismatch: {:?} and {:?}",
-      site, t_ty, f_ty
+      "Select value type mismatch: {:?} and {:?}",
+      t_ty, f_ty
     );
     self.create_expr(f_ty, Opcode::Select, vec![cond, true_val, false_val], true)
   }
@@ -659,11 +635,10 @@ impl SysBuilder {
   /// # Arguments
   /// * `ptr` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
-  pub fn create_array_read(&mut self, site: Filesite, array: BaseNode, idx: BaseNode) -> BaseNode {
+  pub fn create_array_read(&mut self, array: BaseNode, idx: BaseNode) -> BaseNode {
     assert!(
       self.indexable(idx),
-      "{} {}'s type, {:?}, is not indexable!",
-      site,
+      "{}'s type, {:?}, is not indexable!",
       idx.to_string(self),
       idx.get_dtype(self).unwrap()
     );
@@ -681,32 +656,29 @@ impl SysBuilder {
   /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
   pub fn create_array_write(
     &mut self,
-    site: Filesite,
     array: BaseNode,
     idx: BaseNode,
     value: BaseNode,
   ) -> BaseNode {
     assert!(
       self.indexable(idx),
-      "{} {}'s type, {:?}, is not indexable!",
-      site,
+      "{}'s type, {:?}, is not indexable!",
       idx.to_string(self),
       idx.get_dtype(self).unwrap()
     );
     assert!(
       matches!(array.get_kind(), NodeKind::Array),
-      "{} Expect an array, but {:?}",
-      site,
+      "Expect an array, but {:?}",
       array
     );
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
     let vtype = value.get_dtype(self).unwrap_or_else(|| {
-      panic!("{} {} has no type!", site, value.to_string(self));
+      panic!("{} has no type!", value.to_string(self));
     });
     assert_eq!(
       dtype, vtype,
-      "{} Value type mismatch {:?} != {:?}!",
-      site, dtype, vtype
+      "Value type mismatch {:?} != {:?}!",
+      dtype, vtype
     );
     let operands = vec![array, idx, value];
 
@@ -856,17 +828,17 @@ impl SysBuilder {
   }
 
   /// Create a cast operation.
-  pub fn create_bitcast(&mut self, _: Filesite, src: BaseNode, dest_ty: DataType) -> BaseNode {
+  pub fn create_bitcast(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     self.create_cast_impl(src, dest_ty, subcode::Cast::BitCast)
   }
 
   /// Create a sext operation.
-  pub fn create_sext(&mut self, _: Filesite, src: BaseNode, dest_ty: DataType) -> BaseNode {
+  pub fn create_sext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     self.create_cast_impl(src, dest_ty, subcode::Cast::SExt)
   }
 
   /// Create a zext operation.
-  pub fn create_zext(&mut self, _: Filesite, src: BaseNode, dest_ty: DataType) -> BaseNode {
+  pub fn create_zext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     self.create_cast_impl(src, dest_ty, subcode::Cast::ZExt)
   }
 

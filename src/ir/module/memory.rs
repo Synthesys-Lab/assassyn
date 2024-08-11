@@ -3,7 +3,7 @@ use std::ops::RangeInclusive;
 
 use crate::builder::{PortInfo, SysBuilder};
 use crate::ir::node::*;
-use crate::{created_here, ir::*};
+use crate::ir::*;
 
 use super::Attribute;
 
@@ -118,11 +118,11 @@ impl SysBuilder {
       (addr, write, wdata)
     };
 
-    let rdata = self.create_array_read(created_here!(), array, addr);
+    let rdata = self.create_array_read(array, addr);
 
     let wblock = self.create_conditional_block(write);
     self.set_current_block(wblock);
-    self.create_array_write(created_here!(), array, addr, wdata);
+    self.create_array_write(array, addr, wdata);
     let new_ip = self.get_current_ip().next(self).unwrap();
     self.set_current_ip(new_ip);
 
