@@ -181,24 +181,27 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         // Push to new arbiter
         let bind = caller.as_expr::<Bind>(sys).unwrap();
         let callee_idx = bind.get_num_args();
-        let push = bind.get_arg(&key).unwrap();
+        let push = bind.get_arg(&key).unwrap_or_else(|| {
+          panic!("{} not found in bind {}", key, bind);
+        });
         {
           let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
           let arbiter_port = {
             let port = arbiter.get_port(&format!("{}.caller{}.arg{}", module_name, i, j));
             port.unwrap().upcast()
           };
+          // Caller calls the arbiter
           let mut push_mut = push.as_mut::<Expr>(sys).unwrap();
           push_mut.set_operand(0, arbiter_port);
+          // Arbiter calls origin
+          let pop = sys.create_fifo_pop(arbiter_port);
+          sys.bind_arg(new_bind, key, pop);
         }
 
         // Set to new callee
         let mut caller = caller.as_mut::<Expr>(sys).unwrap();
         caller.set_operand(callee_idx, arbiter);
 
-        // Arbiter calls origin
-        let pop = sys.create_fifo_pop(*port);
-        sys.bind_arg(new_bind, key, pop);
       }
       sys.create_async_call(new_bind);
       sys.set_current_block(restore_block);

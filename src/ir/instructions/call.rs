@@ -19,9 +19,9 @@ impl<'sys> Bind<'sys> {
         x.get_value()
           .as_expr::<FIFOPush>(self.expr.sys)
           .unwrap()
-          .get()
+          .fifo()
           .get_name()
-          == key
+          .eq(key)
       })
       .map(|x| x.get_value().clone())
   }
@@ -47,7 +47,11 @@ impl<'sys> Bind<'sys> {
   /// Get an iterator over all arguments.
   pub fn arg_iter(&self) -> impl Iterator<Item = BaseNode> + '_ {
     let n = self.expr.get_num_operands() - 1;
-    self.expr.operand_iter().take(n).map(|x| x.get_value().clone())
+    self
+      .expr
+      .operand_iter()
+      .take(n)
+      .map(|x| x.get_value().clone())
   }
   /// Check if all arguments are fully bound.
   pub fn fully_bound(&self) -> bool {
