@@ -23,16 +23,16 @@ define_attrs!(
   // by our Python frontend behaviorally.
   ExplicitPop,
   // Avoid optimization on this module.
-  OptNone, 
+  OptNone,
   // All the binds in this module will be called after arguments are fully bound. TODO: remove this,
   // since it will be supported by our new Python frontend behaviorally.
-  EagerCallee, 
+  EagerCallee,
   // Allow some arguments are not given to call this module. TODO: More strict enforcement for
   // function calls.
   AllowPartialCall,
   // The compiler will skip to generate an arbiter for this module,
   // even if it has multiple callers.
-  NoArbiter,   
+  NoArbiter,
   // This module's timing is systolic.
   Systolic,
   // This module is a memory module.

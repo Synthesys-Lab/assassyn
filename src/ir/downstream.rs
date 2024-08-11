@@ -57,7 +57,6 @@ impl<'sys> DownstreamRef<'sys> {
 }
 
 impl SysBuilder {
-
   /// Create a downstream module.
   pub fn create_downstream(&mut self, name: String, ports: HashMap<String, BaseNode>) -> BaseNode {
     let id = self.symbol_table.identifier(&name);
@@ -66,8 +65,11 @@ impl SysBuilder {
     downstream.body = body;
     let res = self.insert_element(downstream);
     self.global_symbols.insert(id, res);
-    body.as_mut::<Block>(self).unwrap().get_mut().set_parent(res);
+    body
+      .as_mut::<Block>(self)
+      .unwrap()
+      .get_mut()
+      .set_parent(res);
     res
   }
-
 }
