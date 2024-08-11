@@ -138,8 +138,8 @@ impl<'sys> ModuleRef<'sys> {
   {
     self
       .ports
-      .iter()
-      .map(|(_, x)| x.as_ref::<FIFO>(self.sys).unwrap())
+      .values()
+      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
 }
 
@@ -199,8 +199,8 @@ impl Typed for ModuleRef<'_> {
   fn dtype(&self) -> DataType {
     let types = self
       .ports
-      .iter()
-      .map(|(_, x)| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
+      .values()
+      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
       .collect::<Vec<_>>();
     DataType::module(types)
   }
@@ -223,10 +223,7 @@ impl SysBuilder {
         )
       })
       .collect::<HashMap<_, _>>();
-    let ports = port_table
-      .iter()
-      .map(|(_, v)| v.clone())
-      .collect::<Vec<_>>();
+    let ports = port_table.values().cloned().collect::<Vec<_>>();
     let module_name = self.symbol_table.identifier(name);
     let module = Module::new(&module_name, port_table);
     let module = self.insert_element(module);

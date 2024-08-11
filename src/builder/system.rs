@@ -509,7 +509,11 @@ impl SysBuilder {
     let port = {
       let bind = bind.as_expr::<Bind>(self).unwrap();
       let module = bind.callee();
-      assert!(bind.get_arg(&key).is_none(), "Argument {} already exists!", key);
+      assert!(
+        bind.get_arg(&key).is_none(),
+        "Argument {} already exists!",
+        key
+      );
       let port = module.get_port(&key).unwrap_or_else(|| {
         panic!(
           "\"{}\" is NOT a FIFO of \"{}\" ({:?})",

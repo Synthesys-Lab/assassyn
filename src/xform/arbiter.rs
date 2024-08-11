@@ -201,7 +201,6 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         // Set to new callee
         let mut caller = caller.as_mut::<Expr>(sys).unwrap();
         caller.set_operand(callee_idx, arbiter);
-
       }
       sys.create_async_call(new_bind);
       sys.set_current_block(restore_block);
