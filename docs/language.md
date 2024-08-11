@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This document severs as a language manual of Assasyn[^1], a language that unifies hardware design,
+This document serves as a language manual of Assasyn[^1], a language that unifies hardware design,
 implementation, and verification. It is designed to be a relatively high-level language,
 so that developers can focus on the behavior of the system, rather than timing, state machine,
 and other rules.
@@ -10,8 +10,8 @@ and other rules.
 ## Introduction
 
 Below, is a text representation of our language IR. In the rest of this document, each component
-of this example will explained in both sides, the programming frontend, and the IR representation.
-For specific examples, refer the `tests` directory, which is made to be self-examplatory.
+of this example will be explained in both sides, the programming frontend, and the IR representation.
+For specific examples, refer to the `tests` directory, which is made to be self-examplatory.
 
 ````
 // Listing 1: Pseudo-code of the programming paradigms.
@@ -41,7 +41,7 @@ system main {
 Hardware design is unique to software programming in many ways. Here we characterize several major
 differences:
 
-1. Excessive concurrency: Transistors that builds different hardware modules can be concurrently
+1. Excessive concurrency: Transistors that build different hardware modules can be concurrently
 busy, which is also the source of high performance. However, this also makes the hardware design
 hard to debug. Though we do have parallel programming in software, they are managed in a relatively
 heavy-weighted way, like threads, processes, and tasks. Therefore, a clear way that manages the
@@ -91,7 +91,7 @@ the hardware description.
 
 ### Module
 
-Module is a basic build block block of the system, but it is also slightly different from
+Module is a basic build block of the system, but it is also slightly different from
 the modules we have in both software and hardware programming.
 
 To make an analogy to existing concepts in software programming, a module is like both a function,
