@@ -1,6 +1,6 @@
 use expr::subcode;
 
-use crate::builder::{InsertPoint, SysBuilder};
+use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
@@ -149,9 +149,9 @@ impl BlockMut<'_> {
   /// # Arguments
   /// * `expr` - The expression to insert.
   pub fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
-    let InsertPoint(_, _, at) = self.sys.inesert_point;
+    let at = self.sys.inesert_point.at;
     let (expr, new_at) = self.insert_at(at, expr);
-    self.sys.inesert_point.2 = new_at;
+    self.sys.inesert_point.at = new_at;
     expr
   }
 
@@ -209,12 +209,15 @@ impl SysBuilder {
     let parent = self.get_current_block().unwrap().upcast();
     let instance = Block::new(parent);
     let block = self.insert_element(instance);
-    let InsertPoint(_, insert_block, at) = &self.get_insert_point();
+    let (insert_block, at) = {
+      let ip_ref = &self.get_insert_point();
+      (ip_ref.block, ip_ref.at)
+    };
     let (block, new_at) = self
-      .get_mut::<Block>(insert_block)
+      .get_mut::<Block>(&insert_block)
       .unwrap()
-      .insert_at(*at, block);
-    self.inesert_point.2 = new_at;
+      .insert_at(at, block);
+    self.inesert_point.at = new_at;
     block
   }
 }

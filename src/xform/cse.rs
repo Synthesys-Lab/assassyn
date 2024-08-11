@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-  builder::{InsertPoint, SysBuilder},
+  builder::{system::InsertPoint, SysBuilder},
   ir::{
     node::{BaseNode, BlockRef, ExprRef, IsElement, ModuleRef},
     visitor::Visitor,
@@ -144,7 +144,11 @@ pub fn common_code_elimination(sys: &mut SysBuilder) {
     let duplica = elem.duplica;
     let ip = elem.ip;
     let idx = idx_of(sys, &ip.2);
-    let ip = InsertPoint(ip.0, ip.1, idx);
+    let ip = InsertPoint {
+      module: ip.0,
+      block: ip.1,
+      at: idx.into(),
+    };
     sys.set_current_ip(ip);
     let (dtype, opcode, operands) = {
       let expr = duplica[0].as_ref::<Expr>(sys).unwrap();
