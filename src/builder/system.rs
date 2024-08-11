@@ -645,7 +645,6 @@ impl SysBuilder {
     assert_eq!(ptype, vtype, "Port type mismatch!");
 
     // Create the expression.
-
     self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true)
   }
 

@@ -9,6 +9,7 @@ use self::user::Operand;
 use super::super::ir::visitor::Visitor;
 use super::ir_printer::IRPrinter;
 
+use downstream::Downstream;
 use paste::paste;
 
 pub trait IsElement<'elem, 'sys: 'elem> {
@@ -222,7 +223,7 @@ macro_rules! register_elements {
   };
 }
 
-register_elements!(Module, FIFO, Expr, Array, IntImm, Block, StrImm, Operand);
+register_elements!(Module, FIFO, Optional, Expr, Array, IntImm, Block, StrImm, Operand, Downstream);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
 pub struct BaseNode {
@@ -271,6 +272,10 @@ impl BaseNode {
         let input = self.as_ref::<FIFO>(sys).unwrap();
         input.dtype().clone().into()
       }
+      NodeKind::Optional => {
+        let optional = self.as_ref::<Optional>(sys).unwrap();
+        optional.get_value().get_dtype(sys)
+      }
       NodeKind::Expr => {
         let expr = self.as_ref::<Expr>(sys).unwrap();
         expr.dtype().clone().into()
@@ -285,7 +290,7 @@ impl BaseNode {
         let operand = self.as_ref::<Operand>(sys).unwrap();
         operand.get_value().get_dtype(sys)
       }
-      NodeKind::Unknown => {
+      NodeKind::Unknown | NodeKind::Downstream => {
         panic!("Unknown reference")
       }
     }
@@ -301,7 +306,8 @@ impl BaseNode {
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
       NodeKind::Operand => (*self.as_ref::<Operand>(sys).unwrap().get_user()).into(),
-      NodeKind::Unknown => {
+      NodeKind::Optional => self.as_ref::<Optional>(sys).unwrap().get_parent().into(),
+      NodeKind::Downstream | NodeKind::Unknown => {
         panic!("Unknown reference")
       }
     }
@@ -360,6 +366,9 @@ impl BaseNode {
       NodeKind::Operand => {
         let operand = self.as_ref::<Operand>(sys).unwrap();
         operand.get_value().to_string(sys)
+      }
+      NodeKind::Downstream | NodeKind::Optional => {
+        panic!("Not supported yet!")
       }
     }
   }
