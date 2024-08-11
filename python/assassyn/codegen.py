@@ -169,7 +169,7 @@ class CodeGen(visitor.Visitor):
 
     def visit_system(self, node: SysBuilder):
         self.header.append('use std::path::PathBuf;')
-        self.header.append('use assassyn::{builder::SysBuilder, created_here};')
+        self.header.append('use assassyn::builder::SysBuilder;')
         self.header.append('use assassyn::ir::node::IsElement;')
         self.code.append('fn main() {')
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
@@ -274,10 +274,10 @@ class CodeGen(visitor.Visitor):
         if node.is_binary():
             lhs = self.generate_rval(node.lhs)
             rhs = self.generate_rval(node.rhs)
-            res = f'sys.{ib_method}(created_here!(), {lhs}, {rhs});'
+            res = f'sys.{ib_method}({lhs}, {rhs});'
         elif node.is_unary():
             x = self.generate_rval(node.x)
-            res = f'sys.{ib_method}(created_here!(), {x});'
+            res = f'sys.{ib_method}({x});'
         elif isinstance(node, expr.FIFOField):
             fifo = self.generate_rval(node.fifo)
             res = f'sys.{ib_method}({fifo});'
@@ -293,13 +293,13 @@ class CodeGen(visitor.Visitor):
             arr = node.arr.name if f'{id(node.arr)}' in node.arr.name \
                                 else self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
-            res = f'sys.{ib_method}(created_here!(), {arr}, {idx});'
+            res = f'sys.{ib_method}({arr}, {idx});'
         elif isinstance(node, expr.ArrayWrite):
             arr = node.arr.name if f'{id(node.arr)}' in node.arr.name \
                                 else self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             val = self.generate_rval(node.val)
-            res = f'sys.{ib_method}(created_here!(), {arr}, {idx}, {val});'
+            res = f'sys.{ib_method}({arr}, {idx}, {val});'
         elif isinstance(node, expr.FIFOPush):
             bind_var = self.generate_rval(node.bind)
             fifo_name = node.fifo.name
@@ -313,7 +313,7 @@ class CodeGen(visitor.Visitor):
         elif isinstance(node, expr.Concat):
             msb = self.generate_rval(node.msb)
             lsb = self.generate_rval(node.lsb)
-            res = f'sys.{ib_method}(created_here!(), {msb}, {lsb});'
+            res = f'sys.{ib_method}({msb}, {lsb});'
         elif isinstance(node, expr.Slice):
             x = self.generate_rval(node.x)
             l = self.generate_rval(node.l)
@@ -322,7 +322,7 @@ class CodeGen(visitor.Visitor):
         elif isinstance(node, expr.Cast):
             x = self.generate_rval(node.x)
             ty = generate_dtype(node.dtype)
-            res = f'sys.{ib_method}(created_here!(), {x}, {ty});'
+            res = f'sys.{ib_method}({x}, {ty});'
         elif isinstance(node, expr.Intrinsic):
             if node.opcode == expr.Intrinsic.WAIT_UNTIL:
                 cond = self.generate_rval(node.args[0])
@@ -334,11 +334,11 @@ class CodeGen(visitor.Visitor):
             cond = self.generate_rval(node.cond)
             true_value = self.generate_rval(node.true_value)
             false_value = self.generate_rval(node.false_value)
-            res = f'sys.{ib_method}(created_here!(), {cond}, {true_value}, {false_value});'
+            res = f'sys.{ib_method}({cond}, {true_value}, {false_value});'
         elif isinstance(node, expr.Select1Hot):
             cond = self.generate_rval(node.cond)
             values = ', '.join(self.generate_rval(i) for i in node.values)
-            res = f'sys.{ib_method}(created_here!(), {cond}, vec![{values}]);'
+            res = f'sys.{ib_method}({cond}, vec![{values}]);'
         else:
             length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'
