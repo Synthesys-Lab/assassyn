@@ -55,12 +55,7 @@ impl<'sys> Bind<'sys> {
   }
   /// Check if all arguments are fully bound.
   pub fn fully_bound(&self) -> bool {
-    let n = self.expr.get_num_operands();
-    self
-      .expr
-      .operand_iter()
-      .take(n)
-      .all(|x| !x.get_value().is_unknown())
+    self.callee().get_num_inputs() == self.get_num_args()
   }
 }
 
