@@ -43,7 +43,7 @@ impl Parented for Block {
 }
 
 impl BlockRef<'_> {
-  pub fn get_module(&self) -> ModuleRef<'_> {
+  pub fn get_module(&self) -> BaseNode {
     let mut runner = self.upcast();
     while runner.get_kind() != NodeKind::Module {
       let parent: BaseNode = match runner.get_kind() {
@@ -52,7 +52,7 @@ impl BlockRef<'_> {
       };
       runner = parent;
     }
-    runner.as_ref::<Module>(self.sys).unwrap()
+    runner
   }
 
   fn get_block_intrinsic(

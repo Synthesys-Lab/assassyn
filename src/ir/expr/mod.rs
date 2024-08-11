@@ -297,8 +297,7 @@ impl ExprMut<'_> {
         .get_parent()
         .as_ref::<Block>(self.sys)
         .unwrap()
-        .get_module()
-        .upcast();
+        .get_module();
       if let Some(ref name) = self.get().name {
         let name = name.to_string();
         let mut module_mut = module.as_mut::<Module>(self.sys).unwrap();

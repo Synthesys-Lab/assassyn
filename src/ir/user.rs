@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use crate::{builder::SysBuilder, ir::module::Attribute};
+use crate::builder::SysBuilder;
 
 use super::{node::*, visitor::Visitor, Block, Expr, Module, FIFO};
 
@@ -128,32 +128,52 @@ impl ModuleRef<'_> {
   ///
   /// * `operand` - The operand to gather the related external interfaces.
   pub(crate) fn gather_related_externals(&self, operand: &BaseNode) -> Vec<(BaseNode, BaseNode)> {
-    // Remove all the external interfaces related to this instruction.
-    let tmp = self
-      .get()
-      .external_interfaces
-      .iter()
-      .map(|(ext, users)| {
-        (
-          *ext,
-          users
-            .iter()
-            .filter(|x| {
-              (*x).eq(operand) || {
-                let user = (*x).as_ref::<Operand>(self.sys).unwrap();
-                user.get_value().eq(operand)
-              }
-            })
-            .cloned()
-            .collect::<Vec<_>>(),
-        )
-      })
-      .filter(|(_, users)| !users.is_empty())
-      .collect::<Vec<_>>();
-    tmp
-      .iter()
-      .flat_map(|(ext, users)| users.iter().map(|x| (*ext, *x)))
-      .collect()
+    return gather_related_externals_impl(self.sys, &self.get().external_interfaces, operand);
+  }
+}
+
+fn gather_related_externals_impl(
+  sys: &SysBuilder,
+  external_interfaces: &HashMap<BaseNode, HashSet<BaseNode>>,
+  operand: &BaseNode,
+) -> Vec<(BaseNode, BaseNode)> {
+  // Remove all the external interfaces related to this instruction.
+  let tmp = external_interfaces
+    .iter()
+    .map(|(ext, users)| {
+      (
+        *ext,
+        users
+          .iter()
+          .filter(|x| {
+            (*x).eq(operand) || {
+              let user = (*x).as_ref::<Operand>(sys).unwrap();
+              user.get_value().eq(operand)
+            }
+          })
+          .cloned()
+          .collect::<Vec<_>>(),
+      )
+    })
+    .filter(|(_, users)| !users.is_empty())
+    .collect::<Vec<_>>();
+  tmp
+    .iter()
+    .flat_map(|(ext, users)| users.iter().map(|x| (*ext, *x)))
+    .collect()
+}
+
+fn remove_external_interface_impl(
+  external_interfaces: &mut HashMap<BaseNode, HashSet<BaseNode>>,
+  ext_node: BaseNode,
+  operand: BaseNode,
+) {
+  if let Some(operations) = external_interfaces.get_mut(&ext_node) {
+    assert!(operations.contains(&operand));
+    operations.remove(&operand);
+    if operations.is_empty() {
+      external_interfaces.remove(&ext_node);
+    }
   }
 }
 
@@ -166,20 +186,15 @@ impl ModuleMut<'_> {
   /// * `ext_node` - The external interface node.
   /// * `operand` - The operand node that uses this external interface.
   fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    if let Some(operations) = self.get_mut().external_interfaces.get_mut(&ext_node) {
-      assert!(operations.contains(&operand));
-      operations.remove(&operand);
-      if operations.is_empty() {
-        self.get_mut().external_interfaces.remove(&ext_node);
-      }
-    }
+    remove_external_interface_impl(&mut self.get_mut().external_interfaces, ext_node, operand);
   }
 
   /// Remove all the related external interfaces with the given condition.
   fn remove_related_externals(&mut self, operand: &BaseNode) {
-    let to_remove = self.get().gather_related_externals(operand);
-    to_remove.into_iter().for_each(|(ext, operand)| {
-      self.remove_external_interface(ext, operand);
+    let to_remove =
+      gather_related_externals_impl(self.sys, &self.get().external_interfaces, &operand);
+    to_remove.iter().for_each(|(ext, user)| {
+      self.remove_external_interface(*ext, *user);
     });
   }
 
@@ -220,7 +235,6 @@ impl ExprMut<'_> {
     let block = self.sys.get::<Block>(&self.get().get_parent()).unwrap();
     let module = block.get_module();
     // Remove all the external interfaces related to this instruction.
-    let module = module.upcast();
     let expr = self.get().upcast();
     if let Some(old) = self.get().operands.get(i) {
       let old = *old;
@@ -290,7 +304,6 @@ impl SysBuilder {
           .as_ref::<Block>(self)
           .unwrap()
           .get_module()
-          .upcast()
       }
       _ => unreachable!(),
     };

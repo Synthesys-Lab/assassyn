@@ -120,7 +120,7 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
               .iter()
               .min_by(|x, y| idx_of(sys, &x.1).cmp(&idx_of(sys, &y.1)))
               .unwrap();
-            Some((block.get_module().upcast(), idx.0, idx.1))
+            Some((block.get_module(), idx.0, idx.1))
           } else {
             None
           }

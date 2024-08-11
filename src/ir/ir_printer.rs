@@ -209,7 +209,7 @@ impl Visitor<String> for IRPrinter {
       let ip = block.sys.get_insert_point();
       (ip.module, ip.block, ip.at)
     };
-    let here = cur_mod == block.get_module().upcast() && cur_block == block.upcast();
+    let here = cur_mod == block.get_module() && cur_block == block.upcast();
     let restore_ident = self.indent;
     for (i, elem) in block.body_iter().enumerate() {
       if here && at.map_or(false, |x| x == i) {

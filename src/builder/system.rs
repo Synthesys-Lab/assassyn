@@ -260,7 +260,7 @@ impl SysBuilder {
   pub fn set_current_block(&mut self, block: BaseNode) {
     let module = {
       let block = block.as_ref::<Block>(self).unwrap();
-      block.get_module().upcast()
+      block.get_module()
     };
     self.inesert_point = InsertPoint {
       module,
@@ -299,7 +299,7 @@ impl SysBuilder {
       let module = {
         // TODO(@were): Make this a method function.
         let block = block_ref.as_ref::<Block>(self).unwrap();
-        block.get_module().upcast()
+        block.get_module()
       };
       (module, block_ref, at)
     };
