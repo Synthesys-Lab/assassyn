@@ -262,7 +262,7 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'''  // Get port {node.name}
                 let {port_name} = {{
                   let module = {module_name}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
-                  module.get_port_by_name("{node.name}").unwrap().upcast()
+                  module.get_port("{node.name}").unwrap().upcast()
                 }};''')
             return port_name
         return node.as_operand()
@@ -304,7 +304,7 @@ class CodeGen(visitor.Visitor):
             bind_var = self.generate_rval(node.bind)
             fifo_name = node.fifo.name
             val = self.generate_rval(node.val)
-            res = f'sys.add_bind({bind_var}, "{fifo_name}".into(), {val}, Some(false));'
+            res = f'sys.bind_arg({bind_var}, "{fifo_name}".into(), {val});'
         elif isinstance(node, expr.Bind):
             res = '// Already handled by `EmitBinds`'
         elif isinstance(node, expr.AsyncCall):
