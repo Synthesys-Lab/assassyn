@@ -341,11 +341,7 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::Log, args, true)
   }
 
-  pub fn create_select_1hot(
-    &mut self,
-    cond: BaseNode,
-    values: Vec<BaseNode>,
-  ) -> BaseNode {
+  pub fn create_select_1hot(&mut self, cond: BaseNode, values: Vec<BaseNode>) -> BaseNode {
     let cond_ty = cond.get_dtype(self).unwrap();
     assert_eq!(
       cond_ty.get_bits(),
