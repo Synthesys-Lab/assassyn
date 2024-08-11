@@ -1,5 +1,5 @@
 use crate::{
-  builder::{InsertPoint, SysBuilder},
+  builder::{system::InsertPoint, SysBuilder},
   ir::{
     node::{BaseNode, IsElement, ModuleRef},
     visitor::Visitor,
@@ -52,7 +52,11 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
     if ports.is_empty() {
       continue;
     }
-    sys.set_current_ip(InsertPoint(module, body, 0.into()));
+    sys.set_current_ip(InsertPoint {
+      module,
+      block: body,
+      at: 0.into(),
+    });
 
     let valids = ports
       .into_iter()

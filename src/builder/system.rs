@@ -13,22 +13,42 @@ use self::{
 use super::symbol_table::SymbolTable;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
+pub struct InsertPoint {
+  pub module: BaseNode,
+  pub block: BaseNode,
+  pub at: Option<usize>,
+}
 
 impl InsertPoint {
   pub fn next(&self, sys: &SysBuilder) -> Option<Self> {
-    let InsertPoint(module, block, at) = self;
+    let (module, block, at) = { (self.module, self.block, self.at) };
     let block = block.as_ref::<Block>(sys).unwrap();
     if let Some(cur_at) = at {
       if cur_at + 1 < block.get_num_exprs() {
-        InsertPoint(*module, block.upcast(), Some(cur_at + 1)).into()
+        Some(InsertPoint {
+          module,
+          block: block.upcast(),
+          at: (cur_at + 1).into(),
+        })
       } else {
-        InsertPoint(*module, block.upcast(), None).into()
+        Some(InsertPoint {
+          module,
+          block: block.upcast(),
+          at: None,
+        })
       }
     } else if let Some(nxt_block) = block.next() {
-      InsertPoint(*module, nxt_block, Some(0)).into()
+      Some(InsertPoint {
+        module,
+        block: nxt_block,
+        at: 0.into(),
+      })
     } else if let Ok(block_parent) = block.get_parent().as_ref::<Block>(sys) {
-      return InsertPoint(*module, block_parent.upcast(), None).into();
+      return Some(InsertPoint {
+        module,
+        block: block_parent.upcast(),
+        at: None,
+      });
     } else {
       return None;
     }
@@ -136,7 +156,11 @@ impl SysBuilder {
       global_symbols: HashMap::new(),
       slab: slab::Slab::new(),
       cached_nodes: HashMap::new(),
-      inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
+      inesert_point: InsertPoint {
+        module: BaseNode::unknown(),
+        block: BaseNode::unknown(),
+        at: None,
+      },
       symbol_table: SymbolTable::new(),
     }
   }
@@ -182,11 +206,11 @@ impl SysBuilder {
 
   /// Get the current module to be built.
   pub fn get_current_module(&self) -> Result<ModuleRef<'_>, String> {
-    self.get::<Module>(&self.inesert_point.0)
+    self.get::<Module>(&self.inesert_point.module)
   }
 
   pub fn get_current_block(&self) -> Result<BlockRef<'_>, String> {
-    self.get::<Block>(&self.inesert_point.1)
+    self.get::<Block>(&self.inesert_point.block)
   }
 
   /// Get the module by its name.
@@ -215,7 +239,11 @@ impl SysBuilder {
   /// * `module` - The reference of the module to be set as the current module.
   pub fn set_current_module(&mut self, module: BaseNode) {
     let block = self.get::<Module>(&module).unwrap().get_body().upcast();
-    self.inesert_point = InsertPoint(module, block, None);
+    self.inesert_point = InsertPoint {
+      module,
+      block,
+      at: None,
+    };
   }
 
   /// Get the current insert point of this builder.
@@ -238,7 +266,11 @@ impl SysBuilder {
       let block = block.as_ref::<Block>(self).unwrap();
       block.get_module().upcast()
     };
-    self.inesert_point = InsertPoint(module, block, None);
+    self.inesert_point = InsertPoint {
+      module,
+      block,
+      at: None,
+    };
   }
 
   /// Set the insert before of the current builder.
@@ -275,7 +307,7 @@ impl SysBuilder {
       };
       (module, block_ref, at)
     };
-    self.inesert_point = InsertPoint(module, block, at);
+    self.inesert_point = InsertPoint { module, block, at };
   }
 
   /// Get the insert point of the current builder.
@@ -404,7 +436,7 @@ impl SysBuilder {
       dtype.clone(),
       opcode,
       vec![BaseNode::unknown(); operands.len()],
-      self.inesert_point.1,
+      self.inesert_point.block,
     );
     let res = self.insert_element(instance);
     if insert {
@@ -419,8 +451,7 @@ impl SysBuilder {
 
   /// The helper function to insert an element into the current insert point.
   fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
-    let InsertPoint(_, block, _) = &self.inesert_point;
-    let block = *block;
+    let block = self.inesert_point.block;
     self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 

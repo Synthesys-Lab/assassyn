@@ -199,14 +199,16 @@ impl ModuleMut<'_> {
           self.insert_external_interface(value, operand);
         }
       }
-      NodeKind::Expr => {
-        let expr = value.as_ref::<Expr>(self.sys).unwrap();
-        let block = expr.get_parent().as_ref::<Block>(self.sys).unwrap();
-        if block.get_module().get_key() != self.get().get_key() {
-          assert!(self.get().has_attr(Attribute::Downstream));
-          self.insert_external_interface(value, operand);
-        }
-      }
+      // TODO(@were): Support this later.
+      // NodeKind::Expr => {
+      //   let expr = value.as_ref::<Expr>(self.sys).unwrap();
+      //   let block = expr.get_parent().as_ref::<Block>(self.sys).unwrap();
+      //   if block.get_module().get_key() != self.get().get_key() {
+      //     // TODO(@were): Stricter check for push/pop or downstream.
+      //     // assert!(self.get().has_attr(Attribute::Downstream), "{}", expr);
+      //     self.insert_external_interface(value, operand);
+      //   }
+      // }
       _ => {}
     }
   }

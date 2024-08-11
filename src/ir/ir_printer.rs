@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use expr::subcode;
 
-use crate::builder::InsertPoint;
 use crate::ir::{node::*, *};
 
 use self::user::Operand;
@@ -206,7 +205,10 @@ impl Visitor<String> for IRPrinter {
 
   fn visit_block(&mut self, block: BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    let InsertPoint(cur_mod, cur_block, at) = block.sys.get_insert_point();
+    let (cur_mod, cur_block, at) = {
+      let ip = block.sys.get_insert_point();
+      (ip.module, ip.block, ip.at)
+    };
     let here = cur_mod == block.get_module().upcast() && cur_block == block.upcast();
     let restore_ident = self.indent;
     for (i, elem) in block.body_iter().enumerate() {
