@@ -4,6 +4,7 @@ use crate::builder::SysBuilder;
 
 use super::{
   node::{BaseNode, BlockRef, DownstreamRef, OptionalRef, Parented},
+  user::ExternalInterface,
   Block, Optional,
 };
 
@@ -14,7 +15,7 @@ pub struct Downstream {
   /// The name of this down stream module, can be overriden by `set_name`.
   name: String,
   /// The set of the external interfaces used by this module.
-  pub(crate) external_interfaces: HashMap<BaseNode, HashSet<BaseNode>>,
+  pub(crate) external_interfaces: ExternalInterface,
   /// The body of this downstream module.
   pub(crate) body: BaseNode,
   /// The set of the ports of this module.
@@ -26,7 +27,7 @@ impl Downstream {
     Downstream {
       key: 0,
       name,
-      external_interfaces: HashMap::new(),
+      external_interfaces: ExternalInterface::new(),
       body,
       ports,
     }

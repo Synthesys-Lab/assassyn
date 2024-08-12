@@ -11,6 +11,7 @@ use crate::ir::node::*;
 use crate::ir::*;
 
 pub use attrs::Attribute;
+use user::ExternalInterface;
 
 /// The data structure for a module.
 pub struct Module {
@@ -22,13 +23,9 @@ pub struct Module {
   ports: HashMap<String, BaseNode>,
   /// The body of the module.
   pub(crate) body: BaseNode,
-  /// The set of external interfaces used by the module.
-  pub(crate) external_interfaces: HashMap<BaseNode, HashSet<BaseNode>>,
-  /// The metadata of this module. The pointer to the module builder.
-  builder_func_ptr: Option<usize>,
-  /// The metadata of this module. The nodes that are parameterized by the module builder.
-  parameterizable: Option<Vec<BaseNode>>,
-  /// The redundant data of this module. The set of users that use this module.
+  /// The set of external interfaces used by the module. (out bound)
+  pub(crate) external_interfaces: ExternalInterface,
+  /// The redundant data of this module. The set of users that use this module. (in bound)
   pub(crate) user_set: HashSet<BaseNode>,
   /// The attributes of this module.
   pub(crate) attr: HashSet<Attribute>,
@@ -56,9 +53,7 @@ impl Module {
       name: name.to_string(),
       ports,
       body: BaseNode::new(NodeKind::Unknown, 0),
-      external_interfaces: HashMap::new(),
-      builder_func_ptr: None,
-      parameterizable: None,
+      external_interfaces: ExternalInterface::new(),
       user_set: HashSet::new(),
       attr: HashSet::new(),
       symbol_table: SymbolTable::new(),
@@ -69,15 +64,6 @@ impl Module {
     &self.attr
   }
 
-  /// Get the finger print of the module.
-  pub fn get_builder_func_ptr(&self) -> Option<usize> {
-    self.builder_func_ptr
-  }
-
-  /// Get the nodes that are parameterized by the module builder.
-  pub fn get_parameterizable(&self) -> Option<&Vec<BaseNode>> {
-    self.parameterizable.as_ref()
-  }
 }
 
 impl<'sys> ModuleRef<'sys> {
@@ -144,31 +130,6 @@ impl<'sys> ModuleRef<'sys> {
 }
 
 impl<'a> ModuleMut<'a> {
-  /// Maintain the redundant information, array used in the module.
-  ///
-  /// # Arguments
-  /// * `ext_node` - The external interface node.
-  /// * `operand` - The operand node that uses this external interface.
-  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    assert!(
-      matches!(ext_node.get_kind(), NodeKind::Array | NodeKind::FIFO),
-      "Expecting Array or FIFO but got {:?}",
-      ext_node
-    );
-    assert!(operand.get_kind() == NodeKind::Operand);
-    if !self.get().external_interfaces.contains_key(&ext_node) {
-      self
-        .get_mut()
-        .external_interfaces
-        .insert(ext_node, HashSet::new());
-    }
-    let users = self
-      .get_mut()
-      .external_interfaces
-      .get_mut(&ext_node)
-      .unwrap();
-    users.insert(operand);
-  }
 
   pub fn add_attr(&mut self, attr: Attribute) {
     self.get_mut().attr.insert(attr);
@@ -178,16 +139,11 @@ impl<'a> ModuleMut<'a> {
     self.get_mut().attr = attr;
   }
 
-  /// Set the metadata, the function pointer to the module builder. As part of the fingerprint of
-  /// comparing the equality of the modules.
-  pub fn set_builder_func_ptr(&mut self, key: usize) {
-    self.get_mut().builder_func_ptr = key.into();
+  /// Set the name of a module. Override the name given by the module builder.
+  pub fn set_name(&mut self, name: String) {
+    self.get_mut().name = name.to_string();
   }
 
-  /// Set the metadata, these base nodes are parameterized --- plugged in by the module builder.
-  pub fn set_parameterizable(&mut self, param: Vec<BaseNode>) {
-    self.get_mut().parameterizable = Some(param);
-  }
 }
 
 impl Typed for ModuleRef<'_> {

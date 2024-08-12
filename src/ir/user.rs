@@ -15,6 +15,92 @@ pub struct Operand {
   user: BaseNode,
 }
 
+pub(crate) struct ExternalInterface {
+  external_interfaces: HashMap<BaseNode, HashSet<BaseNode>>,
+}
+
+impl ExternalInterface {
+
+  pub(crate) fn new() -> Self {
+    Self {
+      external_interfaces: HashMap::new(),
+    }
+  }
+
+  /// Maintain the redundant information, array used in the module.
+  ///
+  /// # Arguments
+  /// * `ext_node` - The external interface node.
+  /// * `operand` - The operand node that uses this external interface.
+  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
+    assert!(
+      matches!(ext_node.get_kind(), NodeKind::Array | NodeKind::FIFO),
+      "Expecting Array or FIFO but got {:?}",
+      ext_node
+    );
+    assert!(operand.get_kind() == NodeKind::Operand);
+    if !self.external_interfaces.contains_key(&ext_node) {
+      self
+        .external_interfaces
+        .insert(ext_node, HashSet::new());
+    }
+    let users = self
+      .external_interfaces
+      .get_mut(&ext_node)
+      .unwrap();
+    users.insert(operand);
+  }
+
+  /// Iterate over the external interfaces. External interfaces under the context of this project
+  /// typically refers to the arrays (both read and write) and FIFOs (typically push)
+  /// that are used by the module.
+  pub(crate) fn iter(&self) -> impl Iterator<Item = (&BaseNode, &HashSet<BaseNode>)> {
+    self.external_interfaces.iter()
+  }
+
+  fn gather_related_externals(
+    &self,
+    sys: &SysBuilder,
+    operand: &BaseNode,
+  ) -> Vec<(BaseNode, BaseNode)> {
+    // Remove all the external interfaces related to this instruction.
+    let tmp = self
+      .external_interfaces
+      .iter()
+      .map(|(ext, users)| {
+        (
+          *ext,
+          users
+            .iter()
+            .filter(|x| {
+              (*x).eq(operand) || {
+                let user = (*x).as_ref::<Operand>(sys).unwrap();
+                user.get_value().eq(operand)
+              }
+            })
+            .cloned()
+            .collect::<Vec<_>>(),
+        )
+      })
+      .filter(|(_, users)| !users.is_empty())
+      .collect::<Vec<_>>();
+    tmp
+      .iter()
+      .flat_map(|(ext, users)| users.iter().map(|x| (*ext, *x)))
+      .collect()
+  }
+
+  fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
+    if let Some(operations) = self.external_interfaces.get_mut(&ext_node) {
+      assert!(operations.contains(&operand));
+      operations.remove(&operand);
+      if operations.is_empty() {
+        self.external_interfaces.remove(&ext_node);
+      }
+    }
+  }
+}
+
 impl Parented for Operand {
   fn get_parent(&self) -> BaseNode {
     self.user
@@ -117,66 +203,6 @@ impl Visitor<()> for GatherAllUses {
   }
 }
 
-impl ModuleRef<'_> {
-  /// Gather all the related external interfaces with the given operand. This is typically used to
-  /// maintain the redundant information when modifying this IR.
-  /// If the given operand is an operand, gather just this specific operand.
-  /// If the given operand is a value reference, gather all the operands that `get_value == this
-  /// operand`.
-  ///
-  /// # Arguments
-  ///
-  /// * `operand` - The operand to gather the related external interfaces.
-  pub(crate) fn gather_related_externals(&self, operand: &BaseNode) -> Vec<(BaseNode, BaseNode)> {
-    return gather_related_externals_impl(self.sys, &self.get().external_interfaces, operand);
-  }
-}
-
-fn gather_related_externals_impl(
-  sys: &SysBuilder,
-  external_interfaces: &HashMap<BaseNode, HashSet<BaseNode>>,
-  operand: &BaseNode,
-) -> Vec<(BaseNode, BaseNode)> {
-  // Remove all the external interfaces related to this instruction.
-  let tmp = external_interfaces
-    .iter()
-    .map(|(ext, users)| {
-      (
-        *ext,
-        users
-          .iter()
-          .filter(|x| {
-            (*x).eq(operand) || {
-              let user = (*x).as_ref::<Operand>(sys).unwrap();
-              user.get_value().eq(operand)
-            }
-          })
-          .cloned()
-          .collect::<Vec<_>>(),
-      )
-    })
-    .filter(|(_, users)| !users.is_empty())
-    .collect::<Vec<_>>();
-  tmp
-    .iter()
-    .flat_map(|(ext, users)| users.iter().map(|x| (*ext, *x)))
-    .collect()
-}
-
-fn remove_external_interface_impl(
-  external_interfaces: &mut HashMap<BaseNode, HashSet<BaseNode>>,
-  ext_node: BaseNode,
-  operand: BaseNode,
-) {
-  if let Some(operations) = external_interfaces.get_mut(&ext_node) {
-    assert!(operations.contains(&operand));
-    operations.remove(&operand);
-    if operations.is_empty() {
-      external_interfaces.remove(&ext_node);
-    }
-  }
-}
-
 impl ModuleMut<'_> {
   /// Remove a specific external interface's usage. If this usage set is empty after the removal,
   /// remove the external interface from the module, too.
@@ -186,16 +212,19 @@ impl ModuleMut<'_> {
   /// * `ext_node` - The external interface node.
   /// * `operand` - The operand node that uses this external interface.
   fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    remove_external_interface_impl(&mut self.get_mut().external_interfaces, ext_node, operand);
+    self.get_mut().external_interfaces.remove_external_interface(ext_node, operand);
   }
 
   /// Remove all the related external interfaces with the given condition.
   fn remove_related_externals(&mut self, operand: &BaseNode) {
-    let to_remove =
-      gather_related_externals_impl(self.sys, &self.get().external_interfaces, &operand);
+    let to_remove = self.get().external_interfaces.gather_related_externals(self.sys, operand);
     to_remove.iter().for_each(|(ext, user)| {
       self.remove_external_interface(*ext, *user);
     });
+  }
+
+  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
+    self.get_mut().external_interfaces.insert_external_interface(ext_node, operand);
   }
 
   /// Add related external interfaces to the module.
