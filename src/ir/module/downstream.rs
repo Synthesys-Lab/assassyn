@@ -3,45 +3,38 @@ use std::collections::HashMap;
 use crate::builder::SysBuilder;
 
 use super::{
+  base::ModuleBase,
   node::{BaseNode, BlockRef, DownstreamRef, OptionalRef, Parented},
-  user::ExternalInterface,
   Block, Optional,
 };
 
 /// The data structure for a downstream module.
 pub struct Downstream {
-  /// The index key of this downstream node in the slab buffer.
+  /// The key of this module in the slab buffer.
   pub(crate) key: usize,
-  /// The name of this down stream module, can be overriden by `set_name`.
-  name: String,
-  /// The set of the external interfaces used by this module.
-  pub(crate) external_interfaces: ExternalInterface,
-  /// The body of this downstream module.
-  pub(crate) body: BaseNode,
+  /// The base of the module.
+  base: ModuleBase,
   /// The set of the ports of this module.
-  pub(crate) ports: HashMap<String, BaseNode>,
+  ports: HashMap<String, BaseNode>,
 }
 
 impl Downstream {
-  pub fn new(name: String, body: BaseNode, ports: HashMap<String, BaseNode>) -> Self {
+  pub fn new(name: String, ports: HashMap<String, BaseNode>) -> Self {
     Downstream {
       key: 0,
-      name,
-      external_interfaces: ExternalInterface::new(),
-      body,
+      base: ModuleBase::new(name),
       ports,
     }
   }
 }
 
 impl<'sys> DownstreamRef<'sys> {
-
   pub fn get_body(&self) -> BlockRef<'_> {
-    self.body.as_ref::<Block>(self.sys).unwrap()
+    self.base.body.as_ref::<Block>(self.sys).unwrap()
   }
 
   pub fn get_name(&self) -> &str {
-    &self.name
+    &self.base.name
   }
 
   /// Iterate over the ports of the module.
@@ -56,18 +49,17 @@ impl<'sys> DownstreamRef<'sys> {
       .iter()
       .map(|(_, x)| x.as_ref::<Optional>(self.sys).unwrap())
   }
-
 }
 
 impl SysBuilder {
   /// Create a downstream module.
   pub fn create_downstream(&mut self, name: String, ports: HashMap<String, BaseNode>) -> BaseNode {
+    let mut downstream = Downstream::new(name.clone(), ports);
     let body = self.create_block();
-    let mut downstream = Downstream::new(name.clone(), body, ports);
-    downstream.body = body;
+    downstream.base.body = body;
     let res = self.insert_element(downstream);
     let name = self.symbol_table.insert(&name, res);
-    res.as_mut::<Downstream>(self).unwrap().get_mut().name = name;
+    res.as_mut::<Downstream>(self).unwrap().get_mut().base.name = name;
     body
       .as_mut::<Block>(self)
       .unwrap()

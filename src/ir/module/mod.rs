@@ -1,38 +1,29 @@
 pub mod attrs;
-pub mod memory;
-pub mod meta;
 pub mod base;
 pub mod downstream;
+pub mod memory;
+pub mod meta;
 
 use std::collections::{HashMap, HashSet};
 
-use crate::builder::symbol_table::SymbolTable;
 use crate::builder::system::PortInfo;
 use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
 pub use attrs::Attribute;
-use user::ExternalInterface;
+use base::ModuleBase;
 
 /// The data structure for a module.
 pub struct Module {
   /// The index key of this module in the slab buffer.
   pub(crate) key: usize,
-  /// The name of this module.
-  name: String,
-  /// The input ports of this module.
-  ports: HashMap<String, BaseNode>,
-  /// The body of the module.
-  pub(crate) body: BaseNode,
-  /// The set of external interfaces used by the module. (out bound)
-  pub(crate) external_interfaces: ExternalInterface,
+  /// The base data of this module.
+  pub(crate) base: ModuleBase,
   /// The redundant data of this module. The set of users that use this module. (in bound)
   pub(crate) user_set: HashSet<BaseNode>,
-  /// The attributes of this module.
-  pub(crate) attr: HashSet<Attribute>,
-  /// The symbol table that maintains the unique identifiers.
-  pub(crate) symbol_table: SymbolTable,
+  /// The input ports of this module.
+  ports: HashMap<String, BaseNode>,
 }
 
 impl Module {
@@ -52,20 +43,15 @@ impl Module {
   pub fn new(name: &str, ports: HashMap<String, BaseNode>) -> Module {
     Module {
       key: 0,
-      name: name.to_string(),
+      base: ModuleBase::new(name.to_string()),
       ports,
-      body: BaseNode::new(NodeKind::Unknown, 0),
-      external_interfaces: ExternalInterface::new(),
       user_set: HashSet::new(),
-      attr: HashSet::new(),
-      symbol_table: SymbolTable::new(),
     }
   }
 
   pub fn get_attrs(&self) -> &HashSet<Attribute> {
-    &self.attr
+    &self.base.attr
   }
-
 }
 
 impl<'sys> ModuleRef<'sys> {
@@ -88,7 +74,7 @@ impl<'sys> ModuleRef<'sys> {
 
   /// Get the name of the module.
   pub fn get_name<'res, 'elem: 'res>(&'elem self) -> &'res str {
-    self.name.as_str()
+    self.base.name.as_str()
   }
 
   /// Get the number of expressions in body of the module.
@@ -101,7 +87,7 @@ impl<'sys> ModuleRef<'sys> {
   where
     'sys: 'elem,
   {
-    self.body.as_ref::<Block>(self.sys).unwrap()
+    self.base.body.as_ref::<Block>(self.sys).unwrap()
   }
 
   /// Iterate over the external interfaces. External interfaces under the context of this project
@@ -114,7 +100,7 @@ impl<'sys> ModuleRef<'sys> {
     'sys: 'borrow,
     'sys: 'res,
   {
-    self.external_interfaces.iter()
+    self.base.external_interface.iter()
   }
 
   /// Iterate over the ports of the module.
@@ -132,20 +118,18 @@ impl<'sys> ModuleRef<'sys> {
 }
 
 impl<'a> ModuleMut<'a> {
-
   pub fn add_attr(&mut self, attr: Attribute) {
-    self.get_mut().attr.insert(attr);
+    self.get_mut().base.attr.insert(attr);
   }
 
   pub fn set_attrs(&mut self, attr: HashSet<Attribute>) {
-    self.get_mut().attr = attr;
+    self.get_mut().base.attr = attr;
   }
 
   /// Set the name of a module. Override the name given by the module builder.
   pub fn set_name(&mut self, name: String) {
-    self.get_mut().name = name.to_string();
+    self.get_mut().base.name = name.to_string();
   }
-
 }
 
 impl Typed for ModuleRef<'_> {
@@ -187,10 +171,30 @@ impl SysBuilder {
       fifo_mut.get_mut().set_parent(module);
     }
     let new_name = self.symbol_table.insert(name, module);
-    module.as_mut::<Module>(self).unwrap().get_mut().name = new_name;
+    module.as_mut::<Module>(self).unwrap().get_mut().base.name = new_name;
     let body = Block::new(module);
     let body = self.insert_element(body);
-    self.get_mut::<Module>(&module).unwrap().get_mut().body = body;
+    self.get_mut::<Module>(&module).unwrap().get_mut().base.body = body;
     module
+  }
+
+  pub(crate) fn update_module_symbol_table(
+    &mut self,
+    module: BaseNode,
+    old_name: Option<String>,
+    new_name: String,
+    node: BaseNode,
+  ) -> String {
+    if let Some(name) = old_name {
+    let mut module_mut = module.as_mut::<Module>(self).unwrap();
+    assert!(module_mut
+      .get_mut()
+      .base
+      .symbol_table
+      .remove(&name)
+      .is_some());
+    }
+    let mut module_mut = module.as_mut::<Module>(self).unwrap();
+    module_mut.get_mut().base.symbol_table.insert(&new_name, node)
   }
 }

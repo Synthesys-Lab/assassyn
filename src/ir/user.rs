@@ -52,38 +52,6 @@ impl ExternalInterface {
     self.external_interfaces.iter()
   }
 
-  fn gather_related_externals(
-    &self,
-    sys: &SysBuilder,
-    operand: &BaseNode,
-  ) -> Vec<(BaseNode, BaseNode)> {
-    // Remove all the external interfaces related to this instruction.
-    let tmp = self
-      .external_interfaces
-      .iter()
-      .map(|(ext, users)| {
-        (
-          *ext,
-          users
-            .iter()
-            .filter(|x| {
-              (*x).eq(operand) || {
-                let user = (*x).as_ref::<Operand>(sys).unwrap();
-                user.get_value().eq(operand)
-              }
-            })
-            .cloned()
-            .collect::<Vec<_>>(),
-        )
-      })
-      .filter(|(_, users)| !users.is_empty())
-      .collect::<Vec<_>>();
-    tmp
-      .iter()
-      .flat_map(|(ext, users)| users.iter().map(|x| (*ext, *x)))
-      .collect()
-  }
-
   fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
     if let Some(operations) = self.external_interfaces.get_mut(&ext_node) {
       assert!(operations.contains(&operand));
@@ -198,35 +166,12 @@ impl Visitor<()> for GatherAllUses {
 }
 
 impl ModuleMut<'_> {
-  /// Remove a specific external interface's usage. If this usage set is empty after the removal,
-  /// remove the external interface from the module, too.
-  ///
-  /// # Arguments
-  ///
-  /// * `ext_node` - The external interface node.
-  /// * `operand` - The operand node that uses this external interface.
-  fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    self
-      .get_mut()
-      .external_interfaces
-      .remove_external_interface(ext_node, operand);
-  }
-
-  /// Remove all the related external interfaces with the given condition.
-  fn remove_related_externals(&mut self, operand: &BaseNode) {
-    let to_remove = self
-      .get()
-      .external_interfaces
-      .gather_related_externals(self.sys, operand);
-    to_remove.iter().for_each(|(ext, user)| {
-      self.remove_external_interface(*ext, *user);
-    });
-  }
 
   pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
     self
       .get_mut()
-      .external_interfaces
+      .base
+      .external_interface
       .insert_external_interface(ext_node, operand);
   }
 
@@ -297,6 +242,7 @@ impl SysBuilder {
       return;
     }
     let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+    let value = *operand_ref.get_value();
     // TODO(@were): Make this a unified interface.
     let module = match operand_ref.get_user().get_kind() {
       NodeKind::Expr => {
@@ -310,7 +256,10 @@ impl SysBuilder {
       _ => unreachable!(),
     };
     let mut module_mut = self.get_mut::<Module>(&module).unwrap();
-    module_mut.remove_related_externals(operand);
+    let external_interface = {
+      &mut module_mut.get_mut().base.external_interface
+    };
+    external_interface.remove_external_interface(value, *operand);
     self.remove_user(operand);
   }
 
