@@ -348,7 +348,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       for driver in self
         .trigger_drivers
         .get(&module_name)
-        .unwrap_or_else(|| panic!("{} not found!", module_name))
+        .unwrap_or_else(|| panic!("Driver of \"{}\" not found!", module_name))
         .iter()
       {
         res.push_str(
