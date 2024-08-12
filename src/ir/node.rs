@@ -9,7 +9,6 @@ use self::user::Operand;
 use super::super::ir::visitor::Visitor;
 use super::ir_printer::IRPrinter;
 
-use downstream::Downstream;
 use paste::paste;
 
 pub trait IsElement<'elem, 'sys: 'elem> {

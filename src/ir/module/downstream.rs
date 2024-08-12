@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::builder::SysBuilder;
 
@@ -35,6 +35,7 @@ impl Downstream {
 }
 
 impl<'sys> DownstreamRef<'sys> {
+
   pub fn get_body(&self) -> BlockRef<'_> {
     self.body.as_ref::<Block>(self.sys).unwrap()
   }
@@ -55,17 +56,18 @@ impl<'sys> DownstreamRef<'sys> {
       .iter()
       .map(|(_, x)| x.as_ref::<Optional>(self.sys).unwrap())
   }
+
 }
 
 impl SysBuilder {
   /// Create a downstream module.
   pub fn create_downstream(&mut self, name: String, ports: HashMap<String, BaseNode>) -> BaseNode {
-    let id = self.symbol_table.identifier(&name);
     let body = self.create_block();
-    let mut downstream = Downstream::new(id.clone(), body, ports);
+    let mut downstream = Downstream::new(name.clone(), body, ports);
     downstream.body = body;
     let res = self.insert_element(downstream);
-    self.global_symbols.insert(id, res);
+    let name = self.symbol_table.insert(&name, res);
+    res.as_mut::<Downstream>(self).unwrap().get_mut().name = name;
     body
       .as_mut::<Block>(self)
       .unwrap()

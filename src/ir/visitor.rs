@@ -1,5 +1,3 @@
-use downstream::Downstream;
-
 use crate::{builder::system::SysBuilder, ir::node::*, ir::*};
 
 use super::block::Block;
