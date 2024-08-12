@@ -14,7 +14,7 @@ def constructor(func, *args, **kwargs):
     func(*args, **kwargs)
     builder = Singleton.builder
     module_self = args[0]
-    builder.insert_point['module'].append(module_self)
+    builder.downstreams.append(module_self)
     name_ports_of_module(module_self, Optional)
 
 

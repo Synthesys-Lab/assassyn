@@ -1,3 +1,4 @@
+import assassyn
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
@@ -23,7 +24,7 @@ class ForwardData(Module):
     @module.constructor
     def __init__(self):
         super().__init__()
-        self.data = Port(Int(32))
+        self.data = Port(UInt(32))
 
     @module.combinational
     def build(self):
@@ -43,10 +44,10 @@ class Adder(Downstream):
     def build(self):
         a = self.a
         b = self.b
-        c = a.unwrap_or(Int(32)(0)) + b.unwrap_or(Int(32)(0))
+        c = a.unwrap_or(UInt(32)(0)) + b.unwrap_or(UInt(32)(0))
 
 def test_downstream():
-    sys = SysBuilder('driver')
+    sys = SysBuilder('downstream')
     with sys:
         driver = Driver()
         lhs = ForwardData()
@@ -55,6 +56,16 @@ def test_downstream():
 
         driver.build(lhs, rhs)
         adder.build()
+
+    config = assassyn.backend.config(verilog=None, sim_threshold=200, idle_threshold=200)
+
+    simulator_path = elaborate(sys, **config)
+
+    raw = utils.run_simulator(simulator_path)
+    check_raw(raw)
+
+    raw = utils.run_verilator(verilator_path)
+    check_raw(raw)
 
     print(sys)
 

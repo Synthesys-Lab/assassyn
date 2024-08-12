@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use expr::subcode;
+use module::ModulePort;
 
 use crate::ir::{node::*, *};
 
@@ -161,9 +162,24 @@ impl Visitor<String> for IRPrinter {
       module.get_name()
     ));
     module.get();
-    for elem in module.fifo_iter() {
-      res.push_str(&self.visit_fifo(elem).unwrap());
-      res.push_str(", ");
+    match module.get_ports() {
+      ModulePort::Upstream { .. } => {
+        for elem in module.fifo_iter() {
+          res.push_str(&self.visit_fifo(elem).unwrap());
+          res.push_str(", ");
+        }
+      }
+      ModulePort::Downstream { ports } => {
+        for elem in ports.values() {
+          let option = elem.as_ref::<Optional>(module.sys).unwrap();
+          res.push_str(" { ");
+          res.push_str(option.get_pred().to_string(module.sys).as_str());
+          res.push_str(", ");
+          res.push_str(option.get_value().to_string(module.sys).as_str());
+          res.push_str(" }, ");
+        }
+      }
+      _ => unreachable!(),
     }
     res.push_str(") {\n");
     self.inc_indent();

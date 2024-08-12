@@ -64,8 +64,14 @@ class SysBuilder:
     def __init__(self, name):
         self.name = name
         self.modules = []
+        self.downstreams = []
         self.arrays = []
-        self.insert_point = { 'array': self.arrays, 'expr': None, 'module': self.modules }
+        self.insert_point = {
+            'array': self.arrays,
+            'expr': None,
+            'module': self.modules,
+            'downstream': self.downstreams
+        }
         self.cur_module = None
         self.cur_block = None
         self.builder_func = None

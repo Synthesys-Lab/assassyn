@@ -357,16 +357,28 @@ impl SysBuilder {
     key
   }
 
+  /// Create a string literal node.
   pub fn get_str_literal(&mut self, value: String) -> BaseNode {
     let instance = StrImm::new(value);
-
     self.insert_element(instance)
   }
 
+  /// Create a log command.
   pub fn create_log(&mut self, fmt: BaseNode, mut args: Vec<BaseNode>) -> BaseNode {
     assert_eq!(fmt.get_kind(), NodeKind::StrImm);
     args.insert(0, fmt);
     self.create_expr(DataType::void(), Opcode::Log, args, true)
+  }
+
+  /// Create an "optional" node.
+  ///
+  /// # Arguments
+  /// * `value` - The value to be selected.
+  /// * `pred` - The condition of selecting the value.
+  pub fn create_optional(&mut self, value: BaseNode, pred: BaseNode) -> BaseNode {
+    let instance = Optional::new(value, pred);
+    let res = self.insert_element(instance);
+    res
   }
 
   pub fn create_select_1hot(&mut self, cond: BaseNode, values: Vec<BaseNode>) -> BaseNode {

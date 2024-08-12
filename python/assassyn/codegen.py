@@ -6,9 +6,11 @@ from . import expr
 from . import module
 from . import block
 from . import const
+from .value import Optional
 from .builder import SysBuilder
 from .array import Array
 from .module import Module, Port, Memory
+from .module.downstream import Downstream
 from .block import Block
 from .expr import Expr
 from .utils import identifierize
@@ -170,6 +172,7 @@ class CodeGen(visitor.Visitor):
 
     def visit_system(self, node: SysBuilder):
         self.header.append('use std::path::PathBuf;')
+        self.header.append('use std::collections::HashMap;')
         self.header.append('use assassyn::builder::SysBuilder;')
         self.header.append('use assassyn::ir::node::IsElement;')
         self.code.append('fn main() {')
@@ -195,6 +198,23 @@ class CodeGen(visitor.Visitor):
             bind_emitter.visit_module(elem)
         for elem in node.modules:
             self.visit_module(elem)
+
+        for elem in node.downstreams:
+            self.code.append(f'  // Emit downstream modules')
+            self.code.append('  let downstream_ports = {')
+            self.code.append('    let mut res = HashMap::new();')
+            for port in elem.ports:
+                assert isinstance(port, Optional)
+                value = self.generate_rval(port.value)
+                pred = self.generate_rval(port.pred)
+                self.code.append(f'    let port = sys.create_optional({value}, {pred});')
+                self.code.append(f'    res.insert("{port.name}".into(), port);')
+            self.code.append('    res')
+            self.code.append('  };')
+            var = self.generate_rval(elem)
+            self.code.append(f'  let {var} = sys.create_downstream("{elem.name}", downstream_ports);')
+            self.visit_module(elem)
+
         config = self.emit_config()
         self.code.append(f'''
             let mut config = assassyn::backend::common::Config{{

@@ -78,6 +78,9 @@ impl Module {
     }
   }
 
+  pub fn get_ports(&self) -> &ModulePort {
+    &self.ports
+  }
 
   pub fn downstream(name: String, ports: HashMap<String, BaseNode>) -> Self {
     Module {
@@ -245,8 +248,8 @@ impl SysBuilder {
   }
 
   /// Create a downstream module.
-  pub fn create_downstream(&mut self, name: String, ports: HashMap<String, BaseNode>) -> BaseNode {
-    let mut downstream = Module::downstream(name.clone(), ports);
+  pub fn create_downstream(&mut self, name: &str, ports: HashMap<String, BaseNode>) -> BaseNode {
+    let mut downstream = Module::downstream(name.to_string(), ports);
     let body = self.create_block();
     downstream.body = body;
     let res = self.insert_element(downstream);
@@ -257,7 +260,18 @@ impl SysBuilder {
       .unwrap()
       .get_mut()
       .set_parent(res);
+    let ports = {
+      match res.as_ref::<Module>(self).unwrap().get_ports() {
+        ModulePort::Downstream { ports } => ports.values().cloned().collect::<Vec<_>>(),
+        _ => unreachable!(),
+      }
+    };
+    ports.into_iter().for_each(|x| {
+      x.as_mut::<Optional>(self)
+        .unwrap()
+        .get_mut()
+        .set_parent(res);
+    });
     res
   }
-
 }
