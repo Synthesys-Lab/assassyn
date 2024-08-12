@@ -8,7 +8,6 @@ pub(crate) struct SymbolTable {
 }
 
 impl SymbolTable {
-
   /// The helper function to find a unique identifier for the given identifier.
   fn identifier(&mut self, id: &str) -> String {
     // If the identifier is already in the symbol table, we append a number to it.
