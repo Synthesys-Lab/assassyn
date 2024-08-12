@@ -4,8 +4,8 @@ use super::block::Block;
 
 pub trait Visitor<T> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<T> {
-    for input in module.port_iter() {
-      if let Some(x) = self.visit_input(input) {
+    for input in module.fifo_iter() {
+      if let Some(x) = self.visit_fifo(input) {
         return x.into();
       }
     }
@@ -15,14 +15,7 @@ pub trait Visitor<T> {
     None
   }
 
-  fn visit_downstream(&mut self, downstream: DownstreamRef<'_>) -> Option<T> {
-    if let Some(x) = self.visit_block(downstream.get_body()) {
-      return x.into();
-    }
-    None
-  }
-
-  fn visit_input(&mut self, _: FIFORef<'_>) -> Option<T> {
+  fn visit_fifo(&mut self, _: FIFORef<'_>) -> Option<T> {
     None
   }
 
@@ -82,13 +75,12 @@ pub trait Visitor<T> {
       NodeKind::Expr => self.visit_expr(node.as_ref::<Expr>(sys).unwrap()),
       NodeKind::Block => self.visit_block(node.as_ref::<Block>(sys).unwrap()),
       NodeKind::Module => self.visit_module(node.as_ref::<Module>(sys).unwrap()),
-      NodeKind::FIFO => self.visit_input(node.as_ref::<FIFO>(sys).unwrap()),
+      NodeKind::FIFO => self.visit_fifo(node.as_ref::<FIFO>(sys).unwrap()),
       NodeKind::Optional => self.visit_optional(node.as_ref::<Optional>(sys).unwrap()),
       NodeKind::Array => self.visit_array(node.as_ref::<Array>(sys).unwrap()),
       NodeKind::IntImm => self.visit_int_imm(node.as_ref::<IntImm>(sys).unwrap()),
       NodeKind::StrImm => self.visit_string_imm(node.as_ref::<StrImm>(sys).unwrap()),
       NodeKind::Operand => self.visit_operand(node.as_ref::<Operand>(sys).unwrap()),
-      NodeKind::Downstream => self.visit_downstream(node.as_ref::<Downstream>(sys).unwrap()),
       NodeKind::Unknown => {
         panic!("Unknown node type")
       }

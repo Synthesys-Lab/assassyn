@@ -21,7 +21,7 @@ impl FIFOField<'_> {
 struct FIFODumper;
 
 impl Visitor<String> for FIFODumper {
-  fn visit_input(&mut self, fifo: FIFORef<'_>) -> Option<String> {
+  fn visit_fifo(&mut self, fifo: FIFORef<'_>) -> Option<String> {
     format!(
       "{}.{}",
       fifo.get_parent().to_string(fifo.sys),
@@ -36,7 +36,7 @@ impl Display for FIFOField<'_> {
     write!(
       f,
       "{}.{}",
-      FIFODumper.visit_input(self.fifo()).unwrap(),
+      FIFODumper.visit_fifo(self.fifo()).unwrap(),
       self.get_field()
     )
   }
@@ -48,7 +48,7 @@ impl Display for FIFOPop<'_> {
       f,
       "{} = {}.pop()",
       self.expr.get_name(),
-      FIFODumper.visit_input(self.fifo()).unwrap()
+      FIFODumper.visit_fifo(self.fifo()).unwrap()
     )
   }
 }
@@ -58,7 +58,7 @@ impl Display for FIFOPush<'_> {
     write!(
       f,
       "{}.push({}) // handle: _{}",
-      FIFODumper.visit_input(self.fifo()).unwrap(),
+      FIFODumper.visit_fifo(self.fifo()).unwrap(),
       self.value().to_string(self.expr.sys),
       self.expr.get_key()
     )

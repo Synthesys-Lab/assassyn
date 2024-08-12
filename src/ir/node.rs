@@ -256,7 +256,7 @@ macro_rules! register_elements {
 
 }
 
-register_elements!(Module, FIFO, Optional, Expr, Array, IntImm, Block, StrImm, Operand, Downstream);
+register_elements!(Module, FIFO, Optional, Expr, Array, IntImm, Block, StrImm, Operand);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
 pub struct BaseNode {
@@ -323,7 +323,7 @@ impl BaseNode {
         let operand = self.as_ref::<Operand>(sys).unwrap();
         operand.get_value().get_dtype(sys)
       }
-      NodeKind::Unknown | NodeKind::Downstream => {
+      NodeKind::Unknown => {
         panic!("Unknown reference")
       }
     }
@@ -340,7 +340,7 @@ impl BaseNode {
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
       NodeKind::Operand => (*self.as_ref::<Operand>(sys).unwrap().get_user()).into(),
       NodeKind::Optional => self.as_ref::<Optional>(sys).unwrap().get_parent().into(),
-      NodeKind::Downstream | NodeKind::Unknown => {
+      NodeKind::Unknown => {
         panic!("Unknown reference")
       }
     }
@@ -400,7 +400,7 @@ impl BaseNode {
         let operand = self.as_ref::<Operand>(sys).unwrap();
         operand.get_value().to_string(sys)
       }
-      NodeKind::Downstream | NodeKind::Optional => {
+      NodeKind::Optional => {
         panic!("Not supported yet!")
       }
     }

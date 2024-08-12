@@ -124,7 +124,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     res.push_str(&format!("pub fn {}(\n", namify(module.get_name())));
     res.push_str("  stamp: usize,\n");
     res.push_str("  q: &mut BinaryHeap<Reverse<Event>>,\n");
-    for port in module.port_iter() {
+    for port in module.fifo_iter() {
       res.push_str(&format!(
         "  {}: &VecDeque<{}>,\n",
         fifo_name!(port),
@@ -895,7 +895,7 @@ macro_rules! impl_unwrap_slab {
   }
   res.push_str("\n\n  // Define the module FIFOs\n");
   for module in sys.module_iter() {
-    for port in module.port_iter() {
+    for port in module.fifo_iter() {
       let fifo_ty = dtype_to_rust_type(&port.scalar_ty());
       let fifo_ty = Ident::new(&format!("FIFO{}", fifo_ty), Span::call_site());
       res.push_str(&format!(
@@ -1046,7 +1046,7 @@ macro_rules! impl_unwrap_slab {
       .to_string(),
     );
     // Unpacking the FIFO's from the slab.
-    for fifo in module.port_iter() {
+    for fifo in module.fifo_iter() {
       let id = fifo_name!(fifo);
       let slab_idx = *slab_cache.get(&fifo.upcast()).unwrap();
       res.push_str(&format!(
@@ -1072,7 +1072,7 @@ macro_rules! impl_unwrap_slab {
     // Dump the function call.
     let callee = namify(module.get_name());
     res.push_str(&format!("{}(event.0.stamp, &mut q,", callee,));
-    for fifo in module.port_iter() {
+    for fifo in module.fifo_iter() {
       res.push_str(&format!("{},", fifo_name!(fifo)));
     }
     for elem in ext_interf_args {

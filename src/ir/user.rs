@@ -166,15 +166,12 @@ impl Visitor<()> for GatherAllUses {
 }
 
 impl ModuleMut<'_> {
-
   pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
     self
       .get_mut()
-      .base
       .external_interface
       .insert_external_interface(ext_node, operand);
   }
-
 }
 
 impl ExprMut<'_> {
@@ -255,11 +252,13 @@ impl SysBuilder {
       }
       _ => unreachable!(),
     };
+
     let mut module_mut = self.get_mut::<Module>(&module).unwrap();
-    let external_interface = {
-      &mut module_mut.get_mut().base.external_interface
-    };
-    external_interface.remove_external_interface(value, *operand);
+    module_mut
+      .get_mut()
+      .external_interface
+      .remove_external_interface(value, *operand);
+
     self.remove_user(operand);
   }
 
@@ -322,7 +321,7 @@ impl SysBuilder {
     }
   }
 
-  pub fn add_related_externals(&mut self, module: BaseNode, operand: BaseNode) {
+  fn add_related_externals(&mut self, module: BaseNode, operand: BaseNode) {
     // Reconnect the external interfaces if applicable.
     // TODO(@were): Maybe later unify a common interface for this.
     let value = {
@@ -349,7 +348,10 @@ impl SysBuilder {
         _ => false,
       }
     } {
-      module.as_mut::<Module>(self).unwrap().insert_external_interface(value, operand);
+      module
+        .as_mut::<Module>(self)
+        .unwrap()
+        .insert_external_interface(value, operand);
     }
   }
 }

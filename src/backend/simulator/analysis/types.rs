@@ -36,7 +36,7 @@ struct FIFOTypesUsedVisitor {
 
 impl Visitor<()> for FIFOTypesUsedVisitor {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
-    self.res.extend(module.port_iter().map(|x| x.scalar_ty()));
+    self.res.extend(module.fifo_iter().map(|x| x.scalar_ty()));
     None
   }
 }

@@ -36,7 +36,7 @@ struct ExtInterDumper<'a> {
 
 // TODO(@were): Fix this, dump the actual value of the operand_of one a line.
 impl Visitor<String> for ExtInterDumper<'_> {
-  fn visit_input(&mut self, input: FIFORef<'_>) -> Option<String> {
+  fn visit_fifo(&mut self, input: FIFORef<'_>) -> Option<String> {
     let module = input.get_parent().as_ref::<Module>(input.sys).unwrap();
     let mut res = format!(
       "{}.{}: fifo<{}> {{\n",
@@ -89,7 +89,7 @@ impl Visitor<String> for ExtInterDumper<'_> {
 }
 
 impl Visitor<String> for IRPrinter {
-  fn visit_input(&mut self, input: FIFORef<'_>) -> Option<String> {
+  fn visit_fifo(&mut self, input: FIFORef<'_>) -> Option<String> {
     format!("{}: fifo<{}>", input.get_name(), input.scalar_ty()).into()
   }
 
@@ -161,8 +161,8 @@ impl Visitor<String> for IRPrinter {
       module.get_name()
     ));
     module.get();
-    for elem in module.port_iter() {
-      res.push_str(&self.visit_input(elem).unwrap());
+    for elem in module.fifo_iter() {
+      res.push_str(&self.visit_fifo(elem).unwrap());
       res.push_str(", ");
     }
     res.push_str(") {\n");

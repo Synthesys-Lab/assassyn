@@ -14,7 +14,7 @@ macro_rules! define_attrs {
 
 impl Module {
   pub fn has_attr(&self, attr: Attribute) -> bool {
-    self.base.attr.contains(&attr)
+    self.attr.contains(&attr)
   }
 }
 

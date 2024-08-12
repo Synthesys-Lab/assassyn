@@ -511,7 +511,7 @@ impl SysBuilder {
         "Argument {} already exists!",
         key
       );
-      let port = module.get_port(&key).unwrap_or_else(|| {
+      let port = module.get_fifo(&key).unwrap_or_else(|| {
         panic!(
           "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
           key,

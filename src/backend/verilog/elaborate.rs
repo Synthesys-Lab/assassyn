@@ -420,7 +420,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(format!("{} {}_i (\n", module_name, module_name).as_str());
     res.push_str("  .clk(clk),\n".to_string().as_str());
     res.push_str("  .rst_n(rst_n),\n".to_string().as_str());
-    for port in module.port_iter() {
+    for port in module.fifo_iter() {
       let fifo_name = namify(
         format!(
           "{}_{}",
@@ -601,7 +601,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     // fifo storage element definitions
     for module in self.sys.module_iter() {
-      for fifo in module.port_iter() {
+      for fifo in module.fifo_iter() {
         res.push_str(self.dump_fifo(&fifo).as_str());
       }
     }
@@ -817,7 +817,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     res.push_str(format!("{}input logic clk,\n", " ".repeat(self.indent)).as_str());
     res.push_str(format!("{}input logic rst_n,\n", " ".repeat(self.indent)).as_str());
     res.push('\n');
-    for port in module.port_iter() {
+    for port in module.fifo_iter() {
       res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name!(port)).as_str());
       res.push_str(
         format!(

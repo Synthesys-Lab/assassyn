@@ -43,7 +43,7 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
       let module = module.as_ref::<Module>(sys).unwrap();
       (
         module
-          .port_iter()
+          .fifo_iter()
           .map(|port| port.upcast())
           .collect::<Vec<_>>(),
         module.get_body().upcast(),

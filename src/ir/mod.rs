@@ -12,6 +12,6 @@ pub mod visitor;
 pub use block::Block;
 pub use data::{Array, DataType, IntImm, StrImm, Typed};
 pub use expr::{Expr, Opcode};
-pub use module::{Module, downstream::Downstream};
+pub use module::Module;
 pub use port::{Optional, FIFO};
 pub use user::Operand;

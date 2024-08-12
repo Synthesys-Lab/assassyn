@@ -1,29 +1,57 @@
 pub mod attrs;
-pub mod base;
-pub mod downstream;
 pub mod memory;
 pub mod meta;
 
 use std::collections::{HashMap, HashSet};
 
+use crate::builder::symbol_table::SymbolTable;
 use crate::builder::system::PortInfo;
 use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
 pub use attrs::Attribute;
-use base::ModuleBase;
+use user::ExternalInterface;
+
+pub enum ModulePort {
+  Upstream { ports: HashMap<String, BaseNode> },
+  Downstream { ports: HashMap<String, BaseNode> },
+  None,
+}
 
 /// The data structure for a module.
 pub struct Module {
   /// The index key of this module in the slab buffer.
   pub(crate) key: usize,
-  /// The base data of this module.
-  pub(crate) base: ModuleBase,
-  /// The redundant data of this module. The set of users that use this module. (in bound)
+  /// The name of this module, can be overridden by `set_name`.
+  pub(super) name: String,
+  /// The body of the module.
+  pub(crate) body: BaseNode,
+  /// The set of external interfaces used by the module. (out bound)
+  pub(crate) external_interface: ExternalInterface,
+  /// The attributes of this module.
+  pub(crate) attr: HashSet<Attribute>,
+  /// The symbol table that maintains the unique identifiers.
+  pub(crate) symbol_table: SymbolTable,
+  /// The sub-class data structures of this module.
+  ports: ModulePort,
+  /// The set of users of this module.
   pub(crate) user_set: HashSet<BaseNode>,
-  /// The input ports of this module.
-  ports: HashMap<String, BaseNode>,
+}
+
+impl Default for Module {
+  fn default() -> Self {
+    Module {
+      key: 0,
+      name: String::new(),
+      body: BaseNode::unknown(),
+      external_interface: ExternalInterface::new(),
+      attr: HashSet::new(),
+      symbol_table: SymbolTable::new(),
+      ports: ModulePort::None,
+      user_set: HashSet::new(),
+    }
+  }
 }
 
 impl Module {
@@ -40,24 +68,40 @@ impl Module {
   /// let a = FIFO::new("a", 32);
   /// Module::new("a_plus_b", vec![a.clone()]);
   /// ```
-  pub fn new(name: &str, ports: HashMap<String, BaseNode>) -> Module {
+  pub fn upstream(name: &str, ports: HashMap<String, BaseNode>) -> Module {
     Module {
       key: 0,
-      base: ModuleBase::new(name.to_string()),
-      ports,
+      name: name.to_string(),
+      ports: ModulePort::Upstream { ports },
       user_set: HashSet::new(),
+      ..Default::default()
+    }
+  }
+
+
+  pub fn downstream(name: String, ports: HashMap<String, BaseNode>) -> Self {
+    Module {
+      key: 0,
+      name: name.into(),
+      ports: ModulePort::Downstream { ports },
+      user_set: HashSet::new(),
+      ..Default::default()
     }
   }
 
   pub fn get_attrs(&self) -> &HashSet<Attribute> {
-    &self.base.attr
+    &self.attr
   }
 }
 
 impl<'sys> ModuleRef<'sys> {
   /// Get the number of inputs to the module.
   pub fn get_num_inputs(&self) -> usize {
-    self.ports.len()
+    match self.ports {
+      ModulePort::Upstream { ref ports, .. } => ports.len(),
+      ModulePort::Downstream { ref ports } => ports.len(),
+      _ => unreachable!(),
+    }
   }
 
   /// Get the input by name.
@@ -65,16 +109,18 @@ impl<'sys> ModuleRef<'sys> {
   /// # Arguments
   ///
   /// * `name` - The name of the input.
-  pub fn get_port(&self, name: &str) -> Option<FIFORef<'_>> {
-    self
-      .ports
-      .get(name)
-      .map(|x| x.clone().as_ref::<FIFO>(self.sys).unwrap())
+  pub fn get_fifo(&self, name: &str) -> Option<FIFORef<'_>> {
+    match self.ports {
+      ModulePort::Upstream { ref ports, .. } => ports
+        .get(name)
+        .map(|x| x.clone().as_ref::<FIFO>(self.sys).unwrap()),
+      _ => unreachable!(),
+    }
   }
 
   /// Get the name of the module.
   pub fn get_name<'res, 'elem: 'res>(&'elem self) -> &'res str {
-    self.base.name.as_str()
+    self.name.as_str()
   }
 
   /// Get the number of expressions in body of the module.
@@ -87,7 +133,7 @@ impl<'sys> ModuleRef<'sys> {
   where
     'sys: 'elem,
   {
-    self.base.body.as_ref::<Block>(self.sys).unwrap()
+    self.body.as_ref::<Block>(self.sys).unwrap()
   }
 
   /// Iterate over the external interfaces. External interfaces under the context of this project
@@ -100,46 +146,66 @@ impl<'sys> ModuleRef<'sys> {
     'sys: 'borrow,
     'sys: 'res,
   {
-    self.base.external_interface.iter()
+    self.external_interface.iter()
   }
 
   /// Iterate over the ports of the module.
-  pub fn port_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = FIFORef<'res>> + 'res
+  pub fn fifo_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = FIFORef<'res>> + 'res
   where
     'sys: 'borrow,
     'sys: 'res,
     'borrow: 'res,
   {
-    self
-      .ports
-      .values()
-      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
+    match &self.ports {
+      ModulePort::Upstream { ports, .. } => {
+        ports.values().map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
+      }
+      _ => unreachable!(),
+    }
   }
 }
 
 impl<'a> ModuleMut<'a> {
   pub fn add_attr(&mut self, attr: Attribute) {
-    self.get_mut().base.attr.insert(attr);
+    self.get_mut().attr.insert(attr);
   }
 
   pub fn set_attrs(&mut self, attr: HashSet<Attribute>) {
-    self.get_mut().base.attr = attr;
+    self.get_mut().attr = attr;
   }
 
   /// Set the name of a module. Override the name given by the module builder.
   pub fn set_name(&mut self, name: String) {
-    self.get_mut().base.name = name.to_string();
+    self.get_mut().name = name.to_string();
   }
 }
 
 impl Typed for ModuleRef<'_> {
   fn dtype(&self) -> DataType {
-    let types = self
-      .ports
-      .values()
-      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
-      .collect::<Vec<_>>();
-    DataType::module(types)
+    match self.ports {
+      ModulePort::Upstream { ref ports, .. } => {
+        let types = ports
+          .values()
+          .map(|x| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
+          .collect::<Vec<_>>();
+        DataType::module("module".into(), types)
+      }
+      ModulePort::Downstream { ref ports } => {
+        let mut vec = Vec::new();
+        for port in ports.values() {
+          vec.push(
+            port
+              .as_ref::<Optional>(self.sys)
+              .unwrap()
+              .get_value()
+              .get_dtype(self.sys)
+              .unwrap(),
+          );
+        }
+        DataType::module("downstream".into(), vec)
+      }
+      _ => unreachable!(),
+    }
   }
 }
 
@@ -161,7 +227,7 @@ impl SysBuilder {
       })
       .collect::<HashMap<_, _>>();
     let ports = port_table.values().cloned().collect::<Vec<_>>();
-    let module = Module::new(name, port_table);
+    let module = Module::upstream(name, port_table);
     let module = self.insert_element(module);
     // This part is kinda dirty, since we run into a chicken-egg problem: the port parent cannot
     // be set before the module is constructed. However, module's constructor accepts the ports
@@ -171,30 +237,27 @@ impl SysBuilder {
       fifo_mut.get_mut().set_parent(module);
     }
     let new_name = self.symbol_table.insert(name, module);
-    module.as_mut::<Module>(self).unwrap().get_mut().base.name = new_name;
+    module.as_mut::<Module>(self).unwrap().get_mut().name = new_name;
     let body = Block::new(module);
     let body = self.insert_element(body);
-    self.get_mut::<Module>(&module).unwrap().get_mut().base.body = body;
+    self.get_mut::<Module>(&module).unwrap().get_mut().body = body;
     module
   }
 
-  pub(crate) fn update_module_symbol_table(
-    &mut self,
-    module: BaseNode,
-    old_name: Option<String>,
-    new_name: String,
-    node: BaseNode,
-  ) -> String {
-    if let Some(name) = old_name {
-    let mut module_mut = module.as_mut::<Module>(self).unwrap();
-    assert!(module_mut
+  /// Create a downstream module.
+  pub fn create_downstream(&mut self, name: String, ports: HashMap<String, BaseNode>) -> BaseNode {
+    let mut downstream = Module::downstream(name.clone(), ports);
+    let body = self.create_block();
+    downstream.body = body;
+    let res = self.insert_element(downstream);
+    let name = self.symbol_table.insert(&name, res);
+    res.as_mut::<Module>(self).unwrap().get_mut().name = name;
+    body
+      .as_mut::<Block>(self)
+      .unwrap()
       .get_mut()
-      .base
-      .symbol_table
-      .remove(&name)
-      .is_some());
-    }
-    let mut module_mut = module.as_mut::<Module>(self).unwrap();
-    module_mut.get_mut().base.symbol_table.insert(&new_name, node)
+      .set_parent(res);
+    res
   }
+
 }

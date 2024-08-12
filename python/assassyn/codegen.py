@@ -263,7 +263,7 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'''  // Get port {node.name}
                 let {port_name} = {{
                   let module = {module_name}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
-                  module.get_port("{node.name}").unwrap().upcast()
+                  module.get_fifo("{node.name}").unwrap().upcast()
                 }};''')
             return port_name
         return node.as_operand()
