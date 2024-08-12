@@ -114,7 +114,6 @@ def elaborate( # pylint: disable=too-many-arguments
 
     simulator_path = None
     verilog_path = None
-    
     if simulator:
         simulator_path = os.path.join(sys_dir, f'{sys.name}_simulator')
     if verilog:
