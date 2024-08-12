@@ -5,7 +5,6 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 use crate::ir::{ir_printer::IRPrinter, node::*, visitor::Visitor, *};
 
 use self::{
-  data::ArrayAttr,
   expr::subcode::{self, Binary},
   instructions::Bind,
 };
@@ -45,8 +44,6 @@ pub struct SysBuilder {
   cached_nodes: HashMap<CacheKey, BaseNode>,
   /// The name of the system.
   name: String,
-  /// The global symbols in this system, including modules and arrays.
-  pub(crate) global_symbols: HashMap<String, BaseNode>,
   /// The current module to be built.
   pub(crate) inesert_point: InsertPoint,
   /// The symbol table to maintain the unique identifiers.
@@ -110,7 +107,7 @@ macro_rules! impl_typed_iter {
       /// Iterate over all the modules of the system.
       pub fn $func_name(&self) -> impl Iterator<Item = [<$ty Ref>]<'_>> {
         self
-          .global_symbols
+          .symbol_table
           .iter()
           .filter(|(_, v)| {
             if let NodeKind::$ty = v.get_kind() {
@@ -133,7 +130,6 @@ impl SysBuilder {
   pub fn new(name: &str) -> Self {
     Self {
       name: name.into(),
-      global_symbols: HashMap::new(),
       slab: slab::Slab::new(),
       cached_nodes: HashMap::new(),
       inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
@@ -191,7 +187,7 @@ impl SysBuilder {
 
   /// Get the module by its name.
   pub fn get_module<'a>(&'a self, name: &str) -> Option<ModuleRef<'a>> {
-    if let Some(reference) = self.global_symbols.get(name) {
+    if let Some(reference) = self.symbol_table.get(name) {
       reference.as_ref::<Module>(self).unwrap().into()
     } else {
       None
@@ -200,7 +196,7 @@ impl SysBuilder {
 
   /// Get the array by its name.
   pub fn get_array<'a>(&'a self, name: &str) -> Option<ArrayRef<'a>> {
-    if let Some(reference) = self.global_symbols.get(name) {
+    if let Some(reference) = self.symbol_table.get(name) {
       reference.as_ref::<Array>(self).unwrap().into()
     } else {
       None
@@ -455,36 +451,6 @@ impl SysBuilder {
 
   create_arith_op_impl!(unary, create_neg, subcode::Unary::Neg.into());
   create_arith_op_impl!(unary, create_flip, subcode::Unary::Flip.into());
-
-  /// Create a register array associated to this system.
-  /// An array can be a register, or memory.
-  ///
-  /// # Arguments
-  /// * `ty` - The data type of data in the array.
-  /// * `name` - The name of the array.
-  /// * `size` - The size of the array.
-  /// * `init` - A vector of initial values of this array.
-  // TODO(@were): Add array types, memory, register, or signal wire.
-  pub fn create_array(
-    &mut self,
-    ty: DataType,
-    name: &str,
-    size: usize,
-    init: Option<Vec<BaseNode>>,
-    attrs: Vec<ArrayAttr>,
-  ) -> BaseNode {
-    let array_name = self.symbol_table.identifier(name);
-    if let Some(init) = &init {
-      assert_eq!(init.len(), size);
-      init.iter().for_each(|x| {
-        assert_eq!(x.get_dtype(self).unwrap(), ty);
-      });
-    }
-    let instance = Array::new(ty.clone(), array_name.clone(), size, init, attrs);
-    let key = self.insert_element(instance);
-    self.global_symbols.insert(array_name, key);
-    key
-  }
 
   /// Get an empty bind for the given module.
   ///

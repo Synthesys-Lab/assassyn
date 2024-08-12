@@ -16,7 +16,7 @@ pub use attrs::Attribute;
 pub struct Module {
   /// The index key of this module in the slab buffer.
   pub(crate) key: usize,
-  /// The name of this module, can be overridden by `set_name`.
+  /// The name of this module.
   name: String,
   /// The input ports of this module.
   ports: HashMap<String, BaseNode>,
@@ -178,11 +178,6 @@ impl<'a> ModuleMut<'a> {
     self.get_mut().attr = attr;
   }
 
-  /// Set the name of a module. Override the name given by the module builder.
-  pub fn set_name(&mut self, name: String) {
-    self.get_mut().name = name.to_string();
-  }
-
   /// Set the metadata, the function pointer to the module builder. As part of the fingerprint of
   /// comparing the equality of the modules.
   pub fn set_builder_func_ptr(&mut self, key: usize) {
@@ -224,8 +219,7 @@ impl SysBuilder {
       })
       .collect::<HashMap<_, _>>();
     let ports = port_table.values().cloned().collect::<Vec<_>>();
-    let module_name = self.symbol_table.identifier(name);
-    let module = Module::new(&module_name, port_table);
+    let module = Module::new(name, port_table);
     let module = self.insert_element(module);
     // This part is kinda dirty, since we run into a chicken-egg problem: the port parent cannot
     // be set before the module is constructed. However, module's constructor accepts the ports
@@ -234,7 +228,8 @@ impl SysBuilder {
       let mut fifo_mut = self.get_mut::<FIFO>(&input).unwrap();
       fifo_mut.get_mut().set_parent(module);
     }
-    self.global_symbols.insert(module_name, module);
+    let new_name = self.symbol_table.insert(name, module);
+    module.as_mut::<Module>(self).unwrap().get_mut().name = new_name;
     let body = Block::new(module);
     let body = self.insert_element(body);
     self.get_mut::<Module>(&module).unwrap().get_mut().body = body;
