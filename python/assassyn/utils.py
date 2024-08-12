@@ -34,7 +34,7 @@ def parse_simulator_cycle(toks):
 
 def verilator_path():
     '''Returns the path to Verilator or None if VERILATOR_ROOT is not set'''
-    verilator_root = os.environ.get('VERILATOR_ROOT')    
+    verilator_root = os.environ.get('VERILATOR_ROOT')
     if verilator_root and os.path.isdir(verilator_root):
-        return 'verilator'    
+        return 'verilator'
     return None
