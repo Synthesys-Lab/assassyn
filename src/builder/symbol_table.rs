@@ -17,18 +17,19 @@ impl SymbolTable {
       *x += 1;
       // To avoid user to use the appended identifier, we also insert it into the symbol table.
       self.unique_ids.insert(res.clone(), 0);
-      return res;
+      res
+    } else {
+      // If not, we just use itself.
+      self.unique_ids.insert(id.into(), 0);
+      id.into()
     }
-    // If not, we just use itself.
-    self.unique_ids.insert(id.into(), 0);
-    id.into()
   }
 
   /// Insert the given node into the symbol table.
   pub(crate) fn insert(&mut self, id: &str, node: BaseNode) -> String {
     let id = self.identifier(id);
     self.symbols.insert(id.clone(), node);
-    return id;
+    id
   }
 
   /// Get the node from the symbol table.
