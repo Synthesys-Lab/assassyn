@@ -20,7 +20,6 @@ pub(crate) struct ExternalInterface {
 }
 
 impl ExternalInterface {
-
   pub(crate) fn new() -> Self {
     Self {
       external_interfaces: HashMap::new(),
@@ -40,14 +39,9 @@ impl ExternalInterface {
     );
     assert!(operand.get_kind() == NodeKind::Operand);
     if !self.external_interfaces.contains_key(&ext_node) {
-      self
-        .external_interfaces
-        .insert(ext_node, HashSet::new());
+      self.external_interfaces.insert(ext_node, HashSet::new());
     }
-    let users = self
-      .external_interfaces
-      .get_mut(&ext_node)
-      .unwrap();
+    let users = self.external_interfaces.get_mut(&ext_node).unwrap();
     users.insert(operand);
   }
 
@@ -212,50 +206,30 @@ impl ModuleMut<'_> {
   /// * `ext_node` - The external interface node.
   /// * `operand` - The operand node that uses this external interface.
   fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    self.get_mut().external_interfaces.remove_external_interface(ext_node, operand);
+    self
+      .get_mut()
+      .external_interfaces
+      .remove_external_interface(ext_node, operand);
   }
 
   /// Remove all the related external interfaces with the given condition.
   fn remove_related_externals(&mut self, operand: &BaseNode) {
-    let to_remove = self.get().external_interfaces.gather_related_externals(self.sys, operand);
+    let to_remove = self
+      .get()
+      .external_interfaces
+      .gather_related_externals(self.sys, operand);
     to_remove.iter().for_each(|(ext, user)| {
       self.remove_external_interface(*ext, *user);
     });
   }
 
   pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    self.get_mut().external_interfaces.insert_external_interface(ext_node, operand);
+    self
+      .get_mut()
+      .external_interfaces
+      .insert_external_interface(ext_node, operand);
   }
 
-  /// Add related external interfaces to the module.
-  fn add_related_externals(&mut self, operand: BaseNode) {
-    // Reconnect the external interfaces if applicable.
-    // TODO(@were): Maybe later unify a common interface for this.
-    let operand_ref = operand.as_ref::<Operand>(self.sys).unwrap();
-    let value = *operand_ref.get_value();
-    match value.get_kind() {
-      NodeKind::Array => {
-        self.insert_external_interface(value, operand);
-      }
-      NodeKind::FIFO => {
-        let fifo = value.as_ref::<FIFO>(self.sys).unwrap();
-        if fifo.get_parent().get_key() != self.get().get_key() {
-          self.insert_external_interface(value, operand);
-        }
-      }
-      // TODO(@were): Support this later.
-      // NodeKind::Expr => {
-      //   let expr = value.as_ref::<Expr>(self.sys).unwrap();
-      //   let block = expr.get_parent().as_ref::<Block>(self.sys).unwrap();
-      //   if block.get_module().get_key() != self.get().get_key() {
-      //     // TODO(@were): Stricter check for push/pop or downstream.
-      //     // assert!(self.get().has_attr(Attribute::Downstream), "{}", expr);
-      //     self.insert_external_interface(value, operand);
-      //   }
-      // }
-      _ => {}
-    }
-  }
 }
 
 impl ExprMut<'_> {
@@ -269,9 +243,8 @@ impl ExprMut<'_> {
       let old = *old;
       self.sys.cut_operand(&old);
       let operand = value.map(|x| self.sys.insert_element(Operand::new(x)));
-      let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
       if let Some(operand) = operand {
-        module_mut.add_related_externals(operand);
+        self.sys.add_related_externals(module, operand);
         self.get_mut().operands[i] = operand;
         operand
           .as_mut::<Operand>(self.sys)
@@ -397,6 +370,37 @@ impl SysBuilder {
         let mut expr_mut = user.as_mut::<Expr>(self).unwrap();
         expr_mut.set_operand(i, new_value);
       }
+    }
+  }
+
+  pub fn add_related_externals(&mut self, module: BaseNode, operand: BaseNode) {
+    // Reconnect the external interfaces if applicable.
+    // TODO(@were): Maybe later unify a common interface for this.
+    let value = {
+      let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+      *operand_ref.get_value()
+    };
+    if {
+      match value.get_kind() {
+        NodeKind::Array => true,
+        NodeKind::FIFO => {
+          let fifo = value.as_ref::<FIFO>(self).unwrap();
+          fifo.get_parent().get_key() != module.get_key()
+        }
+        // TODO(@were): Support this later.
+        // NodeKind::Expr => {
+        //   let expr = value.as_ref::<Expr>(self.sys).unwrap();
+        //   let block = expr.get_parent().as_ref::<Block>(self.sys).unwrap();
+        //   if block.get_module().get_key() != self.get().get_key() {
+        //     // TODO(@were): Stricter check for push/pop or downstream.
+        //     // assert!(self.get().has_attr(Attribute::Downstream), "{}", expr);
+        //     self.insert_external_interface(value, operand);
+        //   }
+        // }
+        _ => false,
+      }
+    } {
+      module.as_mut::<Module>(self).unwrap().insert_external_interface(value, operand);
     }
   }
 }

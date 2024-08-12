@@ -132,21 +132,22 @@ impl Visitor<String> for IRPrinter {
         .unwrap_or_else(|| panic!("Failed to dump: {:?}", elem))
       ));
     }
-    if let Some(param) = module.get_parameterizable() {
-      if !param.is_empty() {
-        res.push_str(&" ".repeat(self.indent));
-        res.push_str("// Parameters: ");
-        for (i, elem) in param.iter().enumerate() {
-          res.push_str(if i == 0 { " " } else { ", " });
-          res.push_str(&elem.to_string(module.sys));
-        }
-        res.push('\n');
-      }
-    }
-    if let Some(builder_ptr) = module.get_builder_func_ptr() {
-      res.push_str(&" ".repeat(self.indent));
-      res.push_str(&format!("// Builder Function: 0x{:x}\n", builder_ptr));
-    }
+    // TODO(@were): Later support parameterized fusion.
+    // if let Some(param) = module.get_parameterizable() {
+    //   if !param.is_empty() {
+    //     res.push_str(&" ".repeat(self.indent));
+    //     res.push_str("// Parameters: ");
+    //     for (i, elem) in param.iter().enumerate() {
+    //       res.push_str(if i == 0 { " " } else { ", " });
+    //       res.push_str(&elem.to_string(module.sys));
+    //     }
+    //     res.push('\n');
+    //   }
+    // }
+    // if let Some(builder_ptr) = module.get_builder_func_ptr() {
+    //   res.push_str(&" ".repeat(self.indent));
+    //   res.push_str(&format!("// Builder Function: 0x{:x}\n", builder_ptr));
+    // }
     res.push_str(&" ".repeat(self.indent));
     res.push_str(&format!("// Key: {}\n", module.get_key()));
     res.push_str(&" ".repeat(self.indent));
