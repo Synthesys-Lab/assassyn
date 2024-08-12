@@ -53,7 +53,7 @@ def test_multi_call():
 
     print(sys)
 
-    simulator_path = elaborate(sys, verilog=None)
+    simulator_path, _ = elaborate(sys, verilog=None)
 
     raw = utils.run_simulator(simulator_path)
 

@@ -56,15 +56,15 @@ def test_cond_cse():
         driver = Driver()
         driver.build(adder)
 
-    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog='verilator')
+    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog=utils.verilator_path())
     simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    raw = utils.run_verilator(verilator_path)
-    check(raw)
-
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
+        check(raw)
 
 
 if __name__ == '__main__':

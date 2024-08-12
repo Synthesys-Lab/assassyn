@@ -81,14 +81,15 @@ def test_wait_until():
         driver.build(agent, lock)
 
 
-    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog='verilator')
+    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog=utils.verilator_path())
     simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
     check(raw, parse_simulator_log)
 
-    raw = utils.run_verilator(verilator_path)
-    check(raw, parse_verilator_log)
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
+        check(raw, parse_verilator_log)
 
 
 if __name__ == '__main__':

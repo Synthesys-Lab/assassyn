@@ -96,7 +96,7 @@ def test_arbiter():
 
     print(sys)
 
-    simulator_path = elaborate(sys, sim_threshold=200, idle_threshold=200, verilog=None)
+    simulator_path, _ = elaborate(sys, sim_threshold=200, idle_threshold=200, verilog=None)
 
     raw = utils.run_simulator(simulator_path)
 
