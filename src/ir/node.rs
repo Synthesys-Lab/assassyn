@@ -216,11 +216,45 @@ macro_rules! register_elements {
       Unknown,
     }
 
+    paste! {
+      $(
+
+        pub struct [<$to_register Node>] {
+          key: usize,
+        }
+
+        impl From<BaseNode> for [<$to_register Node>] {
+          fn from(x: BaseNode) -> [<$to_register Node>] {
+            assert_eq!(x.get_kind(), NodeKind::$to_register);
+            [<$to_register Node>] { key: x.get_key() }
+          }
+        }
+
+        impl From<[<$to_register Node>]> for BaseNode {
+          fn from(x: [<$to_register Node>]) -> BaseNode {
+            BaseNode::new(NodeKind::$to_register, x.key)
+          }
+        }
+
+        impl [<$to_register Node>] {
+
+          pub fn as_ref<'elem, 'sys: 'elem>(
+            &self,
+            sys: &'sys SysBuilder,
+          ) -> [<$to_register Ref>]<'sys> {
+            $to_register::reference(sys, BaseNode::new(NodeKind::$to_register, self.key)).unwrap()
+          }
+
+        }
+
+      )*
+    }
+
     pub enum Element {
       $($to_register(Box<$to_register>),)*
     }
-
   };
+
 }
 
 register_elements!(Module, FIFO, Optional, Expr, Array, IntImm, Block, StrImm, Operand, Downstream);
