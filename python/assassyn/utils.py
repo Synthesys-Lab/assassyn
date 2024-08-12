@@ -31,3 +31,14 @@ def parse_verilator_cycle(toks):
 def parse_simulator_cycle(toks):
     '''Helper function to parse rust-simulator dumped cycle'''
     return int(toks[2][1:-4])
+
+def verilator_path():
+    '''Returns the path to Verilator or None if VERILATOR_ROOT is not set'''
+    repo_path = os.environ.get('REPO_PATH')
+    verilator_dir = os.path.join(repo_path, 'verilator') if repo_path else None
+    
+    if verilator_dir and os.path.isdir(verilator_dir):
+        os.environ['VERILATOR_ROOT'] = verilator_dir
+        return 'verilator'
+    
+    return None
