@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::builder::SysBuilder;
 
-use super::{node::*, visitor::Visitor, Block, Expr, Module, FIFO};
+use super::{instructions::Bind, node::*, visitor::Visitor, Block, Expr, Module, FIFO};
 
 /// This node defines a def-use relation between the expression nodes.
 /// This is necessary because a node can be used by multiple in other user.
@@ -32,11 +32,11 @@ impl ExternalInterface {
   /// * `ext_node` - The external interface node.
   /// * `operand` - The operand node that uses this external interface.
   pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    assert!(
-      matches!(ext_node.get_kind(), NodeKind::Array | NodeKind::FIFO),
-      "Expecting Array or FIFO but got {:?}",
-      ext_node
-    );
+    // assert!(
+    //   matches!(ext_node.get_kind(), NodeKind::Array | NodeKind::FIFO),
+    //   "Expecting Array or FIFO but got {:?}",
+    //   ext_node
+    // );
     assert!(operand.get_kind() == NodeKind::Operand);
     // Next line is equivalent to the following code:
     // if !self.external_interfaces.contains_key(&ext_node) {
@@ -337,15 +337,7 @@ impl SysBuilder {
         fifo.get_parent().get_key() != module.get_key()
       }
       // TODO(@were): Support this later.
-      // NodeKind::Expr => {
-      //   let expr = value.as_ref::<Expr>(self.sys).unwrap();
-      //   let block = expr.get_parent().as_ref::<Block>(self.sys).unwrap();
-      //   if block.get_module().get_key() != self.get().get_key() {
-      //     // TODO(@were): Stricter check for push/pop or downstream.
-      //     // assert!(self.get().has_attr(Attribute::Downstream), "{}", expr);
-      //     self.insert_external_interface(value, operand);
-      //   }
-      // }
+      NodeKind::Expr => value.as_expr::<Bind>(self).is_ok(),
       _ => false,
     } {
       module

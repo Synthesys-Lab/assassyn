@@ -13,7 +13,7 @@ use syn::Ident;
 use crate::{
   backend::common::{create_and_clean_dir, Config},
   builder::system::{ModuleKind, SysBuilder},
-  ir::{expr::subcode, instructions::Bind, node::*, visitor::Visitor, *},
+  ir::{expr::subcode, node::*, visitor::Visitor, *},
 };
 
 use super::utils::{
@@ -24,20 +24,18 @@ use self::{expr::subcode::Cast, instructions, ir_printer::IRPrinter, module::Att
 
 use super::analysis;
 
-struct ElaborateModule<'a, 'b> {
+struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   indent: usize,
   module_name: String,
-  slab_cache: &'b HashMap<BaseNode, usize>,
 }
 
-impl<'a, 'b> ElaborateModule<'a, 'b> {
-  fn new(sys: &'a SysBuilder, ri: &'b HashMap<BaseNode, usize>) -> Self {
+impl<'a> ElaborateModule<'a> {
+  fn new(sys: &'a SysBuilder) -> Self {
     Self {
       sys,
       indent: 0,
       module_name: String::new(),
-      slab_cache: ri,
     }
   }
 }
@@ -95,23 +93,13 @@ impl Visitor<String> for NodeRefDumper {
         let value = str_imm.get_value();
         quote::quote!(#value).to_string().into()
       }
-      NodeKind::Module => {
-        let module_name = namify(node.as_ref::<Module>(sys).unwrap().get_name());
-        format!("Box::new(EventKind::Module{})", module_name).into()
-      }
+      NodeKind::Module => Some(namify(node.as_ref::<Module>(sys).unwrap().get_name())),
       _ => Some(namify(node.to_string(sys).as_str()).to_string()),
     }
   }
 }
 
-impl ElaborateModule<'_, '_> {
-  fn current_module_id(&self) -> syn::Ident {
-    let s = format!("Module{}", camelize(&namify(&self.module_name)));
-    syn::Ident::new(&s, Span::call_site())
-  }
-}
-
-impl Visitor<String> for ElaborateModule<'_, '_> {
+impl Visitor<String> for ElaborateModule<'_> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.module_name = module.get_name().to_string();
     let mut res = String::new();
@@ -123,7 +111,6 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
     // First, some common function parameters are dumped.
     res.push_str(&format!("pub fn {}(\n", namify(module.get_name())));
     res.push_str("  stamp: usize,\n");
-    res.push_str("  q: &mut BinaryHeap<Reverse<Event>>,\n");
     for port in module.fifo_iter() {
       res.push_str(&format!(
         "  {}: &VecDeque<{}>,\n",
@@ -131,21 +118,31 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
         dtype_to_rust_type(&port.scalar_ty())
       ));
     }
+    res.push_str(
+      format!(
+        "{}_event: &mut VecDeque<usize>,\n",
+        namify(&self.module_name)
+      )
+      .as_str(),
+    );
+    for port in module.fifo_iter() {
+      res.push_str(&format!(
+        "  {}_pop: &mut VecDeque<usize>,\n",
+        fifo_name!(port),
+      ));
+    }
     // All the writes will be done in half a cycle later by events, so no need to feed them
     // to the function signature.
-    for (interf, _) in module.ext_interf_iter().filter(|(v, ops)| {
-      v.get_kind() == NodeKind::Array && user_contains_opcode(module.sys, ops, vec![Opcode::Load])
-    }) {
-      let array = interf.as_ref::<Array>(module.sys).unwrap();
-      res.push_str(
-        format!(
-          "{}: &{}, // external array read\n",
-          dump_ref!(module.sys, interf),
-          dtype_to_rust_type(&array.dtype())
-        )
-        .as_str(),
-      )
+    let ext_interf = analysis::interface::analyze_module_external_interfaces(&module);
+    for (interf, suffix, ty) in ext_interf {
+      res.push_str(&format!(
+        "  {}{}: {},\n",
+        dump_ref!(module.sys, &interf),
+        suffix,
+        ty
+      ));
     }
+
     res.push_str(") {\n");
     self.indent += 2;
 
@@ -207,52 +204,39 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::Store => {
         let store = expr.as_sub::<instructions::Store>().unwrap();
         let (array, idx) = (store.array(), store.idx());
-        let slab_idx = *self.slab_cache.get(&array.upcast()).unwrap();
         let idx = dump_ref!(store.get().sys, &idx);
         let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
-        let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
-        let aid = array_ty_to_id(&scalar_ty, size);
-        let id = syn::Ident::new(&format!("Array{}Write", aid), Span::call_site());
         let value = dump_ref!(self.sys, &store.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
-        let module_writer = self.current_module_id();
+        let module_writer = &self.module_name;
+        let array_write_q = syn::Ident::new(
+          &format!("{}_write", dump_ref!(store.get().sys, &array.upcast())),
+          Span::call_site(),
+        );
         quote::quote! {
-          q.push(Reverse(Event{
-            stamp: stamp + 50,
-            kind: EventKind::#id(
-              (EventKind::#module_writer.into(), #slab_idx, #idx as usize, #value))
-          }))
+          #array_write_q.push_back(
+            (stamp + 50, #idx as usize, #value.clone(), #module_writer.to_string()));
         }
         .to_string()
       }
       Opcode::AsyncCall => {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
         let bind = call.bind();
-        let event_kind = camelize(&namify(bind.callee().get_name()));
-        let event_kind = format!("EventKind::Module{}", event_kind);
-        format!(
-          "q.push(Reverse(Event{{ stamp: stamp + 100, kind: {} }}))",
-          event_kind
-        )
+        let event_q = namify(bind.callee().get_name());
+        format!("{}_event.push_back(stamp + 100)", event_q)
       }
       Opcode::FIFOPop => {
         // TODO(@were): Support multiple pop.
         let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
         let fifo = pop.fifo();
-        let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
-        let fifo_ty = fifo.scalar_ty();
-        let fifo_pop = syn::Ident::new(
-          &format!("FIFO{}Pop", dtype_to_rust_type(&fifo_ty)),
+        let fifo_pop_q = syn::Ident::new(
+          &format!("{}_pop", dump_ref!(pop.get().sys, &fifo.upcast())),
           Span::call_site(),
         );
-        let module_writer = self.current_module_id();
-        let fifo_name = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
+        let fifo_id = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
         quote::quote! {{
-          q.push(Reverse(Event{
-            stamp: stamp + 50,
-            kind: EventKind::#fifo_pop((EventKind::#module_writer.into(), #slab_idx))
-          }));
-          #fifo_name.front().unwrap().clone()
+          #fifo_pop_q.push_back(stamp + 50);
+          #fifo_id.front().unwrap().clone()
         }}
         .to_string()
       }
@@ -268,20 +252,15 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
       Opcode::FIFOPush => {
         let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
         let fifo = push.fifo();
-        let slab_idx = *self.slab_cache.get(&fifo.upcast()).unwrap();
-        let fifo_push = syn::Ident::new(
-          &format!("FIFO{}Push", dtype_to_rust_type(&fifo.scalar_ty())),
+        let fifo_push_q = syn::Ident::new(
+          &format!("{}_push", dump_ref!(push.get().sys, &fifo.upcast())),
           Span::call_site(),
         );
         let value = dump_ref!(self.sys, &push.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
-        let module_writer = self.current_module_id();
+        let module_writer = &self.module_name;
         quote::quote! {
-          q.push(Reverse(Event{
-            stamp: stamp + 50,
-            kind: EventKind::#fifo_push(
-              (EventKind::#module_writer.into(), #slab_idx, #value.clone()))
-          }))
+          #fifo_push_q.push_back((stamp + 50, #value.clone(), #module_writer.to_string()));
         }
         .to_string()
       }
@@ -389,11 +368,7 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
           }
         }
       }
-      Opcode::Bind => {
-        let bind = expr.as_sub::<Bind>().unwrap();
-        let module = bind.callee();
-        format!("EventKind::Module{}", camelize(&namify(module.get_name())))
-      }
+      Opcode::Bind => "()".into(),
       Opcode::BlockIntrinsic { intrinsic } => {
         let bi = expr.as_sub::<instructions::BlockIntrinsic>().unwrap();
         let value = dump_ref!(self.sys, &bi.value());
@@ -404,16 +379,10 @@ impl Visitor<String> for ElaborateModule<'_, '_> {
             format!("if stamp / 100 == ({} as usize) {{", value)
           }
           subcode::BlockIntrinsic::WaitUntil => {
-            let module_eventkind_id = self.current_module_id().to_string();
             format!(
-              "if !{} {{
-                q.push(Reverse(Event {{
-                  stamp: stamp + 100,
-                  kind: EventKind::{},
-                }}));
-                return;
-              }}",
-              value, module_eventkind_id,
+              "if !{} {{ {}_event.push_back(stamp + 100); return; }}",
+              value,
+              namify(&self.module_name),
             )
           }
           subcode::BlockIntrinsic::Condition => {
@@ -1154,23 +1123,17 @@ macro_rules! impl_unwrap_slab {
   (res, slab_cache)
 }
 
-fn dump_modules(
-  sys: &SysBuilder,
-  fd: &mut File,
-  slab_cache: &HashMap<BaseNode, usize>,
-) -> Result<(), std::io::Error> {
+fn dump_modules(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
   fd.write_all(
     quote! {
       use super::runtime::*;
       use std::collections::VecDeque;
-      use std::collections::BinaryHeap;
-      use std::cmp::Reverse;
       use num_bigint::{BigInt, BigUint};
     }
     .to_string()
     .as_bytes(),
   )?;
-  let mut em = ElaborateModule::new(sys, slab_cache);
+  let mut em = ElaborateModule::new(sys);
   for module in em.sys.module_iter(ModuleKind::Module) {
     if let Some(buffer) = em.visit_module(module) {
       fd.write_all(buffer.as_bytes())?;
@@ -1219,11 +1182,11 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
   }
   // eprintln!("Writing simulator source to file: {}", fname);
   let fname = simulator_name.join("src/main.rs");
-  let (rt_src, ri) = dump_runtime(sys, config);
+  let (rt_src, _) = dump_runtime(sys, config);
   {
     let modules_file = simulator_name.join("src/modules.rs");
     let mut fd = fs::File::create(modules_file).expect("Open failure");
-    dump_modules(sys, &mut fd, &ri).expect("Dump module failure");
+    dump_modules(sys, &mut fd).expect("Dump module failure");
     fd.flush().expect("Flush modules failure");
   }
   {

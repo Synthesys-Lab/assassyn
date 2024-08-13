@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use expr::subcode;
+use instructions::Bind;
 use module::ModulePort;
 
 use crate::ir::{node::*, *};
@@ -82,6 +83,15 @@ impl Visitor<String> for ExtInterDumper<'_> {
     }
     res.push_str(&format!("{}// }}", " ".repeat(self.ident)));
     res.into()
+  }
+
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
+    let mut res = String::new();
+    if let Ok(bind) = expr.clone().as_sub::<Bind>() {
+      res.push_str(format!("{}: module callee", bind.callee().get_name()).as_str());
+      return res.into();
+    }
+    unreachable!()
   }
 
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {

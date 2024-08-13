@@ -531,6 +531,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           )
           .as_str(),
         );
+      } else if interf.get_kind() == NodeKind::Expr {
+        // TODO(@were): Skip this for now. I am 100% sure we need this later.
       } else {
         panic!("Unknown interf kind {:?}", interf.get_kind());
       }
@@ -933,6 +935,8 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           )
           .as_str(),
         );
+      } else if interf.get_kind() == NodeKind::Expr {
+        // TODO(@were): Skip this for now.
       } else {
         panic!("Unknown interf kind {:?}", interf.get_kind());
       }
