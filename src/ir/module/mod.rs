@@ -241,6 +241,15 @@ impl SysBuilder {
     }
     let new_name = self.symbol_table.insert(name, module);
     module.as_mut::<Module>(self).unwrap().get_mut().name = new_name;
+    // This is a BIG PITFALL here. We CANNOT call `sys.create_block` here, because the created block
+    // will be inserted at the current insert point of the system builder, which is NOT this module.
+    // We should: 1. manually new a block instance; 2. insert this newed block into the slab buffer;
+    // 3. set the body of the module to this newed block.
+    //
+    // This same issue applies to the downstream module. See below.
+    //
+    // TODO(@were): I am not sure if this is a good design. Maybe I should unify the way of creating
+    // blocks. When extending downstream module, I totally forgot about this issue.
     let body = Block::new(module);
     let body = self.insert_element(body);
     self.get_mut::<Module>(&module).unwrap().get_mut().body = body;
@@ -249,17 +258,15 @@ impl SysBuilder {
 
   /// Create a downstream module.
   pub fn create_downstream(&mut self, name: &str, ports: HashMap<String, BaseNode>) -> BaseNode {
-    let mut downstream = Module::downstream(name.to_string(), ports);
-    let body = self.create_block();
-    downstream.body = body;
+    let downstream = Module::downstream(name.to_string(), ports);
     let res = self.insert_element(downstream);
+    // This is a BIG PITFALL here. See the comment in `create_module`.
+    let body = Block::new(res);
+    let body = self.insert_element(body);
     let name = self.symbol_table.insert(&name, res);
-    res.as_mut::<Module>(self).unwrap().get_mut().name = name;
-    body
-      .as_mut::<Block>(self)
-      .unwrap()
-      .get_mut()
-      .set_parent(res);
+    let mut downstream_mut = res.as_mut::<Module>(self).unwrap();
+    downstream_mut.get_mut().name = name;
+    downstream_mut.get_mut().body = body;
     let ports = {
       match res.as_ref::<Module>(self).unwrap().get_ports() {
         ModulePort::Downstream { ports } => ports.values().cloned().collect::<Vec<_>>(),

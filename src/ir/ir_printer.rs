@@ -157,31 +157,47 @@ impl Visitor<String> for IRPrinter {
       module.get_attrs().iter().collect::<Vec<_>>()
     ));
     res.push_str(&format!(
-      "{}module {}(",
+      "{}{} {}(",
       " ".repeat(self.indent),
+      match module.get_ports() {
+        ModulePort::Upstream { .. } => "module",
+        ModulePort::Downstream { .. } => "module.downstream",
+        _ => unreachable!(),
+      },
       module.get_name()
     ));
-    module.get();
+    if module.get_num_inputs() != 0 {
+      res.push_str("\n");
+    }
     match module.get_ports() {
       ModulePort::Upstream { .. } => {
         for elem in module.fifo_iter() {
+          res.push_str(" ".repeat(self.indent + 2).as_str());
           res.push_str(&self.visit_fifo(elem).unwrap());
-          res.push_str(", ");
+          res.push_str(",\n");
         }
       }
       ModulePort::Downstream { ports } => {
         for elem in ports.values() {
           let option = elem.as_ref::<Optional>(module.sys).unwrap();
-          res.push_str(" { ");
+          res.push_str(" ".repeat(self.indent + 2).as_str());
+          res.push_str("optional { pred: ");
           res.push_str(option.get_pred().to_string(module.sys).as_str());
-          res.push_str(", ");
+          res.push_str(", value: ");
           res.push_str(option.get_value().to_string(module.sys).as_str());
-          res.push_str(" }, ");
+          res.push_str(" },\n");
         }
       }
       _ => unreachable!(),
     }
-    res.push_str(") {\n");
+    res.push_str(
+      format!(
+        "{}) {{ // block-key: {}\n",
+        " ".repeat(self.indent),
+        module.get_body().get_key()
+      )
+      .as_str(),
+    );
     self.inc_indent();
     if module.get_name().eq("driver") {
       res.push_str(&format!("{}while true {{\n", " ".repeat(self.indent)));
@@ -190,7 +206,6 @@ impl Visitor<String> for IRPrinter {
 
     let body = self.visit_block(module.get_body()).unwrap();
     res.push_str(&body);
-    res.push('\n');
 
     if module.get_name().eq("driver") {
       self.dec_indent();
@@ -222,16 +237,13 @@ impl Visitor<String> for IRPrinter {
 
   fn visit_block(&mut self, block: BlockRef<'_>) -> Option<String> {
     let mut res = String::new();
-    let (cur_mod, cur_block, at) = {
-      let ip = block.sys.get_insert_point();
-      (ip.module, ip.block, ip.at)
-    };
-    let here = cur_mod == block.get_module() && cur_block == block.upcast();
+    let ip = block.sys.get_insert_point();
+    let here = ip.module == block.get_module() && ip.block == block.upcast();
     let restore_ident = self.indent;
     for (i, elem) in block.body_iter().enumerate() {
-      if here && at.map_or(false, |x| x == i) {
+      if here && ip.at.map_or(false, |x| x == i) {
         res.push_str(&format!(
-          "{}-----{{Insert Here}}-----\n",
+          "{}-----{{Insert Mid}}-----\n",
           " ".repeat(self.indent)
         ));
       }
@@ -241,17 +253,17 @@ impl Visitor<String> for IRPrinter {
           res.push_str(&format!("{}\n", self.visit_expr(expr).unwrap()));
         }
         NodeKind::Block => {
-          let block = elem.as_ref::<Block>(block.sys).unwrap();
-          res.push_str(&format!("{}\n", self.visit_block(block).unwrap()));
+          let sub = elem.as_ref::<Block>(block.sys).unwrap();
+          res.push_str(&format!("{}\n", self.visit_block(sub).unwrap()));
         }
         _ => {
           panic!("Not an block-able element: {:?}", elem);
         }
       }
     }
-    if here && at.is_none() {
+    if here && ip.at.is_none() {
       res.push_str(&format!(
-        "{}-----{{Insert Here}}-----\n",
+        "{}-----{{Insert At Last}}-----\n",
         " ".repeat(self.indent)
       ));
     }
