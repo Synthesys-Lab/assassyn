@@ -1,6 +1,6 @@
 use std::{
   collections::HashMap,
-  fs::{self, File, OpenOptions},
+  fs::{self, File},
   io::Write,
   path::PathBuf,
   process::Command,
