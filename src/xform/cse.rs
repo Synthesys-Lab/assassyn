@@ -147,7 +147,7 @@ pub fn common_code_elimination(sys: &mut SysBuilder) {
     let ip = InsertPoint {
       module: ip.0,
       block: ip.1,
-      at: idx.into(),
+      at: idx,
     };
     sys.set_current_ip(ip);
     let (dtype, opcode, operands) = {

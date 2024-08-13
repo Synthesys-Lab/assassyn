@@ -328,25 +328,23 @@ impl SysBuilder {
       let operand_ref = operand.as_ref::<Operand>(self).unwrap();
       *operand_ref.get_value()
     };
-    if {
-      match value.get_kind() {
-        NodeKind::Array => true,
-        NodeKind::FIFO => {
-          let fifo = value.as_ref::<FIFO>(self).unwrap();
-          fifo.get_parent().get_key() != module.get_key()
-        }
-        // TODO(@were): Support this later.
-        // NodeKind::Expr => {
-        //   let expr = value.as_ref::<Expr>(self.sys).unwrap();
-        //   let block = expr.get_parent().as_ref::<Block>(self.sys).unwrap();
-        //   if block.get_module().get_key() != self.get().get_key() {
-        //     // TODO(@were): Stricter check for push/pop or downstream.
-        //     // assert!(self.get().has_attr(Attribute::Downstream), "{}", expr);
-        //     self.insert_external_interface(value, operand);
-        //   }
-        // }
-        _ => false,
+    if match value.get_kind() {
+      NodeKind::Array => true,
+      NodeKind::FIFO => {
+        let fifo = value.as_ref::<FIFO>(self).unwrap();
+        fifo.get_parent().get_key() != module.get_key()
       }
+      // TODO(@were): Support this later.
+      // NodeKind::Expr => {
+      //   let expr = value.as_ref::<Expr>(self.sys).unwrap();
+      //   let block = expr.get_parent().as_ref::<Block>(self.sys).unwrap();
+      //   if block.get_module().get_key() != self.get().get_key() {
+      //     // TODO(@were): Stricter check for push/pop or downstream.
+      //     // assert!(self.get().has_attr(Attribute::Downstream), "{}", expr);
+      //     self.insert_external_interface(value, operand);
+      //   }
+      // }
+      _ => false,
     } {
       module
         .as_mut::<Module>(self)
