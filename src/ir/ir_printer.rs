@@ -167,7 +167,7 @@ impl Visitor<String> for IRPrinter {
       module.get_name()
     ));
     if module.get_num_inputs() != 0 {
-      res.push_str("\n");
+      res.push('\n');
     }
     match module.get_ports() {
       ModulePort::Upstream { .. } => {

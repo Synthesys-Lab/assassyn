@@ -38,9 +38,11 @@ impl ExternalInterface {
       ext_node
     );
     assert!(operand.get_kind() == NodeKind::Operand);
-    if !self.external_interfaces.contains_key(&ext_node) {
-      self.external_interfaces.insert(ext_node, HashSet::new());
-    }
+    // Next line is equivalent to the following code:
+    // if !self.external_interfaces.contains_key(&ext_node) {
+    //   self.external_interfaces.insert(ext_node, HashSet::new());
+    // }
+    self.external_interfaces.entry(ext_node).or_default();
     let users = self.external_interfaces.get_mut(&ext_node).unwrap();
     users.insert(operand);
   }

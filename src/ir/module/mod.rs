@@ -85,7 +85,7 @@ impl Module {
   pub fn downstream(name: String, ports: HashMap<String, BaseNode>) -> Self {
     Module {
       key: 0,
-      name: name.into(),
+      name,
       ports: ModulePort::Downstream { ports },
       user_set: HashSet::new(),
       ..Default::default()
@@ -263,7 +263,7 @@ impl SysBuilder {
     // This is a BIG PITFALL here. See the comment in `create_module`.
     let body = Block::new(res);
     let body = self.insert_element(body);
-    let name = self.symbol_table.insert(&name, res);
+    let name = self.symbol_table.insert(name, res);
     let mut downstream_mut = res.as_mut::<Module>(self).unwrap();
     downstream_mut.get_mut().name = name;
     downstream_mut.get_mut().body = body;

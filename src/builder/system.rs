@@ -377,8 +377,8 @@ impl SysBuilder {
   /// * `pred` - The condition of selecting the value.
   pub fn create_optional(&mut self, value: BaseNode, pred: BaseNode) -> BaseNode {
     let instance = Optional::new(value, pred);
-    let res = self.insert_element(instance);
-    res
+    
+    self.insert_element(instance)
   }
 
   pub fn create_select_1hot(&mut self, cond: BaseNode, values: Vec<BaseNode>) -> BaseNode {
