@@ -299,8 +299,14 @@ impl ExprMut<'_> {
         .unwrap()
         .get_module()
         .upcast();
+      if let Some(ref name) = self.get().name {
+        let name = name.to_string();
+        let mut module_mut = module.as_mut::<Module>(self.sys).unwrap();
+        assert!(module_mut.get_mut().symbol_table.remove(&name).is_some());
+      }
+      let node = self.get().upcast();
       let mut module_mut = module.as_mut::<Module>(self.sys).unwrap();
-      module_mut.get_mut().symbol_table.identifier(&name)
+      module_mut.get_mut().symbol_table.insert(&name, node)
     };
     self.get_mut().name = Some(name);
   }
