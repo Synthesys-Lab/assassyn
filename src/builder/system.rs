@@ -121,27 +121,6 @@ macro_rules! create_arith_op_impl {
   };
 }
 
-macro_rules! impl_typed_iter {
-  ($func_name:ident, $ty: ident) => {
-    paste::paste! {
-      /// Iterate over all the modules of the system.
-      pub fn $func_name(&self) -> impl Iterator<Item = [<$ty Ref>]<'_>> {
-        self
-          .symbol_table
-          .iter()
-          .filter(|(_, v)| {
-            if let NodeKind::$ty = v.get_kind() {
-              true
-            } else {
-              false
-            }
-          })
-          .map(|(_, x)| x.as_ref::<$ty>(self).unwrap())
-      }
-    }
-  };
-}
-
 impl SysBuilder {
   /// Create a new system.
   /// # Arguments
@@ -167,12 +146,16 @@ impl SysBuilder {
 
   /// If this system has a driver.
   pub fn has_driver(&self) -> bool {
-    self.module_iter().any(|x| x.get_name().eq("driver"))
+    self
+      .module_iter(false.into())
+      .any(|x| x.get_name().eq("driver"))
   }
 
   /// If this system has a testbench.
   pub fn has_testbench(&self) -> bool {
-    self.module_iter().any(|x| x.get_name().eq("testbench"))
+    self
+      .module_iter(false.into())
+      .any(|x| x.get_name().eq("testbench"))
   }
 
   /// The helper function to get an element of the system and downcast it to its actual
@@ -188,8 +171,26 @@ impl SysBuilder {
     T::reference(self, *key)
   }
 
-  impl_typed_iter!(module_iter, Module);
-  impl_typed_iter!(array_iter, Array);
+  pub fn array_iter(&self) -> impl Iterator<Item = ArrayRef<'_>> {
+    self
+      .symbol_table
+      .symbols()
+      .filter_map(|v| v.as_ref::<Array>(self).ok())
+  }
+
+  /// Get the iterator of the modules.
+  ///
+  /// # Arguments
+  /// * `downstream` - If true, the iterator will only return downstream modules.
+  ///   If false, the iterator will only return upstream modules.
+  ///   If None, the iterator will return both modules.
+  pub fn module_iter(&self, downstream: Option<bool>) -> impl Iterator<Item = ModuleRef<'_>> {
+    self.symbol_table.symbols().filter_map(move |v| {
+      v.as_ref::<Module>(self)
+        .ok()
+        .filter(|m| downstream.map_or(true, |x| x == m.is_downstream()))
+    })
+  }
 
   /// The helper function to get an element of the system and downcast it to its actual type's
   /// mutable reference.
@@ -377,7 +378,7 @@ impl SysBuilder {
   /// * `pred` - The condition of selecting the value.
   pub fn create_optional(&mut self, value: BaseNode, pred: BaseNode) -> BaseNode {
     let instance = Optional::new(value, pred);
-    
+
     self.insert_element(instance)
   }
 
@@ -808,7 +809,7 @@ impl Display for SysBuilder {
       writeln!(f, "  {};", printer.visit_array(elem).unwrap())?;
     }
     printer.inc_indent();
-    for elem in self.module_iter() {
+    for elem in self.module_iter(None) {
       write!(f, "\n{}", printer.visit_module(elem).unwrap())?;
     }
     printer.dec_indent();

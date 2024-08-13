@@ -107,6 +107,10 @@ impl<'sys> ModuleRef<'sys> {
     }
   }
 
+  pub fn is_downstream(&self) -> bool {
+    matches!(self.ports, ModulePort::Downstream { .. })
+  }
+
   /// Get the input by name.
   ///
   /// # Arguments

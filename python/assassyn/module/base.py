@@ -1,6 +1,7 @@
 '''The base class for the module definition.'''
 from ..utils import identifierize
 
+# pylint: disable=too-few-public-methods
 class ModuleBase:
     '''The base class for the module definition.'''
 
@@ -14,4 +15,3 @@ def name_ports_of_module(module, port_type):
         if isinstance(v, port_type):
             v.name = k
             v.module = module
-

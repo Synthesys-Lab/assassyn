@@ -10,7 +10,6 @@ from .value import Optional
 from .builder import SysBuilder
 from .array import Array
 from .module import Module, Port, Memory
-from .module.downstream import Downstream
 from .block import Block
 from .expr import Expr
 from .utils import identifierize
@@ -170,6 +169,7 @@ class CodeGen(visitor.Visitor):
         return 'Some(init)'
 
 
+    # pylint: disable=too-many-locals, too-many-statements
     def visit_system(self, node: SysBuilder):
         self.header.append('use std::path::PathBuf;')
         self.header.append('use std::collections::HashMap;')
@@ -200,7 +200,7 @@ class CodeGen(visitor.Visitor):
             self.visit_module(elem)
 
         for elem in node.downstreams:
-            self.code.append(f'  // Emit downstream modules')
+            self.code.append('  // Emit downstream modules')
             self.code.append('  let downstream_ports = {')
             self.code.append('    let mut res = HashMap::new();')
             for port in elem.ports:
@@ -212,7 +212,8 @@ class CodeGen(visitor.Visitor):
             self.code.append('    res')
             self.code.append('  };')
             var = self.generate_rval(elem)
-            self.code.append(f'  let {var} = sys.create_downstream("{elem.name}", downstream_ports);')
+            self.code.append(
+                    f'  let {var} = sys.create_downstream("{elem.name}", downstream_ports);')
             self.visit_module(elem)
 
         config = self.emit_config()

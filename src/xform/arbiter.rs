@@ -40,7 +40,8 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
   let mut gather_binds = GatherBinds {
     binds: HashMap::new(),
   };
-  for m in sys.module_iter() {
+  // Only FIFO port upstream modules are considered to be arbitrated.
+  for m in sys.module_iter(Some(false)) {
     gather_binds.visit_module(m);
   }
   gather_binds.binds.retain(|_, v| v.len() > 1);

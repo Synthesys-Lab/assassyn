@@ -50,7 +50,7 @@ pub trait Visitor<T> {
   }
 
   fn enter(&mut self, sys: &SysBuilder) -> Option<T> {
-    for elem in sys.module_iter() {
+    for elem in sys.module_iter(None) {
       let res = self.visit_module(elem);
       if res.is_some() {
         return res;
