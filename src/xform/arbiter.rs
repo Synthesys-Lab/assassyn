@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  builder::{PortInfo, SysBuilder},
+  builder::{system::ModuleKind, PortInfo, SysBuilder},
   ir::{
     instructions::{Bind, FIFOPush},
     module,
@@ -41,7 +41,7 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
     binds: HashMap::new(),
   };
   // Only FIFO port upstream modules are considered to be arbitrated.
-  for m in sys.module_iter(Some(false)) {
+  for m in sys.module_iter(ModuleKind::Module) {
     gather_binds.visit_module(m);
   }
   gather_binds.binds.retain(|_, v| v.len() > 1);

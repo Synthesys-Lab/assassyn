@@ -1,5 +1,5 @@
 use crate::{
-  builder::{system::InsertPoint, SysBuilder},
+  builder::{system::{InsertPoint, ModuleKind}, SysBuilder},
   ir::{
     node::{BaseNode, IsElement, ModuleRef},
     visitor::Visitor,
@@ -29,6 +29,13 @@ impl Visitor<()> for GatherModulesToRewrite {
       }
     }
     None
+  }
+
+  fn enter(&mut self, sys: &SysBuilder) -> Option<()> {
+    for module in sys.module_iter(ModuleKind::Module) {
+      self.visit_module(module);
+    }
+    ().into()
   }
 }
 

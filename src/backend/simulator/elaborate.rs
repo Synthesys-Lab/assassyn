@@ -12,7 +12,7 @@ use syn::Ident;
 
 use crate::{
   backend::common::{create_and_clean_dir, Config},
-  builder::system::SysBuilder,
+  builder::system::{ModuleKind, SysBuilder},
   ir::{expr::subcode, instructions::Bind, node::*, visitor::Visitor, *},
 };
 
@@ -487,7 +487,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
     .to_string(),
   );
 
-  for module in sys.module_iter(None) {
+  for module in sys.module_iter(ModuleKind::All) {
     res.push_str(&format!(
       "use super::modules::{};\n",
       namify(module.get_name())
@@ -652,7 +652,7 @@ fn dump_runtime(sys: &SysBuilder, config: &Config) -> (String, HashMap<BaseNode,
   // }
   res.push_str("#[derive(Clone, Debug, Eq, PartialEq)]\n");
   res.push_str("pub enum EventKind {\n");
-  for module in sys.module_iter(Some(false)) {
+  for module in sys.module_iter(ModuleKind::Module) {
     res.push_str(&format!(
       "  Module{},\n",
       camelize(&namify(module.get_name()))
@@ -894,7 +894,7 @@ macro_rules! impl_unwrap_slab {
     res.push('\n');
   }
   res.push_str("\n\n  // Define the module FIFOs\n");
-  for module in sys.module_iter(Some(false)) {
+  for module in sys.module_iter(ModuleKind::Module) {
     for port in module.fifo_iter() {
       let fifo_ty = dtype_to_rust_type(&port.scalar_ty());
       let fifo_ty = Ident::new(&format!("FIFO{}", fifo_ty), Span::call_site());
@@ -960,7 +960,7 @@ macro_rules! impl_unwrap_slab {
   }
 
   // generate memory initializations
-  for module in sys.module_iter(Some(false)) {
+  for module in sys.module_iter(ModuleKind::Module) {
     for attr in module.get_attrs() {
       if let Attribute::Memory(param) = attr {
         if let Some(init_file) = &param.init_file {
@@ -996,7 +996,7 @@ macro_rules! impl_unwrap_slab {
   }
 
   // generate cycle gatekeeper
-  for module in sys.module_iter(Some(false)) {
+  for module in sys.module_iter(ModuleKind::Module) {
     let module_gatekeeper = syn::Ident::new(
       &format!("{}_triggered", namify(module.get_name())),
       Span::call_site(),
@@ -1023,7 +1023,7 @@ macro_rules! impl_unwrap_slab {
     .to_string(),
   );
   res.push_str("    match &event.0.kind {\n");
-  for module in sys.module_iter(Some(false)) {
+  for module in sys.module_iter(ModuleKind::Module) {
     let module_eventkind = &format!("Module{}", camelize(&namify(module.get_name())));
     res.push_str(&format!("      EventKind::{} => {{\n", module_eventkind));
     let module_gatekeeper = syn::Ident::new(
@@ -1171,7 +1171,7 @@ fn dump_modules(
     .as_bytes(),
   )?;
   let mut em = ElaborateModule::new(sys, slab_cache);
-  for module in em.sys.module_iter(Some(false)) {
+  for module in em.sys.module_iter(ModuleKind::Module) {
     if let Some(buffer) = em.visit_module(module) {
       fd.write_all(buffer.as_bytes())?;
     }

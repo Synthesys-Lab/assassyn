@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::backend::simulator::utils::dtype_to_rust_type;
+use crate::builder::system::ModuleKind;
 use crate::builder::SysBuilder;
 use crate::ir::node::ModuleRef;
 use crate::ir::visitor::Visitor;
@@ -38,6 +39,13 @@ impl Visitor<()> for FIFOTypesUsedVisitor {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
     self.res.extend(module.fifo_iter().map(|x| x.scalar_ty()));
     None
+  }
+
+  fn enter(&mut self, sys: &SysBuilder) -> Option<()> {
+    for module in sys.module_iter(ModuleKind::Module) {
+      self.visit_module(module);
+    }
+    ().into()
   }
 }
 

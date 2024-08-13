@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-  builder::{system::InsertPoint, SysBuilder},
+  builder::{system::{InsertPoint, ModuleKind}, SysBuilder},
   ir::{
     node::{BaseNode, BlockRef, ExprRef, IsElement, ModuleRef},
     visitor::Visitor,
@@ -77,7 +77,7 @@ fn idx_of(sys: &SysBuilder, x: &BaseNode) -> Option<usize> {
 
 fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<CommonExpr> {
   let mut res = Vec::new();
-  for m in sys.module_iter(None) {
+  for m in sys.module_iter(ModuleKind::All) {
     let mut finder = FindCommonSubexpression {
       common: HashMap::new(),
     };

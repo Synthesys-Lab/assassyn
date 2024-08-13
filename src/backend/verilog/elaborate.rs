@@ -9,7 +9,7 @@ use regex::Regex;
 
 use crate::{
   backend::common::{create_and_clean_dir, Config},
-  builder::system::SysBuilder,
+  builder::system::{ModuleKind, SysBuilder},
   ir::{node::*, visitor::Visitor, *},
 };
 
@@ -576,7 +576,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     // memory initializations map
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new(); // array -> init_file_path
-    for module in self.sys.module_iter(Some(false)) {
+    for module in self.sys.module_iter(ModuleKind::Module) {
       for attr in module.get_attrs() {
         if let Attribute::Memory(param) = attr {
           if let Some(init_file) = &param.init_file {
@@ -600,14 +600,14 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     }
 
     // fifo storage element definitions
-    for module in self.sys.module_iter(Some(false)) {
+    for module in self.sys.module_iter(ModuleKind::Module) {
       for fifo in module.fifo_iter() {
         res.push_str(self.dump_fifo(&fifo).as_str());
       }
     }
 
     // trigger fifo definitions
-    for module in self.sys.module_iter(Some(false)) {
+    for module in self.sys.module_iter(ModuleKind::Module) {
       res.push_str(self.dump_trigger(&module).as_str());
     }
 
@@ -619,7 +619,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     }
 
     // module insts
-    for module in self.sys.module_iter(Some(false)) {
+    for module in self.sys.module_iter(ModuleKind::Module) {
       res.push_str(self.dump_module_inst(&module).as_str());
     }
 
@@ -1792,7 +1792,7 @@ pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Res
 
   let mut fd = File::create(fname)?;
 
-  for module in vd.sys.module_iter(Some(false)) {
+  for module in vd.sys.module_iter(ModuleKind::Module) {
     vd.current_module = namify(module.get_name()).to_string();
     fd.write_all(vd.visit_module(module).unwrap().as_bytes())
       .unwrap();

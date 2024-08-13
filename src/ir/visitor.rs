@@ -1,13 +1,18 @@
-use crate::{builder::system::SysBuilder, ir::node::*, ir::*};
+use module::ModulePort;
+
+use crate::{builder::system::{ModuleKind, SysBuilder}, ir::{node::*, *}};
 
 use super::block::Block;
 
 pub trait Visitor<T> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<T> {
-    for input in module.fifo_iter() {
-      if let Some(x) = self.visit_fifo(input) {
-        return x.into();
+    match module.get_ports() {
+      ModulePort::Upstream { ports } | ModulePort::Downstream { ports } => {
+        for elem in ports.values() {
+          self.dispatch(module.sys, elem, vec![]);
+        }
       }
+      _ => unreachable!(),
     }
     if let Some(x) = self.visit_block(module.get_body()) {
       return x.into();
@@ -50,7 +55,7 @@ pub trait Visitor<T> {
   }
 
   fn enter(&mut self, sys: &SysBuilder) -> Option<T> {
-    for elem in sys.module_iter(None) {
+    for elem in sys.module_iter(ModuleKind::All) {
       let res = self.visit_module(elem);
       if res.is_some() {
         return res;
