@@ -1193,22 +1193,23 @@ fn dump_main(fd: &mut File) -> Result<(), std::io::Error> {
 }
 
 fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io::Error> {
+  // Create and clean the simulator directory.
   let simulator_name = config.dirname(sys, "simulator");
   create_and_clean_dir(simulator_name.clone(), config.override_dump);
+  fs::create_dir_all(simulator_name.join("src")).unwrap();
   eprintln!(
     "Writing simulator code to rust project: {}",
     simulator_name.to_str().unwrap()
   );
-  let output = Command::new("cargo")
-    .arg("init")
-    .arg(&simulator_name)
-    .output()
-    .expect("Failed to init cargo project");
-  assert!(output.status.success());
   let manifest = simulator_name.join("Cargo.toml");
   // Dump the Cargo.toml and rustfmt.toml
   {
-    let mut cargo = OpenOptions::new().append(true).open(&manifest)?;
+    let mut cargo = fs::File::create(simulator_name.join("Cargo.toml"))?;
+    writeln!(cargo, "[package]")?;
+    writeln!(cargo, "name = \"{}_simulator\"", sys.get_name())?;
+    writeln!(cargo, "version = \"0.1.0\"")?;
+    writeln!(cargo, "edition = \"2021\"")?;
+    writeln!(cargo, "[dependencies]")?;
     writeln!(cargo, "num-bigint = \"0.4\"")?;
     writeln!(cargo, "num-traits = \"0.2\"")?;
     let mut fmt = fs::File::create(simulator_name.join("rustfmt.toml"))?;
