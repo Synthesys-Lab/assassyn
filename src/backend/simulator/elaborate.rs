@@ -1096,7 +1096,7 @@ macro_rules! impl_unwrap_slab {
       .unwrap();
     res.push_str(
       &quote::quote! {
-        EventKind::#array_write((_, slab_idx, idx, value)) => {
+        EventKind::#array_write((_, slab_idx, idx, _)) => {
           let slab_idx = *slab_idx;
           let idx = *idx;
           data_slab[slab_idx].last_written.ok(event.0.kind.into(), event.0.stamp);

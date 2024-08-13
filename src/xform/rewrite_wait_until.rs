@@ -1,5 +1,8 @@
 use crate::{
-  builder::{system::{InsertPoint, ModuleKind}, SysBuilder},
+  builder::{
+    system::{InsertPoint, ModuleKind},
+    SysBuilder,
+  },
   ir::{
     node::{BaseNode, IsElement, ModuleRef},
     visitor::Visitor,

@@ -192,13 +192,11 @@ impl SysBuilder {
   ///   If None, the iterator will return both modules.
   pub fn module_iter(&self, kind: ModuleKind) -> impl Iterator<Item = ModuleRef<'_>> {
     self.symbol_table.symbols().filter_map(move |v| {
-      v.as_ref::<Module>(self)
-        .ok()
-        .filter(|m| match kind {
-          ModuleKind::Module => !m.is_downstream(),
-          ModuleKind::Downstream => m.is_downstream(),
-          ModuleKind::All => true,
-        })
+      v.as_ref::<Module>(self).ok().filter(|m| match kind {
+        ModuleKind::Module => !m.is_downstream(),
+        ModuleKind::Downstream => m.is_downstream(),
+        ModuleKind::All => true,
+      })
     })
   }
 

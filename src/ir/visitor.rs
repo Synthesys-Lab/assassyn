@@ -1,6 +1,9 @@
 use module::ModulePort;
 
-use crate::{builder::system::{ModuleKind, SysBuilder}, ir::{node::*, *}};
+use crate::{
+  builder::system::{ModuleKind, SysBuilder},
+  ir::{node::*, *},
+};
 
 use super::block::Block;
 

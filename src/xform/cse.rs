@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-  builder::{system::{InsertPoint, ModuleKind}, SysBuilder},
+  builder::{
+    system::{InsertPoint, ModuleKind},
+    SysBuilder,
+  },
   ir::{
     node::{BaseNode, BlockRef, ExprRef, IsElement, ModuleRef},
     visitor::Visitor,
