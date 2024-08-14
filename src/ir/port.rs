@@ -11,8 +11,6 @@ pub struct FIFO {
   name: String,
   /// The data type of this FIFO.
   dtype: DataType,
-  /// The index of this FIFO in the parent module.
-  idx: usize,
   /// The redundant data structure to store the users of this FIFO.
   pub(crate) user_set: HashSet<BaseNode>,
 }
@@ -27,20 +25,8 @@ impl FIFO {
       parent: BaseNode::new(NodeKind::Unknown, 0),
       name: name.to_string(),
       dtype: dtype.clone(),
-      // Similar to the parent field.
-      idx: usize::MAX,
       user_set: HashSet::new(),
     }
-  }
-
-  /// A redundant data structure to store the index of the port in the parent module.
-  pub fn idx(&self) -> usize {
-    self.idx
-  }
-
-  /// A redundant data structure to store the index of the port in the parent module.
-  pub(crate) fn set_idx(&mut self, idx: usize) {
-    self.idx = idx;
   }
 
   pub fn get_name(&self) -> &String {

@@ -17,4 +17,5 @@ pub fn basic(sys: &mut SysBuilder, config: &Config) {
   if config.rewrite_wait_until {
     rewrite_wait_until::rewrite_wait_until(sys);
   }
+  eprintln!("{}", sys);
 }

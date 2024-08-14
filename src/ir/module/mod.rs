@@ -16,10 +16,10 @@ pub use attrs::Attribute;
 pub struct Module {
   /// The index key of this module in the slab buffer.
   pub(crate) key: usize,
-  /// The name of this module, can be overridden by `set_name`.
+  /// The name of this module.
   name: String,
   /// The input ports of this module.
-  ports: Vec<BaseNode>,
+  ports: HashMap<String, BaseNode>,
   /// The body of the module.
   pub(crate) body: BaseNode,
   /// The set of external interfaces used by the module.
@@ -50,11 +50,11 @@ impl Module {
   /// let a = FIFO::new("a", 32);
   /// Module::new("a_plus_b", vec![a.clone()]);
   /// ```
-  pub fn new(name: &str, inputs: Vec<BaseNode>) -> Module {
+  pub fn new(name: &str, ports: HashMap<String, BaseNode>) -> Module {
     Module {
       key: 0,
       name: name.to_string(),
-      ports: inputs,
+      ports,
       body: BaseNode::new(NodeKind::Unknown, 0),
       external_interfaces: HashMap::new(),
       builder_func_ptr: None,
@@ -86,28 +86,15 @@ impl<'sys> ModuleRef<'sys> {
     self.ports.len()
   }
 
-  /// Get the given input reference.
-  ///
-  /// # Arguments
-  ///
-  /// * `i` - The index of the input.
-  pub fn get_port(&self, i: usize) -> Option<FIFORef<'_>> {
-    self
-      .ports
-      .get(i)
-      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
-  }
-
   /// Get the input by name.
   ///
   /// # Arguments
   ///
   /// * `name` - The name of the input.
-  pub fn get_port_by_name(&self, name: &str) -> Option<FIFORef<'_>> {
+  pub fn get_port(&self, name: &str) -> Option<FIFORef<'_>> {
     self
       .ports
-      .iter()
-      .find(|x| x.as_ref::<FIFO>(self.sys).unwrap().get_name().eq(name))
+      .get(name)
       .map(|x| x.clone().as_ref::<FIFO>(self.sys).unwrap())
   }
 
@@ -151,7 +138,7 @@ impl<'sys> ModuleRef<'sys> {
   {
     self
       .ports
-      .iter()
+      .values()
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
 }
@@ -191,11 +178,6 @@ impl<'a> ModuleMut<'a> {
     self.get_mut().attr = attr;
   }
 
-  /// Set the name of a module. Override the name given by the module builder.
-  pub fn set_name(&mut self, name: String) {
-    self.get_mut().name = name.to_string();
-  }
-
   /// Set the metadata, the function pointer to the module builder. As part of the fingerprint of
   /// comparing the equality of the modules.
   pub fn set_builder_func_ptr(&mut self, key: usize) {
@@ -206,19 +188,13 @@ impl<'a> ModuleMut<'a> {
   pub fn set_parameterizable(&mut self, param: Vec<BaseNode>) {
     self.get_mut().parameterizable = Some(param);
   }
-
-  /// Remove a given port of the module.
-  /// TODO: Stricter check for the port usage.
-  pub fn remove_port(&mut self, idx: usize) {
-    self.get_mut().ports.remove(idx);
-  }
 }
 
 impl Typed for ModuleRef<'_> {
   fn dtype(&self) -> DataType {
     let types = self
       .ports
-      .iter()
+      .values()
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
       .collect::<Vec<_>>();
     DataType::module(types)
@@ -233,37 +209,27 @@ impl SysBuilder {
   /// * `name` - The name of the module.
   /// * `inputs` - The inputs' information to the module. Refer to `PortInfo` for more details.
   pub fn create_module(&mut self, name: &str, ports: Vec<PortInfo>) -> BaseNode {
-    let n_inputs = ports.len();
-    let ports = ports
+    let port_table = ports
       .into_iter()
-      .map(|x| self.insert_element(FIFO::new(&x.ty, x.name.as_str())))
-      .collect::<Vec<_>>();
-    let module_name = self.symbol_table.identifier(name);
-    let module = Module::new(&module_name, ports);
+      .map(|x| {
+        (
+          x.name.clone(),
+          self.insert_element(FIFO::new(&x.ty, x.name.as_str())),
+        )
+      })
+      .collect::<HashMap<_, _>>();
+    let ports = port_table.values().cloned().collect::<Vec<_>>();
+    let module = Module::new(name, port_table);
     let module = self.insert_element(module);
     // This part is kinda dirty, since we run into a chicken-egg problem: the port parent cannot
     // be set before the module is constructed. However, module's constructor accepts the ports
     // as inputs. The parent of the ports after the module is constructed.
-    for i in 0..n_inputs {
-      let (input, name) = {
-        let module = module.as_ref::<Module>(self).unwrap();
-        let port = module.get_port(i).unwrap();
-        (port.upcast(), port.get_name().clone())
-      };
-      // Use the symbol table of the module to register the names.
-      let new_name = {
-        let mut module_mut = module.as_mut::<Module>(self).unwrap();
-        module_mut.get_mut().symbol_table.identifier(&name)
-      };
-      assert_eq!(
-        name, new_name,
-        "The names of the ports should be unique! Otherwise, `Module::get_port_by_name` will not work!"
-      );
+    for input in ports {
       let mut fifo_mut = self.get_mut::<FIFO>(&input).unwrap();
       fifo_mut.get_mut().set_parent(module);
-      fifo_mut.get_mut().set_idx(i);
     }
-    self.global_symbols.insert(module_name, module);
+    let new_name = self.symbol_table.insert(name, module);
+    module.as_mut::<Module>(self).unwrap().get_mut().name = new_name;
     let body = Block::new(module);
     let body = self.insert_element(body);
     self.get_mut::<Module>(&module).unwrap().get_mut().body = body;

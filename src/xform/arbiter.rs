@@ -2,13 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use crate::{
   builder::{PortInfo, SysBuilder},
-  created_here,
   ir::{
     instructions::{Bind, FIFOPush},
     module,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
-    DataType, Expr, Module,
+    DataType, Expr, Module, FIFO,
   },
 };
 
@@ -34,7 +33,7 @@ impl Visitor<()> for GatherBinds {
 fn bits_to_int(sys: &mut SysBuilder, x: &BaseNode) -> BaseNode {
   let dtype = x.get_dtype(sys).unwrap();
   let bits = dtype.get_bits();
-  sys.create_bitcast(created_here!(), *x, DataType::int_ty(bits))
+  sys.create_bitcast(*x, DataType::int_ty(bits))
 }
 
 fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet<BaseNode>> {
@@ -49,7 +48,10 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
 }
 
 pub fn inject_arbiter(sys: &mut SysBuilder) {
+  // Find all the modules with more than one caller.
   let module_with_multi_caller = find_module_with_multi_callers(sys);
+  // Inject an arbiter for each module like this.
+  // Callee is the module with multiple callers, and callers are the multiple callers.
   for (callee, callers) in module_with_multi_caller.iter() {
     let res = {
       let module = callee.as_ref::<Module>(sys).unwrap();
@@ -65,6 +67,10 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       callee_mut.add_attr(module::Attribute::OptNone);
     }
     let mut ports = Vec::new();
+    // First, flatten all the ports from the callers.
+    // Something like [caller0.arg0, caller0.arg1, ...], [caller1.arg0, caller1.arg1, ...]
+    // will be merged into one flatten list
+    // [caller0.arg0, caller0.arg1, ..., caller1.arg0, caller1.arg1, ...]
     for (i, caller) in callers.iter().enumerate() {
       let bind = caller.as_expr::<Bind>(sys).unwrap();
       bind
@@ -79,38 +85,46 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
           ));
         });
     }
+    // Use this flattened list to create a new arbiter module.
     let arbiter = sys.create_module("arbiter", ports);
     let mut arbiter_mut = arbiter.as_mut::<Module>(sys).unwrap();
     arbiter_mut.add_attr(module::Attribute::NoArbiter);
     sys.set_current_module(arbiter);
     let restore_block = sys.get_current_block().unwrap().upcast();
-    let mut idx = 0;
+    // For each cluster of callers' input arguments, create a valid signal.
     let mut sub_valids = Vec::new();
-    for caller in callers.iter() {
+    for (i, caller) in callers.iter().enumerate() {
       let bind = caller.as_expr::<Bind>(sys).unwrap();
       let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
-      let valids = (0..n_args)
-        .map(|_| {
-          let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
-          let port = arbiter.get_port(idx).unwrap().upcast();
-          idx += 1;
-          sys.create_fifo_valid(port)
-        })
-        .collect::<Vec<_>>();
+      let valids = {
+        let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
+        let ports = (0..n_args)
+          .map(|x| {
+            arbiter
+              .get_port(&format!("{}.caller{}.arg{}", module_name, i, x))
+              .unwrap()
+              .upcast()
+          })
+          .collect::<Vec<_>>();
+        ports
+          .into_iter()
+          .map(|x| sys.create_fifo_valid(x))
+          .collect::<Vec<_>>()
+      };
       let mut valid_runner = valids[0];
       for valid in valids.iter().skip(1) {
-        valid_runner = sys.create_bitwise_and(created_here!(), valid_runner, *valid);
+        valid_runner = sys.create_bitwise_and(valid_runner, *valid);
       }
       sub_valids.push(valid_runner);
     }
     let mut valid = sub_valids[0];
     for sub_valid in sub_valids.iter().skip(1) {
-      valid = sys.create_bitwise_or(created_here!(), valid, *sub_valid);
+      valid = sys.create_bitwise_or(valid, *sub_valid);
     }
     sys.create_wait_until(valid);
     let mut valid_hot = sub_valids[callers.len() - 1];
     for sub_valid in sub_valids.iter().rev().skip(1) {
-      valid_hot = sys.create_concat(created_here!(), valid_hot, *sub_valid);
+      valid_hot = sys.create_concat(valid_hot, *sub_valid);
     }
 
     let (last_grant_reg, grant_scalar_ty, grant_hot_ty) = {
@@ -125,66 +139,68 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
     };
 
     let zero = sys.get_const_int(DataType::int_ty(1), 0);
-    let last_grant_1h = sys.create_array_read(created_here!(), last_grant_reg, zero);
+    let last_grant_1h = sys.create_array_read(last_grant_reg, zero);
 
     // low_mask = ((last_grant_1h - 1) << 1) + 1
     let one = sys.get_const_int(grant_hot_ty.clone(), 1);
-    let lo = sys.create_sub(created_here!(), last_grant_1h, one);
-    let lo = sys.create_shl(created_here!(), lo, one);
-    let lo = sys.create_add(created_here!(), lo, one);
+    let lo = sys.create_sub(last_grant_1h, one);
+    let lo = sys.create_shl(lo, one);
+    let lo = sys.create_add(lo, one);
     // high_mask = ~low_mask
-    let hi = sys.create_flip(created_here!(), lo);
+    let hi = sys.create_flip(lo);
     // low_valid = valid_hot & low_mask
-    let lo_valid = sys.create_bitwise_and(created_here!(), lo, valid_hot);
+    let lo_valid = sys.create_bitwise_and(lo, valid_hot);
     let signed_lo_valid = bits_to_int(sys, &lo_valid);
-    let lo_valid_neg = sys.create_neg(created_here!(), signed_lo_valid);
-    let lo_grant = sys.create_bitwise_and(created_here!(), lo_valid, lo_valid_neg);
+    let lo_valid_neg = sys.create_neg(signed_lo_valid);
+    let lo_grant = sys.create_bitwise_and(lo_valid, lo_valid_neg);
     // high_valid = valid_hot & high_mask
-    let hi_valid = sys.create_bitwise_and(created_here!(), hi, valid_hot);
+    let hi_valid = sys.create_bitwise_and(hi, valid_hot);
     let signed_hi_valid = bits_to_int(sys, &hi_valid);
-    let hi_valid_neg = sys.create_neg(created_here!(), signed_hi_valid);
-    let hi_grant = sys.create_bitwise_and(created_here!(), hi_valid, hi_valid_neg);
+    let hi_valid_neg = sys.create_neg(signed_hi_valid);
+    let hi_grant = sys.create_bitwise_and(hi_valid, hi_valid_neg);
     let zero = sys.get_const_int(hi_grant.get_dtype(sys).unwrap(), 0);
-    let hi_nez = sys.create_neq(created_here!(), hi_grant, zero);
+    let hi_nez = sys.create_neq(hi_grant, zero);
     // grant = high_valid != 0 ? high_valid : low_valid
-    let grant = sys.create_select(created_here!(), hi_nez, hi_grant, lo_grant);
+    let grant = sys.create_select(hi_nez, hi_grant, lo_grant);
 
-    let mut idx = 0;
     for (i, caller) in callers.iter().enumerate() {
       let i_1h = sys.get_const_int(grant_hot_ty.clone(), 1 << i);
-      let i = sys.get_const_int(grant_scalar_ty.clone(), i as u64);
-      let grant_to = sys.create_slice(grant, i, i);
+      let ii = sys.get_const_int(grant_scalar_ty.clone(), i as u64);
+      let grant_to = sys.create_slice(grant, ii, ii);
       let block = sys.create_conditional_block(grant_to);
       sys.set_current_block(block);
-      sys.create_array_write(created_here!(), last_grant_reg, zero, i_1h);
-      let bind = caller.as_expr::<Bind>(sys).unwrap();
-      let n_args = bind.arg_iter().filter(|x| !x.is_unknown()).count();
-      let mut new_bind = sys.get_init_bind(*callee);
-      for i in 0..n_args {
-        let key = {
-          let module = callee.as_ref::<Module>(sys).unwrap();
-          module.get_port(i).unwrap().get_name().clone()
-        };
-        let port = {
-          let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
-          arbiter.get_port(idx).unwrap().upcast()
-        };
+      sys.create_array_write(last_grant_reg, zero, i_1h);
+      let new_bind = sys.get_init_bind(*callee);
+      let module_ports = {
+        let module = callee.as_ref::<Module>(sys).unwrap();
+        module.port_iter().map(|x| x.upcast()).collect::<Vec<_>>()
+      };
+      for (j, port) in module_ports.iter().enumerate() {
+        let key = port.as_ref::<FIFO>(sys).unwrap().get_name().clone();
 
         // Push to new arbiter
         let bind = caller.as_expr::<Bind>(sys).unwrap();
         let callee_idx = bind.get_num_args();
-        let push = bind.get_arg(i).unwrap();
-        let mut push_mut = push.as_mut::<Expr>(sys).unwrap();
-        push_mut.set_operand(0, port);
+        let push = bind.get_arg(&key).unwrap_or_else(|| {
+          panic!("{} not found in bind {}", key, bind);
+        });
+        {
+          let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
+          let arbiter_port = {
+            let port = arbiter.get_port(&format!("{}.caller{}.arg{}", module_name, i, j));
+            port.unwrap().upcast()
+          };
+          // Caller calls the arbiter
+          let mut push_mut = push.as_mut::<Expr>(sys).unwrap();
+          push_mut.set_operand(0, arbiter_port);
+          // Arbiter calls origin
+          let pop = sys.create_fifo_pop(arbiter_port);
+          sys.bind_arg(new_bind, key, pop);
+        }
 
         // Set to new callee
         let mut caller = caller.as_mut::<Expr>(sys).unwrap();
         caller.set_operand(callee_idx, arbiter);
-
-        // Arbiter calls origin
-        idx += 1;
-        let pop = sys.create_fifo_pop(port);
-        new_bind = sys.add_bind(new_bind, key, pop, Some(false));
       }
       sys.create_async_call(new_bind);
       sys.set_current_block(restore_block);

@@ -5,19 +5,34 @@ use crate::ir::{
   Module,
 };
 
-use super::{AsyncCall, Bind};
+use super::{AsyncCall, Bind, FIFOPush};
 
-impl Bind<'_> {
+impl<'sys> Bind<'sys> {
   /// Get the arguments of this bind expression.
-  pub fn get_arg(&self, i: usize) -> Option<BaseNode> {
-    if i < self.expr.get_num_operands() - 1 {
-      self.expr.get_operand(i).map(|x| *x.get_value())
-    } else {
-      None
-    }
+  pub fn get_arg(&self, key: &str) -> Option<BaseNode> {
+    let n = self.get_num_args();
+    self
+      .expr
+      .operand_iter()
+      .take(n)
+      .find(|x| {
+        x.get_value()
+          .as_expr::<FIFOPush>(self.expr.sys)
+          .unwrap()
+          .fifo()
+          .get_name()
+          .eq(key)
+      })
+      .map(|x| *x.get_value())
   }
+
   /// Get the callee of this bind expression.
-  pub fn callee(&self) -> ModuleRef<'_> {
+  pub fn callee<'res, 'borrow>(&'borrow self) -> ModuleRef<'res>
+  where
+    'sys: 'res,
+    'sys: 'borrow,
+    'borrow: 'res,
+  {
     self
       .expr
       .get_operand_value(self.get().get_num_operands() - 1)
@@ -31,16 +46,12 @@ impl Bind<'_> {
   }
   /// Get an iterator over all arguments.
   pub fn arg_iter(&self) -> impl Iterator<Item = BaseNode> + '_ {
-    (0..self.get_num_args()).map(|i| self.get_arg(i).unwrap())
+    let n = self.expr.get_num_operands() - 1;
+    self.expr.operand_iter().take(n).map(|x| *x.get_value())
   }
   /// Check if all arguments are fully bound.
   pub fn fully_bound(&self) -> bool {
-    let n = self.expr.get_num_operands();
-    self
-      .expr
-      .operand_iter()
-      .take(n)
-      .all(|x| !x.get_value().is_unknown())
+    self.callee().get_num_inputs() == self.get_num_args()
   }
 }
 
@@ -49,15 +60,10 @@ impl Display for Bind<'_> {
     let callee = self.callee();
     let arg_list = self
       .arg_iter()
-      .enumerate()
-      .map(|(i, v)| {
-        let arg = callee.get_port(i).unwrap().get_name().to_string();
-        let feed = if v.is_unknown() {
-          "None".to_string()
-        } else {
-          v.to_string(self.expr.sys)
-        };
-        format!("{}: {}", arg, feed)
+      .map(|arg| {
+        let fifo_push = arg.as_expr::<FIFOPush>(self.expr.sys).unwrap();
+        let value = fifo_push.value().to_string(self.expr.sys);
+        format!("{}: {}", fifo_push.fifo().get_name(), value)
       })
       .collect::<Vec<String>>()
       .join(", ");

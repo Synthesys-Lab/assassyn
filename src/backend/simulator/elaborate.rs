@@ -45,7 +45,7 @@ impl<'a, 'b> ElaborateModule<'a, 'b> {
 macro_rules! fifo_name {
   ($fifo:expr) => {{
     let module = $fifo.get_parent().as_ref::<Module>($fifo.sys).unwrap();
-    format!("{}_{}", namify(module.get_name()), $fifo.idx())
+    format!("{}_{}", namify(module.get_name()), namify($fifo.get_name()))
   }};
 }
 

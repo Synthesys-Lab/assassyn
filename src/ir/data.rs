@@ -232,22 +232,40 @@ impl Array {
 }
 
 impl SysBuilder {
+  /// Remove the given array from the system.
   pub fn remove_array(&mut self, array: BaseNode) {
-    let key = {
-      let mut iter = self.array_iter().filter(|x| x.get_key() == array.get_key());
-      let array = iter.next().unwrap();
-      assert!(iter.next().is_none());
-
-      array.get_key()
-    };
-    self.global_symbols.retain(|_, v| v.get_key() != key);
+    let key = array.as_ref::<Array>(self).unwrap().get_name().to_string();
+    self.symbol_table.remove(&key);
     self.dispose(array);
   }
-}
 
-impl ArrayMut<'_> {
-  pub fn set_name(&mut self, name: String) {
-    let new_name = self.sys.symbol_table.identifier(name.as_str());
-    self.get_mut().name = new_name;
+  /// Create a register array associated to this system.
+  /// An array can be a register, or memory.
+  ///
+  /// # Arguments
+  /// * `ty` - The data type of data in the array.
+  /// * `name` - The name of the array.
+  /// * `size` - The size of the array.
+  /// * `init` - A vector of initial values of this array.
+  // TODO(@were): Add array types, memory, register, or signal wire.
+  pub fn create_array(
+    &mut self,
+    ty: DataType,
+    name: &str,
+    size: usize,
+    init: Option<Vec<BaseNode>>,
+    attrs: Vec<ArrayAttr>,
+  ) -> BaseNode {
+    if let Some(init) = &init {
+      assert_eq!(init.len(), size);
+      init.iter().for_each(|x| {
+        assert_eq!(x.get_dtype(self).unwrap(), ty);
+      });
+    }
+    let instance = Array::new(ty.clone(), name.to_string(), size, init, attrs);
+    let array_node = self.insert_element(instance);
+    let new_name = self.symbol_table.insert(name, array_node);
+    array_node.as_mut::<Array>(self).unwrap().get_mut().name = new_name;
+    array_node
   }
 }

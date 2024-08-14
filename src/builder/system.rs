@@ -2,10 +2,9 @@
 
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
-use crate::ir::{ir_printer::IRPrinter, module::Attribute, node::*, visitor::Visitor, *};
+use crate::ir::{ir_printer::IRPrinter, node::*, visitor::Visitor, *};
 
 use self::{
-  data::ArrayAttr,
   expr::subcode::{self, Binary},
   instructions::Bind,
 };
@@ -14,27 +13,6 @@ use super::symbol_table::SymbolTable;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
-
-#[macro_export]
-macro_rules! created_here {
-  () => {
-    $crate::builder::system::Filesite {
-      file: file!(),
-      line: line!() as usize,
-    }
-  };
-}
-
-pub struct Filesite {
-  pub file: &'static str,
-  pub line: usize,
-}
-
-impl Display for Filesite {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "@{}:{}: ", self.file, self.line)
-  }
-}
 
 impl InsertPoint {
   pub fn next(&self, sys: &SysBuilder) -> Option<Self> {
@@ -66,8 +44,6 @@ pub struct SysBuilder {
   cached_nodes: HashMap<CacheKey, BaseNode>,
   /// The name of the system.
   name: String,
-  /// The global symbols in this system, including modules and arrays.
-  pub(crate) global_symbols: HashMap<String, BaseNode>,
   /// The current module to be built.
   pub(crate) inesert_point: InsertPoint,
   /// The symbol table to maintain the unique identifiers.
@@ -107,18 +83,18 @@ impl PortInfo {
 ///   is always executed.
 macro_rules! create_arith_op_impl {
   (binary, $func_name:ident, $opcode: expr) => {
-    pub fn $func_name(&mut self, site: Filesite, a: BaseNode, b: BaseNode) -> BaseNode {
+    pub fn $func_name(&mut self, a: BaseNode, b: BaseNode) -> BaseNode {
       match self.combine_types($opcode, &a, &b) {
         Ok(res_ty) => self.create_expr(res_ty, $opcode, vec![a, b], true),
-        Err(msg) => panic!("{} {}", site, msg),
+        Err(msg) => panic!("{}", msg),
       }
     }
   };
 
   (unary, $func_name:ident, $opcode: expr) => {
-    pub fn $func_name(&mut self, site: Filesite, x: BaseNode) -> BaseNode {
+    pub fn $func_name(&mut self, x: BaseNode) -> BaseNode {
       let res_ty = x.get_dtype(self).unwrap_or_else(|| {
-        panic!("{}{} has no type!", site.to_string(), x.to_string(self));
+        panic!("{} has no type!", x.to_string(self));
       });
       self.create_expr(res_ty, $opcode, vec![x.clone()], true)
     }
@@ -131,7 +107,7 @@ macro_rules! impl_typed_iter {
       /// Iterate over all the modules of the system.
       pub fn $func_name(&self) -> impl Iterator<Item = [<$ty Ref>]<'_>> {
         self
-          .global_symbols
+          .symbol_table
           .iter()
           .filter(|(_, v)| {
             if let NodeKind::$ty = v.get_kind() {
@@ -154,7 +130,6 @@ impl SysBuilder {
   pub fn new(name: &str) -> Self {
     Self {
       name: name.into(),
-      global_symbols: HashMap::new(),
       slab: slab::Slab::new(),
       cached_nodes: HashMap::new(),
       inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
@@ -212,7 +187,7 @@ impl SysBuilder {
 
   /// Get the module by its name.
   pub fn get_module<'a>(&'a self, name: &str) -> Option<ModuleRef<'a>> {
-    if let Some(reference) = self.global_symbols.get(name) {
+    if let Some(reference) = self.symbol_table.get(name) {
       reference.as_ref::<Module>(self).unwrap().into()
     } else {
       None
@@ -221,7 +196,7 @@ impl SysBuilder {
 
   /// Get the array by its name.
   pub fn get_array<'a>(&'a self, name: &str) -> Option<ArrayRef<'a>> {
-    if let Some(reference) = self.global_symbols.get(name) {
+    if let Some(reference) = self.symbol_table.get(name) {
       reference.as_ref::<Array>(self).unwrap().into()
     } else {
       None
@@ -362,26 +337,20 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::Log, args, true)
   }
 
-  pub fn create_select_1hot(
-    &mut self,
-    site: Filesite,
-    cond: BaseNode,
-    values: Vec<BaseNode>,
-  ) -> BaseNode {
+  pub fn create_select_1hot(&mut self, cond: BaseNode, values: Vec<BaseNode>) -> BaseNode {
     let cond_ty = cond.get_dtype(self).unwrap();
     assert_eq!(
       cond_ty.get_bits(),
       values.len(),
-      "{} Select1Hot value count mismatch!",
-      site
+      "Select1Hot value count mismatch!",
     );
     let v0type = values[0].get_dtype(self).unwrap();
     for elem in values.iter().skip(1) {
       let vitype = elem.get_dtype(self).unwrap();
       assert_eq!(
         v0type, vitype,
-        "{} Select1Hot value type mismatch {:?} != {:?}",
-        site, v0type, vitype,
+        "Select1Hot value type mismatch {:?} != {:?}",
+        v0type, vitype,
       );
     }
     let mut args = vec![cond];
@@ -391,7 +360,6 @@ impl SysBuilder {
 
   pub fn create_select(
     &mut self,
-    site: Filesite,
     cond: BaseNode,
     true_val: BaseNode,
     false_val: BaseNode,
@@ -400,8 +368,8 @@ impl SysBuilder {
     let f_ty = false_val.get_dtype(self).unwrap();
     assert_eq!(
       t_ty, f_ty,
-      "{}Select value type mismatch: {:?} and {:?}",
-      site, t_ty, f_ty
+      "Select value type mismatch: {:?} and {:?}",
+      t_ty, f_ty
     );
     self.create_expr(f_ty, Opcode::Select, vec![cond, true_val, false_val], true)
   }
@@ -484,166 +452,55 @@ impl SysBuilder {
   create_arith_op_impl!(unary, create_neg, subcode::Unary::Neg.into());
   create_arith_op_impl!(unary, create_flip, subcode::Unary::Flip.into());
 
-  /// Create a register array associated to this system.
-  /// An array can be a register, or memory.
+  /// Get an empty bind for the given module.
   ///
   /// # Arguments
-  /// * `ty` - The data type of data in the array.
-  /// * `name` - The name of the array.
-  /// * `size` - The size of the array.
-  /// * `init` - A vector of initial values of this array.
-  // TODO(@were): Add array types, memory, register, or signal wire.
-  pub fn create_array(
-    &mut self,
-    ty: DataType,
-    name: &str,
-    size: usize,
-    init: Option<Vec<BaseNode>>,
-    attrs: Vec<ArrayAttr>,
-  ) -> BaseNode {
-    let array_name = self.symbol_table.identifier(name);
-    if let Some(init) = &init {
-      assert_eq!(init.len(), size);
-      init.iter().for_each(|x| {
-        assert_eq!(x.get_dtype(self).unwrap(), ty);
-      });
-    }
-    let instance = Array::new(ty.clone(), array_name.clone(), size, init, attrs);
-    let key = self.insert_element(instance);
-    self.global_symbols.insert(array_name, key);
-    key
-  }
-
+  /// * `module` - A `BaseNode` reference to a module.
+  ///
+  /// # Returns
+  /// * A `BaseNode` reference to the returned empty bind.
   pub fn get_init_bind(&mut self, node: BaseNode) -> BaseNode {
-    let failure = || {
-      panic!(
-        "[Bind Init] Either a Module or a Bind is expected, but {:?} got!",
-        node
-      )
-    };
     match node.get_kind() {
       // A module is an empty bind.
       NodeKind::Module => {
-        let module = node.as_ref::<Module>(self).unwrap();
-        let mut args = vec![BaseNode::unknown(); module.get_num_inputs()];
-        args.push(module.upcast());
-        self.create_expr(DataType::void(), Opcode::Bind, args, false)
+        node.as_ref::<Module>(self).unwrap();
+        self.create_expr(DataType::void(), Opcode::Bind, vec![node], false)
       }
-      // An expression should be a module type.
-      NodeKind::Expr => {
-        let expr = node.as_ref::<Expr>(self).unwrap();
-        match expr.get_opcode() {
-          Opcode::FIFOPop => {
-            let n = {
-              let dtype = expr.dtype();
-              match dtype {
-                DataType::Module(ports) => ports.len(),
-                _ => panic!("Invalid data type"),
-              }
-            };
-            let mut args = vec![BaseNode::unknown(); n];
-            args.push(node);
-            self.create_expr(DataType::void(), Opcode::Bind, args, false)
-          }
-          Opcode::Bind => node,
-          _ => failure(),
-        }
-      }
-      _ => failure(),
+      _ => panic!("Only a module can be bound!"),
     }
   }
 
-  /// Add a bind to the current module.
-  pub fn add_bind(
-    &mut self,
-    bind: BaseNode,
-    key: String,
-    value: BaseNode,
-    eager: Option<bool>,
-  ) -> BaseNode {
-    let bind = bind.as_ref::<Expr>(self).unwrap().as_sub::<Bind>().unwrap();
-    let module = bind.callee();
-    let port = module.get_port_by_name(&key).unwrap_or_else(|| {
-      panic!(
-        "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
+  /// Add a bound argument to the given bind.
+  pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) {
+    let port = {
+      let bind = bind.as_expr::<Bind>(self).unwrap();
+      let module = bind.callee();
+      assert!(
+        bind.get_arg(&key).is_none(),
+        "Argument {} already exists!",
+        key
+      );
+      let port = module.get_port(&key).unwrap_or_else(|| {
+        panic!(
+          "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
+          key,
+          bind.callee().get_name(),
+          bind.callee().upcast()
+        )
+      });
+      assert_eq!(
+        port.scalar_ty(),
+        value.get_dtype(self).unwrap(),
+        "Port \"{}\" requires {}",
         key,
-        module.get_name(),
-        module.upcast()
-      )
-    });
-    assert_eq!(
-      port.scalar_ty(),
-      value.get_dtype(self).unwrap(),
-      "Port \"{}\" requires {}",
-      key,
-      port.scalar_ty()
-    );
-    self.bind_arg(bind.get().upcast(), port.idx(), value, eager)
-  }
-
-  /// Add a bind to the current module.
-  pub fn push_bind(&mut self, bind: BaseNode, value: BaseNode, eager: Option<bool>) -> BaseNode {
-    let bind = bind.as_expr::<Bind>(self).unwrap();
-    let port_idx = {
-      let mut idx = None;
-      for i in 0..bind.get_num_args() {
-        let arg = bind.get_arg(i).unwrap();
-        if arg.is_unknown() && idx.is_none() {
-          idx = Some(i);
-        } else if idx.is_some() {
-          assert!(arg.is_unknown());
-        }
-      }
-      idx.expect("All arguments bound!")
+        port.scalar_ty()
+      );
+      port.upcast()
     };
-    self.bind_arg(bind.get().upcast(), port_idx, value, eager)
-  }
-
-  fn bind_arg(
-    &mut self,
-    bind: BaseNode,
-    idx: usize,
-    value: BaseNode,
-    eager: Option<bool>,
-  ) -> BaseNode {
-    let bind_expr = bind.as_expr::<Bind>(self).unwrap();
-    assert!(
-      bind_expr.get_arg(idx).unwrap().is_unknown(),
-      "Argument {} is already bound!",
-      idx
-    );
-    let callee = bind_expr.callee();
-    let eager = eager.unwrap_or(callee.get_attrs().contains(&Attribute::EagerCallee));
-    let callee = callee.upcast();
-    let fifo_push = self.create_fifo_push(callee, idx, value);
+    let push = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
     let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
-    bind_mut.set_operand(idx, fifo_push);
-
-    if eager && bind.as_expr::<Bind>(self).unwrap().fully_bound() {
-      self.create_async_call(bind)
-    } else {
-      bind
-    }
-  }
-
-  /// A helper function to create a FIFO push.
-  pub(crate) fn create_fifo_push(
-    &mut self,
-    module: BaseNode,
-    idx: usize,
-    value: BaseNode,
-  ) -> BaseNode {
-    let (ptype, port) = {
-      let module = module.as_ref::<Module>(self).unwrap();
-      let port = module.get_port(idx).unwrap();
-      (port.scalar_ty().clone(), port.upcast())
-    };
-    let vtype = value.get_dtype(self).unwrap();
-    assert_eq!(ptype, vtype, "Port type mismatch!");
-
-    // Create the expression.
-
-    self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true)
+    let n = bind_mut.get().get_num_operands();
+    bind_mut.insert_operand(n - 1, push);
   }
 
   fn indexable(&self, idx: BaseNode) -> bool {
@@ -659,11 +516,10 @@ impl SysBuilder {
   /// # Arguments
   /// * `ptr` - The pointer to the array element.
   /// * `cond` - The condition of reading the array. If None is given, the read is unconditional.
-  pub fn create_array_read(&mut self, site: Filesite, array: BaseNode, idx: BaseNode) -> BaseNode {
+  pub fn create_array_read(&mut self, array: BaseNode, idx: BaseNode) -> BaseNode {
     assert!(
       self.indexable(idx),
-      "{} {}'s type, {:?}, is not indexable!",
-      site,
+      "{}'s type, {:?}, is not indexable!",
       idx.to_string(self),
       idx.get_dtype(self).unwrap()
     );
@@ -681,32 +537,29 @@ impl SysBuilder {
   /// * `cond` - The condition of writing the array. If None is given, the write is unconditional.
   pub fn create_array_write(
     &mut self,
-    site: Filesite,
     array: BaseNode,
     idx: BaseNode,
     value: BaseNode,
   ) -> BaseNode {
     assert!(
       self.indexable(idx),
-      "{} {}'s type, {:?}, is not indexable!",
-      site,
+      "{}'s type, {:?}, is not indexable!",
       idx.to_string(self),
       idx.get_dtype(self).unwrap()
     );
     assert!(
       matches!(array.get_kind(), NodeKind::Array),
-      "{} Expect an array, but {:?}",
-      site,
+      "Expect an array, but {:?}",
       array
     );
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
     let vtype = value.get_dtype(self).unwrap_or_else(|| {
-      panic!("{} {} has no type!", site, value.to_string(self));
+      panic!("{} has no type!", value.to_string(self));
     });
     assert_eq!(
       dtype, vtype,
-      "{} Value type mismatch {:?} != {:?}!",
-      site, dtype, vtype
+      "Value type mismatch {:?} != {:?}!",
+      dtype, vtype
     );
     let operands = vec![array, idx, value];
 
@@ -856,17 +709,17 @@ impl SysBuilder {
   }
 
   /// Create a cast operation.
-  pub fn create_bitcast(&mut self, _: Filesite, src: BaseNode, dest_ty: DataType) -> BaseNode {
+  pub fn create_bitcast(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     self.create_cast_impl(src, dest_ty, subcode::Cast::BitCast)
   }
 
   /// Create a sext operation.
-  pub fn create_sext(&mut self, _: Filesite, src: BaseNode, dest_ty: DataType) -> BaseNode {
+  pub fn create_sext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     self.create_cast_impl(src, dest_ty, subcode::Cast::SExt)
   }
 
   /// Create a zext operation.
-  pub fn create_zext(&mut self, _: Filesite, src: BaseNode, dest_ty: DataType) -> BaseNode {
+  pub fn create_zext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     self.create_cast_impl(src, dest_ty, subcode::Cast::ZExt)
   }
 
