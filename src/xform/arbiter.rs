@@ -171,7 +171,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       let block = sys.create_conditional_block(grant_to);
       sys.set_current_block(block);
       sys.create_array_write(last_grant_reg, zero, i_1h);
-      let new_bind = sys.get_init_bind(*callee);
+      let mut new_bind = sys.get_init_bind(*callee);
       let module_ports = {
         let module = callee.as_ref::<Module>(sys).unwrap();
         module.fifo_iter().map(|x| x.upcast()).collect::<Vec<_>>()
@@ -196,7 +196,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
           push_mut.set_operand(0, arbiter_port);
           // Arbiter calls origin
           let pop = sys.create_fifo_pop(arbiter_port);
-          sys.bind_arg(new_bind, key, pop);
+          sys.bind_arg(&mut new_bind, key, pop);
         }
 
         // Set to new callee

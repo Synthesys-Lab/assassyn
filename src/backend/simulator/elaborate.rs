@@ -12,7 +12,7 @@ use quote::quote;
 use crate::{
   backend::common::{create_and_clean_dir, Config},
   builder::system::{ModuleKind, SysBuilder},
-  ir::{expr::subcode, instructions::Bind, node::*, visitor::Visitor, *},
+  ir::{expr::subcode, node::*, visitor::Visitor, *},
 };
 
 use super::utils::{dtype_to_rust_type, namify};
@@ -134,9 +134,8 @@ impl Visitor<String> for ElaborateModule<'_> {
           let dtype = dtype_to_rust_type(&array.scalar_ty());
           res.push_str(format!("{}: &mut Array<{}>,", array_name, dtype).as_str());
         }
-        NodeKind::Expr => {
-          let bind = interface.as_expr::<Bind>(module.sys).unwrap();
-          let name = dump_ref!(module.sys, &bind.callee().upcast());
+        NodeKind::Module => {
+          let name = dump_ref!(module.sys, interface);
           res.push_str(format!("{}_event: &mut VecDeque<usize>,", name).as_str());
         }
         _ => {}
@@ -508,9 +507,8 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     for (interface, _) in module.ext_interf_iter() {
       match interface.get_kind() {
         // TODO(@were): Stricter type checking.
-        NodeKind::Expr => {
-          let bind = interface.as_expr::<Bind>(sys).unwrap();
-          let name = dump_ref!(sys, &bind.callee().upcast());
+        NodeKind::Module => {
+          let name = dump_ref!(sys, interface);
           fd.write_all(format!("&mut self.{}_event, ", name).as_bytes())?;
         }
         _ => fd.write_all(format!("&mut self.{}, ", dump_ref!(sys, interface)).as_bytes())?,

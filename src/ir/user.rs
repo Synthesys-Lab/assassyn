@@ -330,15 +330,25 @@ impl SysBuilder {
       let operand_ref = operand.as_ref::<Operand>(self).unwrap();
       *operand_ref.get_value()
     };
-    if match value.get_kind() {
-      NodeKind::Array => true,
+    if let Some((value, operand)) = match value.get_kind() {
+      NodeKind::Array => Some((value, operand)),
       NodeKind::FIFO => {
         let fifo = value.as_ref::<FIFO>(self).unwrap();
-        fifo.get_parent().get_key() != module.get_key()
+        if fifo.get_parent().get_key() != module.get_key() {
+          Some((value, operand))
+        } else {
+          None
+        }
       }
       // TODO(@were): Support this later.
-      NodeKind::Expr => value.as_expr::<Bind>(self).is_ok(),
-      _ => false,
+      NodeKind::Expr => {
+        if let Ok(bind) = value.as_expr::<Bind>(self) {
+          Some((bind.callee().upcast(), bind.callee_operand()))
+        } else {
+          None
+        }
+      }
+      _ => None,
     } {
       module
         .as_mut::<Module>(self)

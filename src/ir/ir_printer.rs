@@ -88,7 +88,14 @@ impl Visitor<String> for ExtInterDumper<'_> {
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
     let mut res = String::new();
     if let Ok(bind) = expr.clone().as_sub::<Bind>() {
-      res.push_str(format!("{}: module callee", bind.callee().get_name()).as_str());
+      res.push_str(
+        format!(
+          "{}: module callee by bind-key: {}",
+          bind.callee().get_name(),
+          bind.get().get_key()
+        )
+        .as_str(),
+      );
       return res.into();
     }
     unreachable!()
