@@ -78,10 +78,10 @@ impl BlockRef<'_> {
       .map(|x| x.value())
   }
 
-  pub fn get_cycle(&self) -> Option<u32> {
+  pub fn get_cycle(&self) -> Option<usize> {
     self
       .get_block_intrinsic(0, subcode::BlockIntrinsic::Cycled)
-      .map(|x| x.value().as_ref::<IntImm>(self.sys).unwrap().get_value() as u32)
+      .map(|x| x.value().as_ref::<IntImm>(self.sys).unwrap().get_value() as usize)
   }
 
   pub fn get_condition(&self) -> Option<BaseNode> {

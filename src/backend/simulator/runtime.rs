@@ -21,25 +21,25 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       fn pusher(&self) -> String;
     }
 
-    pub struct ArrayWrite<T: Sized + Num + Default + Clone> {
+    pub struct ArrayWrite<T: Sized + Default + Clone> {
       cycle: usize,
       addr: usize,
       data: T,
       pusher: String,
     }
 
-    impl <T: Sized + Num + Default + Clone> ArrayWrite<T> {
+    impl <T: Sized + Default + Clone> ArrayWrite<T> {
       pub fn new(cycle: usize, addr: usize, data: T, pusher: String) -> Self {
         ArrayWrite { cycle, addr, data, pusher }
       }
     }
 
-    pub struct Array<T: Sized + Num + Default + Clone> {
+    pub struct Array<T: Sized + Default + Clone> {
       pub payload: Vec<T>,
       pub write: XEQ<ArrayWrite<T>>,
     }
 
-    impl <T: Sized + Num + Default + Clone> Array<T> {
+    impl <T: Sized + Default + Clone> Array<T> {
       pub fn new(n: usize) -> Self {
         Array {
           payload: vec![T::default(); n],
@@ -102,7 +102,7 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       }
 
       pub fn tick(&mut self, cycle: usize) {
-        if let Some(event) = self.pop.pop(cycle) {
+        if let Some(_) = self.pop.pop(cycle) {
           self.payload.pop_front().unwrap();
         }
         if let Some(event) = self.push.pop(cycle) {
@@ -111,7 +111,7 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       }
     }
 
-    impl <T: Sized + Num + Default + Clone> Cycled for ArrayWrite<T> {
+    impl <T: Sized + Default + Clone> Cycled for ArrayWrite<T> {
       fn cycle(&self) -> usize {
         self.cycle
       }
@@ -174,7 +174,7 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       pub fn cyclize(stamp: usize) -> String {
         format!("Cycle @{}.{:02}", stamp / 100, stamp % 100)
       }
-      pub fn load_hex_file<T: Num, const N: usize>(array: &mut Vec<T>, init_file: &str) {
+      pub fn load_hex_file<T: Num>(array: &mut Vec<T>, init_file: &str) {
         let mut idx = 0;
         for line in read_to_string(init_file)
           .expect("can not open hex file")

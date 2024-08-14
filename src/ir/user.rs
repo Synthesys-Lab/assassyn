@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::builder::SysBuilder;
 
-use super::{instructions::Bind, node::*, visitor::Visitor, Block, Expr, Module, FIFO};
+use super::{node::*, visitor::Visitor, Block, Expr, Module, FIFO};
 
 /// This node defines a def-use relation between the expression nodes.
 /// This is necessary because a node can be used by multiple in other user.
@@ -330,25 +330,13 @@ impl SysBuilder {
       let operand_ref = operand.as_ref::<Operand>(self).unwrap();
       *operand_ref.get_value()
     };
-    if let Some((value, operand)) = match value.get_kind() {
-      NodeKind::Array => Some((value, operand)),
+    if match value.get_kind() {
+      NodeKind::Module | NodeKind::Array => true,
       NodeKind::FIFO => {
         let fifo = value.as_ref::<FIFO>(self).unwrap();
-        if fifo.get_parent().get_key() != module.get_key() {
-          Some((value, operand))
-        } else {
-          None
-        }
+        fifo.get_parent().get_key() != module.get_key()
       }
-      // TODO(@were): Support this later.
-      NodeKind::Expr => {
-        if let Ok(bind) = value.as_expr::<Bind>(self) {
-          Some((bind.callee().upcast(), bind.callee_operand()))
-        } else {
-          None
-        }
-      }
-      _ => None,
+      _ => false,
     } {
       module
         .as_mut::<Module>(self)

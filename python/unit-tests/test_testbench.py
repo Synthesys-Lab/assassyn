@@ -12,8 +12,8 @@ class Testbench(Module):
 
     @module.combinational
     def build(self):
-        with Cycle(0):
-            log('tbcycle 0')
+        with Cycle(1):
+            log('tbcycle 1')
         with Cycle(2):
             log('tbcycle 2')
         with Cycle(82):
@@ -21,10 +21,10 @@ class Testbench(Module):
 
 def check(raw):
     expected = 0
-    expects = [0, 2, 82]
+    expects = [1, 2, 82]
     for i in raw.split('\n'):
         if 'tbcycle' in i:
-            assert f'tbcycle {expects[expected]}' in i
+            assert f'tbcycle {expects[expected]}' in i, f'tbcycle {expects[expected]} NOT IN {i}'
             expected += 1
     assert expected == 3, f'{expected} != 3'
 

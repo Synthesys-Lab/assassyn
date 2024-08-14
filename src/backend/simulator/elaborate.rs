@@ -550,7 +550,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
           let init_file_path = config.resource_base.join(init_file);
           let init_file_path = init_file_path.to_str().unwrap();
           let array = param.array.as_ref::<Array>(sys).unwrap();
-          let array_name = namify(array.get_name());
+          let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
           fd.write_all(
             &quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }
               .to_string()
@@ -592,7 +592,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       &quote::quote! {
         let tb_cycles = vec![#(#cycles, )*];
         for cycle in tb_cycles {
-          sim.testbench_event.push_back(cycle);
+          sim.testbench_event.push_back(cycle * 100);
         }
       }
       .to_string()
