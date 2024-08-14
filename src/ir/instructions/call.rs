@@ -14,7 +14,6 @@ pub struct LazyBind {
 }
 
 impl LazyBind {
-
   pub fn new(callee: BaseNode) -> Self {
     Self {
       callee,
@@ -37,7 +36,6 @@ impl LazyBind {
   pub fn get_arg(&self, key: &str) -> Option<&BaseNode> {
     self.bind.get(key)
   }
-
 }
 
 impl<'sys> Bind<'sys> {
@@ -77,7 +75,6 @@ impl<'sys> Bind<'sys> {
   pub fn callee_operand(&self) -> BaseNode {
     self.expr.get_operand(self.get_num_args()).unwrap().upcast()
   }
-
 
   /// Get the number of arguments of the callee.
   pub fn get_num_args(&self) -> usize {

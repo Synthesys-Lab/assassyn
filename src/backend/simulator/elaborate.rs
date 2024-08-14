@@ -448,7 +448,12 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     let name = namify(&array.get_name());
     let dtype = dtype_to_rust_type(&array.scalar_ty());
     fd.write(format!("{} : Array<{}>,", name, dtype,).as_bytes())?;
-    simulator_init.push(format!("{} : Array::new({}),", name, array.get_size()));
+    if let Some(init) = array.get_initializer() {
+      let init = init.iter().map(|x| dump_ref!(sys, x)).collect::<Vec<_>>().join(", ");
+      simulator_init.push(format!("{} : Array::new_with_init(vec![{}]),", name, init));
+    } else {
+      simulator_init.push(format!("{} : Array::new({}),", name, array.get_size()));
+    }
     registers.push(name);
   }
   for module in sys.module_iter(ModuleKind::Module) {

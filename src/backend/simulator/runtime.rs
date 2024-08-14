@@ -46,6 +46,12 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
           write: XEQ::new(),
         }
       }
+      pub fn new_with_init(payload: Vec<T>) -> Self {
+        Array {
+          payload,
+          write: XEQ::new(),
+        }
+      }
       pub fn tick(&mut self, cycle: usize) {
         if let Some(event) = self.write.pop(cycle) {
           self.payload[event.addr] = event.data;

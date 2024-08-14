@@ -480,7 +480,11 @@ impl SysBuilder {
   pub fn create_async_call(&mut self, bind: LazyBind) -> BaseNode {
     // A bind will not finalize its place until it is called. This assumption helps to maintain the
     // external interfaces.
-    let mut operands = bind.get_bind().values().map(|x| x.clone()).collect::<Vec<_>>();
+    let mut operands = bind
+      .get_bind()
+      .values()
+      .map(|x| x.clone())
+      .collect::<Vec<_>>();
     operands.push(bind.get_callee());
     let bind = self.create_expr(DataType::void(), Opcode::Bind, operands, true);
     self.create_expr(DataType::void(), Opcode::AsyncCall, vec![bind], true)
