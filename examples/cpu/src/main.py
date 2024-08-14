@@ -4,6 +4,26 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
 
+class Execution(Module):
+    
+    @module.constructor
+    def __init__(self):
+        super().__init__()
+        self.opcode = Port(Bits(7))
+        self.imm_value = Port(Bits(32))
+        self.a_reg = Port(Bits(5))
+        self.b_reg = Port(Bits(5))
+        self.rd_reg = Port(Bits(5))
+
+    @module.combinational
+    def build(self):
+        log("executing")
+
+    @module.wait_until
+    def wait_until(self):
+        # Handle read after write
+        pass
+
 class Decoder(Memory):
     
     @module.constructor
@@ -51,8 +71,33 @@ class Decoder(Memory):
 
             no_imm = ~(read_i_imm | read_u_imm | read_b_imm)
             imm_cond = read_i_imm.concat(read_u_imm).concat(read_b_imm).concat(no_imm)
-                
+            # {read_i_imm, read_u_imm, read_b_imm, no_imm}
+            imm_value = imm_cond.select1hot(Bits(32)(0), b_imm, u_imm, i_imm.zext(Bits(32)))
+            
+            rd_reg = write_rd.select(rd, Bits(5)(0))
 
+            #TODO: parameter list
+            exec.async_called()
+
+            with Condition(is_lui):
+                log("lui:   rd: x{}, imm: 0x{:x}", rd, imm_value)
+            with Condition(is_lw):
+                log("lw:    rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm)
+            with Condition(is_addi):
+                log("addi:  rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm)
+            with Condition(is_add):
+                log("add:   rd: x{}, rs1: x{}, rs2: x{}", rd, rs1, rs2)
+            with Condition(is_bne):
+                log("bne:   rs1:x{}, rs2: x{}, imm: {}", rs1, rs2, b_imm.bitcast(Int(32)))
+            with Condition(is_ret):
+                log("ret")
+            
+            with Condition(~supported):
+                log("unsupported opcode: {:b}, raw_inst: {:x}", opcode, inst)
+        
+        with Condition(on_branch[0]):
+            log("on a branch, stall decoding, pc freeze at 0x{:x}", pc[0])
+                
     @module.wait_until
     def wait_until(self):
         return self.validate_all_ports()
