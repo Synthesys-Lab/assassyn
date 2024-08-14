@@ -91,5 +91,6 @@ class SysBuilder:
 
     def __repr__(self):
         body = '\n\n'.join(map(repr, self.modules))
+        body = body + '\n\n' + '\n\n'.join(map(repr, self.downstreams))
         array = '  ' + '\n  '.join(repr(elem) for elem in self.arrays)
         return f'system {self.name} {{\n{array}\n\n{body}\n}}'

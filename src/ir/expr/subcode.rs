@@ -54,10 +54,10 @@ register_subcode!(
 );
 
 register_subcode!(
-  FIFO {
+  PortField {
     Peek(peek "peek"),
     Valid(valid "valid"),
-    AlmostFull(almost_full "almost_full"),
+    Ready(almost_full "almost_full"),
   }
 );
 

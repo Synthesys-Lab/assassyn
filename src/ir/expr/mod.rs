@@ -140,7 +140,7 @@ register_opcodes!(
   Bind(bind, 1 /*value*/) => { valued },
   FIFOPush(push, 2 /*fifo value*/) => { side_effect },
   FIFOPop(pop, 1 /*fifo*/) => { side_effect, valued },
-  FIFOField({ field: subcode::FIFO }, 1 /*fifo*/) => { valued },
+  PortField({ field: subcode::PortField }, 1 /*fifo*/) => { valued },
   AsyncCall(async_call, -1 /* N/A */) => { side_effect },
   // Other synthesizable operations
   Slice(slice, 3 /*op [lo, hi]*/) => { valued },

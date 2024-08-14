@@ -700,7 +700,7 @@ impl SysBuilder {
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
 
-    self.create_expr(ty, subcode::FIFO::Peek.into(), vec![fifo], true)
+    self.create_expr(ty, subcode::PortField::Peek.into(), vec![fifo], true)
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
@@ -712,7 +712,7 @@ impl SysBuilder {
 
     self.create_expr(
       DataType::int_ty(1),
-      subcode::FIFO::Valid.into(),
+      subcode::PortField::Valid.into(),
       vec![fifo],
       true,
     )

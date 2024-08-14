@@ -260,7 +260,7 @@ impl Visitor<String> for IRPrinter {
     for (i, elem) in block.body_iter().enumerate() {
       if here && ip.at.map_or(false, |x| x == i) {
         res.push_str(&format!(
-          "{}-----{{Insert Mid}}-----\n",
+          "{}-----{{Insert Here}}-----\n",
           " ".repeat(self.indent)
         ));
       }
@@ -280,7 +280,7 @@ impl Visitor<String> for IRPrinter {
     }
     if here && ip.at.is_none() {
       res.push_str(&format!(
-        "{}-----{{Insert At Last}}-----\n",
+        "{}-----{{Insert Here}}-----\n",
         " ".repeat(self.indent)
       ));
     }
