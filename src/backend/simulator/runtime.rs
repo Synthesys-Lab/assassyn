@@ -21,25 +21,25 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       fn pusher(&self) -> String;
     }
 
-    pub struct ArrayWrite<T: Sized + Num + Default + Copy> {
+    pub struct ArrayWrite<T: Sized + Num + Default + Clone> {
       cycle: usize,
       addr: usize,
       data: T,
       pusher: String,
     }
 
-    impl <T: Sized + Num + Default + Copy> ArrayWrite<T> {
+    impl <T: Sized + Num + Default + Clone> ArrayWrite<T> {
       pub fn new(cycle: usize, addr: usize, data: T, pusher: String) -> Self {
         ArrayWrite { cycle, addr, data, pusher }
       }
     }
 
-    pub struct Array<T: Sized + Num + Default + Copy> {
+    pub struct Array<T: Sized + Num + Default + Clone> {
       pub payload: Vec<T>,
       pub write: XEQ<ArrayWrite<T>>,
     }
 
-    impl <T: Sized + Num + Default + Copy> Array<T> {
+    impl <T: Sized + Num + Default + Clone> Array<T> {
       pub fn new(n: usize) -> Self {
         Array {
           payload: vec![T::default(); n],
@@ -111,7 +111,7 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       }
     }
 
-    impl <T: Sized + Num + Default + Copy> Cycled for ArrayWrite<T> {
+    impl <T: Sized + Num + Default + Clone> Cycled for ArrayWrite<T> {
       fn cycle(&self) -> usize {
         self.cycle
       }

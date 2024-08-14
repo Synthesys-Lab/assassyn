@@ -440,6 +440,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   // TODO(@were): Profile the maxium size of all the FIFO channels.
   fd.write_all("use std::collections::VecDeque;\n".as_bytes())?;
   fd.write_all("use super::runtime::*;\n".as_bytes())?;
+  fd.write_all("use num_bigint::{BigInt, BigUint};\n".as_bytes())?;
 
   let mut simulator_init = vec![];
   let mut registers = vec![];
@@ -449,7 +450,11 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     let dtype = dtype_to_rust_type(&array.scalar_ty());
     fd.write(format!("{} : Array<{}>,", name, dtype,).as_bytes())?;
     if let Some(init) = array.get_initializer() {
-      let init = init.iter().map(|x| dump_ref!(sys, x)).collect::<Vec<_>>().join(", ");
+      let init = init
+        .iter()
+        .map(|x| dump_ref!(sys, x))
+        .collect::<Vec<_>>()
+        .join(", ");
       simulator_init.push(format!("{} : Array::new_with_init(vec![{}]),", name, init));
     } else {
       simulator_init.push(format!("{} : Array::new({}),", name, array.get_size()));
