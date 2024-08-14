@@ -11,7 +11,6 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       use num_bigint::{BigInt, BigUint, ToBigInt, ToBigUint};
       use num_traits::Num;
       use std::fs::read_to_string;
-      use super::modules::*;
     }
     .to_string(),
   );
@@ -22,16 +21,35 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       fn pusher(&self) -> String;
     }
 
-    pub struct ArrayWrite<T: Sized> {
+    pub struct ArrayWrite<T: Sized + Num + Default + Copy> {
       cycle: usize,
       addr: usize,
       data: T,
       pusher: String,
     }
 
-    impl <T:Sized> ArrayWrite<T> {
+    impl <T: Sized + Num + Default + Copy> ArrayWrite<T> {
       pub fn new(cycle: usize, addr: usize, data: T, pusher: String) -> Self {
         ArrayWrite { cycle, addr, data, pusher }
+      }
+    }
+
+    pub struct Array<T: Sized + Num + Default + Copy> {
+      pub payload: Vec<T>,
+      pub write: XEQ<ArrayWrite<T>>,
+    }
+
+    impl <T: Sized + Num + Default + Copy> Array<T> {
+      pub fn new(n: usize) -> Self {
+        Array {
+          payload: vec![T::default(); n],
+          write: XEQ::new(),
+        }
+      }
+      pub fn tick(&mut self, cycle: usize) {
+        if let Some(event) = self.write.pop(cycle) {
+          self.payload[event.addr] = event.data;
+        }
       }
     }
 
@@ -58,7 +76,36 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       }
     }
 
-    impl <T: Sized> Cycled for ArrayWrite<T> {
+    pub struct FIFO<T: Sized> {
+      pub payload: VecDeque<T>,
+      pub push: XEQ<FIFOPush<T>>,
+      pub pop: XEQ<FIFOPop>,
+    }
+
+    impl <T: Sized> FIFO<T> {
+      pub fn new() -> Self {
+        FIFO {
+          payload: VecDeque::new(),
+          push: XEQ::new(),
+          pop: XEQ::new(),
+        }
+      }
+
+      pub fn is_empty(&self) -> bool {
+        self.payload.is_empty()
+      }
+
+      pub fn tick(&mut self, cycle: usize) {
+        if let Some(event) = self.pop.pop(cycle) {
+          self.payload.pop_front().unwrap();
+        }
+        if let Some(event) = self.push.pop(cycle) {
+          self.payload.push_back(event.data);
+        }
+      }
+    }
+
+    impl <T: Sized + Num + Default + Copy> Cycled for ArrayWrite<T> {
       fn cycle(&self) -> usize {
         self.cycle
       }
@@ -103,8 +150,8 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
         }
       }
 
-      pub fn pop(&mut self, target: usize) -> Option<T> {
-        if self.q.first_key_value().map_or(false, |(cycle, _)| *cycle == target) {
+      pub fn pop(&mut self, current: usize) -> Option<T> {
+        if self.q.first_key_value().map_or(false, |(cycle, _)| *cycle >= current) {
           self.q.pop_first().map(|(_, event)| event)
         } else {
           None
@@ -121,7 +168,7 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       pub fn cyclize(stamp: usize) -> String {
         format!("Cycle @{}.{:02}", stamp / 100, stamp % 100)
       }
-      pub fn init_vec_by_hex_file<T: Num, const N: usize>(array: &mut [T; N], init_file: &str) {
+      pub fn load_hex_file<T: Num, const N: usize>(array: &mut Vec<T>, init_file: &str) {
         let mut idx = 0;
         for line in read_to_string(init_file)
           .expect("can not open hex file")

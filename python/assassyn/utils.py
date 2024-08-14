@@ -16,7 +16,7 @@ def repo_path():
 
 def run_simulator(path):
     '''The helper function to run the simulator'''
-    cmd = ['cargo', 'run', '--manifest-path', path + '/Cargo.toml', '--release']
+    cmd = ['cargo', 'run', '--manifest-path', path + '/Cargo.toml', '--release', '--offline']
     return subprocess.check_output(cmd).decode('utf-8')
 
 def run_verilator(path):

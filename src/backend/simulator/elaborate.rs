@@ -5,18 +5,17 @@ use std::{
   process::Command,
 };
 
+use module::Attribute;
 use proc_macro2::Span;
 use quote::quote;
 
 use crate::{
   backend::common::{create_and_clean_dir, Config},
   builder::system::{ModuleKind, SysBuilder},
-  ir::{expr::subcode, node::*, visitor::Visitor, *},
+  ir::{expr::subcode, instructions::Bind, node::*, visitor::Visitor, *},
 };
 
-use super::utils::{
-  array_ty_to_id, camelize, dtype_to_rust_type, namify, unwrap_array_ty, user_contains_opcode,
-};
+use super::utils::{dtype_to_rust_type, namify};
 
 use self::{expr::subcode::Cast, instructions};
 
@@ -49,7 +48,7 @@ macro_rules! dump_ref {
   };
 }
 
-struct NodeRefDumper;
+pub(super) struct NodeRefDumper;
 
 fn int_imm_dumper_impl(ty: &DataType, value: u64) -> String {
   if ty.get_bits() == 1 {
@@ -107,13 +106,6 @@ impl Visitor<String> for ElaborateModule<'_> {
     // First, some common function parameters are dumped.
     res.push_str(&format!("pub fn {}(\n", namify(module.get_name())));
     res.push_str("  stamp: usize,\n");
-    for port in module.fifo_iter() {
-      res.push_str(&format!(
-        "  {}: &VecDeque<{}>,\n",
-        fifo_name!(port),
-        dtype_to_rust_type(&port.scalar_ty())
-      ));
-    }
     res.push_str(
       format!(
         "{}_event: &mut VecDeque<usize>,\n",
@@ -122,18 +114,33 @@ impl Visitor<String> for ElaborateModule<'_> {
       .as_str(),
     );
     for port in module.fifo_iter() {
-      res.push_str(&format!("  {}_pop: &mut XEQ<FIFOPop>,\n", fifo_name!(port),));
+      let fifo_name = fifo_name!(port);
+      let dtype = dtype_to_rust_type(&port.scalar_ty());
+      res.push_str(format!("{}: &mut FIFO<{}>,", fifo_name, dtype).as_str());
     }
     // All the writes will be done in half a cycle later by events, so no need to feed them
     // to the function signature.
-    let ext_interf = super::interface::dump_module_external_interfaces(&module);
-    for (interf, suffix, ty) in ext_interf {
-      res.push_str(&format!(
-        "  {}{}: {},\n",
-        dump_ref!(module.sys, &interf),
-        suffix,
-        ty
-      ));
+    for (interface, _) in module.ext_interf_iter() {
+      match interface.get_kind() {
+        NodeKind::FIFO => {
+          let fifo = interface.as_ref::<FIFO>(module.sys).unwrap();
+          let fifo_name = namify(&fifo_name!(fifo));
+          let dtype = dtype_to_rust_type(&fifo.scalar_ty());
+          res.push_str(format!("{}: &mut FIFO<{}>,", fifo_name, dtype).as_str());
+        }
+        NodeKind::Array => {
+          let array = interface.as_ref::<Array>(module.sys).unwrap();
+          let array_name = namify(array.get_name());
+          let dtype = dtype_to_rust_type(&array.scalar_ty());
+          res.push_str(format!("{}: &mut Array<{}>,", array_name, dtype).as_str());
+        }
+        NodeKind::Expr => {
+          let bind = interface.as_expr::<Bind>(module.sys).unwrap();
+          let name = dump_ref!(module.sys, &bind.callee().upcast());
+          res.push_str(format!("{}_event: &mut VecDeque<usize>,", name).as_str());
+        }
+        _ => {}
+      }
     }
 
     res.push_str(") {\n");
@@ -187,7 +194,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         let load = expr.as_sub::<instructions::Load>().unwrap();
         let (array, idx) = (load.array(), load.idx());
         format!(
-          "{}[{} as usize].clone()",
+          "{}.payload[{} as usize].clone()",
           namify(array.get_name()),
           NodeRefDumper
             .dispatch(load.get().sys, &idx, vec![])
@@ -202,12 +209,12 @@ impl Visitor<String> for ElaborateModule<'_> {
         let value = dump_ref!(self.sys, &store.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
         let module_writer = &self.module_name;
-        let array_write_q = syn::Ident::new(
-          &format!("{}_write", dump_ref!(store.get().sys, &array.upcast())),
+        let array = syn::Ident::new(
+          &dump_ref!(store.get().sys, &array.upcast()),
           Span::call_site(),
         );
         quote::quote! {
-          #array_write_q.push(
+          #array.write.push(
             ArrayWrite::new(stamp + 50, #idx as usize, #value.clone(), #module_writer.to_string()));
         }
         .to_string()
@@ -222,15 +229,11 @@ impl Visitor<String> for ElaborateModule<'_> {
         // TODO(@were): Support multiple pop.
         let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
         let fifo = pop.fifo();
-        let fifo_pop_q = syn::Ident::new(
-          &format!("{}_pop", dump_ref!(pop.get().sys, &fifo.upcast())),
-          Span::call_site(),
-        );
         let fifo_id = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
         let module_name = &self.module_name;
         quote::quote! {{
-          #fifo_pop_q.push(FIFOPop::new(stamp + 50, #module_name.to_string()));
-          #fifo_id.front().unwrap().clone()
+          #fifo_id.pop.push(FIFOPop::new(stamp + 50, #module_name.to_string()));
+          #fifo_id.payload.front().unwrap().clone()
         }}
         .to_string()
       }
@@ -246,15 +249,12 @@ impl Visitor<String> for ElaborateModule<'_> {
       Opcode::FIFOPush => {
         let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
         let fifo = push.fifo();
-        let fifo_push_q = syn::Ident::new(
-          &format!("{}_push", dump_ref!(push.get().sys, &fifo.upcast())),
-          Span::call_site(),
-        );
+        let fifo_id = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
         let value = dump_ref!(self.sys, &push.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
         let module_writer = &self.module_name;
         quote::quote! {
-          #fifo_push_q.push(FIFOPush::new(stamp + 50, #value.clone(), #module_writer.to_string()));
+          #fifo_id.push.push(FIFOPush::new(stamp + 50, #value.clone(), #module_writer.to_string()));
         }
         .to_string()
       }
@@ -442,49 +442,124 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("use std::collections::VecDeque;\n".as_bytes())?;
   fd.write_all("use super::runtime::*;\n".as_bytes())?;
 
-  fd.write_all("pub fn simulate() {\n".as_bytes())?;
-  fd.write_all("  // The global time stamp\n".as_bytes())?;
-  fd.write_all("  let mut stamp: usize = 0;\n".as_bytes())?;
-  fd.write_all("  // Count the consecutive cycles idled\n".as_bytes())?;
-  fd.write_all("  let mut idled: usize = 0;\n".as_bytes())?;
-  fd.write_all("  // Declare all the arrays\n".as_bytes())?;
+  let mut simulator_init = vec![];
+  let mut registers = vec![];
+  fd.write_all("struct Simulator { stamp: usize, ".as_bytes())?;
   for array in sys.array_iter() {
-    fd.write(
-      format!(
-        "    let mut {} : {}; // Data payload\n",
-        namify(&array.get_name()),
-        dtype_to_rust_type(&array.dtype())
-      )
-      .as_bytes(),
-    )?;
-    fd.write(
-      format!(
-        "    let mut {}_write : XEQ<ArrayWrite<{}>>; // Write event\n",
-        namify(&array.get_name()),
-        dtype_to_rust_type(&array.scalar_ty())
-      )
-      .as_bytes(),
-    )?;
+    let name = namify(&array.get_name());
+    let dtype = dtype_to_rust_type(&array.scalar_ty());
+    fd.write(format!("{} : Array<{}>,", name, dtype,).as_bytes())?;
+    simulator_init.push(format!("{} : Array::new({}),", name, array.get_size()));
+    registers.push(name);
   }
-  fd.write_all("\n\n  // Define the module FIFOs\n".as_bytes())
-    .unwrap();
   for module in sys.module_iter(ModuleKind::Module) {
+    fd.write_all(format!(" {}_event : VecDeque<usize>,", namify(&module.get_name())).as_bytes())?;
+    simulator_init.push(format!(
+      "{}_event : VecDeque::new(),",
+      namify(&module.get_name())
+    ));
+    for fifo in module.fifo_iter() {
+      let name = fifo_name!(fifo);
+      let ty = dtype_to_rust_type(&fifo.scalar_ty());
+      fd.write_all(format!("{} : FIFO<{}>,", name, ty).as_bytes())?;
+      simulator_init.push(format!("{} : FIFO::new(),", name));
+      registers.push(name);
+    }
+  }
+  fd.write_all("}".as_bytes())?;
+
+  fd.write_all("impl Simulator {".as_bytes())?;
+
+  // Constructor.
+  fd.write_all("pub fn new() -> Self {".as_bytes())?;
+  fd.write_all("Simulator {".as_bytes())?;
+  fd.write_all("stamp: 0,".as_bytes())?;
+  for elem in simulator_init {
+    fd.write_all(elem.as_bytes())?;
+  }
+  fd.write_all("}}".as_bytes())?;
+
+  // Tick the registers.
+  fd.write_all("pub fn tick_registers(&mut self) {".as_bytes())?;
+  for elem in registers {
+    fd.write_all(format!("self.{}.tick(self.stamp);", elem).as_bytes())?;
+  }
+  fd.write_all("}".as_bytes())?;
+
+  let mut simulators = vec![];
+  for module in sys.module_iter(ModuleKind::Module) {
+    let module_name = namify(module.get_name());
+    simulators.push(module_name.clone());
+    fd.write_all(format!("fn simulate_{}(&mut self) {{", module_name).as_bytes())?;
     fd.write_all(
       format!(
-        "  let mut {}_event : VecDeque<usize> = VecDeque::new();\n",
-        namify(&module.get_name())
+        "if self.{}_event.front().map_or(false, |x| *x <= self.stamp) {{",
+        module_name
       )
       .as_bytes(),
     )?;
+    fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
+    fd.write_all(format!("super::modules::{}(", module_name).as_bytes())?;
+    fd.write_all(format!("self.stamp, &mut self.{}_event, ", module_name).as_bytes())?;
+    for fifo in module.fifo_iter() {
+      let fifo_name = fifo_name!(fifo);
+      fd.write_all(format!("&mut self.{}, ", fifo_name).as_bytes())?;
+    }
+    for (interface, _) in module.ext_interf_iter() {
+      match interface.get_kind() {
+        // TODO(@were): Stricter type checking.
+        NodeKind::Expr => {
+          let bind = interface.as_expr::<Bind>(sys).unwrap();
+          let name = dump_ref!(sys, &bind.callee().upcast());
+          fd.write_all(format!("&mut self.{}_event, ", name).as_bytes())?;
+        }
+        _ => fd.write_all(format!("&mut self.{}, ", dump_ref!(sys, interface)).as_bytes())?,
+      }
+    }
+    fd.write_all(");".as_bytes())?;
+    fd.write_all("}".as_bytes())?;
+    fd.write_all("}".as_bytes())?;
   }
 
+  fd.write_all("}".as_bytes())?;
+
+  fd.write_all("pub fn simulate() {\n".as_bytes())?;
+
+  // TODO(@were): Later we allow some randomization of the simulation, these functions can be
+  // shuffled.
+  fd.write_all("let mut sim = Simulator::new();\n".as_bytes())?;
+  fd.write_all("let simulators = vec![".as_bytes())?;
+  for sim in simulators {
+    fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
+  }
+  fd.write_all("];\n".as_bytes())?;
+
+  // generate memory initializations
+  for module in sys.module_iter(ModuleKind::Module) {
+    for attr in module.get_attrs() {
+      if let Attribute::Memory(param) = attr {
+        if let Some(init_file) = &param.init_file {
+          let init_file_path = config.resource_base.join(init_file);
+          let init_file_path = init_file_path.to_str().unwrap();
+          let array = param.array.as_ref::<Array>(sys).unwrap();
+          let array_name = namify(array.get_name());
+          fd.write_all(
+            &quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }
+              .to_string()
+              .as_bytes(),
+          )?;
+        }
+      }
+    }
+  }
+
+  let sim_threshold = config.sim_threshold;
   if sys.has_driver() {
     // Push the initial events.
-    let sim_threshold = config.sim_threshold;
     fd.write_all(
       &quote::quote! {
         for i in 1..=#sim_threshold {
-          driver_event.push_back(i * 100);
+          sim.driver_event.push_back(i * 100);
         }
       }
       .to_string()
@@ -509,7 +584,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       &quote::quote! {
         let tb_cycles = vec![#(#cycles, )*];
         for cycle in tb_cycles {
-          testbench_event.push_back(cycle);
+          sim.testbench_event.push_back(cycle);
         }
       }
       .to_string()
@@ -517,45 +592,24 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     )?;
   }
 
+  fd.write_all(
+    quote! {
+      for i in 1..=#sim_threshold {
+        sim.stamp = i * 100;
+        for simulate in simulators.iter() {
+          simulate(&mut sim);
+        }
+        sim.stamp += 50;
+        sim.tick_registers();
+      }
+    }
+    .to_string()
+    .as_bytes(),
+  )?;
+
   fd.write_all("}".as_bytes())?;
 
   Ok(())
-
-  // // generate memory initializations
-  // for module in sys.module_iter(ModuleKind::Module) {
-  //   for attr in module.get_attrs() {
-  //     if let Attribute::Memory(param) = attr {
-  //       if let Some(init_file) = &param.init_file {
-  //         let init_file_path = config.resource_base.join(init_file);
-  //         let init_file_path = init_file_path.to_str().unwrap();
-  //         let array = param.array.as_ref::<Array>(sys).unwrap();
-  //         let slab_idx = slab_cache.get(&param.array).unwrap();
-  //         let (scalar_ty, size) = unwrap_array_ty(&array.dtype());
-  //         let scalar_ty = dtype_to_rust_type(&scalar_ty)
-  //           .parse::<proc_macro2::TokenStream>()
-  //           .unwrap();
-  //         res.push_str(
-  //           format!(
-  //             "\n// initializing array {}, slab_idx = {}, with file {}\n",
-  //             array.get_name(),
-  //             slab_idx,
-  //             init_file
-  //           )
-  //           .as_str(),
-  //         );
-  //         res.push_str(
-  //           &quote::quote! {
-  //             init_vec_by_hex_file(
-  //               data_slab[#slab_idx].unwrap_payload_mut::<[#scalar_ty; #size]>(),
-  //               #init_file_path
-  //             );
-  //           }
-  //           .to_string(),
-  //         );
-  //       }
-  //     }
-  //   }
-  // }
 
   // // generate cycle gatekeeper
   // for module in sys.module_iter(ModuleKind::Module) {
@@ -780,7 +834,7 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
     let mut fd = fs::File::create(modules_file).expect("Open failure");
     dump_modules(sys, &mut fd).expect("Dump module failure");
     fd.flush().expect("Flush modules failure");
-  }
+  };
   {
     // Dump runtime, mainly data casting.
     let runtime_file = simulator_name.join("src/runtime.rs");
