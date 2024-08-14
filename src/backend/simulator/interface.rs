@@ -7,7 +7,7 @@ use crate::backend::simulator::utils::dtype_to_rust_type;
 use crate::ir::node::*;
 use crate::ir::*;
 
-pub(in crate::backend::simulator) fn analyze_module_external_interfaces(
+pub(in crate::backend::simulator) fn dump_module_external_interfaces(
   m: &ModuleRef<'_>,
 ) -> Vec<(BaseNode, String, String)> {
   let mut res = Vec::new();
@@ -34,7 +34,7 @@ pub(in crate::backend::simulator) fn analyze_module_external_interfaces(
           *interf,
           "_write".to_string(),
           format!(
-            "&mut VecDeque<(usize, usize, {}, String)>",
+            "&mut XEQ<ArrayWrite<{}>>",
             dtype_to_rust_type(&array.scalar_ty())
           ),
         ));
@@ -45,7 +45,7 @@ pub(in crate::backend::simulator) fn analyze_module_external_interfaces(
         *interf,
         "_push".to_string(),
         format!(
-          "&mut VecDeque<(usize, {}, String)>",
+          "&mut XEQ<FIFOPush<{}>>",
           dtype_to_rust_type(&fifo.scalar_ty())
         ),
       ));

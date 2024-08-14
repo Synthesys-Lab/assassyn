@@ -88,7 +88,7 @@ pub(super) fn array_ty_to_id(scalar_ty: &DataType, size: usize) -> String {
 pub(super) fn user_contains_opcode(
   sys: &SysBuilder,
   users: &HashSet<BaseNode>,
-  ops: Vec<Opcode>,
+  target: Opcode,
 ) -> bool {
   users.iter().any(|operand| {
     let opcode = operand
@@ -98,6 +98,6 @@ pub(super) fn user_contains_opcode(
       .as_ref::<Expr>(sys)
       .unwrap()
       .get_opcode();
-    ops.contains(&opcode)
+    opcode == target
   })
 }
