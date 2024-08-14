@@ -446,9 +446,9 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   let mut registers = vec![];
   fd.write_all("struct Simulator { stamp: usize, ".as_bytes())?;
   for array in sys.array_iter() {
-    let name = namify(&array.get_name());
+    let name = namify(array.get_name());
     let dtype = dtype_to_rust_type(&array.scalar_ty());
-    fd.write(format!("{} : Array<{}>,", name, dtype,).as_bytes())?;
+    fd.write_all(format!("{} : Array<{}>,", name, dtype,).as_bytes())?;
     if let Some(init) = array.get_initializer() {
       let init = init
         .iter()
@@ -462,10 +462,10 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     registers.push(name);
   }
   for module in sys.module_iter(ModuleKind::Module) {
-    fd.write_all(format!(" {}_event : VecDeque<usize>,", namify(&module.get_name())).as_bytes())?;
+    fd.write_all(format!(" {}_event : VecDeque<usize>,", namify(module.get_name())).as_bytes())?;
     simulator_init.push(format!(
       "{}_event : VecDeque::new(),",
-      namify(&module.get_name())
+      namify(module.get_name())
     ));
     for fifo in module.fifo_iter() {
       let name = fifo_name!(fifo);
@@ -552,7 +552,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
           let array = param.array.as_ref::<Array>(sys).unwrap();
           let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
           fd.write_all(
-            &quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }
+            quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }
               .to_string()
               .as_bytes(),
           )?;
@@ -565,7 +565,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   if sys.has_driver() {
     // Push the initial events.
     fd.write_all(
-      &quote::quote! {
+      quote::quote! {
         for i in 1..=#sim_threshold {
           sim.driver_event.push_back(i * 100);
         }
@@ -589,7 +589,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       .collect::<Vec<_>>();
     // Push the initial events.
     fd.write_all(
-      &quote::quote! {
+      quote::quote! {
         let tb_cycles = vec![#(#cycles, )*];
         for cycle in tb_cycles {
           sim.testbench_event.push_back(cycle * 100);

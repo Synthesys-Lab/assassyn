@@ -482,8 +482,7 @@ impl SysBuilder {
     // external interfaces.
     let mut operands = bind
       .get_bind()
-      .values()
-      .map(|x| x.clone())
+      .values().copied()
       .collect::<Vec<_>>();
     operands.push(bind.get_callee());
     let bind = self.create_expr(DataType::void(), Opcode::Bind, operands, true);
