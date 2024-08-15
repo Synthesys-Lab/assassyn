@@ -27,16 +27,13 @@ impl Optional {
   pub fn get_value(&self) -> BaseNode {
     self.value
   }
-
 }
 
 impl OptionalRef<'_> {
-
   /// Get the underlying data type of this optional port.
   pub fn underlying_ty(&self) -> DataType {
     self.get().value.get_dtype(self.sys).unwrap()
   }
-  
 }
 
 impl Typed for Optional {

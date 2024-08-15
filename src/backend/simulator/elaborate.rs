@@ -105,7 +105,10 @@ impl Visitor<String> for ElaborateModule<'_> {
     ));
     // Dump the function signature.
     // First, some common function parameters are dumped.
-    res.push_str(&format!("pub fn {}(sim: &mut Simulator) {{\n", namify(module.get_name())));
+    res.push_str(&format!(
+      "pub fn {}(sim: &mut Simulator) {{\n",
+      namify(module.get_name())
+    ));
     self.indent += 2;
 
     res.push_str(&self.visit_block(module.get_body()).unwrap());
@@ -186,7 +189,10 @@ impl Visitor<String> for ElaborateModule<'_> {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
         let bind = call.bind();
         let event_q = namify(bind.callee().get_name());
-        format!("{{ let stamp = sim.stamp; sim.{}_event.push_back(stamp + 100) }}", event_q)
+        format!(
+          "{{ let stamp = sim.stamp; sim.{}_event.push_back(stamp + 100) }}",
+          event_q
+        )
       }
       Opcode::FIFOPop => {
         // TODO(@were): Support multiple pop.
@@ -446,7 +452,9 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   for module in sys.module_iter(ModuleKind::All) {
     let module_name = namify(module.get_name());
     if !module.is_downstream() {
-      fd.write_all(format!("pub {}_event : VecDeque<usize>,", namify(module.get_name())).as_bytes())?;
+      fd.write_all(
+        format!("pub {}_event : VecDeque<usize>,", namify(module.get_name())).as_bytes(),
+      )?;
       simulator_init.push(format!("{}_event : VecDeque::new(),", module_name));
       fd.write_all(format!("pub {}_triggered : bool,", module_name).as_bytes())?;
       simulator_init.push(format!("{}_triggered : false,", module_name));

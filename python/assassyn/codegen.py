@@ -11,7 +11,7 @@ from .builder import SysBuilder
 from .array import Array
 from .module import Module, Port, Memory
 from .block import Block
-from .expr import Expr, PureInstrinsic
+from .expr import Expr
 from .utils import identifierize
 
 CG_OPCODE = {
@@ -215,7 +215,7 @@ class CodeGen(visitor.Visitor):
             for port in elem.ports:
                 assert isinstance(port, Optional)
                 value = self.generate_rval(port.value)
-                var_id = self.generate_rval(port);
+                var_id = self.generate_rval(port)
                 self.code.append(f'  let {var_id} = sys.create_optional({value});')
             self.code.append('  let downstream_ports = {')
             self.code.append('    let mut res = HashMap::new();')
@@ -291,7 +291,7 @@ class CodeGen(visitor.Visitor):
             imm_decl = f'  let {imm_var} = sys.get_const_int({ty}, {node.value}); // {node}'
             self.code.append(imm_decl)
             return imm_var
-        elif isinstance(node, module.Port):
+        if isinstance(node, module.Port):
             module_name = self.generate_rval(node.module)
             port_name = f'{module_name}_{node.name}'
             self.code.append(f'''  // Get port {node.name}
@@ -300,7 +300,7 @@ class CodeGen(visitor.Visitor):
                   module.get_fifo("{node.name}").unwrap().upcast()
                 }};''')
             return port_name
-        elif isinstance(node, Optional):
+        if isinstance(node, Optional):
             module_name = self.generate_rval(node.value)
             port_name = f'{module_name}_{node.name}'
             return port_name
