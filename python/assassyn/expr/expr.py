@@ -17,10 +17,6 @@ class Expr(Value):
         '''Dump the expression as an operand'''
         return f'_{identifierize(self)}'
 
-    def is_fifo_related(self):
-        '''If the opcode is FIFO related'''
-        return self.opcode // 100 == 3
-
     def is_binary(self):
         '''If the opcode is a binary operator'''
         return self.opcode // 100 == 2
@@ -249,12 +245,16 @@ class PureInstrinsic(Expr):
         OPTIONAL_UNWRAP: 'unwrap',
     }
 
-    def __init__(self, opcode, fifo):
+    def __init__(self, opcode, *args):
         super().__init__(opcode)
-        self.fifo = fifo
+        self.args = list(args)
 
     def __repr__(self):
-        return f'{self.as_operand()} = {self.fifo.as_operand()}.{self.OPERATORS[self.opcode]}()'
+        if self.opcode in [PureInstrinsic.FIFO_PEEK, PureInstrinsic.FIFO_VALID,
+                           PureInstrinsic.OPTIONAL_VALID, PureInstrinsic.OPTIONAL_UNWRAP]:
+            fifo = self.args[0].as_operand()
+            return f'{self.as_operand()} = {fifo}.{self.OPERATORS[self.opcode]}()'
+        raise NotImplementedError
 
 
 class Bind(Expr):

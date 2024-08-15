@@ -5,7 +5,7 @@ use std::{
   process::Command,
 };
 
-use module::Attribute;
+use module::{Attribute, ModulePort};
 use proc_macro2::Span;
 use quote::quote;
 
@@ -89,6 +89,7 @@ impl Visitor<String> for NodeRefDumper {
         quote::quote!(#value).to_string().into()
       }
       NodeKind::Module => Some(namify(node.as_ref::<Module>(sys).unwrap().get_name())),
+      NodeKind::Optional => Some(format!("_{}", node.get_key())),
       _ => Some(namify(node.to_string(sys).as_str()).to_string()),
     }
   }
@@ -106,17 +107,33 @@ impl Visitor<String> for ElaborateModule<'_> {
     // First, some common function parameters are dumped.
     res.push_str(&format!("pub fn {}(\n", namify(module.get_name())));
     res.push_str("  stamp: usize,\n");
-    res.push_str(
-      format!(
-        "{}_event: &mut VecDeque<usize>,\n",
-        namify(&self.module_name)
-      )
-      .as_str(),
-    );
-    for port in module.fifo_iter() {
-      let fifo_name = fifo_name!(port);
-      let dtype = dtype_to_rust_type(&port.scalar_ty());
-      res.push_str(format!("{}: &mut FIFO<{}>,", fifo_name, dtype).as_str());
+    if !module.is_downstream() {
+      res.push_str(
+        format!(
+          "{}_event: &mut VecDeque<usize>,\n",
+          namify(&self.module_name)
+        )
+        .as_str(),
+      );
+    }
+    match module.get_ports() {
+      module::ModulePort::Upstream { ports } => {
+        for fifo in ports.values() {
+          let fifo = fifo.as_ref::<FIFO>(module.sys).unwrap();
+          let fifo_name = fifo_name!(fifo);
+          let dtype = dtype_to_rust_type(&fifo.scalar_ty());
+          res.push_str(format!("{}: &mut FIFO<{}>,\n", fifo_name, dtype).as_str());
+        }
+      }
+      module::ModulePort::Downstream { ports } => {
+        for optional in ports.values() {
+          let name = dump_ref!(module.sys, optional);
+          let optional = optional.as_ref::<Optional>(module.sys).unwrap();
+          let ty = dtype_to_rust_type(&optional.underlying_ty());
+          res.push_str(format!("{}: Option<{}>,\n", name, ty).as_str());
+        }
+      }
+      _ => unreachable!(),
     }
     // All the writes will be done in half a cycle later by events, so no need to feed them
     // to the function signature.
@@ -238,17 +255,14 @@ impl Visitor<String> for ElaborateModule<'_> {
       }
       Opcode::PureIntrinsic { intrinsic } => {
         let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
-        let fifo = call
-          .get()
-          .get_operand_value(0)
-          .unwrap()
-          .as_ref::<FIFO>(self.sys)
-          .unwrap();
+        let port_self = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
         match intrinsic {
           subcode::PureIntrinsic::FIFOPeek => {
-            format!("{}.front().unwrap().clone()", fifo_name!(fifo))
+            format!("{}.front().unwrap().clone()", port_self)
           }
-          subcode::PureIntrinsic::FIFOValid => format!("!{}.is_empty()", fifo_name!(fifo)),
+          subcode::PureIntrinsic::FIFOValid => format!("!{}.is_empty()", port_self),
+          subcode::PureIntrinsic::OptionalValid => format!("{}.is_some()", port_self),
+          subcode::PureIntrinsic::OptionalUnwrap => format!("{}.unwrap()", port_self),
           _ => panic!("Unsupported FIFO field: {:?}", intrinsic),
         }
       }
@@ -450,7 +464,18 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("use num_bigint::{BigInt, BigUint};\n".as_bytes())?;
 
   let mut simulator_init = vec![];
+  let mut downstream_reset = vec![];
   let mut registers = vec![];
+  // Dump the memebers of the simulator struct.
+  // struct Simuator {
+  //   ... arrays
+  //   ... module
+  //     ... modules' ports
+  // }
+  //
+  // Along with the struct, the constructor will also be dumped lazily.
+  // By "lazily", it means that constructor will be pre-stored in the simulator_init vector,
+  // and will be filled in the `Simulator::new` function dumping.
   fd.write_all("struct Simulator { stamp: usize, ".as_bytes())?;
   for array in sys.array_iter() {
     let name = namify(array.get_name());
@@ -468,18 +493,37 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     }
     registers.push(name);
   }
-  for module in sys.module_iter(ModuleKind::Module) {
-    fd.write_all(format!(" {}_event : VecDeque<usize>,", namify(module.get_name())).as_bytes())?;
-    simulator_init.push(format!(
-      "{}_event : VecDeque::new(),",
-      namify(module.get_name())
-    ));
-    for fifo in module.fifo_iter() {
-      let name = fifo_name!(fifo);
-      let ty = dtype_to_rust_type(&fifo.scalar_ty());
-      fd.write_all(format!("{} : FIFO<{}>,", name, ty).as_bytes())?;
-      simulator_init.push(format!("{} : FIFO::new(),", name));
-      registers.push(name);
+  for module in sys.module_iter(ModuleKind::All) {
+    let module_name = namify(module.get_name());
+    if !module.is_downstream() {
+      fd.write_all(format!(" {}_event : VecDeque<usize>,", namify(module.get_name())).as_bytes())?;
+      simulator_init.push(format!("{}_event : VecDeque::new(),", module_name));
+      fd.write_all(format!("{}_triggered : bool,", module_name).as_bytes())?;
+      simulator_init.push(format!("{}_triggered : false,", module_name));
+      downstream_reset.push(format!("self.{}_triggered = false;", module_name));
+    }
+    match module.get_ports() {
+      module::ModulePort::Upstream { ports } => {
+        for fifo in ports.values() {
+          let fifo = fifo.as_ref::<FIFO>(sys).unwrap();
+          let name = fifo_name!(fifo);
+          let ty = dtype_to_rust_type(&fifo.scalar_ty());
+          fd.write_all(format!("{} : FIFO<{}>,", name, ty).as_bytes())?;
+          simulator_init.push(format!("{} : FIFO::new(),", name));
+          registers.push(name);
+        }
+      }
+      module::ModulePort::Downstream { ports } => {
+        for optional in ports.values() {
+          let name = dump_ref!(sys, optional);
+          let optional = optional.as_ref::<Optional>(sys).unwrap();
+          let ty = dtype_to_rust_type(&optional.underlying_ty());
+          fd.write_all(format!("{} : Option<{}>,", name, ty).as_bytes())?;
+          simulator_init.push(format!("{} : None,", name));
+          downstream_reset.push(format!("self.{} = None;", name));
+        }
+      }
+      _ => unreachable!(),
     }
   }
   fd.write_all("}".as_bytes())?;
@@ -495,6 +539,13 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   }
   fd.write_all("}}".as_bytes())?;
 
+  // Reset the downstream ports every cycle.
+  fd.write_all("pub fn reset_downstream(&mut self) {".as_bytes())?;
+  for elem in downstream_reset {
+    fd.write_all(elem.as_bytes())?;
+  }
+  fd.write_all("}".as_bytes())?;
+
   // Tick the registers.
   fd.write_all("pub fn tick_registers(&mut self) {".as_bytes())?;
   for elem in registers {
@@ -503,27 +554,66 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("}".as_bytes())?;
 
   let mut simulators = vec![];
-  for module in sys.module_iter(ModuleKind::Module) {
+  let mut downstreams = vec![];
+  for module in sys.module_iter(ModuleKind::All) {
     let module_name = namify(module.get_name());
-    simulators.push(module_name.clone());
     fd.write_all(format!("fn simulate_{}(&mut self) {{", module_name).as_bytes())?;
-    fd.write_all(
-      format!(
-        "if self.{}_event.front().map_or(false, |x| *x <= self.stamp) {{",
-        module_name
-      )
-      .as_bytes(),
-    )?;
-    fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
+    if !module.is_downstream() {
+      fd.write_all(
+        format!(
+          "if self.{}_event.front().map_or(false, |x| *x <= self.stamp) {{",
+          module_name
+        )
+        .as_bytes(),
+      )?;
+      fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
+    } else {
+      let mut conds = vec![];
+      for elem in module.optional_iter() {
+        if let Ok(expr) = elem.get_value().as_ref::<Expr>(sys) {
+          let external_module = expr
+            .get_parent()
+            .as_ref::<Block>(sys)
+            .unwrap()
+            .get_module()
+            .as_ref::<Module>(sys)
+            .unwrap();
+          conds.push(format!(
+            "self.{}_triggered",
+            namify(external_module.get_name())
+          ));
+        }
+      }
+      fd.write_all("if ".as_bytes())?;
+      fd.write_all(conds.join(" && ").as_bytes())?;
+      fd.write_all(" {".as_bytes())?;
+    }
     fd.write_all(format!("super::modules::{}(", module_name).as_bytes())?;
-    fd.write_all(format!("self.stamp, &mut self.{}_event, ", module_name).as_bytes())?;
-    for fifo in module.fifo_iter() {
-      let fifo_name = fifo_name!(fifo);
-      fd.write_all(format!("&mut self.{}, ", fifo_name).as_bytes())?;
+    fd.write_all("self.stamp,".as_bytes())?;
+    if !module.is_downstream() {
+      fd.write_all(format!("&mut self.{}_event,", namify(module.get_name())).as_bytes())?;
+    }
+    match module.get_ports() {
+      ModulePort::Upstream { ports } | ModulePort::Downstream { ports } => {
+        if !module.is_downstream() {
+          simulators.push(module_name.clone());
+        } else {
+          downstreams.push(module_name.clone());
+        }
+        for port in ports.values() {
+          let port_name = dump_ref!(sys, port);
+          if module.is_downstream() {
+            fd.write_all(format!("self.{}, ", port_name).as_bytes())?;
+          } else {
+            fd.write_all(format!("&mut self.{}, ", port_name).as_bytes())?;
+          }
+        }
+      }
+      _ => unreachable!(),
     }
     for (interface, _) in module.ext_interf_iter() {
       match interface.get_kind() {
-        // TODO(@were): Stricter type checking.
+        // TODO(@were): Stricter type checking later.
         NodeKind::Module => {
           let name = dump_ref!(sys, interface);
           fd.write_all(format!("&mut self.{}_event, ", name).as_bytes())?;
@@ -531,9 +621,12 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         _ => fd.write_all(format!("&mut self.{}, ", dump_ref!(sys, interface)).as_bytes())?,
       }
     }
-    fd.write_all(");".as_bytes())?;
-    fd.write_all("}".as_bytes())?;
-    fd.write_all("}".as_bytes())?;
+    fd.write_all("); // close caller\n".as_bytes())?;
+    if !module.is_downstream() {
+      fd.write_all(format!("self.{}_triggered = true;\n", module_name).as_bytes())?;
+    }
+    fd.write_all("} // close event condition\n".as_bytes())?;
+    fd.write_all("} // close function\n".as_bytes())?;
   }
 
   fd.write_all("}".as_bytes())?;
@@ -546,6 +639,14 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("let simulators = vec![".as_bytes())?;
   for sim in simulators {
     fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
+  }
+  fd.write_all("];\n".as_bytes())?;
+
+  // TODO(@were): A downstream module can be recursively dependent to another downstream module.
+  // A topological order among these downstream modules is needed.
+  fd.write_all("let downstreams = vec![".as_bytes())?;
+  for downstream in downstreams {
+    fd.write_all(format!("Simulator::simulate_{},", downstream).as_bytes())?;
   }
   fd.write_all("];\n".as_bytes())?;
 
@@ -569,8 +670,9 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   }
 
   let sim_threshold = config.sim_threshold;
+
+  // Push the initial events from driver.
   if sys.has_driver() {
-    // Push the initial events.
     fd.write_all(
       quote::quote! {
         for i in 1..=#sim_threshold {
@@ -582,6 +684,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     )?;
   }
 
+  // Push the initial events from testbench.
   if let Some(testbench) = sys.get_module("testbench") {
     let cycles = testbench
       .get_body()
@@ -594,7 +697,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         }
       })
       .collect::<Vec<_>>();
-    // Push the initial events.
     fd.write_all(
       quote::quote! {
         let tb_cycles = vec![#(#cycles, )*];
@@ -611,7 +713,11 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     quote! {
       for i in 1..=#sim_threshold {
         sim.stamp = i * 100;
+        sim.reset_downstream();
         for simulate in simulators.iter() {
+          simulate(&mut sim);
+        }
+        for simulate in downstreams.iter() {
           simulate(&mut sim);
         }
         sim.stamp += 50;
@@ -638,7 +744,7 @@ fn dump_modules(sys: &SysBuilder, fd: &mut File) -> Result<(), std::io::Error> {
     .as_bytes(),
   )?;
   let mut em = ElaborateModule::new(sys);
-  for module in em.sys.module_iter(ModuleKind::Module) {
+  for module in em.sys.module_iter(ModuleKind::All) {
     if let Some(buffer) = em.visit_module(module) {
       fd.write_all(buffer.as_bytes())?;
     }

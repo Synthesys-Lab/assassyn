@@ -131,25 +131,37 @@ class Optional:
     '''The class for a predicated value'''
 
     def __init__(self, value: Value):
+        self.name = None
+        self.module = None
         self.value = value
 
     @ir_builder(node_type='expr')
     def valid(self):
         '''The frontend API to get the predicate of an optional value'''
         from .expr import PureInstrinsic
-        return PureInstrinsic(PureInstrinsic.FIFO_VALID, self.value)
+        return PureInstrinsic(PureInstrinsic.OPTIONAL_VALID, self)
+
+    @ir_builder(node_type='expr')
+    def unwrap(self):
+        '''The frontend API to get the value of an optional value'''
+        from .expr import PureInstrinsic
+        return PureInstrinsic(PureInstrinsic.OPTIONAL_UNWRAP, self)
 
     @ir_builder(node_type='expr')
     def unwrap_or(self, default):
         '''The frontend API to get the value of an optional value with a given default'''
         from .expr import Select
-        return Select(Select.SELECT, self.valid(), self.value, default)
+        return Select(Select.SELECT, self.valid(), self.unwrap(), default)
 
     @ir_builder(node_type='expr')
     def map_or(self, f, default):
         '''The frontend API to get the map of an optional value with a given default'''
         from .expr import Select
-        return Select(Select.SELECT, self.valid(), f(self.value), default)
+        return Select(Select.SELECT, self.valid(), f(self.unwrap()), default)
+
+    def as_operand(self):
+        '''Dump the port as a right-hand side reference.'''
+        return f'{self.module.as_operand()}.{self.name}'
 
     def __repr__(self):
         return f'Optional{{ value: {self.value.as_operand()} }}'

@@ -11,7 +11,7 @@ from .builder import SysBuilder
 from .array import Array
 from .module import Module, Port, Memory
 from .block import Block
-from .expr import Expr
+from .expr import Expr, PureInstrinsic
 from .utils import identifierize
 
 CG_OPCODE = {
@@ -43,6 +43,8 @@ CG_OPCODE = {
 
     expr.PureInstrinsic.FIFO_PEEK: 'peek',
     expr.PureInstrinsic.FIFO_VALID: 'valid',
+    expr.PureInstrinsic.OPTIONAL_UNWRAP: 'unwrap',
+    expr.PureInstrinsic.OPTIONAL_VALID: 'valid',
 
     expr.FIFOPop.FIFO_POP: 'pop',
     expr.FIFOPush.FIFO_PUSH: 'push',
@@ -64,13 +66,23 @@ CG_OPCODE = {
     expr.intrinsic.Intrinsic.WAIT_UNTIL: 'wait_until',
 }
 
+CG_MIDFIX = {
+    expr.FIFOPop.FIFO_POP: 'fifo',
+    expr.FIFOPush.FIFO_PUSH: 'fifo',
+    expr.PureInstrinsic.FIFO_PEEK: 'fifo',
+    expr.PureInstrinsic.FIFO_VALID: 'fifo',
+
+    expr.PureInstrinsic.OPTIONAL_VALID: 'optional',
+    expr.PureInstrinsic.OPTIONAL_UNWRAP: 'optional',
+}
+
 CG_ARRAY_ATTR = {
     Array.FULLY_PARTITIONED: 'FullyPartitioned',
 }
 
 CG_SIMULATOR = {
-        'verilator': 'Verilator',
-        'vcs': 'VCS',
+    'verilator': 'Verilator',
+    'vcs': 'VCS',
 }
 
 def opcode_to_ib(node: Expr):
@@ -78,9 +90,8 @@ def opcode_to_ib(node: Expr):
     opcode = node.opcode
     if node.opcode == expr.Bind.BIND:
         return ''
-    if node.is_fifo_related():
-        return f'create_fifo_{CG_OPCODE[opcode]}'
-    return f'create_{CG_OPCODE[opcode]}'
+    midfix = f'_{CG_MIDFIX.get(opcode)}' if opcode in CG_MIDFIX else ''
+    return f'create{midfix}_{CG_OPCODE[opcode]}'
 
 def generate_dtype(ty: dtype.DType):
     '''Generate AST data type representation into assassyn data type representation'''
@@ -201,13 +212,16 @@ class CodeGen(visitor.Visitor):
 
         for elem in node.downstreams:
             self.code.append('  // Emit downstream modules')
-            self.code.append('  let downstream_ports = {')
-            self.code.append('    let mut res = HashMap::new();')
             for port in elem.ports:
                 assert isinstance(port, Optional)
                 value = self.generate_rval(port.value)
-                self.code.append(f'    let port = sys.create_optional({value});')
-                self.code.append(f'    res.insert("{port.name}".into(), port);')
+                var_id = self.generate_rval(port);
+                self.code.append(f'  let {var_id} = sys.create_optional({value});')
+            self.code.append('  let downstream_ports = {')
+            self.code.append('    let mut res = HashMap::new();')
+            for port in elem.ports:
+                var_id = self.generate_rval(port)
+                self.code.append(f'    res.insert("{port.name}".into(), {var_id});')
             self.code.append('    res')
             self.code.append('  };')
             var = self.generate_rval(elem)
@@ -277,7 +291,7 @@ class CodeGen(visitor.Visitor):
             imm_decl = f'  let {imm_var} = sys.get_const_int({ty}, {node.value}); // {node}'
             self.code.append(imm_decl)
             return imm_var
-        if isinstance(node, module.Port):
+        elif isinstance(node, module.Port):
             module_name = self.generate_rval(node.module)
             port_name = f'{module_name}_{node.name}'
             self.code.append(f'''  // Get port {node.name}
@@ -285,6 +299,10 @@ class CodeGen(visitor.Visitor):
                   let module = {module_name}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
                   module.get_fifo("{node.name}").unwrap().upcast()
                 }};''')
+            return port_name
+        elif isinstance(node, Optional):
+            module_name = self.generate_rval(node.value)
+            port_name = f'{module_name}_{node.name}'
             return port_name
         return node.as_operand()
 
@@ -300,7 +318,13 @@ class CodeGen(visitor.Visitor):
             x = self.generate_rval(node.x)
             res = f'sys.{ib_method}({x});'
         elif isinstance(node, expr.PureInstrinsic):
-            fifo = self.generate_rval(node.fifo)
+            if node.opcode in (expr.PureInstrinsic.FIFO_PEEK,
+                               expr.PureInstrinsic.FIFO_VALID,
+                               expr.PureInstrinsic.OPTIONAL_UNWRAP,
+                               expr.PureInstrinsic.OPTIONAL_VALID):
+                fifo = self.generate_rval(node.args[0])
+                res = f'sys.{ib_method}({fifo});'
+            fifo = self.generate_rval(node.args[0])
             res = f'sys.{ib_method}({fifo});'
         elif isinstance(node, expr.FIFOPop):
             fifo = self.generate_rval(node.fifo)

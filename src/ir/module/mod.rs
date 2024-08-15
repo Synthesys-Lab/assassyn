@@ -167,7 +167,22 @@ impl<'sys> ModuleRef<'sys> {
       ModulePort::Upstream { ports, .. } => {
         ports.values().map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
       }
-      _ => unreachable!(),
+      _ => panic!("Did you access ports as FIFO in a downstream module?"),
+    }
+  }
+
+  /// Iterate over the optional ports of the module.
+  pub fn optional_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = OptionalRef<'res>> + 'res
+  where
+    'sys: 'borrow,
+    'sys: 'res,
+    'borrow: 'res,
+  {
+    match &self.ports {
+      ModulePort::Downstream { ports } => {
+        ports.values().map(|x| x.as_ref::<Optional>(self.sys).unwrap())
+      }
+      _ => panic!("Did you access ports as Optional in an upstream module?"),
     }
   }
 }

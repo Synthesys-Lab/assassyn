@@ -401,7 +401,8 @@ impl BaseNode {
         operand.get_value().to_string(sys)
       }
       NodeKind::Optional => {
-        panic!("Not supported yet!")
+        let optional = self.as_ref::<Optional>(sys).unwrap();
+        optional.to_string()
       }
     }
   }

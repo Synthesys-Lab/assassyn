@@ -2,6 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
+use expr::subcode::PureIntrinsic;
 use instructions::call::LazyBind;
 
 use crate::ir::{ir_printer::IRPrinter, node::*, visitor::Visitor, *};
@@ -382,11 +383,43 @@ impl SysBuilder {
   ///
   /// # Arguments
   /// * `value` - The value to be selected.
-  /// * `pred` - The condition of selecting the value.
   pub fn create_optional(&mut self, value: BaseNode) -> BaseNode {
     let instance = Optional::new(value);
-
     self.insert_element(instance)
+  }
+
+  /// The helper function to create an "optional" intrinsic.
+  ///
+  /// # Arguments
+  /// * `optional` - The optional value.
+  /// * `intrinsic` - The intrinsic to be executed.
+  fn create_optional_intrin(
+    &mut self,
+    optional: BaseNode,
+    intrinsic: subcode::PureIntrinsic,
+  ) -> BaseNode {
+    let dtype = {
+      let optional = optional.as_ref::<Optional>(self).unwrap();
+      optional.get_value().get_dtype(self).unwrap()
+    };
+    let opcode = Opcode::PureIntrinsic { intrinsic };
+    self.create_expr(dtype, opcode, vec![optional], true)
+  }
+
+  /// Create an "optional" unwrap node, which gets the value from the optional when valid.
+  ///
+  /// # Arguments
+  /// * `optional` - The optional value to be unwrapped.
+  pub fn create_optional_unwrap(&mut self, optional: BaseNode) -> BaseNode {
+    self.create_optional_intrin(optional, PureIntrinsic::OptionalUnwrap)
+  }
+
+  /// Create an "optional" valid node, which checks if the optional value is valid.
+  ///
+  /// # Arguments
+  /// * `optional` - The optional value to be checked.
+  pub fn create_optional_valid(&mut self, optional: BaseNode) -> BaseNode {
+    self.create_optional_intrin(optional, PureIntrinsic::OptionalValid)
   }
 
   pub fn create_select_1hot(&mut self, cond: BaseNode, values: Vec<BaseNode>) -> BaseNode {
@@ -709,9 +742,8 @@ impl SysBuilder {
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
-    assert_eq!(
-      fifo.get_kind(),
-      NodeKind::FIFO,
+    assert!(
+      matches!(fifo.get_kind(), NodeKind::FIFO),
       "Expect FIFO as the operand"
     );
 
