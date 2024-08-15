@@ -1527,7 +1527,12 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       Opcode::PureIntrinsic { intrinsic } => {
         let name = namify(expr.upcast().to_string(self.sys).as_str());
         let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
-        let fifo = call.get().get_operand_value(0).unwrap().as_ref::<FIFO>(self.sys).unwrap();
+        let fifo = call
+          .get()
+          .get_operand_value(0)
+          .unwrap()
+          .as_ref::<FIFO>(self.sys)
+          .unwrap();
         let fifo_name = fifo_name!(fifo);
         match intrinsic {
           subcode::PureIntrinsic::FIFOValid => Some(format!(

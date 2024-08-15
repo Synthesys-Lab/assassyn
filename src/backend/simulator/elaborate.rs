@@ -238,7 +238,12 @@ impl Visitor<String> for ElaborateModule<'_> {
       }
       Opcode::PureIntrinsic { intrinsic } => {
         let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
-        let fifo = call.get().get_operand_value(0).unwrap().as_ref::<FIFO>(self.sys).unwrap();
+        let fifo = call
+          .get()
+          .get_operand_value(0)
+          .unwrap()
+          .as_ref::<FIFO>(self.sys)
+          .unwrap();
         match intrinsic {
           subcode::PureIntrinsic::FIFOPeek => {
             format!("{}.front().unwrap().clone()", fifo_name!(fifo))

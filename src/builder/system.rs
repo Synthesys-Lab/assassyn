@@ -700,7 +700,12 @@ impl SysBuilder {
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
 
-    self.create_expr(ty, subcode::PureIntrinsic::FIFOPeek.into(), vec![fifo], true)
+    self.create_expr(
+      ty,
+      subcode::PureIntrinsic::FIFOPeek.into(),
+      vec![fifo],
+      true,
+    )
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {

@@ -27,7 +27,6 @@ impl Optional {
   pub fn get_value(&self) -> BaseNode {
     self.value
   }
-
 }
 
 pub struct FIFO {

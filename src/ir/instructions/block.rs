@@ -44,10 +44,10 @@ impl Display for PureIntrinsic<'_> {
       "{}",
       match self.expr.get_opcode() {
         Opcode::PureIntrinsic { intrinsic } => match intrinsic {
-          subcode::PureIntrinsic::PortValid |
-          subcode::PureIntrinsic::FIFOValid |
-          subcode::PureIntrinsic::FIFOReady |
-          subcode::PureIntrinsic::FIFOPeek => {
+          subcode::PureIntrinsic::PortValid
+          | subcode::PureIntrinsic::FIFOValid
+          | subcode::PureIntrinsic::FIFOReady
+          | subcode::PureIntrinsic::FIFOPeek => {
             format!(
               "{}.{}()",
               self
