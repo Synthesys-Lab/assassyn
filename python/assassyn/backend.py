@@ -112,9 +112,11 @@ def elaborate( # pylint: disable=too-many-arguments
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir, check=True)
 
-    paths = []
+    simulator_path = None
+    verilog_path = None
     if simulator:
-        paths.append(os.path.join(sys_dir, f'{sys.name}_simulator'))
+        simulator_path = os.path.join(sys_dir, f'{sys.name}_simulator')
     if verilog:
-        paths.append(os.path.join(sys_dir, f'{sys.name}_verilog'))
-    return paths[0] if len(paths) == 1 else paths
+        verilog_path = os.path.join(sys_dir, f'{sys.name}_verilog')
+
+    return [simulator_path, verilog_path]

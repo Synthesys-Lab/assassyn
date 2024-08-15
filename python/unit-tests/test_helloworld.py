@@ -30,13 +30,14 @@ def test_helloworld():
         driver = Driver()
         driver.build()
 
-    simulator_path, verilog_path = elaborate(sys, verilog='verilator')
+    simulator_path, verilog_path = elaborate(sys, verilog=utils.verilator_path())
     
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
 
-    raw = utils.run_verilator(verilog_path)
-    check_raw(raw)
+    if verilog_path:
+        raw = utils.run_verilator(verilog_path)
+        check_raw(raw)
 
 
 if __name__ == '__main__':

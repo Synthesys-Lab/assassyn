@@ -55,7 +55,7 @@ def impl(sys_name, init_file, resource_base):
         driver = Driver()
         driver.build(memory)
 
-    config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog='verilator')
+    config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog=utils.verilator_path())
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 

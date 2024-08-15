@@ -63,9 +63,12 @@ def test_array_multi_write():
         driver = Driver()
         driver.build(mod_a, mod_c)
 
-    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
+    simulator_path, verilator_path = elaborate(sys, verilog=utils.verilator_path())
+    
     utils.run_simulator(simulator_path)
-    utils.run_verilator(verilator_path)
+    
+    if verilator_path:
+        utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
     test_array_multi_write()

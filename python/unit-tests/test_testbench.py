@@ -34,13 +34,14 @@ def test_testbench():
         testbench = Testbench()
         testbench.build()
 
-    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
+    simulator_path, verilator_path = elaborate(sys, verilog=utils.verilator_path())
 
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    raw = utils.run_verilator(verilator_path)
-    check(raw)
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
+        check(raw)
 
 
 if __name__ == '__main__':

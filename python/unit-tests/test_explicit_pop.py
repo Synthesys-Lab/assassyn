@@ -56,14 +56,14 @@ def test_explicit_pop():
         driver = Driver()
         driver.build(adder)
 
-    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
+    simulator_path, verilator_path = elaborate(sys, verilog=utils.verilator_path())
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
 
-    raw = utils.run_verilator(verilator_path)
-    check_raw(raw)
-
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
+        check_raw(raw)
 
 
 if __name__ == '__main__':

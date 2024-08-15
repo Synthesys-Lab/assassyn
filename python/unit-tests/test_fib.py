@@ -40,8 +40,6 @@ def check(raw):
             expect_b = int(c)
             assert int(a) + int(b) == int(c)
 
-
-
 def test_fib():
 
     sys = SysBuilder('fib')
@@ -49,13 +47,14 @@ def test_fib():
         driver = Driver()
         driver.build()
 
-    simulator_path, verilator_path = elaborate(sys, verilog='verilator')
+    simulator_path, verilator_path = elaborate(sys, verilog=utils.verilator_path())
 
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    #raw = utils.run_verilator(verilator_path)
-    #check(raw)
+    # if verilator_path:
+    #     raw = utils.run_verilator(verilator_path)
+    #     check(raw)
 
 
 if __name__ == '__main__':

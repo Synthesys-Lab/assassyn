@@ -51,14 +51,15 @@ def test_concat():
         driver = Driver()
         driver.build(adder)
 
-    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog='verilator')
+    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog=utils.verilator_path())
     simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
     check_concat(raw)
 
-    raw = utils.run_verilator(verilator_path)
-    check_concat(raw)
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
+        check_concat(raw)
 
 
 if __name__ == '__main__':
