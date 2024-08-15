@@ -236,13 +236,15 @@ impl Visitor<String> for ElaborateModule<'_> {
         }}
         .to_string()
       }
-      Opcode::PortField { field } => {
-        let get_field = expr.as_sub::<instructions::PortField>().unwrap();
-        let fifo = get_field.fifo();
-        match get_field.get_field() {
-          subcode::PortField::Peek => format!("{}.front().unwrap().clone()", fifo_name!(fifo)),
-          subcode::PortField::Valid => format!("!{}.is_empty()", fifo_name!(fifo)),
-          _ => panic!("Unsupported FIFO field: {:?}", field),
+      Opcode::PureIntrinsic { intrinsic } => {
+        let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
+        let fifo = call.get().get_operand_value(0).unwrap().as_ref::<FIFO>(self.sys).unwrap();
+        match intrinsic {
+          subcode::PureIntrinsic::FIFOPeek => {
+            format!("{}.front().unwrap().clone()", fifo_name!(fifo))
+          }
+          subcode::PureIntrinsic::FIFOValid => format!("!{}.is_empty()", fifo_name!(fifo)),
+          _ => panic!("Unsupported FIFO field: {:?}", intrinsic),
         }
       }
       Opcode::FIFOPush => {

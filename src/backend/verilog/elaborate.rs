@@ -1524,24 +1524,24 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         Some("".to_string())
       }
 
-      Opcode::PortField { field } => {
+      Opcode::PureIntrinsic { intrinsic } => {
         let name = namify(expr.upcast().to_string(self.sys).as_str());
-        let get_field = expr.as_sub::<instructions::PortField>().unwrap();
-        let fifo = get_field.fifo();
+        let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
+        let fifo = call.get().get_operand_value(0).unwrap().as_ref::<FIFO>(self.sys).unwrap();
         let fifo_name = fifo_name!(fifo);
-        match field {
-          subcode::PortField::Valid => Some(format!(
+        match intrinsic {
+          subcode::PureIntrinsic::FIFOValid => Some(format!(
             "logic {};\nassign {} = fifo_{}_pop_valid;\n\n",
             name, name, fifo_name
           )),
-          subcode::PortField::Peek => Some(format!(
+          subcode::PureIntrinsic::FIFOPeek => Some(format!(
             "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\n\n",
             fifo.scalar_ty().get_bits() - 1,
             name,
             name,
             fifo_name
           )),
-          subcode::PortField::Ready => todo!(),
+          _ => todo!(),
         }
       }
 

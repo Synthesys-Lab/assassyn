@@ -1,22 +1,11 @@
 use std::fmt::Display;
 
 use crate::ir::{
-  expr::subcode,
   node::{FIFORef, IsElement, Parented},
   visitor::Visitor,
-  Opcode,
 };
 
-use super::{PortField, FIFOPop, FIFOPush};
-
-impl PortField<'_> {
-  pub fn get_field(&self) -> subcode::PortField {
-    match self.expr.get_opcode() {
-      Opcode::PortField { field } => field,
-      _ => unreachable!(),
-    }
-  }
-}
+use super::{FIFOPop, FIFOPush};
 
 struct FIFODumper;
 
@@ -28,17 +17,6 @@ impl Visitor<String> for FIFODumper {
       fifo.get_name()
     )
     .into()
-  }
-}
-
-impl Display for PortField<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "{}.{}",
-      FIFODumper.visit_fifo(self.fifo()).unwrap(),
-      self.get_field()
-    )
   }
 }
 

@@ -54,10 +54,11 @@ register_subcode!(
 );
 
 register_subcode!(
-  PortField {
-    Peek(peek "peek"),
-    Valid(valid "valid"),
-    Ready(almost_full "almost_full"),
+  PureIntrinsic {
+    PortValid(valid "valid"),
+    FIFOPeek(peek "peek"),
+    FIFOValid(valid "valid"),
+    FIFOReady(ready "ready"),
   }
 );
 

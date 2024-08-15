@@ -10,12 +10,10 @@ pub struct Optional {
   pub(super) parent: BaseNode,
   /// The value of this optional port.
   value: BaseNode,
-  /// The predication of this optional port.
-  pred: BaseNode,
 }
 
 impl Optional {
-  pub fn new(value: BaseNode, pred: BaseNode) -> Self {
+  pub fn new(value: BaseNode) -> Self {
     Self {
       key: 0,
       // When instantiating an optional port, the parent module is not constructed yet.
@@ -23,7 +21,6 @@ impl Optional {
       // Later SysBuilder will call set_parent() to set the correct parent.
       parent: BaseNode::new(NodeKind::Unknown, 0),
       value,
-      pred,
     }
   }
 
@@ -31,9 +28,6 @@ impl Optional {
     self.value
   }
 
-  pub fn get_pred(&self) -> BaseNode {
-    self.pred
-  }
 }
 
 pub struct FIFO {

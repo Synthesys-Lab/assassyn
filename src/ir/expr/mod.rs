@@ -140,7 +140,6 @@ register_opcodes!(
   Bind(bind, 1 /*value*/) => { valued },
   FIFOPush(push, 2 /*fifo value*/) => { side_effect },
   FIFOPop(pop, 1 /*fifo*/) => { side_effect, valued },
-  PortField({ field: subcode::PortField }, 1 /*fifo*/) => { valued },
   AsyncCall(async_call, -1 /* N/A */) => { side_effect },
   // Other synthesizable operations
   Slice(slice, 3 /*op [lo, hi]*/) => { valued },
@@ -148,6 +147,8 @@ register_opcodes!(
   Concat(concat, 2/*msb lsb*/) => { valued },
   // Block intrinsics
   BlockIntrinsic({ intrinsic: subcode::BlockIntrinsic }, -1 /*N/A*/) => { side_effect },
+  // Pure intrinsics
+  PureIntrinsic({ intrinsic: subcode::PureIntrinsic }, -1 /*N/A*/) => { valued },
   // Non-synthesizable operations
   Log(log, -1 /*N/A*/) => { side_effect }
 );

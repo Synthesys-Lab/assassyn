@@ -383,8 +383,8 @@ impl SysBuilder {
   /// # Arguments
   /// * `value` - The value to be selected.
   /// * `pred` - The condition of selecting the value.
-  pub fn create_optional(&mut self, value: BaseNode, pred: BaseNode) -> BaseNode {
-    let instance = Optional::new(value, pred);
+  pub fn create_optional(&mut self, value: BaseNode) -> BaseNode {
+    let instance = Optional::new(value);
 
     self.insert_element(instance)
   }
@@ -700,7 +700,7 @@ impl SysBuilder {
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
 
-    self.create_expr(ty, subcode::PortField::Peek.into(), vec![fifo], true)
+    self.create_expr(ty, subcode::PureIntrinsic::FIFOPeek.into(), vec![fifo], true)
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
@@ -712,7 +712,7 @@ impl SysBuilder {
 
     self.create_expr(
       DataType::int_ty(1),
-      subcode::PortField::Valid.into(),
+      subcode::PureIntrinsic::FIFOValid.into(),
       vec![fifo],
       true,
     )

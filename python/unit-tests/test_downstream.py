@@ -36,9 +36,8 @@ class Adder(Downstream):
     @downstream.constructor
     def __init__(self, a, b):
         super().__init__()
-        true = UInt(1)(1)
-        self.a = Optional(a, true)
-        self.b = Optional(b, true)
+        self.a = Optional(a)
+        self.b = Optional(b)
 
     @downstream.combinational
     def build(self):

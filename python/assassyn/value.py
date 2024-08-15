@@ -130,21 +130,26 @@ class Value:
 class Optional:
     '''The class for a predicated value'''
 
-    def __init__(self, value: Value, pred: Value):
+    def __init__(self, value: Value):
         self.value = value
-        self.pred = pred
+
+    @ir_builder(node_type='expr')
+    def valid(self):
+        '''The frontend API to get the predicate of an optional value'''
+        from .expr import PureInstrinsic
+        return PureInstrinsic(PureInstrinsic.FIFO_VALID, self.value)
 
     @ir_builder(node_type='expr')
     def unwrap_or(self, default):
         '''The frontend API to get the value of an optional value with a given default'''
         from .expr import Select
-        return Select(Select.SELECT, self.pred, self.value, default)
+        return Select(Select.SELECT, self.valid(), self.value, default)
 
     @ir_builder(node_type='expr')
     def map_or(self, f, default):
         '''The frontend API to get the map of an optional value with a given default'''
         from .expr import Select
-        return Select(Select.SELECT, self.pred, f(self.value), default)
+        return Select(Select.SELECT, self.valid(), f(self.value), default)
 
     def __repr__(self):
-        return f'Optional{{ value: {self.value.as_operand()}, pred: {self.pred} }}'
+        return f'Optional{{ value: {self.value.as_operand()} }}'

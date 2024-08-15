@@ -198,9 +198,7 @@ impl Visitor<String> for IRPrinter {
         for elem in ports.values() {
           let option = elem.as_ref::<Optional>(module.sys).unwrap();
           res.push_str(" ".repeat(self.indent + 2).as_str());
-          res.push_str("optional { pred: ");
-          res.push_str(option.get_pred().to_string(module.sys).as_str());
-          res.push_str(", value: ");
+          res.push_str("optional { value: ");
           res.push_str(option.get_value().to_string(module.sys).as_str());
           res.push_str(" },\n");
         }

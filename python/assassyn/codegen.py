@@ -41,8 +41,8 @@ CG_OPCODE = {
     expr.Slice.SLICE: 'slice',
     expr.Concat.CONCAT: 'concat',
 
-    expr.FIFOField.FIFO_PEEK: 'peek',
-    expr.FIFOField.FIFO_VALID: 'valid',
+    expr.PureInstrinsic.FIFO_PEEK: 'peek',
+    expr.PureInstrinsic.FIFO_VALID: 'valid',
 
     expr.FIFOPop.FIFO_POP: 'pop',
     expr.FIFOPush.FIFO_PUSH: 'push',
@@ -206,8 +206,7 @@ class CodeGen(visitor.Visitor):
             for port in elem.ports:
                 assert isinstance(port, Optional)
                 value = self.generate_rval(port.value)
-                pred = self.generate_rval(port.pred)
-                self.code.append(f'    let port = sys.create_optional({value}, {pred});')
+                self.code.append(f'    let port = sys.create_optional({value});')
                 self.code.append(f'    res.insert("{port.name}".into(), port);')
             self.code.append('    res')
             self.code.append('  };')
@@ -300,7 +299,7 @@ class CodeGen(visitor.Visitor):
         elif node.is_unary():
             x = self.generate_rval(node.x)
             res = f'sys.{ib_method}({x});'
-        elif isinstance(node, expr.FIFOField):
+        elif isinstance(node, expr.PureInstrinsic):
             fifo = self.generate_rval(node.fifo)
             res = f'sys.{ib_method}({fifo});'
         elif isinstance(node, expr.FIFOPop):

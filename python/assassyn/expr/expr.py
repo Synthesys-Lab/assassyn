@@ -31,7 +31,7 @@ class Expr(Value):
 
     def is_valued(self):
         '''If this operation has a return value'''
-        valued = (FIFOField, FIFOPop, ArrayRead, Slice, Cast, Concat, Select, Select1Hot)
+        valued = (PureInstrinsic, FIFOPop, ArrayRead, Slice, Cast, Concat, Select, Select1Hot)
         other = isinstance(self, valued)
         return other or self.is_binary() or self.is_unary()
 
@@ -233,16 +233,20 @@ class UnaryOp(Expr):
     def __repr__(self):
         return f'{self.as_operand()} = {self.OPERATORS[self.opcode]}{self.x.as_operand()}'
 
-class FIFOField(Expr):
+class PureInstrinsic(Expr):
     '''The class for accessing FIFO fields, valid, and peek'''
 
     # FIFO operations
     FIFO_VALID = 300
     FIFO_PEEK  = 303
+    OPTIONAL_VALID = 304
+    OPTIONAL_UNWRAP = 305
 
     OPERATORS = {
         FIFO_VALID: 'valid',
         FIFO_PEEK: 'peek',
+        OPTIONAL_VALID: 'valid',
+        OPTIONAL_UNWRAP: 'unwrap',
     }
 
     def __init__(self, opcode, fifo):
