@@ -13,12 +13,6 @@ use crate::ir::*;
 pub use attrs::Attribute;
 use user::ExternalInterface;
 
-pub enum ModulePort {
-  Upstream { ports: HashMap<String, BaseNode> },
-  Downstream { ports: HashMap<String, BaseNode> },
-  None,
-}
-
 /// The data structure for a module.
 pub struct Module {
   /// The index key of this module in the slab buffer.
@@ -34,7 +28,7 @@ pub struct Module {
   /// The symbol table that maintains the unique identifiers.
   pub(crate) symbol_table: SymbolTable,
   /// The sub-class data structures of this module.
-  ports: ModulePort,
+  ports: HashMap<String, BaseNode>,
   /// The set of users of this module.
   pub(crate) user_set: HashSet<BaseNode>,
 }
@@ -48,7 +42,7 @@ impl Default for Module {
       external_interface: ExternalInterface::new(),
       attr: HashSet::new(),
       symbol_table: SymbolTable::new(),
-      ports: ModulePort::None,
+      ports: HashMap::new(),
       user_set: HashSet::new(),
     }
   }
@@ -68,25 +62,11 @@ impl Module {
   /// let a = FIFO::new("a", 32);
   /// Module::new("a_plus_b", vec![a.clone()]);
   /// ```
-  pub fn upstream(name: &str, ports: HashMap<String, BaseNode>) -> Module {
+  pub fn new(name: &str, ports: HashMap<String, BaseNode>) -> Module {
     Module {
       key: 0,
       name: name.to_string(),
-      ports: ModulePort::Upstream { ports },
-      user_set: HashSet::new(),
-      ..Default::default()
-    }
-  }
-
-  pub fn get_ports(&self) -> &ModulePort {
-    &self.ports
-  }
-
-  pub fn downstream(name: String, ports: HashMap<String, BaseNode>) -> Self {
-    Module {
-      key: 0,
-      name,
-      ports: ModulePort::Downstream { ports },
+      ports,
       user_set: HashSet::new(),
       ..Default::default()
     }
@@ -100,15 +80,11 @@ impl Module {
 impl<'sys> ModuleRef<'sys> {
   /// Get the number of inputs to the module.
   pub fn get_num_inputs(&self) -> usize {
-    match self.ports {
-      ModulePort::Upstream { ref ports, .. } => ports.len(),
-      ModulePort::Downstream { ref ports } => ports.len(),
-      _ => unreachable!(),
-    }
+    self.ports.len()
   }
 
   pub fn is_downstream(&self) -> bool {
-    matches!(self.ports, ModulePort::Downstream { .. })
+    self.has_attr(Attribute::Downstream)
   }
 
   /// Get the input by name.
@@ -117,12 +93,10 @@ impl<'sys> ModuleRef<'sys> {
   ///
   /// * `name` - The name of the input.
   pub fn get_fifo(&self, name: &str) -> Option<FIFORef<'_>> {
-    match self.ports {
-      ModulePort::Upstream { ref ports, .. } => ports
-        .get(name)
-        .map(|x| x.clone().as_ref::<FIFO>(self.sys).unwrap()),
-      _ => unreachable!(),
-    }
+    self
+      .ports
+      .get(name)
+      .map(|x| x.clone().as_ref::<FIFO>(self.sys).unwrap())
   }
 
   /// Get the name of the module.
@@ -163,29 +137,10 @@ impl<'sys> ModuleRef<'sys> {
     'sys: 'res,
     'borrow: 'res,
   {
-    match &self.ports {
-      ModulePort::Upstream { ports, .. } => {
-        ports.values().map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
-      }
-      _ => panic!("Did you access ports as FIFO in a downstream module?"),
-    }
-  }
-
-  /// Iterate over the optional ports of the module.
-  pub fn optional_iter<'borrow, 'res>(
-    &'borrow self,
-  ) -> impl Iterator<Item = OptionalRef<'res>> + 'res
-  where
-    'sys: 'borrow,
-    'sys: 'res,
-    'borrow: 'res,
-  {
-    match &self.ports {
-      ModulePort::Downstream { ports } => ports
-        .values()
-        .map(|x| x.as_ref::<Optional>(self.sys).unwrap()),
-      _ => panic!("Did you access ports as Optional in an upstream module?"),
-    }
+    self
+      .ports
+      .values()
+      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
 }
 
@@ -206,30 +161,20 @@ impl<'a> ModuleMut<'a> {
 
 impl Typed for ModuleRef<'_> {
   fn dtype(&self) -> DataType {
-    match self.ports {
-      ModulePort::Upstream { ref ports, .. } => {
-        let types = ports
-          .values()
-          .map(|x| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
-          .collect::<Vec<_>>();
-        DataType::module("module".into(), types)
+    let types = self
+      .ports
+      .values()
+      .map(|x| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
+      .collect::<Vec<_>>();
+    DataType::module(
+      if self.is_downstream() {
+        "downstream"
+      } else {
+        "module"
       }
-      ModulePort::Downstream { ref ports } => {
-        let mut vec = Vec::new();
-        for port in ports.values() {
-          vec.push(
-            port
-              .as_ref::<Optional>(self.sys)
-              .unwrap()
-              .get_value()
-              .get_dtype(self.sys)
-              .unwrap(),
-          );
-        }
-        DataType::module("downstream".into(), vec)
-      }
-      _ => unreachable!(),
-    }
+      .into(),
+      types,
+    )
   }
 }
 
@@ -251,7 +196,7 @@ impl SysBuilder {
       })
       .collect::<HashMap<_, _>>();
     let ports = port_table.values().cloned().collect::<Vec<_>>();
-    let module = Module::upstream(name, port_table);
+    let module = Module::new(name, port_table);
     let module = self.insert_element(module);
     // This part is kinda dirty, since we run into a chicken-egg problem: the port parent cannot
     // be set before the module is constructed. However, module's constructor accepts the ports
@@ -278,8 +223,8 @@ impl SysBuilder {
   }
 
   /// Create a downstream module.
-  pub fn create_downstream(&mut self, name: &str, ports: HashMap<String, BaseNode>) -> BaseNode {
-    let downstream = Module::downstream(name.to_string(), ports);
+  pub fn create_downstream(&mut self, name: &str) -> BaseNode {
+    let downstream = Module::new(name, HashMap::new());
     let res = self.insert_element(downstream);
     // This is a BIG PITFALL here. See the comment in `create_module`.
     let body = Block::new(res);
@@ -288,18 +233,7 @@ impl SysBuilder {
     let mut downstream_mut = res.as_mut::<Module>(self).unwrap();
     downstream_mut.get_mut().name = name;
     downstream_mut.get_mut().body = body;
-    let ports = {
-      match res.as_ref::<Module>(self).unwrap().get_ports() {
-        ModulePort::Downstream { ports } => ports.values().cloned().collect::<Vec<_>>(),
-        _ => unreachable!(),
-      }
-    };
-    ports.into_iter().for_each(|x| {
-      x.as_mut::<Optional>(self)
-        .unwrap()
-        .get_mut()
-        .set_parent(res);
-    });
+    downstream_mut.get_mut().attr.insert(Attribute::Downstream);
     res
   }
 }

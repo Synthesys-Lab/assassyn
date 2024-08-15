@@ -89,7 +89,6 @@ impl Visitor<String> for NodeRefDumper {
         quote::quote!(#value).to_string().into()
       }
       NodeKind::Module => Some(namify(node.as_ref::<Module>(sys).unwrap().get_name())),
-      NodeKind::Optional => Some(format!("sim._{}", node.get_key())),
       _ => Some(namify(node.to_string(sys).as_str()).to_string()),
     }
   }
@@ -215,8 +214,6 @@ impl Visitor<String> for ElaborateModule<'_> {
             format!("sim.{}.front().unwrap().clone()", port_self)
           }
           subcode::PureIntrinsic::FIFOValid => format!("!sim.{}.is_empty()", port_self),
-          subcode::PureIntrinsic::OptionalValid => format!("sim.{}.is_some()", port_self),
-          subcode::PureIntrinsic::OptionalUnwrap => format!("sim.{}.unwrap()", port_self),
           _ => panic!("Unsupported FIFO field: {:?}", intrinsic),
         }
       }
@@ -361,6 +358,16 @@ impl Visitor<String> for ElaborateModule<'_> {
           }
         }
       }
+      Opcode::Optional => {
+        let optional = expr.as_sub::<instructions::Optional>().unwrap();
+        let default_value = optional.default_value();
+        format!(
+          "if self.{}.is_some() {{ {}.unwrap() }} else {{ {} }}",
+          id.clone().unwrap(),
+          id.clone().unwrap(),
+          dump_ref!(self.sys, &default_value)
+        )
+      }
     };
     let res = if let Some(id) = id {
       format!("{}let {} = {};\n", " ".repeat(self.indent), id, res)
@@ -459,29 +466,15 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       fd.write_all(format!("pub {}_triggered : bool,", module_name).as_bytes())?;
       simulator_init.push(format!("{}_triggered : false,", module_name));
       downstream_reset.push(format!("self.{}_triggered = false;", module_name));
-    }
-    match module.get_ports() {
-      module::ModulePort::Upstream { ports } => {
-        for fifo in ports.values() {
-          let fifo = fifo.as_ref::<FIFO>(sys).unwrap();
-          let name = fifo_name!(fifo);
-          let ty = dtype_to_rust_type(&fifo.scalar_ty());
-          fd.write_all(format!("pub {} : FIFO<{}>,", name, ty).as_bytes())?;
-          simulator_init.push(format!("{} : FIFO::new(),", name));
-          registers.push(name);
-        }
+      for fifo in module.fifo_iter() {
+        let name = fifo_name!(fifo);
+        let ty = dtype_to_rust_type(&fifo.scalar_ty());
+        fd.write_all(format!("pub {} : FIFO<{}>,", name, ty).as_bytes())?;
+        simulator_init.push(format!("{} : FIFO::new(),", name));
+        registers.push(name);
       }
-      module::ModulePort::Downstream { ports } => {
-        for optional in ports.values() {
-          let name = dump_ref!(sys, optional);
-          let optional = optional.as_ref::<Optional>(sys).unwrap();
-          let ty = dtype_to_rust_type(&optional.underlying_ty());
-          fd.write_all(format!("pub {} : Option<{}>,", name, ty).as_bytes())?;
-          simulator_init.push(format!("{} : None,", name));
-          downstream_reset.push(format!("self.{} = None;", name));
-        }
-      }
-      _ => unreachable!(),
+    } else {
+      // TODO(@were): Gather all the options.
     }
   }
   fd.write_all("}".as_bytes())?;
@@ -526,22 +519,8 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       )?;
       fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
     } else {
-      let mut conds = vec![];
-      for elem in module.optional_iter() {
-        if let Ok(expr) = elem.get_value().as_ref::<Expr>(sys) {
-          let external_module = expr
-            .get_parent()
-            .as_ref::<Block>(sys)
-            .unwrap()
-            .get_module()
-            .as_ref::<Module>(sys)
-            .unwrap();
-          conds.push(format!(
-            "self.{}_triggered",
-            namify(external_module.get_name())
-          ));
-        }
-      }
+      let conds: Vec<String> = vec![];
+      // TODO: Gather all the options.
       fd.write_all("if ".as_bytes())?;
       fd.write_all(conds.join(" && ").as_bytes())?;
       fd.write_all(" {".as_bytes())?;

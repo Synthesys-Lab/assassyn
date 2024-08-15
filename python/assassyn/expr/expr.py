@@ -350,3 +350,20 @@ class Select1Hot(Expr):
         cond = self.cond.as_operand()
         values = ', '.join(i.as_operand() for i in self.values)
         return f'{lval} = select_1hot {cond} ({values})'
+
+class Optional(Expr):
+    '''The class for optional instruction'''
+
+    # Optional operation, a special case of select
+    OPTIONAL = 1002
+
+    def __init__(self, value, default):
+        super().__init__(Optional.OPTIONAL)
+        self.value = value
+        self.default = default
+
+    def __repr__(self):
+        lval = self.as_operand()
+        value = self.value.as_operand()
+        default = self.default.as_operand()
+        return f'{lval} = optional {{ master: {value} default: {default} }}'

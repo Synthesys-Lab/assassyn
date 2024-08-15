@@ -13,5 +13,5 @@ pub use block::Block;
 pub use data::{Array, DataType, IntImm, StrImm, Typed};
 pub use expr::{Expr, Opcode};
 pub use module::Module;
-pub use port::{Optional, FIFO};
+pub use port::FIFO;
 pub use user::Operand;

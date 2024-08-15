@@ -6,7 +6,6 @@ from . import expr
 from . import module
 from . import block
 from . import const
-from .value import Optional
 from .builder import SysBuilder
 from .array import Array
 from .module import Module, Port, Memory
@@ -212,21 +211,9 @@ class CodeGen(visitor.Visitor):
 
         for elem in node.downstreams:
             self.code.append('  // Emit downstream modules')
-            for port in elem.ports:
-                assert isinstance(port, Optional)
-                value = self.generate_rval(port.value)
-                var_id = self.generate_rval(port)
-                self.code.append(f'  let {var_id} = sys.create_optional({value});')
-            self.code.append('  let downstream_ports = {')
-            self.code.append('    let mut res = HashMap::new();')
-            for port in elem.ports:
-                var_id = self.generate_rval(port)
-                self.code.append(f'    res.insert("{port.name}".into(), {var_id});')
-            self.code.append('    res')
-            self.code.append('  };')
             var = self.generate_rval(elem)
             self.code.append(
-                    f'  let {var} = sys.create_downstream("{elem.name}", downstream_ports);')
+                    f'  let {var} = sys.create_downstream("{elem.name}");')
             self.visit_module(elem)
 
         config = self.emit_config()
@@ -299,10 +286,6 @@ class CodeGen(visitor.Visitor):
                   let module = {module_name}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
                   module.get_fifo("{node.name}").unwrap().upcast()
                 }};''')
-            return port_name
-        if isinstance(node, Optional):
-            module_name = self.generate_rval(node.value)
-            port_name = f'{module_name}_{node.name}'
             return port_name
         return node.as_operand()
 
@@ -382,6 +365,14 @@ class CodeGen(visitor.Visitor):
             cond = self.generate_rval(node.cond)
             values = ', '.join(self.generate_rval(i) for i in node.values)
             res = f'sys.{ib_method}({cond}, vec![{values}]);'
+        # TODO(@were): For now, optional is a ad-hoc solution for downstream's inputs.
+        # Later, it will be replaced by a more general IR node, predicated select.
+        # The predicated condition is not fully supported in the current assassyn IR.
+        elif isinstance(node, expr.Optional):
+            var_id = self.generate_rval(node)
+            default = self.generate_rval(node.default)
+            value = self.generate_rval(node.value)
+            res = f'let {var_id} = sys.create_optional({value}, {default});'
         else:
             length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'

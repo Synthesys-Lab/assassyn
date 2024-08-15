@@ -55,8 +55,6 @@ register_subcode!(
 
 register_subcode!(
   PureIntrinsic {
-    OptionalUnwrap(unwrap "unwrap"),
-    OptionalValid(valid "valid"),
     FIFOPeek(peek "peek"),
     FIFOValid(valid "valid"),
     FIFOReady(ready "ready"),

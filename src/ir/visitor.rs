@@ -1,5 +1,3 @@
-use module::ModulePort;
-
 use crate::{
   builder::system::{ModuleKind, SysBuilder},
   ir::{node::*, *},
@@ -9,13 +7,8 @@ use super::block::Block;
 
 pub trait Visitor<T> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<T> {
-    match module.get_ports() {
-      ModulePort::Upstream { ports } | ModulePort::Downstream { ports } => {
-        for elem in ports.values() {
-          self.dispatch(module.sys, elem, vec![]);
-        }
-      }
-      _ => unreachable!(),
+    for elem in module.fifo_iter() {
+      self.visit_fifo(elem);
     }
     if let Some(x) = self.visit_block(module.get_body()) {
       return x.into();
@@ -24,10 +17,6 @@ pub trait Visitor<T> {
   }
 
   fn visit_fifo(&mut self, _: FIFORef<'_>) -> Option<T> {
-    None
-  }
-
-  fn visit_optional(&mut self, _: OptionalRef<'_>) -> Option<T> {
     None
   }
 
@@ -84,7 +73,6 @@ pub trait Visitor<T> {
       NodeKind::Block => self.visit_block(node.as_ref::<Block>(sys).unwrap()),
       NodeKind::Module => self.visit_module(node.as_ref::<Module>(sys).unwrap()),
       NodeKind::FIFO => self.visit_fifo(node.as_ref::<FIFO>(sys).unwrap()),
-      NodeKind::Optional => self.visit_optional(node.as_ref::<Optional>(sys).unwrap()),
       NodeKind::Array => self.visit_array(node.as_ref::<Array>(sys).unwrap()),
       NodeKind::IntImm => self.visit_int_imm(node.as_ref::<IntImm>(sys).unwrap()),
       NodeKind::StrImm => self.visit_string_imm(node.as_ref::<StrImm>(sys).unwrap()),

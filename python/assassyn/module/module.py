@@ -95,7 +95,7 @@ class Module(ModuleBase):
         self._attrs = {}
         self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite)
         if not _reserved_module_name(self.name):
-            self.name = self.name + '_' + self.as_operand()
+            self.name = self.name + self.as_operand()
 
     def validate_all_ports(self):
         '''A syntactic sugar for checking the validity of all the ports in this module.'''

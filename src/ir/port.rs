@@ -2,46 +2,6 @@ use std::collections::HashSet;
 
 use crate::ir::{node::*, *};
 
-/// The data structure for an optional port.
-pub struct Optional {
-  /// A unique key of this instance in the slab buffer.
-  pub(crate) key: usize,
-  /// The parent module of this optional port.
-  pub(super) parent: BaseNode,
-  /// The value of this optional port.
-  value: BaseNode,
-}
-
-impl Optional {
-  pub fn new(value: BaseNode) -> Self {
-    Self {
-      key: 0,
-      // When instantiating an optional port, the parent module is not constructed yet.
-      // To avoid running into a chicken-egg paradox, we set the parent to a dummy node for now.
-      // Later SysBuilder will call set_parent() to set the correct parent.
-      parent: BaseNode::new(NodeKind::Unknown, 0),
-      value,
-    }
-  }
-
-  pub fn get_value(&self) -> BaseNode {
-    self.value
-  }
-}
-
-impl OptionalRef<'_> {
-  /// Get the underlying data type of this optional port.
-  pub fn underlying_ty(&self) -> DataType {
-    self.get().value.get_dtype(self.sys).unwrap()
-  }
-}
-
-impl Typed for Optional {
-  fn dtype(&self) -> DataType {
-    DataType::void()
-  }
-}
-
 pub struct FIFO {
   /// A unique key of this instance in the slab buffer.
   pub(crate) key: usize,
@@ -87,15 +47,6 @@ impl FIFOMut<'_> {
 impl Typed for FIFO {
   fn dtype(&self) -> DataType {
     DataType::void()
-  }
-}
-
-impl Parented for Optional {
-  fn get_parent(&self) -> BaseNode {
-    self.parent
-  }
-  fn set_parent(&mut self, parent: BaseNode) {
-    self.parent = parent;
   }
 }
 

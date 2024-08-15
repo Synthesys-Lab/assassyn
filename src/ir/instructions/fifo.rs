@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::ir::{
-  node::{FIFORef, IsElement, OptionalRef, Parented},
+  node::{FIFORef, IsElement, Parented},
   visitor::Visitor,
 };
 
@@ -40,11 +40,5 @@ impl Display for FIFOPush<'_> {
       self.value().to_string(self.expr.sys),
       self.expr.get_key()
     )
-  }
-}
-
-impl Display for OptionalRef<'_> {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Optional{{ {} }}", self.get_value().to_string(self.sys))
   }
 }

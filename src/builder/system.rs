@@ -1,8 +1,5 @@
-// TODO(@were): Remove all the predications and move to blocks.
-
 use std::{collections::HashMap, fmt::Display, hash::Hash};
 
-use expr::subcode::PureIntrinsic;
 use instructions::call::LazyBind;
 
 use crate::ir::{ir_printer::IRPrinter, node::*, visitor::Visitor, *};
@@ -379,47 +376,18 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::Log, args, true)
   }
 
-  /// Create an "optional" node.
-  ///
-  /// # Arguments
-  /// * `value` - The value to be selected.
-  pub fn create_optional(&mut self, value: BaseNode) -> BaseNode {
-    let instance = Optional::new(value);
-    self.insert_element(instance)
-  }
-
   /// The helper function to create an "optional" intrinsic.
   ///
   /// # Arguments
-  /// * `optional` - The optional value.
-  /// * `intrinsic` - The intrinsic to be executed.
-  fn create_optional_intrin(
-    &mut self,
-    optional: BaseNode,
-    intrinsic: subcode::PureIntrinsic,
-  ) -> BaseNode {
-    let dtype = {
-      let optional = optional.as_ref::<Optional>(self).unwrap();
-      optional.get_value().get_dtype(self).unwrap()
-    };
-    let opcode = Opcode::PureIntrinsic { intrinsic };
-    self.create_expr(dtype, opcode, vec![optional], true)
-  }
-
-  /// Create an "optional" unwrap node, which gets the value from the optional when valid.
-  ///
-  /// # Arguments
-  /// * `optional` - The optional value to be unwrapped.
-  pub fn create_optional_unwrap(&mut self, optional: BaseNode) -> BaseNode {
-    self.create_optional_intrin(optional, PureIntrinsic::OptionalUnwrap)
-  }
-
-  /// Create an "optional" valid node, which checks if the optional value is valid.
-  ///
-  /// # Arguments
-  /// * `optional` - The optional value to be checked.
-  pub fn create_optional_valid(&mut self, optional: BaseNode) -> BaseNode {
-    self.create_optional_intrin(optional, PureIntrinsic::OptionalValid)
+  /// * `master` - The master value of an option.
+  /// * `default_` - The intrinsic to be executed.
+  pub fn create_optional(&mut self, master: BaseNode, default_: BaseNode) -> BaseNode {
+    let dtype = master.get_dtype(self).unwrap();
+    assert!(
+      dtype == default_.get_dtype(self).unwrap(),
+      "Master value should be an unsigned integer!"
+    );
+    self.create_expr(dtype, Opcode::Optional, vec![master, default_], true)
   }
 
   pub fn create_select_1hot(&mut self, cond: BaseNode, values: Vec<BaseNode>) -> BaseNode {

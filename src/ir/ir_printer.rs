@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use expr::subcode;
 use instructions::Bind;
-use module::ModulePort;
 
 use crate::ir::{node::*, *};
 
@@ -176,34 +175,20 @@ impl Visitor<String> for IRPrinter {
     res.push_str(&format!(
       "{}{} {}(",
       " ".repeat(self.indent),
-      match module.get_ports() {
-        ModulePort::Upstream { .. } => "module",
-        ModulePort::Downstream { .. } => "module.downstream",
-        _ => unreachable!(),
+      if module.has_attr(module::Attribute::Downstream) {
+        "module.downstream"
+      } else {
+        "module"
       },
       module.get_name()
     ));
     if module.get_num_inputs() != 0 {
       res.push('\n');
     }
-    match module.get_ports() {
-      ModulePort::Upstream { .. } => {
-        for elem in module.fifo_iter() {
-          res.push_str(" ".repeat(self.indent + 2).as_str());
-          res.push_str(&self.visit_fifo(elem).unwrap());
-          res.push_str(",\n");
-        }
-      }
-      ModulePort::Downstream { ports } => {
-        for elem in ports.values() {
-          let option = elem.as_ref::<Optional>(module.sys).unwrap();
-          res.push_str(" ".repeat(self.indent + 2).as_str());
-          res.push_str("optional { value: ");
-          res.push_str(option.get_value().to_string(module.sys).as_str());
-          res.push_str(" },\n");
-        }
-      }
-      _ => unreachable!(),
+    for elem in module.fifo_iter() {
+      res.push_str(" ".repeat(self.indent + 2).as_str());
+      res.push_str(&self.visit_fifo(elem).unwrap());
+      res.push_str(",\n");
     }
     res.push_str(
       format!(

@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::ir::{expr::subcode, node::BaseNode, DataType, Opcode, Typed};
 
-use super::{Binary, Cast, Compare, Select, Select1Hot, Unary};
+use super::{Binary, Cast, Compare, Optional, Select, Select1Hot, Unary};
 
 impl Binary<'_> {
   pub fn get_opcode(&self) -> subcode::Binary {
@@ -143,6 +143,17 @@ impl Display for Select1Hot<'_> {
       self.expr.get_name(),
       self.cond().to_string(self.get().sys),
       values
+    )
+  }
+}
+
+impl Display for Optional<'_> {
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+    write!(
+      f,
+      "{} = optional {}",
+      self.expr.get_name(),
+      self.value().to_string(self.get().sys)
     )
   }
 }
