@@ -124,7 +124,7 @@ class EmitBinds(visitor.Visitor):
         if isinstance(node, expr.Bind):
             bind_var = self.cg.generate_rval(node)
             module_var = self.cg.generate_rval(node.callee)
-            self.cg.code.append(f'  let mut {bind_var} = sys.get_init_bind({module_var});')
+            self.cg.code.append(f'  let {bind_var} = sys.get_init_bind({module_var});')
 
 
 class CodeGen(visitor.Visitor):
@@ -324,7 +324,7 @@ class CodeGen(visitor.Visitor):
             bind_var = self.generate_rval(node.bind)
             fifo_name = node.fifo.name
             val = self.generate_rval(node.val)
-            res = f'sys.bind_arg(&mut {bind_var}, "{fifo_name}".into(), {val});'
+            res = f'sys.bind_arg({bind_var}, "{fifo_name}".into(), {val});'
         elif isinstance(node, expr.Bind):
             res = '// Already handled by `EmitBinds`'
         elif isinstance(node, expr.AsyncCall):

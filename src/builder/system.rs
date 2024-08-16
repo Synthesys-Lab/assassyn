@@ -71,6 +71,9 @@ pub struct SysBuilder {
   pub(crate) inesert_point: InsertPoint,
   /// The symbol table to maintain the unique identifiers.
   pub(crate) symbol_table: SymbolTable,
+  /// The set of finalized binds. A lazy bind will not be instantiated as a bind expression until
+  /// it is called. Key: LazyBind, Value: Expr::Bind.
+  finalized_binds: HashMap<BaseNode, BaseNode>,
 }
 
 /// The information of an input of a module.
@@ -140,6 +143,7 @@ impl SysBuilder {
         at: None,
       },
       symbol_table: SymbolTable::new(),
+      finalized_binds: HashMap::new(),
     }
   }
 
@@ -464,12 +468,17 @@ impl SysBuilder {
   }
 
   /// Create an async call to the given bind. Push all the values to the corresponding named ports.
-  pub fn create_async_call(&mut self, bind: LazyBind) -> BaseNode {
+  pub fn create_async_call(&mut self, lazy_bind: BaseNode) -> BaseNode {
     // A bind will not finalize its place until it is called. This assumption helps to maintain the
     // external interfaces.
-    let mut operands = bind.get_bind().values().copied().collect::<Vec<_>>();
-    operands.push(bind.get_callee());
+    let operands = {
+      let bind = lazy_bind.as_ref::<LazyBind>(self).unwrap();
+      let mut res = bind.get_bind().values().copied().collect::<Vec<_>>();
+      res.push(bind.get_callee());
+      res
+    };
     let bind = self.create_expr(DataType::void(), Opcode::Bind, operands, true);
+    self.finalized_binds.insert(lazy_bind, bind);
     self.create_expr(DataType::void(), Opcode::AsyncCall, vec![bind], true)
   }
 
@@ -500,20 +509,22 @@ impl SysBuilder {
   ///
   /// # Returns
   /// * A `BaseNode` reference to the returned empty bind.
-  pub fn get_init_bind(&mut self, node: BaseNode) -> LazyBind {
+  pub fn get_init_bind(&mut self, node: BaseNode) -> BaseNode {
     match node.get_kind() {
       // A module is an empty bind.
       NodeKind::Module => {
         node.as_ref::<Module>(self).unwrap();
-        LazyBind::new(node)
+        let instance = LazyBind::new(node);
+        self.insert_element(instance)
       }
       _ => panic!("Only a module can be bound!"),
     }
   }
 
   /// Add a bound argument to the given bind.
-  pub fn bind_arg(&mut self, bind: &mut LazyBind, key: String, value: BaseNode) {
+  pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) {
     let port = {
+      let bind = bind.as_ref::<LazyBind>(self).unwrap();
       assert!(
         bind.get_arg(&key).is_none(),
         "Argument {} already exists!",
@@ -538,7 +549,17 @@ impl SysBuilder {
       port.upcast()
     };
     let push = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
-    bind.bind_arg(key, push);
+    if let Some(bind) = self.finalized_binds.get(&bind).cloned() {
+      let mut expr_mut = self.get_mut::<Expr>(&bind).unwrap();
+      let n = expr_mut.get().get_num_operands();
+      expr_mut.insert_operand(n - 1, push);
+    } else {
+      self
+        .get_mut::<LazyBind>(&bind)
+        .unwrap()
+        .get_mut()
+        .bind_arg(key, push);
+    }
   }
 
   fn indexable(&self, idx: BaseNode) -> bool {

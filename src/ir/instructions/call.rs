@@ -9,6 +9,7 @@ use super::{AsyncCall, Bind, FIFOPush};
 
 /// A lazy evaluation instance of a bind expression.
 pub struct LazyBind {
+  pub(crate) key: usize,
   callee: BaseNode,
   bind: HashMap<String, BaseNode>,
 }
@@ -16,6 +17,7 @@ pub struct LazyBind {
 impl LazyBind {
   pub fn new(callee: BaseNode) -> Self {
     Self {
+      key: 0,
       callee,
       bind: HashMap::new(),
     }

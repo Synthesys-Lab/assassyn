@@ -77,6 +77,7 @@ pub trait Visitor<T> {
       NodeKind::IntImm => self.visit_int_imm(node.as_ref::<IntImm>(sys).unwrap()),
       NodeKind::StrImm => self.visit_string_imm(node.as_ref::<StrImm>(sys).unwrap()),
       NodeKind::Operand => self.visit_operand(node.as_ref::<Operand>(sys).unwrap()),
+      NodeKind::LazyBind => None, /* This node should not be in the AST at all!*/
       NodeKind::Unknown => {
         panic!("Unknown node type")
       }
