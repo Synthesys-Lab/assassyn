@@ -90,11 +90,16 @@ class Value:
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.SHR, self, other)
 
-    @ir_builder(node_type='expr')
-    def optional(self, default):
+    # This is a pitfall of developing the frontend. This optional method is served as a "ir_builder"
+    # API, but it should not be annotated with this decorator. It calls the "select" method, and
+    # the called "select" method will insert the generated Select node into the AST. It we annotate
+    # this method here, the generated node will be inserted into the AST twice.
+    def optional(self, default, predicate=None):
         '''The frontend API to create an optional value with default'''
-        from .expr import Optional
-        return Optional(self, default)
+        if predicate is None:
+            predicate = self.valid()
+        assert isinstance(predicate, Value), "Expecting a Value object"
+        return predicate.select(self, default)
 
     @ir_builder(node_type='expr')
     def bitcast(self, dtype):
@@ -131,3 +136,10 @@ class Value:
         '''The frontend API to create a select1hot operation'''
         from .expr import Select1Hot
         return Select1Hot(Select1Hot.SELECT_1HOT, self, args)
+
+    @ir_builder(node_type='expr')
+    def valid(self):
+        '''The frontend API to check if this value is valid.
+        NOTE: This operation is only usable in downstream modules.'''
+        from .expr import PureInstrinsic
+        return PureInstrinsic(PureInstrinsic.VALUE_VALID, self)

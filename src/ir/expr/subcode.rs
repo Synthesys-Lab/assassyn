@@ -58,6 +58,8 @@ register_subcode!(
     FIFOPeek(peek "peek"),
     FIFOValid(valid "valid"),
     FIFOReady(ready "ready"),
+    ValueValid(valid "valid"),
+    ModuleTriggered(triggered "triggered"),
   }
 );
 

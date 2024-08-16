@@ -235,14 +235,14 @@ class PureInstrinsic(Expr):
     # FIFO operations
     FIFO_VALID = 300
     FIFO_PEEK  = 303
-    OPTIONAL_VALID = 304
-    OPTIONAL_UNWRAP = 305
+    MODULE_TRIGGERED = 304
+    VALUE_VALID = 305
 
     OPERATORS = {
         FIFO_VALID: 'valid',
         FIFO_PEEK: 'peek',
-        OPTIONAL_VALID: 'valid',
-        OPTIONAL_UNWRAP: 'unwrap',
+        MODULE_TRIGGERED: 'triggered',
+        VALUE_VALID: 'valid',
     }
 
     def __init__(self, opcode, *args):
@@ -251,7 +251,7 @@ class PureInstrinsic(Expr):
 
     def __repr__(self):
         if self.opcode in [PureInstrinsic.FIFO_PEEK, PureInstrinsic.FIFO_VALID,
-                           PureInstrinsic.OPTIONAL_VALID, PureInstrinsic.OPTIONAL_UNWRAP]:
+                           PureInstrinsic.MODULE_TRIGGERED, PureInstrinsic.VALUE_VALID]:
             fifo = self.args[0].as_operand()
             return f'{self.as_operand()} = {fifo}.{self.OPERATORS[self.opcode]}()'
         raise NotImplementedError
@@ -350,20 +350,3 @@ class Select1Hot(Expr):
         cond = self.cond.as_operand()
         values = ', '.join(i.as_operand() for i in self.values)
         return f'{lval} = select_1hot {cond} ({values})'
-
-class Optional(Expr):
-    '''The class for optional instruction'''
-
-    # Optional operation, a special case of select
-    OPTIONAL = 1002
-
-    def __init__(self, value, default):
-        super().__init__(Optional.OPTIONAL)
-        self.value = value
-        self.default = default
-
-    def __repr__(self):
-        lval = self.as_operand()
-        value = self.value.as_operand()
-        default = self.default.as_operand()
-        return f'{lval} = optional {{ master: {value} default: {default} }}'

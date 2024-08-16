@@ -9,3 +9,4 @@ from .module import Module, Port, Memory, Downstream
 from .block import Condition, Cycle
 from . import module
 from .module import downstream
+from .value import Value

@@ -42,8 +42,8 @@ CG_OPCODE = {
 
     expr.PureInstrinsic.FIFO_PEEK: 'peek',
     expr.PureInstrinsic.FIFO_VALID: 'valid',
-    expr.PureInstrinsic.OPTIONAL_UNWRAP: 'unwrap',
-    expr.PureInstrinsic.OPTIONAL_VALID: 'valid',
+    expr.PureInstrinsic.MODULE_TRIGGERED: 'module_triggered',
+    expr.PureInstrinsic.VALUE_VALID: 'value_valid',
 
     expr.FIFOPop.FIFO_POP: 'pop',
     expr.FIFOPush.FIFO_PUSH: 'push',
@@ -70,9 +70,6 @@ CG_MIDFIX = {
     expr.FIFOPush.FIFO_PUSH: 'fifo',
     expr.PureInstrinsic.FIFO_PEEK: 'fifo',
     expr.PureInstrinsic.FIFO_VALID: 'fifo',
-
-    expr.PureInstrinsic.OPTIONAL_VALID: 'optional',
-    expr.PureInstrinsic.OPTIONAL_UNWRAP: 'optional',
 }
 
 CG_ARRAY_ATTR = {
@@ -301,12 +298,9 @@ class CodeGen(visitor.Visitor):
             x = self.generate_rval(node.x)
             res = f'sys.{ib_method}({x});'
         elif isinstance(node, expr.PureInstrinsic):
-            if node.opcode in (expr.PureInstrinsic.FIFO_PEEK,
-                               expr.PureInstrinsic.FIFO_VALID,
-                               expr.PureInstrinsic.OPTIONAL_UNWRAP,
-                               expr.PureInstrinsic.OPTIONAL_VALID):
-                fifo = self.generate_rval(node.args[0])
-                res = f'sys.{ib_method}({fifo});'
+            if len(node.args) == 1:
+                master = self.generate_rval(node.args[0])
+                res = f'sys.{ib_method}({master});'
             fifo = self.generate_rval(node.args[0])
             res = f'sys.{ib_method}({fifo});'
         elif isinstance(node, expr.FIFOPop):
@@ -368,11 +362,6 @@ class CodeGen(visitor.Visitor):
         # TODO(@were): For now, optional is a ad-hoc solution for downstream's inputs.
         # Later, it will be replaced by a more general IR node, predicated select.
         # The predicated condition is not fully supported in the current assassyn IR.
-        elif isinstance(node, expr.Optional):
-            var_id = self.generate_rval(node)
-            default = self.generate_rval(node.default)
-            value = self.generate_rval(node.value)
-            res = f'let {var_id} = sys.create_optional({value}, {default});'
         else:
             length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'

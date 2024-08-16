@@ -222,6 +222,13 @@ class Module(ModuleBase):
         '''The helper function to get the implicit FIFO setting.'''
         return self._attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
 
+    @ir_builder(node_type='expr')
+    def triggered(self):
+        '''The frontend API for creating a triggered node,
+        which checks if this module is triggered this cycle.
+        NOTE: This operation is only usable in downstream modules.'''
+        return PureInstrinsic(PureInstrinsic.MODULE_TRIGGERED, self)
+
 class Port:
     '''The AST node for defining a port in modules.'''
 
@@ -269,6 +276,7 @@ def combinational(
     Singleton.builder.cur_module = module_self
     Singleton.builder.builder_func = func
     module_self.body = Block(Block.MODULE_ROOT)
+    # TODO(@were): Make implicit pop more robust.
     with module_self.body:
         module_self.implicit_pop()
         res = func(*args, **kwargs)

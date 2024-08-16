@@ -696,17 +696,21 @@ impl SysBuilder {
     self.create_expr(ty, Opcode::FIFOPop, vec![fifo], true)
   }
 
+  /// The helper function to create a pure intrinsic.
+  pub fn create_pure_intrinsic(
+    &mut self,
+    ty: DataType,
+    subcode: subcode::PureIntrinsic,
+    operands: Vec<BaseNode>,
+  ) -> BaseNode {
+    self.create_expr(ty, subcode.into(), operands, true)
+  }
+
   /// Create a FIFO peek operation. This is similar to pop, but does not remove the value from the
   /// FIFO.
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-
-    self.create_expr(
-      ty,
-      subcode::PureIntrinsic::FIFOPeek.into(),
-      vec![fifo],
-      true,
-    )
+    self.create_pure_intrinsic(ty, subcode::PureIntrinsic::FIFOPeek, vec![fifo])
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
@@ -714,12 +718,10 @@ impl SysBuilder {
       matches!(fifo.get_kind(), NodeKind::FIFO),
       "Expect FIFO as the operand"
     );
-
-    self.create_expr(
+    self.create_pure_intrinsic(
       DataType::int_ty(1),
-      subcode::PureIntrinsic::FIFOValid.into(),
+      subcode::PureIntrinsic::FIFOValid,
       vec![fifo],
-      true,
     )
   }
 
@@ -741,6 +743,42 @@ impl SysBuilder {
     };
 
     self.create_expr(ty, Opcode::Slice, vec![src, start, end], true)
+  }
+
+  /// Create a value.valid operation, which checks if this value is validly produced in this cycle.
+  /// NOTE: This operation is only valid in a downstream module.
+  ///
+  /// # Arguments
+  /// * `value` - The value to be checked.
+  pub fn create_value_valid(&mut self, value: BaseNode) -> BaseNode {
+    assert!(
+      self.get_current_module().unwrap().is_downstream(),
+      "`value.valid` is only meaningful in a downstream module!"
+    );
+    value.as_ref::<Expr>(self).unwrap();
+    self.create_pure_intrinsic(
+      DataType::uint_ty(1),
+      subcode::PureIntrinsic::ValueValid,
+      vec![value],
+    )
+  }
+
+  /// Create a module.triggered operation, which checks if this module is triggered in this cycle.
+  /// NOTE: This operation is only valid in a downstream module.
+  ///
+  /// # Arguments
+  /// * `module` - The module to be checked.
+  pub fn create_module_triggered(&mut self, module: BaseNode) -> BaseNode {
+    assert!(
+      self.get_current_module().unwrap().is_downstream(),
+      "`module.valid` is only meaningful in a downstream module!"
+    );
+    module.as_ref::<Module>(self).unwrap();
+    self.create_pure_intrinsic(
+      DataType::uint_ty(1),
+      subcode::PureIntrinsic::ModuleTriggered,
+      vec![module],
+    )
   }
 
   fn retype_imm(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {

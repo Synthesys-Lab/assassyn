@@ -459,82 +459,85 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       );
     }
     for (interf, _) in module.ext_interf_iter() {
-      if interf.get_kind() == NodeKind::FIFO {
-        let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-        let fifo_name = namify(
-          format!(
-            "{}_{}",
-            fifo
-              .get_parent()
-              .as_ref::<Module>(self.sys)
-              .unwrap()
-              .get_name(),
-            fifo_name!(fifo)
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .fifo_{}_push_valid(fifo_{}_driver_{}_push_valid),\n",
-            fifo_name, fifo_name, module_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .fifo_{}_push_data(fifo_{}_driver_{}_push_data),\n",
-            fifo_name, fifo_name, module_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .fifo_{}_push_ready(fifo_{}_driver_{}_push_ready),\n",
-            fifo_name, fifo_name, module_name
-          )
-          .as_str(),
-        );
-      } else if interf.get_kind() == NodeKind::Array {
-        let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-        res.push_str(
-          format!(
-            "  .array_{}_q(array_{}_q),\n",
-            namify(array_ref.get_name()),
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .array_{}_w(array_{}_driver_{}_w),\n",
-            namify(array_ref.get_name()),
-            namify(array_ref.get_name()),
-            module_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .array_{}_widx(array_{}_driver_{}_widx),\n",
-            namify(array_ref.get_name()),
-            namify(array_ref.get_name()),
-            module_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .array_{}_d(array_{}_driver_{}_d),\n",
-            namify(array_ref.get_name()),
-            namify(array_ref.get_name()),
-            module_name
-          )
-          .as_str(),
-        );
-      } else if interf.get_kind() == NodeKind::Module {
-        // TODO(@were): Skip this for now. I am 100% sure we need this later.
-      } else {
-        panic!("Unknown interf kind {:?}", interf.get_kind());
+      match interf.get_kind() {
+        NodeKind::FIFO => {
+          let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
+          let fifo_name = namify(
+            format!(
+              "{}_{}",
+              fifo
+                .get_parent()
+                .as_ref::<Module>(self.sys)
+                .unwrap()
+                .get_name(),
+              fifo_name!(fifo)
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .fifo_{}_push_valid(fifo_{}_driver_{}_push_valid),\n",
+              fifo_name, fifo_name, module_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .fifo_{}_push_data(fifo_{}_driver_{}_push_data),\n",
+              fifo_name, fifo_name, module_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .fifo_{}_push_ready(fifo_{}_driver_{}_push_ready),\n",
+              fifo_name, fifo_name, module_name
+            )
+            .as_str(),
+          );
+        }
+        NodeKind::Array => {
+          let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
+          res.push_str(
+            format!(
+              "  .array_{}_q(array_{}_q),\n",
+              namify(array_ref.get_name()),
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .array_{}_w(array_{}_driver_{}_w),\n",
+              namify(array_ref.get_name()),
+              namify(array_ref.get_name()),
+              module_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .array_{}_widx(array_{}_driver_{}_widx),\n",
+              namify(array_ref.get_name()),
+              namify(array_ref.get_name()),
+              module_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .array_{}_d(array_{}_driver_{}_d),\n",
+              namify(array_ref.get_name()),
+              namify(array_ref.get_name()),
+              module_name
+            )
+            .as_str(),
+          );
+        }
+        NodeKind::Module | NodeKind::Expr => {
+          // TODO(@were): Skip this for now. I am 100% sure we need this later.
+        }
+        _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }
     }
 
@@ -849,96 +852,99 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     }
 
     for (interf, _ops) in module.ext_interf_iter() {
-      if interf.get_kind() == NodeKind::FIFO {
-        let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-        let fifo_name = namify(
-          format!(
-            "{}_{}",
-            fifo
-              .get_parent()
-              .as_ref::<Module>(self.sys)
-              .unwrap()
-              .get_name(),
-            fifo_name!(fifo)
-          )
-          .as_str(),
-        );
-        res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name).as_str());
-        res.push_str(
-          format!(
-            "{}output logic fifo_{}_push_valid,\n",
-            " ".repeat(self.indent),
-            fifo_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}output logic [{}:0] fifo_{}_push_data,\n",
-            " ".repeat(self.indent),
-            fifo.scalar_ty().get_bits() - 1,
-            fifo_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}input logic fifo_{}_push_ready,\n",
-            " ".repeat(self.indent),
-            fifo_name
-          )
-          .as_str(),
-        );
-      } else if interf.get_kind() == NodeKind::Array {
-        let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-        res.push_str(
-          format!(
-            "{}// array {}\n",
-            " ".repeat(self.indent),
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}input logic [{}:0] array_{}_q[0:{}],\n",
-            " ".repeat(self.indent),
-            array_ref.scalar_ty().get_bits() - 1,
-            namify(array_ref.get_name()),
-            array_ref.get_size() - 1
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}output logic array_{}_w,\n",
-            " ".repeat(self.indent),
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}output logic [{}:0] array_{}_widx,\n",
-            " ".repeat(self.indent),
-            (array_ref.get_size()).ilog2(),
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}output logic [{}:0] array_{}_d,\n",
-            " ".repeat(self.indent),
-            array_ref.scalar_ty().get_bits() - 1,
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-      } else if interf.get_kind() == NodeKind::Module {
-        // TODO(@were): Skip this for now.
-      } else {
-        panic!("Unknown interf kind {:?}", interf.get_kind());
+      match interf.get_kind() {
+        NodeKind::FIFO => {
+          let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
+          let fifo_name = namify(
+            format!(
+              "{}_{}",
+              fifo
+                .get_parent()
+                .as_ref::<Module>(self.sys)
+                .unwrap()
+                .get_name(),
+              fifo_name!(fifo)
+            )
+            .as_str(),
+          );
+          res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name).as_str());
+          res.push_str(
+            format!(
+              "{}output logic fifo_{}_push_valid,\n",
+              " ".repeat(self.indent),
+              fifo_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}output logic [{}:0] fifo_{}_push_data,\n",
+              " ".repeat(self.indent),
+              fifo.scalar_ty().get_bits() - 1,
+              fifo_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}input logic fifo_{}_push_ready,\n",
+              " ".repeat(self.indent),
+              fifo_name
+            )
+            .as_str(),
+          );
+        }
+        NodeKind::Array => {
+          let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
+          res.push_str(
+            format!(
+              "{}// array {}\n",
+              " ".repeat(self.indent),
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}input logic [{}:0] array_{}_q[0:{}],\n",
+              " ".repeat(self.indent),
+              array_ref.scalar_ty().get_bits() - 1,
+              namify(array_ref.get_name()),
+              array_ref.get_size() - 1
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}output logic array_{}_w,\n",
+              " ".repeat(self.indent),
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}output logic [{}:0] array_{}_widx,\n",
+              " ".repeat(self.indent),
+              (array_ref.get_size()).ilog2(),
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}output logic [{}:0] array_{}_d,\n",
+              " ".repeat(self.indent),
+              array_ref.scalar_ty().get_bits() - 1,
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+        }
+        NodeKind::Module | NodeKind::Expr => {
+          // TODO(@were): Skip this for now.
+        }
+        _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }
       res.push('\n');
     }

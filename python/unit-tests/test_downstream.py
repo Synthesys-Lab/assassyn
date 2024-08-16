@@ -34,16 +34,16 @@ class ForwardData(Module):
 class Adder(Downstream):
 
     @downstream.constructor
-    def __init__(self, a, b):
+    def __init__(self):
         super().__init__()
-        self.a = Optional(a)
-        self.b = Optional(b)
 
     @downstream.combinational
-    def build(self):
-        a = self.a
-        b = self.b
-        c = a.unwrap_or(UInt(32)(0)) + b.unwrap_or(UInt(32)(0))
+    def build(self, a: Value, b: Value):
+        a = a.optional(UInt(32)(1))
+        print('built', a)
+        b = b.optional(UInt(32)(1))
+        print('built', b)
+        c = a + b
 
 def test_downstream():
     sys = SysBuilder('downstream')
@@ -51,14 +51,19 @@ def test_downstream():
         driver = Driver()
         lhs = ForwardData()
         rhs = ForwardData()
-        adder = Adder(lhs.build(), rhs.build())
+        a = lhs.build()
+        b = rhs.build()
+        adder = Adder()
 
         driver.build(lhs, rhs)
-        adder.build()
+        adder.build(a, b)
 
     print(sys)
 
-    config = assassyn.backend.config(verilog=None, sim_threshold=200, idle_threshold=200)
+    config = assassyn.backend.config(
+            verilog=None,
+            sim_threshold=200,
+            idle_threshold=200)
 
     simulator_path = elaborate(sys, **config)
 
@@ -67,8 +72,6 @@ def test_downstream():
 
     #raw = utils.run_verilator(verilator_path)
     #check_raw(raw)
-
-
 
 if __name__ == '__main__':
     test_downstream()

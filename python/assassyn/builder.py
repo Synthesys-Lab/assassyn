@@ -8,7 +8,7 @@ class Singleton(type):
     '''The class maintains the global singleton instance of the system builder.'''
     builder = None
     repr_ident = None
-    id_slice = slice(-5, -1)
+    id_slice = slice(-6, -1)
 
 @decorator
 #pylint: disable=keyword-arg-before-vararg

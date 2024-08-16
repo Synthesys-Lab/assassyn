@@ -336,6 +336,18 @@ impl SysBuilder {
         let fifo = value.as_ref::<FIFO>(self).unwrap();
         fifo.get_parent().get_key() != module.get_key()
       }
+      NodeKind::Expr => {
+        let expr = value.as_ref::<Expr>(self).unwrap();
+        // If this expression is NOT in the same module as the user, then it is an external
+        // interface.
+        expr
+          .get_parent()
+          .as_ref::<Block>(self)
+          .unwrap()
+          .get_module()
+          .get_key()
+          != module.get_key()
+      }
       _ => false,
     } {
       module

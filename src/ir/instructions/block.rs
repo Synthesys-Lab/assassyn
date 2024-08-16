@@ -46,7 +46,9 @@ impl Display for PureIntrinsic<'_> {
         Opcode::PureIntrinsic { intrinsic } => match intrinsic {
           subcode::PureIntrinsic::FIFOValid
           | subcode::PureIntrinsic::FIFOReady
-          | subcode::PureIntrinsic::FIFOPeek => {
+          | subcode::PureIntrinsic::FIFOPeek
+          | subcode::PureIntrinsic::ValueValid
+          | subcode::PureIntrinsic::ModuleTriggered => {
             format!(
               "{}.{}()",
               self

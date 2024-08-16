@@ -208,13 +208,26 @@ impl Visitor<String> for ElaborateModule<'_> {
       }
       Opcode::PureIntrinsic { intrinsic } => {
         let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
-        let port_self = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
         match intrinsic {
           subcode::PureIntrinsic::FIFOPeek => {
+            let port_self = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
             format!("sim.{}.front().unwrap().clone()", port_self)
           }
-          subcode::PureIntrinsic::FIFOValid => format!("!sim.{}.is_empty()", port_self),
-          _ => panic!("Unsupported FIFO field: {:?}", intrinsic),
+          subcode::PureIntrinsic::FIFOValid => {
+            let port_self = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
+            format!("!sim.{}.is_empty()", port_self)
+          }
+          subcode::PureIntrinsic::FIFOReady => {
+            todo!()
+          }
+          subcode::PureIntrinsic::ValueValid => {
+            let value = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
+            format!("sim.{}_valid", value)
+          }
+          subcode::PureIntrinsic::ModuleTriggered => {
+            let port_self = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
+            format!("sim.{}_triggered", port_self)
+          }
         }
       }
       Opcode::FIFOPush => {
@@ -370,9 +383,9 @@ impl Visitor<String> for ElaborateModule<'_> {
       }
     };
     let res = if let Some(id) = id {
-      format!("{}let {} = {};\n", " ".repeat(self.indent), id, res)
+      format!("let {} = {{ {} }};\n", id, res)
     } else {
-      format!("{}{};\n", " ".repeat(self.indent), res)
+      format!("{};\n", res)
     };
     if open_scope {
       self.indent += 2;
