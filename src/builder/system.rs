@@ -376,20 +376,6 @@ impl SysBuilder {
     self.create_expr(DataType::void(), Opcode::Log, args, true)
   }
 
-  /// The helper function to create an "optional" intrinsic.
-  ///
-  /// # Arguments
-  /// * `master` - The master value of an option.
-  /// * `default_` - The intrinsic to be executed.
-  pub fn create_optional(&mut self, master: BaseNode, default_: BaseNode) -> BaseNode {
-    let dtype = master.get_dtype(self).unwrap();
-    assert!(
-      dtype == default_.get_dtype(self).unwrap(),
-      "Master value should be an unsigned integer!"
-    );
-    self.create_expr(dtype, Opcode::Optional, vec![master, default_], true)
-  }
-
   pub fn create_select_1hot(&mut self, cond: BaseNode, values: Vec<BaseNode>) -> BaseNode {
     let cond_ty = cond.get_dtype(self).unwrap();
     assert_eq!(
@@ -755,7 +741,10 @@ impl SysBuilder {
       self.get_current_module().unwrap().is_downstream(),
       "`value.valid` is only meaningful in a downstream module!"
     );
-    value.as_ref::<Expr>(self).unwrap();
+    assert!(
+      matches!(value.get_kind(), NodeKind::Expr),
+      "A value expected for a validity check!"
+    );
     self.create_pure_intrinsic(
       DataType::uint_ty(1),
       subcode::PureIntrinsic::ValueValid,

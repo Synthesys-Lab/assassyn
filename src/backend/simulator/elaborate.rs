@@ -1,4 +1,5 @@
 use std::{
+  collections::HashSet,
   fs::{self, File},
   io::{self, Write},
   path::PathBuf,
@@ -23,6 +24,7 @@ struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   indent: usize,
   module_name: String,
+  module_ctx: BaseNode,
 }
 
 impl<'a> ElaborateModule<'a> {
@@ -31,6 +33,7 @@ impl<'a> ElaborateModule<'a> {
       sys,
       indent: 0,
       module_name: String::new(),
+      module_ctx: BaseNode::unknown(),
     }
   }
 }
@@ -44,11 +47,27 @@ macro_rules! fifo_name {
 
 macro_rules! dump_ref {
   ($sys:expr, $value:expr) => {
-    NodeRefDumper.dispatch($sys, $value, vec![]).unwrap()
+    NodeRefDumper::new(None)
+      .dispatch($sys, $value, vec![])
+      .unwrap()
+  };
+
+  ($ctx: expr, $sys:expr, $value:expr) => {
+    NodeRefDumper::new(Some($ctx))
+      .dispatch($sys, $value, vec![])
+      .unwrap()
   };
 }
 
-pub(super) struct NodeRefDumper;
+pub(super) struct NodeRefDumper {
+  module_ctx: Option<BaseNode>,
+}
+
+impl NodeRefDumper {
+  pub fn new(module_ctx: Option<BaseNode>) -> Self {
+    Self { module_ctx }
+  }
+}
 
 fn int_imm_dumper_impl(ty: &DataType, value: u64) -> String {
   if ty.get_bits() == 1 {
@@ -89,14 +108,51 @@ impl Visitor<String> for NodeRefDumper {
         quote::quote!(#value).to_string().into()
       }
       NodeKind::Module => Some(namify(node.as_ref::<Module>(sys).unwrap().get_name())),
+      NodeKind::Expr => {
+        let expr = node.as_ref::<Expr>(sys).unwrap();
+        let id = {
+          let raw = namify(&expr.get_name());
+          if self.module_ctx.map_or(false, |x| {
+            x != expr.get_parent().as_ref::<Block>(sys).unwrap().get_module()
+          }) {
+            format!("sim.{}_value.unwrap()", raw)
+          } else {
+            raw
+          }
+        };
+
+        id.into()
+      }
       _ => Some(namify(node.to_string(sys).as_str()).to_string()),
     }
   }
 }
 
+fn needs_validity(expr: &ExprRef<'_>) -> bool {
+  let res = expr
+    .users()
+    .iter()
+    .filter_map(|x| {
+      x.as_ref::<Operand>(expr.sys)
+        .unwrap()
+        .get_parent()
+        .as_ref::<Expr>(expr.sys)
+        .ok()
+    })
+    .any(|user| {
+      if let Opcode::PureIntrinsic { intrinsic } = user.get_opcode() {
+        matches!(intrinsic, subcode::PureIntrinsic::ValueValid)
+      } else {
+        false
+      }
+    });
+  res
+}
+
 impl Visitor<String> for ElaborateModule<'_> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.module_name = module.get_name().to_string();
+    self.module_ctx = module.upcast();
     let mut res = String::new();
     res.push_str(&format!(
       "\n// Elaborating module {}\n",
@@ -118,10 +174,14 @@ impl Visitor<String> for ElaborateModule<'_> {
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
-    let id = if expr.get_opcode().is_valued() {
-      Some(namify(expr.upcast().to_string(self.sys).as_str()))
+    let (id, expose_validity) = if expr.get_opcode().is_valued() {
+      let need = needs_validity(&expr);
+      (
+        Some(namify(expr.upcast().to_string(self.sys).as_str())),
+        need,
+      )
     } else {
-      None
+      (None, false)
     };
     let mut open_scope = false;
     let res = match expr.get_opcode() {
@@ -132,26 +192,30 @@ impl Visitor<String> for ElaborateModule<'_> {
         let lhs = format!(
           "ValueCastTo::<{}>::cast(&{})",
           ty,
-          dump_ref!(self.sys, &bin.a())
+          dump_ref!(self.module_ctx, self.sys, &bin.a())
         );
         let rhs = format!(
           "ValueCastTo::<{}>::cast(&{})",
           ty,
-          dump_ref!(self.sys, &bin.b())
+          dump_ref!(self.module_ctx, self.sys, &bin.b())
         );
         format!("{} {} {}", lhs, bin.get_opcode(), rhs)
       }
       Opcode::Unary { .. } => {
         let uop = expr.as_sub::<instructions::Unary>().unwrap();
-        format!("{}{}", uop.get_opcode(), dump_ref!(self.sys, &uop.x()))
+        format!(
+          "{}{}",
+          uop.get_opcode(),
+          dump_ref!(self.module_ctx, self.sys, &uop.x())
+        )
       }
       Opcode::Compare { .. } => {
         let cmp = expr.as_sub::<instructions::Compare>().unwrap();
         format!(
           "{} {} {}",
-          dump_ref!(self.sys, &cmp.a()),
+          dump_ref!(self.module_ctx, self.sys, &cmp.a()),
           cmp.get_opcode(),
-          dump_ref!(self.sys, &cmp.b()),
+          dump_ref!(self.module_ctx, self.sys, &cmp.b()),
         )
       }
       Opcode::Load => {
@@ -160,7 +224,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         format!(
           "sim.{}.payload[{} as usize].clone()",
           namify(array.get_name()),
-          NodeRefDumper
+          NodeRefDumper::new(None)
             .dispatch(load.get().sys, &idx, vec![])
             .unwrap()
         )
@@ -168,13 +232,13 @@ impl Visitor<String> for ElaborateModule<'_> {
       Opcode::Store => {
         let store = expr.as_sub::<instructions::Store>().unwrap();
         let (array, idx) = (store.array(), store.idx());
-        let idx = dump_ref!(store.get().sys, &idx);
+        let idx = dump_ref!(self.module_ctx, store.get().sys, &idx);
         let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
-        let value = dump_ref!(self.sys, &store.value());
+        let value = dump_ref!(self.module_ctx, self.sys, &store.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
         let module_writer = &self.module_name;
         let array = syn::Ident::new(
-          &dump_ref!(store.get().sys, &array.upcast()),
+          &dump_ref!(self.module_ctx, store.get().sys, &array.upcast()),
           Span::call_site(),
         );
         quote::quote! {
@@ -194,7 +258,6 @@ impl Visitor<String> for ElaborateModule<'_> {
         )
       }
       Opcode::FIFOPop => {
-        // TODO(@were): Support multiple pop.
         let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
         let fifo = pop.fifo();
         let fifo_id = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
@@ -210,22 +273,37 @@ impl Visitor<String> for ElaborateModule<'_> {
         let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
         match intrinsic {
           subcode::PureIntrinsic::FIFOPeek => {
-            let port_self = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
+            let port_self = dump_ref!(
+              self.module_ctx,
+              self.sys,
+              &call.get().get_operand_value(0).unwrap()
+            );
             format!("sim.{}.front().unwrap().clone()", port_self)
           }
           subcode::PureIntrinsic::FIFOValid => {
-            let port_self = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
+            let port_self = dump_ref!(
+              self.module_ctx,
+              self.sys,
+              &call.get().get_operand_value(0).unwrap()
+            );
             format!("!sim.{}.is_empty()", port_self)
           }
           subcode::PureIntrinsic::FIFOReady => {
             todo!()
           }
           subcode::PureIntrinsic::ValueValid => {
-            let value = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
-            format!("sim.{}_valid", value)
+            let value = call.get().get_operand_value(0).unwrap();
+            let expr = value
+              .as_ref::<Expr>(self.sys)
+              .expect("A value expected for validity");
+            format!("sim.{}_value.is_some()", namify(&expr.get_name()))
           }
           subcode::PureIntrinsic::ModuleTriggered => {
-            let port_self = dump_ref!(self.sys, &call.get().get_operand_value(0).unwrap());
+            let port_self = dump_ref!(
+              self.module_ctx,
+              self.sys,
+              &call.get().get_operand_value(0).unwrap()
+            );
             format!("sim.{}_triggered", port_self)
           }
         }
@@ -234,7 +312,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
         let fifo = push.fifo();
         let fifo_id = syn::Ident::new(&fifo_name!(fifo), Span::call_site());
-        let value = dump_ref!(self.sys, &push.value());
+        let value = dump_ref!(self.module_ctx, self.sys, &push.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();
         let module_writer = &self.module_name;
         quote::quote! {
@@ -252,14 +330,17 @@ impl Visitor<String> for ElaborateModule<'_> {
         ));
         res.push_str("println!(");
         for elem in expr.operand_iter() {
-          res.push_str(&format!("{}, ", dump_ref!(self.sys, elem.get_value())));
+          res.push_str(&format!(
+            "{}, ",
+            dump_ref!(self.module_ctx, self.sys, elem.get_value())
+          ));
         }
         res.push(')');
         res
       }
       Opcode::Slice => {
         let slice = expr.as_sub::<instructions::Slice>().unwrap();
-        let a = dump_ref!(self.sys, &slice.x());
+        let a = dump_ref!(self.module_ctx, self.sys, &slice.x());
         let l = slice.l();
         let r = slice.r();
         format!(
@@ -278,8 +359,8 @@ impl Visitor<String> for ElaborateModule<'_> {
       Opcode::Concat => {
         let dtype = expr.dtype();
         let concat = expr.as_sub::<instructions::Concat>().unwrap();
-        let a = dump_ref!(self.sys, &concat.msb());
-        let b = dump_ref!(self.sys, &concat.lsb());
+        let a = dump_ref!(self.module_ctx, self.sys, &concat.msb());
+        let b = dump_ref!(self.module_ctx, self.sys, &concat.lsb());
         let b_bits = concat.lsb().get_dtype(concat.get().sys).unwrap().get_bits();
         format! {
           "{{
@@ -296,9 +377,9 @@ impl Visitor<String> for ElaborateModule<'_> {
       }
       Opcode::Select => {
         let select = expr.as_sub::<instructions::Select>().unwrap();
-        let cond = dump_ref!(self.sys, &select.cond());
-        let true_value = dump_ref!(self.sys, &select.true_value());
-        let false_value = dump_ref!(self.sys, &select.false_value());
+        let cond = dump_ref!(self.module_ctx, self.sys, &select.cond());
+        let true_value = dump_ref!(self.module_ctx, self.sys, &select.true_value());
+        let false_value = dump_ref!(self.module_ctx, self.sys, &select.false_value());
         format!(
           "if {} {{ {} }} else {{ {} }}",
           cond, true_value, false_value
@@ -309,7 +390,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         let cond = select1hot.cond();
         let mut res = format!(
           "{{ let cond = {}; assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");",
-          dump_ref!(self.sys, &cond)
+          dump_ref!(self.module_ctx, self.sys, &cond)
         );
         for (i, value) in select1hot.value_iter().enumerate() {
           if i != 0 {
@@ -318,7 +399,7 @@ impl Visitor<String> for ElaborateModule<'_> {
           res.push_str(&format!(
             "if cond >> {} & 1 != 0 {{ {} }}",
             i,
-            dump_ref!(self.sys, &value)
+            dump_ref!(self.module_ctx, self.sys, &value)
           ));
         }
         res.push_str(" else { unreachable!() } }");
@@ -328,7 +409,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         let cast = expr.as_sub::<instructions::Cast>().unwrap();
         let src_dtype = cast.src_type();
         let dest_dtype = cast.dest_type();
-        let a = dump_ref!(cast.get().sys, &cast.x());
+        let a = dump_ref!(self.module_ctx, cast.get().sys, &cast.x());
         match cast.get_opcode() {
           Cast::ZExt | Cast::BitCast => {
             // perform zero extension
@@ -351,7 +432,7 @@ impl Visitor<String> for ElaborateModule<'_> {
       Opcode::Bind => "()".into(),
       Opcode::BlockIntrinsic { intrinsic } => {
         let bi = expr.as_sub::<instructions::BlockIntrinsic>().unwrap();
-        let value = dump_ref!(self.sys, &bi.value());
+        let value = dump_ref!(self.module_ctx, self.sys, &bi.value());
         match intrinsic {
           subcode::BlockIntrinsic::Value => value,
           subcode::BlockIntrinsic::Cycled => {
@@ -371,19 +452,14 @@ impl Visitor<String> for ElaborateModule<'_> {
           }
         }
       }
-      Opcode::Optional => {
-        let optional = expr.as_sub::<instructions::Optional>().unwrap();
-        let default_value = optional.default_value();
-        format!(
-          "if self.{}.is_some() {{ {}.unwrap() }} else {{ {} }}",
-          id.clone().unwrap(),
-          id.clone().unwrap(),
-          dump_ref!(self.sys, &default_value)
-        )
-      }
     };
     let res = if let Some(id) = id {
-      format!("let {} = {{ {} }};\n", id, res)
+      let valid = if expose_validity {
+        format!("sim.{}_value = Some({}.clone());", id, id)
+      } else {
+        "".into()
+      };
+      format!("let {} = {{ {} }}; {}\n", id, res, valid)
     } else {
       format!("{};\n", res)
     };
@@ -469,6 +545,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     }
     registers.push(name);
   }
+  let mut expr_validities = HashSet::new();
   for module in sys.module_iter(ModuleKind::All) {
     let module_name = namify(module.get_name());
     if !module.is_downstream() {
@@ -487,8 +564,25 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         registers.push(name);
       }
     } else {
-      // TODO(@were): Gather all the options.
+      // TODO(@were): Make this a gather.
+      for expr in module
+        .ext_interf_iter()
+        .filter_map(|(x, _)| x.as_ref::<Expr>(sys).ok())
+        .filter(|x| needs_validity(&x))
+      {
+        expr_validities.insert(expr.upcast());
+      }
     }
+  }
+  for expr in expr_validities
+    .into_iter()
+    .map(|x| x.as_ref::<Expr>(sys).unwrap())
+  {
+    let name = namify(&expr.get_name());
+    let dtype = dtype_to_rust_type(&expr.dtype());
+    fd.write_all(format!("pub {}_value : Option<{}>,", name, dtype).as_bytes())?;
+    simulator_init.push(format!("{}_value : None,", name));
+    downstream_reset.push(format!("self.{}_value = None;", name));
   }
   fd.write_all("}".as_bytes())?;
 
@@ -532,8 +626,25 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       )?;
       fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
     } else {
-      let conds: Vec<String> = vec![];
-      // TODO: Gather all the options.
+      let mut conds = HashSet::new();
+      for (interf, _) in module.ext_interf_iter() {
+        if let Ok(expr) = interf.as_ref::<Expr>(sys) {
+          conds.insert(namify(
+            &expr
+              .get_parent()
+              .as_ref::<Block>(sys)
+              .unwrap()
+              .get_module()
+              .as_ref::<Module>(sys)
+              .unwrap()
+              .get_name(),
+          ));
+        }
+      }
+      let conds = conds
+        .into_iter()
+        .map(|x| format!("self.{}_triggered", x))
+        .collect::<Vec<_>>();
       fd.write_all("if ".as_bytes())?;
       fd.write_all(conds.join(" && ").as_bytes())?;
       fd.write_all(" {".as_bytes())?;

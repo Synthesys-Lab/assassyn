@@ -40,10 +40,21 @@ class Adder(Downstream):
     @downstream.combinational
     def build(self, a: Value, b: Value):
         a = a.optional(UInt(32)(1))
-        print('built', a)
         b = b.optional(UInt(32)(1))
-        print('built', b)
         c = a + b
+        log("downstream: {} + {} = {}", a, b, c)
+
+def check_raw(raw):
+    cnt = 0
+    for i in raw.split('\n'):
+        if 'downstream:' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(a) + int(b) == int(c)
+            cnt += 1
+    assert cnt == 99, f'cnt: {cnt} != 99'
 
 def test_downstream():
     sys = SysBuilder('downstream')
@@ -62,13 +73,13 @@ def test_downstream():
 
     config = assassyn.backend.config(
             verilog=None,
-            sim_threshold=200,
-            idle_threshold=200)
+            sim_threshold=100,
+            idle_threshold=100)
 
     simulator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    #check_raw(raw)
+    check_raw(raw)
 
     #raw = utils.run_verilator(verilator_path)
     #check_raw(raw)
