@@ -568,7 +568,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       for expr in module
         .ext_interf_iter()
         .filter_map(|(x, _)| x.as_ref::<Expr>(sys).ok())
-        .filter(|x| needs_validity(&x))
+        .filter(|x| needs_validity(x))
       {
         expr_validities.insert(expr.upcast());
       }
@@ -630,7 +630,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       for (interf, _) in module.ext_interf_iter() {
         if let Ok(expr) = interf.as_ref::<Expr>(sys) {
           conds.insert(namify(
-            &expr
+            expr
               .get_parent()
               .as_ref::<Block>(sys)
               .unwrap()
