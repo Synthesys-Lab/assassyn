@@ -76,7 +76,7 @@ def test_downstream():
             sim_threshold=100,
             idle_threshold=100)
 
-    simulator_path = elaborate(sys, **config)
+    simulator_path, _ = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
