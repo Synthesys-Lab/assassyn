@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  builder::{PortInfo, SysBuilder},
+  builder::{system::ModuleKind, PortInfo, SysBuilder},
   ir::{
     instructions::{Bind, FIFOPush},
     module,
@@ -40,7 +40,8 @@ fn find_module_with_multi_callers(sys: &SysBuilder) -> HashMap<BaseNode, HashSet
   let mut gather_binds = GatherBinds {
     binds: HashMap::new(),
   };
-  for m in sys.module_iter() {
+  // Only FIFO port upstream modules are considered to be arbitrated.
+  for m in sys.module_iter(ModuleKind::Module) {
     gather_binds.visit_module(m);
   }
   gather_binds.binds.retain(|_, v| v.len() > 1);
@@ -101,7 +102,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         let ports = (0..n_args)
           .map(|x| {
             arbiter
-              .get_port(&format!("{}.caller{}.arg{}", module_name, i, x))
+              .get_fifo(&format!("{}.caller{}.arg{}", module_name, i, x))
               .unwrap()
               .upcast()
           })
@@ -173,7 +174,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       let new_bind = sys.get_init_bind(*callee);
       let module_ports = {
         let module = callee.as_ref::<Module>(sys).unwrap();
-        module.port_iter().map(|x| x.upcast()).collect::<Vec<_>>()
+        module.fifo_iter().map(|x| x.upcast()).collect::<Vec<_>>()
       };
       for (j, port) in module_ports.iter().enumerate() {
         let key = port.as_ref::<FIFO>(sys).unwrap().get_name().clone();
@@ -187,7 +188,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
         {
           let arbiter = arbiter.as_ref::<Module>(sys).unwrap();
           let arbiter_port = {
-            let port = arbiter.get_port(&format!("{}.caller{}.arg{}", module_name, i, j));
+            let port = arbiter.get_fifo(&format!("{}.caller{}.arg{}", module_name, i, j));
             port.unwrap().upcast()
           };
           // Caller calls the arbiter

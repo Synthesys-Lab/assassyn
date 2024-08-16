@@ -1,33 +1,56 @@
-// TODO(@were): Remove all the predications and move to blocks.
-
 use std::{collections::HashMap, fmt::Display, hash::Hash};
+
+use instructions::call::LazyBind;
 
 use crate::ir::{ir_printer::IRPrinter, node::*, visitor::Visitor, *};
 
-use self::{
-  expr::subcode::{self, Binary},
-  instructions::Bind,
-};
+use self::expr::subcode::{self, Binary};
 
 use super::symbol_table::SymbolTable;
 
+pub enum ModuleKind {
+  Module,
+  Downstream,
+  All,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct InsertPoint(pub BaseNode, pub BaseNode, pub Option<usize>);
+pub struct InsertPoint {
+  pub module: BaseNode,
+  pub block: BaseNode,
+  pub at: Option<usize>,
+}
 
 impl InsertPoint {
   pub fn next(&self, sys: &SysBuilder) -> Option<Self> {
-    let InsertPoint(module, block, at) = self;
+    let (module, block, at) = { (self.module, self.block, self.at) };
     let block = block.as_ref::<Block>(sys).unwrap();
     if let Some(cur_at) = at {
       if cur_at + 1 < block.get_num_exprs() {
-        InsertPoint(*module, block.upcast(), Some(cur_at + 1)).into()
+        Some(InsertPoint {
+          module,
+          block: block.upcast(),
+          at: (cur_at + 1).into(),
+        })
       } else {
-        InsertPoint(*module, block.upcast(), None).into()
+        Some(InsertPoint {
+          module,
+          block: block.upcast(),
+          at: None,
+        })
       }
     } else if let Some(nxt_block) = block.next() {
-      InsertPoint(*module, nxt_block, Some(0)).into()
+      Some(InsertPoint {
+        module,
+        block: nxt_block,
+        at: 0.into(),
+      })
     } else if let Ok(block_parent) = block.get_parent().as_ref::<Block>(sys) {
-      return InsertPoint(*module, block_parent.upcast(), None).into();
+      return Some(InsertPoint {
+        module,
+        block: block_parent.upcast(),
+        at: None,
+      });
     } else {
       return None;
     }
@@ -48,6 +71,9 @@ pub struct SysBuilder {
   pub(crate) inesert_point: InsertPoint,
   /// The symbol table to maintain the unique identifiers.
   pub(crate) symbol_table: SymbolTable,
+  /// The set of finalized binds. A lazy bind will not be instantiated as a bind expression until
+  /// it is called. Key: LazyBind, Value: Expr::Bind.
+  finalized_binds: HashMap<BaseNode, BaseNode>,
 }
 
 /// The information of an input of a module.
@@ -76,11 +102,11 @@ impl PortInfo {
 ///
 /// # Arguments
 /// * `ty` - The result's data type of the expression. If None is given, the data type will be
-///   inferred from the operands.
+///    inferred from the operands.
 /// * `a` - The first operand.
 /// * `b` - The second operand.
 /// * `pred` - The condition of executing this expression. If the condition is not `None`, this
-///   is always executed.
+///    is always executed.
 macro_rules! create_arith_op_impl {
   (binary, $func_name:ident, $opcode: expr) => {
     pub fn $func_name(&mut self, a: BaseNode, b: BaseNode) -> BaseNode {
@@ -101,27 +127,6 @@ macro_rules! create_arith_op_impl {
   };
 }
 
-macro_rules! impl_typed_iter {
-  ($func_name:ident, $ty: ident) => {
-    paste::paste! {
-      /// Iterate over all the modules of the system.
-      pub fn $func_name(&self) -> impl Iterator<Item = [<$ty Ref>]<'_>> {
-        self
-          .symbol_table
-          .iter()
-          .filter(|(_, v)| {
-            if let NodeKind::$ty = v.get_kind() {
-              true
-            } else {
-              false
-            }
-          })
-          .map(|(_, x)| x.as_ref::<$ty>(self).unwrap())
-      }
-    }
-  };
-}
-
 impl SysBuilder {
   /// Create a new system.
   /// # Arguments
@@ -132,8 +137,13 @@ impl SysBuilder {
       name: name.into(),
       slab: slab::Slab::new(),
       cached_nodes: HashMap::new(),
-      inesert_point: InsertPoint(BaseNode::unknown(), BaseNode::unknown(), None),
+      inesert_point: InsertPoint {
+        module: BaseNode::unknown(),
+        block: BaseNode::unknown(),
+        at: None,
+      },
       symbol_table: SymbolTable::new(),
+      finalized_binds: HashMap::new(),
     }
   }
 
@@ -143,12 +153,16 @@ impl SysBuilder {
 
   /// If this system has a driver.
   pub fn has_driver(&self) -> bool {
-    self.module_iter().any(|x| x.get_name().eq("driver"))
+    self
+      .module_iter(ModuleKind::Module)
+      .any(|x| x.get_name().eq("driver"))
   }
 
   /// If this system has a testbench.
   pub fn has_testbench(&self) -> bool {
-    self.module_iter().any(|x| x.get_name().eq("testbench"))
+    self
+      .module_iter(ModuleKind::Module)
+      .any(|x| x.get_name().eq("testbench"))
   }
 
   /// The helper function to get an element of the system and downcast it to its actual
@@ -164,8 +178,28 @@ impl SysBuilder {
     T::reference(self, *key)
   }
 
-  impl_typed_iter!(module_iter, Module);
-  impl_typed_iter!(array_iter, Array);
+  pub fn array_iter(&self) -> impl Iterator<Item = ArrayRef<'_>> {
+    self
+      .symbol_table
+      .symbols()
+      .filter_map(|v| v.as_ref::<Array>(self).ok())
+  }
+
+  /// Get the iterator of the modules.
+  ///
+  /// # Arguments
+  /// * `downstream` - If true, the iterator will only return downstream modules.
+  ///   If false, the iterator will only return upstream modules.
+  ///   If None, the iterator will return both modules.
+  pub fn module_iter(&self, kind: ModuleKind) -> impl Iterator<Item = ModuleRef<'_>> {
+    self.symbol_table.symbols().filter_map(move |v| {
+      v.as_ref::<Module>(self).ok().filter(|m| match kind {
+        ModuleKind::Module => !m.is_downstream(),
+        ModuleKind::Downstream => m.is_downstream(),
+        ModuleKind::All => true,
+      })
+    })
+  }
 
   /// The helper function to get an element of the system and downcast it to its actual type's
   /// mutable reference.
@@ -178,11 +212,11 @@ impl SysBuilder {
 
   /// Get the current module to be built.
   pub fn get_current_module(&self) -> Result<ModuleRef<'_>, String> {
-    self.get::<Module>(&self.inesert_point.0)
+    self.get::<Module>(&self.inesert_point.module)
   }
 
   pub fn get_current_block(&self) -> Result<BlockRef<'_>, String> {
-    self.get::<Block>(&self.inesert_point.1)
+    self.get::<Block>(&self.inesert_point.block)
   }
 
   /// Get the module by its name.
@@ -211,7 +245,11 @@ impl SysBuilder {
   /// * `module` - The reference of the module to be set as the current module.
   pub fn set_current_module(&mut self, module: BaseNode) {
     let block = self.get::<Module>(&module).unwrap().get_body().upcast();
-    self.inesert_point = InsertPoint(module, block, None);
+    self.inesert_point = InsertPoint {
+      module,
+      block,
+      at: None,
+    };
   }
 
   /// Get the current insert point of this builder.
@@ -232,9 +270,13 @@ impl SysBuilder {
   pub fn set_current_block(&mut self, block: BaseNode) {
     let module = {
       let block = block.as_ref::<Block>(self).unwrap();
-      block.get_module().upcast()
+      block.get_module()
     };
-    self.inesert_point = InsertPoint(module, block, None);
+    self.inesert_point = InsertPoint {
+      module,
+      block,
+      at: None,
+    };
   }
 
   /// Set the insert before of the current builder.
@@ -242,8 +284,8 @@ impl SysBuilder {
   /// # Arguments
   ///
   /// * `expr` - The reference of the expression to be set as the insert point. NOTE: This expr
-  ///   should be a part of the current module to be built. Ohterwise, an assertion failure will be
-  ///   raised.
+  ///    should be a part of the current module to be built. Ohterwise, an assertion failure will
+  ///    be raised.
   pub fn set_insert_before(&mut self, node: BaseNode) {
     // Make this more general, the insert before point can also be a block.
     // Which leads to something like this:
@@ -267,11 +309,11 @@ impl SysBuilder {
       let module = {
         // TODO(@were): Make this a method function.
         let block = block_ref.as_ref::<Block>(self).unwrap();
-        block.get_module().upcast()
+        block.get_module()
       };
       (module, block_ref, at)
     };
-    self.inesert_point = InsertPoint(module, block, at);
+    self.inesert_point = InsertPoint { module, block, at };
   }
 
   /// Get the insert point of the current builder.
@@ -325,12 +367,13 @@ impl SysBuilder {
     key
   }
 
+  /// Create a string literal node.
   pub fn get_str_literal(&mut self, value: String) -> BaseNode {
     let instance = StrImm::new(value);
-
     self.insert_element(instance)
   }
 
+  /// Create a log command.
   pub fn create_log(&mut self, fmt: BaseNode, mut args: Vec<BaseNode>) -> BaseNode {
     assert_eq!(fmt.get_kind(), NodeKind::StrImm);
     args.insert(0, fmt);
@@ -400,7 +443,12 @@ impl SysBuilder {
       dtype.clone(),
       opcode,
       vec![BaseNode::unknown(); operands.len()],
-      self.inesert_point.1,
+      if insert {
+        self.inesert_point.block
+      } else {
+        // If this expression is not inserted at all, leave its parent block as unknown.
+        BaseNode::unknown()
+      },
     );
     let res = self.insert_element(instance);
     if insert {
@@ -415,21 +463,23 @@ impl SysBuilder {
 
   /// The helper function to insert an element into the current insert point.
   fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
-    let InsertPoint(_, block, _) = &self.inesert_point;
-    let block = *block;
+    let block = self.inesert_point.block;
     self.get_mut::<Block>(&block).unwrap().insert_at_ip(expr)
   }
 
   /// Create an async call to the given bind. Push all the values to the corresponding named ports.
-  pub fn create_async_call(&mut self, bind: BaseNode) -> BaseNode {
-    assert!({
-      let expr = self.get::<Expr>(&bind).unwrap();
-      matches!(expr.get_opcode(), Opcode::Bind)
-    });
-    let args = vec![bind];
-    self.insert_at_ip(bind);
-
-    self.create_expr(DataType::void(), Opcode::AsyncCall, args, true)
+  pub fn create_async_call(&mut self, lazy_bind: BaseNode) -> BaseNode {
+    // A bind will not finalize its place until it is called. This assumption helps to maintain the
+    // external interfaces.
+    let operands = {
+      let bind = lazy_bind.as_ref::<LazyBind>(self).unwrap();
+      let mut res = bind.get_bind().values().copied().collect::<Vec<_>>();
+      res.push(bind.get_callee());
+      res
+    };
+    let bind = self.create_expr(DataType::void(), Opcode::Bind, operands, true);
+    self.finalized_binds.insert(lazy_bind, bind);
+    self.create_expr(DataType::void(), Opcode::AsyncCall, vec![bind], true)
   }
 
   create_arith_op_impl!(binary, create_add, Binary::Add.into());
@@ -464,7 +514,8 @@ impl SysBuilder {
       // A module is an empty bind.
       NodeKind::Module => {
         node.as_ref::<Module>(self).unwrap();
-        self.create_expr(DataType::void(), Opcode::Bind, vec![node], false)
+        let instance = LazyBind::new(node);
+        self.insert_element(instance)
       }
       _ => panic!("Only a module can be bound!"),
     }
@@ -473,19 +524,19 @@ impl SysBuilder {
   /// Add a bound argument to the given bind.
   pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) {
     let port = {
-      let bind = bind.as_expr::<Bind>(self).unwrap();
-      let module = bind.callee();
+      let bind = bind.as_ref::<LazyBind>(self).unwrap();
       assert!(
         bind.get_arg(&key).is_none(),
         "Argument {} already exists!",
         key
       );
-      let port = module.get_port(&key).unwrap_or_else(|| {
+      let module = bind.get_callee().as_ref::<Module>(self).unwrap();
+      let port = module.get_fifo(&key).unwrap_or_else(|| {
         panic!(
           "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
           key,
-          bind.callee().get_name(),
-          bind.callee().upcast()
+          module.get_name(),
+          module.upcast()
         )
       });
       assert_eq!(
@@ -498,9 +549,17 @@ impl SysBuilder {
       port.upcast()
     };
     let push = self.create_expr(DataType::void(), Opcode::FIFOPush, vec![port, value], true);
-    let mut bind_mut = bind.as_mut::<Expr>(self).unwrap();
-    let n = bind_mut.get().get_num_operands();
-    bind_mut.insert_operand(n - 1, push);
+    if let Some(bind) = self.finalized_binds.get(&bind).cloned() {
+      let mut expr_mut = self.get_mut::<Expr>(&bind).unwrap();
+      let n = expr_mut.get().get_num_operands();
+      expr_mut.insert_operand(n - 1, push);
+    } else {
+      self
+        .get_mut::<LazyBind>(&bind)
+        .unwrap()
+        .get_mut()
+        .bind_arg(key, push);
+    }
   }
 
   fn indexable(&self, idx: BaseNode) -> bool {
@@ -644,26 +703,32 @@ impl SysBuilder {
     self.create_expr(ty, Opcode::FIFOPop, vec![fifo], true)
   }
 
+  /// The helper function to create a pure intrinsic.
+  pub fn create_pure_intrinsic(
+    &mut self,
+    ty: DataType,
+    subcode: subcode::PureIntrinsic,
+    operands: Vec<BaseNode>,
+  ) -> BaseNode {
+    self.create_expr(ty, subcode.into(), operands, true)
+  }
+
   /// Create a FIFO peek operation. This is similar to pop, but does not remove the value from the
   /// FIFO.
   pub fn create_fifo_peek(&mut self, fifo: BaseNode) -> BaseNode {
     let ty = fifo.as_ref::<FIFO>(self).unwrap().scalar_ty();
-
-    self.create_expr(ty, subcode::FIFO::Peek.into(), vec![fifo], true)
+    self.create_pure_intrinsic(ty, subcode::PureIntrinsic::FIFOPeek, vec![fifo])
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
-    assert_eq!(
-      fifo.get_kind(),
-      NodeKind::FIFO,
+    assert!(
+      matches!(fifo.get_kind(), NodeKind::FIFO),
       "Expect FIFO as the operand"
     );
-
-    self.create_expr(
+    self.create_pure_intrinsic(
       DataType::int_ty(1),
-      subcode::FIFO::Valid.into(),
+      subcode::PureIntrinsic::FIFOValid,
       vec![fifo],
-      true,
     )
   }
 
@@ -685,6 +750,45 @@ impl SysBuilder {
     };
 
     self.create_expr(ty, Opcode::Slice, vec![src, start, end], true)
+  }
+
+  /// Create a value.valid operation, which checks if this value is validly produced in this cycle.
+  /// NOTE: This operation is only valid in a downstream module.
+  ///
+  /// # Arguments
+  /// * `value` - The value to be checked.
+  pub fn create_value_valid(&mut self, value: BaseNode) -> BaseNode {
+    assert!(
+      self.get_current_module().unwrap().is_downstream(),
+      "`value.valid` is only meaningful in a downstream module!"
+    );
+    assert!(
+      matches!(value.get_kind(), NodeKind::Expr),
+      "A value expected for a validity check!"
+    );
+    self.create_pure_intrinsic(
+      DataType::uint_ty(1),
+      subcode::PureIntrinsic::ValueValid,
+      vec![value],
+    )
+  }
+
+  /// Create a module.triggered operation, which checks if this module is triggered in this cycle.
+  /// NOTE: This operation is only valid in a downstream module.
+  ///
+  /// # Arguments
+  /// * `module` - The module to be checked.
+  pub fn create_module_triggered(&mut self, module: BaseNode) -> BaseNode {
+    assert!(
+      self.get_current_module().unwrap().is_downstream(),
+      "`module.valid` is only meaningful in a downstream module!"
+    );
+    module.as_ref::<Module>(self).unwrap();
+    self.create_pure_intrinsic(
+      DataType::uint_ty(1),
+      subcode::PureIntrinsic::ModuleTriggered,
+      vec![module],
+    )
   }
 
   fn retype_imm(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
@@ -765,7 +869,7 @@ impl Display for SysBuilder {
       writeln!(f, "  {};", printer.visit_array(elem).unwrap())?;
     }
     printer.inc_indent();
-    for elem in self.module_iter() {
+    for elem in self.module_iter(ModuleKind::All) {
       write!(f, "\n{}", printer.visit_module(elem).unwrap())?;
     }
     printer.dec_indent();

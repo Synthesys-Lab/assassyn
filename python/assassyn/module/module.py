@@ -5,8 +5,9 @@ from decorator import decorator
 from ..builder import Singleton, ir_builder
 from ..dtype import DType
 from ..block import Block
-from ..expr import Bind, FIFOPop, FIFOField, FIFOPush, AsyncCall
+from ..expr import Bind, FIFOPop, PureInstrinsic, FIFOPush, AsyncCall
 from ..expr.intrinsic import _wait_until
+from .base import ModuleBase, name_ports_of_module
 
 @decorator
 def constructor(func, *args, **kwargs):
@@ -17,15 +18,7 @@ def constructor(func, *args, **kwargs):
     func(*args, **kwargs)
     for key in ['body', '_pop_cache', '_wait_until', '_finalized']:
         assert hasattr(module_self, key), 'Did you forget to call `super().__init__?`'
-    name_ports_of_module(module_self)
-
-
-def name_ports_of_module(module):
-    '''The helper function to name the ports of a module.'''
-    for k, v in module.__dict__.items():
-        if isinstance(v, Port):
-            v.name = k
-            v.module = module
+    name_ports_of_module(module_self, Port)
 
 def _reserved_module_name(name):
     return name in ['Driver', 'Testbench']
@@ -39,12 +32,13 @@ def wait_until(func, *args, **kwargs):
     Singleton.builder.cur_module = module_self
     module_self._attrs[Module.ATTR_TIMING] = Timing(Timing.BACKPRESSURE)
 
-    module_self.implicit_restore()
+    restored = module_self.implicit_restore()
     restore = Singleton.builder.insert_point['expr']
     Singleton.builder.insert_point['expr'] = module_self._wait_until
     cond = func(*args, **kwargs)
     _wait_until(cond)
-    module_self.implicit_pop()
+    if restored:
+        module_self.implicit_pop()
 
     Singleton.builder.insert_point['expr'] = restore
     Singleton.builder.cur_module = None
@@ -64,7 +58,7 @@ class Timing:
     def __repr__(self):
         return ['undefined', 'systolic', 'backpressure'][self.ty]
 
-class Module:
+class Module(ModuleBase):
     '''The AST node for defining a module.'''
 
     ATTR_EXPLICIT_FIFO = 0
@@ -92,15 +86,16 @@ class Module:
           - disable_arbiter_rewrite(bool): When there are multiple callers, if this module
           should be rewritten by the compiler.
         '''
+        super().__init__()
         self.body = None
-        self._attrs = {}
-        self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite)
         self._pop_cache = {}
         self._wait_until = []
         self._finalized = False
         self.name = type(self).__name__
+        self._attrs = {}
+        self.parse_attrs(explicit_fifo, timing, disable_arbiter_rewrite)
         if not _reserved_module_name(self.name):
-            self.name = self.name + '_' + self.as_operand()
+            self.name = self.name + self.as_operand()
 
     def validate_all_ports(self):
         '''A syntactic sugar for checking the validity of all the ports in this module.'''
@@ -124,7 +119,6 @@ class Module:
         elif self._finalized:
             assert False, 'Finalization cannot be reverted!'
 
-
     @property
     def ports(self):
         '''The helper function to get all the ports in the module.'''
@@ -142,10 +136,6 @@ class Module:
         bound = Bind(self, **kwargs)
         return bound
 
-    def as_operand(self):
-        '''Dump the module as a right-hand side reference.'''
-        return f'_{hex(id(self))[-5:-1]}'
-
     def __repr__(self):
         ports = '\n    '.join(repr(v) for v in self.ports)
         if ports:
@@ -162,7 +152,7 @@ class Module:
   }}
 '''
         Singleton.repr_ident = 4
-        body = self.body.__repr__()
+        body = self.body.__repr__() if self.body is not None else ''
         precond = '\n      '.join(repr(v) for v in self._wait_until)
         if precond:
             precond = f'''
@@ -202,15 +192,25 @@ class Module:
 
     def implicit_restore(self):
         '''Implicitly restore all the FIFO.pop back to FIFOs.'''
+        restored = False
         if not self.is_explicit_fifo:
             for k, v in self.__dict__.items():
                 if isinstance(v, FIFOPop):
                     setattr(self, k, v.fifo)
+                    restored = True
+        return restored
+
+    def parse_attrs(self, is_explicit_fifo, timing, disable_arbiter_rewrite):
+        '''The helper function to parse the attributes.'''
+        self._attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
+        self._attrs[Module.ATTR_TIMING] = Timing(timing)
+        self._attrs[Module.ATTR_DISABLE_ARBITER] = disable_arbiter_rewrite
 
     @property
     def is_systolic(self):
         '''The helper function to get if this module is systolic.'''
-        return self._attrs.get(Module.ATTR_TIMING, Timing(Timing.UNDEFINED)).ty == Timing.SYSTOLIC
+        value = self._attrs.get(Module.ATTR_TIMING, Timing(Timing.UNDEFINED)).ty
+        return value == Timing.SYSTOLIC
 
     @property
     def disable_arbiter_rewrite(self):
@@ -222,11 +222,12 @@ class Module:
         '''The helper function to get the implicit FIFO setting.'''
         return self._attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
 
-    def parse_attrs(self, is_explicit_fifo, timing, disable_arbiter_rewrite):
-        '''The helper function to parse the attributes.'''
-        self._attrs[Module.ATTR_EXPLICIT_FIFO] = is_explicit_fifo
-        self._attrs[Module.ATTR_TIMING] = Timing(timing)
-        self._attrs[Module.ATTR_DISABLE_ARBITER] = disable_arbiter_rewrite
+    @ir_builder(node_type='expr')
+    def triggered(self):
+        '''The frontend API for creating a triggered node,
+        which checks if this module is triggered this cycle.
+        NOTE: This operation is only usable in downstream modules.'''
+        return PureInstrinsic(PureInstrinsic.MODULE_TRIGGERED, self)
 
 class Port:
     '''The AST node for defining a port in modules.'''
@@ -239,12 +240,12 @@ class Port:
     @ir_builder(node_type='expr')
     def valid(self):
         '''The frontend API for creating a FIFO.valid operation.'''
-        return FIFOField(FIFOField.FIFO_VALID, self)
+        return PureInstrinsic(PureInstrinsic.FIFO_VALID, self)
 
     @ir_builder(node_type='expr')
     def peek(self):
         '''The frontend API for creating a FIFO.peek operation.'''
-        return FIFOField(FIFOField.FIFO_PEEK, self)
+        return PureInstrinsic(PureInstrinsic.FIFO_PEEK, self)
 
     @ir_builder(node_type='expr')
     def pop(self):
@@ -257,7 +258,7 @@ class Port:
         return FIFOPush(self, v)
 
     def __repr__(self):
-        return f'{self.name}: port<{self.dtype}>'
+        return f'{self.name}: Port<{self.dtype}>'
 
     def as_operand(self):
         '''Dump the port as a right-hand side reference.'''
@@ -275,6 +276,7 @@ def combinational(
     Singleton.builder.cur_module = module_self
     Singleton.builder.builder_func = func
     module_self.body = Block(Block.MODULE_ROOT)
+    # TODO(@were): Make implicit pop more robust.
     with module_self.body:
         module_self.implicit_pop()
         res = func(*args, **kwargs)

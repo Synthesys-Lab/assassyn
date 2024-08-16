@@ -1,6 +1,6 @@
 use expr::subcode;
 
-use crate::builder::{InsertPoint, SysBuilder};
+use crate::builder::SysBuilder;
 use crate::ir::node::*;
 use crate::ir::*;
 
@@ -43,7 +43,7 @@ impl Parented for Block {
 }
 
 impl BlockRef<'_> {
-  pub fn get_module(&self) -> ModuleRef<'_> {
+  pub fn get_module(&self) -> BaseNode {
     let mut runner = self.upcast();
     while runner.get_kind() != NodeKind::Module {
       let parent: BaseNode = match runner.get_kind() {
@@ -52,7 +52,7 @@ impl BlockRef<'_> {
       };
       runner = parent;
     }
-    runner.as_ref::<Module>(self.sys).unwrap()
+    runner
   }
 
   fn get_block_intrinsic(
@@ -78,10 +78,10 @@ impl BlockRef<'_> {
       .map(|x| x.value())
   }
 
-  pub fn get_cycle(&self) -> Option<u32> {
+  pub fn get_cycle(&self) -> Option<usize> {
     self
       .get_block_intrinsic(0, subcode::BlockIntrinsic::Cycled)
-      .map(|x| x.value().as_ref::<IntImm>(self.sys).unwrap().get_value() as u32)
+      .map(|x| x.value().as_ref::<IntImm>(self.sys).unwrap().get_value() as usize)
   }
 
   pub fn get_condition(&self) -> Option<BaseNode> {
@@ -149,9 +149,9 @@ impl BlockMut<'_> {
   /// # Arguments
   /// * `expr` - The expression to insert.
   pub fn insert_at_ip(&mut self, expr: BaseNode) -> BaseNode {
-    let InsertPoint(_, _, at) = self.sys.inesert_point;
+    let at = self.sys.inesert_point.at;
     let (expr, new_at) = self.insert_at(at, expr);
-    self.sys.inesert_point.2 = new_at;
+    self.sys.inesert_point.at = new_at;
     expr
   }
 
@@ -209,12 +209,15 @@ impl SysBuilder {
     let parent = self.get_current_block().unwrap().upcast();
     let instance = Block::new(parent);
     let block = self.insert_element(instance);
-    let InsertPoint(_, insert_block, at) = &self.get_insert_point();
+    let (insert_block, at) = {
+      let ip_ref = &self.get_insert_point();
+      (ip_ref.block, ip_ref.at)
+    };
     let (block, new_at) = self
-      .get_mut::<Block>(insert_block)
+      .get_mut::<Block>(&insert_block)
       .unwrap()
-      .insert_at(*at, block);
-    self.inesert_point.2 = new_at;
+      .insert_at(at, block);
+    self.inesert_point.at = new_at;
     block
   }
 }

@@ -1,17 +1,22 @@
-use crate::{builder::system::SysBuilder, ir::node::*, ir::*};
+use crate::{
+  builder::system::{ModuleKind, SysBuilder},
+  ir::{node::*, *},
+};
 
 use super::block::Block;
 
 pub trait Visitor<T> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<T> {
-    for input in module.port_iter() {
-      self.visit_input(input);
+    for elem in module.fifo_iter() {
+      self.visit_fifo(elem);
     }
-    self.visit_block(module.get_body());
+    if let Some(x) = self.visit_block(module.get_body()) {
+      return x.into();
+    }
     None
   }
 
-  fn visit_input(&mut self, _: FIFORef<'_>) -> Option<T> {
+  fn visit_fifo(&mut self, _: FIFORef<'_>) -> Option<T> {
     None
   }
 
@@ -42,7 +47,7 @@ pub trait Visitor<T> {
   }
 
   fn enter(&mut self, sys: &SysBuilder) -> Option<T> {
-    for elem in sys.module_iter() {
+    for elem in sys.module_iter(ModuleKind::All) {
       let res = self.visit_module(elem);
       if res.is_some() {
         return res;
@@ -67,11 +72,12 @@ pub trait Visitor<T> {
       NodeKind::Expr => self.visit_expr(node.as_ref::<Expr>(sys).unwrap()),
       NodeKind::Block => self.visit_block(node.as_ref::<Block>(sys).unwrap()),
       NodeKind::Module => self.visit_module(node.as_ref::<Module>(sys).unwrap()),
-      NodeKind::FIFO => self.visit_input(node.as_ref::<FIFO>(sys).unwrap()),
+      NodeKind::FIFO => self.visit_fifo(node.as_ref::<FIFO>(sys).unwrap()),
       NodeKind::Array => self.visit_array(node.as_ref::<Array>(sys).unwrap()),
       NodeKind::IntImm => self.visit_int_imm(node.as_ref::<IntImm>(sys).unwrap()),
       NodeKind::StrImm => self.visit_string_imm(node.as_ref::<StrImm>(sys).unwrap()),
       NodeKind::Operand => self.visit_operand(node.as_ref::<Operand>(sys).unwrap()),
+      NodeKind::LazyBind => None, /* This node should not be in the AST at all!*/
       NodeKind::Unknown => {
         panic!("Unknown node type")
       }

@@ -33,7 +33,6 @@ def check(raw):
             c = line_toks[-1]
             b = line_toks[-3]
             a = line_toks[-5]
-            print(line_toks)
             assert int(a) == expect_a
             assert int(b) == expect_b
             expect_a = int(b)

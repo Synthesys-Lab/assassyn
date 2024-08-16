@@ -140,7 +140,6 @@ register_opcodes!(
   Bind(bind, 1 /*value*/) => { valued },
   FIFOPush(push, 2 /*fifo value*/) => { side_effect },
   FIFOPop(pop, 1 /*fifo*/) => { side_effect, valued },
-  FIFOField({ field: subcode::FIFO }, 1 /*fifo*/) => { valued },
   AsyncCall(async_call, -1 /* N/A */) => { side_effect },
   // Other synthesizable operations
   Slice(slice, 3 /*op [lo, hi]*/) => { valued },
@@ -148,6 +147,8 @@ register_opcodes!(
   Concat(concat, 2/*msb lsb*/) => { valued },
   // Block intrinsics
   BlockIntrinsic({ intrinsic: subcode::BlockIntrinsic }, -1 /*N/A*/) => { side_effect },
+  // Pure intrinsics
+  PureIntrinsic({ intrinsic: subcode::PureIntrinsic }, -1 /*N/A*/) => { valued },
   // Non-synthesizable operations
   Log(log, -1 /*N/A*/) => { side_effect }
 );
@@ -297,14 +298,16 @@ impl ExprMut<'_> {
         .get_parent()
         .as_ref::<Block>(self.sys)
         .unwrap()
-        .get_module()
-        .upcast();
-      if let Some(ref name) = self.get().name {
-        let name = name.to_string();
-        let mut module_mut = module.as_mut::<Module>(self.sys).unwrap();
-        assert!(module_mut.get_mut().symbol_table.remove(&name).is_some());
-      }
+        .get_module();
       let node = self.get().upcast();
+      if let Some(old_name) = self.get().name.clone() {
+        let mut module_mut = module.as_mut::<Module>(self.sys).unwrap();
+        assert!(module_mut
+          .get_mut()
+          .symbol_table
+          .remove(&old_name)
+          .is_some());
+      }
       let mut module_mut = module.as_mut::<Module>(self.sys).unwrap();
       module_mut.get_mut().symbol_table.insert(&name, node)
     };

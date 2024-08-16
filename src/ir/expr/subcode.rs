@@ -54,10 +54,12 @@ register_subcode!(
 );
 
 register_subcode!(
-  FIFO {
-    Peek(peek "peek"),
-    Valid(valid "valid"),
-    AlmostFull(almost_full "almost_full"),
+  PureIntrinsic {
+    FIFOPeek(peek "peek"),
+    FIFOValid(valid "valid"),
+    FIFOReady(ready "ready"),
+    ValueValid(valid "valid"),
+    ModuleTriggered(triggered "triggered"),
   }
 );
 

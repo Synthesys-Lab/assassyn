@@ -19,12 +19,24 @@ impl Module {
 }
 
 define_attrs!(
-  ExplicitPop,      // In this module, FIFO pops are explicitly defined. TODO: remove this.
-  OptNone,          // Avoid optimization on this module.
-  EagerCallee, // All the binds in this module will be called after arguments are fully bound. TODO: remove this.
-  AllowPartialCall, // Allow some arguments are not given to call this module.
-  NoArbiter,   // The compiler will skip to generate an arbiter for this module,
+  // In this module, FIFO pops are explicitly defined. TODO: remove this, since it will be handled
+  // by our Python frontend behaviorally.
+  ExplicitPop,
+  // Avoid optimization on this module.
+  OptNone,
+  // All the binds in this module will be called after arguments are fully bound. TODO: remove this,
+  // since it will be supported by our new Python frontend behaviorally.
+  EagerCallee,
+  // Allow some arguments are not given to call this module. TODO: More strict enforcement for
+  // function calls.
+  AllowPartialCall,
+  // The compiler will skip to generate an arbiter for this module,
   // even if it has multiple callers.
-  Systolic, // This module's timing is systolic.
+  NoArbiter,
+  // This module's timing is systolic.
+  Systolic,
+  // This module is a memory module.
   Memory(MemoryParams),
+  // This module is a downstream module, which is combinationally connected to the upstream module.
+  Downstream,
 );

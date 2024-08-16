@@ -11,29 +11,41 @@ use crate::ir::node::*;
 use crate::ir::*;
 
 pub use attrs::Attribute;
+use user::ExternalInterface;
 
 /// The data structure for a module.
 pub struct Module {
   /// The index key of this module in the slab buffer.
   pub(crate) key: usize,
-  /// The name of this module.
-  name: String,
-  /// The input ports of this module.
-  ports: HashMap<String, BaseNode>,
+  /// The name of this module, can be overridden by `set_name`.
+  pub(super) name: String,
   /// The body of the module.
   pub(crate) body: BaseNode,
-  /// The set of external interfaces used by the module.
-  pub(crate) external_interfaces: HashMap<BaseNode, HashSet<BaseNode>>,
-  /// The metadata of this module. The pointer to the module builder.
-  builder_func_ptr: Option<usize>,
-  /// The metadata of this module. The nodes that are parameterized by the module builder.
-  parameterizable: Option<Vec<BaseNode>>,
-  /// The redundant data of this module. The set of users that use this module.
-  pub(crate) user_set: HashSet<BaseNode>,
+  /// The set of external interfaces used by the module. (out bound)
+  pub(crate) external_interface: ExternalInterface,
   /// The attributes of this module.
   pub(crate) attr: HashSet<Attribute>,
   /// The symbol table that maintains the unique identifiers.
   pub(crate) symbol_table: SymbolTable,
+  /// The sub-class data structures of this module.
+  ports: HashMap<String, BaseNode>,
+  /// The set of users of this module.
+  pub(crate) user_set: HashSet<BaseNode>,
+}
+
+impl Default for Module {
+  fn default() -> Self {
+    Module {
+      key: 0,
+      name: String::new(),
+      body: BaseNode::unknown(),
+      external_interface: ExternalInterface::new(),
+      attr: HashSet::new(),
+      symbol_table: SymbolTable::new(),
+      ports: HashMap::new(),
+      user_set: HashSet::new(),
+    }
+  }
 }
 
 impl Module {
@@ -55,28 +67,13 @@ impl Module {
       key: 0,
       name: name.to_string(),
       ports,
-      body: BaseNode::new(NodeKind::Unknown, 0),
-      external_interfaces: HashMap::new(),
-      builder_func_ptr: None,
-      parameterizable: None,
       user_set: HashSet::new(),
-      attr: HashSet::new(),
-      symbol_table: SymbolTable::new(),
+      ..Default::default()
     }
   }
 
   pub fn get_attrs(&self) -> &HashSet<Attribute> {
     &self.attr
-  }
-
-  /// Get the finger print of the module.
-  pub fn get_builder_func_ptr(&self) -> Option<usize> {
-    self.builder_func_ptr
-  }
-
-  /// Get the nodes that are parameterized by the module builder.
-  pub fn get_parameterizable(&self) -> Option<&Vec<BaseNode>> {
-    self.parameterizable.as_ref()
   }
 }
 
@@ -86,12 +83,16 @@ impl<'sys> ModuleRef<'sys> {
     self.ports.len()
   }
 
+  pub fn is_downstream(&self) -> bool {
+    self.has_attr(Attribute::Downstream)
+  }
+
   /// Get the input by name.
   ///
   /// # Arguments
   ///
   /// * `name` - The name of the input.
-  pub fn get_port(&self, name: &str) -> Option<FIFORef<'_>> {
+  pub fn get_fifo(&self, name: &str) -> Option<FIFORef<'_>> {
     self
       .ports
       .get(name)
@@ -126,11 +127,11 @@ impl<'sys> ModuleRef<'sys> {
     'sys: 'borrow,
     'sys: 'res,
   {
-    self.external_interfaces.iter()
+    self.external_interface.iter()
   }
 
   /// Iterate over the ports of the module.
-  pub fn port_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = FIFORef<'res>> + 'res
+  pub fn fifo_iter<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = FIFORef<'res>> + 'res
   where
     'sys: 'borrow,
     'sys: 'res,
@@ -144,32 +145,6 @@ impl<'sys> ModuleRef<'sys> {
 }
 
 impl<'a> ModuleMut<'a> {
-  /// Maintain the redundant information, array used in the module.
-  ///
-  /// # Arguments
-  /// * `ext_node` - The external interface node.
-  /// * `operand` - The operand node that uses this external interface.
-  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    assert!(
-      matches!(ext_node.get_kind(), NodeKind::Array | NodeKind::FIFO),
-      "Expecting Array or FIFO but got {:?}",
-      ext_node
-    );
-    assert!(operand.get_kind() == NodeKind::Operand);
-    if !self.get().external_interfaces.contains_key(&ext_node) {
-      self
-        .get_mut()
-        .external_interfaces
-        .insert(ext_node, HashSet::new());
-    }
-    let users = self
-      .get_mut()
-      .external_interfaces
-      .get_mut(&ext_node)
-      .unwrap();
-    users.insert(operand);
-  }
-
   pub fn add_attr(&mut self, attr: Attribute) {
     self.get_mut().attr.insert(attr);
   }
@@ -178,15 +153,9 @@ impl<'a> ModuleMut<'a> {
     self.get_mut().attr = attr;
   }
 
-  /// Set the metadata, the function pointer to the module builder. As part of the fingerprint of
-  /// comparing the equality of the modules.
-  pub fn set_builder_func_ptr(&mut self, key: usize) {
-    self.get_mut().builder_func_ptr = key.into();
-  }
-
-  /// Set the metadata, these base nodes are parameterized --- plugged in by the module builder.
-  pub fn set_parameterizable(&mut self, param: Vec<BaseNode>) {
-    self.get_mut().parameterizable = Some(param);
+  /// Set the name of a module. Override the name given by the module builder.
+  pub fn set_name(&mut self, name: String) {
+    self.get_mut().name = name.to_string();
   }
 }
 
@@ -197,7 +166,15 @@ impl Typed for ModuleRef<'_> {
       .values()
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap().scalar_ty())
       .collect::<Vec<_>>();
-    DataType::module(types)
+    DataType::module(
+      if self.is_downstream() {
+        "downstream"
+      } else {
+        "module"
+      }
+      .into(),
+      types,
+    )
   }
 }
 
@@ -230,9 +207,33 @@ impl SysBuilder {
     }
     let new_name = self.symbol_table.insert(name, module);
     module.as_mut::<Module>(self).unwrap().get_mut().name = new_name;
+    // This is a BIG PITFALL here. We CANNOT call `sys.create_block` here, because the created block
+    // will be inserted at the current insert point of the system builder, which is NOT this module.
+    // We should: 1. manually new a block instance; 2. insert this newed block into the slab buffer;
+    // 3. set the body of the module to this newed block.
+    //
+    // This same issue applies to the downstream module. See below.
+    //
+    // TODO(@were): I am not sure if this is a good design. Maybe I should unify the way of creating
+    // blocks. When extending downstream module, I totally forgot about this issue.
     let body = Block::new(module);
     let body = self.insert_element(body);
     self.get_mut::<Module>(&module).unwrap().get_mut().body = body;
     module
+  }
+
+  /// Create a downstream module.
+  pub fn create_downstream(&mut self, name: &str) -> BaseNode {
+    let downstream = Module::new(name, HashMap::new());
+    let res = self.insert_element(downstream);
+    // This is a BIG PITFALL here. See the comment in `create_module`.
+    let body = Block::new(res);
+    let body = self.insert_element(body);
+    let name = self.symbol_table.insert(name, res);
+    let mut downstream_mut = res.as_mut::<Module>(self).unwrap();
+    downstream_mut.get_mut().name = name;
+    downstream_mut.get_mut().body = body;
+    downstream_mut.get_mut().attr.insert(Attribute::Downstream);
+    res
   }
 }

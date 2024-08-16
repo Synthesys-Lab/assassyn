@@ -1,6 +1,7 @@
 '''The module for the block AST node related implementations.'''
 
 from .builder import ir_builder, Singleton
+from .utils import identifierize
 
 class Block:
     '''The base node of a block.'''
@@ -24,7 +25,7 @@ class Block:
 
     def as_operand(self):
         '''Dump the block as an operand.'''
-        return f'_{hex(id(self))[-5:-1]}'
+        return f'_{identifierize(self)}'
 
     def insert(self, x, elem):
         '''Insert an instruction at the specified position.'''

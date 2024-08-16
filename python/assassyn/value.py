@@ -1,5 +1,6 @@
 '''The base node module for the overloaded frontend'''
 
+
 from .builder import ir_builder
 
 #pylint: disable=import-outside-toplevel
@@ -89,6 +90,17 @@ class Value:
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.SHR, self, other)
 
+    # This is a pitfall of developing the frontend. This optional method is served as a "ir_builder"
+    # API, but it should not be annotated with this decorator. It calls the "select" method, and
+    # the called "select" method will insert the generated Select node into the AST. It we annotate
+    # this method here, the generated node will be inserted into the AST twice.
+    def optional(self, default, predicate=None):
+        '''The frontend API to create an optional value with default'''
+        if predicate is None:
+            predicate = self.valid()
+        assert isinstance(predicate, Value), "Expecting a Value object"
+        return predicate.select(self, default)
+
     @ir_builder(node_type='expr')
     def bitcast(self, dtype):
         '''The frontend API to create a bitcast operation'''
@@ -125,22 +137,9 @@ class Value:
         from .expr import Select1Hot
         return Select1Hot(Select1Hot.SELECT_1HOT, self, args)
 
-
-class Optional:
-    '''The class for a predicated value'''
-
-    def __init__(self, value: Value, pred: Value):
-        self.value = value
-        self.pred = pred
-
     @ir_builder(node_type='expr')
-    def unwrap_or(self, default):
-        '''The frontend API to get the value of an optional value with a given default'''
-        from .expr import Select
-        return Select(Select.SELECT, self.pred, self.value, default)
-
-    @ir_builder(node_type='expr')
-    def map_or(self, f, default):
-        '''The frontend API to get the map of an optional value with a given default'''
-        from .expr import Select
-        return Select(Select.SELECT, self.pred, f(self.value), default)
+    def valid(self):
+        '''The frontend API to check if this value is valid.
+        NOTE: This operation is only usable in downstream modules.'''
+        from .expr import PureInstrinsic
+        return PureInstrinsic(PureInstrinsic.VALUE_VALID, self)

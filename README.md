@@ -17,7 +17,9 @@ $ ./init.sh
 $ source setup.sh # Add assassyn's python package to your PYTHONPATH
 ````
 
-Because of the nature of Rust toolchain, rust backend will be built along with your designs.
+All the test cases are located in `python/unit-tests`. These cases are not only testing features,
+but also self-examplified to demonstrate the usage of each feature.
+Refer `python/unit-tests/README.md` for more details on the feature-case correspondence.
 
 **Advanced Users**: If you would like to simulate the generated RTL, you can use
 [verilator](https://github.com/verilator/verilator). To simply setup verilator, you can run
@@ -32,10 +34,10 @@ $ source setup.sh # Re-run the script since it has a different environment varia
 all other Python scripts.
 
 ````sh
-$ python python/tests/test_driver.py 
+$ python python/unit-tests/test_driver.py 
 ````
 
-Refer our [developer doc](./docs/developers.md) for more details.
+Refer our [developer doc](./docs/developers.md) for more details on tooling.
 
 ## Why yet another RTL generator?
 

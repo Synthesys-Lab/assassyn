@@ -11,6 +11,7 @@ from .array import Array
 from .module import Module, Port, Memory
 from .block import Block
 from .expr import Expr
+from .utils import identifierize
 
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
@@ -39,8 +40,10 @@ CG_OPCODE = {
     expr.Slice.SLICE: 'slice',
     expr.Concat.CONCAT: 'concat',
 
-    expr.FIFOField.FIFO_PEEK: 'peek',
-    expr.FIFOField.FIFO_VALID: 'valid',
+    expr.PureInstrinsic.FIFO_PEEK: 'peek',
+    expr.PureInstrinsic.FIFO_VALID: 'valid',
+    expr.PureInstrinsic.MODULE_TRIGGERED: 'module_triggered',
+    expr.PureInstrinsic.VALUE_VALID: 'value_valid',
 
     expr.FIFOPop.FIFO_POP: 'pop',
     expr.FIFOPush.FIFO_PUSH: 'push',
@@ -62,13 +65,20 @@ CG_OPCODE = {
     expr.intrinsic.Intrinsic.WAIT_UNTIL: 'wait_until',
 }
 
+CG_MIDFIX = {
+    expr.FIFOPop.FIFO_POP: 'fifo',
+    expr.FIFOPush.FIFO_PUSH: 'fifo',
+    expr.PureInstrinsic.FIFO_PEEK: 'fifo',
+    expr.PureInstrinsic.FIFO_VALID: 'fifo',
+}
+
 CG_ARRAY_ATTR = {
     Array.FULLY_PARTITIONED: 'FullyPartitioned',
 }
 
 CG_SIMULATOR = {
-        'verilator': 'Verilator',
-        'vcs': 'VCS',
+    'verilator': 'Verilator',
+    'vcs': 'VCS',
 }
 
 def opcode_to_ib(node: Expr):
@@ -76,9 +86,8 @@ def opcode_to_ib(node: Expr):
     opcode = node.opcode
     if node.opcode == expr.Bind.BIND:
         return ''
-    if node.is_fifo_related():
-        return f'create_fifo_{CG_OPCODE[opcode]}'
-    return f'create_{CG_OPCODE[opcode]}'
+    midfix = f'_{CG_MIDFIX.get(opcode)}' if opcode in CG_MIDFIX else ''
+    return f'create{midfix}_{CG_OPCODE[opcode]}'
 
 def generate_dtype(ty: dtype.DType):
     '''Generate AST data type representation into assassyn data type representation'''
@@ -167,8 +176,10 @@ class CodeGen(visitor.Visitor):
         return 'Some(init)'
 
 
+    # pylint: disable=too-many-locals, too-many-statements
     def visit_system(self, node: SysBuilder):
         self.header.append('use std::path::PathBuf;')
+        self.header.append('use std::collections::HashMap;')
         self.header.append('use assassyn::builder::SysBuilder;')
         self.header.append('use assassyn::ir::node::IsElement;')
         self.code.append('fn main() {')
@@ -194,6 +205,14 @@ class CodeGen(visitor.Visitor):
             bind_emitter.visit_module(elem)
         for elem in node.modules:
             self.visit_module(elem)
+
+        for elem in node.downstreams:
+            self.code.append('  // Emit downstream modules')
+            var = self.generate_rval(elem)
+            self.code.append(
+                    f'  let {var} = sys.create_downstream("{elem.name}");')
+            self.visit_module(elem)
+
         config = self.emit_config()
         self.code.append(f'''
             let mut config = assassyn::backend::common::Config{{
@@ -252,7 +271,7 @@ class CodeGen(visitor.Visitor):
         '''Generate the value reference on as the right-hand side of an assignment'''
         if isinstance(node, const.Const):
             ty = generate_dtype(node.dtype)
-            imm_var = f'imm_{hex(id(node))[-5:-1]}'
+            imm_var = f'imm_{identifierize(node)}'
             imm_decl = f'  let {imm_var} = sys.get_const_int({ty}, {node.value}); // {node}'
             self.code.append(imm_decl)
             return imm_var
@@ -262,7 +281,7 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'''  // Get port {node.name}
                 let {port_name} = {{
                   let module = {module_name}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
-                  module.get_port("{node.name}").unwrap().upcast()
+                  module.get_fifo("{node.name}").unwrap().upcast()
                 }};''')
             return port_name
         return node.as_operand()
@@ -278,8 +297,11 @@ class CodeGen(visitor.Visitor):
         elif node.is_unary():
             x = self.generate_rval(node.x)
             res = f'sys.{ib_method}({x});'
-        elif isinstance(node, expr.FIFOField):
-            fifo = self.generate_rval(node.fifo)
+        elif isinstance(node, expr.PureInstrinsic):
+            if len(node.args) == 1:
+                master = self.generate_rval(node.args[0])
+                res = f'sys.{ib_method}({master});'
+            fifo = self.generate_rval(node.args[0])
             res = f'sys.{ib_method}({fifo});'
         elif isinstance(node, expr.FIFOPop):
             fifo = self.generate_rval(node.fifo)
@@ -290,13 +312,11 @@ class CodeGen(visitor.Visitor):
             args = ', '.join(self.generate_rval(i) for i in node.args[1:])
             res = f'sys.{ib_method}(fmt, vec![{args}]);'
         elif isinstance(node, expr.ArrayRead):
-            arr = node.arr.name if f'{id(node.arr)}' in node.arr.name \
-                                else self.generate_rval(node.arr)
+            arr = self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             res = f'sys.{ib_method}({arr}, {idx});'
         elif isinstance(node, expr.ArrayWrite):
-            arr = node.arr.name if f'{id(node.arr)}' in node.arr.name \
-                                else self.generate_rval(node.arr)
+            arr = self.generate_rval(node.arr)
             idx = self.generate_rval(node.idx)
             val = self.generate_rval(node.val)
             res = f'sys.{ib_method}({arr}, {idx}, {val});'
@@ -339,6 +359,9 @@ class CodeGen(visitor.Visitor):
             cond = self.generate_rval(node.cond)
             values = ', '.join(self.generate_rval(i) for i in node.values)
             res = f'sys.{ib_method}({cond}, vec![{values}]);'
+        # TODO(@were): For now, optional is a ad-hoc solution for downstream's inputs.
+        # Later, it will be replaced by a more general IR node, predicated select.
+        # The predicated condition is not fully supported in the current assassyn IR.
         else:
             length = len(repr(node)) - 1
             res = f'  // ^{"~" * length}: Support the instruction above'

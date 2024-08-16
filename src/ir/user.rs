@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::builder::SysBuilder;
 
@@ -13,6 +13,56 @@ pub struct Operand {
   pub(crate) key: usize,
   def: BaseNode,
   user: BaseNode,
+}
+
+pub(crate) struct ExternalInterface {
+  external_interfaces: HashMap<BaseNode, HashSet<BaseNode>>,
+}
+
+impl ExternalInterface {
+  pub(crate) fn new() -> Self {
+    Self {
+      external_interfaces: HashMap::new(),
+    }
+  }
+
+  /// Maintain the redundant information, array used in the module.
+  ///
+  /// # Arguments
+  /// * `ext_node` - The external interface node.
+  /// * `operand` - The operand node that uses this external interface.
+  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
+    // assert!(
+    //   matches!(ext_node.get_kind(), NodeKind::Array | NodeKind::FIFO),
+    //   "Expecting Array or FIFO but got {:?}",
+    //   ext_node
+    // );
+    assert!(operand.get_kind() == NodeKind::Operand);
+    // Next line is equivalent to the following code:
+    // if !self.external_interfaces.contains_key(&ext_node) {
+    //   self.external_interfaces.insert(ext_node, HashSet::new());
+    // }
+    self.external_interfaces.entry(ext_node).or_default();
+    let users = self.external_interfaces.get_mut(&ext_node).unwrap();
+    users.insert(operand);
+  }
+
+  /// Iterate over the external interfaces. External interfaces under the context of this project
+  /// typically refers to the arrays (both read and write) and FIFOs (typically push)
+  /// that are used by the module.
+  pub(crate) fn iter(&self) -> impl Iterator<Item = (&BaseNode, &HashSet<BaseNode>)> {
+    self.external_interfaces.iter()
+  }
+
+  fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
+    if let Some(operations) = self.external_interfaces.get_mut(&ext_node) {
+      assert!(operations.contains(&operand));
+      operations.remove(&operand);
+      if operations.is_empty() {
+        self.external_interfaces.remove(&ext_node);
+      }
+    }
+  }
 }
 
 impl Parented for Operand {
@@ -117,90 +167,12 @@ impl Visitor<()> for GatherAllUses {
   }
 }
 
-impl ModuleRef<'_> {
-  /// Gather all the related external interfaces with the given operand. This is typically used to
-  /// maintain the redundant information when modifying this IR.
-  /// If the given operand is an operand, gather just this specific operand.
-  /// If the given operand is a value reference, gather all the operands that `get_value == this
-  /// operand`.
-  ///
-  /// # Arguments
-  ///
-  /// * `operand` - The operand to gather the related external interfaces.
-  pub(crate) fn gather_related_externals(&self, operand: &BaseNode) -> Vec<(BaseNode, BaseNode)> {
-    // Remove all the external interfaces related to this instruction.
-    let tmp = self
-      .get()
-      .external_interfaces
-      .iter()
-      .map(|(ext, users)| {
-        (
-          *ext,
-          users
-            .iter()
-            .filter(|x| {
-              (*x).eq(operand) || {
-                let user = (*x).as_ref::<Operand>(self.sys).unwrap();
-                user.get_value().eq(operand)
-              }
-            })
-            .cloned()
-            .collect::<Vec<_>>(),
-        )
-      })
-      .filter(|(_, users)| !users.is_empty())
-      .collect::<Vec<_>>();
-    tmp
-      .iter()
-      .flat_map(|(ext, users)| users.iter().map(|x| (*ext, *x)))
-      .collect()
-  }
-}
-
 impl ModuleMut<'_> {
-  /// Remove a specific external interface's usage. If this usage set is empty after the removal,
-  /// remove the external interface from the module, too.
-  ///
-  /// # Arguments
-  ///
-  /// * `ext_node` - The external interface node.
-  /// * `operand` - The operand node that uses this external interface.
-  fn remove_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
-    if let Some(operations) = self.get_mut().external_interfaces.get_mut(&ext_node) {
-      assert!(operations.contains(&operand));
-      operations.remove(&operand);
-      if operations.is_empty() {
-        self.get_mut().external_interfaces.remove(&ext_node);
-      }
-    }
-  }
-
-  /// Remove all the related external interfaces with the given condition.
-  fn remove_related_externals(&mut self, operand: &BaseNode) {
-    let to_remove = self.get().gather_related_externals(operand);
-    to_remove.into_iter().for_each(|(ext, operand)| {
-      self.remove_external_interface(ext, operand);
-    });
-  }
-
-  /// Add related external interfaces to the module.
-  fn add_related_externals(&mut self, operand: BaseNode) {
-    // Reconnect the external interfaces if applicable.
-    // TODO(@were): Maybe later unify a common interface for this.
-    let operand_ref = operand.as_ref::<Operand>(self.sys).unwrap();
-    let value = *operand_ref.get_value();
-    match value.get_kind() {
-      NodeKind::Array => {
-        self.insert_external_interface(value, operand);
-      }
-      NodeKind::FIFO => {
-        let fifo = value.as_ref::<FIFO>(self.sys).unwrap();
-        if fifo.get_parent().get_key() != self.get().get_key() {
-          self.insert_external_interface(value, operand);
-        }
-      }
-      _ => {}
-    }
+  pub(crate) fn insert_external_interface(&mut self, ext_node: BaseNode, operand: BaseNode) {
+    self
+      .get_mut()
+      .external_interface
+      .insert_external_interface(ext_node, operand);
   }
 }
 
@@ -210,15 +182,13 @@ impl ExprMut<'_> {
     let block = self.sys.get::<Block>(&self.get().get_parent()).unwrap();
     let module = block.get_module();
     // Remove all the external interfaces related to this instruction.
-    let module = module.upcast();
     let expr = self.get().upcast();
     if let Some(old) = self.get().operands.get(i) {
       let old = *old;
       self.sys.cut_operand(&old);
       let operand = value.map(|x| self.sys.insert_element(Operand::new(x)));
-      let mut module_mut = self.sys.get_mut::<Module>(&module).unwrap();
       if let Some(operand) = operand {
-        module_mut.add_related_externals(operand);
+        self.sys.add_related_externals(module, operand);
         self.get_mut().operands[i] = operand;
         operand
           .as_mut::<Operand>(self.sys)
@@ -271,6 +241,7 @@ impl SysBuilder {
       return;
     }
     let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+    let value = *operand_ref.get_value();
     // TODO(@were): Make this a unified interface.
     let module = match operand_ref.get_user().get_kind() {
       NodeKind::Expr => {
@@ -280,12 +251,16 @@ impl SysBuilder {
           .as_ref::<Block>(self)
           .unwrap()
           .get_module()
-          .upcast()
       }
       _ => unreachable!(),
     };
+
     let mut module_mut = self.get_mut::<Module>(&module).unwrap();
-    module_mut.remove_related_externals(operand);
+    module_mut
+      .get_mut()
+      .external_interface
+      .remove_external_interface(value, *operand);
+
     self.remove_user(operand);
   }
 
@@ -345,6 +320,40 @@ impl SysBuilder {
         let mut expr_mut = user.as_mut::<Expr>(self).unwrap();
         expr_mut.set_operand(i, new_value);
       }
+    }
+  }
+
+  fn add_related_externals(&mut self, module: BaseNode, operand: BaseNode) {
+    // Reconnect the external interfaces if applicable.
+    // TODO(@were): Maybe later unify a common interface for this.
+    let value = {
+      let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+      *operand_ref.get_value()
+    };
+    if match value.get_kind() {
+      NodeKind::Module | NodeKind::Array => true,
+      NodeKind::FIFO => {
+        let fifo = value.as_ref::<FIFO>(self).unwrap();
+        fifo.get_parent().get_key() != module.get_key()
+      }
+      NodeKind::Expr => {
+        let expr = value.as_ref::<Expr>(self).unwrap();
+        // If this expression is NOT in the same module as the user, then it is an external
+        // interface.
+        expr
+          .get_parent()
+          .as_ref::<Block>(self)
+          .unwrap()
+          .get_module()
+          .get_key()
+          != module.get_key()
+      }
+      _ => false,
+    } {
+      module
+        .as_mut::<Module>(self)
+        .unwrap()
+        .insert_external_interface(value, operand);
     }
   }
 }

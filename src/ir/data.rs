@@ -10,7 +10,7 @@ pub enum DataType {
   Bits(usize),
   Fp32,
   Str,
-  Module(Vec<Box<DataType>>),
+  Module(String, Vec<Box<DataType>>),
   ArrayType(Box<DataType>, usize),
 }
 
@@ -28,8 +28,8 @@ impl DataType {
     DataType::Void
   }
 
-  pub fn module(inputs: Vec<DataType>) -> Self {
-    DataType::Module(inputs.into_iter().map(Box::new).collect())
+  pub fn module(kind: String, inputs: Vec<DataType>) -> Self {
+    DataType::Module(kind, inputs.into_iter().map(Box::new).collect())
   }
 
   pub fn int_ty(bits: usize) -> Self {
@@ -66,7 +66,7 @@ impl DataType {
       DataType::UInt(bits) => *bits,
       DataType::Fp32 => 32,
       DataType::Str => 0,
-      DataType::Module(_) => 0,
+      DataType::Module(_, _) => 0,
       DataType::Bits(bits) => *bits,
       DataType::ArrayType(ty, size) => ty.get_bits() * size,
     }
@@ -93,7 +93,7 @@ impl DataType {
   }
 
   pub fn is_module(&self) -> bool {
-    matches!(self, DataType::Module(_))
+    matches!(self, DataType::Module(_, _))
   }
 }
 
@@ -107,15 +107,18 @@ impl Display for DataType {
       DataType::Str => write!(f, "Str"),
       DataType::Void => write!(f, "void"),
       DataType::ArrayType(ty, size) => write!(f, "array[{} x {}]", ty, size),
-      DataType::Module(args) => write!(
-        f,
-        "module[{}]",
-        args
-          .iter()
-          .map(|x| x.to_string())
-          .collect::<Vec<String>>()
-          .join(", ")
-      ),
+      DataType::Module(prefix, args) => {
+        write!(
+          f,
+          "{}[{}]",
+          prefix,
+          args
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+        )
+      }
     }
   }
 }

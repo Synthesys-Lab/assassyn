@@ -9,6 +9,7 @@ use self::user::Operand;
 use super::super::ir::visitor::Visitor;
 use super::ir_printer::IRPrinter;
 
+use instructions::call::LazyBind;
 use paste::paste;
 
 pub trait IsElement<'elem, 'sys: 'elem> {
@@ -215,14 +216,48 @@ macro_rules! register_elements {
       Unknown,
     }
 
+    paste! {
+      $(
+
+        pub struct [<$to_register Node>] {
+          key: usize,
+        }
+
+        impl From<BaseNode> for [<$to_register Node>] {
+          fn from(x: BaseNode) -> [<$to_register Node>] {
+            assert_eq!(x.get_kind(), NodeKind::$to_register);
+            [<$to_register Node>] { key: x.get_key() }
+          }
+        }
+
+        impl From<[<$to_register Node>]> for BaseNode {
+          fn from(x: [<$to_register Node>]) -> BaseNode {
+            BaseNode::new(NodeKind::$to_register, x.key)
+          }
+        }
+
+        impl [<$to_register Node>] {
+
+          pub fn as_ref<'elem, 'sys: 'elem>(
+            &self,
+            sys: &'sys SysBuilder,
+          ) -> [<$to_register Ref>]<'sys> {
+            $to_register::reference(sys, BaseNode::new(NodeKind::$to_register, self.key)).unwrap()
+          }
+
+        }
+
+      )*
+    }
+
     pub enum Element {
       $($to_register(Box<$to_register>),)*
     }
-
   };
+
 }
 
-register_elements!(Module, FIFO, Expr, Array, IntImm, Block, StrImm, Operand);
+register_elements!(Module, FIFO, Expr, Array, IntImm, Block, StrImm, Operand, LazyBind);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Copy)]
 pub struct BaseNode {
@@ -285,9 +320,7 @@ impl BaseNode {
         let operand = self.as_ref::<Operand>(sys).unwrap();
         operand.get_value().get_dtype(sys)
       }
-      NodeKind::Unknown => {
-        panic!("Unknown reference")
-      }
+      NodeKind::Unknown | NodeKind::LazyBind => unreachable!(),
     }
   }
 
@@ -301,9 +334,7 @@ impl BaseNode {
       NodeKind::Block => self.as_ref::<Block>(sys).unwrap().get_parent().into(),
       NodeKind::Expr => self.as_ref::<Expr>(sys).unwrap().get_parent().into(),
       NodeKind::Operand => (*self.as_ref::<Operand>(sys).unwrap().get_user()).into(),
-      NodeKind::Unknown => {
-        panic!("Unknown reference")
-      }
+      NodeKind::Unknown | NodeKind::LazyBind => unreachable!(),
     }
   }
 
@@ -361,6 +392,7 @@ impl BaseNode {
         let operand = self.as_ref::<Operand>(sys).unwrap();
         operand.get_value().to_string(sys)
       }
+      NodeKind::LazyBind => unreachable!(),
     }
   }
 }

@@ -4,6 +4,7 @@
 
 from ..builder import ir_builder
 from ..value import Value
+from ..utils import identifierize
 
 class Expr(Value):
     '''The frontend base node for expressions'''
@@ -14,11 +15,7 @@ class Expr(Value):
 
     def as_operand(self):
         '''Dump the expression as an operand'''
-        return f'_{hex(id(self))[-5:-1]}'
-
-    def is_fifo_related(self):
-        '''If the opcode is FIFO related'''
-        return self.opcode // 100 == 3
+        return f'_{identifierize(self)}'
 
     def is_binary(self):
         '''If the opcode is a binary operator'''
@@ -30,7 +27,7 @@ class Expr(Value):
 
     def is_valued(self):
         '''If this operation has a return value'''
-        valued = (FIFOField, FIFOPop, ArrayRead, Slice, Cast, Concat, Select, Select1Hot)
+        valued = (PureInstrinsic, FIFOPop, ArrayRead, Slice, Cast, Concat, Select, Select1Hot)
         other = isinstance(self, valued)
         return other or self.is_binary() or self.is_unary()
 
@@ -232,24 +229,32 @@ class UnaryOp(Expr):
     def __repr__(self):
         return f'{self.as_operand()} = {self.OPERATORS[self.opcode]}{self.x.as_operand()}'
 
-class FIFOField(Expr):
+class PureInstrinsic(Expr):
     '''The class for accessing FIFO fields, valid, and peek'''
 
     # FIFO operations
     FIFO_VALID = 300
     FIFO_PEEK  = 303
+    MODULE_TRIGGERED = 304
+    VALUE_VALID = 305
 
     OPERATORS = {
         FIFO_VALID: 'valid',
         FIFO_PEEK: 'peek',
+        MODULE_TRIGGERED: 'triggered',
+        VALUE_VALID: 'valid',
     }
 
-    def __init__(self, opcode, fifo):
+    def __init__(self, opcode, *args):
         super().__init__(opcode)
-        self.fifo = fifo
+        self.args = list(args)
 
     def __repr__(self):
-        return f'{self.as_operand()} = {self.fifo.as_operand()}.{self.OPERATORS[self.opcode]}()'
+        if self.opcode in [PureInstrinsic.FIFO_PEEK, PureInstrinsic.FIFO_VALID,
+                           PureInstrinsic.MODULE_TRIGGERED, PureInstrinsic.VALUE_VALID]:
+            fifo = self.args[0].as_operand()
+            return f'{self.as_operand()} = {fifo}.{self.OPERATORS[self.opcode]}()'
+        raise NotImplementedError
 
 
 class Bind(Expr):

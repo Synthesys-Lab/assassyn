@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-  builder::{InsertPoint, SysBuilder},
+  builder::{
+    system::{InsertPoint, ModuleKind},
+    SysBuilder,
+  },
   ir::{
     node::{BaseNode, BlockRef, ExprRef, IsElement, ModuleRef},
     visitor::Visitor,
@@ -77,7 +80,7 @@ fn idx_of(sys: &SysBuilder, x: &BaseNode) -> Option<usize> {
 
 fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<CommonExpr> {
   let mut res = Vec::new();
-  for m in sys.module_iter() {
+  for m in sys.module_iter(ModuleKind::All) {
     let mut finder = FindCommonSubexpression {
       common: HashMap::new(),
     };
@@ -120,7 +123,7 @@ fn find_common_subexpression(sys: &SysBuilder, da: &DepthAnalysis) -> Vec<Common
               .iter()
               .min_by(|x, y| idx_of(sys, &x.1).cmp(&idx_of(sys, &y.1)))
               .unwrap();
-            Some((block.get_module().upcast(), idx.0, idx.1))
+            Some((block.get_module(), idx.0, idx.1))
           } else {
             None
           }
@@ -144,7 +147,11 @@ pub fn common_code_elimination(sys: &mut SysBuilder) {
     let duplica = elem.duplica;
     let ip = elem.ip;
     let idx = idx_of(sys, &ip.2);
-    let ip = InsertPoint(ip.0, ip.1, idx);
+    let ip = InsertPoint {
+      module: ip.0,
+      block: ip.1,
+      at: idx,
+    };
     sys.set_current_ip(ip);
     let (dtype, opcode, operands) = {
       let expr = duplica[0].as_ref::<Expr>(sys).unwrap();

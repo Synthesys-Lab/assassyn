@@ -3,13 +3,20 @@
 import os
 import subprocess
 
+def identifierize(obj):
+    '''The helper function to get the identifier of the given object. You can change `id_slice`
+    to tune the length of the identifier. The default is slice(-5:-1).'''
+    # pylint: disable=import-outside-toplevel
+    from .builder import Singleton
+    return hex(id(obj))[Singleton.id_slice]
+
 def repo_path():
     '''Get the path to assassyn repository'''
     return os.environ['ASSASSYN_HOME']
 
 def run_simulator(path):
     '''The helper function to run the simulator'''
-    cmd = ['cargo', 'run', '--manifest-path', path + '/Cargo.toml', '--release']
+    cmd = ['cargo', 'run', '--manifest-path', path + '/Cargo.toml', '--release', '--offline']
     return subprocess.check_output(cmd).decode('utf-8')
 
 def run_verilator(path):

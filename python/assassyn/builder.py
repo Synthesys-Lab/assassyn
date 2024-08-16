@@ -8,6 +8,7 @@ class Singleton(type):
     '''The class maintains the global singleton instance of the system builder.'''
     builder = None
     repr_ident = None
+    id_slice = slice(-6, -1)
 
 @decorator
 #pylint: disable=keyword-arg-before-vararg
@@ -30,9 +31,11 @@ class SysBuilder:
     def cleanup_symtab(self):
         '''Clean up the symbol table. Assign those named values to its identifier.'''
         value_dict = { id(v): v for v in self.named_expr }
-        for k, v in self.module_symtab.items():
-            if id(v) in value_dict:
-                value_dict[id(v)].name = k
+        if self.module_symtab is not None:
+            for k, v in self.module_symtab.items():
+                if id(v) in value_dict:
+                    value_dict[id(v)].name = k
+            self.module_symtab = None
 
     def get_current_module(self):
         '''Get the current module being built.'''
@@ -61,8 +64,14 @@ class SysBuilder:
     def __init__(self, name):
         self.name = name
         self.modules = []
+        self.downstreams = []
         self.arrays = []
-        self.insert_point = { 'array': self.arrays, 'expr': None, 'module': self.modules }
+        self.insert_point = {
+            'array': self.arrays,
+            'expr': None,
+            'module': self.modules,
+            'downstream': self.downstreams
+        }
         self.cur_module = None
         self.cur_block = None
         self.builder_func = None
@@ -82,5 +91,6 @@ class SysBuilder:
 
     def __repr__(self):
         body = '\n\n'.join(map(repr, self.modules))
+        body = body + '\n\n' + '\n\n'.join(map(repr, self.downstreams))
         array = '  ' + '\n  '.join(repr(elem) for elem in self.arrays)
         return f'system {self.name} {{\n{array}\n\n{body}\n}}'

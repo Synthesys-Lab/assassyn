@@ -87,7 +87,6 @@ register_opcode!(
   AsyncCall => { (bind, 0, expr::Bind) },
   FIFOPush => { (fifo, 0, node::FIFO) (value, 1, BaseNode) },
   FIFOPop => { (fifo, 0, node::FIFO) },
-  FIFOField { field } => { (fifo, 0, node::FIFO) },
   Binary { binop } => { (a, 0, BaseNode) (b, 1, BaseNode) },
   Unary { uop } => { (x, 0, BaseNode) },
   Select => { (cond, 0, BaseNode) (true_value, 1, BaseNode) (false_value, 2, BaseNode) },
@@ -97,5 +96,6 @@ register_opcode!(
   Concat => { (msb, 0, BaseNode) (lsb, 1, BaseNode) },
   Cast { cast } => { (x, 0, BaseNode) }, // NOTE: This "," cannot be omitted!
   BlockIntrinsic { intrinsic } => { (value, 0, BaseNode) },
+  PureIntrinsic { intrinsic } => { },
   Log => { },
 );

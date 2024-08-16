@@ -52,10 +52,10 @@ in hardware design, a variable can only be written once, and will be only visibl
 In this language, the "write-once" rule will be double-enforced by both the compiler[^2] and the
 generated simulator runtime.
 
-3. Resource Constraint: In software programming, different functions can share the same computing
-resources the ISA. However, hardware design is to allocate the resources themselves.
-In this language, the time-multiplexed resource sharing, and the dedicated allocation should be
-well abstracted.
+3. Resource Constraint: In software programming, different functionalities can share the same
+computing resources through the ISA, while hardware design is to instantiate these
+computing resources. In this language, the time-multiplexed resource sharing,
+and the dedicated allocation should be well abstracted.
 
 ## Language & System Components
 
@@ -195,3 +195,5 @@ with Cycle(2):
 
 [^1]: The name "Assasyn" stands for "**As**ynchronous **S**emantics for **A**rchitectural
 **S**imulation and **Syn**thesis".
+[^2]: I have the ambition to build a formal verification to statically enforce this rule, but for
+now, we only have a runtime check.

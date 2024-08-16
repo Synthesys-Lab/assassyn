@@ -9,7 +9,7 @@ use regex::Regex;
 
 use crate::{
   backend::common::{create_and_clean_dir, Config},
-  builder::system::SysBuilder,
+  builder::system::{ModuleKind, SysBuilder},
   ir::{node::*, visitor::Visitor, *},
 };
 
@@ -420,7 +420,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(format!("{} {}_i (\n", module_name, module_name).as_str());
     res.push_str("  .clk(clk),\n".to_string().as_str());
     res.push_str("  .rst_n(rst_n),\n".to_string().as_str());
-    for port in module.port_iter() {
+    for port in module.fifo_iter() {
       let fifo_name = namify(
         format!(
           "{}_{}",
@@ -459,80 +459,85 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       );
     }
     for (interf, _) in module.ext_interf_iter() {
-      if interf.get_kind() == NodeKind::FIFO {
-        let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-        let fifo_name = namify(
-          format!(
-            "{}_{}",
-            fifo
-              .get_parent()
-              .as_ref::<Module>(self.sys)
-              .unwrap()
-              .get_name(),
-            fifo_name!(fifo)
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .fifo_{}_push_valid(fifo_{}_driver_{}_push_valid),\n",
-            fifo_name, fifo_name, module_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .fifo_{}_push_data(fifo_{}_driver_{}_push_data),\n",
-            fifo_name, fifo_name, module_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .fifo_{}_push_ready(fifo_{}_driver_{}_push_ready),\n",
-            fifo_name, fifo_name, module_name
-          )
-          .as_str(),
-        );
-      } else if interf.get_kind() == NodeKind::Array {
-        let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-        res.push_str(
-          format!(
-            "  .array_{}_q(array_{}_q),\n",
-            namify(array_ref.get_name()),
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .array_{}_w(array_{}_driver_{}_w),\n",
-            namify(array_ref.get_name()),
-            namify(array_ref.get_name()),
-            module_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .array_{}_widx(array_{}_driver_{}_widx),\n",
-            namify(array_ref.get_name()),
-            namify(array_ref.get_name()),
-            module_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "  .array_{}_d(array_{}_driver_{}_d),\n",
-            namify(array_ref.get_name()),
-            namify(array_ref.get_name()),
-            module_name
-          )
-          .as_str(),
-        );
-      } else {
-        panic!("Unknown interf kind {:?}", interf.get_kind());
+      match interf.get_kind() {
+        NodeKind::FIFO => {
+          let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
+          let fifo_name = namify(
+            format!(
+              "{}_{}",
+              fifo
+                .get_parent()
+                .as_ref::<Module>(self.sys)
+                .unwrap()
+                .get_name(),
+              fifo_name!(fifo)
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .fifo_{}_push_valid(fifo_{}_driver_{}_push_valid),\n",
+              fifo_name, fifo_name, module_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .fifo_{}_push_data(fifo_{}_driver_{}_push_data),\n",
+              fifo_name, fifo_name, module_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .fifo_{}_push_ready(fifo_{}_driver_{}_push_ready),\n",
+              fifo_name, fifo_name, module_name
+            )
+            .as_str(),
+          );
+        }
+        NodeKind::Array => {
+          let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
+          res.push_str(
+            format!(
+              "  .array_{}_q(array_{}_q),\n",
+              namify(array_ref.get_name()),
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .array_{}_w(array_{}_driver_{}_w),\n",
+              namify(array_ref.get_name()),
+              namify(array_ref.get_name()),
+              module_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .array_{}_widx(array_{}_driver_{}_widx),\n",
+              namify(array_ref.get_name()),
+              namify(array_ref.get_name()),
+              module_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "  .array_{}_d(array_{}_driver_{}_d),\n",
+              namify(array_ref.get_name()),
+              namify(array_ref.get_name()),
+              module_name
+            )
+            .as_str(),
+          );
+        }
+        NodeKind::Module | NodeKind::Expr => {
+          // TODO(@were): Skip this for now. I am 100% sure we need this later.
+        }
+        _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }
     }
 
@@ -576,7 +581,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     // memory initializations map
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new(); // array -> init_file_path
-    for module in self.sys.module_iter() {
+    for module in self.sys.module_iter(ModuleKind::Module) {
       for attr in module.get_attrs() {
         if let Attribute::Memory(param) = attr {
           if let Some(init_file) = &param.init_file {
@@ -600,14 +605,14 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     }
 
     // fifo storage element definitions
-    for module in self.sys.module_iter() {
-      for fifo in module.port_iter() {
+    for module in self.sys.module_iter(ModuleKind::Module) {
+      for fifo in module.fifo_iter() {
         res.push_str(self.dump_fifo(&fifo).as_str());
       }
     }
 
     // trigger fifo definitions
-    for module in self.sys.module_iter() {
+    for module in self.sys.module_iter(ModuleKind::Module) {
       res.push_str(self.dump_trigger(&module).as_str());
     }
 
@@ -619,7 +624,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     }
 
     // module insts
-    for module in self.sys.module_iter() {
+    for module in self.sys.module_iter(ModuleKind::Module) {
       res.push_str(self.dump_module_inst(&module).as_str());
     }
 
@@ -817,7 +822,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     res.push_str(format!("{}input logic clk,\n", " ".repeat(self.indent)).as_str());
     res.push_str(format!("{}input logic rst_n,\n", " ".repeat(self.indent)).as_str());
     res.push('\n');
-    for port in module.port_iter() {
+    for port in module.fifo_iter() {
       res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name!(port)).as_str());
       res.push_str(
         format!(
@@ -847,94 +852,99 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     }
 
     for (interf, _ops) in module.ext_interf_iter() {
-      if interf.get_kind() == NodeKind::FIFO {
-        let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-        let fifo_name = namify(
-          format!(
-            "{}_{}",
-            fifo
-              .get_parent()
-              .as_ref::<Module>(self.sys)
-              .unwrap()
-              .get_name(),
-            fifo_name!(fifo)
-          )
-          .as_str(),
-        );
-        res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name).as_str());
-        res.push_str(
-          format!(
-            "{}output logic fifo_{}_push_valid,\n",
-            " ".repeat(self.indent),
-            fifo_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}output logic [{}:0] fifo_{}_push_data,\n",
-            " ".repeat(self.indent),
-            fifo.scalar_ty().get_bits() - 1,
-            fifo_name
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}input logic fifo_{}_push_ready,\n",
-            " ".repeat(self.indent),
-            fifo_name
-          )
-          .as_str(),
-        );
-      } else if interf.get_kind() == NodeKind::Array {
-        let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-        res.push_str(
-          format!(
-            "{}// array {}\n",
-            " ".repeat(self.indent),
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}input logic [{}:0] array_{}_q[0:{}],\n",
-            " ".repeat(self.indent),
-            array_ref.scalar_ty().get_bits() - 1,
-            namify(array_ref.get_name()),
-            array_ref.get_size() - 1
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}output logic array_{}_w,\n",
-            " ".repeat(self.indent),
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}output logic [{}:0] array_{}_widx,\n",
-            " ".repeat(self.indent),
-            (array_ref.get_size()).ilog2(),
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "{}output logic [{}:0] array_{}_d,\n",
-            " ".repeat(self.indent),
-            array_ref.scalar_ty().get_bits() - 1,
-            namify(array_ref.get_name())
-          )
-          .as_str(),
-        );
-      } else {
-        panic!("Unknown interf kind {:?}", interf.get_kind());
+      match interf.get_kind() {
+        NodeKind::FIFO => {
+          let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
+          let fifo_name = namify(
+            format!(
+              "{}_{}",
+              fifo
+                .get_parent()
+                .as_ref::<Module>(self.sys)
+                .unwrap()
+                .get_name(),
+              fifo_name!(fifo)
+            )
+            .as_str(),
+          );
+          res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name).as_str());
+          res.push_str(
+            format!(
+              "{}output logic fifo_{}_push_valid,\n",
+              " ".repeat(self.indent),
+              fifo_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}output logic [{}:0] fifo_{}_push_data,\n",
+              " ".repeat(self.indent),
+              fifo.scalar_ty().get_bits() - 1,
+              fifo_name
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}input logic fifo_{}_push_ready,\n",
+              " ".repeat(self.indent),
+              fifo_name
+            )
+            .as_str(),
+          );
+        }
+        NodeKind::Array => {
+          let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
+          res.push_str(
+            format!(
+              "{}// array {}\n",
+              " ".repeat(self.indent),
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}input logic [{}:0] array_{}_q[0:{}],\n",
+              " ".repeat(self.indent),
+              array_ref.scalar_ty().get_bits() - 1,
+              namify(array_ref.get_name()),
+              array_ref.get_size() - 1
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}output logic array_{}_w,\n",
+              " ".repeat(self.indent),
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}output logic [{}:0] array_{}_widx,\n",
+              " ".repeat(self.indent),
+              (array_ref.get_size()).ilog2(),
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+          res.push_str(
+            format!(
+              "{}output logic [{}:0] array_{}_d,\n",
+              " ".repeat(self.indent),
+              array_ref.scalar_ty().get_bits() - 1,
+              namify(array_ref.get_name())
+            )
+            .as_str(),
+          );
+        }
+        NodeKind::Module | NodeKind::Expr => {
+          // TODO(@were): Skip this for now.
+        }
+        _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }
       res.push('\n');
     }
@@ -1520,24 +1530,29 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         Some("".to_string())
       }
 
-      Opcode::FIFOField { field } => {
+      Opcode::PureIntrinsic { intrinsic } => {
         let name = namify(expr.upcast().to_string(self.sys).as_str());
-        let get_field = expr.as_sub::<instructions::FIFOField>().unwrap();
-        let fifo = get_field.fifo();
+        let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
+        let fifo = call
+          .get()
+          .get_operand_value(0)
+          .unwrap()
+          .as_ref::<FIFO>(self.sys)
+          .unwrap();
         let fifo_name = fifo_name!(fifo);
-        match field {
-          subcode::FIFO::Valid => Some(format!(
+        match intrinsic {
+          subcode::PureIntrinsic::FIFOValid => Some(format!(
             "logic {};\nassign {} = fifo_{}_pop_valid;\n\n",
             name, name, fifo_name
           )),
-          subcode::FIFO::Peek => Some(format!(
+          subcode::PureIntrinsic::FIFOPeek => Some(format!(
             "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\n\n",
             fifo.scalar_ty().get_bits() - 1,
             name,
             name,
             fifo_name
           )),
-          subcode::FIFO::AlmostFull => todo!(),
+          _ => todo!(),
         }
       }
 
@@ -1792,7 +1807,7 @@ pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Res
 
   let mut fd = File::create(fname)?;
 
-  for module in vd.sys.module_iter() {
+  for module in vd.sys.module_iter(ModuleKind::Module) {
     vd.current_module = namify(module.get_name()).to_string();
     fd.write_all(vd.visit_module(module).unwrap().as_bytes())
       .unwrap();

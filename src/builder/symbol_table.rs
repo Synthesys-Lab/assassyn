@@ -25,6 +25,10 @@ impl SymbolTable {
     }
   }
 
+  pub(crate) fn symbols(&self) -> impl Iterator<Item = &BaseNode> {
+    self.symbols.values()
+  }
+
   /// Insert the given node into the symbol table.
   pub(crate) fn insert(&mut self, id: &str, node: BaseNode) -> String {
     let id = self.identifier(id);
@@ -42,9 +46,10 @@ impl SymbolTable {
     self.symbols.remove(id)
   }
 
-  pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &BaseNode)> {
-    self.symbols.iter()
-  }
+  // TODO(@were): Open this function when we need it.
+  // pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &BaseNode)> {
+  //   self.symbols.iter()
+  // }
 
   pub(crate) fn new() -> Self {
     SymbolTable {

@@ -1,5 +1,8 @@
 use crate::{
-  builder::{InsertPoint, SysBuilder},
+  builder::{
+    system::{InsertPoint, ModuleKind},
+    SysBuilder,
+  },
   ir::{
     node::{BaseNode, IsElement, ModuleRef},
     visitor::Visitor,
@@ -30,6 +33,13 @@ impl Visitor<()> for GatherModulesToRewrite {
     }
     None
   }
+
+  fn enter(&mut self, sys: &SysBuilder) -> Option<()> {
+    for module in sys.module_iter(ModuleKind::Module) {
+      self.visit_module(module);
+    }
+    ().into()
+  }
 }
 
 pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
@@ -43,7 +53,7 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
       let module = module.as_ref::<Module>(sys).unwrap();
       (
         module
-          .port_iter()
+          .fifo_iter()
           .map(|port| port.upcast())
           .collect::<Vec<_>>(),
         module.get_body().upcast(),
@@ -52,7 +62,11 @@ pub(super) fn rewrite_wait_until(sys: &mut SysBuilder) {
     if ports.is_empty() {
       continue;
     }
-    sys.set_current_ip(InsertPoint(module, body, 0.into()));
+    sys.set_current_ip(InsertPoint {
+      module,
+      block: body,
+      at: 0.into(),
+    });
 
     let valids = ports
       .into_iter()
