@@ -139,8 +139,9 @@ class Decoder(Memory):
         super().__init__(width=32, depth=1024, latency=(1, 1), init_file=init_file)
 
     @module.combinational
-    def build(self, inst, pc: Array, on_branch: Array, exec: Module):
+    def build(self, pc: Array, on_branch: Array, exec: Module):
         super().build()
+        inst = self.rdata
         with Condition(~on_branch[0]):
             # Slice the fields
             opcode = inst[0:6]
@@ -154,7 +155,7 @@ class Decoder(Memory):
 
             sign = inst[31:31]
             b_imm = inst[31:31].concat(inst[7:7]).concat(inst[25:30]).concat(inst[8:11]).concat(Bits(1)(0))
-            b_imm = sign.select(Bits(19)(0x7ffff), Bits((19)(0))).concat(b_imm)
+            b_imm = (sign.select(Bits(19)(0x7ffff), Bits(19)(0))).concat(b_imm)
 
             is_lui  = opcode == Bits(6)(0b0110111)
             is_addi = opcode == Bits(6)(0b0010011)
@@ -217,8 +218,9 @@ class MemoryAccess(Memory):
         super().__init__(width=32, depth=65536 * 2, latency=(1, 1), init_file=init_file)
 
     @module.combinational
-    def build(self, data, writeback: Module, mem_bypass_reg: Array):
+    def build(self, writeback: Module, mem_bypass_reg: Array):
         super().build()
+        data = self.rdata
         log("mem-data: 0x{:x}", data)
         writeback.async_called(mdata = data)
         with Condition(mem_bypass_reg[0] != Bits(5)(0)):
@@ -240,7 +242,7 @@ class Fetcher(Module):
         with Condition(~on_branch[0]):
             log("Fetching instruction at PC: 0x{:x}", pc[0])
             to_fetch = pc[0][2:11].bitcast(UInt(10))
-            decoder.async_called(write = Bits(1)(0), wdata = Bits(32)(0), addr = to_fetch)
+            decoder.async_called(we = Bits(1)(0), wdata = Bits(32)(0), addr = to_fetch)
             pc[0] = (pc[0].bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
 
         with Condition(on_branch[0]):
@@ -285,7 +287,7 @@ def main():
 
         memory_access = MemoryAccess('resource/0to100.data')
         memory_access.wait_until()
-        memory_access.build(data = memory_access.rdata, writeback = writeback, mem_bypass_reg = mem_bypass_reg)
+        memory_access.build(writeback = writeback, mem_bypass_reg = mem_bypass_reg)
 
         exec = Execution()
         exec.wait_until(exec_bypass_reg, mem_bypass_reg, reg_onwrite)
@@ -304,8 +306,7 @@ def main():
 
         decoder = Decoder('resource/0to100.data')
         decoder.wait_until()
-        print(decoder.rdata)
-        decoder.build(inst = decoder.rdata, pc = pc, on_branch = on_branch, exec = exec)
+        decoder.build(pc = pc, on_branch = on_branch, exec = exec)
     
         fetcher = Fetcher()
         fetcher.build(decoder, pc, on_branch)
