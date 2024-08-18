@@ -26,6 +26,7 @@ CG_OPCODE = {
     expr.BinaryOp.ILE: 'ile',
     expr.BinaryOp.IGE: 'ige',
     expr.BinaryOp.EQ:  'eq',
+    expr.BinaryOp.NEQ: 'neq',
 
     expr.BinaryOp.BITWISE_OR:  'bitwise_or',
     expr.BinaryOp.BITWISE_AND: 'bitwise_and',

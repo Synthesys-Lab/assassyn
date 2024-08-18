@@ -50,6 +50,7 @@ class BinaryOp(Expr):
     EQ          = 213
     SHL         = 214
     SHR         = 215
+    NEQ         = 216
 
     OPERATORS = {
       ADD: '+',
@@ -63,6 +64,7 @@ class BinaryOp(Expr):
       ILE: '<=',
       IGE: '>=',
       EQ:  '==',
+      NEQ: '!=',
 
       BITWISE_AND: '&',
       BITWISE_OR:  '|',
