@@ -75,7 +75,8 @@ def elaborate( # pylint: disable=too-many-arguments
         simulator=True,
         verilog=False,
         idle_threshold=100,
-        sim_threshold=100):
+        sim_threshold=100,
+        random=False):
     '''
     Invoke the elaboration process of the given system.
 
@@ -108,7 +109,7 @@ def elaborate( # pylint: disable=too-many-arguments
     make_existing_dir(os.path.join(sys_dir, 'src'))
     # Dump the assassyn IR builder
     with open(os.path.join(sys_dir, 'src/main.rs'), 'w', encoding='utf-8') as fd:
-        raw = codegen.codegen(sys, simulator, verilog, idle_threshold, sim_threshold, resource_base)
+        raw = codegen.codegen(sys, simulator, verilog, idle_threshold, sim_threshold, random, resource_base)
         fd.write(raw)
     if pretty_printer:
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)
