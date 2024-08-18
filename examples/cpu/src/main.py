@@ -16,7 +16,18 @@ class Execution(Module):
         self.rd_reg = Port(Bits(5))
 
     @module.combinational
-    def build(self, reg_onwrite: Array, on_branch: Array, pc: Array, exec_bypass_reg: Array, exec_bypass_data: Array, mem_bypass_reg: Array, mem_bypass_data: Array, rf: Array, memory: Memory, writeback: Module):
+    def build(self, 
+              reg_onwrite: Array, 
+              on_branch: Array, 
+              pc: Array, 
+              exec_bypass_reg: Array, 
+              exec_bypass_data: Array, 
+              mem_bypass_reg: Array, 
+              mem_bypass_data: Array, 
+              rf: Array, 
+              memory: Memory, 
+              writeback: Module
+    ):
         log("executing: {:b}", self.opcode)
 
         with Condition(self.rd_reg != Bits(5)(0)):
@@ -64,7 +75,8 @@ class Execution(Module):
             log("reset on-branch")
         
         with Condition(is_bne):
-            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) + self.imm_value.bitcast(Int(32))).bitcast(Bits(32))
+            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) \
+                      + self.imm_value.bitcast(Int(32))).bitcast(Bits(32))
             br_dest = (a != b).select(new_pc, pc[0])
             log("if {} != {}: branch to {}; actual: {}", a, b, new_pc, br_dest)
 
@@ -99,7 +111,9 @@ class Execution(Module):
         valid = a_valid & b_valid & rd_valid
         with Condition(~valid):
             log("operand not ready, stall execution, x{}: {}, x{}: {}, x{}: {}", \
-                self.a_reg.peek(), a_valid, self.b_reg.peek(), b_valid, self.rd_reg.peek(), rd_valid)
+                self.a_reg.peek(), a_valid, \
+                self.b_reg.peek(), b_valid, \
+                self.rd_reg.peek(), rd_valid)
         return valid
 
     
@@ -155,7 +169,10 @@ class Decoder(Memory):
             u_imm = inst[12:31].concat(Bits(12)(0)) 
 
             sign = inst[31:31]
-            b_imm = inst[31:31].concat(inst[7:7]).concat(inst[25:30]).concat(inst[8:11]).concat(Bits(1)(0))
+            b_imm = inst[31:31].concat(inst[7:7]) \
+                               .concat(inst[25:30]) \
+                               .concat(inst[8:11]) \
+                               .concat(Bits(1)(0))
             b_imm = (sign.select(Bits(19)(0x7ffff), Bits(19)(0))).concat(b_imm)
 
             is_lui  = opcode == Bits(7)(0b0110111)
@@ -181,13 +198,26 @@ class Decoder(Memory):
             reg_b = read_rs2.select(rs2, Bits(5)(0))
 
             no_imm = ~(read_i_imm | read_u_imm | read_b_imm)
-            imm_cond = read_i_imm.concat(read_u_imm).concat(read_b_imm).concat(no_imm)
+            imm_cond = read_i_imm.concat(read_u_imm) \
+                                 .concat(read_b_imm) \
+                                 .concat(no_imm)
             # {read_i_imm, read_u_imm, read_b_imm, no_imm}
-            imm_value = imm_cond.select1hot(Bits(32)(0), b_imm, u_imm, i_imm.zext(Bits(32)))
+            imm_value = imm_cond.select1hot(
+                Bits(32)(0), 
+                b_imm, 
+                u_imm, 
+                i_imm.zext(Bits(32))
+            )
             
             rd_reg = write_rd.select(rd, Bits(5)(0))
 
-            exec.async_called(opcode = opcode, imm_value = imm_value, a_reg = reg_a, b_reg = reg_b, rd_reg = rd_reg)
+            exec.async_called(
+                opcode = opcode, 
+                imm_value = imm_value, 
+                a_reg = reg_a, 
+                b_reg = reg_b, 
+                rd_reg = rd_reg
+            )
 
             with Condition(is_lui):
                 log("lui:   rd: x{}, imm: 0x{:x}", rd, imm_value)
