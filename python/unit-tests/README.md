@@ -9,6 +9,7 @@
 | test_bind.py              | Partial function bind.                             | RV     |
 | test_cse.py               | Common code elimination.                           | RV     |
 | test_concat.py            | Concatentate operator.                             | RV     |
+| test_downstream.py        | Combinational logic across multiple normal modules.| R      |
 | test_driver.py            | Test a standalone driver module.                   | RV     |
 | test_dt_conv.py           | Data cast operator.                                | RV     |
 | test_eager_bind.rs        | Conditional calling bind.                          | RV     |
@@ -18,9 +19,9 @@
 | test_helloworld.py        | Hello world! A simplest test case for logger.      | RV     |
 | test_imbalance.py         | Imbalanced data arrival from 2 difference sources. | RV     |
 | test_inline{0/1}.py       | Inlined hierarchical synthesis.                    | RV     |
-| test_init_reg.py          | Register initialization.                           | R      |
 | test_memory.py            | Memory module read and file initialization.        | R      |
 | test_multi_call.rs        | Multiple caller arbiter with backend rewriting.    | R      |
+| test_reg_init.py          | Register initialization.                           | R      |
 | test_select.rs            | Select trinary operator                            | RV     |
 | test_testbench.py         | Cycled block, useful in testbench.                 | RV     |
 | test_wait_until.py        | Wait-until execution.                              | RV     |

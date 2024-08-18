@@ -51,7 +51,7 @@ def test_concat():
         driver = Driver()
         driver.build(adder)
 
-    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog=utils.verilator_path())
+    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog=utils.has_verilator())
     simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
