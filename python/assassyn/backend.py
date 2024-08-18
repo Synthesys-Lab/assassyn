@@ -17,7 +17,8 @@ def config( # pylint: disable=too-many-arguments
         simulator=True,
         verilog=False,
         sim_threshold=100,
-        idle_threshold=100):
+        idle_threshold=100,
+        random=False):
     '''The helper function to dump the default configuration of elaboration.'''
     res = {
         'path': path,
@@ -28,7 +29,8 @@ def config( # pylint: disable=too-many-arguments
         'simulator': simulator,
         'verilog': verilog,
         'sim_threshold': sim_threshold,
-        'idle_threshold': idle_threshold
+        'idle_threshold': idle_threshold,
+        'random': random
     }
     return res.copy()
 
