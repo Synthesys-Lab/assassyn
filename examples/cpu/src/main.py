@@ -35,11 +35,11 @@ class Execution(Module):
         is_branch = is_bne
 
         a = (exec_bypass_reg[0] == self.a_reg).select(
-            exec_bypass_reg[0], 
+            exec_bypass_data[0], 
             (mem_bypass_reg[0] == self.a_reg).select(mem_bypass_data[0], rf[self.a_reg])
         )
         b = (exec_bypass_reg[0] == self.b_reg).select(
-            exec_bypass_reg[0], 
+            exec_bypass_data[0], 
             (mem_bypass_reg[0] == self.b_reg).select(mem_bypass_data[0], rf[self.b_reg])
         )
         
@@ -71,14 +71,14 @@ class Execution(Module):
         is_memory = is_lw
         is_memory_read = is_lw
 
-        request_addr = is_memory.select(result[2:19].bitcast(UInt(17)), UInt(17)(0))
+        request_addr = is_memory.select(result[2:19].bitcast(Int(17)), Int(17)(0))
 
         mem_bypass_reg[0] = is_memory_read.select(self.rd_reg, Bits(5)(0))
 
         with Condition(is_memory):
             log("addr: {:x}, lineno: {:x}", result, request_addr)
 
-        memory.async_called(we = Bits(1)(0), wdata = a, addr = request_addr)
+        memory.async_called(we = Int(1)(0), wdata = a, addr = request_addr)
         wb = writeback.bind(opcode = self.opcode, result = result, rd = self.rd_reg)
 
         return wb
@@ -157,12 +157,12 @@ class Decoder(Memory):
             b_imm = inst[31:31].concat(inst[7:7]).concat(inst[25:30]).concat(inst[8:11]).concat(Bits(1)(0))
             b_imm = (sign.select(Bits(19)(0x7ffff), Bits(19)(0))).concat(b_imm)
 
-            is_lui  = opcode == Bits(6)(0b0110111)
-            is_addi = opcode == Bits(6)(0b0010011)
-            is_add  = opcode == Bits(6)(0b0110011)
-            is_lw   = opcode == Bits(6)(0b0000011)
-            is_bne  = opcode == Bits(6)(0b1100011)
-            is_ret  = opcode == Bits(6)(0b1101111)
+            is_lui  = opcode == Bits(7)(0b0110111)
+            is_addi = opcode == Bits(7)(0b0010011)
+            is_add  = opcode == Bits(7)(0b0110011)
+            is_lw   = opcode == Bits(7)(0b0000011)
+            is_bne  = opcode == Bits(7)(0b1100011)
+            is_ret  = opcode == Bits(7)(0b1101111)
 
             supported = is_lui | is_addi | is_add | is_lw | is_bne | is_ret
             write_rd = is_lui | is_addi | is_add | is_lw
@@ -218,14 +218,14 @@ class MemoryAccess(Memory):
         super().__init__(width=32, depth=65536 * 2, latency=(1, 1), init_file=init_file)
 
     @module.combinational
-    def build(self, writeback: Module, mem_bypass_reg: Array):
+    def build(self, writeback: Module, mem_bypass_reg: Array, mem_bypass_data: Array):
         super().build()
         data = self.rdata
         log("mem-data: 0x{:x}", data)
         writeback.async_called(mdata = data)
         with Condition(mem_bypass_reg[0] != Bits(5)(0)):
             log("bypass memory data: x{} = {}", mem_bypass_reg[0], data)
-        mem_bypass_reg[0] = (mem_bypass_reg[0] != Bits(5)(0)).select(data, Bits(5)(0))
+        mem_bypass_data[0] = (mem_bypass_reg[0] != Bits(5)(0)).select(data, Bits(32)(0))
 
     @module.wait_until
     def wait_until(self):
@@ -241,8 +241,8 @@ class Fetcher(Module):
     def build(self, decoder: Memory, pc: Array, on_branch: Array):
         with Condition(~on_branch[0]):
             log("Fetching instruction at PC: 0x{:x}", pc[0])
-            to_fetch = pc[0][2:11].bitcast(UInt(10))
-            decoder.async_called(we = Bits(1)(0), wdata = Bits(32)(0), addr = to_fetch)
+            to_fetch = pc[0][2:11].bitcast(Int(10))
+            decoder.async_called(we = Int(1)(0), wdata = Bits(32)(0), addr = to_fetch)
             pc[0] = (pc[0].bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
 
         with Condition(on_branch[0]):
@@ -287,7 +287,7 @@ def main():
 
         memory_access = MemoryAccess('resource/0to100.data')
         memory_access.wait_until()
-        memory_access.build(writeback = writeback, mem_bypass_reg = mem_bypass_reg)
+        memory_access.build(writeback = writeback, mem_bypass_reg = mem_bypass_reg, mem_bypass_data=mem_bypass_data)
 
         exec = Execution()
         exec.wait_until(exec_bypass_reg, mem_bypass_reg, reg_onwrite)
