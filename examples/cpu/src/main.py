@@ -125,7 +125,8 @@ class WriteBack(Module):
         is_result = is_lui | is_addi | is_add | is_bne
         is_memory = is_lw
         cond = is_memory.concat(is_result)
-        data = cond.select(self.mdata, self.result)
+        # {is_memory, is_result}
+        data = cond.select1hot(self.result, self.mdata)
 
         with Condition((self.rd != Bits(5)(0))):
             log("opcode: {:b}, writeback: x{} = {:x}", self.opcode, self.rd, data)
