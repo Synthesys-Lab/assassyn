@@ -112,7 +112,11 @@ def elaborate( # pylint: disable=too-many-arguments
         random_sims = "false"
         if random:
             random_sims = "true"
-        raw = codegen.codegen(sys, simulator, verilog, idle_threshold, sim_threshold, random_sims, resource_base)
+        raw = codegen.codegen(
+            sys, simulator, verilog,
+            idle_threshold, sim_threshold, random_sims,
+            resource_base
+        )
         fd.write(raw)
     if pretty_printer:
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)

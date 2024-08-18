@@ -126,7 +126,7 @@ class EmitBinds(visitor.Visitor):
             module_var = self.cg.generate_rval(node.callee)
             self.cg.code.append(f'  let {bind_var} = sys.get_init_bind({module_var});')
 
-
+# pylint: disable=too-many-instance-attributes
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
 
