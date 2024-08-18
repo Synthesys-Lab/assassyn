@@ -155,7 +155,8 @@ class CodeGen(visitor.Visitor):
         '''Emit the configuration fed to the generated simulator'''
         idle_threshold = f'idle_threshold: {self.idle_threshold}'
         sim_threshold = f'sim_threshold: {self.sim_threshold}'
-        config = [idle_threshold, sim_threshold]
+        random_option = f'random: {self.random}'
+        config = [idle_threshold, sim_threshold, random_option]
         if self.resource_base is not None:
             resource_base = f'resource_base: PathBuf::from("{self.resource_base}")'
             config.append(resource_base)
@@ -387,7 +388,7 @@ class CodeGen(visitor.Visitor):
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         self.code.append(array_decl)
 
-    def __init__(self, simulator, verilog, idle_threshold, sim_threshold, resource_base): #pylint: disable=too-many-arguments
+    def __init__(self, simulator, verilog, idle_threshold, sim_threshold, random, resource_base): #pylint: disable=too-many-arguments
         self.code = []
         self.header = []
         self.emitted_bind = set()
@@ -399,6 +400,7 @@ class CodeGen(visitor.Visitor):
             self.targets['verilog'] = verilog
         self.idle_threshold = idle_threshold
         self.sim_threshold = sim_threshold
+        self.random = random
 
     def get_source(self):
         '''Concatenate the generated source code for the given system'''
@@ -410,6 +412,7 @@ def codegen( #pylint: disable=too-many-arguments
         verilog,
         idle_threshold,
         sim_threshold,
+        random,
         resource_base):
     '''
     The help function to generate the assassyn IR builder for the given system
@@ -418,6 +421,6 @@ def codegen( #pylint: disable=too-many-arguments
         sys (SysBuilder): The system to generate the builder for
         kwargs: Additional arguments to pass to the code
     '''
-    cg = CodeGen(simulator, verilog, idle_threshold, sim_threshold, resource_base)
+    cg = CodeGen(simulator, verilog, idle_threshold, sim_threshold, random, resource_base)
     cg.visit_system(sys)
     return cg.get_source()
