@@ -1,7 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
+from assassyn.backend import *
 from assassyn import utils
 
 class Execution(Module):
@@ -273,7 +273,7 @@ def main():
         pc          = RegArray(bits32, 1)
         on_branch   = RegArray(bits1, 1)
         reg_file    = RegArray(bits32, 32)
-        reg_onwrite = RegArray(bits1, 32)
+        reg_onwrite = RegArray(bits1, 32, attr=[Array.FULLY_PARTITIONED]) #TODO: Make it downstream
 
         exec_bypass_reg = RegArray(bits5, 1)
         exec_bypass_data = RegArray(bits32, 1)
@@ -315,6 +315,15 @@ def main():
         driver.build(fetcher)
 
     print(sys)
+    conf = config(
+            verilog=None,
+            sim_threshold=100,
+            idle_threshold=100)
+
+    simulator_path, _ = elaborate(sys, **conf)
+
+    raw = utils.run_simulator(simulator_path)
+    print(raw)
 
 if __name__ == '__main__':
     main()
