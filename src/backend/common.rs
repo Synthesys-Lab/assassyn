@@ -11,6 +11,8 @@ pub struct Config {
   pub sim_threshold: usize,
   /// The number of cycles allowed to be idle before the simulation is stopped
   pub idle_threshold: usize,
+  /// If true, the order of simulators will be randomized.
+  pub random: bool,
   /// The base directory of memory initialization files
   pub resource_base: PathBuf,
 }
@@ -22,6 +24,7 @@ impl Default for Config {
       override_dump: true,
       sim_threshold: 100,
       idle_threshold: 100,
+      random: false,
       resource_base: PathBuf::new(),
     }
   }

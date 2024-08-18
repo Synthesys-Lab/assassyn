@@ -20,6 +20,8 @@ use super::utils::{dtype_to_rust_type, namify};
 
 use self::{expr::subcode::Cast, instructions};
 
+use rand::seq::SliceRandom;
+
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   indent: usize,
@@ -668,6 +670,10 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   // shuffled.
   fd.write_all("let mut sim = Simulator::new();\n".as_bytes())?;
   fd.write_all("let simulators : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
+  if config.random {
+    let mut rng = rand::thread_rng();
+    simulators.shuffle(&mut rng);
+  }
   for sim in simulators {
     fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
   }
