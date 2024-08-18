@@ -101,6 +101,10 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
         self.payload.is_empty()
       }
 
+      pub fn front(&self) -> Option<&T> {
+        self.payload.front()
+      }
+
       pub fn tick(&mut self, cycle: usize) {
         if let Some(_) = self.pop.pop(cycle) {
           self.payload.pop_front().unwrap();
