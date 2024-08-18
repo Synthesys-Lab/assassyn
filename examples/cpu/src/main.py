@@ -16,13 +16,121 @@ class Execution(Module):
         self.rd_reg = Port(Bits(5))
 
     @module.combinational
-    def build(self):
-        log("executing")
+    def build(self, reg_onwrite: Array, on_branch: Array, pc: Array, exec_bypass_reg: Array, exec_bypass_data: Array, mem_bypass_reg: Array, mem_bypass_data: Array, rf: Array, memory: Memory, writeback: Module):
+        log("executing: {:b}", self.opcode)
+
+        with Condition(self.rd_reg != Bits(5)(0)):
+            reg_onwrite[self.rd_reg] = Bits(1)(1)
+            log("set x{} as on-write", self.rd_reg)
+
+        is_lui  = self.opcode == Bits(7)(0b0110111)
+        is_addi = self.opcode == Bits(7)(0b0010011)
+        is_add  = self.opcode == Bits(7)(0b0110011)
+        is_lw   = self.opcode == Bits(7)(0b0000011)
+        is_bne  = self.opcode == Bits(7)(0b1100011)
+        # is_ret  = self.opcode == Bits(7)(0b1101111)
+
+        # Instruction attributes
+        uses_imm = is_addi | is_bne
+        is_branch = is_bne
+
+        a = (exec_bypass_reg[0] == self.a_reg).select(
+            exec_bypass_reg[0], 
+            (mem_bypass_reg[0] == self.a_reg).select(mem_bypass_data[0], rf[self.a_reg])
+        )
+        b = (exec_bypass_reg[0] == self.b_reg).select(
+            exec_bypass_reg[0], 
+            (mem_bypass_reg[0] == self.b_reg).select(mem_bypass_data[0], rf[self.b_reg])
+        )
+        
+        rhs = uses_imm.select(self.imm_value, b)
+
+        invokde_adder = is_add | is_addi | is_lw
+
+        result = (a.bitcast(Int(32)) + rhs.bitcast(Int(32))).bitcast(Bits(32))
+        result = (invokde_adder.concat(is_lui).concat(is_branch)).select1hot(
+        # {invokde_adder, is_lui, is_branch}
+            Bits(32)(0), self.imm_value, result
+        )
+        log("{:b}: a: {:x}, b:{:x}, res: {:x}", self.opcode, a, rhs, result)
+
+        produced_by_exec = is_lui | is_addi | is_add
+
+        exec_bypass_reg[0] = produced_by_exec.select(self.rd_reg, Bits(5)(0))
+        exec_bypass_data[0] = produced_by_exec.select(result, Bits(32)(0))
+
+        with Condition(is_branch):
+            on_branch[0] = Bits(1)(0)
+            log("reset on-branch")
+        
+        with Condition(is_bne):
+            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) + self.imm_value.bitcast(Int(32))).bitcast(Bits(32))
+            br_dest = (a != b).select(new_pc, pc[0])
+            log("if {} != {}: branch to {}; actual: {}", a, b, new_pc, br_dest)
+
+        is_memory = is_lw
+        is_memory_read = is_lw
+
+        request_addr = is_memory.select(result[2:19].bitcast(UInt(17)), UInt(17)(0))
+
+        mem_bypass_reg[0] = is_memory_read.select(self.rd_reg, Bits(5)(0))
+
+        with Condition(is_memory):
+            log("addr: {:x}, lineno: {:x}", result, request_addr)
+
+        memory.async_called(we = Bits(1)(0), wdata = a, addr = request_addr)
+        wb = writeback.bind(opcode = self.opcode, result = result, rd = self.rd_reg)
+
+        return wb
+
 
     @module.wait_until
-    def wait_until(self):
+    def wait_until(self, exec_bypass_reg: Array, mem_bypass_reg: Array, reg_onwrite: Array):
         # Handle read after write
-        pass
+        a_valid = (~reg_onwrite[self.a_reg.peek()])      | \
+            (exec_bypass_reg[0] == self.a_reg.peek())    | \
+            (mem_bypass_reg[0] == self.a_reg.peek())
+        b_valid = (~reg_onwrite[self.b_reg.peek()])      | \
+            (exec_bypass_reg[0] == self.b_reg.peek())    | \
+            (mem_bypass_reg[0] == self.b_reg.peek())
+
+        rd_valid = ~reg_onwrite[self.rd_reg.peek()]
+
+        valid = a_valid & b_valid & rd_valid
+        with Condition(~valid):
+            log("operand not ready, stall execution, x{}: {}, x{}: {}, x{}: {}", \
+                self.a_reg.peek(), a_valid, self.b_reg.peek(), b_valid, self.rd_reg.peek(), rd_valid)
+        return valid
+
+    
+class WriteBack(Module):
+    
+    @module.constructor
+    def __init__(self):
+        super().__init__()
+        self.opcode = Port(Bits(7))
+        self.result = Port(Bits(32))
+        self.rd     = Port(Bits(5)) 
+        self.mdata  = Port(Bits(32))
+
+    @module.combinational
+    def build(self, reg_file: Array, reg_onwrite: Array):
+        is_lui  = self.opcode == Bits(7)(0b0110111)
+        is_addi = self.opcode == Bits(7)(0b0010011)
+        is_add  = self.opcode == Bits(7)(0b0110011)
+        is_lw   = self.opcode == Bits(7)(0b0000011)
+        is_bne  = self.opcode == Bits(7)(0b1100011)
+        # is_ret  = self.opcode == Bits(7)(0b1101111)
+
+        is_result = is_lui | is_addi | is_add | is_bne
+        is_memory = is_lw
+        cond = is_memory.concat(is_result)
+        data = cond.select(self.mdata, self.result)
+
+        with Condition((self.rd != Bits(5)(0))):
+            log("opcode: {:b}, writeback: x{} = {:x}", self.opcode, self.rd, data)
+            reg_file[self.rd] = data
+            reg_onwrite[self.rd] = Bits(1)(0)
 
 class Decoder(Memory):
     
@@ -31,7 +139,8 @@ class Decoder(Memory):
         super().__init__(width=32, depth=1024, latency=(1, 1), init_file=init_file)
 
     @module.combinational
-    def build(self, inst, pc, on_branch, exec):
+    def build(self, inst, pc: Array, on_branch: Array, exec: Module):
+        super().build()
         with Condition(~on_branch[0]):
             # Slice the fields
             opcode = inst[0:6]
@@ -76,8 +185,7 @@ class Decoder(Memory):
             
             rd_reg = write_rd.select(rd, Bits(5)(0))
 
-            #TODO: parameter list
-            exec.async_called()
+            exec.async_called(opcode = opcode, imm_value = imm_value, a_reg = reg_a, b_reg = reg_b, rd_reg = rd_reg)
 
             with Condition(is_lui):
                 log("lui:   rd: x{}, imm: 0x{:x}", rd, imm_value)
@@ -98,6 +206,25 @@ class Decoder(Memory):
         with Condition(on_branch[0]):
             log("on a branch, stall decoding, pc freeze at 0x{:x}", pc[0])
                 
+    @module.wait_until
+    def wait_until(self):
+        return self.validate_all_ports()
+
+class MemoryAccess(Memory):
+    
+    @module.constructor
+    def __init__(self, init_file):
+        super().__init__(width=32, depth=65536 * 2, latency=(1, 1), init_file=init_file)
+
+    @module.combinational
+    def build(self, data, writeback: Module, mem_bypass_reg: Array):
+        super().build()
+        log("mem-data: 0x{:x}", data)
+        writeback.async_called(mdata = data)
+        with Condition(mem_bypass_reg[0] != Bits(5)(0)):
+            log("bypass memory data: x{} = {}", mem_bypass_reg[0], data)
+        mem_bypass_reg[0] = (mem_bypass_reg[0] != Bits(5)(0)).select(data, Bits(5)(0))
+
     @module.wait_until
     def wait_until(self):
         return self.validate_all_ports()
@@ -129,3 +256,64 @@ class Driver(Module):
     @module.combinational
     def build(self, fetcher: Module):
         fetcher.async_called()
+
+
+def main():
+    sys = SysBuilder('cpu')
+
+    with sys:
+        # Data Types
+        bits1   = Bits(1)
+        bits5   = Bits(5)
+        bits32  = Bits(32)
+
+        # Data Structures
+        pc          = RegArray(bits32, 1)
+        on_branch   = RegArray(bits1, 1)
+        reg_file    = RegArray(bits32, 32)
+        reg_onwrite = RegArray(bits1, 32)
+
+        exec_bypass_reg = RegArray(bits5, 1)
+        exec_bypass_data = RegArray(bits32, 1)
+
+        mem_bypass_reg = RegArray(bits5, 1)
+        mem_bypass_data = RegArray(bits32, 1)
+
+
+        writeback = WriteBack()
+        writeback.build(reg_file, reg_onwrite)
+
+        memory_access = MemoryAccess('resource/0to100.data')
+        memory_access.wait_until()
+        memory_access.build(data = memory_access.rdata, writeback = writeback, mem_bypass_reg = mem_bypass_reg)
+
+        exec = Execution()
+        exec.wait_until(exec_bypass_reg, mem_bypass_reg, reg_onwrite)
+        wb = exec.build(
+            pc = pc,
+            on_branch=on_branch,
+            reg_onwrite=reg_onwrite,
+            exec_bypass_reg = exec_bypass_reg,
+            exec_bypass_data = exec_bypass_data,
+            mem_bypass_reg = mem_bypass_reg,
+            mem_bypass_data = mem_bypass_data,
+            rf = reg_file,
+            memory = memory_access,
+            writeback = writeback
+        )
+
+        decoder = Decoder('resource/0to100.data')
+        decoder.wait_until()
+        print(decoder.rdata)
+        decoder.build(inst = decoder.rdata, pc = pc, on_branch = on_branch, exec = exec)
+    
+        fetcher = Fetcher()
+        fetcher.build(decoder, pc, on_branch)
+
+        driver = Driver()
+        driver.build(fetcher)
+
+    print(sys)
+
+if __name__ == '__main__':
+    main()
