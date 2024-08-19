@@ -1684,7 +1684,9 @@ pub fn generate_cpp_testbench(dir: &Path, sys: &SysBuilder, simulator: &Simulato
   }
   let main_fname = dir.join("main.cpp");
   let mut main_fd = File::create(main_fname).unwrap();
-  main_fd.write_all(include_str!("main.cpp").as_bytes()).unwrap();
+  main_fd
+    .write_all(include_str!("main.cpp").as_bytes())
+    .unwrap();
   let make_fname = dir.join("Makefile");
   let mut make_fd = File::create(make_fname).unwrap();
   make_fd
