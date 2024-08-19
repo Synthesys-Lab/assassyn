@@ -193,7 +193,7 @@ class Decoder(Memory):
             is_add  = op_check.add
             is_lw   = op_check.lw
             is_bne  = op_check.bne
-            # is_ret  = op_check.ret
+            is_ret  = op_check.ret
 
             supported = is_lui | is_addi | is_add | is_lw | is_bne | is_ret
             write_rd = is_lui | is_addi | is_add | is_lw
@@ -262,7 +262,12 @@ class MemoryAccess(Memory):
         super().__init__(width=32, depth=65536 * 2, latency=(1, 1), init_file=init_file)
 
     @module.combinational
-    def build(self, writeback: Module, mem_bypass_reg: Array, mem_bypass_data: Array):
+    def build(
+        self, 
+        writeback: Module, 
+        mem_bypass_reg: Array, 
+        mem_bypass_data: Array
+    ):
         super().build()
         data = self.rdata
         log("mem-data: 0x{:x}", data)
@@ -331,7 +336,11 @@ def main():
 
         memory_access = MemoryAccess('0to100.data')
         memory_access.wait_until()
-        memory_access.build(writeback = writeback, mem_bypass_reg = mem_bypass_reg, mem_bypass_data=mem_bypass_data)
+        memory_access.build(
+            writeback = writeback, 
+            mem_bypass_reg = mem_bypass_reg, 
+            mem_bypass_data=mem_bypass_data
+        )
 
         exec = Execution()
         exec.wait_until(exec_bypass_reg, mem_bypass_reg, reg_onwrite)
