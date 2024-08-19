@@ -4,6 +4,8 @@ from assassyn.frontend import *
 from assassyn.backend import *
 from assassyn import utils
 
+from utils.opcodes import *
+
 class Execution(Module):
     
     @module.constructor
@@ -35,12 +37,15 @@ class Execution(Module):
             reg_onwrite[self.rd_reg] = Bits(1)(1)
             log("set x{} as on-write", self.rd_reg)
 
-        is_lui  = self.opcode == Bits(7)(0b0110111)
-        is_addi = self.opcode == Bits(7)(0b0010011)
-        is_add  = self.opcode == Bits(7)(0b0110011)
-        is_lw   = self.opcode == Bits(7)(0b0000011)
-        is_bne  = self.opcode == Bits(7)(0b1100011)
-        # is_ret  = self.opcode == Bits(7)(0b1101111)
+        op_check = OpcodeChecker(self.opcode)
+        op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
+
+        is_lui  = op_check.lui
+        is_addi = op_check.addi
+        is_add  = op_check.add
+        is_lw   = op_check.lw
+        is_bne  = op_check.bne
+        # is_ret  = op_check.ret
 
         # Instruction attributes
         uses_imm = is_addi | is_bne
@@ -131,12 +136,15 @@ class WriteBack(Module):
 
     @module.combinational
     def build(self, reg_file: Array, reg_onwrite: Array):
-        is_lui  = self.opcode == Bits(7)(0b0110111)
-        is_addi = self.opcode == Bits(7)(0b0010011)
-        is_add  = self.opcode == Bits(7)(0b0110011)
-        is_lw   = self.opcode == Bits(7)(0b0000011)
-        is_bne  = self.opcode == Bits(7)(0b1100011)
-        # is_ret  = self.opcode == Bits(7)(0b1101111)
+        op_check = OpcodeChecker(self.opcode)
+        op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
+
+        is_lui  = op_check.lui
+        is_addi = op_check.addi
+        is_add  = op_check.add
+        is_lw   = op_check.lw
+        is_bne  = op_check.bne
+        # is_ret  = op_check.ret
 
         is_result = is_lui | is_addi | is_add | is_bne
         is_memory = is_lw
@@ -177,12 +185,15 @@ class Decoder(Memory):
                                .concat(Bits(1)(0))
             b_imm = (sign.select(Bits(19)(0x7ffff), Bits(19)(0))).concat(b_imm)
 
-            is_lui  = opcode == Bits(7)(0b0110111)
-            is_addi = opcode == Bits(7)(0b0010011)
-            is_add  = opcode == Bits(7)(0b0110011)
-            is_lw   = opcode == Bits(7)(0b0000011)
-            is_bne  = opcode == Bits(7)(0b1100011)
-            is_ret  = opcode == Bits(7)(0b1101111)
+            op_check = OpcodeChecker(opcode)
+            op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
+
+            is_lui  = op_check.lui
+            is_addi = op_check.addi
+            is_add  = op_check.add
+            is_lw   = op_check.lw
+            is_bne  = op_check.bne
+            # is_ret  = op_check.ret
 
             supported = is_lui | is_addi | is_add | is_lw | is_bne | is_ret
             write_rd = is_lui | is_addi | is_add | is_lw
