@@ -761,6 +761,12 @@ macro_rules! dump_ref_immwidth {
   };
 }
 
+impl VerilogDumper<'_, '_> {
+  fn indent_str(&self) -> String {
+    " ".repeat(self.indent)
+  }
+}
+
 impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     let mut res = String::new();
@@ -768,87 +774,69 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     res.push_str(format!("module {} (\n", self.current_module).as_str());
 
     self.indent += 2;
-    res.push_str(format!("{}input logic clk,\n", " ".repeat(self.indent)).as_str());
-    res.push_str(format!("{}input logic rst_n,\n", " ".repeat(self.indent)).as_str());
+    res.push_str(format!("{}input logic clk,\n", self.indent_str()).as_str());
+    res.push_str(format!("{}input logic rst_n,\n", self.indent_str()).as_str());
     res.push('\n');
     for port in module.fifo_iter() {
-      res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name!(port)).as_str());
-      res.push_str(
-        format!(
-          "{}input logic fifo_{}_pop_valid,\n",
-          " ".repeat(self.indent),
-          fifo_name!(port)
-        )
-        .as_str(),
-      );
-      res.push_str(
-        format!(
-          "{}input logic [{}:0] fifo_{}_pop_data,\n",
-          " ".repeat(self.indent),
-          port.scalar_ty().get_bits() - 1,
-          fifo_name!(port)
-        )
-        .as_str(),
-      );
-      res.push_str(
-        format!(
-          "{}output logic fifo_{}_pop_ready,\n\n",
-          " ".repeat(self.indent),
-          fifo_name!(port)
-        )
-        .as_str(),
-      );
+      let name = fifo_name!(port);
+      res.push_str(format!("{}// port {}\n", self.indent_str(), name).as_str());
+      res.push_str(&format!(
+        "{}input logic fifo_{}_pop_valid,\n",
+        self.indent_str(),
+        name
+      ));
+      res.push_str(&format!(
+        "{}input logic [{}:0] fifo_{}_pop_data,\n",
+        self.indent_str(),
+        port.scalar_ty().get_bits() - 1,
+        name
+      ));
+      res.push_str(&format!(
+        "{}output logic fifo_{}_pop_ready,\n\n",
+        self.indent_str(),
+        name
+      ));
     }
 
     for (interf, _ops) in module.ext_interf_iter() {
       match interf.get_kind() {
         NodeKind::FIFO => {
           let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-          let fifo_name = namify(
-            format!(
-              "{}_{}",
+          let fifo_name = format!(
+            "{}_{}",
+            namify(
               fifo
                 .get_parent()
                 .as_ref::<Module>(self.sys)
                 .unwrap()
-                .get_name(),
-              fifo_name!(fifo)
-            )
-            .as_str(),
+                .get_name()
+            ),
+            fifo_name!(fifo)
           );
-          res.push_str(format!("{}// port {}\n", " ".repeat(self.indent), fifo_name).as_str());
-          res.push_str(
-            format!(
-              "{}output logic fifo_{}_push_valid,\n",
-              " ".repeat(self.indent),
-              fifo_name
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "{}output logic [{}:0] fifo_{}_push_data,\n",
-              " ".repeat(self.indent),
-              fifo.scalar_ty().get_bits() - 1,
-              fifo_name
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "{}input logic fifo_{}_push_ready,\n",
-              " ".repeat(self.indent),
-              fifo_name
-            )
-            .as_str(),
-          );
+          res.push_str(format!("{}// port {}\n", self.indent_str(), fifo_name).as_str());
+          res.push_str(&format!(
+            "{}output logic fifo_{}_push_valid,\n",
+            self.indent_str(),
+            fifo_name
+          ));
+          res.push_str(&format!(
+            "{}output logic [{}:0] fifo_{}_push_data,\n",
+            self.indent_str(),
+            fifo.scalar_ty().get_bits() - 1,
+            fifo_name
+          ));
+          res.push_str(&format!(
+            "{}input logic fifo_{}_push_ready,\n",
+            self.indent_str(),
+            fifo_name
+          ));
         }
         NodeKind::Array => {
           let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
           res.push_str(
             format!(
               "{}// array {}\n",
-              " ".repeat(self.indent),
+              self.indent_str(),
               namify(array_ref.get_name())
             )
             .as_str(),
@@ -856,7 +844,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           res.push_str(
             format!(
               "{}input logic [{}:0] array_{}_q[0:{}],\n",
-              " ".repeat(self.indent),
+              self.indent_str(),
               array_ref.scalar_ty().get_bits() - 1,
               namify(array_ref.get_name()),
               array_ref.get_size() - 1
@@ -866,7 +854,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           res.push_str(
             format!(
               "{}output logic array_{}_w,\n",
-              " ".repeat(self.indent),
+              self.indent_str(),
               namify(array_ref.get_name())
             )
             .as_str(),
@@ -874,7 +862,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           res.push_str(
             format!(
               "{}output logic [{}:0] array_{}_widx,\n",
-              " ".repeat(self.indent),
+              self.indent_str(),
               (array_ref.get_size()).ilog2(),
               namify(array_ref.get_name())
             )
@@ -883,7 +871,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           res.push_str(
             format!(
               "{}output logic [{}:0] array_{}_d,\n",
-              " ".repeat(self.indent),
+              self.indent_str(),
               array_ref.scalar_ty().get_bits() - 1,
               namify(array_ref.get_name())
             )
@@ -907,7 +895,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       res.push_str(
         format!(
           "{}output logic {}_trigger_push_valid,\n",
-          " ".repeat(self.indent),
+          self.indent_str(),
           trigger_module
         )
         .as_str(),
@@ -915,7 +903,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       res.push_str(
         format!(
           "{}input logic {}_trigger_push_ready,\n",
-          " ".repeat(self.indent),
+          self.indent_str(),
           trigger_module
         )
         .as_str(),
@@ -926,21 +914,9 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
       res.push('\n');
     }
 
-    res.push_str(format!("{}// trigger\n", " ".repeat(self.indent)).as_str());
-    res.push_str(
-      format!(
-        "{}input logic trigger_pop_valid,\n",
-        " ".repeat(self.indent)
-      )
-      .as_str(),
-    );
-    res.push_str(
-      format!(
-        "{}output logic trigger_pop_ready\n",
-        " ".repeat(self.indent)
-      )
-      .as_str(),
-    );
+    res.push_str(format!("{}// trigger\n", self.indent_str()).as_str());
+    res.push_str(format!("{}input logic trigger_pop_valid,\n", self.indent_str()).as_str());
+    res.push_str(format!("{}output logic trigger_pop_ready\n", self.indent_str()).as_str());
     self.indent -= 2;
     res.push_str(");\n\n");
 
@@ -1246,49 +1222,40 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
-    match expr.get_opcode() {
+    let decl = if expr.get_opcode().is_valued() &&
+      !matches!(expr.get_opcode(), Opcode::FIFOPop | Opcode::Bind) {
+      Some((
+        namify(&expr.upcast().to_string(self.sys)),
+        expr.dtype().get_bits() - 1,
+      ))
+    } else {
+      None
+    };
+
+    let body = match expr.get_opcode() {
       Opcode::Binary { .. } => {
-        let name = namify(&expr.upcast().to_string(self.sys));
-        let dbits = expr.dtype().get_bits() - 1;
         let bin = expr.as_sub::<instructions::Binary>().unwrap();
-        Some(format!(
-          "logic [{}:0] {};\nassign {} = {} {} {};\n\n",
-          dbits,
-          name,
-          name,
+        format!(
+          "{} {} {}",
           dump_ref!(self.sys, &bin.a()),
           bin.get_opcode(),
           dump_ref!(self.sys, &bin.b())
-        ))
+        )
       }
 
       Opcode::Unary { .. } => {
-        let name = namify(&expr.upcast().to_string(self.sys));
-        let dbits = expr.dtype().get_bits() - 1;
         let uop = expr.as_sub::<instructions::Unary>().unwrap();
-        Some(format!(
-          "logic [{}:0] {};\nassign {} = {}{};\n\n",
-          dbits,
-          name,
-          name,
-          uop.get_opcode(),
-          dump_ref!(self.sys, &uop.x())
-        ))
+        format!("{}{};\n\n", uop.get_opcode(), dump_ref!(self.sys, &uop.x()))
       }
 
       Opcode::Compare { .. } => {
-        let name = namify(&expr.upcast().to_string(self.sys));
-        let dbits = expr.dtype().get_bits() - 1;
         let cmp = expr.as_sub::<instructions::Compare>().unwrap();
-        Some(format!(
-          "logic [{}:0] {};\nassign {} = {} {} {};\n\n",
-          dbits,
-          name,
-          name,
+        format!(
+          "{} {} {};\n\n",
           dump_ref!(self.sys, &cmp.a()),
           cmp.get_opcode(),
           dump_ref!(self.sys, &cmp.b())
-        ))
+        )
       }
 
       Opcode::FIFOPop => {
@@ -1296,7 +1263,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
         let fifo = pop.fifo();
         let fifo_name = fifo_name!(fifo);
-        Some(format!(
+        format!(
             "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\nassign fifo_{}_pop_ready = trigger{};\n\n",
             fifo.scalar_ty().get_bits() - 1,
             name,
@@ -1304,7 +1271,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             fifo_name,
             fifo_name,
             self.get_pred().map(|p| format!(" && {}", p)).unwrap_or("".to_string())
-          ))
+          )
       }
 
       Opcode::Log => {
@@ -1387,22 +1354,17 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         res.pop();
         res.push_str(");\n");
         res.push('\n');
-        Some(res)
+        res
       }
 
       Opcode::Load => {
-        let dtype = expr.dtype();
-        let name = namify(expr.upcast().to_string(self.sys).as_str());
         let load = expr.as_sub::<instructions::Load>().unwrap();
         let (array_ref, array_idx) = (load.array(), load.idx());
-        Some(format!(
-          "logic [{}:0] {};\nassign {} = array_{}_q[{}];\n\n",
-          dtype.get_bits() - 1,
-          name,
-          name,
+        format!(
+          "array_{}_q[{}]",
           namify(array_ref.get_name()),
           dump_ref!(self.sys, &array_idx)
-        ))
+        )
       }
 
       Opcode::Store => {
@@ -1438,7 +1400,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             );
           }
         }
-        Some("".to_string())
+        "".to_string()
       }
 
       Opcode::FIFOPush => {
@@ -1477,11 +1439,10 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             );
           }
         }
-        Some("".to_string())
+        "".to_string()
       }
 
       Opcode::PureIntrinsic { intrinsic } => {
-        let name = namify(expr.upcast().to_string(self.sys).as_str());
         let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
         let fifo = call
           .get()
@@ -1491,17 +1452,8 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           .unwrap();
         let fifo_name = fifo_name!(fifo);
         match intrinsic {
-          subcode::PureIntrinsic::FIFOValid => Some(format!(
-            "logic {};\nassign {} = fifo_{}_pop_valid;\n\n",
-            name, name, fifo_name
-          )),
-          subcode::PureIntrinsic::FIFOPeek => Some(format!(
-            "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\n\n",
-            fifo.scalar_ty().get_bits() - 1,
-            name,
-            name,
-            fifo_name
-          )),
+          subcode::PureIntrinsic::FIFOValid => format!("fifo_{}_pop_valid", fifo_name),
+          subcode::PureIntrinsic::FIFOPeek => format!("fifo_{}_pop_data", fifo_name),
           _ => todo!(),
         }
       }
@@ -1531,56 +1483,32 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
             self.triggers.insert(module_name.clone(), vec![pred]);
           }
         }
-        Some("".to_string())
+        "".to_string()
       }
 
       Opcode::Slice => {
-        let dbits = expr.dtype().get_bits() - 1;
-        let name = namify(expr.upcast().to_string(self.sys).as_str());
         let slice = expr.as_sub::<instructions::Slice>().unwrap();
         let a = dump_ref!(self.sys, &slice.x());
         let l = dump_ref!(self.sys, &slice.l_intimm().upcast());
         let r = dump_ref!(self.sys, &slice.r_intimm().upcast());
-        Some(format!(
-          "logic [{}:0] {};\nassign {} = {}[{}:{}];\n\n",
-          dbits, name, name, a, r, l
-        ))
+        format!("{}[{}:{}]", a, r, l)
       }
 
       Opcode::Concat => {
-        let dbits = expr.dtype().get_bits() - 1;
-        let name = namify(expr.upcast().to_string(self.sys).as_str());
         let concat = expr.as_sub::<instructions::Concat>().unwrap();
         let a = dump_ref_immwidth!(self.sys, &concat.msb());
         let b = dump_ref_immwidth!(self.sys, &concat.lsb());
-        Some(format!(
-          "logic [{}:0] {};\nassign {} = {{{}, {}}};\n\n",
-          dbits, name, name, a, b
-        ))
+        format!("{{{}, {}}}", a, b)
       }
 
       Opcode::Cast { .. } => {
         let dbits = expr.dtype().get_bits();
-        let name = namify(expr.upcast().to_string(self.sys).as_str());
         let cast = expr.as_sub::<instructions::Cast>().unwrap();
         let a = dump_ref!(self.sys, &cast.x());
         let pad = dbits - cast.x().get_dtype(self.sys).unwrap().get_bits();
         match cast.get_opcode() {
-          subcode::Cast::BitCast => Some(format!(
-            "logic [{}:0] {};\nassign {} = {};\n\n",
-            dbits - 1,
-            name,
-            name,
-            a
-          )),
-          subcode::Cast::ZExt => Some(format!(
-            "logic [{}:0] {};\nassign {} = {{{}'b0, {}}};\n\n",
-            dbits - 1,
-            name,
-            name,
-            pad,
-            a
-          )),
+          subcode::Cast::BitCast => a,
+          subcode::Cast::ZExt => format!("{{{}'b0, {}}}", pad, a),
           subcode::Cast::SExt => {
             let src_dtype = cast.src_type();
             let dest_dtype = cast.dest_type();
@@ -1591,55 +1519,38 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
               && dest_dtype.get_bits() > src_dtype.get_bits()
             {
               // perform sext
-              Some(format!(
-                "logic [{}:0] {};\nassign {} = {{{}'{{{}[{}]}}, {}}};\n\n",
-                dbits,
-                name,
-                name,
+              format!(
+                "{{{}'{{{}[{}]}}, {}}}",
                 dest_dtype.get_bits() - src_dtype.get_bits(),
                 a,
                 src_dtype.get_bits() - 1,
                 a
-              ))
+              )
             } else {
-              Some(format!(
-                "logic [{}:0] {};\nassign {} = {{{}'b0, {}}};\n\n",
-                dbits - 1,
-                name,
-                name,
-                pad,
-                a
-              ))
+              format!("{{{}'b0, {}}}", pad, a)
             }
           }
         }
       }
 
       Opcode::Select => {
-        let dbits = expr.dtype().get_bits() - 1;
-        let name = namify(expr.upcast().to_string(self.sys).as_str());
         let select = expr.as_sub::<instructions::Select>().unwrap();
         let cond = dump_ref!(self.sys, &select.cond());
         let true_value = dump_ref!(self.sys, &select.true_value());
         let false_value = dump_ref!(self.sys, &select.false_value());
-        Some(format!(
-          "logic [{}:0] {};\nassign {} = {} ? {} : {};\n\n",
-          dbits, name, name, cond, true_value, false_value
-        ))
+        format!("{} ? {} : {}", cond, true_value, false_value)
       }
 
       Opcode::Bind => {
         // currently handled in AsyncCall
-        Some("".to_string())
+        "".to_string()
       }
 
       Opcode::Select1Hot => {
         let dtype = expr.dtype().get_bits() - 1;
-        let name = namify(expr.upcast().to_string(self.sys).as_str());
         let select1hot = expr.as_sub::<instructions::Select1Hot>().unwrap();
         let cond = dump_ref!(self.sys, &select1hot.cond());
-        let mut result = format!("logic [{}:0] {};\n", dtype, name);
-        result += &format!("assign {} = ", name);
+        let mut result = String::new();
 
         let mut first = true;
         for (i, elem) in select1hot.value_iter().enumerate() {
@@ -1657,13 +1568,18 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           first = false;
         }
 
-        result += ";";
-
-        Some(result)
+        result
       }
 
       _ => panic!("Unknown OP: {:?}", expr.get_opcode()),
+    };
+
+    if let Some((id, bits)) = decl {
+      format!("logic [{}:0] {}; assign {} = {};\n", bits, id, id, body)
+    } else {
+      body
     }
+    .into()
   }
 }
 
