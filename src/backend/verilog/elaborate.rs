@@ -669,11 +669,13 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
     let mut res = String::new();
 
     res.push_str(&format!(
-  "
+      "
 module {} (
   input logic clk,
   input logic rst_n,
-", self.current_module));
+",
+      self.current_module
+    ));
 
     self.indent += 2;
     for port in module.fifo_iter() {
