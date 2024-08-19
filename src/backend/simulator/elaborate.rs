@@ -20,8 +20,6 @@ use super::utils::{dtype_to_rust_type, namify};
 
 use self::{expr::subcode::Cast, instructions};
 
-use rand::seq::SliceRandom;
-
 struct ElaborateModule<'a> {
   sys: &'a SysBuilder,
   indent: usize,
@@ -516,6 +514,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("use std::collections::VecDeque;\n".as_bytes())?;
   fd.write_all("use super::runtime::*;\n".as_bytes())?;
   fd.write_all("use num_bigint::{BigInt, BigUint};\n".as_bytes())?;
+  fd.write_all("use rand::seq::SliceRandom;\n".as_bytes())?;
 
   let mut simulator_init = vec![];
   let mut downstream_reset = vec![];
@@ -669,15 +668,22 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   // TODO(@were): Later we allow some randomization of the simulation, these functions can be
   // shuffled.
   fd.write_all("let mut sim = Simulator::new();\n".as_bytes())?;
-  fd.write_all("let simulators : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
+
   if config.random {
-    let mut rng = rand::thread_rng();
-    simulators.shuffle(&mut rng);
+    fd.write_all("let mut simulators : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
+    for sim in simulators {
+      fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
+    }
+    fd.write_all("];\n".as_bytes())?;
+    fd.write_all("let mut rng = rand::thread_rng();\n".as_bytes())?;
+    fd.write_all("simulators.shuffle(&mut rng);\n".as_bytes())?;
+  } else {
+    fd.write_all("let simulators : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
+    for sim in simulators {
+      fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
+    }
+    fd.write_all("];\n".as_bytes())?;
   }
-  for sim in simulators {
-    fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
-  }
-  fd.write_all("];\n".as_bytes())?;
 
   // TODO(@were): A downstream module can be recursively dependent to another downstream module.
   // A topological order among these downstream modules is needed.
@@ -824,9 +830,11 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
     writeln!(cargo, "[dependencies]")?;
     writeln!(cargo, "num-bigint = \"0.4\"")?;
     writeln!(cargo, "num-traits = \"0.2\"")?;
+    writeln!(cargo, "rand = \"0.8\"")?;
     let mut fmt = fs::File::create(simulator_name.join("rustfmt.toml"))?;
     writeln!(fmt, "max_width = 100")?;
     writeln!(fmt, "tab_spaces = 2")?;
+
     fmt.flush()?;
   }
   {
