@@ -285,8 +285,7 @@ logic fifo_{name}_driver_{driver}_push_ready;\n",
     });
 
     res.push_str(&format!(
-      "
-logic fifo_{name}_push_valid;
+      "logic fifo_{name}_push_valid;
 assign fifo_{name}_push_valid = {pusher_valid};
 logic fifo_{name}_push_ready;
 {pusher_readiness}
@@ -294,8 +293,16 @@ logic fifo_{name}_pop_valid;
 logic [{ty_width}:0] fifo_{name}_push_data;
 assign fifo_{name}_push_data = {pusher_data};
 logic [{ty_width}:0] fifo_{name}_pop_data;
-logic fifo_{name}_pop_ready;
-fifo #({width}) fifo_{name}_i (
+logic fifo_{name}_pop_ready;\n",
+      name = fifo_name,
+      ty_width = fifo_width - 1,
+      pusher_readiness = pusher_ready.join("\n"),
+      pusher_valid = pusher_valid.join(" | "),
+      pusher_data = pusher_data.join("\n")
+    ));
+
+    res.push_str(&format!(
+      "fifo #({width}) fifo_{name}_i (
   .clk(clk),
   .rst_n(rst_n),
   .push_valid(fifo_{name}_push_valid),
@@ -304,12 +311,8 @@ fifo #({width}) fifo_{name}_i (
   .pop_valid(fifo_{name}_pop_valid),
   .pop_data(fifo_{name}_pop_data),
   .pop_ready(fifo_{name}_pop_ready));\n",
-      ty_width = fifo_width - 1,
       name = fifo_name,
       width = fifo_width,
-      pusher_readiness = pusher_ready.join("\n"),
-      pusher_valid = pusher_valid.join(" | "),
-      pusher_data = pusher_data.join("\n")
     ));
 
     res
@@ -386,85 +389,38 @@ fifo #(1) {module}_trigger_i (
   fn dump_module_inst(&self, module: &ModuleRef) -> String {
     let mut res = String::new();
     let module_name = namify(module.get_name());
-    res.push_str(format!("// {}\n", module_name).as_str());
-    res.push_str(format!("{} {}_i (\n", module_name, module_name).as_str());
-    res.push_str("  .clk(clk),\n".to_string().as_str());
-    res.push_str("  .rst_n(rst_n),\n".to_string().as_str());
+    res.push_str(&format!(
+      "// {module}
+{module} {module}_i (
+  .clk(clk),
+  .rst_n(rst_n),",
+      module = module_name
+    ));
     for port in module.fifo_iter() {
-      let fifo_name = namify(
-        format!(
-          "{}_{}",
-          port
-            .get_parent()
-            .as_ref::<Module>(self.sys)
-            .unwrap()
-            .get_name(),
-          fifo_name!(port)
-        )
-        .as_str(),
-      );
-      res.push_str(
-        format!(
-          "  .fifo_{}_pop_valid(fifo_{}_pop_valid),\n",
-          namify(port.get_name().as_str()),
-          fifo_name
-        )
-        .as_str(),
-      );
-      res.push_str(
-        format!(
-          "  .fifo_{}_pop_data(fifo_{}_pop_data),\n",
-          namify(port.get_name().as_str()),
-          fifo_name
-        )
-        .as_str(),
-      );
-      res.push_str(
-        format!(
-          "  .fifo_{}_pop_ready(fifo_{}_pop_ready),\n",
-          namify(port.get_name().as_str()),
-          fifo_name
-        )
-        .as_str(),
-      );
+      let port_name = fifo_name!(port);
+      res.push_str(&format!(
+        "
+  .fifo_{fifo}_pop_valid(fifo_{module}_{fifo}_pop_valid),
+  .fifo_{fifo}_pop_data(fifo_{module}_{fifo}_pop_data),
+  .fifo_{fifo}_pop_ready(fifo_{module}_{fifo}_pop_ready),",
+        fifo = port_name,
+        module = module_name
+      ));
     }
     for (interf, _) in module.ext_interf_iter() {
       match interf.get_kind() {
         NodeKind::FIFO => {
           let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-          let fifo_name = namify(
-            format!(
-              "{}_{}",
-              fifo
-                .get_parent()
-                .as_ref::<Module>(self.sys)
-                .unwrap()
-                .get_name(),
-              fifo_name!(fifo)
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "  .fifo_{}_push_valid(fifo_{}_driver_{}_push_valid),\n",
-              fifo_name, fifo_name, module_name
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "  .fifo_{}_push_data(fifo_{}_driver_{}_push_data),\n",
-              fifo_name, fifo_name, module_name
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "  .fifo_{}_push_ready(fifo_{}_driver_{}_push_ready),\n",
-              fifo_name, fifo_name, module_name
-            )
-            .as_str(),
-          );
+          let fifo_name =
+            namify(format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)).as_str());
+          res.push_str(&format!(
+            "
+  .fifo_{fifo}_push_valid(fifo_{fifo}_driver_{module}_push_valid),
+  .fifo_{fifo}_push_data(fifo_{fifo}_driver_{module}_push_data),
+  .fifo_{fifo}_push_ready(fifo_{fifo}_driver_{module}_push_ready),",
+            fifo = fifo_name,
+            module = module_name
+          ));
         }
         NodeKind::Array => {
           let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
@@ -614,7 +570,8 @@ end"
       Simulator::Verilator => "",
     };
 
-    fd.write_all(include_str!("fifo.sv").as_bytes()).unwrap();
+    fd.write_all(include_str!("fifo_impl.sv").as_bytes())
+      .unwrap();
 
     fd.write_all(
       format!(

@@ -38,6 +38,12 @@ impl FIFO {
   }
 }
 
+impl FIFORef<'_> {
+  pub fn get_module(&self) -> ModuleRef<'_> {
+    self.get_parent().as_ref::<Module>(self.sys).unwrap()
+  }
+}
+
 impl FIFOMut<'_> {
   pub fn set_name(&mut self, name: String) {
     self.get_mut().name = name;
