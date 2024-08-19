@@ -649,6 +649,7 @@ end"
         "
 module fifo #(
     parameter WIDTH = 8
+    parameter DEPTH_LOG2 = 4
 ) (
   input logic clk,
   input logic rst_n,
@@ -662,18 +663,42 @@ module fifo #(
   input  logic               pop_ready
 );
 
-logic [WIDTH - 1:0] q[$];
+logic [16:0] front;
+logic [16:0] back;
+logic [DEPTH_LOG2:0] count;
+logic [WIDTH - 1:0] q[0:(1 << DEPTH_LOG2)];
 
 always @(posedge clk or negedge rst_n) begin
   if (!rst_n) begin
+    front <= 0;
+    back <= 0;
     pop_valid <= 1'b0;
     pop_data <= 'x;
+    count <= 0;
   end else begin
-    if (pop_ready) q.pop_front();
+    if (pop_ready) begin
+      if (front != back) begin
+        pop_valid <= 1'b1;
+        front <= (front + 1) & {{ DEPTH_LOG2 {{ 1'b1 }} }};
+        count <= count - 1;
+      end else begin
+        pop_valid <= 1'b0;
+        pop_data <= 'x;
+      end
+    end
 
-    if (push_valid) q.push_back(push_data);
+    if (push_valid) begin
+      if (((back + 1) & {{ DEPTH_LOG2 {{ 1'b1 }} }}) != front) begin
+        q[back] <= push_data;
+        back <= (back + 1) & {{ DEPTH_LOG2 {{ 1'b1 }} }};
+        push_ready <= ((back + 1) & {{ DEPTH_LOG2 {{ 1'b1 }} }}) != front;
+        count <= count + 1;
+      end else begin
+        push_ready <= 1'b0;
+      end
+    end
 
-    if (q.size() == 0) begin
+    if count == 0 begin
       pop_valid <= 1'b0;
       pop_data <= 'x;
     end else begin
