@@ -32,7 +32,6 @@ macro_rules! fifo_name {
 struct VerilogDumper<'a, 'b> {
   sys: &'a SysBuilder,
   config: &'b Config,
-  indent: usize,
   pred_stack: VecDeque<String>,
   fifo_pushes: HashMap<String, Vec<(String, String)>>, // fifo_name -> [(pred, value)]
   array_stores: HashMap<String, Vec<(String, String, String)>>, // array_name -> [(pred, idx, value)]
@@ -48,7 +47,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     Self {
       sys,
       config,
-      indent: 0,
       pred_stack: VecDeque::new(),
       fifo_pushes: HashMap::new(),
       array_stores: HashMap::new(),
@@ -656,12 +654,6 @@ macro_rules! dump_ref_immwidth {
   };
 }
 
-impl VerilogDumper<'_, '_> {
-  fn indent_str(&self) -> String {
-    " ".repeat(self.indent)
-  }
-}
-
 impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.current_module = namify(module.get_name()).to_string();
@@ -677,7 +669,6 @@ module {} (
       self.current_module
     ));
 
-    self.indent += 2;
     for port in module.fifo_iter() {
       let bits = port.scalar_ty().get_bits();
       let name = fifo_name!(port);
@@ -744,33 +735,26 @@ module {} (
     let mut has_trigger_modules = false;
     for trigger_module in trigger_modules {
       has_trigger_modules = true;
-      res.push_str(
-        format!(
-          "{}output logic {}_trigger_push_valid,\n",
-          self.indent_str(),
-          trigger_module
-        )
-        .as_str(),
-      );
-      res.push_str(
-        format!(
-          "{}input logic {}_trigger_push_ready,\n",
-          self.indent_str(),
-          trigger_module
-        )
-        .as_str(),
-      );
+      res.push_str(&format!(
+        "
+  output logic {}_trigger_push_valid,
+  input logic {}_trigger_push_ready,
+",
+        trigger_module, trigger_module
+      ));
     }
 
     if has_trigger_modules {
       res.push('\n');
     }
 
-    res.push_str(format!("{}// trigger\n", self.indent_str()).as_str());
-    res.push_str(format!("{}input logic trigger_pop_valid,\n", self.indent_str()).as_str());
-    res.push_str(format!("{}output logic trigger_pop_ready\n", self.indent_str()).as_str());
-    self.indent -= 2;
-    res.push_str(");\n\n");
+    res.push_str(
+      "
+  // trigger
+  input logic trigger_pop_valid,
+  output logic trigger_pop_ready
+);",
+    );
 
     let mut wait_until: Option<String> = None;
 
@@ -815,17 +799,21 @@ module {} (
       0
     };
 
-    res.push_str("logic trigger;\n".to_string().as_str());
     res.push_str(
-      "assign trigger_pop_ready = trigger;\n\n"
-        .to_string()
-        .as_str(),
+      "
+  logic trigger;
+  assign trigger_pop_ready = trigger;
+",
     );
 
     if self.current_module == "testbench" {
-      res.push_str("int cycle_cnt;\n");
-      res.push_str("always_ff @(posedge clk or negedge rst_n) if (!rst_n) cycle_cnt <= 0; ");
-      res.push_str("else if (trigger) cycle_cnt <= cycle_cnt + 1;\n\n");
+      res.push_str(
+        "
+  int cycle_cnt;
+  always_ff @(posedge clk or negedge rst_n) if (!rst_n) cycle_cnt <= 0;
+  else if (trigger) cycle_cnt <= cycle_cnt + 1;
+",
+      );
     }
 
     self.fifo_pushes.clear();
@@ -875,16 +863,13 @@ module {} (
         }
       }
       if has_conditional_branch {
-        res.push_str(
-          format!(
-            "assign {}_trigger_push_valid = trigger && ({});\n\n",
-            m,
-            valid_conds.join(" || ")
-          )
-          .as_str(),
-        );
+        let conds = valid_conds.join(" || ");
+        res.push_str(&format!(
+          "assign {}_trigger_push_valid = trigger && ({});\n\n",
+          m, conds
+        ));
       } else {
-        res.push_str(format!("assign {}_trigger_push_valid = trigger;\n\n", m).as_str());
+        res.push_str(&format!("assign {}_trigger_push_valid = trigger;\n\n", m));
       }
     }
 
@@ -974,14 +959,11 @@ module {} (
         idx_str.push_str("'x".to_string().as_str());
       }
       if has_conditional_branch {
-        res.push_str(
-          format!(
-            "assign array_{}_w = trigger && ({});\n",
-            a,
-            w_conds.join(" || ")
-          )
-          .as_str(),
-        );
+        res.push_str(&format!(
+          "assign array_{}_w = trigger && ({});\n",
+          a,
+          w_conds.join(" || ")
+        ));
       } else {
         res.push_str(format!("assign array_{}_w = trigger;\n", a).as_str());
       }
@@ -1098,13 +1080,13 @@ module {} (
 
       Opcode::Unary { .. } => {
         let uop = expr.as_sub::<instructions::Unary>().unwrap();
-        format!("{}{};\n\n", uop.get_opcode(), dump_ref!(self.sys, &uop.x()))
+        format!("{}{}", uop.get_opcode(), dump_ref!(self.sys, &uop.x()))
       }
 
       Opcode::Compare { .. } => {
         let cmp = expr.as_sub::<instructions::Compare>().unwrap();
         format!(
-          "{} {} {};\n\n",
+          "{} {} {}\n\n",
           dump_ref!(self.sys, &cmp.a()),
           cmp.get_opcode(),
           dump_ref!(self.sys, &cmp.b())
@@ -1117,14 +1099,21 @@ module {} (
         let fifo = pop.fifo();
         let fifo_name = fifo_name!(fifo);
         format!(
-            "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\nassign fifo_{}_pop_ready = trigger{};\n\n",
-            fifo.scalar_ty().get_bits() - 1,
-            name,
-            name,
-            fifo_name,
-            fifo_name,
-            self.get_pred().map(|p| format!(" && {}", p)).unwrap_or("".to_string())
-          )
+          "
+  logic [{}:0] {};
+  assign {} = fifo_{}_pop_data;
+  assign fifo_{}_pop_ready = trigger{};
+",
+          fifo.scalar_ty().get_bits() - 1,
+          name,
+          name,
+          fifo_name,
+          fifo_name,
+          self
+            .get_pred()
+            .map(|p| format!(" && {}", p))
+            .unwrap_or("".to_string())
+        )
       }
 
       Opcode::Log => {
@@ -1259,18 +1248,8 @@ module {} (
       Opcode::FIFOPush => {
         let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
         let fifo = push.fifo();
-        let fifo_name = namify(
-          format!(
-            "{}_{}",
-            fifo
-              .get_parent()
-              .as_ref::<Module>(self.sys)
-              .unwrap()
-              .get_name(),
-            fifo_name!(fifo)
-          )
-          .as_str(),
-        );
+        let fifo_name =
+          namify(format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)).as_str());
         let pred = self.get_pred().unwrap_or("".to_string());
         match self.fifo_pushes.get_mut(&fifo_name) {
           Some(fps) => fps.push((pred, dump_ref!(self.sys, &push.value()))),
