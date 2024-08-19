@@ -1,10 +1,11 @@
 import pytest
+import sys
 
 from assassyn.frontend import *
 from assassyn.backend import *
 from assassyn import utils
 
-from utils.opcodes import *
+from opcodes import *
 
 class Execution(Module):
     
