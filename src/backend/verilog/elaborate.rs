@@ -644,75 +644,11 @@ end"
       Simulator::Verilator => "",
     };
 
+    fd.write_all(include_str!("fifo.sv").as_bytes()).unwrap();
+
     fd.write_all(
       format!(
         "
-module fifo #(
-    parameter WIDTH = 8
-    parameter DEPTH_LOG2 = 4
-) (
-  input logic clk,
-  input logic rst_n,
-
-  input  logic               push_valid,
-  input  logic [WIDTH - 1:0] push_data,
-  output logic               push_ready,
-
-  output logic               pop_valid,
-  output logic [WIDTH - 1:0] pop_data,
-  input  logic               pop_ready
-);
-
-logic [16:0] front;
-logic [16:0] back;
-logic [DEPTH_LOG2:0] count;
-logic [WIDTH - 1:0] q[0:(1 << DEPTH_LOG2)];
-
-always @(posedge clk or negedge rst_n) begin
-  if (!rst_n) begin
-    front <= 0;
-    back <= 0;
-    pop_valid <= 1'b0;
-    pop_data <= 'x;
-    count <= 0;
-  end else begin
-    if (pop_ready) begin
-      if (front != back) begin
-        pop_valid <= 1'b1;
-        front <= (front + 1) & {{ DEPTH_LOG2 {{ 1'b1 }} }};
-        count <= count - 1;
-      end else begin
-        pop_valid <= 1'b0;
-        pop_data <= 'x;
-      end
-    end
-
-    if (push_valid) begin
-      if (((back + 1) & {{ DEPTH_LOG2 {{ 1'b1 }} }}) != front) begin
-        q[back] <= push_data;
-        back <= (back + 1) & {{ DEPTH_LOG2 {{ 1'b1 }} }};
-        push_ready <= ((back + 1) & {{ DEPTH_LOG2 {{ 1'b1 }} }}) != front;
-        count <= count + 1;
-      end else begin
-        push_ready <= 1'b0;
-      end
-    end
-
-    if count == 0 begin
-      pop_valid <= 1'b0;
-      pop_data <= 'x;
-    end else begin
-      pop_valid <= 1'b1;
-      pop_data <= q[0];
-    end
-  end
-end
-
-assign push_ready = 1'b1;
-
-endmodule
-
-
 module tb;
 
 logic clk;
@@ -1748,56 +1684,7 @@ pub fn generate_cpp_testbench(dir: &Path, sys: &SysBuilder, simulator: &Simulato
   }
   let main_fname = dir.join("main.cpp");
   let mut main_fd = File::create(main_fname).unwrap();
-  main_fd
-    .write_all("#include \"Vtb.h\"\n".to_string().as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("#include \"verilated.h\"\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("#include \"verilated_vcd_c.h\"\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("vluint64_t main_time = 0;\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("double sc_time_stamp() { return main_time; }\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("int main(int argc, char **argv) {\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("  Verilated::commandArgs(argc, argv);\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("  auto* top = new Vtb;\n".to_string().as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("  Verilated::traceEverOn(true);\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("  auto* tfp = new VerilatedVcdC;\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("  top->trace(tfp, 99);\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("  tfp->open(\"wave.vcd\");\n".as_bytes())
-    .unwrap();
-  main_fd
-    .write_all("  while (!Verilated::gotFinish()) {\n".as_bytes())
-    .unwrap();
-  main_fd.write_all("    top->eval();\n".as_bytes()).unwrap();
-  main_fd
-    .write_all("    tfp->dump(main_time);\n".as_bytes())
-    .unwrap();
-  main_fd.write_all("    main_time++;\n".as_bytes()).unwrap();
-  main_fd.write_all("  }\n".as_bytes()).unwrap();
-  main_fd.write_all("  tfp->close();\n".as_bytes()).unwrap();
-  main_fd.write_all("  delete top;\n".as_bytes()).unwrap();
-  main_fd.write_all("  delete tfp;\n".as_bytes()).unwrap();
-  main_fd.write_all("  return 0;\n".as_bytes()).unwrap();
-  main_fd.write_all("}\n".as_bytes()).unwrap();
+  main_fd.write_all(include_str!("main.cpp").as_bytes()).unwrap();
   let make_fname = dir.join("Makefile");
   let mut make_fd = File::create(make_fname).unwrap();
   make_fd
