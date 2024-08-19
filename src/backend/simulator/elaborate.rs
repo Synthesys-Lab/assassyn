@@ -670,20 +670,15 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("let mut sim = Simulator::new();\n".as_bytes())?;
 
   if config.random {
-    fd.write_all("let mut simulators : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
-    for sim in simulators {
-      fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
-    }
-    fd.write_all("];\n".as_bytes())?;
     fd.write_all("let mut rng = rand::thread_rng();\n".as_bytes())?;
-    fd.write_all("simulators.shuffle(&mut rng);\n".as_bytes())?;
+    fd.write_all("let mut simulators : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
   } else {
     fd.write_all("let simulators : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
-    for sim in simulators {
-      fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
-    }
-    fd.write_all("];\n".as_bytes())?;
   }
+  for sim in simulators {
+    fd.write_all(format!("Simulator::simulate_{},", sim).as_bytes())?;
+  }
+  fd.write_all("];\n".as_bytes())?;
 
   // TODO(@were): A downstream module can be recursively dependent to another downstream module.
   // A topological order among these downstream modules is needed.
@@ -752,11 +747,18 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     )?;
   }
 
+  let randomization = if config.random {
+    quote! { simulators.shuffle(&mut rng); }
+  } else {
+    quote! {}
+  };
+
   fd.write_all(
     quote! {
       for i in 1..=#sim_threshold {
         sim.stamp = i * 100;
         sim.reset_downstream();
+        #randomization;
         for simulate in simulators.iter() {
           simulate(&mut sim);
         }
