@@ -655,6 +655,7 @@ impl SysBuilder {
           Binary::Shl | Binary::Shr => match (&aty, &bty) {
             (DataType::Int(a), DataType::Int(_)) => Some(DataType::Int(*a)),
             (DataType::UInt(a), DataType::UInt(_)) => Some(DataType::UInt(*a)),
+            (DataType::Bits(a), DataType::Bits(_)) => Some(DataType::Bits(*a)),
             _ => None,
           },
           Binary::BitwiseAnd => Some(DataType::bits_ty(aty.get_bits().min(bty.get_bits()))),
