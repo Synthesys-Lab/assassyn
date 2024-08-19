@@ -79,11 +79,12 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   fn dump_array(&self, array: &ArrayRef, mem_init_path: Option<&String>) -> String {
     let mut res = String::new();
     let array_name = namify(array.get_name());
+    let scalar_bits = array.scalar_ty().get_bits();
     res.push_str(format!("// array: {}[{}]\n", array_name, array.get_size()).as_str());
     res.push_str(
       format!(
         "logic [{}:0] array_{}_q[0:{}];\n",
-        array.scalar_ty().get_bits() - 1,
+        scalar_bits - 1,
         array_name,
         array.get_size() - 1
       )
@@ -94,7 +95,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(
         format!(
           "logic [{}:0] array_{}_driver_{}_d;\n",
-          array.scalar_ty().get_bits() - 1,
+          scalar_bits - 1,
           array_name,
           driver
         )
@@ -112,14 +113,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(format!("logic array_{}_driver_{}_w;\n", array_name, driver).as_str());
     }
 
-    res.push_str(
-      format!(
-        "logic [{}:0] array_{}_d;\n",
-        array.scalar_ty().get_bits() - 1,
-        array_name
-      )
-      .as_str(),
-    );
+    res.push_str(format!("logic [{}:0] array_{}_d;\n", scalar_bits - 1, array_name).as_str());
     res.push_str(
       format!(
         "assign array_{}_d = \n{};\n",
@@ -131,11 +125,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .iter()
           .map(|driver| format!(
             "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_d)",
-            array.scalar_ty().get_bits(),
-            array_name,
-            driver,
-            array_name,
-            driver
+            scalar_bits, array_name, driver, array_name, driver
           ))
           .collect::<Vec<String>>()
           .join(" |\n")
@@ -278,14 +268,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     );
     res.push_str(
       format!(
-        "logic [{}:0] fifo_{}_push_data;\n",
-        fifo_width - 1,
-        fifo_name
-      )
-      .as_str(),
-    );
-    res.push_str(
-      format!(
         "assign fifo_{}_push_data = \n{};\n",
         fifo_name,
         self
@@ -302,7 +284,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       )
       .as_str(),
     );
-    res.push_str(format!("logic fifo_{}_push_ready;\n", fifo_name).as_str());
     for driver in self.fifo_drivers.get(&fifo_name).unwrap().iter() {
       res.push_str(
         format!(
@@ -312,26 +293,26 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         .as_str(),
       );
     }
-    res.push_str(format!("logic fifo_{}_pop_valid;\n", fifo_name).as_str());
-    res.push_str(
-      format!(
-        "logic [{}:0] fifo_{}_pop_data;\n",
-        fifo_width - 1,
-        fifo_name
-      )
-      .as_str(),
-    );
-    res.push_str(format!("logic fifo_{}_pop_ready;\n", fifo_name).as_str());
-    res.push_str(format!("fifo #({}) fifo_{}_i (\n", fifo_width, fifo_name).as_str());
-    res.push_str("  .clk(clk),\n".to_string().as_str());
-    res.push_str("  .rst_n(rst_n),\n".to_string().as_str());
-    res.push_str(format!("  .push_valid(fifo_{}_push_valid),\n", fifo_name).as_str());
-    res.push_str(format!("  .push_data(fifo_{}_push_data),\n", fifo_name).as_str());
-    res.push_str(format!("  .push_ready(fifo_{}_push_ready),\n", fifo_name).as_str());
-    res.push_str(format!("  .pop_valid(fifo_{}_pop_valid),\n", fifo_name).as_str());
-    res.push_str(format!("  .pop_data(fifo_{}_pop_data),\n", fifo_name).as_str());
-    res.push_str(format!("  .pop_ready(fifo_{}_pop_ready)\n", fifo_name).as_str());
-    res.push_str(");\n\n".to_string().as_str());
+    res.push_str(&format!(
+      "
+logic fifo_{name}_push_ready;\n
+logic fifo_{name}_pop_valid;\n
+logic [{ty_width}:0] fifo_{name}_push_data;\n
+logic [{ty_width}:0] fifo_{name}_pop_data;\n
+logic fifo_{name}_pop_ready;\n
+fifo #({width}) fifo_{name}_i (\n
+  .clk(clk),\n
+  .rst_n(rst_n),
+  .push_valid(fifo_{name}_push_valid),\n
+  .push_data(fifo_{name}_push_data),\n
+  .push_ready(fifo_{name}_push_ready),\n
+  .pop_valid(fifo_{name}_pop_valid),\n
+  .pop_data(fifo_{name}_pop_data),\n
+  .pop_ready(fifo_{name}_pop_ready));\n",
+      ty_width = fifo_width - 1,
+      name = fifo_name,
+      width = fifo_width
+    ));
 
     res
   }
