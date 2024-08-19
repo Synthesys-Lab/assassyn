@@ -367,7 +367,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     if module_name != "driver" && module_name != "testbench" {
       res.push_str(
         format!(
-          "assign {}_trigger_push_valid = \n{};\n",
+          "assign {}_trigger_push_valid = {};\n",
           module_name,
           self
             .trigger_drivers
@@ -1222,8 +1222,9 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
-    let decl = if expr.get_opcode().is_valued() &&
-      !matches!(expr.get_opcode(), Opcode::FIFOPop | Opcode::Bind) {
+    let decl = if expr.get_opcode().is_valued()
+      && !matches!(expr.get_opcode(), Opcode::FIFOPop | Opcode::Bind)
+    {
       Some((
         namify(&expr.upcast().to_string(self.sys)),
         expr.dtype().get_bits() - 1,
