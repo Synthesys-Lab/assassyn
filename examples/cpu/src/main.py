@@ -80,6 +80,7 @@ class Execution(Module):
                       + self.imm_value.bitcast(Int(32))).bitcast(Bits(32))
             br_dest = (a != b).select(new_pc, pc[0])
             log("if {} != {}: branch to {}; actual: {}", a, b, new_pc, br_dest)
+            pc[0] = br_dest
 
         is_memory = is_lw
         is_memory_read = is_lw
@@ -336,7 +337,7 @@ def main():
             writeback = writeback
         )
 
-        decoder = Decoder('0to100.data')
+        decoder = Decoder('0to100.exe')
         decoder.wait_until()
         decoder.build(pc = pc, on_branch = on_branch, exec = exec)
     
@@ -353,6 +354,7 @@ def main():
         idle_threshold=100,
         resource_base=f'{utils.repo_path()}/examples/cpu/resource'
     )
+    # TODO: Support ret instruction to exit elegantly
 
     simulator_path, _ = elaborate(sys, **conf)
 
