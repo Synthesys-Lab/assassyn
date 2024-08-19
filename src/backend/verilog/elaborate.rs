@@ -284,41 +284,6 @@ logic fifo_{name}_driver_{driver}_push_ready;\n",
       );
     });
 
-    // res.push_str(format!("logic fifo_{}_push_valid;\n", fifo_name).as_str());
-    // res.push_str(
-    //   format!(
-    //     "assign fifo_{}_push_valid = {};\n",
-    //     fifo_name,
-    //     self
-    //       .fifo_drivers
-    //       .get(&fifo_name)
-    //       .unwrap()
-    //       .iter()
-    //       .map(|driver| format!("fifo_{}_driver_{}_push_valid", fifo_name, driver))
-    //       .collect::<Vec<String>>()
-    //       .join(" | ")
-    //   )
-    //   .as_str(),
-    // );
-    // res.push_str(
-    //   format!(
-    //     "assign fifo_{}_push_data = \n{};\n",
-    //     fifo_name,
-    //     self
-    //       .fifo_drivers
-    //       .get(&fifo_name)
-    //       .unwrap()
-    //       .iter()
-    //       .map(|driver| format!(
-    //         "  ({{{}{{fifo_{}_driver_{}_push_valid}}}} & fifo_{}_driver_{}_push_data)",
-    //         fifo_width, fifo_name, driver, fifo_name, driver
-    //       ))
-    //       .collect::<Vec<String>>()
-    //       .join(" |\n")
-    //   )
-    //   .as_str(),
-    // );
-    // for driver in self.fifo_drivers.get(&fifo_name).unwrap().iter() {}
     res.push_str(&format!(
       "
 logic fifo_{name}_push_valid;

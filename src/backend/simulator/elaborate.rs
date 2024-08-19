@@ -834,9 +834,7 @@ fn elaborate_impl(sys: &SysBuilder, config: &Config) -> Result<PathBuf, std::io:
     writeln!(cargo, "num-traits = \"0.2\"")?;
     writeln!(cargo, "rand = \"0.8\"")?;
     let mut fmt = fs::File::create(simulator_name.join("rustfmt.toml"))?;
-    writeln!(fmt, "max_width = 100")?;
-    writeln!(fmt, "tab_spaces = 2")?;
-
+    writeln!(fmt, include_str!("../../../rustfmt.toml"))?;
     fmt.flush()?;
   }
   {
