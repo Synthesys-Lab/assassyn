@@ -16,17 +16,18 @@ class Execution(Module):
         self.rd_reg = Port(Bits(5))
 
     @module.combinational
-    def build(self, 
-              reg_onwrite: Array, 
-              on_branch: Array, 
-              pc: Array, 
-              exec_bypass_reg: Array, 
-              exec_bypass_data: Array, 
-              mem_bypass_reg: Array, 
-              mem_bypass_data: Array, 
-              rf: Array, 
-              memory: Memory, 
-              writeback: Module
+    def build(
+        self, 
+        reg_onwrite: Array, 
+        on_branch: Array, 
+        pc: Array, 
+        exec_bypass_reg: Array, 
+        exec_bypass_data: Array, 
+        mem_bypass_reg: Array, 
+        mem_bypass_data: Array, 
+        rf: Array, 
+        memory: Memory, 
+        writeback: Module
     ):
         log("executing: {:b}", self.opcode)
 
@@ -316,7 +317,7 @@ def main():
         writeback = WriteBack()
         writeback.build(reg_file, reg_onwrite)
 
-        memory_access = MemoryAccess('resource/0to100.data')
+        memory_access = MemoryAccess('0to100.data')
         memory_access.wait_until()
         memory_access.build(writeback = writeback, mem_bypass_reg = mem_bypass_reg, mem_bypass_data=mem_bypass_data)
 
@@ -335,7 +336,7 @@ def main():
             writeback = writeback
         )
 
-        decoder = Decoder('resource/0to100.data')
+        decoder = Decoder('0to100.data')
         decoder.wait_until()
         decoder.build(pc = pc, on_branch = on_branch, exec = exec)
     
@@ -347,9 +348,11 @@ def main():
 
     print(sys)
     conf = config(
-            verilog=None,
-            sim_threshold=100,
-            idle_threshold=100)
+        verilog=None,
+        sim_threshold=100,
+        idle_threshold=100,
+        resource_base=f'{utils.repo_path()}/examples/cpu/resource'
+    )
 
     simulator_path, _ = elaborate(sys, **conf)
 
