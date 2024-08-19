@@ -5,6 +5,8 @@ use std::{
   path::Path,
 };
 
+use instructions::FIFOPush;
+// use instructions::FIFOPush;
 use regex::Regex;
 
 use crate::{
@@ -237,81 +239,114 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     );
     let fifo_width = fifo.scalar_ty().get_bits();
     res.push_str(format!("// fifo: {}\n", fifo_name).as_str());
-    for driver in self.fifo_drivers.get(&fifo_name).unwrap().iter() {
-      res.push_str(format!("logic fifo_{}_driver_{}_push_valid;\n", fifo_name, driver).as_str());
-      res.push_str(
-        format!(
-          "logic [{}:0] fifo_{}_driver_{}_push_data;\n",
-          fifo_width - 1,
-          fifo_name,
-          driver
-        )
-        .as_str(),
-      );
-      res.push_str(format!("logic fifo_{}_driver_{}_push_ready;\n", fifo_name, driver).as_str());
-    }
-    res.push_str(format!("logic fifo_{}_push_valid;\n", fifo_name).as_str());
-    res.push_str(
-      format!(
-        "assign fifo_{}_push_valid = {};\n",
-        fifo_name,
-        self
-          .fifo_drivers
-          .get(&fifo_name)
+
+    let drivers = fifo
+      .users()
+      .iter()
+      .filter_map(|x| {
+        x.as_ref::<Operand>(self.sys)
           .unwrap()
-          .iter()
-          .map(|driver| format!("fifo_{}_driver_{}_push_valid", fifo_name, driver))
-          .collect::<Vec<String>>()
-          .join(" | ")
-      )
-      .as_str(),
-    );
-    res.push_str(
-      format!(
-        "assign fifo_{}_push_data = \n{};\n",
-        fifo_name,
-        self
-          .fifo_drivers
-          .get(&fifo_name)
-          .unwrap()
-          .iter()
-          .map(|driver| format!(
-            "  ({{{}{{fifo_{}_driver_{}_push_valid}}}} & fifo_{}_driver_{}_push_data)",
-            fifo_width, fifo_name, driver, fifo_name, driver
-          ))
-          .collect::<Vec<String>>()
-          .join(" |\n")
-      )
-      .as_str(),
-    );
-    for driver in self.fifo_drivers.get(&fifo_name).unwrap().iter() {
-      res.push_str(
+          .get_user()
+          .as_expr::<FIFOPush>(self.sys)
+          .ok()
+          .map(|y| {
+            y.get()
+              .get_parent()
+              .as_ref::<Block>(self.sys)
+              .unwrap()
+              .get_module()
+          })
+      })
+      .collect::<HashSet<_>>();
+
+    let mut pusher_valid = vec![];
+    let mut pusher_data = vec![];
+    let mut pusher_ready = vec![];
+    drivers.iter().for_each(|x| {
+      let module = x.as_ref::<Module>(self.sys).unwrap();
+      let driver = namify(module.get_name());
+      res.push_str(&format!(
+        "
+logic fifo_{name}_driver_{driver}_push_valid;\n
+logic [{ty_width}:0] fifo_{name}_driver_{driver}_push_data;\n
+logic fifo_{name}_driver_{driver}_push_ready;\n",
+        name = fifo_name,
+        driver = driver,
+        ty_width = fifo_width - 1
+      ));
+      pusher_valid.push(format!("fifo_{}_driver_{}_push_valid", fifo_name, driver));
+      pusher_data.push(format!(
+          "({{{width}{{fifo_{name}_driver_{driver}_push_valid}}}} & fifo_{name}_driver_{driver}_push_data)",
+          width=fifo_width, driver=driver,name=fifo_name));
+      pusher_ready.push(
         format!(
-          "assign fifo_{}_driver_{}_push_ready = fifo_{}_push_ready;\n",
+          "assign fifo_{}_driver_{}_push_ready = fifo_{}_push_ready;",
           fifo_name, driver, fifo_name
         )
-        .as_str(),
       );
-    }
+    });
+
+    // res.push_str(format!("logic fifo_{}_push_valid;\n", fifo_name).as_str());
+    // res.push_str(
+    //   format!(
+    //     "assign fifo_{}_push_valid = {};\n",
+    //     fifo_name,
+    //     self
+    //       .fifo_drivers
+    //       .get(&fifo_name)
+    //       .unwrap()
+    //       .iter()
+    //       .map(|driver| format!("fifo_{}_driver_{}_push_valid", fifo_name, driver))
+    //       .collect::<Vec<String>>()
+    //       .join(" | ")
+    //   )
+    //   .as_str(),
+    // );
+    // res.push_str(
+    //   format!(
+    //     "assign fifo_{}_push_data = \n{};\n",
+    //     fifo_name,
+    //     self
+    //       .fifo_drivers
+    //       .get(&fifo_name)
+    //       .unwrap()
+    //       .iter()
+    //       .map(|driver| format!(
+    //         "  ({{{}{{fifo_{}_driver_{}_push_valid}}}} & fifo_{}_driver_{}_push_data)",
+    //         fifo_width, fifo_name, driver, fifo_name, driver
+    //       ))
+    //       .collect::<Vec<String>>()
+    //       .join(" |\n")
+    //   )
+    //   .as_str(),
+    // );
+    // for driver in self.fifo_drivers.get(&fifo_name).unwrap().iter() {}
     res.push_str(&format!(
       "
-logic fifo_{name}_push_ready;\n
-logic fifo_{name}_pop_valid;\n
-logic [{ty_width}:0] fifo_{name}_push_data;\n
-logic [{ty_width}:0] fifo_{name}_pop_data;\n
-logic fifo_{name}_pop_ready;\n
-fifo #({width}) fifo_{name}_i (\n
-  .clk(clk),\n
+logic fifo_{name}_push_valid;
+assign fifo_{name}_push_valid = {pusher_valid};
+logic fifo_{name}_push_ready;
+{pusher_readiness}
+logic fifo_{name}_pop_valid;
+logic [{ty_width}:0] fifo_{name}_push_data;
+assign fifo_{name}_push_data = {pusher_data};
+logic [{ty_width}:0] fifo_{name}_pop_data;
+logic fifo_{name}_pop_ready;
+fifo #({width}) fifo_{name}_i (
+  .clk(clk),
   .rst_n(rst_n),
-  .push_valid(fifo_{name}_push_valid),\n
-  .push_data(fifo_{name}_push_data),\n
-  .push_ready(fifo_{name}_push_ready),\n
-  .pop_valid(fifo_{name}_pop_valid),\n
-  .pop_data(fifo_{name}_pop_data),\n
+  .push_valid(fifo_{name}_push_valid),
+  .push_data(fifo_{name}_push_data),
+  .push_ready(fifo_{name}_push_ready),
+  .pop_valid(fifo_{name}_pop_valid),
+  .pop_data(fifo_{name}_pop_data),
   .pop_ready(fifo_{name}_pop_ready));\n",
       ty_width = fifo_width - 1,
       name = fifo_name,
-      width = fifo_width
+      width = fifo_width,
+      pusher_readiness = pusher_ready.join("\n"),
+      pusher_valid = pusher_valid.join(" | "),
+      pusher_data = pusher_data.join("\n")
     ));
 
     res
@@ -328,20 +363,12 @@ fifo #({width}) fifo_{name}_i (\n
         .unwrap_or_else(|| panic!("Driver of \"{}\" not found!", module_name))
         .iter()
       {
-        res.push_str(
-          format!(
-            "logic {}_driver_{}_trigger_push_valid;\n",
-            module_name, driver
-          )
-          .as_str(),
-        );
-        res.push_str(
-          format!(
-            "logic {}_driver_{}_trigger_push_ready;\n",
-            module_name, driver
-          )
-          .as_str(),
-        );
+        res.push_str(&format!(
+          "logic {module}_driver_{driver}_trigger_push_valid;\n
+logic {module}_driver_{driver}_trigger_push_ready;\n",
+          module = module_name,
+          driver = driver
+        ));
       }
     }
     res.push_str(format!("logic {}_trigger_push_valid;\n", module_name).as_str());
@@ -375,18 +402,21 @@ fifo #({width}) fifo_{name}_i (\n
         );
       }
     }
-    res.push_str(format!("logic {}_trigger_pop_valid;\n", module_name).as_str());
-    res.push_str(format!("logic {}_trigger_pop_ready;\n", module_name).as_str());
-    res.push_str(format!("fifo #(1) {}_trigger_i (\n", module_name).as_str());
-    res.push_str("  .clk(clk),\n".to_string().as_str());
-    res.push_str("  .rst_n(rst_n),\n".to_string().as_str());
-    res.push_str(format!("  .push_valid({}_trigger_push_valid),\n", module_name).as_str());
-    res.push_str("  .push_data(1'b1),\n".to_string().as_str());
-    res.push_str(format!("  .push_ready({}_trigger_push_ready),\n", module_name).as_str());
-    res.push_str(format!("  .pop_valid({}_trigger_pop_valid),\n", module_name).as_str());
-    res.push_str("  .pop_data(),\n".to_string().as_str());
-    res.push_str(format!("  .pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
-    res.push_str(");\n\n".to_string().as_str());
+    res.push_str(&format!(
+      "
+logic {module}_trigger_pop_valid;
+logic {module}_trigger_pop_ready;
+fifo #(1) {module}_trigger_i (
+  .clk(clk),
+  .rst_n(rst_n),
+  .push_valid({module}_trigger_push_valid),
+  .push_data(1'b1),
+  .push_ready({module}_trigger_push_ready),
+  .pop_valid({module}_trigger_pop_valid),
+  .pop_data(),
+  .pop_ready({module}_trigger_pop_ready));",
+      module = module_name
+    ));
     res
   }
 
@@ -750,6 +780,8 @@ impl VerilogDumper<'_, '_> {
 
 impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
+    self.current_module = namify(module.get_name()).to_string();
+
     let mut res = String::new();
 
     res.push_str(format!("module {} (\n", self.current_module).as_str());
@@ -1595,7 +1627,6 @@ pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Res
   let mut fd = File::create(fname)?;
 
   for module in vd.sys.module_iter(ModuleKind::Module) {
-    vd.current_module = namify(module.get_name()).to_string();
     fd.write_all(vd.visit_module(module).unwrap().as_bytes())
       .unwrap();
   }
