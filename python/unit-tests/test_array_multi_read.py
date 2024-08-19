@@ -87,7 +87,7 @@ def test_array_multi_read():
         driver = Driver()
         driver.build(mod_a, mod_b, mod_c)
 
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.verilator_path())
+    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
     
     raw = utils.run_simulator(simulator_path)
     check(raw)

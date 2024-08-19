@@ -81,7 +81,7 @@ def test_bind():
         driver = Driver()
         driver.build(lhs, rhs)
 
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.verilator_path())
+    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)

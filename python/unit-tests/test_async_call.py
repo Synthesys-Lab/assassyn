@@ -54,7 +54,7 @@ def test_async_call():
 
     print(sys)
 
-    config = assassyn.backend.config(verilog=utils.verilator_path(), sim_threshold=200, idle_threshold=200)
+    config = assassyn.backend.config(verilog=utils.has_verilator(), sim_threshold=200, idle_threshold=200)
 
     simulator_path, verilator_path = elaborate(sys, **config)
 
