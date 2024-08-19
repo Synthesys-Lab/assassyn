@@ -679,23 +679,17 @@ module {} (
 
     self.indent += 2;
     for port in module.fifo_iter() {
+      let bits = port.scalar_ty().get_bits();
       let name = fifo_name!(port);
-      res.push_str(format!("{}// port {}\n", self.indent_str(), name).as_str());
       res.push_str(&format!(
-        "{}input logic fifo_{}_pop_valid,\n",
-        self.indent_str(),
-        name
-      ));
-      res.push_str(&format!(
-        "{}input logic [{}:0] fifo_{}_pop_data,\n",
-        self.indent_str(),
-        port.scalar_ty().get_bits() - 1,
-        name
-      ));
-      res.push_str(&format!(
-        "{}output logic fifo_{}_pop_ready,\n\n",
-        self.indent_str(),
-        name
+        "
+  // port {name}
+  input logic fifo_{name}_pop_valid,
+  input logic [{ty_bits}:0] fifo_{name}_pop_data,
+  output logic fifo_{name}_pop_ready,
+",
+        name = name,
+        ty_bits = bits - 1
       ));
     }
 
@@ -708,70 +702,33 @@ module {} (
             namify(fifo.get_module().get_name()),
             fifo_name!(fifo)
           );
-          res.push_str(format!("{}// port {}\n", self.indent_str(), fifo_name).as_str());
           res.push_str(&format!(
-            "{}output logic fifo_{}_push_valid,\n",
-            self.indent_str(),
-            fifo_name
-          ));
-          res.push_str(&format!(
-            "{}output logic [{}:0] fifo_{}_push_data,\n",
-            self.indent_str(),
-            fifo.scalar_ty().get_bits() - 1,
-            fifo_name
-          ));
-          res.push_str(&format!(
-            "{}input logic fifo_{}_push_ready,\n",
-            self.indent_str(),
-            fifo_name
+            "
+  // port {name}
+  output logic fifo_{name}_push_valid,
+  output logic [{ty_bits}:0] fifo_{name}_push_data,
+  input logic fifo_{name}_push_ready,
+",
+            name = fifo_name,
+            ty_bits = fifo.scalar_ty().get_bits() - 1
           ));
         }
         NodeKind::Array => {
           let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-          res.push_str(
-            format!(
-              "{}// array {}\n",
-              self.indent_str(),
-              namify(array_ref.get_name())
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "{}input logic [{}:0] array_{}_q[0:{}],\n",
-              self.indent_str(),
-              array_ref.scalar_ty().get_bits() - 1,
-              namify(array_ref.get_name()),
-              array_ref.get_size() - 1
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "{}output logic array_{}_w,\n",
-              self.indent_str(),
-              namify(array_ref.get_name())
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "{}output logic [{}:0] array_{}_widx,\n",
-              self.indent_str(),
-              (array_ref.get_size()).ilog2(),
-              namify(array_ref.get_name())
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "{}output logic [{}:0] array_{}_d,\n",
-              self.indent_str(),
-              array_ref.scalar_ty().get_bits() - 1,
-              namify(array_ref.get_name())
-            )
-            .as_str(),
-          );
+          let name = namify(array_ref.get_name());
+          res.push_str(&format!(
+            "
+  // array {name}
+  input logic [{ty_bits}:0] array_{name}_q[0:{size}],
+  output logic array_{name}_w,
+  output logic [{idx_size}:0] array_{name}_widx,
+  output logic [{ty_bits}:0] array_{name}_d,
+",
+            name = name,
+            ty_bits = array_ref.scalar_ty().get_bits() - 1,
+            size = array_ref.get_size() - 1,
+            idx_size = array_ref.get_size().ilog2()
+          ));
         }
         NodeKind::Module | NodeKind::Expr => {
           // TODO(@were): Skip this for now.
