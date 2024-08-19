@@ -36,8 +36,6 @@ struct VerilogDumper<'a, 'b> {
   array_stores: HashMap<String, Vec<(String, String, String)>>, // array_name -> [(pred, idx, value)]
   triggers: HashMap<String, Vec<String>>,                       // module_name -> [pred]
   current_module: String,
-  has_testbench: bool,
-  has_driver: bool,
   trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
   array_drivers: HashMap<String, HashSet<String>>,   // array -> {driver module}
   fifo_drivers: HashMap<String, HashSet<String>>,    // fifo -> {driver module}
@@ -55,8 +53,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       array_stores: HashMap::new(),
       triggers: HashMap::new(),
       current_module: String::new(),
-      has_testbench: false,
-      has_driver: false,
       trigger_drivers: HashMap::new(),
       array_drivers: HashMap::new(),
       fifo_drivers: HashMap::new(),
@@ -616,10 +612,10 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(self.dump_trigger(&module).as_str());
     }
 
-    if self.has_testbench {
+    if self.sys.has_testbench() {
       res.push_str("assign testbench_trigger_push_valid = 1'b1;\n\n");
     }
-    if self.has_driver {
+    if self.sys.has_driver() {
       res.push_str("assign driver_trigger_push_valid = 1'b1;\n\n");
     }
 
@@ -767,14 +763,6 @@ macro_rules! dump_ref_immwidth {
 
 impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
-    if self.current_module == "testbench" {
-      self.has_testbench = true;
-    }
-
-    if self.current_module == "driver" {
-      self.has_driver = true;
-    }
-
     let mut res = String::new();
 
     res.push_str(format!("module {} (\n", self.current_module).as_str());
@@ -1307,13 +1295,14 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
         let name = namify(&expr.upcast().to_string(self.sys));
         let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
         let fifo = pop.fifo();
+        let fifo_name = fifo_name!(fifo);
         Some(format!(
             "logic [{}:0] {};\nassign {} = fifo_{}_pop_data;\nassign fifo_{}_pop_ready = trigger{};\n\n",
             fifo.scalar_ty().get_bits() - 1,
             name,
             name,
-            fifo_name!(fifo),
-            fifo_name!(fifo),
+            fifo_name,
+            fifo_name,
             self.get_pred().map(|p| format!(" && {}", p)).unwrap_or("".to_string())
           ))
       }
@@ -1690,21 +1679,7 @@ pub fn generate_cpp_testbench(dir: &Path, sys: &SysBuilder, simulator: &Simulato
   let make_fname = dir.join("Makefile");
   let mut make_fd = File::create(make_fname).unwrap();
   make_fd
-    .write_all(".PHONY: verilator main\n".as_bytes())
-    .unwrap();
-  make_fd.write_all("verilator:\n".as_bytes()).unwrap();
-  make_fd
-    .write_all(
-      format!(
-        "\t$(VERILATOR_ROOT)/bin/verilator --cc {}.sv --exe main.cpp --top tb --timing --trace\n",
-        sys.get_name()
-      )
-      .as_bytes(),
-    )
-    .unwrap();
-  make_fd.write_all("main: verilator\n".as_bytes()).unwrap();
-  make_fd
-    .write_all("\tmake -C obj_dir -f Vtb.mk\n".as_bytes())
+    .write_all(format!(include_str!("Makefile"), sys.get_name()).as_bytes())
     .unwrap();
 }
 

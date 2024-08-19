@@ -57,6 +57,14 @@ always @(posedge clk or negedge rst_n) begin
     front <= new_front;
     count <= new_count;
     pop_valid <= new_count != 0;
+    // This is the most tricky part of the code:
+    // If new_count is 0, we have noting to pop, so we just give pop_valid a 0,
+    // and pop_data a 'x. Otherwise, we have to pop something real from the FIFO.
+    // Because the array write uses a non-blocking "<=" operator, the result
+    // of array write will not be visible until the next cycle. However, we
+    // need this result when new_front == back. This indicates the newly
+    // pushed data is also the front of the FIFO. Instead of reading it from
+    // the array buffer, we directly forward the push_data to pop_data.
     pop_data <= new_count == 0 ? 'x : (new_front == back && push_valid ? push_data : q[new_front]);
 
   end
