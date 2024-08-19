@@ -223,18 +223,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
   fn dump_fifo(&self, fifo: &FIFORef) -> String {
     let mut res = String::new();
-    let fifo_name = namify(
-      format!(
-        "{}_{}",
-        fifo
-          .get_parent()
-          .as_ref::<Module>(self.sys)
-          .unwrap()
-          .get_name(),
-        fifo_name!(fifo)
-      )
-      .as_str(),
-    );
+    let fifo_name =
+      namify(format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)).as_str());
     let fifo_width = fifo.scalar_ty().get_bits();
     res.push_str(format!("// fifo: {}\n", fifo_name).as_str());
 
@@ -411,8 +401,11 @@ fifo #(1) {module}_trigger_i (
       match interf.get_kind() {
         NodeKind::FIFO => {
           let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-          let fifo_name =
-            namify(format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)).as_str());
+          let fifo_name = namify(&format!(
+            "{}_{}",
+            fifo.get_module().get_name(),
+            fifo_name!(fifo)
+          ));
           res.push_str(&format!(
             "
   .fifo_{fifo}_push_valid(fifo_{fifo}_driver_{module}_push_valid),
@@ -424,41 +417,16 @@ fifo #(1) {module}_trigger_i (
         }
         NodeKind::Array => {
           let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-          res.push_str(
-            format!(
-              "  .array_{}_q(array_{}_q),\n",
-              namify(array_ref.get_name()),
-              namify(array_ref.get_name())
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "  .array_{}_w(array_{}_driver_{}_w),\n",
-              namify(array_ref.get_name()),
-              namify(array_ref.get_name()),
-              module_name
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "  .array_{}_widx(array_{}_driver_{}_widx),\n",
-              namify(array_ref.get_name()),
-              namify(array_ref.get_name()),
-              module_name
-            )
-            .as_str(),
-          );
-          res.push_str(
-            format!(
-              "  .array_{}_d(array_{}_driver_{}_d),\n",
-              namify(array_ref.get_name()),
-              namify(array_ref.get_name()),
-              module_name
-            )
-            .as_str(),
-          );
+          let array_name = namify(array_ref.get_name());
+          res.push_str(&format!(
+            "
+  .array_{name}_q(array_{name}_q),
+  .array_{name}_w(array_{name}_driver_{module}_w),
+  .array_{name}_widx(array_{name}_driver_{module}_widx),
+  .array_{name}_d(array_{name}_driver_{module}_d),\n",
+            name = array_name,
+            module = module_name
+          ));
         }
         NodeKind::Module | NodeKind::Expr => {
           // TODO(@were): Skip this for now. I am 100% sure we need this later.
@@ -471,24 +439,20 @@ fifo #(1) {module}_trigger_i (
     trigger_modules.sort_unstable();
     trigger_modules.dedup();
     for trigger_module in trigger_modules {
-      res.push_str(
-        format!(
-          "  .{}_trigger_push_valid({}_driver_{}_trigger_push_valid),\n",
-          trigger_module, trigger_module, module_name
-        )
-        .as_str(),
-      );
-      res.push_str(
-        format!(
-          "  .{}_trigger_push_ready({}_driver_{}_trigger_push_ready),\n",
-          trigger_module, trigger_module, module_name
-        )
-        .as_str(),
-      );
+      res.push_str(&format!(
+        "
+  .{trigger}_trigger_push_valid({trigger}_driver_{module}_trigger_push_valid),
+  .{trigger}_trigger_push_ready({trigger}_driver_{module}_trigger_push_ready),",
+        trigger = trigger_module,
+        module = module_name
+      ));
     }
-    res.push_str(format!("  .trigger_pop_valid({}_trigger_pop_valid),\n", module_name).as_str());
-    res.push_str(format!("  .trigger_pop_ready({}_trigger_pop_ready)\n", module_name).as_str());
-    res.push_str(");\n\n".to_string().as_str());
+    res.push_str(&format!(
+      "
+  .trigger_pop_valid({module}_trigger_pop_valid),
+  .trigger_pop_ready({module}_trigger_pop_ready));\n",
+      module = module_name
+    ));
     res
   }
 
@@ -533,13 +497,13 @@ fifo #(1) {module}_trigger_i (
     // fifo storage element definitions
     for module in self.sys.module_iter(ModuleKind::Module) {
       for fifo in module.fifo_iter() {
-        res.push_str(self.dump_fifo(&fifo).as_str());
+        res.push_str(&self.dump_fifo(&fifo));
       }
     }
 
     // trigger fifo definitions
     for module in self.sys.module_iter(ModuleKind::Module) {
-      res.push_str(self.dump_trigger(&module).as_str());
+      res.push_str(&self.dump_trigger(&module));
     }
 
     if self.sys.has_testbench() {
@@ -704,12 +668,14 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
 
     let mut res = String::new();
 
-    res.push_str(format!("module {} (\n", self.current_module).as_str());
+    res.push_str(&format!(
+  "
+module {} (
+  input logic clk,
+  input logic rst_n,
+", self.current_module));
 
     self.indent += 2;
-    res.push_str(format!("{}input logic clk,\n", self.indent_str()).as_str());
-    res.push_str(format!("{}input logic rst_n,\n", self.indent_str()).as_str());
-    res.push('\n');
     for port in module.fifo_iter() {
       let name = fifo_name!(port);
       res.push_str(format!("{}// port {}\n", self.indent_str(), name).as_str());
@@ -737,13 +703,7 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
           let fifo_name = format!(
             "{}_{}",
-            namify(
-              fifo
-                .get_parent()
-                .as_ref::<Module>(self.sys)
-                .unwrap()
-                .get_name()
-            ),
+            namify(fifo.get_module().get_name()),
             fifo_name!(fifo)
           );
           res.push_str(format!("{}// port {}\n", self.indent_str(), fifo_name).as_str());
