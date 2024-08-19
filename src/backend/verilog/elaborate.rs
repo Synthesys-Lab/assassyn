@@ -40,7 +40,6 @@ struct VerilogDumper<'a, 'b> {
   current_module: String,
   trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
   array_drivers: HashMap<String, HashSet<String>>,   // array -> {driver module}
-  fifo_drivers: HashMap<String, HashSet<String>>,    // fifo -> {driver module}
   simulator: Simulator,
 }
 
@@ -57,7 +56,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       current_module: String::new(),
       trigger_drivers: HashMap::new(),
       array_drivers: HashMap::new(),
-      fifo_drivers: HashMap::new(),
       simulator,
     }
   }
@@ -1432,17 +1430,6 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
           )
           .as_str(),
         );
-        match self.fifo_drivers.get_mut(&fifo_name) {
-          Some(fds) => {
-            fds.insert(self.current_module.clone());
-          }
-          None => {
-            self.fifo_drivers.insert(
-              fifo_name.clone(),
-              HashSet::from([self.current_module.clone()]),
-            );
-          }
-        }
         let pred = self.get_pred().unwrap_or("".to_string());
         match self.fifo_pushes.get_mut(&fifo_name) {
           Some(fps) => fps.push((pred, dump_ref!(self.sys, &push.value()))),
