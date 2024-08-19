@@ -19,6 +19,23 @@ use self::{expr::subcode, module::Attribute};
 
 use super::Simulator;
 
+enum Predication {
+  Conditional(String),
+  Unconditional,
+}
+
+impl Predication {
+  fn from_cond_str(conds: &Vec<String>) -> Self {
+    if conds.iter().all(|x| !x.is_empty()) {
+      Self::Conditional(conds.join(" || "))
+    } else if conds.len() == 1 && conds.iter().all(|x| x.is_empty()) {
+      Self::Unconditional
+    } else {
+      panic!("Mixed conditional and unconditional branches");
+    }
+  }
+}
+
 fn namify(name: &str) -> String {
   name.replace('.', "_")
 }
@@ -820,57 +837,29 @@ module {} (
     self.array_stores.clear();
     self.triggers.clear();
     for elem in module.get_body().body_iter().skip(skip) {
-      match elem.get_kind() {
+      res.push_str(&match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(expr).unwrap().as_str());
+          self.visit_expr(expr).unwrap()
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(block).unwrap().as_str());
+          self.visit_block(block).unwrap()
         }
         _ => {
           panic!("Unexpected reference type: {:?}", elem);
         }
-      }
+      });
     }
 
     for (m, preds) in self.triggers.drain() {
-      let mut valid_conds = Vec::<String>::new();
-      let mut has_unconditional_branch = false;
-      let mut has_conditional_branch = false;
-      for p in preds {
-        if p.is_empty() {
-          if has_unconditional_branch {
-            panic!("multiple unconditional branches for trigger {}", m);
-          }
-          if has_conditional_branch {
-            panic!(
-              "mixed conditional and unconditional branches for trigger {}",
-              m
-            );
-          }
-          has_unconditional_branch = true;
-        } else {
-          if has_unconditional_branch {
-            panic!(
-              "mixed conditional and unconditional branches for trigger {}",
-              m
-            );
-          }
-          has_conditional_branch = true;
-          valid_conds.push(p.clone());
-        }
-      }
-      if has_conditional_branch {
-        let conds = valid_conds.join(" || ");
-        res.push_str(&format!(
+      res.push_str(&match Predication::from_cond_str(&preds) {
+        Predication::Conditional(cond) => format!(
           "assign {}_trigger_push_valid = trigger && ({});\n\n",
-          m, conds
-        ));
-      } else {
-        res.push_str(&format!("assign {}_trigger_push_valid = trigger;\n\n", m));
-      }
+          m, cond
+        ),
+        Predication::Unconditional => format!("assign {}_trigger_push_valid = trigger;\n\n", m),
+      });
     }
 
     for (f, branches) in self.fifo_pushes.drain() {
@@ -880,44 +869,38 @@ module {} (
       let mut has_conditional_branch = false;
       for (p, v) in branches {
         if p.is_empty() {
-          if has_unconditional_branch {
-            panic!("multiple unconditional branches for fifo {}", f);
-          }
-          if has_conditional_branch {
-            panic!(
-              "mixed conditional and unconditional branches for fifo {}",
-              f
-            );
-          }
+          assert!(
+            !has_unconditional_branch,
+            "multiple unconditional branches for fifo {}",
+            f
+          );
+          assert!(
+            !has_conditional_branch,
+            "mixed conditional and unconditional branches for fifo {}",
+            f
+          );
           has_unconditional_branch = true;
-          data_str.push_str(v.to_string().as_str());
+          data_str.push_str(&v);
         } else {
-          if has_unconditional_branch {
-            panic!(
-              "mixed conditional and unconditional branches for fifo {}",
-              f
-            );
-          }
+          assert!(
+            !has_unconditional_branch,
+            "mixed conditional and unconditional branches for fifo {}",
+            f
+          );
           has_conditional_branch = true;
           valid_conds.push(p.clone());
           data_str.push_str(format!("{} ? {} : ", p, v).as_str());
         }
       }
       if has_conditional_branch {
-        data_str.push_str("'x".to_string().as_str());
+        data_str.push_str("'x");
       }
-      if has_conditional_branch {
-        res.push_str(
-          format!(
-            "assign fifo_{}_push_valid = trigger && ({});\n",
-            f,
-            valid_conds.join(" || ")
-          )
-          .as_str(),
-        );
+      res.push_str(&if has_conditional_branch {
+        let valid = valid_conds.join(" || ");
+        format!("assign fifo_{}_push_valid = trigger && ({});\n", f, valid)
       } else {
-        res.push_str(format!("assign fifo_{}_push_valid = trigger;\n", f).as_str());
-      }
+        format!("assign fifo_{}_push_valid = trigger;\n", f)
+      });
       res.push_str(format!("assign fifo_{}_push_data = {};\n\n", f, data_str).as_str());
     }
 
@@ -958,17 +941,19 @@ module {} (
         d_str.push_str("'x".to_string().as_str());
         idx_str.push_str("'x".to_string().as_str());
       }
-      if has_conditional_branch {
-        res.push_str(&format!(
-          "assign array_{}_w = trigger && ({});\n",
-          a,
-          w_conds.join(" || ")
-        ));
+      res.push_str(&if has_conditional_branch {
+        let cond = w_conds.join(" || ");
+        format!("assign array_{}_w = trigger && ({});\n", a, cond)
       } else {
-        res.push_str(format!("assign array_{}_w = trigger;\n", a).as_str());
-      }
-      res.push_str(format!("assign array_{}_d = {};\n", a, d_str).as_str());
-      res.push_str(format!("assign array_{}_widx = {};\n\n", a, idx_str).as_str());
+        format!("assign array_{}_w = trigger;\n", a)
+      });
+      res.push_str(&format!(
+        "
+  assign array_{}_d = {};
+  assign array_{}_widx = {};
+",
+        a, d_str, a, idx_str
+      ));
     }
 
     // tie off array store port
@@ -1004,15 +989,14 @@ module {} (
       }
     }
 
-    res.push_str(
-      format!(
-        "assign trigger = trigger_pop_valid{};\n\n",
-        wait_until.unwrap_or("".to_string())
-      )
-      .as_str(),
-    );
-
-    res.push_str(format!("endmodule // {}\n\n\n", self.current_module).as_str());
+    res.push_str(&format!(
+      "
+  assign trigger = trigger_pop_valid{};
+  endmodule // {}
+",
+      wait_until.unwrap_or("".to_string()),
+      self.current_module
+    ));
 
     Some(res)
   }
@@ -1248,8 +1232,11 @@ module {} (
       Opcode::FIFOPush => {
         let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
         let fifo = push.fifo();
-        let fifo_name =
-          namify(format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)).as_str());
+        let fifo_name = format!(
+          "{}_{}",
+          namify(fifo.get_module().get_name()),
+          fifo_name!(fifo)
+        );
         let pred = self.get_pred().unwrap_or("".to_string());
         match self.fifo_pushes.get_mut(&fifo_name) {
           Some(fps) => fps.push((pred, dump_ref!(self.sys, &push.value()))),
