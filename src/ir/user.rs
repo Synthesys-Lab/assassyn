@@ -299,60 +299,6 @@ impl SysBuilder {
     self.remove_user(operand);
   }
 
-  // pub(crate) fn remove_user(&mut self, operand: &BaseNode) {
-  //   if operand.is_unknown() {
-  //     return;
-  //   }
-  //   let operand_ref = operand.as_ref::<Operand>(self).unwrap();
-  //   let def_value = *operand_ref.get_value();
-  //   match def_value.get_kind() {
-  //     NodeKind::Module => {
-  //       let mut module_mut = self.get_mut::<Module>(&def_value).unwrap();
-  //       module_mut.remove_user(operand);
-  //     }
-  //     NodeKind::FIFO => {
-  //       let mut fifo_mut = self.get_mut::<FIFO>(&def_value).unwrap();
-  //       fifo_mut.remove_user(operand);
-  //     }
-  //     NodeKind::Expr => {
-  //       let mut expr_mut = self.get_mut::<Expr>(&def_value).unwrap();
-  //       expr_mut.remove_user(operand);
-  //     }
-  //     NodeKind::Array => {
-  //       let mut array_mut = self.get_mut::<Array>(&def_value).unwrap();
-  //       array_mut.remove_user(operand);
-  //     }
-  //     _ => {}
-  //   }
-  // }
-
-  // pub(crate) fn add_user(&mut self, operand: BaseNode) {
-  //   if operand.is_unknown() {
-  //     return;
-  //   }
-  //   let operand_ref = operand.as_ref::<Operand>(self).unwrap();
-  //   let value = *operand_ref.get_value();
-  //   match value.get_kind() {
-  //     NodeKind::Module => {
-  //       let mut module_mut = self.get_mut::<Module>(&value).unwrap();
-  //       module_mut.add_user(operand);
-  //     }
-  //     NodeKind::FIFO => {
-  //       let mut fifo_mut = self.get_mut::<FIFO>(&value).unwrap();
-  //       fifo_mut.add_user(operand);
-  //     }
-  //     NodeKind::Expr => {
-  //       let mut expr_mut = self.get_mut::<Expr>(&value).unwrap();
-  //       expr_mut.add_user(operand);
-  //     }
-  //     NodeKind::Array => {
-  //       let mut array_mut = self.get_mut::<Array>(&value).unwrap();
-  //       array_mut.add_user(operand);
-  //     }
-  //     _ => {}
-  //   }
-  // }
-
   // TODO(@were): I strongly believe we can have a BFS based gatherer to have better performance.
   pub fn replace_all_uses_with(&mut self, src: BaseNode, dst: BaseNode) {
     let mut gather = GatherAllUses::new(src);
