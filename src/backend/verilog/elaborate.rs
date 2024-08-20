@@ -390,7 +390,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       }
     }
 
-    let trigger_modules = get_triggered_modules(&module);
+    let trigger_modules = get_triggered_modules(module);
 
     for trigger_module in trigger_modules {
       res.push_str(&format!(
