@@ -352,3 +352,17 @@ class Select1Hot(Expr):
         cond = self.cond.as_operand()
         values = ', '.join(i.as_operand() for i in self.values)
         return f'{lval} = select_1hot {cond} ({values})'
+
+class Reduce:
+    @staticmethod
+    def concat(*args):
+        if len(args) < 2:
+            raise ValueError("concat requires at least two arguments")
+        
+        def concat_chain(args):
+            if len(args) == 2:
+                return args[0].concat(args[1])
+            else:
+                return concat_chain(args[:-1]).concat(args[-1])
+        
+        return concat_chain(args)
