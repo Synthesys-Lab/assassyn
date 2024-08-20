@@ -223,8 +223,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       ));
       pusher_valid.push(format!("  fifo_{name}_driver_{driver}_push_valid"));
       pusher_data.push(format!(
-          "  ({{{width}{{fifo_{name}_driver_{driver}_push_valid}}}} & fifo_{name}_driver_{driver}_push_data)",
-          width=fifo_width));
+          "  ({{{fifo_width}{{fifo_{name}_driver_{driver}_push_valid}}}} & fifo_{name}_driver_{driver}_push_data)"));
       pusher_ready.push(
         format!("  assign fifo_{name}_driver_{driver}_push_ready = fifo_{name}_push_ready;")
       );
@@ -640,7 +639,7 @@ module {} (
           ));
         }
         NodeKind::Module | NodeKind::Expr => {
-          // TODO(@were): Skip this for now.
+          // Handled somewhere else. See `callers` and `callees`.
         }
         _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }

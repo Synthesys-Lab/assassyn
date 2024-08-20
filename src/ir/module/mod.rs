@@ -144,9 +144,7 @@ impl<'sys> ModuleRef<'sys> {
   }
 
   /// Iterate over the callers that triggers this module.
-  pub fn callers<'borrow, 'res>(
-    &'borrow self,
-  ) -> impl Iterator<Item = ModuleRef<'res>> + 'res
+  pub fn callers<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = ModuleRef<'res>> + 'res
   where
     'sys: 'borrow,
     'sys: 'res,
@@ -164,9 +162,7 @@ impl<'sys> ModuleRef<'sys> {
   }
 
   /// Iterate over the callees that are triggered by this module.
-  pub fn callees<'borrow, 'res>(
-    &'borrow self,
-  ) -> impl Iterator<Item = ModuleRef<'res>> + 'res
+  pub fn callees<'borrow, 'res>(&'borrow self) -> impl Iterator<Item = ModuleRef<'res>> + 'res
   where
     'sys: 'borrow,
     'sys: 'res,
