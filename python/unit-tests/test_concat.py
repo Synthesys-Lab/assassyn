@@ -15,8 +15,8 @@ class Adder(Module):
     
     @module.combinational
     def build(self):
-        c = self.msb.concat(self.lsb) 
-        # c = Reduce.concat(self.msb, self.lsb)
+        # c = self.msb.concat(self.lsb) 
+        c = concat(self.msb, self.lsb)
         log("concat: {} << 32 + {} = {}", self.msb, self.lsb, c)
 
 

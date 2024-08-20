@@ -60,7 +60,7 @@ class Execution(Module):
         invokde_adder = is_add | is_addi | is_lw
 
         result = (a.bitcast(Int(32)) + rhs.bitcast(Int(32))).bitcast(Bits(32))
-        result = (Reduce.concat(invokde_adder, is_lui, is_branch)).select1hot(
+        result = (concat(invokde_adder, is_lui, is_branch)).select1hot(
         # {invokde_adder, is_lui, is_branch}
             Bits(32)(0), self.imm_value, result
         )
@@ -187,7 +187,7 @@ class Decoder(Memory):
             u_imm = inst[12:31].concat(Bits(12)(0)) 
 
             sign = inst[31:31]
-            b_imm = Reduce.concat(inst[31:31], inst[7:7], inst[25:30], inst[8:11], Bits(1)(0))
+            b_imm = concat(inst[31:31], inst[7:7], inst[25:30], inst[8:11], Bits(1)(0))
             b_imm = (sign.select(Bits(19)(0x7ffff), Bits(19)(0))).concat(b_imm)
 
             op_check = OpcodeChecker(opcode)
@@ -216,7 +216,7 @@ class Decoder(Memory):
             reg_b = read_rs2.select(rs2, Bits(5)(0))
 
             no_imm = ~(read_i_imm | read_u_imm | read_b_imm)
-            imm_cond = Reduce.concat(read_i_imm, read_u_imm, read_b_imm, no_imm)
+            imm_cond = concat(read_i_imm, read_u_imm, read_b_imm, no_imm)
             # {read_i_imm, read_u_imm, read_b_imm, no_imm}
             imm_value = imm_cond.select1hot(
                 Bits(32)(0), 

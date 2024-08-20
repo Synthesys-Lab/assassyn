@@ -6,6 +6,8 @@ from ..builder import ir_builder
 from ..value import Value
 from ..utils import identifierize
 
+from functools import reduce
+
 class Expr(Value):
     '''The frontend base node for expressions'''
 
@@ -353,21 +355,11 @@ class Select1Hot(Expr):
         values = ', '.join(i.as_operand() for i in self.values)
         return f'{lval} = select_1hot {cond} ({values})'
 
-# pylint: disable=too-few-public-methods
-class Reduce:
-    """Provides reduction operations for expressions."""
-
-    @staticmethod
-    def concat(*args):
-        """
-        Concatenate multiple arguments recursively.
-        """
-        if len(args) < 2:
-            raise ValueError("concat requires at least two arguments")
-
-        def concat_chain(items):
-            if len(items) == 2:
-                return items[0].concat(items[1])
-            return concat_chain(items[:-1]).concat(items[-1])
-
-        return concat_chain(args)
+def concat(*args):
+    """
+    Concatenate multiple arguments using the existing concat method.
+    This function translates concat(a, b, c) into a.concat(b).concat(c).
+    """
+    if len(args) < 2:
+        raise ValueError("concat requires at least two arguments")
+    return reduce(lambda x, y: x.concat(y), args)
