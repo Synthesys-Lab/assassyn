@@ -2,11 +2,11 @@
 
 #pylint: disable=cyclic-import,import-outside-toplevel
 
+from functools import reduce
+
 from ..builder import ir_builder
 from ..value import Value
 from ..utils import identifierize
-
-from functools import reduce
 
 class Expr(Value):
     '''The frontend base node for expressions'''
