@@ -354,15 +354,19 @@ class Select1Hot(Expr):
         return f'{lval} = select_1hot {cond} ({values})'
 
 class Reduce:
+    """Provides reduction operations for expressions."""
+
     @staticmethod
     def concat(*args):
+        """
+        Concatenate multiple arguments recursively.
+        """
         if len(args) < 2:
             raise ValueError("concat requires at least two arguments")
-        
-        def concat_chain(args):
-            if len(args) == 2:
-                return args[0].concat(args[1])
-            else:
-                return concat_chain(args[:-1]).concat(args[-1])
-        
+
+        def concat_chain(items):
+            if len(items) == 2:
+                return items[0].concat(items[1])
+            return concat_chain(items[:-1]).concat(items[-1])
+
         return concat_chain(args)
