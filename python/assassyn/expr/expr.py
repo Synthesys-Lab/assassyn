@@ -353,6 +353,7 @@ class Select1Hot(Expr):
         values = ', '.join(i.as_operand() for i in self.values)
         return f'{lval} = select_1hot {cond} ({values})'
 
+# pylint: disable=too-few-public-methods
 class Reduce:
     """Provides reduction operations for expressions."""
 
