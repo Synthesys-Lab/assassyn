@@ -8,7 +8,7 @@ cd `dirname $0`
 REPO_DIR=`git rev-parse --show-toplevel`
 
 # Test unit tests
-cd $REPO_DIR/python/unit-test
+cd $REPO_DIR/python/unit-tests
 pytest --workers 8
 
 # Test examples

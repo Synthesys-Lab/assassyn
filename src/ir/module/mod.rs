@@ -150,15 +150,20 @@ impl<'sys> ModuleRef<'sys> {
     'sys: 'res,
     'borrow: 'res,
   {
-    self.user_set.iter().map(|x| {
-      x.as_ref::<Operand>(self.sys)
-        .unwrap()
-        .get_expr()
-        .get_block()
-        .get_module()
-        .as_ref::<Module>(self.sys)
-        .unwrap()
-    })
+    let mut seen = HashSet::new();
+    self
+      .user_set
+      .iter()
+      .map(|x| {
+        x.as_ref::<Operand>(self.sys)
+          .unwrap()
+          .get_expr()
+          .get_block()
+          .get_module()
+          .as_ref::<Module>(self.sys)
+          .unwrap()
+      })
+      .filter(move |x| seen.insert(x.key))
   }
 
   /// Iterate over the callees that are triggered by this module.
