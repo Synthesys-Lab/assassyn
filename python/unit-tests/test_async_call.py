@@ -54,9 +54,7 @@ def test_async_call():
 
     print(sys)
 
-random-branch
     config = assassyn.backend.config(verilog=utils.verilator_path(), sim_threshold=200, idle_threshold=200, random=True)
-
 
     simulator_path, verilator_path = elaborate(sys, **config)
 
