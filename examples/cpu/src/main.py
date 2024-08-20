@@ -21,7 +21,6 @@ class Execution(Module):
     @module.combinational
     def build(
         self, 
-        reg_onwrite: Array, 
         on_branch: Array, 
         pc: Array, 
         exec_bypass_reg: Array, 
@@ -33,10 +32,6 @@ class Execution(Module):
         writeback: Module
     ):
         log("executing: {:b}", self.opcode)
-
-        with Condition(self.rd_reg != Bits(5)(0)):
-            reg_onwrite[self.rd_reg] = Bits(1)(1)
-            log("set x{} as on-write", self.rd_reg)
 
         op_check = OpcodeChecker(self.opcode)
         op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
@@ -101,27 +96,40 @@ class Execution(Module):
         memory.async_called(we = Int(1)(0), wdata = a, addr = request_addr)
         wb = writeback.bind(opcode = self.opcode, result = result, rd = self.rd_reg)
 
-        return wb
+        with Condition(self.rd_reg != Bits(5)(0)):
+            log("set x{} as on-write", self.rd_reg)
+            return wb, Bits(32)(1) << self.rd_reg
 
+        return wb, None
 
     @module.wait_until
-    def wait_until(self, exec_bypass_reg: Array, mem_bypass_reg: Array, reg_onwrite: Array):
-        # Handle read after write
-        a_valid = (~reg_onwrite[self.a_reg.peek()])      | \
-            (exec_bypass_reg[0] == self.a_reg.peek())    | \
-            (mem_bypass_reg[0] == self.a_reg.peek())
-        b_valid = (~reg_onwrite[self.b_reg.peek()])      | \
-            (exec_bypass_reg[0] == self.b_reg.peek())    | \
-            (mem_bypass_reg[0] == self.b_reg.peek())
+    def wait_until(
+        self, 
+        exec_bypass_reg: Array, 
+        mem_bypass_reg: Array, 
+        reg_onwrite: Array
+    ):
+        a_reg = self.a_reg.peek()
+        b_reg = self.b_reg.peek()
+        rd_reg = self.rd_reg.peek()
 
-        rd_valid = ~reg_onwrite[self.rd_reg.peek()]
+        on_write = reg_onwrite[0]
+
+        a_valid = (~(on_write >> a_reg & Bits(32)(1))).bitcast(Bits(1)) | \
+            (exec_bypass_reg[0] == a_reg) | \
+            (mem_bypass_reg[0] == a_reg)
+        b_valid = (~(on_write >> b_reg & Bits(32)(1))).bitcast(Bits(1)) | \
+            (exec_bypass_reg[0] == b_reg) | \
+            (mem_bypass_reg[0] == b_reg)
+
+        rd_valid = ~((on_write >> rd_reg & Bits(32)(1)).bitcast(Bits(1)))
 
         valid = a_valid & b_valid & rd_valid
         with Condition(~valid):
             log("operand not ready, stall execution, x{}: {}, x{}: {}, x{}: {}", \
-                self.a_reg.peek(), a_valid, \
-                self.b_reg.peek(), b_valid, \
-                self.rd_reg.peek(), rd_valid)
+                a_reg, a_valid, \
+                b_reg, b_valid, \
+                rd_reg, rd_valid)
         return valid
 
     
@@ -136,7 +144,7 @@ class WriteBack(Module):
         self.mdata  = Port(Bits(32))
 
     @module.combinational
-    def build(self, reg_file: Array, reg_onwrite: Array):
+    def build(self, reg_file: Array):
         op_check = OpcodeChecker(self.opcode)
         op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
 
@@ -156,7 +164,7 @@ class WriteBack(Module):
         with Condition((self.rd != Bits(5)(0))):
             log("opcode: {:b}, writeback: x{} = {:x}", self.opcode, self.rd, data)
             reg_file[self.rd] = data
-            reg_onwrite[self.rd] = Bits(1)(0)
+            return Bits(32)(1) << self.rd
 
 class Decoder(Memory):
     
@@ -298,6 +306,18 @@ class Fetcher(Module):
         with Condition(on_branch[0]):
             log("on a branch, stall fetching, pc freeze at 0x{:x}", pc[0])
 
+class OnwriteDS(Downstream):
+    
+    @downstream.constructor
+    def __init__(self):
+        super().__init__()
+
+    @downstream.combinational
+    def build(self, reg_onwrite: Array, decoder_rd: Value, writeback_rd: Value):
+        id_rd = decoder_rd.optional(Bits(32)(0))
+        wb_rd = writeback_rd.optional(Bits(32)(0))
+
+        reg_onwrite[0] = reg_onwrite[0] ^ id_rd ^ wb
 
 class Driver(Module):
     
@@ -323,7 +343,7 @@ def main():
         pc          = RegArray(bits32, 1)
         on_branch   = RegArray(bits1, 1)
         reg_file    = RegArray(bits32, 32)
-        reg_onwrite = RegArray(bits1, 32, attr=[Array.FULLY_PARTITIONED]) #TODO: Make it downstream
+        reg_onwrite = RegArray(bits32, 1)
 
         exec_bypass_reg = RegArray(bits5, 1)
         exec_bypass_data = RegArray(bits32, 1)
@@ -331,9 +351,8 @@ def main():
         mem_bypass_reg = RegArray(bits5, 1)
         mem_bypass_data = RegArray(bits32, 1)
 
-
         writeback = WriteBack()
-        writeback.build(reg_file, reg_onwrite)
+        writeback.build(reg_file = reg_file)
 
         memory_access = MemoryAccess('0to100.data')
         memory_access.wait_until()
@@ -344,11 +363,14 @@ def main():
         )
 
         exec = Execution()
-        exec.wait_until(exec_bypass_reg, mem_bypass_reg, reg_onwrite)
+        exec.wait_until(
+            exec_bypass_reg = exec_bypass_reg, 
+            mem_bypass_reg = mem_bypass_reg, 
+            reg_onwrite = reg_onwrite
+        )
         wb = exec.build(
             pc = pc,
             on_branch=on_branch,
-            reg_onwrite=reg_onwrite,
             exec_bypass_reg = exec_bypass_reg,
             exec_bypass_data = exec_bypass_data,
             mem_bypass_reg = mem_bypass_reg,
