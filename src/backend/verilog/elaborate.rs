@@ -1,7 +1,7 @@
 use std::{
   collections::{HashMap, HashSet, VecDeque},
   fs::File,
-  io::{Error, Write},
+  io::{self, Error, Write},
   path::Path,
 };
 
@@ -204,13 +204,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .get_user()
           .as_expr::<FIFOPush>(self.sys)
           .ok()
-          .map(|y| {
-            y.get()
-              .get_parent()
-              .as_ref::<Block>(self.sys)
-              .unwrap()
-              .get_module()
-          })
+          .map(|y| y.get().get_block().get_module())
       })
       .collect::<HashSet<_>>();
 
@@ -257,15 +251,16 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     ));
 
     res.push_str(&format!(
-      "fifo #({width}) fifo_{name}_i (
-  .clk(clk),
-  .rst_n(rst_n),
-  .push_valid(fifo_{name}_push_valid),
-  .push_data(fifo_{name}_push_data),
-  .push_ready(fifo_{name}_push_ready),
-  .pop_valid(fifo_{name}_pop_valid),
-  .pop_data(fifo_{name}_pop_data),
-  .pop_ready(fifo_{name}_pop_ready));\n",
+      "
+  fifo #({width}) fifo_{name}_i (
+    .clk(clk),
+    .rst_n(rst_n),
+    .push_valid(fifo_{name}_push_valid),
+    .push_data(fifo_{name}_push_data),
+    .push_ready(fifo_{name}_push_ready),
+    .pop_valid(fifo_{name}_pop_valid),
+    .pop_data(fifo_{name}_pop_data),
+    .pop_ready(fifo_{name}_pop_ready));\n",
       name = fifo_name,
       width = fifo_width,
     ));
@@ -286,7 +281,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       {
         res.push_str(&format!(
           "
-  logic {module}_driver_{driver}_trigger_push_valid;\n
+  logic {module}_driver_{driver}_trigger_push_valid;
   logic {module}_driver_{driver}_trigger_push_ready;\n",
           module = module_name,
           driver = driver
@@ -339,7 +334,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let mut res = String::new();
     let module_name = namify(module.get_name());
     res.push_str(&format!(
-      "// {module}
+      "
+  // {module}
   {module} {module}_i (
     .clk(clk),
     .rst_n(rst_n),",
@@ -394,9 +390,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       }
     }
 
-    let mut trigger_modules = get_triggered_modules(&module.upcast(), self.sys);
-    trigger_modules.sort_unstable();
-    trigger_modules.dedup();
+    let trigger_modules = get_triggered_modules(&module);
+
     for trigger_module in trigger_modules {
       res.push_str(&format!(
         "
@@ -495,6 +490,7 @@ end"
     fd.write_all(include_str!("fifo_impl.sv").as_bytes())
       .unwrap();
 
+    let threashold = (sim_threshold + 1) * 100;
     fd.write_all(
       format!(
         "
@@ -508,13 +504,13 @@ initial begin
   rst_n = 1'b0;
   #150;
   rst_n = 1'b1;
-  #{};
+  #{threashold};
   $finish();
 end
 
 always #50 clk <= !clk;
 
-{}
+{init}
 
 top top_i (
   .clk(clk),
@@ -522,9 +518,7 @@ top top_i (
 );
 
 endmodule
-",
-        (sim_threshold + 1) * 100,
-        init
+"
       )
       .as_bytes(),
     )?;
@@ -533,39 +527,15 @@ endmodule
   }
 }
 
-fn get_triggered_modules(node: &BaseNode, sys: &SysBuilder) -> Vec<String> {
-  let mut triggered_modules = Vec::<String>::new();
-  match node.get_kind() {
-    NodeKind::Module => {
-      let module = node.as_ref::<Module>(sys).unwrap();
-      for elem in module.get_body().body_iter() {
-        if elem.get_kind() == NodeKind::Expr || elem.get_kind() == NodeKind::Block {
-          triggered_modules.append(get_triggered_modules(&elem, sys).as_mut());
-        }
-      }
-    }
-    NodeKind::Block => {
-      let block = node.as_ref::<Block>(sys).unwrap();
-      for elem in block.body_iter() {
-        if elem.get_kind() == NodeKind::Expr || elem.get_kind() == NodeKind::Block {
-          triggered_modules.append(get_triggered_modules(&elem, sys).as_mut());
-        }
-      }
-    }
-    NodeKind::Expr => {
-      let expr = node.as_ref::<Expr>(sys).unwrap();
-      if matches!(expr.get_opcode(), Opcode::AsyncCall) {
-        let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
-        // let triggered_module = {
-        //   let bind = call.bind();
-        //   bind.callee()
-        // };
-        triggered_modules.push(namify(call.bind().callee().get_name()));
-      }
-    }
-    _ => {}
-  }
-  triggered_modules
+fn get_triggered_modules(m: &ModuleRef<'_>) -> HashSet<String> {
+  m.ext_interf_iter()
+    .filter_map(|(interf, _)| {
+      interf
+        .as_ref::<Module>(m.sys)
+        .ok()
+        .map(|x| namify(x.get_name()))
+    })
+    .collect::<HashSet<_>>()
 }
 
 fn node_dump_ref(
@@ -597,7 +567,7 @@ fn node_dump_ref(
       let value = str_imm.get_value();
       quote::quote!(#value).to_string().into()
     }
-    NodeKind::Expr => Some(namify(node.to_string(sys).as_str())),
+    NodeKind::Expr => Some(namify(&node.to_string(sys))),
     _ => panic!("Unknown node of kind {:?}", node.get_kind()),
   }
 }
@@ -689,12 +659,8 @@ module {} (
       res.push('\n');
     }
 
-    let mut trigger_modules = get_triggered_modules(&module.upcast(), self.sys);
-    trigger_modules.sort_unstable();
-    trigger_modules.dedup();
-    let mut has_trigger_modules = false;
+    let trigger_modules = get_triggered_modules(&module);
     for trigger_module in trigger_modules {
-      has_trigger_modules = true;
       res.push_str(&format!(
         "
   output logic {}_trigger_push_valid,
@@ -702,10 +668,6 @@ module {} (
 ",
         trigger_module, trigger_module
       ));
-    }
-
-    if has_trigger_modules {
-      res.push('\n');
     }
 
     res.push_str(
@@ -730,11 +692,11 @@ module {} (
         match elem.get_kind() {
           NodeKind::Expr => {
             let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-            res.push_str(self.visit_expr(expr).unwrap().as_str());
+            res.push_str(&self.visit_expr(expr).unwrap());
           }
           NodeKind::Block => {
             let block = elem.as_ref::<Block>(self.sys).unwrap();
-            res.push_str(self.visit_block(block).unwrap().as_str());
+            res.push_str(&self.visit_block(block).unwrap());
           }
           _ => {
             panic!("Unexpected reference type: {:?}", elem);
@@ -747,11 +709,11 @@ module {} (
       let value = bi.value();
       wait_until = Some(format!(
         " && ({}{})",
-        namify(value.to_string(self.sys).as_str()),
+        namify(&value.to_string(self.sys)),
         if value.get_dtype(self.sys).unwrap().get_bits() == 1 {
           "".into()
         } else {
-          " != 0".to_string()
+          " != '0".to_string()
         }
       ));
       skip
@@ -838,7 +800,6 @@ module {} (
       if interf.get_kind() == NodeKind::Array {
         let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
         let array_name = namify(array_ref.get_name());
-        // let mut read_only = false;
         let read_only = !ops.iter().any(|x| {
           matches!(
             x.as_ref::<Operand>(self.sys)
@@ -851,13 +812,10 @@ module {} (
           )
         });
         if read_only {
-          res.push_str(
-            format!(
-              "assign array_{name}_w = '0;\nassign array_{name}_d = '0;\nassign array_{name}_widx = '0;\n\n",
-              name = array_name
-            )
-            .as_str(),
-          );
+          res.push_str(&format!(
+            "  assign array_{name}_w = '0;\nassign array_{name}_d = '0;\nassign array_{name}_widx = '0;\n\n",
+            name = array_name
+          ));
         }
       }
     }
@@ -897,11 +855,11 @@ endmodule // {}
       match elem.get_kind() {
         NodeKind::Expr => {
           let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          res.push_str(self.visit_expr(expr).unwrap().as_str());
+          res.push_str(&self.visit_expr(expr).unwrap());
         }
         NodeKind::Block => {
           let block = elem.as_ref::<Block>(self.sys).unwrap();
-          res.push_str(self.visit_block(block).unwrap().as_str());
+          res.push_str(&self.visit_block(block).unwrap());
         }
         _ => {
           panic!("Unexpected reference type: {:?}", elem);
@@ -1169,12 +1127,12 @@ endmodule // {}
         let dbits = expr.dtype().get_bits();
         let cast = expr.as_sub::<instructions::Cast>().unwrap();
         let a = dump_ref!(self.sys, &cast.x());
-        let pad = dbits - cast.x().get_dtype(self.sys).unwrap().get_bits();
+        let src_dtype = cast.src_type();
+        let pad = dbits - src_dtype.get_bits();
         match cast.get_opcode() {
           subcode::Cast::BitCast => a,
           subcode::Cast::ZExt => format!("{{{}'b0, {}}}", pad, a),
           subcode::Cast::SExt => {
-            let src_dtype = cast.src_type();
             let dest_dtype = cast.dest_type();
             if src_dtype.is_int()
               && src_dtype.is_signed()
@@ -1183,13 +1141,7 @@ endmodule // {}
               && dest_dtype.get_bits() > src_dtype.get_bits()
             {
               // perform sext
-              format!(
-                "{{{}'{{{}[{}]}}, {}}}",
-                dest_dtype.get_bits() - src_dtype.get_bits(),
-                a,
-                src_dtype.get_bits() - 1,
-                a
-              )
+              format!("{{{}'{{{}[{}]}}, {}}}", pad, a, src_dtype.get_bits() - 1, a)
             } else {
               format!("{{{}'b0, {}}}", pad, a)
             }
@@ -1237,20 +1189,20 @@ endmodule // {}
   }
 }
 
-pub fn generate_cpp_testbench(dir: &Path, sys: &SysBuilder, simulator: &Simulator) {
-  if !matches!(simulator, Simulator::Verilator) {
-    return;
+pub fn generate_cpp_testbench(
+  dir: &Path,
+  sys: &SysBuilder,
+  simulator: &Simulator,
+) -> io::Result<()> {
+  if matches!(simulator, Simulator::Verilator) {
+    let main_fname = dir.join("main.cpp");
+    let mut main_fd = File::create(main_fname)?;
+    main_fd.write_all(include_str!("main.cpp").as_bytes())?;
+    let make_fname = dir.join("Makefile");
+    let mut make_fd = File::create(make_fname).unwrap();
+    make_fd.write_all(format!(include_str!("Makefile"), sys.get_name()).as_bytes())?;
   }
-  let main_fname = dir.join("main.cpp");
-  let mut main_fd = File::create(main_fname).unwrap();
-  main_fd
-    .write_all(include_str!("main.cpp").as_bytes())
-    .unwrap();
-  let make_fname = dir.join("Makefile");
-  let mut make_fd = File::create(make_fname).unwrap();
-  make_fd
-    .write_all(format!(include_str!("Makefile"), sys.get_name()).as_bytes())
-    .unwrap();
+  Ok(())
 }
 
 pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Result<(), Error> {
@@ -1258,17 +1210,16 @@ pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Res
   let verilog_name = config.dirname(sys, "verilog");
   let fname = verilog_name.join(format!("{}.sv", sys.get_name()));
 
-  println!("Writing verilog rtl to {}", fname.to_str().unwrap());
+  eprintln!("Writing verilog rtl to {}", fname.to_str().unwrap());
 
-  generate_cpp_testbench(&verilog_name, sys, &simulator);
+  generate_cpp_testbench(&verilog_name, sys, &simulator)?;
 
   let mut vd = VerilogDumper::new(sys, config, simulator);
 
   let mut fd = File::create(fname)?;
 
   for module in vd.sys.module_iter(ModuleKind::Module) {
-    fd.write_all(vd.visit_module(module).unwrap().as_bytes())
-      .unwrap();
+    fd.write_all(vd.visit_module(module).unwrap().as_bytes())?;
   }
 
   vd.dump_runtime(fd, config.sim_threshold)?;
