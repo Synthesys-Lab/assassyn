@@ -238,7 +238,6 @@ impl Array {
   pub fn user(&self) -> &HashSet<BaseNode> {
     &self.user_set
   }
-
 }
 
 impl SysBuilder {

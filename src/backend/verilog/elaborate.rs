@@ -38,7 +38,6 @@ struct VerilogDumper<'a, 'b> {
   triggers: HashMap<String, Gather>,    // module_name -> [pred]
   current_module: String,
   trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
-  array_drivers: HashMap<String, HashSet<String>>,   // array -> {driver module}
   simulator: Simulator,
 }
 
@@ -53,7 +52,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       triggers: HashMap::new(),
       current_module: String::new(),
       trigger_drivers: HashMap::new(),
-      array_drivers: HashMap::new(),
       simulator,
     }
   }
@@ -89,120 +87,76 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       decl_size = array.get_size() - 1
     ));
 
-    // let drivers = array
-    //   .users()
-    //   .iter()
-    //   .map(|x| {
-    //     x.as_ref::<Operand>(array.sys)
-    //       .unwrap()
-    //       .get_user()
-    //       .as_ref::<Expr>(array.sys)
-    //       .unwrap()
-    //       .get_block()
-    //       .get_module()
-    //   })
-    //   .collect::<HashSet<_>>()
-    //   .into_iter()
-    //   .map(|x| namify(x.as_ref::<Module>(array.sys).unwrap().get_name()))
-    //   .collect::<HashSet<_>>();
+    let drivers = array
+      .users()
+      .iter()
+      .map(|x| {
+        x.as_ref::<Operand>(array.sys)
+          .unwrap()
+          .get_expr()
+          .get_block()
+          .get_module()
+      })
+      .collect::<HashSet<_>>()
+      .into_iter()
+      .map(|x| namify(x.as_ref::<Module>(array.sys).unwrap().get_name()))
+      .collect::<HashSet<_>>();
 
-    for driver in self.array_drivers.get(&array_name).unwrap().iter() {
-      res.push_str(
-        format!(
-          "logic [{}:0] array_{}_driver_{}_d;\n",
-          scalar_bits - 1,
+    let scalar_bits = array.scalar_ty().get_bits();
+    let decl_bits = scalar_bits - 1;
+    let idx_bits = array.get_size().ilog2();
+    drivers.iter().for_each(|driver| {
+      res.push_str(&format!(
+        "
+  logic [{decl_bits}:0] array_{name}_driver_{driver}_d;
+  logic [{idx_bits}:0] array_{name}_driver_{driver}_widx;
+  logic array_{name}_driver_{driver}_w;
+",
+        name = array_name,
+        driver = driver,
+      ))
+    });
+
+    res.push_str(&format!("
+  logic [{decl_bits}:0] array_{array_name}_d;
+  assign array_{array_name}_d = \n{};
+  logic [{idx_bits}:0] array_{array_name}_widx;
+  assign array_{array_name}_widx = \n{};
+  logic array_{array_name}_w;
+  assign array_{array_name}_w = \n{};
+",
+      drivers // one-hot select driver write-data
+        .iter()
+        .map(|driver| format!(
+          "  ({{{scalar_bits}{{array_{name}_driver_{driver}_w}}}} & array_{name}_driver_{driver}_d)",
+          name = array_name,
+        ))
+        .collect::<Vec<String>>()
+        .join("|"),
+      drivers // one-hot select driver write-index
+        .iter()
+        .map(|driver| format!(
+          "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_widx)",
+          array.get_size().ilog2() + 1,
+          array_name,
+          driver,
           array_name,
           driver
-        )
-        .as_str(),
-      );
-      res.push_str(
-        format!(
-          "logic [{}:0] array_{}_driver_{}_widx;\n",
-          array.get_size().ilog2(),
-          array_name,
-          driver
-        )
-        .as_str(),
-      );
-      res.push_str(format!("logic array_{}_driver_{}_w;\n", array_name, driver).as_str());
-    }
-
-    res.push_str(format!("logic [{}:0] array_{}_d;\n", scalar_bits - 1, array_name).as_str());
-    res.push_str(
-      format!(
-        "assign array_{}_d = \n{};\n",
-        array_name,
-        self
-          .array_drivers
-          .get(&array_name)
-          .unwrap()
-          .iter()
-          .map(|driver| format!(
-            "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_d)",
-            scalar_bits, array_name, driver, array_name, driver
-          ))
-          .collect::<Vec<String>>()
-          .join(" |\n")
-      )
-      .as_str(),
-    );
-    res.push_str(
-      format!(
-        "logic [{}:0] array_{}_widx;\n",
-        array.get_size().ilog2(),
-        array_name
-      )
-      .as_str(),
-    );
-    res.push_str(
-      format!(
-        "assign array_{}_widx = \n{};\n",
-        array_name,
-        self
-          .array_drivers
-          .get(&array_name)
-          .unwrap()
-          .iter()
-          .map(|driver| format!(
-            "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_widx)",
-            array.get_size().ilog2() + 1,
-            array_name,
-            driver,
-            array_name,
-            driver
-          ))
-          .collect::<Vec<String>>()
-          .join(" |\n")
-      )
-      .as_str(),
-    );
-    res.push_str(format!("logic array_{}_w;\n", array_name).as_str());
-    res.push_str(
-      format!(
-        "assign array_{}_w = {};\n",
-        array_name,
-        self
-          .array_drivers
-          .get(&array_name)
-          .unwrap()
-          .iter()
-          .map(|driver| format!("array_{}_driver_{}_w", array_name, driver))
-          .collect::<Vec<String>>()
-          .join(" | ")
-      )
-      .as_str(),
-    );
+        ))
+        .collect::<Vec<String>>()
+        .join(" |\n"),
+      drivers // gather all the write-enable signals
+        .iter()
+        .map(|driver| format!("array_{}_driver_{}_w", array_name, driver))
+        .collect::<Vec<String>>()
+        .join(" | ")
+    ));
     res.push_str("always_ff @(posedge clk or negedge rst_n)\n");
     if mem_init_path.is_some() {
-      res.push_str(
-        format!(
-          "if (!rst_n) $readmemh(\"{}\", array_{}_q);\n",
-          mem_init_path.unwrap(),
-          array_name
-        )
-        .as_str(),
-      );
+      res.push_str(&format!(
+        "if (!rst_n) $readmemh(\"{}\", array_{array_name}_q);\n",
+        mem_init_path.unwrap(),
+      ));
     } else if let Some(initializer) = array.get_initializer() {
       res.push_str("if (!rst_n) begin\n");
       for (idx, _) in initializer.iter().enumerate() {
@@ -211,24 +165,18 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .unwrap()
           .get_value();
         res.push_str(&format!(
-          "    array_{}_q[{}] <= {};\n",
-          array_name, idx, elem_init
+          "    array_{array_name}_q[{idx}] <= {elem_init};\n"
         ));
       }
       res.push_str("end\n");
     } else {
-      res.push_str(
-        format!(
-          "if (!rst_n) array_{}_q <= '{{default : {}'d0}};\n",
-          array_name,
-          array.scalar_ty().get_bits()
-        )
-        .as_str(),
-      );
+      res.push_str(&format!(
+        "if (!rst_n) array_{array_name}_q <= '{{default : {scalar_bits}'d0}};\n",
+      ));
     }
     res.push_str(&format!(
-      "else if (array_{}_w) array_{}_q[array_{}_widx] <= array_{}_d;\n",
-      array_name, array_name, array_name, array_name
+      "else if (array_{n}_w) array_{n}_q[array_{n}_widx] <= array_{n}_d;\n",
+      n = array_name,
     ));
 
     res.push('\n');
@@ -238,10 +186,13 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
   fn dump_fifo(&self, fifo: &FIFORef) -> String {
     let mut res = String::new();
-    let fifo_name =
-      namify(format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)).as_str());
+    let fifo_name = namify(&format!(
+      "{}_{}",
+      fifo.get_module().get_name(),
+      fifo_name!(fifo)
+    ));
     let fifo_width = fifo.scalar_ty().get_bits();
-    res.push_str(format!("// fifo: {}\n", fifo_name).as_str());
+    res.push_str(&format!("// fifo: {fifo_name}\n"));
 
     let drivers = fifo
       .users()
@@ -266,6 +217,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let mut pusher_data = vec![];
     let mut pusher_ready = vec![];
     drivers.iter().for_each(|x| {
+      let name = &fifo_name;
       let module = x.as_ref::<Module>(self.sys).unwrap();
       let driver = namify(module.get_name());
       res.push_str(&format!(
@@ -273,19 +225,15 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   logic fifo_{name}_driver_{driver}_push_valid;\n
   logic [{ty_width}:0] fifo_{name}_driver_{driver}_push_data;\n
   logic fifo_{name}_driver_{driver}_push_ready;\n",
-        name = fifo_name,
         driver = driver,
         ty_width = fifo_width - 1
       ));
-      pusher_valid.push(format!("  fifo_{}_driver_{}_push_valid", fifo_name, driver));
+      pusher_valid.push(format!("  fifo_{name}_driver_{driver}_push_valid"));
       pusher_data.push(format!(
           "  ({{{width}{{fifo_{name}_driver_{driver}_push_valid}}}} & fifo_{name}_driver_{driver}_push_data)",
-          width=fifo_width, driver=driver,name=fifo_name));
+          width=fifo_width));
       pusher_ready.push(
-        format!(
-          "  assign fifo_{}_driver_{}_push_ready = fifo_{}_push_ready;",
-          fifo_name, driver, fifo_name
-        )
+        format!("  assign fifo_{name}_driver_{driver}_push_ready = fifo_{name}_push_ready;")
       );
     });
 
@@ -327,7 +275,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   fn dump_trigger(&self, module: &ModuleRef) -> String {
     let mut res = String::new();
     let module_name = namify(module.get_name());
-    res.push_str(format!("// {} trigger\n", module_name).as_str());
+    res.push_str(&format!("// {} trigger\n", module_name));
     if module_name != "driver" && module_name != "testbench" {
       for driver in self
         .trigger_drivers
@@ -344,35 +292,28 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         ));
       }
     }
-    res.push_str(format!("  logic {}_trigger_push_valid;\n", module_name).as_str());
+    res.push_str(&format!("  logic {}_trigger_push_valid;\n", module_name));
     if module_name != "driver" && module_name != "testbench" {
-      res.push_str(
-        format!(
-          "  assign {}_trigger_push_valid = {};\n",
-          module_name,
-          self
-            .trigger_drivers
-            .get(&module_name)
-            .unwrap()
-            .iter()
-            .map(|driver| format!("  {}_driver_{}_trigger_push_valid", module_name, driver))
-            .collect::<Vec<String>>()
-            .join(" |\n")
-            .as_str()
-        )
-        .as_str(),
-      );
+      res.push_str(&format!(
+        "  assign {}_trigger_push_valid = {};\n",
+        module_name,
+        self
+          .trigger_drivers
+          .get(&module_name)
+          .unwrap()
+          .iter()
+          .map(|driver| format!("  {}_driver_{}_trigger_push_valid", module_name, driver))
+          .collect::<Vec<String>>()
+          .join(" |\n")
+      ));
     }
-    res.push_str(format!("  logic {}_trigger_push_ready;\n", module_name).as_str());
+    res.push_str(&format!("  logic {}_trigger_push_ready;\n", module_name));
     if module_name != "driver" && module_name != "testbench" {
       for driver in self.trigger_drivers.get(&module_name).unwrap().iter() {
-        res.push_str(
-          format!(
-            "  assign {}_driver_{}_trigger_push_ready = {}_trigger_push_ready;\n",
-            module_name, driver, module_name
-          )
-          .as_str(),
-        );
+        res.push_str(&format!(
+          "  assign {}_driver_{}_trigger_push_ready = {}_trigger_push_ready;\n",
+          module_name, driver, module_name
+        ));
       }
     }
     res.push_str(&format!(
@@ -507,11 +448,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     // array storage element definitions
     for array in self.sys.array_iter() {
-      res.push_str(
-        self
-          .dump_array(&array, mem_init_map.get(&array.upcast()))
-          .as_str(),
-      );
+      res.push_str(&self.dump_array(&array, mem_init_map.get(&array.upcast())));
     }
 
     // fifo storage element definitions
@@ -535,7 +472,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     // module insts
     for module in self.sys.module_iter(ModuleKind::Module) {
-      res.push_str(self.dump_module_inst(&module).as_str());
+      res.push_str(&self.dump_module_inst(&module));
     }
 
     res.push_str("endmodule // top\n\n");
@@ -901,21 +838,6 @@ module {} (
         let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
         let array_name = namify(array_ref.get_name());
         // let mut read_only = false;
-        match self.array_drivers.get_mut(&array_name) {
-          Some(ads) => {
-            // if !ads.contains(&self.current_module) {
-            //   read_only = true;
-            // }
-            ads.insert(self.current_module.clone());
-          }
-          None => {
-            // read_only = true;
-            self.array_drivers.insert(
-              array_name.clone(),
-              HashSet::from([self.current_module.clone()]),
-            );
-          }
-        }
         let read_only = !ops.iter().any(|x| {
           matches!(
             x.as_ref::<Operand>(self.sys)
@@ -1136,26 +1058,15 @@ endmodule // {}
         let store = expr.as_sub::<instructions::Store>().unwrap();
         let (array_ref, array_idx) = (store.array(), store.idx());
         let array_name = namify(array_ref.get_name());
-        match self.array_drivers.get_mut(&array_name) {
-          Some(ads) => {
-            ads.insert(self.current_module.clone());
-          }
-          None => {
-            self.array_drivers.insert(
-              array_name.clone(),
-              HashSet::from([self.current_module.clone()]),
-            );
-          }
-        }
         let pred = self.get_pred().unwrap_or("".to_string());
         let idx = dump_ref!(self.sys, &array_idx);
         let idx_bits = store.idx().get_dtype(self.sys).unwrap().get_bits();
         let value = dump_ref!(self.sys, &store.value());
         let value_bits = store.value().get_dtype(self.sys).unwrap().get_bits();
         match self.array_stores.get_mut(&array_name) {
-          Some(ass) => {
-            ass.0.push(pred.clone(), idx, idx_bits);
-            ass.1.push(pred, value, value_bits);
+          Some((g_idx, g_value)) => {
+            g_idx.push(pred.clone(), idx, idx_bits);
+            g_value.push(pred, value, value_bits);
           }
           None => {
             self.array_stores.insert(

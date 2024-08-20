@@ -99,6 +99,10 @@ impl OperandRef<'_> {
       None
     }
   }
+
+  pub fn get_expr(&self) -> ExprRef<'_> {
+    self.user.as_ref::<Expr>(self.sys).unwrap()
+  }
 }
 
 impl OperandMut<'_> {
