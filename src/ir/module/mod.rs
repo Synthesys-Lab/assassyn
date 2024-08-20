@@ -142,6 +142,40 @@ impl<'sys> ModuleRef<'sys> {
       .values()
       .map(|x| x.as_ref::<FIFO>(self.sys).unwrap())
   }
+
+  /// Iterate over the callers that triggers this module.
+  pub fn callers<'borrow, 'res>(
+    &'borrow self,
+  ) -> impl Iterator<Item = ModuleRef<'res>> + 'res
+  where
+    'sys: 'borrow,
+    'sys: 'res,
+    'borrow: 'res,
+  {
+    self.user_set.iter().map(|x| {
+      x.as_ref::<Operand>(self.sys)
+        .unwrap()
+        .get_expr()
+        .get_block()
+        .get_module()
+        .as_ref::<Module>(self.sys)
+        .unwrap()
+    })
+  }
+
+  /// Iterate over the callees that are triggered by this module.
+  pub fn callees<'borrow, 'res>(
+    &'borrow self,
+  ) -> impl Iterator<Item = ModuleRef<'res>> + 'res
+  where
+    'sys: 'borrow,
+    'sys: 'res,
+    'borrow: 'res,
+  {
+    self
+      .ext_interf_iter()
+      .filter_map(|(k, _)| k.as_ref::<Module>(self.sys).ok())
+  }
 }
 
 impl<'a> ModuleMut<'a> {

@@ -37,7 +37,6 @@ struct VerilogDumper<'a, 'b> {
   array_stores: HashMap<String, (Gather, Gather)>, // array_name -> (idx, value)
   triggers: HashMap<String, Gather>,    // module_name -> [pred]
   current_module: String,
-  trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
   simulator: Simulator,
 }
 
@@ -51,7 +50,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       array_stores: HashMap::new(),
       triggers: HashMap::new(),
       current_module: String::new(),
-      trigger_drivers: HashMap::new(),
       simulator,
     }
   }
@@ -273,12 +271,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let module_name = namify(module.get_name());
     res.push_str(&format!("// {} trigger\n", module_name));
     if module_name != "driver" && module_name != "testbench" {
-      for driver in self
-        .trigger_drivers
-        .get(&module_name)
-        .unwrap_or_else(|| panic!("Driver of \"{}\" not found!", module_name))
-        .iter()
-      {
+      module.callers().for_each(|x| {
+        let driver = namify(x.get_name());
         res.push_str(&format!(
           "
   logic {module}_driver_{driver}_trigger_push_valid;
@@ -286,31 +280,32 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           module = module_name,
           driver = driver
         ));
-      }
+      });
     }
     res.push_str(&format!("  logic {}_trigger_push_valid;\n", module_name));
     if module_name != "driver" && module_name != "testbench" {
       res.push_str(&format!(
         "  assign {}_trigger_push_valid = {};\n",
         module_name,
-        self
-          .trigger_drivers
-          .get(&module_name)
-          .unwrap()
-          .iter()
-          .map(|driver| format!("  {}_driver_{}_trigger_push_valid", module_name, driver))
+        module
+          .callers()
+          .map(|x| {
+            let driver = namify(x.get_name());
+            format!("  {}_driver_{}_trigger_push_valid", module_name, driver)
+          })
           .collect::<Vec<String>>()
           .join(" |\n")
       ));
     }
     res.push_str(&format!("  logic {}_trigger_push_ready;\n", module_name));
     if module_name != "driver" && module_name != "testbench" {
-      for driver in self.trigger_drivers.get(&module_name).unwrap().iter() {
+      module.callers().for_each(|x| {
+        let driver = namify(x.get_name());
         res.push_str(&format!(
           "  assign {}_driver_{}_trigger_push_ready = {}_trigger_push_ready;\n",
           module_name, driver, module_name
         ));
-      }
+      });
     }
     res.push_str(&format!(
       "
@@ -528,13 +523,8 @@ endmodule
 }
 
 fn get_triggered_modules(m: &ModuleRef<'_>) -> HashSet<String> {
-  m.ext_interf_iter()
-    .filter_map(|(interf, _)| {
-      interf
-        .as_ref::<Module>(m.sys)
-        .ok()
-        .map(|x| namify(x.get_name()))
-    })
+  m.callees()
+    .map(|x| namify(x.get_name()))
     .collect::<HashSet<_>>()
 }
 
@@ -552,14 +542,12 @@ fn node_dump_ref(
     NodeKind::FIFO => namify(node.as_ref::<FIFO>(sys).unwrap().get_name()).into(),
     NodeKind::IntImm => {
       let int_imm = node.as_ref::<IntImm>(sys).unwrap();
+      let dbits = int_imm.dtype().get_bits();
+      let value = int_imm.get_value();
       if immwidth {
-        Some(format!(
-          "{}'d{}",
-          int_imm.dtype().get_bits(),
-          int_imm.get_value()
-        ))
+        Some(format!("{}'d{}", dbits, value))
       } else {
-        Some(format!("{}", int_imm.get_value()))
+        Some(format!("{}", value))
       }
     }
     NodeKind::StrImm => {
@@ -1080,29 +1068,18 @@ endmodule // {}
 
       Opcode::AsyncCall => {
         let call = expr.as_sub::<instructions::AsyncCall>().unwrap();
-        let module_name = {
+        let callee = {
           let bind = call.bind();
           bind.callee().get_name().to_string()
         };
-        let module_name = namify(&module_name);
-        match self.trigger_drivers.get_mut(&module_name) {
-          Some(tds) => {
-            tds.insert(self.current_module.clone());
-          }
-          None => {
-            self.trigger_drivers.insert(
-              module_name.clone(),
-              HashSet::from([self.current_module.clone()]),
-            );
-          }
-        }
+        let callee = namify(&callee);
         let pred = self.get_pred().unwrap_or("".to_string());
-        match self.triggers.get_mut(&module_name) {
+        match self.triggers.get_mut(&callee) {
           Some(trgs) => trgs.push(pred, "".into(), 0),
           None => {
             self
               .triggers
-              .insert(module_name, Gather::new(pred, "".into(), 0));
+              .insert(callee, Gather::new(pred, "".into(), 0));
           }
         }
         "".to_string()
