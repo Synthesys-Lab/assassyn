@@ -37,7 +37,6 @@ impl ExternalInterface {
     //   "Expecting Array or FIFO but got {:?}",
     //   ext_node
     // );
-    assert!(operand.get_kind() == NodeKind::Operand);
     // Next line is equivalent to the following code:
     // if !self.external_interfaces.contains_key(&ext_node) {
     //   self.external_interfaces.insert(ext_node, HashSet::new());
@@ -188,7 +187,7 @@ impl ExprMut<'_> {
       self.sys.cut_operand(&old);
       let operand = value.map(|x| self.sys.insert_element(Operand::new(x)));
       if let Some(operand) = operand {
-        self.sys.add_related_externals(module, operand);
+        self.sys.add_related_externals(module, operand.into());
         self.get_mut().operands[i] = operand;
         operand
           .as_mut::<Operand>(self.sys)
@@ -246,11 +245,7 @@ impl SysBuilder {
     let module = match operand_ref.get_user().get_kind() {
       NodeKind::Expr => {
         let expr = operand_ref.get_user().as_ref::<Expr>(self).unwrap();
-        expr
-          .get_parent()
-          .as_ref::<Block>(self)
-          .unwrap()
-          .get_module()
+        expr.get_block().get_module()
       }
       _ => unreachable!(),
     };
@@ -340,13 +335,7 @@ impl SysBuilder {
         let expr = value.as_ref::<Expr>(self).unwrap();
         // If this expression is NOT in the same module as the user, then it is an external
         // interface.
-        expr
-          .get_parent()
-          .as_ref::<Block>(self)
-          .unwrap()
-          .get_module()
-          .get_key()
-          != module.get_key()
+        expr.get_block().get_module().get_key() != module.get_key()
       }
       _ => false,
     } {

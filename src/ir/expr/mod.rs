@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 
-use node::NodeKind;
+use node::{BlockRef, NodeKind};
 
 use crate::ir::node::IsElement;
 use crate::ir::*;
@@ -237,6 +237,10 @@ impl<'a> ExprRef<'a> {
 impl ExprRef<'_> {
   pub fn get_operand_value(&self, i: usize) -> Option<BaseNode> {
     self.get_operand(i).map(|x| *x.get_value())
+  }
+
+  pub fn get_block(&self) -> BlockRef<'_> {
+    self.get_parent().as_ref::<Block>(self.sys).unwrap()
   }
 
   pub fn get_operand(&self, i: usize) -> Option<OperandRef<'_>> {

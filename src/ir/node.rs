@@ -219,6 +219,7 @@ macro_rules! register_elements {
     paste! {
       $(
 
+        #[derive(Clone, Debug, Eq, PartialEq, Hash)]
         pub struct [<$to_register Node>] {
           key: usize,
         }

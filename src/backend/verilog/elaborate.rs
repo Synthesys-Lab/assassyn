@@ -33,11 +33,9 @@ struct VerilogDumper<'a, 'b> {
   sys: &'a SysBuilder,
   config: &'b Config,
   pred_stack: VecDeque<String>,
-
   fifo_pushes: HashMap<String, Gather>, // fifo_name -> value
   array_stores: HashMap<String, (Gather, Gather)>, // array_name -> (idx, value)
-
-  triggers: HashMap<String, Gather>, // module_name -> [pred]
+  triggers: HashMap<String, Gather>,    // module_name -> [pred]
   current_module: String,
   trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
   array_drivers: HashMap<String, HashSet<String>>,   // array -> {driver module}
@@ -881,31 +879,42 @@ module {} (
     }
 
     // tie off array store port
-    for (interf, _ops) in module.ext_interf_iter() {
+    for (interf, ops) in module.ext_interf_iter() {
       if interf.get_kind() == NodeKind::Array {
         let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
         let array_name = namify(array_ref.get_name());
-        let mut read_only = false;
+        // let mut read_only = false;
         match self.array_drivers.get_mut(&array_name) {
           Some(ads) => {
-            if !ads.contains(&self.current_module) {
-              read_only = true;
-            }
+            // if !ads.contains(&self.current_module) {
+            //   read_only = true;
+            // }
             ads.insert(self.current_module.clone());
           }
           None => {
-            read_only = true;
+            // read_only = true;
             self.array_drivers.insert(
               array_name.clone(),
               HashSet::from([self.current_module.clone()]),
             );
           }
         }
+        let read_only = !ops.iter().any(|x| {
+          matches!(
+            x.as_ref::<Operand>(self.sys)
+              .unwrap()
+              .get_user()
+              .as_ref::<Expr>(self.sys)
+              .unwrap()
+              .get_opcode(),
+            Opcode::Store
+          )
+        });
         if read_only {
           res.push_str(
             format!(
-              "assign array_{}_w = '0;\nassign array_{}_d = '0;\nassign array_{}_widx = '0;\n\n",
-              array_name, array_name, array_name
+              "assign array_{name}_w = '0;\nassign array_{name}_d = '0;\nassign array_{name}_widx = '0;\n\n",
+              name = array_name
             )
             .as_str(),
           );
@@ -1025,15 +1034,7 @@ endmodule // {}
       }
 
       Opcode::Log => {
-        let mut format_str = dump_ref!(
-          self.sys,
-          expr
-            .operand_iter()
-            .collect::<Vec<OperandRef>>()
-            .first()
-            .unwrap()
-            .get_value()
-        );
+        let mut format_str = dump_ref!(self.sys, expr.operand_iter().next().unwrap().get_value());
 
         let re = Regex::new(r"\{(:.[bxXo]?)?\}").unwrap();
 
@@ -1281,28 +1282,18 @@ endmodule // {}
       }
 
       Opcode::Select1Hot => {
-        let dtype = expr.dtype().get_bits() - 1;
+        let dbits = expr.dtype().get_bits();
         let select1hot = expr.as_sub::<instructions::Select1Hot>().unwrap();
         let cond = dump_ref!(self.sys, &select1hot.cond());
-        let mut result = String::new();
-
-        let mut first = true;
-        for (i, elem) in select1hot.value_iter().enumerate() {
-          let str_elem = dump_ref!(self.sys, &elem);
-          if !first {
-            result += " |\n    ";
-          }
-          result += &format!(
-            "({{{}{{{}[{}] == 1'b1}}}} & {})",
-            dtype + 1,
-            cond,
-            i,
-            str_elem
-          );
-          first = false;
-        }
-
-        result
+        select1hot
+          .value_iter()
+          .enumerate()
+          .map(|(i, elem)| {
+            let value = dump_ref!(self.sys, &elem);
+            format!("({{{}{{{}[{}] == 1'b1}}}} & {})", dbits, cond, i, value)
+          })
+          .collect::<Vec<_>>()
+          .join(" | ")
       }
 
       _ => panic!("Unknown OP: {:?}", expr.get_opcode()),
