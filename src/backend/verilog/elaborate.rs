@@ -78,16 +78,33 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let mut res = String::new();
     let array_name = namify(array.get_name());
     let scalar_bits = array.scalar_ty().get_bits();
-    res.push_str(format!("// array: {}[{}]\n", array_name, array.get_size()).as_str());
-    res.push_str(
-      format!(
-        "logic [{}:0] array_{}_q[0:{}];\n",
-        scalar_bits - 1,
-        array_name,
-        array.get_size() - 1
-      )
-      .as_str(),
-    );
+    res.push_str(&format!(
+      "
+  // array: {name}[{size}]
+  logic [{ty_bits}:0] array_{name}_q[0:{decl_size}];
+",
+      name = array_name,
+      size = array.get_size(),
+      ty_bits = scalar_bits - 1,
+      decl_size = array.get_size() - 1
+    ));
+
+    // let drivers = array
+    //   .users()
+    //   .iter()
+    //   .map(|x| {
+    //     x.as_ref::<Operand>(array.sys)
+    //       .unwrap()
+    //       .get_user()
+    //       .as_ref::<Expr>(array.sys)
+    //       .unwrap()
+    //       .get_block()
+    //       .get_module()
+    //   })
+    //   .collect::<HashSet<_>>()
+    //   .into_iter()
+    //   .map(|x| namify(x.as_ref::<Module>(array.sys).unwrap().get_name()))
+    //   .collect::<HashSet<_>>();
 
     for driver in self.array_drivers.get(&array_name).unwrap().iter() {
       res.push_str(

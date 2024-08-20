@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{collections::HashSet, fmt::Display};
 
 use crate::{builder::SysBuilder, ir::node::*};
 
@@ -187,6 +187,7 @@ pub struct Array {
   size: usize,
   init: Option<Vec<BaseNode>>,
   attrs: Vec<ArrayAttr>,
+  pub(crate) user_set: HashSet<BaseNode>,
 }
 
 impl Typed for Array {
@@ -210,6 +211,7 @@ impl Array {
       size,
       init,
       attrs,
+      user_set: HashSet::new(),
     }
   }
 
@@ -232,6 +234,11 @@ impl Array {
   pub fn get_initializer(&self) -> Option<&Vec<BaseNode>> {
     self.init.as_ref()
   }
+
+  pub fn user(&self) -> &HashSet<BaseNode> {
+    &self.user_set
+  }
+
 }
 
 impl SysBuilder {

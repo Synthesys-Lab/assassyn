@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::builder::SysBuilder;
 
-use super::{node::*, visitor::Visitor, Block, Expr, Module, FIFO};
+use super::{node::*, visitor::Visitor, Array, Block, Expr, Module, FIFO};
 
 /// This node defines a def-use relation between the expression nodes.
 /// This is necessary because a node can be used by multiple in other user.
@@ -115,8 +115,10 @@ impl OperandMut<'_> {
 }
 
 macro_rules! impl_user_methods {
-  ($class:ident) => {
+  ($($class:ident),* $(,)?) => {
     paste::paste! {
+
+      $(
       impl [< $class Mut >] <'_> {
         pub(crate) fn add_user(&mut self, user: BaseNode) {
           assert!(!self.get().users().contains(&user));
@@ -128,18 +130,52 @@ macro_rules! impl_user_methods {
           self.get_mut().user_set.remove(user);
         }
       }
+
       impl [<$class Ref>] <'_> {
         pub fn users(&self) -> &HashSet<BaseNode> {
           &self.get().user_set
         }
       }
+      )*
+
+      impl SysBuilder {
+
+        fn remove_user(&mut self, operand: &BaseNode) {
+          if operand.is_unknown() {
+            return;
+          }
+          let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+          let def_value = *operand_ref.get_value();
+          match def_value.get_kind() {
+            $( NodeKind::$class => {
+              let mut mutator = self.get_mut::<$class>(&def_value).unwrap();
+              mutator.remove_user(operand);
+            } )*
+            _ => {}
+          }
+        }
+
+        fn add_user(&mut self, operand: BaseNode) {
+          if operand.is_unknown() {
+            return;
+          }
+          let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+          let value = *operand_ref.get_value();
+          match value.get_kind() {
+            $( NodeKind::$class => {
+              let mut mutator = self.get_mut::<$class>(&value).unwrap();
+              mutator.add_user(operand);
+            } )*
+            _ => {}
+          }
+        }
+      }
+
     }
   };
 }
 
-impl_user_methods!(Module);
-impl_user_methods!(Expr);
-impl_user_methods!(FIFO);
+impl_user_methods!(Module, Expr, FIFO, Array);
 
 struct GatherAllUses {
   src: BaseNode,
@@ -187,7 +223,7 @@ impl ExprMut<'_> {
       self.sys.cut_operand(&old);
       let operand = value.map(|x| self.sys.insert_element(Operand::new(x)));
       if let Some(operand) = operand {
-        self.sys.add_related_externals(module, operand.into());
+        self.sys.add_related_externals(module, operand);
         self.get_mut().operands[i] = operand;
         operand
           .as_mut::<Operand>(self.sys)
@@ -259,51 +295,59 @@ impl SysBuilder {
     self.remove_user(operand);
   }
 
-  pub(crate) fn remove_user(&mut self, operand: &BaseNode) {
-    if operand.is_unknown() {
-      return;
-    }
-    let operand_ref = operand.as_ref::<Operand>(self).unwrap();
-    let def_value = *operand_ref.get_value();
-    match def_value.get_kind() {
-      NodeKind::Module => {
-        let mut module_mut = self.get_mut::<Module>(&def_value).unwrap();
-        module_mut.remove_user(operand);
-      }
-      NodeKind::FIFO => {
-        let mut fifo_mut = self.get_mut::<FIFO>(&def_value).unwrap();
-        fifo_mut.remove_user(operand);
-      }
-      NodeKind::Expr => {
-        let mut expr_mut = self.get_mut::<Expr>(&def_value).unwrap();
-        expr_mut.remove_user(operand);
-      }
-      _ => {}
-    }
-  }
+  // pub(crate) fn remove_user(&mut self, operand: &BaseNode) {
+  //   if operand.is_unknown() {
+  //     return;
+  //   }
+  //   let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+  //   let def_value = *operand_ref.get_value();
+  //   match def_value.get_kind() {
+  //     NodeKind::Module => {
+  //       let mut module_mut = self.get_mut::<Module>(&def_value).unwrap();
+  //       module_mut.remove_user(operand);
+  //     }
+  //     NodeKind::FIFO => {
+  //       let mut fifo_mut = self.get_mut::<FIFO>(&def_value).unwrap();
+  //       fifo_mut.remove_user(operand);
+  //     }
+  //     NodeKind::Expr => {
+  //       let mut expr_mut = self.get_mut::<Expr>(&def_value).unwrap();
+  //       expr_mut.remove_user(operand);
+  //     }
+  //     NodeKind::Array => {
+  //       let mut array_mut = self.get_mut::<Array>(&def_value).unwrap();
+  //       array_mut.remove_user(operand);
+  //     }
+  //     _ => {}
+  //   }
+  // }
 
-  pub(crate) fn add_user(&mut self, operand: BaseNode) {
-    if operand.is_unknown() {
-      return;
-    }
-    let operand_ref = operand.as_ref::<Operand>(self).unwrap();
-    let value = *operand_ref.get_value();
-    match value.get_kind() {
-      NodeKind::Module => {
-        let mut module_mut = self.get_mut::<Module>(&value).unwrap();
-        module_mut.add_user(operand);
-      }
-      NodeKind::FIFO => {
-        let mut fifo_mut = self.get_mut::<FIFO>(&value).unwrap();
-        fifo_mut.add_user(operand);
-      }
-      NodeKind::Expr => {
-        let mut expr_mut = self.get_mut::<Expr>(&value).unwrap();
-        expr_mut.add_user(operand);
-      }
-      _ => {}
-    }
-  }
+  // pub(crate) fn add_user(&mut self, operand: BaseNode) {
+  //   if operand.is_unknown() {
+  //     return;
+  //   }
+  //   let operand_ref = operand.as_ref::<Operand>(self).unwrap();
+  //   let value = *operand_ref.get_value();
+  //   match value.get_kind() {
+  //     NodeKind::Module => {
+  //       let mut module_mut = self.get_mut::<Module>(&value).unwrap();
+  //       module_mut.add_user(operand);
+  //     }
+  //     NodeKind::FIFO => {
+  //       let mut fifo_mut = self.get_mut::<FIFO>(&value).unwrap();
+  //       fifo_mut.add_user(operand);
+  //     }
+  //     NodeKind::Expr => {
+  //       let mut expr_mut = self.get_mut::<Expr>(&value).unwrap();
+  //       expr_mut.add_user(operand);
+  //     }
+  //     NodeKind::Array => {
+  //       let mut array_mut = self.get_mut::<Array>(&value).unwrap();
+  //       array_mut.add_user(operand);
+  //     }
+  //     _ => {}
+  //   }
+  // }
 
   // TODO(@were): I strongly believe we can have a BFS based gatherer to have better performance.
   pub fn replace_all_uses_with(&mut self, src: BaseNode, dst: BaseNode) {
