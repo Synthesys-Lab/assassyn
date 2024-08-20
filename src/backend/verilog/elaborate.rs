@@ -17,24 +17,7 @@ use crate::{
 
 use self::{expr::subcode, module::Attribute};
 
-use super::Simulator;
-
-enum Predication {
-  Conditional(String),
-  Unconditional,
-}
-
-impl Predication {
-  fn from_cond_str(conds: &Vec<String>) -> Self {
-    if conds.iter().all(|x| !x.is_empty()) {
-      Self::Conditional(conds.join(" || "))
-    } else if conds.len() == 1 && conds.iter().all(|x| x.is_empty()) {
-      Self::Unconditional
-    } else {
-      panic!("Mixed conditional and unconditional branches");
-    }
-  }
-}
+use super::{gather::Gather, Simulator};
 
 fn namify(name: &str) -> String {
   name.replace('.', "_")
@@ -50,9 +33,11 @@ struct VerilogDumper<'a, 'b> {
   sys: &'a SysBuilder,
   config: &'b Config,
   pred_stack: VecDeque<String>,
-  fifo_pushes: HashMap<String, Vec<(String, String)>>, // fifo_name -> [(pred, value)]
-  array_stores: HashMap<String, Vec<(String, String, String)>>, // array_name -> [(pred, idx, value)]
-  triggers: HashMap<String, Vec<String>>,                       // module_name -> [pred]
+
+  fifo_pushes: HashMap<String, Gather>, // fifo_name -> value
+  array_stores: HashMap<String, (Gather, Gather)>, // array_name -> (idx, value)
+
+  triggers: HashMap<String, Gather>, // module_name -> [pred]
   current_module: String,
   trigger_drivers: HashMap<String, HashSet<String>>, // module_name -> {driver module}
   array_drivers: HashMap<String, HashSet<String>>,   // array -> {driver module}
@@ -270,35 +255,36 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       let driver = namify(module.get_name());
       res.push_str(&format!(
         "
-logic fifo_{name}_driver_{driver}_push_valid;\n
-logic [{ty_width}:0] fifo_{name}_driver_{driver}_push_data;\n
-logic fifo_{name}_driver_{driver}_push_ready;\n",
+  logic fifo_{name}_driver_{driver}_push_valid;\n
+  logic [{ty_width}:0] fifo_{name}_driver_{driver}_push_data;\n
+  logic fifo_{name}_driver_{driver}_push_ready;\n",
         name = fifo_name,
         driver = driver,
         ty_width = fifo_width - 1
       ));
-      pusher_valid.push(format!("fifo_{}_driver_{}_push_valid", fifo_name, driver));
+      pusher_valid.push(format!("  fifo_{}_driver_{}_push_valid", fifo_name, driver));
       pusher_data.push(format!(
-          "({{{width}{{fifo_{name}_driver_{driver}_push_valid}}}} & fifo_{name}_driver_{driver}_push_data)",
+          "  ({{{width}{{fifo_{name}_driver_{driver}_push_valid}}}} & fifo_{name}_driver_{driver}_push_data)",
           width=fifo_width, driver=driver,name=fifo_name));
       pusher_ready.push(
         format!(
-          "assign fifo_{}_driver_{}_push_ready = fifo_{}_push_ready;",
+          "  assign fifo_{}_driver_{}_push_ready = fifo_{}_push_ready;",
           fifo_name, driver, fifo_name
         )
       );
     });
 
     res.push_str(&format!(
-      "logic fifo_{name}_push_valid;
-assign fifo_{name}_push_valid = {pusher_valid};
-logic fifo_{name}_push_ready;
-{pusher_readiness}
-logic fifo_{name}_pop_valid;
-logic [{ty_width}:0] fifo_{name}_push_data;
-assign fifo_{name}_push_data = {pusher_data};
-logic [{ty_width}:0] fifo_{name}_pop_data;
-logic fifo_{name}_pop_ready;\n",
+      "
+  logic fifo_{name}_push_valid;
+  assign fifo_{name}_push_valid = {pusher_valid};
+  logic fifo_{name}_push_ready;
+  {pusher_readiness}
+  logic fifo_{name}_pop_valid;
+  logic [{ty_width}:0] fifo_{name}_push_data;
+  assign fifo_{name}_push_data = {pusher_data};
+  logic [{ty_width}:0] fifo_{name}_pop_data;
+  logic fifo_{name}_pop_ready;\n",
       name = fifo_name,
       ty_width = fifo_width - 1,
       pusher_readiness = pusher_ready.join("\n"),
@@ -335,18 +321,19 @@ logic fifo_{name}_pop_ready;\n",
         .iter()
       {
         res.push_str(&format!(
-          "logic {module}_driver_{driver}_trigger_push_valid;\n
-logic {module}_driver_{driver}_trigger_push_ready;\n",
+          "
+  logic {module}_driver_{driver}_trigger_push_valid;\n
+  logic {module}_driver_{driver}_trigger_push_ready;\n",
           module = module_name,
           driver = driver
         ));
       }
     }
-    res.push_str(format!("logic {}_trigger_push_valid;\n", module_name).as_str());
+    res.push_str(format!("  logic {}_trigger_push_valid;\n", module_name).as_str());
     if module_name != "driver" && module_name != "testbench" {
       res.push_str(
         format!(
-          "assign {}_trigger_push_valid = {};\n",
+          "  assign {}_trigger_push_valid = {};\n",
           module_name,
           self
             .trigger_drivers
@@ -361,12 +348,12 @@ logic {module}_driver_{driver}_trigger_push_ready;\n",
         .as_str(),
       );
     }
-    res.push_str(format!("logic {}_trigger_push_ready;\n", module_name).as_str());
+    res.push_str(format!("  logic {}_trigger_push_ready;\n", module_name).as_str());
     if module_name != "driver" && module_name != "testbench" {
       for driver in self.trigger_drivers.get(&module_name).unwrap().iter() {
         res.push_str(
           format!(
-            "assign {}_driver_{}_trigger_push_ready = {}_trigger_push_ready;\n",
+            "  assign {}_driver_{}_trigger_push_ready = {}_trigger_push_ready;\n",
             module_name, driver, module_name
           )
           .as_str(),
@@ -375,17 +362,17 @@ logic {module}_driver_{driver}_trigger_push_ready;\n",
     }
     res.push_str(&format!(
       "
-logic {module}_trigger_pop_valid;
-logic {module}_trigger_pop_ready;
-fifo #(1) {module}_trigger_i (
-  .clk(clk),
-  .rst_n(rst_n),
-  .push_valid({module}_trigger_push_valid),
-  .push_data(1'b1),
-  .push_ready({module}_trigger_push_ready),
-  .pop_valid({module}_trigger_pop_valid),
-  .pop_data(),
-  .pop_ready({module}_trigger_pop_ready));",
+  logic {module}_trigger_pop_valid;
+  logic {module}_trigger_pop_ready;
+  fifo #(1) {module}_trigger_i (
+    .clk(clk),
+    .rst_n(rst_n),
+    .push_valid({module}_trigger_push_valid),
+    .push_data(1'b1),
+    .push_ready({module}_trigger_push_ready),
+    .pop_valid({module}_trigger_pop_valid),
+    .pop_data(),
+    .pop_ready({module}_trigger_pop_ready));",
       module = module_name
     ));
     res
@@ -396,18 +383,18 @@ fifo #(1) {module}_trigger_i (
     let module_name = namify(module.get_name());
     res.push_str(&format!(
       "// {module}
-{module} {module}_i (
-  .clk(clk),
-  .rst_n(rst_n),",
+  {module} {module}_i (
+    .clk(clk),
+    .rst_n(rst_n),",
       module = module_name
     ));
     for port in module.fifo_iter() {
       let port_name = fifo_name!(port);
       res.push_str(&format!(
         "
-  .fifo_{fifo}_pop_valid(fifo_{module}_{fifo}_pop_valid),
-  .fifo_{fifo}_pop_data(fifo_{module}_{fifo}_pop_data),
-  .fifo_{fifo}_pop_ready(fifo_{module}_{fifo}_pop_ready),",
+    .fifo_{fifo}_pop_valid(fifo_{module}_{fifo}_pop_valid),
+    .fifo_{fifo}_pop_data(fifo_{module}_{fifo}_pop_data),
+    .fifo_{fifo}_pop_ready(fifo_{module}_{fifo}_pop_ready),",
         fifo = port_name,
         module = module_name
       ));
@@ -423,9 +410,9 @@ fifo #(1) {module}_trigger_i (
           ));
           res.push_str(&format!(
             "
-  .fifo_{fifo}_push_valid(fifo_{fifo}_driver_{module}_push_valid),
-  .fifo_{fifo}_push_data(fifo_{fifo}_driver_{module}_push_data),
-  .fifo_{fifo}_push_ready(fifo_{fifo}_driver_{module}_push_ready),",
+    .fifo_{fifo}_push_valid(fifo_{fifo}_driver_{module}_push_valid),
+    .fifo_{fifo}_push_data(fifo_{fifo}_driver_{module}_push_data),
+    .fifo_{fifo}_push_ready(fifo_{fifo}_driver_{module}_push_ready),\n",
             fifo = fifo_name,
             module = module_name
           ));
@@ -435,10 +422,10 @@ fifo #(1) {module}_trigger_i (
           let array_name = namify(array_ref.get_name());
           res.push_str(&format!(
             "
-  .array_{name}_q(array_{name}_q),
-  .array_{name}_w(array_{name}_driver_{module}_w),
-  .array_{name}_widx(array_{name}_driver_{module}_widx),
-  .array_{name}_d(array_{name}_driver_{module}_d),\n",
+    .array_{name}_q(array_{name}_q),
+    .array_{name}_w(array_{name}_driver_{module}_w),
+    .array_{name}_widx(array_{name}_driver_{module}_widx),
+    .array_{name}_d(array_{name}_driver_{module}_d),\n",
             name = array_name,
             module = module_name
           ));
@@ -456,16 +443,16 @@ fifo #(1) {module}_trigger_i (
     for trigger_module in trigger_modules {
       res.push_str(&format!(
         "
-  .{trigger}_trigger_push_valid({trigger}_driver_{module}_trigger_push_valid),
-  .{trigger}_trigger_push_ready({trigger}_driver_{module}_trigger_push_ready),",
+    .{trigger}_trigger_push_valid({trigger}_driver_{module}_trigger_push_valid),
+    .{trigger}_trigger_push_ready({trigger}_driver_{module}_trigger_push_ready),",
         trigger = trigger_module,
         module = module_name
       ));
     }
     res.push_str(&format!(
       "
-  .trigger_pop_valid({module}_trigger_pop_valid),
-  .trigger_pop_ready({module}_trigger_pop_ready));\n",
+    .trigger_pop_valid({module}_trigger_pop_valid),
+    .trigger_pop_ready({module}_trigger_pop_ready));\n",
       module = module_name
     ));
     res
@@ -479,10 +466,13 @@ fifo #(1) {module}_trigger_i (
     // runtime
     let mut res = String::new();
 
-    res.push_str("module top (\n");
-    res.push_str("  input logic clk,\n");
-    res.push_str("  input logic rst_n\n");
-    res.push_str(");\n\n");
+    res.push_str(
+      "
+  module top (
+    input logic clk,
+    input logic rst_n
+  );\n\n",
+    );
 
     // memory initializations map
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new(); // array -> init_file_path
@@ -522,10 +512,10 @@ fifo #(1) {module}_trigger_i (
     }
 
     if self.sys.has_testbench() {
-      res.push_str("assign testbench_trigger_push_valid = 1'b1;\n\n");
+      res.push_str("  assign testbench_trigger_push_valid = 1'b1;\n\n");
     }
     if self.sys.has_driver() {
-      res.push_str("assign driver_trigger_push_valid = 1'b1;\n\n");
+      res.push_str("  assign driver_trigger_push_valid = 1'b1;\n\n");
     }
 
     // module insts
@@ -770,7 +760,7 @@ module {} (
   // trigger
   input logic trigger_pop_valid,
   output logic trigger_pop_ready
-);",
+);\n",
     );
 
     let mut wait_until: Option<String> = None;
@@ -852,107 +842,41 @@ module {} (
       });
     }
 
-    for (m, preds) in self.triggers.drain() {
-      res.push_str(&match Predication::from_cond_str(&preds) {
-        Predication::Conditional(cond) => format!(
-          "assign {}_trigger_push_valid = trigger && ({});\n\n",
-          m, cond
-        ),
-        Predication::Unconditional => format!("assign {}_trigger_push_valid = trigger;\n\n", m),
-      });
+    for (m, cond) in self.triggers.drain() {
+      res.push_str(&format!(
+        "  assign {}_trigger_push_valid = {};\n\n",
+        m,
+        cond.condition.and("trigger".into())
+      ));
     }
 
-    for (f, branches) in self.fifo_pushes.drain() {
-      let mut valid_conds = Vec::<String>::new();
-      let mut data_str = String::new();
-      let mut has_unconditional_branch = false;
-      let mut has_conditional_branch = false;
-      for (p, v) in branches {
-        if p.is_empty() {
-          assert!(
-            !has_unconditional_branch,
-            "multiple unconditional branches for fifo {}",
-            f
-          );
-          assert!(
-            !has_conditional_branch,
-            "mixed conditional and unconditional branches for fifo {}",
-            f
-          );
-          has_unconditional_branch = true;
-          data_str.push_str(&v);
-        } else {
-          assert!(
-            !has_unconditional_branch,
-            "mixed conditional and unconditional branches for fifo {}",
-            f
-          );
-          has_conditional_branch = true;
-          valid_conds.push(p.clone());
-          data_str.push_str(format!("{} ? {} : ", p, v).as_str());
-        }
-      }
-      if has_conditional_branch {
-        data_str.push_str("'x");
-      }
-      res.push_str(&if has_conditional_branch {
-        let valid = valid_conds.join(" || ");
-        format!("assign fifo_{}_push_valid = trigger && ({});\n", f, valid)
-      } else {
-        format!("assign fifo_{}_push_valid = trigger;\n", f)
-      });
-      res.push_str(format!("assign fifo_{}_push_data = {};\n\n", f, data_str).as_str());
-    }
+    res.push_str("  // Gather FIFO pushes\n");
 
-    for (a, branches) in self.array_stores.drain() {
-      let mut w_conds = Vec::<String>::new();
-      let mut idx_str = String::new();
-      let mut d_str = String::new();
-      let mut has_unconditional_branch = false;
-      let mut has_conditional_branch = false;
-      for (p, idx, v) in branches {
-        if p.is_empty() {
-          if has_unconditional_branch {
-            panic!("multiple unconditional branches for array {} store", a);
-          }
-          if has_conditional_branch {
-            panic!(
-              "mixed conditional and unconditional branches for array {} store",
-              a
-            );
-          }
-          has_unconditional_branch = true;
-          d_str.push_str(v.to_string().as_str());
-          idx_str.push_str(idx.to_string().as_str());
-        } else {
-          if has_unconditional_branch {
-            panic!(
-              "mixed conditional and unconditional branches for array {} store",
-              a
-            );
-          }
-          has_conditional_branch = true;
-          w_conds.push(p.clone());
-          d_str.push_str(format!("{} ? {} : ", p, v).as_str());
-          idx_str.push_str(format!("{} ? {} : ", p, idx).as_str());
-        }
-      }
-      if has_conditional_branch {
-        d_str.push_str("'x".to_string().as_str());
-        idx_str.push_str("'x".to_string().as_str());
-      }
-      res.push_str(&if has_conditional_branch {
-        let cond = w_conds.join(" || ");
-        format!("assign array_{}_w = trigger && ({});\n", a, cond)
-      } else {
-        format!("assign array_{}_w = trigger;\n", a)
-      });
+    for (fifo, g) in self.fifo_pushes.drain() {
       res.push_str(&format!(
         "
-  assign array_{}_d = {};
-  assign array_{}_widx = {};
+  assign fifo_{fifo}_push_valid = {cond};
+  assign fifo_{fifo}_push_data = {value};
 ",
-        a, d_str, a, idx_str
+        fifo = fifo,
+        cond = g.condition.and("trigger".into()),
+        value = g.value
+      ));
+    }
+
+    res.push_str("  // Gather Array writes\n");
+
+    for (a, (idx, data)) in self.array_stores.drain() {
+      res.push_str(&format!(
+        "
+  assign array_{a}_w = {cond};
+  assign array_{a}_d = {data};
+  assign array_{a}_widx = {idx};
+",
+        a = a,
+        cond = idx.condition.and("trigger".into()),
+        idx = idx.value,
+        data = data.value
       ));
     }
 
@@ -992,7 +916,7 @@ module {} (
     res.push_str(&format!(
       "
   assign trigger = trigger_pop_valid{};
-  endmodule // {}
+endmodule // {}
 ",
       wait_until.unwrap_or("".to_string()),
       self.current_module
@@ -1070,7 +994,7 @@ module {} (
       Opcode::Compare { .. } => {
         let cmp = expr.as_sub::<instructions::Compare>().unwrap();
         format!(
-          "{} {} {}\n\n",
+          "{} {} {}",
           dump_ref!(self.sys, &cmp.a()),
           cmp.get_opcode(),
           dump_ref!(self.sys, &cmp.b())
@@ -1160,21 +1084,18 @@ module {} (
         format_str = format_str.replace('"', "");
 
         let mut res = String::new();
-        res.push_str(
-          format!(
-            "always_ff @(posedge clk iff trigger{}) ",
-            self
-              .get_pred()
-              .map(|p| format!(" && {}", p))
-              .unwrap_or("".to_string())
-          )
-          .as_str(),
-        );
+        res.push_str(&format!(
+          "  always_ff @(posedge clk iff trigger{}) ",
+          self
+            .get_pred()
+            .map(|p| format!(" && {}", p))
+            .unwrap_or("".to_string())
+        ));
         res.push_str("$display(\"%t\\t");
-        res.push_str(format_str.as_str());
+        res.push_str(&format_str);
         res.push_str("\", $time - 200, ");
         for elem in expr.operand_iter().skip(1) {
-          res.push_str(format!("{}, ", dump_ref!(self.sys, elem.get_value())).as_str());
+          res.push_str(&format!("{}, ", dump_ref!(self.sys, elem.get_value())));
         }
         res.pop();
         res.pop();
@@ -1209,20 +1130,22 @@ module {} (
           }
         }
         let pred = self.get_pred().unwrap_or("".to_string());
+        let idx = dump_ref!(self.sys, &array_idx);
+        let idx_bits = store.idx().get_dtype(self.sys).unwrap().get_bits();
+        let value = dump_ref!(self.sys, &store.value());
+        let value_bits = store.value().get_dtype(self.sys).unwrap().get_bits();
         match self.array_stores.get_mut(&array_name) {
-          Some(ass) => ass.push((
-            pred,
-            dump_ref!(self.sys, &array_idx),
-            dump_ref!(self.sys, &store.value()),
-          )),
+          Some(ass) => {
+            ass.0.push(pred.clone(), idx, idx_bits);
+            ass.1.push(pred, value, value_bits);
+          }
           None => {
             self.array_stores.insert(
               array_name.clone(),
-              vec![(
-                pred,
-                dump_ref!(self.sys, &array_idx),
-                dump_ref!(self.sys, &store.value()),
-              )],
+              (
+                Gather::new(pred.clone(), idx, idx_bits),
+                Gather::new(pred, value, value_bits),
+              ),
             );
           }
         }
@@ -1238,12 +1161,13 @@ module {} (
           fifo_name!(fifo)
         );
         let pred = self.get_pred().unwrap_or("".to_string());
+        let value = dump_ref!(self.sys, &push.value());
         match self.fifo_pushes.get_mut(&fifo_name) {
-          Some(fps) => fps.push((pred, dump_ref!(self.sys, &push.value()))),
+          Some(fps) => fps.push(pred, value, fifo.scalar_ty().get_bits()),
           None => {
             self.fifo_pushes.insert(
               fifo_name.clone(),
-              vec![(pred, dump_ref!(self.sys, &push.value()))],
+              Gather::new(pred, value, fifo.scalar_ty().get_bits()),
             );
           }
         }
@@ -1286,9 +1210,11 @@ module {} (
         }
         let pred = self.get_pred().unwrap_or("".to_string());
         match self.triggers.get_mut(&module_name) {
-          Some(trgs) => trgs.push(pred),
+          Some(trgs) => trgs.push(pred, "".into(), 0),
           None => {
-            self.triggers.insert(module_name.clone(), vec![pred]);
+            self
+              .triggers
+              .insert(module_name, Gather::new(pred, "".into(), 0));
           }
         }
         "".to_string()
@@ -1383,7 +1309,7 @@ module {} (
     };
 
     if let Some((id, bits)) = decl {
-      format!("logic [{}:0] {}; assign {} = {};\n", bits, id, id, body)
+      format!("  logic [{}:0] {}; assign {} = {};\n", bits, id, id, body)
     } else {
       body
     }
