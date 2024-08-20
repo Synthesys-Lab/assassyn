@@ -69,7 +69,7 @@ class Value:
     def __eq__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.EQ, self, other)
-    
+
     @ir_builder(node_type='expr')
     def __ne__(self, other):
         from .expr import BinaryOp
