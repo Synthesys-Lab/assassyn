@@ -125,6 +125,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   logic array_{array_name}_w;
   assign array_{array_name}_w = \n{};
 ",
+      // FIXME(@were): Make sure these drivers are write-only ones?
       drivers // one-hot select driver write-data
         .iter()
         .map(|driver| format!(
