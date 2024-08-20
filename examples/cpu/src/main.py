@@ -1,5 +1,4 @@
 import pytest
-import sys
 
 from assassyn.frontend import *
 from assassyn.backend import *

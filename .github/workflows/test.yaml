@@ -80,3 +80,4 @@ jobs:
           VERILATOR_ROOT: ${{ github.workspace }}/verilator
         run: |
           python3 examples/systolic-array/systolic_array.py;
+          python3 examples/cpu/src/main.py
