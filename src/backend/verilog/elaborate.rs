@@ -64,9 +64,9 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         self
           .pred_stack
           .iter()
-          .cloned()
+          .map(|s| s.as_str())
           .collect::<Vec<_>>()
-          .join(" && "),
+          .join(" && ")
       ))
     }
   }
@@ -83,7 +83,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // array buffer
     let q = display.field("q");
     res.push_str(&format!("  // {}\n", array));
-    res.push_str(&declare_array(array, &q));
+    res.push_str(&declare_array(array, &q, ";"));
 
     let mut seen = HashSet::new();
     let drivers = array
@@ -567,41 +567,34 @@ module {} (
           let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
           let parent_name = fifo.get_module().get_name().to_string();
           let display = utils::DisplayInstance::from_fifo(&fifo, true);
-          let bits = fifo.scalar_ty().get_bits() - 1;
           // TODO(@were): Support `push_ready` for backpressures.
           // (push_valid, push_data, push_ready) works like
           // `if push_valid && push_ready: FIFO.push()`
           res.push_str(&format!("  // External FIFO {}.{}\n", parent_name, fifo.get_name()));
-          res.push_str(&format!("  output logic {},\n", display.field("push_valid")));
-          res.push_str(&format!("  output logic [{}:0] {},\n", bits, display.field("push_data")));
-          res.push_str(&format!("  input logic {},\n", display.field("push_ready")));
+          res.push_str(&declare_out(bool_ty(), &display.field("push_valid")));
+          res.push_str(&declare_out(fifo.scalar_ty(), &display.field("push_data")));
+          res.push_str(&declare_in(bool_ty(), &display.field("push_ready")));
         }
         NodeKind::Array => {
           let array = interf.as_ref::<Array>(self.sys).unwrap();
           let display = utils::DisplayInstance::from_array(&array);
-          let bits = array.scalar_ty().get_bits() - 1;
-          let size = array.get_size();
-          let idx_bits = size.ilog2();
-          res.push_str(&format!("  // array {}\n", array.get_name()));
+          res.push_str(&format!("  // {}\n", array));
           if self.sys.user_contains_opcode(ops, Opcode::Load) {
-            res.push_str(&format!(
-              "  input logic [{bits}:0] {}[0:{}],\n",
-              display.field("q"),
-              size - 1
-            ));
+            res.push_str(&declare_array(&array, &display.field("q"), ","));
           }
           // (w, widx, d): something like `array[widx] = d;`
           if self.sys.user_contains_opcode(ops, Opcode::Store) {
-            res.push_str(&format!("  output logic {},\n", display.field("w")));
-            res.push_str(&format!("  output logic [{idx_bits}:0] {},\n", display.field("widx")));
-            res.push_str(&format!("  output logic [{bits}:0] {},\n", display.field("d")));
+            res.push_str(&declare_out(bool_ty(), &display.field("w")));
+            res.push_str(&declare_out(array.get_idx_type(), &display.field("widx")));
+            res.push_str(&declare_out(array.scalar_ty(), &display.field("d")));
           }
         }
         NodeKind::Module => {
           let module = interf.as_ref::<Module>(self.sys).unwrap();
-          let module_name = namify(module.get_name());
-          res.push_str(&format!("  output logic {}_trigger_push_valid,\n", module_name));
-          res.push_str(&format!("  input logic {}_trigger_push_ready,\n", module_name));
+          let display = utils::DisplayInstance::from_module(&module);
+          res.push_str(&format!("  // Module {}\n", module.get_name()));
+          res.push_str(&declare_out(bool_ty(), &display.field("trigger_push_valid")));
+          res.push_str(&declare_in(bool_ty(), &display.field("trigger_push_ready")));
         }
         NodeKind::Expr => {
           // TODO(@were): Handle this later.
@@ -783,21 +776,16 @@ endmodule // {}
       }
 
       Opcode::FIFOPop => {
-        let name = namify(&expr.upcast().to_string(self.sys));
+        let id = namify(&expr.upcast().to_string(self.sys));
         let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
         let fifo = pop.fifo();
-        let fifo_name = fifo_name!(fifo);
+        let display = utils::DisplayInstance::from_fifo(&fifo, false);
         format!(
-          "
-  logic [{}:0] {};
-  assign {} = fifo_{}_pop_data;
-  assign fifo_{}_pop_ready = trigger{};
-",
-          fifo.scalar_ty().get_bits() - 1,
-          name,
-          name,
-          fifo_name,
-          fifo_name,
+          "{}\n  assign {} = {};\n  assign {} = trigger{};\n",
+          declare_logic(fifo.scalar_ty(), &id),
+          id,
+          display.field("pop_data"),
+          display.field("pop_ready"),
           self
             .get_pred()
             .map(|p| format!(" && {}", p))
@@ -810,11 +798,11 @@ endmodule // {}
 
         let re = Regex::new(r"\{(:.[bxXo]?)?\}").unwrap();
 
-        let dtypes: Vec<_> = expr
+        let dtypes = expr
           .operand_iter()
           .skip(1)
           .map(|elem| elem.get_value().get_dtype(self.sys).unwrap())
-          .collect();
+          .collect::<Vec<_>>();
 
         let mut dtype_index = 0;
         format_str = re

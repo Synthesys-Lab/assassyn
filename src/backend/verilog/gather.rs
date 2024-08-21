@@ -46,7 +46,7 @@ impl Gather {
     match self.condition {
       Condition::Unconditional => panic!("Mixed conditional and unconditional gather!"),
       Condition::Conditional(ref mut c) => {
-        *c = format!("{} || {}", c, cond);
+        *c = format!("{} || ({})", c, cond);
         self.value = format!("{} | ({{ {} {{ {} }} }} & {})", self.value, bits, cond, value);
       }
     }
