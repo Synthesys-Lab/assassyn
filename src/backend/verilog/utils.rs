@@ -19,11 +19,11 @@ impl DisplayInstance {
   }
 
   pub(super) fn from_array(array: &ArrayRef<'_>) -> Self {
-    DisplayInstance::new("array", namify(&array.get_name()))
+    DisplayInstance::new("array", namify(array.get_name()))
   }
 
   pub(super) fn from_fifo(fifo: &FIFORef<'_>) -> Self {
-    DisplayInstance::new("fifo", namify(&fifo.get_name()))
+    DisplayInstance::new("fifo", namify(fifo.get_name()))
   }
 }
 
@@ -42,7 +42,7 @@ impl Edge {
   pub(super) fn new(instance: DisplayInstance, driver: &ModuleRef<'_>) -> Edge {
     Edge {
       instance,
-      driver: namify(&driver.get_name()),
+      driver: namify(driver.get_name()),
     }
   }
 
