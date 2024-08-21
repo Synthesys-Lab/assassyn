@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::builder::SysBuilder;
 
-use super::{node::*, visitor::Visitor, Array, Block, Expr, Module, FIFO};
+use super::{node::*, visitor::Visitor, Array, Block, Expr, Module, Opcode, FIFO};
 
 /// This node defines a def-use relation between the expression nodes.
 /// This is necessary because a node can be used by multiple in other user.
@@ -90,7 +90,7 @@ impl Operand {
   }
 }
 
-impl OperandRef<'_> {
+impl<'sys> OperandRef<'sys> {
   pub fn get_idx(&self) -> Option<usize> {
     if let Ok(expr) = self.user.as_ref::<Expr>(self.sys) {
       let mut iter = expr.operand_iter();
@@ -100,7 +100,12 @@ impl OperandRef<'_> {
     }
   }
 
-  pub fn get_expr(&self) -> ExprRef<'_> {
+  pub fn get_expr<'borrow, 'res>(&self) -> ExprRef<'res>
+  where
+    'sys: 'res,
+    'borrow: 'res,
+    'sys: 'borrow,
+  {
     self.user.as_ref::<Expr>(self.sys).unwrap()
   }
 }
@@ -275,6 +280,12 @@ impl ExprMut<'_> {
 }
 
 impl SysBuilder {
+  pub fn user_contains_opcode(&self, users: &HashSet<BaseNode>, opcode: Opcode) -> bool {
+    users
+      .iter()
+      .any(|x| x.as_ref::<Operand>(self).unwrap().get_expr().get_opcode() == opcode)
+  }
+
   pub(crate) fn cut_operand(&mut self, operand: &BaseNode) {
     if operand.is_unknown() {
       return;

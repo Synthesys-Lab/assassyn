@@ -9,10 +9,7 @@ impl BlockIntrinsic<'_> {
   pub fn get_subcode(&self) -> subcode::BlockIntrinsic {
     match self.expr.get_opcode() {
       Opcode::BlockIntrinsic { intrinsic } => intrinsic,
-      _ => panic!(
-        "Expecting Opcode::BlockIntrinsic, but got {:?}",
-        self.expr.get_opcode()
-      ),
+      _ => panic!("Expecting Opcode::BlockIntrinsic, but got {:?}", self.expr.get_opcode()),
     }
   }
 }
@@ -60,10 +57,7 @@ impl Display for PureIntrinsic<'_> {
             )
           }
         },
-        _ => panic!(
-          "Expecting Opcode::PureIntrinsic, but got {:?}",
-          self.expr.get_opcode()
-        ),
+        _ => panic!("Expecting Opcode::PureIntrinsic, but got {:?}", self.expr.get_opcode()),
       }
     )
   }

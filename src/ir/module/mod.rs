@@ -223,12 +223,7 @@ impl SysBuilder {
   pub fn create_module(&mut self, name: &str, ports: Vec<PortInfo>) -> BaseNode {
     let port_table = ports
       .into_iter()
-      .map(|x| {
-        (
-          x.name.clone(),
-          self.insert_element(FIFO::new(&x.ty, x.name.as_str())),
-        )
-      })
+      .map(|x| (x.name.clone(), self.insert_element(FIFO::new(&x.ty, x.name.as_str()))))
       .collect::<HashMap<_, _>>();
     let ports = port_table.values().cloned().collect::<Vec<_>>();
     let module = Module::new(name, port_table);

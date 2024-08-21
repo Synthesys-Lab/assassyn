@@ -22,7 +22,7 @@ def check(raw):
             assert int(i.split()[-1]) == 10
 
 def test_driver():
-    sys = SysBuilder('driver')
+    sys = SysBuilder('reg_init')
     with sys:
         driver = Driver()
         driver.build()

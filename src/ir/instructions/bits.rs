@@ -18,15 +18,7 @@ impl Display for Slice<'_> {
     let a = self.x().to_string(self.expr.sys);
     let l = self.l();
     let r = self.r();
-    write!(
-      f,
-      "{} = {}[{}:{}] // {}",
-      self.expr.get_name(),
-      a,
-      l,
-      r,
-      self.expr.dtype()
-    )
+    write!(f, "{} = {}[{}:{}] // {}", self.expr.get_name(), a, l, r, self.expr.dtype())
   }
 }
 
@@ -35,10 +27,7 @@ impl Display for Concat<'_> {
     let a = self.msb().to_string(self.expr.sys);
     let (b, b_bits) = {
       let b = self.lsb();
-      (
-        b.to_string(self.expr.sys),
-        b.get_dtype(self.expr.sys).unwrap().get_bits(),
-      )
+      (b.to_string(self.expr.sys), b.get_dtype(self.expr.sys).unwrap().get_bits())
     };
     write!(
       f,

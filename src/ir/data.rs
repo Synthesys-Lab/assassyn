@@ -53,10 +53,7 @@ impl DataType {
   }
 
   pub fn is_scalar(&self) -> bool {
-    matches!(
-      self,
-      DataType::Bits(_) | DataType::Int(_) | DataType::UInt(_) | DataType::Fp32
-    )
+    matches!(self, DataType::Bits(_) | DataType::Int(_) | DataType::UInt(_) | DataType::Fp32)
   }
 
   pub fn get_bits(&self) -> usize {
@@ -221,6 +218,10 @@ impl Array {
 
   pub fn get_size(&self) -> usize {
     self.size
+  }
+
+  pub fn get_idx_type(&self) -> DataType {
+    DataType::int_ty((self.size.ilog2() + 1) as usize)
   }
 
   pub fn get_name(&self) -> &str {

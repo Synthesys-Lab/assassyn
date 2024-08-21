@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
 use super::super::common::namify;
-use crate::ir::node::{ArrayRef, FIFORef, ModuleRef};
+use crate::ir::{
+  node::{ArrayRef, FIFORef, ModuleRef},
+  DataType,
+};
 
 #[derive(Debug, Clone)]
 pub(super) struct DisplayInstance {
@@ -22,8 +25,14 @@ impl DisplayInstance {
     DisplayInstance::new("array", namify(array.get_name()))
   }
 
-  pub(super) fn from_fifo(fifo: &FIFORef<'_>) -> Self {
-    DisplayInstance::new("fifo", namify(fifo.get_name()))
+  pub(super) fn from_fifo(fifo: &FIFORef<'_>, global: bool) -> Self {
+    let raw = namify(fifo.get_name());
+    let fifo_name = if global {
+      format!("{}_{}", namify(fifo.get_module().get_name()), raw)
+    } else {
+      raw
+    };
+    DisplayInstance::new("fifo", fifo_name)
   }
 }
 
@@ -56,8 +65,45 @@ pub(super) fn broadcast(value: String, bits: usize) -> String {
 }
 
 pub(super) fn select_1h(iter: impl Iterator<Item = (String, String)>, bits: usize) -> String {
-  iter
-    .map(|(pred, value)| format!("({} & {})", broadcast(pred, bits), value))
-    .collect::<Vec<_>>()
-    .join(" | ")
+  reduce(iter
+    .map(|(pred, value)| format!("({} & {})", broadcast(pred, bits), value)), " | ")
+}
+
+pub(super) fn reduce(iter: impl Iterator<Item = String>, concat: &str) -> String {
+  let res = iter.collect::<Vec<_>>().join(concat);
+  if res.is_empty() {
+    "'x".to_string()
+  } else {
+    res
+  }
+}
+
+pub(super) fn bool_ty() -> DataType {
+  DataType::int_ty(1)
+}
+
+fn declare_impl(
+  decl_prefix: &'static str,
+  ty: DataType,
+  id: &String,
+  term: &'static str,
+) -> String {
+  let bits = ty.get_bits() - 1;
+  format!("  {} [{}:0] {}{}\n", decl_prefix, bits, id, term)
+}
+
+pub(super) fn declare_logic(ty: DataType, id: &String) -> String {
+  declare_impl("logic", ty, id, ";")
+}
+
+pub(super) fn declare_in(ty: DataType, id: &String) -> String {
+  declare_impl("input logic", ty, id, ",")
+}
+
+pub(super) fn declare_out(ty: DataType, id: &String) -> String {
+  declare_impl("output logic", ty, id, ",")
+}
+
+pub(super) fn declare_array(ty: DataType, id: &String, size: usize) -> String {
+  format!("  logic [{}:0] {} [{}];\n", ty.get_bits() - 1, id, size)
 }

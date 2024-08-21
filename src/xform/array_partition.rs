@@ -61,16 +61,10 @@ pub fn rewrite_array_partitions(sys: &mut SysBuilder) {
     let (dtype, name, size, init) = {
       let array = array.as_ref::<Array>(sys).unwrap();
       let size = array.get_size();
-      let init = array.get_initializer().map_or_else(
-        || vec![None; size],
-        |x| x.iter().map(|x| Some(vec![*x])).collect::<Vec<_>>(),
-      );
-      (
-        array.scalar_ty().clone(),
-        array.get_name().to_string(),
-        array.get_size(),
-        init,
-      )
+      let init = array
+        .get_initializer()
+        .map_or_else(|| vec![None; size], |x| x.iter().map(|x| Some(vec![*x])).collect::<Vec<_>>());
+      (array.scalar_ty().clone(), array.get_name().to_string(), array.get_size(), init)
     };
     let partition = init
       .iter()

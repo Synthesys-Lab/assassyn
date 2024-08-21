@@ -382,19 +382,11 @@ impl SysBuilder {
 
   pub fn create_select_1hot(&mut self, cond: BaseNode, values: Vec<BaseNode>) -> BaseNode {
     let cond_ty = cond.get_dtype(self).unwrap();
-    assert_eq!(
-      cond_ty.get_bits(),
-      values.len(),
-      "Select1Hot value count mismatch!",
-    );
+    assert_eq!(cond_ty.get_bits(), values.len(), "Select1Hot value count mismatch!",);
     let v0type = values[0].get_dtype(self).unwrap();
     for elem in values.iter().skip(1) {
       let vitype = elem.get_dtype(self).unwrap();
-      assert_eq!(
-        v0type, vitype,
-        "Select1Hot value type mismatch {:?} != {:?}",
-        v0type, vitype,
-      );
+      assert_eq!(v0type, vitype, "Select1Hot value type mismatch {:?} != {:?}", v0type, vitype,);
     }
     let mut args = vec![cond];
     args.extend(values);
@@ -409,11 +401,7 @@ impl SysBuilder {
   ) -> BaseNode {
     let t_ty = true_val.get_dtype(self).unwrap();
     let f_ty = false_val.get_dtype(self).unwrap();
-    assert_eq!(
-      t_ty, f_ty,
-      "Select value type mismatch: {:?} and {:?}",
-      t_ty, f_ty
-    );
+    assert_eq!(t_ty, f_ty, "Select value type mismatch: {:?} and {:?}", t_ty, f_ty);
     self.create_expr(f_ty, Opcode::Select, vec![cond, true_val, false_val], true)
   }
 
@@ -525,19 +513,10 @@ impl SysBuilder {
   pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) {
     let port = {
       let bind = bind.as_ref::<LazyBind>(self).unwrap();
-      assert!(
-        bind.get_arg(&key).is_none(),
-        "Argument {} already exists!",
-        key
-      );
+      assert!(bind.get_arg(&key).is_none(), "Argument {} already exists!", key);
       let module = bind.get_callee().as_ref::<Module>(self).unwrap();
       let port = module.get_fifo(&key).unwrap_or_else(|| {
-        panic!(
-          "\"{}\" is NOT a FIFO of \"{}\" ({:?})",
-          key,
-          module.get_name(),
-          module.upcast()
-        )
+        panic!("\"{}\" is NOT a FIFO of \"{}\" ({:?})", key, module.get_name(), module.upcast())
       });
       assert_eq!(
         port.scalar_ty(),
@@ -564,10 +543,7 @@ impl SysBuilder {
 
   fn indexable(&self, idx: BaseNode) -> bool {
     let dtype = idx.get_dtype(self).unwrap();
-    matches!(
-      dtype,
-      DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_)
-    )
+    matches!(dtype, DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_))
   }
 
   /// Create a read operation on an array.
@@ -606,20 +582,12 @@ impl SysBuilder {
       idx.to_string(self),
       idx.get_dtype(self).unwrap()
     );
-    assert!(
-      matches!(array.get_kind(), NodeKind::Array),
-      "Expect an array, but {:?}",
-      array
-    );
+    assert!(matches!(array.get_kind(), NodeKind::Array), "Expect an array, but {:?}", array);
     let dtype = array.as_ref::<Array>(self).unwrap().scalar_ty();
     let vtype = value.get_dtype(self).unwrap_or_else(|| {
       panic!("{} has no type!", value.to_string(self));
     });
-    assert_eq!(
-      dtype, vtype,
-      "Value type mismatch {:?} != {:?}!",
-      dtype, vtype
-    );
+    assert_eq!(dtype, vtype, "Value type mismatch {:?} != {:?}!", dtype, vtype);
     let operands = vec![array, idx, value];
 
     self.create_expr(DataType::void(), Opcode::Store, operands, true)
@@ -636,10 +604,7 @@ impl SysBuilder {
     let bty = b.get_dtype(self).unwrap();
     if op.is_cmp() {
       if aty.get_bits() != bty.get_bits() {
-        return Err(format!(
-          "Cannot compare types {} and {} for {:?}",
-          aty, bty, op
-        ));
+        return Err(format!("Cannot compare types {} and {} for {:?}", aty, bty, op));
       }
       return Ok(DataType::uint_ty(1));
     }
@@ -684,10 +649,7 @@ impl SysBuilder {
     if let Some(res) = res {
       Ok(res)
     } else {
-      Err(format!(
-        "Cannot combine types {} and {} for {:?}",
-        aty, bty, op
-      ))
+      Err(format!("Cannot combine types {} and {} for {:?}", aty, bty, op))
     }
   }
 
@@ -722,15 +684,8 @@ impl SysBuilder {
   }
 
   pub fn create_fifo_valid(&mut self, fifo: BaseNode) -> BaseNode {
-    assert!(
-      matches!(fifo.get_kind(), NodeKind::FIFO),
-      "Expect FIFO as the operand"
-    );
-    self.create_pure_intrinsic(
-      DataType::int_ty(1),
-      subcode::PureIntrinsic::FIFOValid,
-      vec![fifo],
-    )
+    assert!(matches!(fifo.get_kind(), NodeKind::FIFO), "Expect FIFO as the operand");
+    self.create_pure_intrinsic(DataType::int_ty(1), subcode::PureIntrinsic::FIFOValid, vec![fifo])
   }
 
   /// Create a slice operation.

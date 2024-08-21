@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt};
 
 use expr::subcode;
 
@@ -38,12 +38,8 @@ struct ExtInterDumper<'a> {
 impl Visitor<String> for ExtInterDumper<'_> {
   fn visit_fifo(&mut self, input: FIFORef<'_>) -> Option<String> {
     let module = input.get_parent().as_ref::<Module>(input.sys).unwrap();
-    let mut res = format!(
-      "{}.{}: fifo<{}> {{\n",
-      module.get_name(),
-      input.get_name(),
-      input.scalar_ty()
-    );
+    let mut res =
+      format!("{}.{}: fifo<{}> {{\n", module.get_name(), input.get_name(), input.scalar_ty());
     for op in self.users.iter() {
       let expr = IRPrinter::new(self.redundancy)
         .visit_expr(
@@ -61,12 +57,8 @@ impl Visitor<String> for ExtInterDumper<'_> {
   }
 
   fn visit_array(&mut self, array: ArrayRef<'_>) -> Option<String> {
-    let mut res = format!(
-      "Array: {}[{} x {}] {{\n",
-      array.get_name(),
-      array.get_size(),
-      array.scalar_ty(),
-    );
+    let mut res =
+      format!("Array: {}[{} x {}] {{\n", array.get_name(), array.get_size(), array.scalar_ty(),);
     for op in self.users.iter() {
       let expr = IRPrinter::new(self.redundancy)
         .visit_expr(
@@ -98,13 +90,7 @@ impl Visitor<String> for IRPrinter {
   }
 
   fn visit_array(&mut self, array: ArrayRef<'_>) -> Option<String> {
-    format!(
-      "Array: {}[{} x {}]",
-      array.get_name(),
-      array.get_size(),
-      array.scalar_ty(),
-    )
-    .into()
+    format!("Array: {}[{} x {}]", array.get_name(), array.get_size(), array.scalar_ty(),).into()
   }
 
   fn visit_int_imm(&mut self, int_imm: IntImmRef<'_>) -> Option<String> {
@@ -113,12 +99,7 @@ impl Visitor<String> for IRPrinter {
 
   fn visit_operand(&mut self, operand: OperandRef<'_>) -> Option<String> {
     let expr = operand.get_user().to_string(operand.sys);
-    format!(
-      "{} /* in {} */",
-      operand.get_value().to_string(operand.sys),
-      expr
-    )
-    .into()
+    format!("{} /* in {} */", operand.get_value().to_string(operand.sys), expr).into()
   }
 
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
@@ -155,10 +136,7 @@ impl Visitor<String> for IRPrinter {
     res.push_str(&" ".repeat(self.indent));
     res.push_str(&format!("// Key: {}\n", module.get_key()));
     res.push_str(&" ".repeat(self.indent));
-    res.push_str(&format!(
-      "#{:?}\n",
-      module.get_attrs().iter().collect::<Vec<_>>()
-    ));
+    res.push_str(&format!("#{:?}\n", module.get_attrs().iter().collect::<Vec<_>>()));
     res.push_str(&format!(
       "{}{} {}(",
       " ".repeat(self.indent),
@@ -229,10 +207,7 @@ impl Visitor<String> for IRPrinter {
     let restore_ident = self.indent;
     for (i, elem) in block.body_iter().enumerate() {
       if here && ip.at.map_or(false, |x| x == i) {
-        res.push_str(&format!(
-          "{}-----{{Insert Here}}-----\n",
-          " ".repeat(self.indent)
-        ));
+        res.push_str(&format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)));
       }
       match elem.get_kind() {
         NodeKind::Expr => {
@@ -249,10 +224,7 @@ impl Visitor<String> for IRPrinter {
       }
     }
     if here && ip.at.is_none() {
-      res.push_str(&format!(
-        "{}-----{{Insert Here}}-----\n",
-        " ".repeat(self.indent)
-      ));
+      res.push_str(&format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)));
     }
     if restore_ident != self.indent {
       self.indent -= 2;
@@ -263,5 +235,11 @@ impl Visitor<String> for IRPrinter {
       res = format!("{}{{{}\n{}}}", indent, res, indent);
     }
     res.into()
+  }
+}
+
+impl fmt::Display for ArrayRef<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", IRPrinter::new(false).visit_array(self.clone()).unwrap())
   }
 }

@@ -11,12 +11,7 @@ struct FIFODumper;
 
 impl Visitor<String> for FIFODumper {
   fn visit_fifo(&mut self, fifo: FIFORef<'_>) -> Option<String> {
-    format!(
-      "{}.{}",
-      fifo.get_parent().to_string(fifo.sys),
-      fifo.get_name()
-    )
-    .into()
+    format!("{}.{}", fifo.get_parent().to_string(fifo.sys), fifo.get_name()).into()
   }
 }
 

@@ -12,14 +12,16 @@ use regex::Regex;
 use crate::{
   backend::common::{create_and_clean_dir, Config},
   builder::system::{ModuleKind, SysBuilder},
-  ir::{node::*, visitor::Visitor, *},
+  ir::{instructions::BlockIntrinsic, node::*, visitor::Visitor, *},
 };
 
 use self::{expr::subcode, module::Attribute};
 
 use super::{
   gather::Gather,
-  utils::{self, select_1h, Edge},
+  utils::{
+    self, bool_ty, declare_array, declare_in, declare_logic, declare_out, reduce, select_1h, Edge,
+  },
   Simulator,
 };
 
@@ -83,15 +85,10 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let d = display.field("d");
     // array buffer
     let q = display.field("q");
-    let array_name = namify(array.get_name());
     let scalar_bits = array.scalar_ty().get_bits();
+    res.push_str(&format!("  // {}\n", array));
     res.push_str(&format!(
-      "
-  // array: {name}[{size}]
-  logic [{ty_bits}:0] {q}[0:{decl_size}];
-",
-      name = array_name,
-      size = array.get_size(),
+      "  logic [{ty_bits}:0] {q}[0:{decl_size}];",
       ty_bits = scalar_bits - 1,
       decl_size = array.get_size() - 1
     ));
@@ -100,12 +97,13 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let drivers = array
       .users()
       .iter()
-      .map(|x| {
-        x.as_ref::<Operand>(array.sys)
-          .unwrap()
-          .get_expr()
-          .get_block()
-          .get_module()
+      .filter_map(move |x| {
+        let expr = x.as_ref::<Operand>(array.sys).unwrap().get_expr();
+        if matches!(expr.get_opcode(), Opcode::Store) {
+          Some(expr.get_block().get_module())
+        } else {
+          None
+        }
       })
       .filter(|x| seen.insert(x.get_key()))
       .map(|x| Edge::new(display.clone(), &x.as_ref::<Module>(array.sys).unwrap()))
@@ -116,26 +114,19 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let idx_bits = array.get_size().ilog2();
 
     drivers.iter().for_each(|edge| {
-      res.push_str(&format!(
-        "
-  logic [{decl_bits}:0] {};
-  logic [{idx_bits}:0] {};
-  logic {};
-",
-        edge.field("d"),
-        edge.field("widx"),
-        edge.field("w"),
-      ))
+      res.push_str(&declare_logic(array.scalar_ty(), &edge.field("d")));
+      res.push_str(&declare_logic(DataType::int_ty(1), &edge.field("w")));
+      res.push_str(&declare_logic(array.get_idx_type(), &edge.field("widx")));
     });
 
     res.push_str(&format!(
       "
   logic [{decl_bits}:0] {d};
-  assign {d} = \n{};
+  assign {d} = {};
   logic [{idx_bits}:0] {widx};
-  assign {widx} = \n{};
+  assign {widx} = {};
   logic {w};
-  assign {w} = \n{};
+  assign {w} = {};
 ",
       // FIXME(@were): Make sure these drivers are write-only ones?
       // one-hot select driver write-data
@@ -153,34 +144,22 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         (array.get_size().ilog2() + 1) as usize
       ),
       // gather all the write-enable signals
-      drivers
-        .iter()
-        .map(|edge| edge.field("w"))
-        .collect::<Vec<String>>()
-        .join(" | ")
+      reduce(drivers.iter().map(|edge| edge.field("w")), " | ")
     ));
-    res.push_str("always_ff @(posedge clk or negedge rst_n)\n");
+    res.push_str("  always_ff @(posedge clk or negedge rst_n)\n");
     if mem_init_path.is_some() {
-      res.push_str(&format!(
-        "if (!rst_n) $readmemh(\"{}\", {q});\n",
-        mem_init_path.unwrap(),
-      ));
+      res.push_str(&format!("    if (!rst_n) $readmemh(\"{}\", {q});\n", mem_init_path.unwrap()));
     } else if let Some(initializer) = array.get_initializer() {
-      res.push_str("if (!rst_n) begin\n");
-      for (idx, _) in initializer.iter().enumerate() {
-        let elem_init = initializer[idx]
-          .as_ref::<IntImm>(self.sys)
-          .unwrap()
-          .get_value();
-        res.push_str(&format!("    {q}[{idx}] <= {elem_init};\n",));
+      res.push_str("    if (!rst_n) begin\n");
+      for (idx, value) in initializer.iter().enumerate() {
+        let elem_init = value.as_ref::<IntImm>(self.sys).unwrap().get_value();
+        res.push_str(&format!("      {q}[{idx}] <= {elem_init};\n",));
       }
-      res.push_str("end\n");
+      res.push_str("    end\n");
     } else {
-      res.push_str(&format!(
-        "if (!rst_n) {q} <= '{{default : {scalar_bits}'d0}};\n",
-      ));
+      res.push_str(&format!("    if (!rst_n) {q} <= '{{default : {scalar_bits}'d0}};\n",));
     }
-    res.push_str(&format!("else if ({w}) {q}[{widx}] <= {d};\n",));
+    res.push_str(&format!("    else if ({w}) {q}[{widx}] <= {d};\n",));
 
     res.push('\n');
 
@@ -189,15 +168,19 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
   fn dump_fifo(&self, fifo: &FIFORef) -> String {
     let mut res = String::new();
-    let fifo_name = namify(&format!(
-      "{}_{}",
-      fifo.get_module().get_name(),
-      fifo_name!(fifo)
-    ));
+    let display = utils::DisplayInstance::from_fifo(fifo, true);
+    let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));
     let fifo_width = fifo.scalar_ty().get_bits();
-    res.push_str(&format!("// fifo: {fifo_name}\n"));
+    res.push_str(&format!("  // fifo: {fifo_name}\n"));
 
-    let drivers = fifo
+    let push_valid = display.field("push_valid"); // If external pushers have data to push
+    let push_data = display.field("push_data"); // Data to be pushed
+    let pop_ready = display.field("pop_ready"); // If the FIFO pops data
+    let push_ready = display.field("push_ready"); // If the FIFO is ready to accept data
+    let pop_valid = display.field("pop_valid"); // If the popped data is valid
+    let pop_data = display.field("pop_data"); // Popped data
+
+    let edges = fifo
       .users()
       .iter()
       .filter_map(|x| {
@@ -208,60 +191,54 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .ok()
           .map(|y| y.get().get_block().get_module())
       })
-      .collect::<HashSet<_>>();
+      .collect::<HashSet<_>>()
+      .iter()
+      .map(|x| Edge::new(display.clone(), &x.as_ref::<Module>(self.sys).unwrap()))
+      .collect::<Vec<_>>();
 
-    let mut pusher_valid = vec![];
-    let mut pusher_data = vec![];
-    let mut pusher_ready = vec![];
-    drivers.iter().for_each(|x| {
-      let name = &fifo_name;
-      let module = x.as_ref::<Module>(self.sys).unwrap();
-      let driver = namify(module.get_name());
-      res.push_str(&format!(
-        "
-  logic fifo_{name}_driver_{driver}_push_valid;\n
-  logic [{ty_width}:0] fifo_{name}_driver_{driver}_push_data;\n
-  logic fifo_{name}_driver_{driver}_push_ready;\n",
-        driver = driver,
-        ty_width = fifo_width - 1
-      ));
-      pusher_valid.push(format!("  fifo_{name}_driver_{driver}_push_valid"));
-      pusher_data.push(format!(
-          "  ({{{fifo_width}{{fifo_{name}_driver_{driver}_push_valid}}}} & fifo_{name}_driver_{driver}_push_data)"));
-      pusher_ready.push(
-        format!("  assign fifo_{name}_driver_{driver}_push_ready = fifo_{name}_push_ready;")
-      );
+    res.push_str(&format!("  logic {pop_valid};\n"));
+    res.push_str(&format!("  logic {pop_ready};\n"));
+
+    edges.iter().for_each(|edge| {
+      res.push_str(&format!("  logic {};\n", edge.field("push_valid")));
+      res.push_str(&format!("  logic [{}:0] {};\n", fifo_width - 1, edge.field("push_data")));
+      res.push_str(&format!("  logic {};\n", edge.field("push_ready")));
     });
 
-    res.push_str(&format!(
-      "
-  logic fifo_{name}_push_valid;
-  assign fifo_{name}_push_valid = {pusher_valid};
-  logic fifo_{name}_push_ready;
-  {pusher_readiness}
-  logic fifo_{name}_pop_valid;
-  logic [{ty_width}:0] fifo_{name}_push_data;
-  assign fifo_{name}_push_data = {pusher_data};
-  logic [{ty_width}:0] fifo_{name}_pop_data;
-  logic fifo_{name}_pop_ready;\n",
-      name = fifo_name,
-      ty_width = fifo_width - 1,
-      pusher_readiness = pusher_ready.join("\n"),
-      pusher_valid = pusher_valid.join(" | "),
-      pusher_data = pusher_data.join("\n")
-    ));
+    res.push_str(&format!("  logic {push_ready};\n"));
+    edges
+      .iter()
+      .for_each(|x| res.push_str(&format!("  assign {} = {push_ready};", x.field("push_ready"))));
+
+    let valid = edges
+      .iter()
+      .map(|x| x.field("push_valid"))
+      .collect::<Vec<_>>()
+      .join(" | ");
+    let data = select_1h(
+      edges
+        .iter()
+        .map(|x| (x.field("push_valid"), x.field("push_data"))),
+      fifo_width,
+    );
+
+    res.push_str(&format!("  logic [{ty_width}:0] {push_data};\n", ty_width = fifo_width - 1));
+    res.push_str(&format!("  assign {push_data} = {data};\n"));
+    res.push_str(&format!("  logic {push_valid};\n"));
+    res.push_str(&format!("  assign {push_valid} = {valid};\n"));
+    res.push_str(&format!("  logic [{ty_width}:0] {pop_data};", ty_width = fifo_width - 1,));
 
     res.push_str(&format!(
       "
   fifo #({width}) fifo_{name}_i (
     .clk(clk),
     .rst_n(rst_n),
-    .push_valid(fifo_{name}_push_valid),
-    .push_data(fifo_{name}_push_data),
-    .push_ready(fifo_{name}_push_ready),
-    .pop_valid(fifo_{name}_pop_valid),
-    .pop_data(fifo_{name}_pop_data),
-    .pop_ready(fifo_{name}_pop_ready));\n",
+    .push_valid({push_valid}),
+    .push_data({push_data}),
+    .push_ready({push_ready}),
+    .pop_valid({pop_valid}),
+    .pop_data({pop_data}),
+    .pop_ready({pop_ready}));\n\n",
       name = fifo_name,
       width = fifo_width,
     ));
@@ -272,7 +249,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   fn dump_trigger(&self, module: &ModuleRef) -> String {
     let mut res = String::new();
     let module_name = namify(module.get_name());
-    res.push_str(&format!("// {} trigger\n", module_name));
+    res.push_str(&format!("  // {} trigger\n", module_name));
     if module_name != "driver" && module_name != "testbench" {
       module.callers().for_each(|x| {
         let driver = namify(x.get_name());
@@ -345,20 +322,16 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         "
     .fifo_{fifo}_pop_valid(fifo_{module}_{fifo}_pop_valid),
     .fifo_{fifo}_pop_data(fifo_{module}_{fifo}_pop_data),
-    .fifo_{fifo}_pop_ready(fifo_{module}_{fifo}_pop_ready),",
+    .fifo_{fifo}_pop_ready(fifo_{module}_{fifo}_pop_ready),\n",
         fifo = port_name,
         module = module_name
       ));
     }
-    for (interf, _) in module.ext_interf_iter() {
+    for (interf, ops) in module.ext_interf_iter() {
       match interf.get_kind() {
         NodeKind::FIFO => {
           let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-          let fifo_name = namify(&format!(
-            "{}_{}",
-            fifo.get_module().get_name(),
-            fifo_name!(fifo)
-          ));
+          let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));
           res.push_str(&format!(
             "
     .fifo_{fifo}_push_valid(fifo_{fifo}_driver_{module}_push_valid),
@@ -370,22 +343,16 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         }
         NodeKind::Array => {
           let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-          let array_display = utils::DisplayInstance::from_array(&array_ref);
-          let edge = Edge::new(array_display.clone(), module);
-          res.push_str(&format!(
-            "
-    .{q}({q}),
-    .{w}({dw}),
-    .{widx}({dwidx}),
-    .{d}({dd}),\n",
-            q = array_display.field("q"),
-            w = array_display.field("w"),
-            dw = edge.field("w"),
-            widx = array_display.field("widx"),
-            dwidx = edge.field("widx"),
-            d = array_display.field("d"),
-            dd = edge.field("d"),
-          ));
+          let display = utils::DisplayInstance::from_array(&array_ref);
+          let edge = Edge::new(display.clone(), module);
+          if self.sys.user_contains_opcode(ops, Opcode::Load) {
+            res.push_str(&format!("    .{q}({q}),\n", q = display.field("q"),));
+          }
+          if self.sys.user_contains_opcode(ops, Opcode::Store) {
+            res.push_str(&format!("    .{}({}),\n", display.field("w"), edge.field("w")));
+            res.push_str(&format!("    .{}({}),\n", display.field("widx"), edge.field("widx")));
+            res.push_str(&format!("    .{}({}),\n", display.field("d"), edge.field("d")));
+          }
         }
         NodeKind::Module | NodeKind::Expr => {
           // TODO(@were): Skip this for now. I am 100% sure we need this later.
@@ -424,10 +391,10 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     res.push_str(
       "
-  module top (
-    input logic clk,
-    input logic rst_n
-  );\n\n",
+module top (
+  input logic clk,
+  input logic rst_n
+);\n\n",
     );
 
     // memory initializations map
@@ -582,6 +549,24 @@ macro_rules! dump_ref_immwidth {
   };
 }
 
+impl VerilogDumper<'_, '_> {
+  fn print_body(&mut self, node: BaseNode) -> String {
+    match node.get_kind() {
+      NodeKind::Expr => {
+        let expr = node.as_ref::<Expr>(self.sys).unwrap();
+        self.visit_expr(expr).unwrap()
+      }
+      NodeKind::Block => {
+        let block = node.as_ref::<Block>(self.sys).unwrap();
+        self.visit_block(block).unwrap()
+      }
+      _ => {
+        panic!("Unexpected reference type: {:?}", node);
+      }
+    }
+  }
+}
+
 impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.current_module = namify(module.get_name()).to_string();
@@ -598,85 +583,72 @@ module {} (
     ));
 
     for port in module.fifo_iter() {
-      let bits = port.scalar_ty().get_bits();
       let name = fifo_name!(port);
-      res.push_str(&format!(
-        "
-  // port {name}
-  input logic fifo_{name}_pop_valid,
-  input logic [{ty_bits}:0] fifo_{name}_pop_data,
-  output logic fifo_{name}_pop_ready,
-",
-        name = name,
-        ty_bits = bits - 1
-      ));
+      let ty = port.scalar_ty();
+      let display = utils::DisplayInstance::from_fifo(&port, false);
+      // (pop_valid, pop_data): something like `let front : Optional<T> = FIFO.pop();`.
+      // `pop_ready: when enabled, it is something like fifo.pop()
+      res.push_str(&format!("  // Port FIFO {name}\n", name = name));
+      res.push_str(&declare_in(bool_ty(), &display.field("pop_valid")));
+      res.push_str(&declare_in(ty, &display.field("pop_data")));
+      res.push_str(&declare_out(bool_ty(), &display.field("pop_ready")));
     }
 
-    for (interf, _ops) in module.ext_interf_iter() {
+    for (interf, ops) in module.ext_interf_iter() {
       match interf.get_kind() {
         NodeKind::FIFO => {
           let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-          let fifo_name = format!(
-            "{}_{}",
-            namify(fifo.get_module().get_name()),
-            fifo_name!(fifo)
-          );
-          res.push_str(&format!(
-            "
-  // port {name}
-  output logic fifo_{name}_push_valid,
-  output logic [{ty_bits}:0] fifo_{name}_push_data,
-  input logic fifo_{name}_push_ready,
-",
-            name = fifo_name,
-            ty_bits = fifo.scalar_ty().get_bits() - 1
-          ));
+          let parent_name = fifo.get_module().get_name().to_string();
+          let display = utils::DisplayInstance::from_fifo(&fifo, true);
+          let bits = fifo.scalar_ty().get_bits() - 1;
+          // TODO(@were): Support `push_ready` for backpressures.
+          // (push_valid, push_data, push_ready) works like
+          // `if push_valid && push_ready: FIFO.push()`
+          res.push_str(&format!("  // External FIFO {}.{}\n", parent_name, fifo.get_name()));
+          res.push_str(&format!("  output logic {},\n", display.field("push_valid")));
+          res.push_str(&format!("  output logic [{}:0] {},\n", bits, display.field("push_data")));
+          res.push_str(&format!("  input logic {},\n", display.field("push_ready")));
         }
         NodeKind::Array => {
-          let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-          let name = namify(array_ref.get_name());
-          res.push_str(&format!(
-            "
-  // array {name}
-  input logic [{ty_bits}:0] array_{name}_q[0:{size}],
-  output logic array_{name}_w,
-  output logic [{idx_size}:0] array_{name}_widx,
-  output logic [{ty_bits}:0] array_{name}_d,
-",
-            name = name,
-            ty_bits = array_ref.scalar_ty().get_bits() - 1,
-            size = array_ref.get_size() - 1,
-            idx_size = array_ref.get_size().ilog2()
-          ));
+          let array = interf.as_ref::<Array>(self.sys).unwrap();
+          let display = utils::DisplayInstance::from_array(&array);
+          let bits = array.scalar_ty().get_bits() - 1;
+          let size = array.get_size();
+          let idx_bits = size.ilog2();
+          res.push_str(&format!("  // array {}\n", array.get_name()));
+          if self.sys.user_contains_opcode(ops, Opcode::Load) {
+            res.push_str(&format!(
+              "  input logic [{bits}:0] {}[0:{}],\n",
+              display.field("q"),
+              size - 1
+            ));
+          }
+          // (w, widx, d): something like `array[widx] = d;`
+          if self.sys.user_contains_opcode(ops, Opcode::Store) {
+            res.push_str(&format!("  output logic {},\n", display.field("w")));
+            res.push_str(&format!("  output logic [{idx_bits}:0] {},\n", display.field("widx")));
+            res.push_str(&format!("  output logic [{bits}:0] {},\n", display.field("d")));
+          }
         }
-        NodeKind::Module | NodeKind::Expr => {
-          // Handled somewhere else. See `callers` and `callees`.
+        NodeKind::Module => {
+          let module = interf.as_ref::<Module>(self.sys).unwrap();
+          let module_name = namify(module.get_name());
+          res.push_str(&format!("  output logic {}_trigger_push_valid,\n", module_name));
+          res.push_str(&format!("  input logic {}_trigger_push_ready,\n", module_name));
+        }
+        NodeKind::Expr => {
+          // TODO(@were): Handle this later.
         }
         _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }
       res.push('\n');
     }
 
-    let trigger_modules = get_triggered_modules(&module);
-    for trigger_module in trigger_modules {
-      res.push_str(&format!(
-        "
-  output logic {}_trigger_push_valid,
-  input logic {}_trigger_push_ready,
-",
-        trigger_module, trigger_module
-      ));
-    }
+    res.push_str("  // self.event_q\n");
+    res.push_str("  input logic trigger_pop_valid,\n");
+    res.push_str("  output logic trigger_pop_ready);\n");
 
-    res.push_str(
-      "
-  // trigger
-  input logic trigger_pop_valid,
-  output logic trigger_pop_ready
-);\n",
-    );
-
-    let mut wait_until: Option<String> = None;
+    let mut wait_until: String = "".to_string();
 
     let skip = if let Some(wu_intrin) = module.get_body().get_wait_until() {
       let mut skip = 0;
@@ -687,33 +659,11 @@ module {} (
           skip = i + 1;
           break;
         }
-        match elem.get_kind() {
-          NodeKind::Expr => {
-            let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-            res.push_str(&self.visit_expr(expr).unwrap());
-          }
-          NodeKind::Block => {
-            let block = elem.as_ref::<Block>(self.sys).unwrap();
-            res.push_str(&self.visit_block(block).unwrap());
-          }
-          _ => {
-            panic!("Unexpected reference type: {:?}", elem);
-          }
-        }
+        res.push_str(&self.print_body(elem));
       }
-      let bi = wu_intrin
-        .as_expr::<instructions::BlockIntrinsic>(self.sys)
-        .unwrap();
+      let bi = wu_intrin.as_expr::<BlockIntrinsic>(self.sys).unwrap();
       let value = bi.value();
-      wait_until = Some(format!(
-        " && ({}{})",
-        namify(&value.to_string(self.sys)),
-        if value.get_dtype(self.sys).unwrap().get_bits() == 1 {
-          "".into()
-        } else {
-          " != '0".to_string()
-        }
-      ));
+      wait_until = format!(" && ({} != '0)", namify(&value.to_string(self.sys)));
       skip
     } else {
       0
@@ -740,19 +690,7 @@ module {} (
     self.array_stores.clear();
     self.triggers.clear();
     for elem in module.get_body().body_iter().skip(skip) {
-      res.push_str(&match elem.get_kind() {
-        NodeKind::Expr => {
-          let expr = elem.as_ref::<Expr>(self.sys).unwrap();
-          self.visit_expr(expr).unwrap()
-        }
-        NodeKind::Block => {
-          let block = elem.as_ref::<Block>(self.sys).unwrap();
-          self.visit_block(block).unwrap()
-        }
-        _ => {
-          panic!("Unexpected reference type: {:?}", elem);
-        }
-      });
+      res.push_str(&self.print_body(elem));
     }
 
     for (m, cond) in self.triggers.drain() {
@@ -793,38 +731,12 @@ module {} (
       ));
     }
 
-    // tie off array store port
-    for (interf, ops) in module.ext_interf_iter() {
-      if interf.get_kind() == NodeKind::Array {
-        let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-        let array_name = namify(array_ref.get_name());
-        let read_only = !ops.iter().any(|x| {
-          matches!(
-            x.as_ref::<Operand>(self.sys)
-              .unwrap()
-              .get_user()
-              .as_ref::<Expr>(self.sys)
-              .unwrap()
-              .get_opcode(),
-            Opcode::Store
-          )
-        });
-        if read_only {
-          res.push_str(&format!(
-            "  assign array_{name}_w = '0;\nassign array_{name}_d = '0;\nassign array_{name}_widx = '0;\n\n",
-            name = array_name
-          ));
-        }
-      }
-    }
-
     res.push_str(&format!(
       "
   assign trigger = trigger_pop_valid{};
 endmodule // {}
 ",
-      wait_until.unwrap_or("".to_string()),
-      self.current_module
+      wait_until, self.current_module
     ));
 
     Some(res)
@@ -872,10 +784,7 @@ endmodule // {}
     let decl = if expr.get_opcode().is_valued()
       && !matches!(expr.get_opcode(), Opcode::FIFOPop | Opcode::Bind)
     {
-      Some((
-        namify(&expr.upcast().to_string(self.sys)),
-        expr.dtype().get_bits() - 1,
-      ))
+      Some((namify(&expr.upcast().to_string(self.sys)), expr.dtype()))
     } else {
       None
     };
@@ -1004,11 +913,7 @@ endmodule // {}
       Opcode::Load => {
         let load = expr.as_sub::<instructions::Load>().unwrap();
         let (array_ref, array_idx) = (load.array(), load.idx());
-        format!(
-          "array_{}_q[{}]",
-          namify(array_ref.get_name()),
-          dump_ref!(self.sys, &array_idx)
-        )
+        format!("array_{}_q[{}]", namify(array_ref.get_name()), dump_ref!(self.sys, &array_idx))
       }
 
       Opcode::Store => {
@@ -1028,10 +933,7 @@ endmodule // {}
           None => {
             self.array_stores.insert(
               array_name.clone(),
-              (
-                Gather::new(pred.clone(), idx, idx_bits),
-                Gather::new(pred, value, value_bits),
-              ),
+              (Gather::new(pred.clone(), idx, idx_bits), Gather::new(pred, value, value_bits)),
             );
           }
         }
@@ -1041,20 +943,15 @@ endmodule // {}
       Opcode::FIFOPush => {
         let push = expr.as_sub::<instructions::FIFOPush>().unwrap();
         let fifo = push.fifo();
-        let fifo_name = format!(
-          "{}_{}",
-          namify(fifo.get_module().get_name()),
-          fifo_name!(fifo)
-        );
+        let fifo_name = format!("{}_{}", namify(fifo.get_module().get_name()), fifo_name!(fifo));
         let pred = self.get_pred().unwrap_or("".to_string());
         let value = dump_ref!(self.sys, &push.value());
         match self.fifo_pushes.get_mut(&fifo_name) {
           Some(fps) => fps.push(pred, value, fifo.scalar_ty().get_bits()),
           None => {
-            self.fifo_pushes.insert(
-              fifo_name.clone(),
-              Gather::new(pred, value, fifo.scalar_ty().get_bits()),
-            );
+            self
+              .fifo_pushes
+              .insert(fifo_name.clone(), Gather::new(pred, value, fifo.scalar_ty().get_bits()));
           }
         }
         "".to_string()
@@ -1167,8 +1064,8 @@ endmodule // {}
       _ => panic!("Unknown OP: {:?}", expr.get_opcode()),
     };
 
-    if let Some((id, bits)) = decl {
-      format!("  logic [{}:0] {}; assign {} = {};\n", bits, id, id, body)
+    if let Some((id, ty)) = decl {
+      format!("{}  assign {} = {};\n", declare_logic(ty, &id), id, body)
     } else {
       body
     }

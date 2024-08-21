@@ -10,6 +10,7 @@ int main(int argc, char **argv) {
   auto* tfp = new VerilatedVcdC;
   top->trace(tfp, 99);
   tfp->open("wave.vcd");
+  // Simulate until arrive $finish
   while (!Verilated::gotFinish()) {
     top->eval();
     tfp->dump(main_time);

@@ -101,11 +101,7 @@ impl Display for Bind<'_> {
       .map(|arg| {
         let fifo_push = arg.as_expr::<FIFOPush>(self.expr.sys).unwrap();
         // let value = fifo_push.value().to_string(self.expr.sys);
-        format!(
-          "{}: {}",
-          fifo_push.fifo().get_name(),
-          arg.to_string(self.expr.sys)
-        )
+        format!("{}: {}", fifo_push.fifo().get_name(), arg.to_string(self.expr.sys))
       })
       .collect::<Vec<String>>()
       .join(", ");
