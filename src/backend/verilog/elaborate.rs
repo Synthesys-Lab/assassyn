@@ -37,11 +37,10 @@ struct VerilogDumper<'a, 'b> {
   array_stores: HashMap<String, (Gather, Gather)>, // array_name -> (idx, value)
   triggers: HashMap<String, Gather>,    // module_name -> [pred]
   current_module: String,
-  simulator: Simulator,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
-  fn new(sys: &'a SysBuilder, config: &'b Config, simulator: Simulator) -> Self {
+  fn new(sys: &'a SysBuilder, config: &'b Config) -> Self {
     Self {
       sys,
       config,
@@ -50,7 +49,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       array_stores: HashMap::new(),
       triggers: HashMap::new(),
       current_module: String::new(),
-      simulator,
     }
   }
 
@@ -469,7 +467,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     fd.write_all(res.as_bytes()).unwrap();
 
-    let init = match self.simulator {
+    let init = match self.config.verilog {
       Simulator::VCS => {
         "
 initial begin
@@ -479,6 +477,7 @@ initial begin
 end"
       }
       Simulator::Verilator => "",
+      Simulator::None => panic!("No simulator specified"),
     };
 
     fd.write_all(include_str!("fifo_impl.sv").as_bytes())
@@ -1165,12 +1164,8 @@ endmodule // {}
   }
 }
 
-pub fn generate_cpp_testbench(
-  dir: &Path,
-  sys: &SysBuilder,
-  simulator: &Simulator,
-) -> io::Result<()> {
-  if matches!(simulator, Simulator::Verilator) {
+pub fn generate_cpp_testbench(dir: &Path, sys: &SysBuilder, config: &Config) -> io::Result<()> {
+  if matches!(config.verilog, Simulator::Verilator) {
     let main_fname = dir.join("main.cpp");
     let mut main_fd = File::create(main_fname)?;
     main_fd.write_all(include_str!("main.cpp").as_bytes())?;
@@ -1181,16 +1176,23 @@ pub fn generate_cpp_testbench(
   Ok(())
 }
 
-pub fn elaborate(sys: &SysBuilder, config: &Config, simulator: Simulator) -> Result<(), Error> {
+pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
+  if matches!(config.verilog, Simulator::None) {
+    return Err(Error::new(
+      io::ErrorKind::Other,
+      "No simulator specified for verilog generation",
+    ));
+  }
+
   create_and_clean_dir(config.dirname(sys, "verilog"), config.override_dump);
   let verilog_name = config.dirname(sys, "verilog");
   let fname = verilog_name.join(format!("{}.sv", sys.get_name()));
 
   eprintln!("Writing verilog rtl to {}", fname.to_str().unwrap());
 
-  generate_cpp_testbench(&verilog_name, sys, &simulator)?;
+  generate_cpp_testbench(&verilog_name, sys, &config)?;
 
-  let mut vd = VerilogDumper::new(sys, config, simulator);
+  let mut vd = VerilogDumper::new(sys, config);
 
   let mut fd = File::create(fname)?;
 

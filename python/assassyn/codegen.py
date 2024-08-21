@@ -161,6 +161,10 @@ class CodeGen(visitor.Visitor):
         if self.resource_base is not None:
             resource_base = f'resource_base: PathBuf::from("{self.resource_base}")'
             config.append(resource_base)
+        if 'verilog' in self.targets:
+            verilog_target = self.targets['verilog']
+            simulator = f'assassyn::backend::verilog::Simulator::{CG_SIMULATOR[verilog_target]}'
+            config.append(f'verilog: {simulator}')
         return ', '.join(config)
 
     def generate_init_value(self, init_value, ty: str):
@@ -225,18 +229,15 @@ class CodeGen(visitor.Visitor):
         self.code.append('  println!("{}", sys);')
         config = 'assassyn::xform::Config{ rewrite_wait_until: true }'
         self.code.append(f'  assassyn::xform::basic(&mut sys, &{config});')
-        be_path = 'assassyn::backend'
+        backend = 'assassyn::backend'
         if self.targets['simulator']:
             base_dir = '(env!("CARGO_MANIFEST_DIR").to_string()).into()'
             self.code.append(f'  config.base_dir = {base_dir};')
-            self.code.append(f'  {be_path}::simulator::elaborate(&sys, &config).unwrap();')
+            self.code.append(f'  {backend}::simulator::elaborate(&sys, &config).unwrap();')
         if 'verilog' in self.targets:
             base_dir = '(env!("CARGO_MANIFEST_DIR").to_string()).into()'
             self.code.append(f'  config.base_dir = {base_dir};')
-            verilog_target = self.targets['verilog']
-            simulator = f'{be_path}::verilog::Simulator::{CG_SIMULATOR[verilog_target]}'
-            self.code.append(
-                    f'  {be_path}::verilog::elaborate(&sys, &config, {simulator}).unwrap();')
+            self.code.append(f'  {backend}::verilog::elaborate(&sys, &config).unwrap();')
         self.code.append('}\n')
 
     def visit_module(self, node: Module):

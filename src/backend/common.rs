@@ -2,6 +2,8 @@ use std::{env, fs, path::PathBuf};
 
 use crate::builder::SysBuilder;
 
+use super::verilog;
+
 pub struct Config {
   /// The name of the file to dump simulation code to a temporary directory.
   pub base_dir: PathBuf,
@@ -15,6 +17,8 @@ pub struct Config {
   pub random: bool,
   /// The base directory of memory initialization files
   pub resource_base: PathBuf,
+  /// The simulator to use for verilog simulation
+  pub verilog: verilog::Simulator,
 }
 
 impl Default for Config {
@@ -26,6 +30,7 @@ impl Default for Config {
       idle_threshold: 100,
       random: false,
       resource_base: PathBuf::new(),
+      verilog: verilog::Simulator::default(),
     }
   }
 }
