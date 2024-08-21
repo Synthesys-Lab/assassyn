@@ -65,8 +65,10 @@ pub(super) fn broadcast(value: String, bits: usize) -> String {
 }
 
 pub(super) fn select_1h(iter: impl Iterator<Item = (String, String)>, bits: usize) -> String {
-  reduce(iter
-    .map(|(pred, value)| format!("({} & {})", broadcast(pred, bits), value)), " | ")
+  reduce(
+    iter.map(|(pred, value)| format!("({} & {})", broadcast(pred, bits), value)),
+    " | ",
+  )
 }
 
 pub(super) fn reduce(iter: impl Iterator<Item = String>, concat: &str) -> String {
