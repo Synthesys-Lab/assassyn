@@ -68,3 +68,7 @@ pub(super) fn create_and_clean_dir(dir: PathBuf, override_dir: bool) {
     assert!(files.count() == 0);
   }
 }
+
+pub(super) fn namify(name: &str) -> String {
+  name.replace('.', "_")
+}

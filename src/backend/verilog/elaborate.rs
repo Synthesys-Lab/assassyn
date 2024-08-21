@@ -17,7 +17,11 @@ use crate::{
 
 use self::{expr::subcode, module::Attribute};
 
-use super::{gather::Gather, Simulator};
+use super::{
+  gather::Gather,
+  utils::{self, select_1h, Edge},
+  Simulator,
+};
 
 fn namify(name: &str) -> String {
   name.replace('.', "_")
@@ -70,12 +74,21 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
   fn dump_array(&self, array: &ArrayRef, mem_init_path: Option<&String>) -> String {
     let mut res = String::new();
+    let display = utils::DisplayInstance::from_array(array);
+    // write enable
+    let w = display.field("w");
+    // write index
+    let widx = display.field("widx");
+    // write data
+    let d = display.field("d");
+    // array buffer
+    let q = display.field("q");
     let array_name = namify(array.get_name());
     let scalar_bits = array.scalar_ty().get_bits();
     res.push_str(&format!(
       "
   // array: {name}[{size}]
-  logic [{ty_bits}:0] array_{name}_q[0:{decl_size}];
+  logic [{ty_bits}:0] {q}[0:{decl_size}];
 ",
       name = array_name,
       size = array.get_size(),
@@ -83,6 +96,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       decl_size = array.get_size() - 1
     ));
 
+    let mut seen = HashSet::new();
     let drivers = array
       .users()
       .iter()
@@ -93,65 +107,62 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .get_block()
           .get_module()
       })
-      .collect::<HashSet<_>>()
-      .into_iter()
-      .map(|x| namify(x.as_ref::<Module>(array.sys).unwrap().get_name()))
-      .collect::<HashSet<_>>();
+      .filter(|x| seen.insert(x.get_key()))
+      .map(|x| Edge::new(display.clone(), &x.as_ref::<Module>(array.sys).unwrap()))
+      .collect::<Vec<_>>();
 
     let scalar_bits = array.scalar_ty().get_bits();
     let decl_bits = scalar_bits - 1;
     let idx_bits = array.get_size().ilog2();
-    drivers.iter().for_each(|driver| {
+
+    drivers.iter().for_each(|edge| {
       res.push_str(&format!(
         "
-  logic [{decl_bits}:0] array_{name}_driver_{driver}_d;
-  logic [{idx_bits}:0] array_{name}_driver_{driver}_widx;
-  logic array_{name}_driver_{driver}_w;
+  logic [{decl_bits}:0] {};
+  logic [{idx_bits}:0] {};
+  logic {};
 ",
-        name = array_name,
-        driver = driver,
+        edge.field("d"),
+        edge.field("widx"),
+        edge.field("w"),
       ))
     });
 
-    res.push_str(&format!("
-  logic [{decl_bits}:0] array_{array_name}_d;
-  assign array_{array_name}_d = \n{};
-  logic [{idx_bits}:0] array_{array_name}_widx;
-  assign array_{array_name}_widx = \n{};
-  logic array_{array_name}_w;
-  assign array_{array_name}_w = \n{};
+    res.push_str(&format!(
+      "
+  logic [{decl_bits}:0] {d};
+  assign {d} = \n{};
+  logic [{idx_bits}:0] {widx};
+  assign {widx} = \n{};
+  logic {w};
+  assign {w} = \n{};
 ",
       // FIXME(@were): Make sure these drivers are write-only ones?
-      drivers // one-hot select driver write-data
+      // one-hot select driver write-data
+      select_1h(
+        drivers
+          .iter()
+          .map(|edge| (edge.field("w"), edge.field("d"))),
+        scalar_bits
+      ),
+      // one-hot select driver write-index
+      select_1h(
+        drivers
+          .iter()
+          .map(|edge| (edge.field("w"), edge.field("widx"))),
+        (array.get_size().ilog2() + 1) as usize
+      ),
+      // gather all the write-enable signals
+      drivers
         .iter()
-        .map(|driver| format!(
-          "  ({{{scalar_bits}{{array_{name}_driver_{driver}_w}}}} & array_{name}_driver_{driver}_d)",
-          name = array_name,
-        ))
-        .collect::<Vec<String>>()
-        .join("|"),
-      drivers // one-hot select driver write-index
-        .iter()
-        .map(|driver| format!(
-          "  ({{{}{{array_{}_driver_{}_w}}}} & array_{}_driver_{}_widx)",
-          array.get_size().ilog2() + 1,
-          array_name,
-          driver,
-          array_name,
-          driver
-        ))
-        .collect::<Vec<String>>()
-        .join(" |\n"),
-      drivers // gather all the write-enable signals
-        .iter()
-        .map(|driver| format!("array_{}_driver_{}_w", array_name, driver))
+        .map(|edge| edge.field("w"))
         .collect::<Vec<String>>()
         .join(" | ")
     ));
     res.push_str("always_ff @(posedge clk or negedge rst_n)\n");
     if mem_init_path.is_some() {
       res.push_str(&format!(
-        "if (!rst_n) $readmemh(\"{}\", array_{array_name}_q);\n",
+        "if (!rst_n) $readmemh(\"{}\", {q});\n",
         mem_init_path.unwrap(),
       ));
     } else if let Some(initializer) = array.get_initializer() {
@@ -161,20 +172,15 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           .as_ref::<IntImm>(self.sys)
           .unwrap()
           .get_value();
-        res.push_str(&format!(
-          "    array_{array_name}_q[{idx}] <= {elem_init};\n"
-        ));
+        res.push_str(&format!("    {q}[{idx}] <= {elem_init};\n",));
       }
       res.push_str("end\n");
     } else {
       res.push_str(&format!(
-        "if (!rst_n) array_{array_name}_q <= '{{default : {scalar_bits}'d0}};\n",
+        "if (!rst_n) {q} <= '{{default : {scalar_bits}'d0}};\n",
       ));
     }
-    res.push_str(&format!(
-      "else if (array_{n}_w) array_{n}_q[array_{n}_widx] <= array_{n}_d;\n",
-      n = array_name,
-    ));
+    res.push_str(&format!("else if ({w}) {q}[{widx}] <= {d};\n",));
 
     res.push('\n');
 
@@ -364,15 +370,21 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         }
         NodeKind::Array => {
           let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-          let array_name = namify(array_ref.get_name());
+          let array_display = utils::DisplayInstance::from_array(&array_ref);
+          let edge = Edge::new(array_display.clone(), module);
           res.push_str(&format!(
             "
-    .array_{name}_q(array_{name}_q),
-    .array_{name}_w(array_{name}_driver_{module}_w),
-    .array_{name}_widx(array_{name}_driver_{module}_widx),
-    .array_{name}_d(array_{name}_driver_{module}_d),\n",
-            name = array_name,
-            module = module_name
+    .{q}({q}),
+    .{w}({dw}),
+    .{widx}({dwidx}),
+    .{d}({dd}),\n",
+            q = array_display.field("q"),
+            w = array_display.field("w"),
+            dw = edge.field("w"),
+            widx = array_display.field("widx"),
+            dwidx = edge.field("widx"),
+            d = array_display.field("d"),
+            dd = edge.field("d"),
           ));
         }
         NodeKind::Module | NodeKind::Expr => {
