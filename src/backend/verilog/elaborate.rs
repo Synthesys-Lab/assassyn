@@ -1190,7 +1190,7 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
 
   eprintln!("Writing verilog rtl to {}", fname.to_str().unwrap());
 
-  generate_cpp_testbench(&verilog_name, sys, &config)?;
+  generate_cpp_testbench(&verilog_name, sys, config)?;
 
   let mut vd = VerilogDumper::new(sys, config);
 

@@ -3,14 +3,11 @@ pub(super) mod gather;
 
 pub use elaborate::elaborate;
 
+#[derive(Default)]
 pub enum Simulator {
   VCS,
   Verilator,
+  #[default]
   None,
 }
 
-impl Default for Simulator {
-  fn default() -> Self {
-    Simulator::None
-  }
-}
