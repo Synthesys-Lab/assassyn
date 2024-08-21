@@ -12,13 +12,13 @@ pub(super) struct DisplayInstance {
   id: String,
 }
 
+pub(super) trait Field {
+  fn field(&self, attr: &str) -> String;
+}
+
 impl DisplayInstance {
   fn new(prefix: &'static str, id: String) -> DisplayInstance {
     DisplayInstance { prefix, id }
-  }
-
-  pub(super) fn field(&self, field: &str) -> String {
-    format!("{}_{}", self, field)
   }
 
   pub(super) fn from_module(module: &ModuleRef<'_>) -> Self {
@@ -37,6 +37,12 @@ impl DisplayInstance {
       raw
     };
     DisplayInstance::new("fifo", fifo_name)
+  }
+}
+
+impl Field for DisplayInstance {
+  fn field(&self, attr: &str) -> String {
+    format!("{}_{}", self, attr)
   }
 }
 
@@ -62,8 +68,10 @@ impl Edge {
       driver: namify(driver.get_name()),
     }
   }
+}
 
-  pub(super) fn field(&self, field: &str) -> String {
+impl Field for Edge {
+  fn field(&self, field: &str) -> String {
     format!("{}_driver_{}_{}", self.instance, self.driver, field)
   }
 }
@@ -118,4 +126,12 @@ pub(super) fn declare_array(array: &ArrayRef<'_>, id: &String) -> String {
   let size = array.get_size();
   let ty = array.scalar_ty();
   format!("  logic [{}:0] {} [0:{}];\n", ty.get_bits() - 1, id, size - 1)
+}
+
+pub(super) fn connect_top<T: Field, U: Field>(display: &T, edge: &U, fields: &[&str]) -> String {
+  let mut res = String::new();
+  for field in fields {
+    res.push_str(&format!("    .{}({}),\n", display.field(field), edge.field(field)));
+  }
+  res
 }

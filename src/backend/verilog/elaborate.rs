@@ -10,7 +10,7 @@ use instructions::FIFOPush;
 use regex::Regex;
 
 use crate::{
-  backend::common::{create_and_clean_dir, Config},
+  backend::common::{create_and_clean_dir, namify, Config},
   builder::system::{ModuleKind, SysBuilder},
   ir::{instructions::BlockIntrinsic, node::*, visitor::Visitor, *},
 };
@@ -20,14 +20,11 @@ use self::{expr::subcode, module::Attribute};
 use super::{
   gather::Gather,
   utils::{
-    self, bool_ty, declare_array, declare_in, declare_logic, declare_out, reduce, select_1h, Edge,
+    self, bool_ty, connect_top, declare_array, declare_in, declare_logic, declare_out, reduce,
+    select_1h, Edge, Field,
   },
   Simulator,
 };
-
-fn namify(name: &str) -> String {
-  name.replace('.', "_")
-}
 
 macro_rules! fifo_name {
   ($fifo:expr) => {{
@@ -246,7 +243,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   fn dump_trigger(&self, module: &ModuleRef) -> String {
     let mut res = String::new();
     let module_name = namify(module.get_name());
-    let display = utils::DisplayInstance::from_module(&module);
+    let display = utils::DisplayInstance::from_module(module);
     res.push_str(&format!("  // Trigger FIFO of Module: {}\n", module.get_name()));
     let push_valid = display.field("trigger_push_valid");
     let push_ready = display.field("trigger_push_ready");
@@ -298,7 +295,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res
   }
 
-  fn dump_module_inst(&self, module: &ModuleRef) -> String {
+  fn dump_module_instance(&self, module: &ModuleRef) -> String {
     let mut res = String::new();
     let module_name = namify(module.get_name());
     res.push_str(&format!(
@@ -306,33 +303,22 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   // {module}
   {module} {module}_i (
     .clk(clk),
-    .rst_n(rst_n),",
+    .rst_n(rst_n),
+",
       module = module_name
     ));
     for port in module.fifo_iter() {
-      let port_name = fifo_name!(port);
-      res.push_str(&format!(
-        "
-    .fifo_{fifo}_pop_valid(fifo_{module}_{fifo}_pop_valid),
-    .fifo_{fifo}_pop_data(fifo_{module}_{fifo}_pop_data),
-    .fifo_{fifo}_pop_ready(fifo_{module}_{fifo}_pop_ready),\n",
-        fifo = port_name,
-        module = module_name
-      ));
+      let local = utils::DisplayInstance::from_fifo(&port, false);
+      let global = utils::DisplayInstance::from_fifo(&port, true);
+      res.push_str(&connect_top(&local, &global, &["pop_ready", "pop_data", "pop_valid"]));
     }
     for (interf, ops) in module.ext_interf_iter() {
       match interf.get_kind() {
         NodeKind::FIFO => {
           let fifo = interf.as_ref::<FIFO>(self.sys).unwrap();
-          let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));
-          res.push_str(&format!(
-            "
-    .fifo_{fifo}_push_valid(fifo_{fifo}_driver_{module}_push_valid),
-    .fifo_{fifo}_push_data(fifo_{fifo}_driver_{module}_push_data),
-    .fifo_{fifo}_push_ready(fifo_{fifo}_driver_{module}_push_ready),\n",
-            fifo = fifo_name,
-            module = module_name
-          ));
+          let fifo = utils::DisplayInstance::from_fifo(&fifo, true);
+          let edge = Edge::new(fifo.clone(), module);
+          res.push_str(&connect_top(&fifo, &edge, &["push_valid", "push_data", "push_ready"]));
         }
         NodeKind::Array => {
           let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
@@ -342,35 +328,29 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
             res.push_str(&format!("    .{q}({q}),\n", q = display.field("q"),));
           }
           if self.sys.user_contains_opcode(ops, Opcode::Store) {
-            res.push_str(&format!("    .{}({}),\n", display.field("w"), edge.field("w")));
-            res.push_str(&format!("    .{}({}),\n", display.field("widx"), edge.field("widx")));
-            res.push_str(&format!("    .{}({}),\n", display.field("d"), edge.field("d")));
+            res.push_str(&connect_top(&display, &edge, &["w", "widx", "d"]));
           }
         }
-        NodeKind::Module | NodeKind::Expr => {
-          // TODO(@were): Skip this for now. I am 100% sure we need this later.
+        NodeKind::Module => {
+          let interf = interf.as_ref::<Module>(self.sys).unwrap();
+          let display = utils::DisplayInstance::from_module(&interf);
+          let edge = Edge::new(display.clone(), module);
+          res.push_str(&connect_top(
+            &display,
+            &edge,
+            &["trigger_push_valid", "trigger_push_ready"],
+          ));
+        }
+        NodeKind::Expr => {
+          // TODO(@were): Implement this for downstreams.
         }
         _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }
     }
 
-    let trigger_modules = get_triggered_modules(module);
-
-    for trigger_module in trigger_modules {
-      res.push_str(&format!(
-        "
-    .{trigger}_trigger_push_valid({trigger}_driver_{module}_trigger_push_valid),
-    .{trigger}_trigger_push_ready({trigger}_driver_{module}_trigger_push_ready),",
-        trigger = trigger_module,
-        module = module_name
-      ));
-    }
-    res.push_str(&format!(
-      "
-    .trigger_pop_valid({module}_trigger_pop_valid),
-    .trigger_pop_ready({module}_trigger_pop_ready));\n",
-      module = module_name
-    ));
+    let display = utils::DisplayInstance::from_module(module);
+    res.push_str(&format!("    .trigger_pop_valid({}),\n", display.field("trigger_pop_valid")));
+    res.push_str(&format!("    .trigger_pop_ready({}));\n", display.field("trigger_pop_ready")));
     res
   }
 
@@ -432,7 +412,7 @@ module top (
 
     // module insts
     for module in self.sys.module_iter(ModuleKind::Module) {
-      res.push_str(&self.dump_module_inst(&module));
+      res.push_str(&self.dump_module_instance(&module));
     }
 
     res.push_str("endmodule // top\n\n");
@@ -490,12 +470,6 @@ endmodule
 
     Ok(())
   }
-}
-
-fn get_triggered_modules(m: &ModuleRef<'_>) -> HashSet<String> {
-  m.callees()
-    .map(|x| namify(x.get_name()))
-    .collect::<HashSet<_>>()
 }
 
 fn node_dump_ref(
