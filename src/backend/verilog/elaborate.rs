@@ -85,13 +85,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let d = display.field("d");
     // array buffer
     let q = display.field("q");
-    let scalar_bits = array.scalar_ty().get_bits();
     res.push_str(&format!("  // {}\n", array));
-    res.push_str(&format!(
-      "  logic [{ty_bits}:0] {q}[0:{decl_size}];",
-      ty_bits = scalar_bits - 1,
-      decl_size = array.get_size() - 1
-    ));
+    res.push_str(&declare_array(array, &q));
 
     let mut seen = HashSet::new();
     let drivers = array
@@ -110,8 +105,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       .collect::<Vec<_>>();
 
     let scalar_bits = array.scalar_ty().get_bits();
-    let decl_bits = scalar_bits - 1;
-    let idx_bits = array.get_size().ilog2();
 
     drivers.iter().for_each(|edge| {
       res.push_str(&declare_logic(array.scalar_ty(), &edge.field("d")));
@@ -119,49 +112,52 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(&declare_logic(array.get_idx_type(), &edge.field("widx")));
     });
 
-    res.push_str(&format!(
-      "
-  logic [{decl_bits}:0] {d};
-  assign {d} = {};
-  logic [{idx_bits}:0] {widx};
-  assign {widx} = {};
-  logic {w};
-  assign {w} = {};
-",
-      // FIXME(@were): Make sure these drivers are write-only ones?
-      // one-hot select driver write-data
-      select_1h(
-        drivers
-          .iter()
-          .map(|edge| (edge.field("w"), edge.field("d"))),
-        scalar_bits
-      ),
-      // one-hot select driver write-index
-      select_1h(
-        drivers
-          .iter()
-          .map(|edge| (edge.field("w"), edge.field("widx"))),
-        (array.get_size().ilog2() + 1) as usize
-      ),
-      // gather all the write-enable signals
-      reduce(drivers.iter().map(|edge| edge.field("w")), " | ")
-    ));
+    // if w: array[widx] = d;
+    // where w is the gathered write enable signal
+    // widx/d are 1-hot selected from all the writers
+    res.push_str(&declare_logic(array.scalar_ty(), &d));
+    res.push_str(&declare_logic(array.get_idx_type(), &widx));
+    res.push_str(&declare_logic(DataType::int_ty(1), &w));
+
+    let write_data = select_1h(
+      drivers
+        .iter()
+        .map(|edge| (edge.field("w"), edge.field("d"))),
+      scalar_bits,
+    );
+    res.push_str(&format!("  assign {d} = {};\n", write_data));
+
+    let write_idx = select_1h(
+      drivers
+        .iter()
+        .map(|edge| (edge.field("w"), edge.field("widx"))),
+      (array.get_size().ilog2() + 1) as usize,
+    );
+    res.push_str(&format!("  assign {widx} = {};\n", write_idx));
+
+    let write_enable = reduce(drivers.iter().map(|edge| edge.field("w")), " | ");
+    res.push_str(&format!("  assign {w} = {};\n", write_enable));
+
     res.push_str("  always_ff @(posedge clk or negedge rst_n)\n");
+    // Dump the initializer
+    res.push_str("    if (!rst_n)\n");
     if mem_init_path.is_some() {
-      res.push_str(&format!("    if (!rst_n) $readmemh(\"{}\", {q});\n", mem_init_path.unwrap()));
+      // Read from memory initialization file
+      res.push_str(&format!("      $readmemh(\"{}\", {q});\n", mem_init_path.unwrap()));
     } else if let Some(initializer) = array.get_initializer() {
-      res.push_str("    if (!rst_n) begin\n");
+      // Read from the hardcoded initializer
+      res.push_str("    begin\n");
       for (idx, value) in initializer.iter().enumerate() {
         let elem_init = value.as_ref::<IntImm>(self.sys).unwrap().get_value();
         res.push_str(&format!("      {q}[{idx}] <= {elem_init};\n",));
       }
       res.push_str("    end\n");
     } else {
-      res.push_str(&format!("    if (!rst_n) {q} <= '{{default : {scalar_bits}'d0}};\n",));
+      // Initialize to 0
+      res.push_str(&format!("      {q} <= '{{default : {scalar_bits}'d0}};\n",));
     }
-    res.push_str(&format!("    else if ({w}) {q}[{widx}] <= {d};\n",));
-
-    res.push('\n');
+    // Dump the array write
+    res.push_str(&format!("    else if ({w}) {q}[{widx}] <= {d};\n\n",));
 
     res
   }
@@ -171,7 +167,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let display = utils::DisplayInstance::from_fifo(fifo, true);
     let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));
     let fifo_width = fifo.scalar_ty().get_bits();
-    res.push_str(&format!("  // fifo: {fifo_name}\n"));
+    res.push_str(&format!("  // {}\n", fifo));
 
     let push_valid = display.field("push_valid"); // If external pushers have data to push
     let push_data = display.field("push_data"); // Data to be pushed
@@ -196,38 +192,39 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       .map(|x| Edge::new(display.clone(), &x.as_ref::<Module>(self.sys).unwrap()))
       .collect::<Vec<_>>();
 
-    res.push_str(&format!("  logic {pop_valid};\n"));
-    res.push_str(&format!("  logic {pop_ready};\n"));
+    res.push_str("  // Declare the pop.{data/valid/ready}\n");
+    res.push_str(&declare_logic(fifo.scalar_ty(), &pop_data));
+    res.push_str(&declare_logic(bool_ty(), &pop_valid));
+    res.push_str(&declare_logic(bool_ty(), &pop_ready));
 
     edges.iter().for_each(|edge| {
-      res.push_str(&format!("  logic {};\n", edge.field("push_valid")));
-      res.push_str(&format!("  logic [{}:0] {};\n", fifo_width - 1, edge.field("push_data")));
-      res.push_str(&format!("  logic {};\n", edge.field("push_ready")));
+      res.push_str(&declare_logic(fifo.scalar_ty(), &edge.field("push_data")));
+      res.push_str(&declare_logic(bool_ty(), &edge.field("push_valid")));
+      res.push_str(&declare_logic(bool_ty(), &edge.field("push_ready")));
     });
 
+    res.push_str("  // Broadcast the push_ready signal to all the pushers\n");
     res.push_str(&format!("  logic {push_ready};\n"));
     edges
       .iter()
       .for_each(|x| res.push_str(&format!("  assign {} = {push_ready};", x.field("push_ready"))));
 
-    let valid = edges
-      .iter()
-      .map(|x| x.field("push_valid"))
-      .collect::<Vec<_>>()
-      .join(" | ");
+    res.push_str("  // Gather all the push signal\n");
+    let valid = reduce(edges.iter().map(|x| x.field("push_valid")), " | ");
+    res.push_str(&declare_logic(DataType::int_ty(1), &push_valid));
+    res.push_str(&format!("  assign {} = {};\n", push_valid, valid));
+
+    res.push_str("  // 1-hot select the push data\n");
     let data = select_1h(
       edges
         .iter()
         .map(|x| (x.field("push_valid"), x.field("push_data"))),
       fifo_width,
     );
-
-    res.push_str(&format!("  logic [{ty_width}:0] {push_data};\n", ty_width = fifo_width - 1));
+    res.push_str(&declare_logic(fifo.scalar_ty(), &push_data));
     res.push_str(&format!("  assign {push_data} = {data};\n"));
-    res.push_str(&format!("  logic {push_valid};\n"));
-    res.push_str(&format!("  assign {push_valid} = {valid};\n"));
-    res.push_str(&format!("  logic [{ty_width}:0] {pop_data};", ty_width = fifo_width - 1,));
 
+    // Instantiate the FIFO
     res.push_str(&format!(
       "
   fifo #({width}) fifo_{name}_i (
@@ -249,58 +246,54 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   fn dump_trigger(&self, module: &ModuleRef) -> String {
     let mut res = String::new();
     let module_name = namify(module.get_name());
-    res.push_str(&format!("  // {} trigger\n", module_name));
+    let display = utils::DisplayInstance::from_module(&module);
+    res.push_str(&format!("  // Trigger FIFO of Module: {}\n", module.get_name()));
+    let push_valid = display.field("trigger_push_valid");
+    let push_ready = display.field("trigger_push_ready");
+    let pop_valid = display.field("trigger_pop_valid");
+    let pop_ready = display.field("trigger_pop_ready");
+
+    let callers = module
+      .callers()
+      .map(|x| Edge::new(display.clone(), &x))
+      .collect::<Vec<_>>();
+
     if module_name != "driver" && module_name != "testbench" {
-      module.callers().for_each(|x| {
-        let driver = namify(x.get_name());
-        res.push_str(&format!(
-          "
-  logic {module}_driver_{driver}_trigger_push_valid;
-  logic {module}_driver_{driver}_trigger_push_ready;\n",
-          module = module_name,
-          driver = driver
-        ));
+      callers.iter().for_each(|edge| {
+        res.push_str(&declare_logic(bool_ty(), &edge.field("trigger_push_valid")));
+        res.push_str(&declare_logic(bool_ty(), &edge.field("trigger_push_ready")));
       });
     }
-    res.push_str(&format!("  logic {}_trigger_push_valid;\n", module_name));
+    res.push_str(&declare_logic(bool_ty(), &push_valid));
+
+    res.push_str("  // Gather all the push signal\n");
     if module_name != "driver" && module_name != "testbench" {
       res.push_str(&format!(
-        "  assign {}_trigger_push_valid = {};\n",
-        module_name,
-        module
-          .callers()
-          .map(|x| {
-            let driver = namify(x.get_name());
-            format!("  {}_driver_{}_trigger_push_valid", module_name, driver)
-          })
-          .collect::<Vec<String>>()
-          .join(" |\n")
+        "  assign {push_valid} = {};\n",
+        reduce(callers.iter().map(|x| x.field("trigger_push_valid")), " | ")
       ));
     }
-    res.push_str(&format!("  logic {}_trigger_push_ready;\n", module_name));
+    res.push_str("  // Broadcast the push_ready signal to all the pushers\n");
+    res.push_str(&declare_logic(bool_ty(), &push_ready));
     if module_name != "driver" && module_name != "testbench" {
-      module.callers().for_each(|x| {
-        let driver = namify(x.get_name());
-        res.push_str(&format!(
-          "  assign {}_driver_{}_trigger_push_ready = {}_trigger_push_ready;\n",
-          module_name, driver, module_name
-        ));
+      callers.iter().for_each(|x| {
+        res.push_str(&format!("  assign {} = {};\n", x.field("trigger_push_ready"), push_ready));
       });
     }
+    res.push_str(&declare_logic(bool_ty(), &pop_valid));
+    res.push_str(&declare_logic(bool_ty(), &pop_ready));
     res.push_str(&format!(
       "
-  logic {module}_trigger_pop_valid;
-  logic {module}_trigger_pop_ready;
-  fifo #(1) {module}_trigger_i (
+  fifo #(1) {}_trigger_i (
     .clk(clk),
     .rst_n(rst_n),
-    .push_valid({module}_trigger_push_valid),
+    .push_valid({push_valid}),
     .push_data(1'b1),
-    .push_ready({module}_trigger_push_ready),
-    .pop_valid({module}_trigger_pop_valid),
+    .push_ready({push_ready}),
+    .pop_valid({pop_valid}),
     .pop_data(),
-    .pop_ready({module}_trigger_pop_ready));",
-      module = module_name
+    .pop_ready({pop_ready}));",
+      module_name
     ));
     res
   }

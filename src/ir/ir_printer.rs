@@ -243,3 +243,9 @@ impl fmt::Display for ArrayRef<'_> {
     write!(f, "{}", IRPrinter::new(false).visit_array(self.clone()).unwrap())
   }
 }
+
+impl fmt::Display for FIFORef<'_> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", IRPrinter::new(false).visit_fifo(self.clone()).unwrap())
+  }
+}

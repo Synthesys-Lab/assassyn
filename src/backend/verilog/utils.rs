@@ -21,6 +21,10 @@ impl DisplayInstance {
     format!("{}_{}", self, field)
   }
 
+  pub(super) fn from_module(module: &ModuleRef<'_>) -> Self {
+    DisplayInstance::new("", namify(module.get_name()))
+  }
+
   pub(super) fn from_array(array: &ArrayRef<'_>) -> Self {
     DisplayInstance::new("array", namify(array.get_name()))
   }
@@ -38,7 +42,11 @@ impl DisplayInstance {
 
 impl Display for DisplayInstance {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}_{}", self.prefix, self.id)
+    if self.prefix.is_empty() {
+      write!(f, "{}", self.id)
+    } else {
+      write!(f, "{}_{}", self.prefix, self.id)
+    }
   }
 }
 
@@ -106,6 +114,8 @@ pub(super) fn declare_out(ty: DataType, id: &String) -> String {
   declare_impl("output logic", ty, id, ",")
 }
 
-pub(super) fn declare_array(ty: DataType, id: &String, size: usize) -> String {
-  format!("  logic [{}:0] {} [{}];\n", ty.get_bits() - 1, id, size)
+pub(super) fn declare_array(array: &ArrayRef<'_>, id: &String) -> String {
+  let size = array.get_size();
+  let ty = array.scalar_ty();
+  format!("  logic [{}:0] {} [0:{}];\n", ty.get_bits() - 1, id, size - 1)
 }
