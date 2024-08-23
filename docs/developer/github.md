@@ -24,6 +24,12 @@ way to write a toy example to play with this framework, and sanity-check the bui
 **Formatting:** To ensure consistent code style, copy `assassyn/utils/pre-commit` to your
 `.git/hooks/pre-commit`. This setup automatically formats your code and checks coding style with each commit.
 
+If you want to bypass the pre-commit hook during a commit, you can use the command:
+
+````
+git commit -m 'your commit message' --no-verify
+````
+
 **Adding New Features:**
 
 1. Fork the repository to your account `<img src="./imag/fork.png" width=100>`
