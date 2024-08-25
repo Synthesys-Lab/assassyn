@@ -876,7 +876,7 @@ endmodule // {}
         let (array_ref, array_idx) = (store.array(), store.idx());
         let array_name = namify(array_ref.get_name());
         let pred = self.get_pred().unwrap_or("".to_string());
-        let idx = dump_ref!(self.sys, &array_idx);
+        let idx = dump_ref_immwidth!(self.sys, &array_idx);
         let idx_bits = store.idx().get_dtype(self.sys).unwrap().get_bits();
         let value = dump_ref!(self.sys, &store.value());
         let value_bits = store.value().get_dtype(self.sys).unwrap().get_bits();

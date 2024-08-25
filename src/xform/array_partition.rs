@@ -3,11 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
   builder::SysBuilder,
   ir::{
-    data::ArrayAttr,
-    instructions,
-    node::{BaseNode, ExprRef, IsElement},
-    visitor::Visitor,
-    Array, Expr, IntImm, Opcode,
+    data::ArrayAttr, instructions, node::{BaseNode, ExprRef, IsElement}, visitor::Visitor, Array, DataType, Expr, IntImm, Opcode
   },
 };
 
@@ -88,7 +84,8 @@ pub fn rewrite_array_partitions(sys: &mut SysBuilder) {
         (opcode, idx, value)
       };
       let idx_ty = idx.get_dtype(sys).unwrap();
-      let zero = sys.get_const_int(idx_ty.clone(), 0);
+      // FIXME(@were): Should it be int_ty or uint_ty?
+      let zero = sys.get_const_int(DataType::int_ty(1), 0);
       match opcode {
         Opcode::Load => {
           sys.set_insert_before(*user);
