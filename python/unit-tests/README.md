@@ -1,6 +1,6 @@
 | Python                    | Feature to Test                                    | Status |
 |---------------------------|----------------------------------------------------|--------|
-| test_arbiter.py           | Disable arbiter rewriting using module attr.       | R      |
+| test_arbiter.py           | Disable arbiter rewriting using module attr.       | RV     |
 | test_array_multi_read.py  | Expose the same reg to multiple module readers.    | RV     |
 | test_array_multi_write.py | Multiple exclusive writes in a same moudle.        | RV     |
 | teat_array_partition0.py  | Partitioned array write with constant indices.     | RV     |

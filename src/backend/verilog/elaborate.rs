@@ -83,7 +83,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // array buffer
     let q = display.field("q");
     res.push_str(&format!("  // {}\n", array));
-    res.push_str(&declare_array(array, &q, ";"));
+    res.push_str(&declare_array("", array, &q, ";"));
 
     let mut seen = HashSet::new();
     let drivers = array
@@ -248,7 +248,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(&format!("  // Trigger SM of Module: {}\n", module.get_name()));
     let delta_value = display.field("counter_delta");
     let pop_ready = display.field("counter_pop_ready");
-    let counter = display.field("counter_value");
+    let pop_valid = display.field("counter_pop_valid");
     let delta_ready = display.field("counter_delta_ready");
 
     let callers = module
@@ -285,8 +285,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         res.push_str(&format!("  assign {} = {};\n", x.field("counter_delta_ready"), pop_ready));
       });
     }
-    // FIXME(@were): Do not hardcode the delta & counter width.
-    res.push_str(&declare_logic(DataType::int_ty(8), &counter));
+    res.push_str(&declare_logic(bool_ty(), &pop_valid));
     res.push_str(&format!(
       "
   trigger_counter #(8) {}_trigger_i (
@@ -294,7 +293,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     .rst_n(rst_n),
     .delta({delta_value}),
     .delta_ready({delta_ready}),
-    .current({counter}),
+    .pop_valid({pop_valid}),
     .pop_ready({pop_ready}));\n",
       module_name
     ));
@@ -356,7 +355,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       display.field("counter_delta_ready")
     ));
     res.push_str(&format!("    .counter_pop_ready({}),\n", display.field("counter_pop_ready")));
-    res.push_str(&format!("    .counter_value({}));\n", display.field("counter_value")));
+    res.push_str(&format!("    .counter_pop_valid({}));\n", display.field("counter_pop_valid")));
     res
   }
 
@@ -587,7 +586,7 @@ module {} (
           let display = utils::DisplayInstance::from_array(&array);
           res.push_str(&format!("  // {}\n", array));
           if self.sys.user_contains_opcode(ops, Opcode::Load) {
-            res.push_str(&declare_array(&array, &display.field("q"), ","));
+            res.push_str(&declare_array("input", &array, &display.field("q"), ","));
           }
           // (w, widx, d): something like `array[widx] = d;`
           if self.sys.user_contains_opcode(ops, Opcode::Store) {
@@ -613,8 +612,7 @@ module {} (
     }
 
     res.push_str("  // self.event_q\n");
-    // FIXME(@were): Do not hardcode the counter width.
-    res.push_str("  input logic[7:0] counter_value,\n");
+    res.push_str("  input logic counter_pop_valid,\n");
     res.push_str("  input logic counter_delta_ready,\n");
     res.push_str("  output logic counter_pop_ready);\n\n");
 
@@ -683,7 +681,7 @@ module {} (
   assign fifo_{fifo}_push_data = {value};
 ",
         fifo = fifo,
-        cond = g.and("executed"),
+        cond = g.and("executed", " || "),
         value = g.select_1h()
       ));
     }
@@ -698,7 +696,7 @@ module {} (
   assign array_{a}_widx = {idx};
 ",
         a = a,
-        cond = idx.and("executed"),
+        cond = idx.and("executed", " || "),
         idx = idx.select_1h(),
         data = data.select_1h()
       ));
@@ -706,7 +704,7 @@ module {} (
 
     res.push_str(&format!(
       "
-  assign executed = (counter_value != 0){};
+  assign executed = counter_pop_valid{};
   assign counter_pop_ready = executed;
 endmodule // {}
 ",

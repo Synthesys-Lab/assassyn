@@ -22,6 +22,7 @@ logic [WIDTH - 1:0] q[0:(1<<DEPTH_LOG2)-1];
 
 logic [DEPTH_LOG2:0] new_count;
 logic [DEPTH_LOG2-1:0] new_front;
+logic temp_pop_valid;
 
 always @(posedge clk or negedge rst_n) begin
   if (!rst_n) begin
@@ -50,7 +51,9 @@ always @(posedge clk or negedge rst_n) begin
     count <= new_count;
 
     push_ready <= new_count < (1 << DEPTH_LOG2);
-    pop_valid <= new_count != 0;
+
+    temp_pop_valid = new_count != 0 || push_valid;
+    pop_valid <= temp_pop_valid;
     // This is the most tricky part of the code:
     // If new_count is 0, we have noting to pop, so we just give pop_valid a 0,
     // and pop_data a 'x. Otherwise, we have to pop something real from the FIFO.
@@ -59,7 +62,7 @@ always @(posedge clk or negedge rst_n) begin
     // need this result when new_front == back. This indicates the newly
     // pushed data is also the front of the FIFO. Instead of reading it from
     // the array buffer, we directly forward the push_data to pop_data.
-    pop_data <= new_count == 0 ? 'x : (new_front == back && push_valid ? push_data : q[new_front]);
+    pop_data <= temp_pop_valid ? (new_front == back && push_valid ? push_data : q[new_front]) : 'x;
 
   end
 end
@@ -84,7 +87,7 @@ module trigger_counter #(
   output logic             delta_ready,
 
   input  logic             pop_ready,
-  output logic [WIDTH-1:0] current
+  output logic             pop_valid
 );
 
 logic [WIDTH-1:0] count;
@@ -104,7 +107,7 @@ always @(posedge clk or negedge rst_n) begin
     delta_ready <= new_count != {WIDTH{1'b1}};
     // Assign the new counter value.
     count <= new_count;
-    current <= new_count;
+    pop_valid <= (new_count != 0 || delta != 0);
   end
 end
 

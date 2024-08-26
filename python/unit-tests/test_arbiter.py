@@ -112,7 +112,6 @@ def test_arbiter():
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    print("Verilog path: ", verilog_path)
     if verilog_path:
         raw = utils.run_verilator(verilog_path)
         check(raw)

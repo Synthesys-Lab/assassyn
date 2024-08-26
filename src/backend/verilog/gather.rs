@@ -20,14 +20,14 @@ impl Gather {
     }
   }
 
-  pub(super) fn and(&self, cond: &str) -> String {
+  pub(super) fn and(&self, cond: &str, join: &str) -> String {
     if self.is_conditional() {
       let gather_cond = self
         .condition
         .iter()
         .map(|x| format!("({})", x))
         .collect::<Vec<_>>()
-        .join(" && ");
+        .join(join);
       format!("({}) && ({})", cond, gather_cond)
     } else {
       cond.into()
