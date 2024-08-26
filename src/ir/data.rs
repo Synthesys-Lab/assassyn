@@ -221,7 +221,7 @@ impl Array {
   }
 
   pub fn get_idx_type(&self) -> DataType {
-    DataType::int_ty((self.size.ilog2() + 1) as usize)
+    DataType::int_ty((self.size.ilog2().max(1)) as usize)
   }
 
   pub fn get_name(&self) -> &str {

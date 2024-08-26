@@ -43,6 +43,16 @@ class Driver(Module):
         memory.async_called(we = we.bitcast(Int(1)), addr = addr, wdata = v.bitcast(Bits(32)))
         cnt[0] = plused
 
+def check(raw):
+    for line in raw.splitlines():
+        if '[sram]' in line:
+            toks = line.split()
+            c = int(toks[-1])
+            b = int(toks[-3])
+            a = int(toks[-5])
+            assert c % 2 == 1 or a == 0, f'Expected odd number or zero, got {line}'
+            assert c == a + b, f'{a} + {b} = {c}'
+
 
 def impl(sys_name, init_file, resource_base):
     sys = SysBuilder(sys_name)
@@ -60,15 +70,12 @@ def impl(sys_name, init_file, resource_base):
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    for line in raw.splitlines():
-        if '[sram]' in line:
-            toks = line.split()
-            c = int(toks[-1])
-            b = int(toks[-3])
-            a = int(toks[-5])
-            assert c % 2 == 1 or a == 0, f'Expected odd number or zero, got {line}'
-            assert c == a + b, f'{a} + {b} = {c}'
+    if utils.has_verilator():
+        raw = utils.run_verilator(verilator_path)
+        check(raw)
+
 
 def test_memory():
     impl('memory', None, None)

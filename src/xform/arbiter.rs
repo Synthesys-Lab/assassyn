@@ -139,8 +139,10 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       )
     };
 
-    let zero = sys.get_const_int(DataType::int_ty(1), 0);
-    let last_grant_1h = sys.create_array_read(last_grant_reg, zero);
+    let last_grant_1h = {
+      let zero = sys.get_const_int(DataType::int_ty(1), 0);
+      sys.create_array_read(last_grant_reg, zero)
+    };
 
     // low_mask = ((last_grant_1h - 1) << 1) + 1
     let one = sys.get_const_int(grant_hot_ty.clone(), 1);
@@ -159,8 +161,10 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
     let signed_hi_valid = bits_to_int(sys, &hi_valid);
     let hi_valid_neg = sys.create_neg(signed_hi_valid);
     let hi_grant = sys.create_bitwise_and(hi_valid, hi_valid_neg);
-    let zero = sys.get_const_int(hi_grant.get_dtype(sys).unwrap(), 0);
-    let hi_nez = sys.create_neq(hi_grant, zero);
+    let hi_nez = {
+      let zero = sys.get_const_int(hi_grant.get_dtype(sys).unwrap(), 0);
+      sys.create_neq(hi_grant, zero)
+    };
     // grant = high_valid != 0 ? high_valid : low_valid
     let grant = sys.create_select(hi_nez, hi_grant, lo_grant);
 
@@ -170,6 +174,7 @@ pub fn inject_arbiter(sys: &mut SysBuilder) {
       let grant_to = sys.create_slice(grant, ii, ii);
       let block = sys.create_conditional_block(grant_to);
       sys.set_current_block(block);
+      let zero = sys.get_const_int(DataType::int_ty(1), 0);
       sys.create_array_write(last_grant_reg, zero, i_1h);
       let new_bind = sys.get_init_bind(*callee);
       let module_ports = {

@@ -128,7 +128,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       drivers
         .iter()
         .map(|edge| (edge.field("w"), edge.field("widx"))),
-      (array.get_size().ilog2() + 1) as usize,
+      array.get_idx_type().get_bits(),
     );
     res.push_str(&format!("  assign {widx} = {};\n", write_idx));
 
@@ -390,6 +390,8 @@ module top (
         }
       }
     }
+
+    dbg!(&mem_init_map);
 
     // array storage element definitions
     for array in self.sys.array_iter() {

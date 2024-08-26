@@ -125,7 +125,18 @@ pub(super) fn declare_out(ty: DataType, id: &String) -> String {
 pub(super) fn declare_array(prefix: &str, array: &ArrayRef<'_>, id: &String, term: &str) -> String {
   let size = array.get_size();
   let ty = array.scalar_ty();
-  format!("  {} logic [{}:0] {} [0:{}]{}\n", prefix, ty.get_bits() - 1, id, size - 1, term)
+  format!(
+    "  {}logic [{}:0] {} [0:{}]{}\n",
+    if prefix.is_empty() {
+      "".into()
+    } else {
+      format!("{} ", prefix)
+    },
+    ty.get_bits() - 1,
+    id,
+    size - 1,
+    term
+  )
 }
 
 pub(super) fn connect_top<T: Field, U: Field>(display: &T, edge: &U, fields: &[&str]) -> String {

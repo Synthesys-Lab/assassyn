@@ -19,13 +19,12 @@
 | test_helloworld.py        | Hello world! A simplest test case for logger.      | RV     |
 | test_imbalance.py         | Imbalanced data arrival from 2 difference sources. | RV     |
 | test_inline{0/1}.py       | Inlined hierarchical synthesis.                    | RV     |
-| test_memory.py            | Memory module read and file initialization.        | R      |
-| test_multi_call.rs        | Multiple caller arbiter with backend rewriting.    | R      |
+| test_memory.py            | Memory module read and file initialization.        | RV     |
+| test_multi_call.rs        | Multiple caller arbiter with backend rewriting.    | RV     |
 | test_reg_init.py          | Register initialization.                           | RV     |
 | test_select.rs            | Select trinary operator                            | RV     |
 | test_testbench.py         | Cycled block, useful in testbench.                 | RV     |
 | test_wait_until.py        | Wait-until execution.                              | RV     |
-
 
 - R: Rust simulator is tested.
 - V: Verilog is correctly simulated by Verilator.

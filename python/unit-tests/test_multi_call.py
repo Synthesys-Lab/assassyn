@@ -39,6 +39,14 @@ class Driver(Module):
             adder.async_called(add_a = odd, add_b = odd2)
             adder.async_called(add_a = even2, add_b = even)
 
+def check(raw):
+    for i in raw.split('\n'):
+        if f'adder: ' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(a) + int(b) == int(c)
 
 def test_multi_call():
 
@@ -53,19 +61,14 @@ def test_multi_call():
 
     print(sys)
 
-    simulator_path, _ = elaborate(sys, verilog=None)
+    simulator_path, verilog_path = elaborate(sys, verilog=utils.has_verilator())
 
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    print(raw)
+    raw = utils.run_verilator(verilog_path)
+    check(raw)
 
-    for i in raw.split('\n'):
-        if f'adder: ' in i:
-            line_toks = i.split()
-            c = line_toks[-1]
-            a = line_toks[-3]
-            b = line_toks[-5]
-            assert int(a) + int(b) == int(c)
 
 if __name__ == '__main__':
     test_multi_call()
