@@ -49,7 +49,7 @@ always @(posedge clk or negedge rst_n) begin
     front <= new_front;
     count <= new_count;
 
-    push_ready = new_count < (1 << DEPTH_LOG2);
+    push_ready <= new_count < (1 << DEPTH_LOG2);
     pop_valid <= new_count != 0;
     // This is the most tricky part of the code:
     // If new_count is 0, we have noting to pop, so we just give pop_valid a 0,
@@ -74,7 +74,7 @@ endmodule
 // instances pushed to it in a single same cycle, but it can only pop one
 // instance per cycle.
 module trigger_counter #(
-    parameter WIDTH = 8,
+    parameter WIDTH = 8
     // parameter NAME = "fifo" // TODO(@were): Open this later
 ) (
   input logic clk,
@@ -84,8 +84,8 @@ module trigger_counter #(
   input  logic [WIDTH - 1:0] delta,
   output logic               delta_ready,
 
-  input  logic               pop_ready
-  output logic [WIDTH - 1:0] current,
+  input  logic               pop_ready,
+  output logic [WIDTH - 1:0] current
 );
 
 logic [WIDHT:0] count;
