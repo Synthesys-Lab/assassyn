@@ -221,7 +221,13 @@ impl Array {
   }
 
   pub fn get_idx_type(&self) -> DataType {
-    DataType::int_ty((self.size.ilog2().max(1)) as usize)
+    let bits = self.size.ilog2().max(1);
+    let bits = if 1 << bits < self.size {
+      bits + 1
+    } else {
+      bits
+    };
+    DataType::int_ty(bits as usize)
   }
 
   pub fn get_name(&self) -> &str {

@@ -85,7 +85,7 @@ class Execution(Module):
         is_memory = is_lw
         is_memory_read = is_lw
 
-        request_addr = is_memory.select(result[2:19].bitcast(Int(17)), Int(17)(0))
+        request_addr = is_memory.select(result[2:18].bitcast(Int(17)), Int(17)(0))
 
         mem_bypass_reg[0] = is_memory_read.select(self.rd_reg, Bits(5)(0))
 
@@ -114,14 +114,14 @@ class Execution(Module):
 
         on_write = reg_onwrite[0]
 
-        a_valid = (~(on_write >> a_reg & Bits(32)(1))).bitcast(Bits(1)) | \
+        a_valid = (~(on_write >> a_reg & Bits(32)(1)))[0:0] | \
             (exec_bypass_reg[0] == a_reg) | \
             (mem_bypass_reg[0] == a_reg)
-        b_valid = (~(on_write >> b_reg & Bits(32)(1))).bitcast(Bits(1)) | \
+        b_valid = (~(on_write >> b_reg & Bits(32)(1)))[0:0] | \
             (exec_bypass_reg[0] == b_reg) | \
             (mem_bypass_reg[0] == b_reg)
 
-        rd_valid = ~((on_write >> rd_reg & Bits(32)(1)).bitcast(Bits(1)))
+        rd_valid = (~(on_write >> rd_reg & Bits(32)(1)))[0:0]
 
         valid = a_valid & b_valid & rd_valid
         with Condition(~valid):
@@ -386,17 +386,18 @@ def main():
 
     print(sys)
     conf = config(
-        verilog=None,
-        sim_threshold=100,
-        idle_threshold=100,
+        verilog=utils.has_verilator(),
+        sim_threshold=500,
+        idle_threshold=500,
         resource_base=f'{utils.repo_path()}/examples/cpu/resource'
     )
-    # TODO: Support ret instruction to exit elegantly
 
-    simulator_path, _ = elaborate(sys, **conf)
+    simulator_path, verilog_path = elaborate(sys, **conf)
 
     raw = utils.run_simulator(simulator_path)
     print(raw)
+
+    raw = utils.run_verilator(verilog_path)
 
 if __name__ == '__main__':
     main()
