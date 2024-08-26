@@ -80,27 +80,28 @@ module trigger_counter #(
   input logic clk,
   input logic rst_n,
 
-  input  logic               delta_valid,
-  input  logic [WIDTH - 1:0] delta,
-  output logic               delta_ready,
+  input  logic [WIDTH-1:0] delta,
+  output logic             delta_ready,
 
-  input  logic               pop_ready,
-  output logic [WIDTH - 1:0] current
+  input  logic             pop_ready,
+  output logic [WIDTH-1:0] current
 );
 
-logic [WIDHT:0] count;
-logic [WIDTH:0] new_count;
+logic [WIDTH-1:0] count;
+logic [WIDTH-1:0] temp;
+logic [WIDTH-1:0] new_count;
 
 always @(posedge clk or negedge rst_n) begin
   if (!rst_n) begin
     count <= '0;
   end else begin
-    // If delta_valid is high, counter += delta
     // If pop_ready is high, counter -= 1
-    assign new_count = count + (delta_valid ? delta : 0) - (pop_ready ? 1 : 0);
+    assign temp = count + delta;
+    // To avoid overflow minus
+    assign new_count = temp >= (pop_ready ? 1 : 0) ? temp - (pop_ready ? 1 : 0) : 0;
     // If the counter is gonna overflow, this counter cannot accept any new
     // deltas.
-    delta_ready <= new_count < (1 << DEPTH_LOG2);
+    delta_ready <= new_count != {WIDTH{1'b1}};
     // Assign the new counter value.
     count <= new_count;
     current <= new_count;

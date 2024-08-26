@@ -240,15 +240,16 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res
   }
 
+  /// Dump the trigger event state machine's instantiation.
   fn dump_trigger(&self, module: &ModuleRef) -> String {
     let mut res = String::new();
     let module_name = namify(module.get_name());
     let display = utils::DisplayInstance::from_module(module);
-    res.push_str(&format!("  // Trigger FIFO of Module: {}\n", module.get_name()));
-    let push_valid = display.field("trigger_push_valid");
-    let push_ready = display.field("trigger_push_ready");
-    let pop_valid = display.field("trigger_pop_valid");
-    let pop_ready = display.field("trigger_pop_ready");
+    res.push_str(&format!("  // Trigger SM of Module: {}\n", module.get_name()));
+    let delta_value = display.field("counter_delta");
+    let pop_ready = display.field("counter_pop_ready");
+    let counter = display.field("counter_value");
+    let delta_ready = display.field("counter_delta_ready");
 
     let callers = module
       .callers()
@@ -257,39 +258,44 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     if module_name != "driver" && module_name != "testbench" {
       callers.iter().for_each(|edge| {
-        res.push_str(&declare_logic(bool_ty(), &edge.field("trigger_push_valid")));
-        res.push_str(&declare_logic(bool_ty(), &edge.field("trigger_push_ready")));
+        res.push_str(&declare_logic(
+          DataType::int_ty(8 /*FIXME(@were): Do not hardcode*/),
+          &edge.field("counter_delta"),
+        ));
+        res.push_str(&declare_logic(bool_ty(), &edge.field("counter_delta_ready")));
       });
     }
-    res.push_str(&declare_logic(bool_ty(), &push_valid));
+    res.push_str(&declare_logic(bool_ty(), &delta_ready));
+    res.push_str(&declare_logic(
+      DataType::int_ty(8 /*FIXME(@were): Do not hardcode*/),
+      &delta_value,
+    ));
 
     res.push_str("  // Gather all the push signal\n");
     if module_name != "driver" && module_name != "testbench" {
       res.push_str(&format!(
-        "  assign {push_valid} = {};\n",
-        reduce(callers.iter().map(|x| x.field("trigger_push_valid")), " | ")
+        "  assign {delta_value} = {};\n",
+        reduce(callers.iter().map(|x| x.field("counter_delta")), " + ")
       ));
     }
     res.push_str("  // Broadcast the push_ready signal to all the pushers\n");
-    res.push_str(&declare_logic(bool_ty(), &push_ready));
+    res.push_str(&declare_logic(bool_ty(), &pop_ready));
     if module_name != "driver" && module_name != "testbench" {
       callers.iter().for_each(|x| {
-        res.push_str(&format!("  assign {} = {};\n", x.field("trigger_push_ready"), push_ready));
+        res.push_str(&format!("  assign {} = {};\n", x.field("counter_delta_ready"), pop_ready));
       });
     }
-    res.push_str(&declare_logic(bool_ty(), &pop_valid));
-    res.push_str(&declare_logic(bool_ty(), &pop_ready));
+    // FIXME(@were): Do not hardcode the delta & counter width.
+    res.push_str(&declare_logic(DataType::int_ty(8), &counter));
     res.push_str(&format!(
       "
-  fifo #(1) {}_trigger_i (
+  trigger_counter #(8) {}_trigger_i (
     .clk(clk),
     .rst_n(rst_n),
-    .push_valid({push_valid}),
-    .push_data(1'b1),
-    .push_ready({push_ready}),
-    .pop_valid({pop_valid}),
-    .pop_data(),
-    .pop_ready({pop_ready}));",
+    .delta({delta_value}),
+    .delta_ready({delta_ready}),
+    .current({counter}),
+    .pop_ready({pop_ready}));\n",
       module_name
     ));
     res
@@ -335,11 +341,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           let interf = interf.as_ref::<Module>(self.sys).unwrap();
           let display = utils::DisplayInstance::from_module(&interf);
           let edge = Edge::new(display.clone(), module);
-          res.push_str(&connect_top(
-            &display,
-            &edge,
-            &["trigger_push_valid", "trigger_push_ready"],
-          ));
+          res.push_str(&connect_top(&display, &edge, &["counter_delta_ready", "counter_delta"]));
         }
         NodeKind::Expr => {
           // TODO(@were): Implement this for downstreams.
@@ -349,8 +351,12 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     }
 
     let display = utils::DisplayInstance::from_module(module);
-    res.push_str(&format!("    .trigger_pop_valid({}),\n", display.field("trigger_pop_valid")));
-    res.push_str(&format!("    .trigger_pop_ready({}));\n", display.field("trigger_pop_ready")));
+    res.push_str(&format!(
+      "    .counter_delta_ready({}),\n",
+      display.field("counter_delta_ready")
+    ));
+    res.push_str(&format!("    .counter_pop_ready({}),\n", display.field("counter_pop_ready")));
+    res.push_str(&format!("    .counter_value({}));\n", display.field("counter_value")));
     res
   }
 
@@ -403,11 +409,12 @@ module top (
       res.push_str(&self.dump_trigger(&module));
     }
 
+    // FIXME(@were): Do not hardcode the counter delta width.
     if self.sys.has_testbench() {
-      res.push_str("  assign testbench_trigger_push_valid = 1'b1;\n\n");
+      res.push_str("  assign testbench_counter_delta = 8'b1;\n\n");
     }
     if self.sys.has_driver() {
-      res.push_str("  assign driver_trigger_push_valid = 1'b1;\n\n");
+      res.push_str("  assign driver_counter_delta = 8'b1;\n\n");
     }
 
     // module insts
@@ -593,8 +600,9 @@ module {} (
           let module = interf.as_ref::<Module>(self.sys).unwrap();
           let display = utils::DisplayInstance::from_module(&module);
           res.push_str(&format!("  // Module {}\n", module.get_name()));
-          res.push_str(&declare_out(bool_ty(), &display.field("trigger_push_valid")));
-          res.push_str(&declare_in(bool_ty(), &display.field("trigger_push_ready")));
+          // FIXME(@were): Do not hardcode the counter delta width.
+          res.push_str(&declare_out(DataType::int_ty(8), &display.field("counter_delta")));
+          res.push_str(&declare_in(bool_ty(), &display.field("counter_delta_ready")));
         }
         NodeKind::Expr => {
           // TODO(@were): Handle this later.
@@ -605,8 +613,10 @@ module {} (
     }
 
     res.push_str("  // self.event_q\n");
-    res.push_str("  input logic trigger_pop_valid,\n");
-    res.push_str("  output logic trigger_pop_ready);\n");
+    // FIXME(@were): Do not hardcode the counter width.
+    res.push_str("  input logic[7:0] counter_value,\n");
+    res.push_str("  input logic counter_delta_ready,\n");
+    res.push_str("  output logic counter_pop_ready);\n\n");
 
     let mut wait_until: String = "".to_string();
 
@@ -629,19 +639,14 @@ module {} (
       0
     };
 
-    res.push_str(
-      "
-  logic trigger;
-  assign trigger_pop_ready = trigger;
-",
-    );
+    res.push_str("  logic executed;\n");
 
     if self.current_module == "testbench" {
       res.push_str(
         "
   int cycle_cnt;
   always_ff @(posedge clk or negedge rst_n) if (!rst_n) cycle_cnt <= 0;
-  else if (trigger) cycle_cnt <= cycle_cnt + 1;
+  else if (executed) cycle_cnt <= cycle_cnt + 1;
 ",
       );
     }
@@ -653,11 +658,19 @@ module {} (
       res.push_str(&self.print_body(elem));
     }
 
-    for (m, cond) in self.triggers.drain() {
+    for (m, g) in self.triggers.drain() {
       res.push_str(&format!(
-        "  assign {}_trigger_push_valid = {};\n\n",
+        "  assign {}_counter_delta = executed ? {} : 0;\n\n",
         m,
-        cond.condition.and("trigger".into())
+        if g.is_conditional() {
+          g.condition
+            .iter()
+            .map(|x| format!("{{ {}'b0, |{} }}", g.bits - 1, x))
+            .collect::<Vec<_>>()
+            .join(" + ")
+        } else {
+          "1".into()
+        }
       ));
     }
 
@@ -670,8 +683,8 @@ module {} (
   assign fifo_{fifo}_push_data = {value};
 ",
         fifo = fifo,
-        cond = g.condition.and("trigger".into()),
-        value = g.value
+        cond = g.and("executed"),
+        value = g.select_1h()
       ));
     }
 
@@ -685,15 +698,16 @@ module {} (
   assign array_{a}_widx = {idx};
 ",
         a = a,
-        cond = idx.condition.and("trigger".into()),
-        idx = idx.value,
-        data = data.value
+        cond = idx.and("executed"),
+        idx = idx.select_1h(),
+        data = data.select_1h()
       ));
     }
 
     res.push_str(&format!(
       "
-  assign trigger = trigger_pop_valid{};
+  assign executed = (counter_value != 0){};
+  assign counter_pop_ready = executed;
 endmodule // {}
 ",
       wait_until, self.current_module
@@ -785,7 +799,7 @@ endmodule // {}
         let fifo = pop.fifo();
         let display = utils::DisplayInstance::from_fifo(&fifo, false);
         format!(
-          "{}\n  assign {} = {};\n  assign {} = trigger{};\n",
+          "{}\n  assign {} = {};\n  assign {} = executed{};\n",
           declare_logic(fifo.scalar_ty(), &id),
           id,
           display.field("pop_data"),
@@ -850,7 +864,7 @@ endmodule // {}
 
         let mut res = String::new();
         res.push_str(&format!(
-          "  always_ff @(posedge clk iff trigger{}) ",
+          "  always_ff @(posedge clk iff executed{}) ",
           self
             .get_pred()
             .map(|p| format!(" && {}", p))
@@ -940,12 +954,13 @@ endmodule // {}
         };
         let callee = namify(&callee);
         let pred = self.get_pred().unwrap_or("".to_string());
+        // FIXME(@were): Do not hardcode the counter delta width.
         match self.triggers.get_mut(&callee) {
-          Some(trgs) => trgs.push(pred, "".into(), 0),
+          Some(trgs) => trgs.push(pred, "".into(), 8),
           None => {
             self
               .triggers
-              .insert(callee, Gather::new(pred, "".into(), 0));
+              .insert(callee, Gather::new(pred, "".into(), 8));
           }
         }
         "".to_string()
