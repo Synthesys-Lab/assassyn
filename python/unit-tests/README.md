@@ -4,7 +4,7 @@
 | test_array_multi_read.py  | Expose the same reg to multiple module readers.    | RV     |
 | test_array_multi_write.py | Multiple exclusive writes in a same moudle.        | RV     |
 | teat_array_partition0.py  | Partitioned array write with constant indices.     | RV     |
-| teat_array_partition1.py  | Partitioned array write with variable indices.     | R      |
+| teat_array_partition1.py  | Partitioned array write with variable indices.     | RV     |
 | test_async_call.py        | Basic async calling convention b/t modules.        | RV     |
 | test_bind.py              | Partial function bind.                             | RV     |
 | test_cse.py               | Common code elimination.                           | RV     |

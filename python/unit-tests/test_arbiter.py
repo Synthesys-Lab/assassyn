@@ -81,6 +81,17 @@ class Driver(Module):
                 arb.async_called(a0 = even)
                 arb.async_called(a1 = odd)
 
+def check(raw):
+    last_grant = None
+    for i in raw.split('\n'):
+        if "grants odd" in i:
+            assert (last_grant is None or last_grant == 0)
+            last_grant = 1
+        if "grants even" in i:
+            assert (last_grant is None or last_grant == 1)
+            last_grant = 0
+
+
 def test_arbiter():
     sys = SysBuilder('arbiter')
     with sys:
@@ -96,20 +107,15 @@ def test_arbiter():
 
     print(sys)
 
-    simulator_path, _ = elaborate(sys, sim_threshold=200, idle_threshold=200, verilog=None)
+    simulator_path, verilog_path = elaborate(sys, sim_threshold=200, idle_threshold=200, verilog=utils.has_verilator())
 
     raw = utils.run_simulator(simulator_path)
+    check(raw)
 
-    print(raw)
-
-    last_grant = None
-    for i in raw.split('\n'):
-        if "grants odd" in i:
-            assert (last_grant is None or last_grant == 0)
-            last_grant = 1
-        if "grants even" in i:
-            assert (last_grant is None or last_grant == 1)
-            last_grant = 0
+    print("Verilog path: ", verilog_path)
+    if verilog_path:
+        raw = utils.run_verilator(verilog_path)
+        check(raw)
 
 if __name__ == '__main__':
     test_arbiter()

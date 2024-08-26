@@ -432,7 +432,7 @@ end"
       Simulator::None => panic!("No simulator specified"),
     };
 
-    fd.write_all(include_str!("fifo_impl.sv").as_bytes())
+    fd.write_all(include_str!("./runtime.sv").as_bytes())
       .unwrap();
 
     let threashold = (sim_threshold + 1) * 100;
@@ -760,9 +760,13 @@ endmodule // {}
         )
       }
 
-      Opcode::Unary { .. } => {
+      Opcode::Unary { ref uop } => {
+        let dump = match uop {
+          subcode::Unary::Flip => "~",
+          subcode::Unary::Neg => "-",
+        };
         let uop = expr.as_sub::<instructions::Unary>().unwrap();
-        format!("{}{}", uop.get_opcode(), dump_ref!(self.sys, &uop.x()))
+        format!("{}{}", dump, dump_ref!(self.sys, &uop.x()))
       }
 
       Opcode::Compare { .. } => {

@@ -21,7 +21,7 @@ class ModA(Module):
             arr[0] = self.a + Int(32)(1)
 
 class ModC(Module):
-    
+
     @module.constructor
     def __init__(self):
         super().__init__()

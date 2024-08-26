@@ -50,7 +50,7 @@ def test_async_call():
         adder.build()
 
         driver = Driver()
-        driver.build(adder)
+        call = driver.build(adder)
 
     print(sys)
 

@@ -17,10 +17,10 @@ module fifo #(
 
 logic [DEPTH_LOG2-1:0] front;
 logic [DEPTH_LOG2-1:0] back;
-logic [DEPTH_LOG2-1:0] count;
+logic [DEPTH_LOG2:0] count;
 logic [WIDTH - 1:0] q[0:(1<<DEPTH_LOG2)-1];
 
-logic [DEPTH_LOG2-1:0] new_count;
+logic [DEPTH_LOG2:0] new_count;
 logic [DEPTH_LOG2-1:0] new_front;
 
 always @(posedge clk or negedge rst_n) begin
@@ -33,29 +33,23 @@ always @(posedge clk or negedge rst_n) begin
     push_ready <= 1'b1;
   end else begin
 
-    // $display("%t\t%s: front=%d back=%d count=%d", $time, NAME, front, back, count);
-
+    // The number of elements in the queue after this cycle.
     assign new_count = count + (push_valid ? 1 : 0) - (pop_ready ? 1 : 0);
 
+    // The new front of the queue after this cycle.
     assign new_front = front + (pop_ready && count != 0 ? 1 : 0);
 
-    if (push_valid) begin
-      // $display("%t\t%s.push %d", $time, NAME, push_data);
-      if (new_count <= (1 << DEPTH_LOG2)) begin
-        q[back] <= push_data;
-        back <= (back + 1);
-        push_ready <= (count + 1 - (pop_ready ? 1 : 0)) != (1 << DEPTH_LOG2);
-      end else begin
-        push_ready <= 1'b0;
-      end
+
+    if (push_valid && new_count <= (1 << DEPTH_LOG2)) begin
+      q[back] <= push_data;
+      back <= (back + 1);
     end
 
-    // if (pop_ready && new_count != 0) begin
-    //   $display("%t\t%s.pop %d", $time, NAME, q[new_front]);
-    // end
 
     front <= new_front;
     count <= new_count;
+
+    push_ready = new_count < (1 << DEPTH_LOG2);
     pop_valid <= new_count != 0;
     // This is the most tricky part of the code:
     // If new_count is 0, we have noting to pop, so we just give pop_valid a 0,
@@ -67,6 +61,49 @@ always @(posedge clk or negedge rst_n) begin
     // the array buffer, we directly forward the push_data to pop_data.
     pop_data <= new_count == 0 ? 'x : (new_front == back && push_valid ? push_data : q[new_front]);
 
+  end
+end
+
+endmodule
+
+// The purpose of a FIFO is different from the purpose of a counter.
+// A FIFO can only be pushed or popped once per cycle, while a counter
+// can increase multiple event counters in a single cycle.
+//
+// This is tyically useful for an arbiter, where an arbiter can have multiple
+// instances pushed to it in a single same cycle, but it can only pop one
+// instance per cycle.
+module trigger_counter #(
+    parameter WIDTH = 8,
+    // parameter NAME = "fifo" // TODO(@were): Open this later
+) (
+  input logic clk,
+  input logic rst_n,
+
+  input  logic               delta_valid,
+  input  logic [WIDTH - 1:0] delta,
+  output logic               delta_ready,
+
+  input  logic               pop_ready
+  output logic [WIDTH - 1:0] current,
+);
+
+logic [WIDHT:0] count;
+logic [WIDTH:0] new_count;
+
+always @(posedge clk or negedge rst_n) begin
+  if (!rst_n) begin
+    count <= '0;
+  end else begin
+    // If delta_valid is high, counter += delta
+    // If pop_ready is high, counter -= 1
+    assign new_count = count + (delta_valid ? delta : 0) - (pop_ready ? 1 : 0);
+    // If the counter is gonna overflow, this counter cannot accept any new
+    // deltas.
+    delta_ready <= new_count < (1 << DEPTH_LOG2);
+    // Assign the new counter value.
+    count <= new_count;
+    current <= new_count;
   end
 end
 
