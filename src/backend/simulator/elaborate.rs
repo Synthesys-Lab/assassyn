@@ -581,10 +581,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     let module_name = namify(module.get_name());
     fd.write_all(format!("fn simulate_{}(&mut self) {{", module_name).as_bytes())?;
     if !module.is_downstream() {
-      fd.write_all(
-        format!("if self.event_valid(&self.{}_event) {{", module_name)
-          .as_bytes(),
-      )?;
+      fd.write_all(format!("if self.event_valid(&self.{}_event) {{", module_name).as_bytes())?;
       fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
     } else {
       let mut conds = HashSet::new();
