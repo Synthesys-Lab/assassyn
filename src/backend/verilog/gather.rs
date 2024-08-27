@@ -133,7 +133,7 @@ impl Visitor<()> for ExternalUsage {
 
     if !externals.is_empty() {
       self
-        .expr_externally_used.entry(expr.get_block().get_module()).or_insert_with(HashSet::new);
+        .expr_externally_used.entry(expr.get_block().get_module()).or_default();
       self
         .expr_externally_used
         .get_mut(&expr.get_block().get_module())
@@ -141,7 +141,7 @@ impl Visitor<()> for ExternalUsage {
         .insert(expr.upcast());
 
       for elem in externals {
-        self.module_use_external_expr.entry(elem).or_insert_with(|| HashSet::new());
+        self.module_use_external_expr.entry(elem).or_default();
         self
           .module_use_external_expr
           .get_mut(&elem)
