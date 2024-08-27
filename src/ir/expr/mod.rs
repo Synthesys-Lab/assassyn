@@ -16,13 +16,6 @@ use super::{block::Block, node::BaseNode};
 
 pub mod subcode;
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
-pub enum BindKind {
-  KVBind,
-  Sequential,
-  Unknown,
-}
-
 macro_rules! find_opcode_attr {
   ( $target:ident; $($ky:ident),* ) => {
     find_opcode_attr!(@find $target ; $($ky),*)
