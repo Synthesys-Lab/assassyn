@@ -3,7 +3,8 @@ use std::{collections::HashSet, env, fs, path::PathBuf};
 use crate::{
   builder::SysBuilder,
   ir::{
-    node::{BaseNode, ModuleRef}, Expr,
+    node::{BaseNode, ModuleRef},
+    Expr,
   },
 };
 

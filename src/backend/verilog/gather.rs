@@ -133,7 +133,9 @@ impl Visitor<()> for ExternalUsage {
 
     if !externals.is_empty() {
       self
-        .expr_externally_used.entry(expr.get_block().get_module()).or_default();
+        .expr_externally_used
+        .entry(expr.get_block().get_module())
+        .or_default();
       self
         .expr_externally_used
         .get_mut(&expr.get_block().get_module())
