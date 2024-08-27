@@ -9,7 +9,7 @@
 | test_bind.py              | Partial function bind.                             | RV     |
 | test_cse.py               | Common code elimination.                           | RV     |
 | test_concat.py            | Concatentate operator.                             | RV     |
-| test_downstream.py        | Combinational logic across multiple normal modules.| R      |
+| test_downstream.py        | Combinational logic across multiple normal modules.| RV     |
 | test_driver.py            | Test a standalone driver module.                   | RV     |
 | test_dt_conv.py           | Data cast operator.                                | RV     |
 | test_eager_bind.rs        | Conditional calling bind.                          | RV     |
