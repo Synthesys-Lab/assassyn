@@ -510,14 +510,12 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   let mut expr_validities = HashSet::new();
   for module in sys.module_iter(ModuleKind::All) {
     let module_name = namify(module.get_name());
+    fd.write_all(format!("pub {}_triggered : bool,", module_name).as_bytes())?;
+    simulator_init.push(format!("{}_triggered : false,", module_name));
+    downstream_reset.push(format!("self.{}_triggered = false;", module_name));
     if !module.is_downstream() {
-      fd.write_all(
-        format!("pub {}_event : VecDeque<usize>,", namify(module.get_name())).as_bytes(),
-      )?;
+      fd.write_all(format!("pub {}_event : VecDeque<usize>,", module_name).as_bytes())?;
       simulator_init.push(format!("{}_event : VecDeque::new(),", module_name));
-      fd.write_all(format!("pub {}_triggered : bool,", module_name).as_bytes())?;
-      simulator_init.push(format!("{}_triggered : false,", module_name));
-      downstream_reset.push(format!("self.{}_triggered = false;", module_name));
       for fifo in module.fifo_iter() {
         let name = fifo_name!(fifo);
         let ty = dtype_to_rust_type(&fifo.scalar_ty());
@@ -559,6 +557,10 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   }
   fd.write_all("}}".as_bytes())?;
 
+  fd.write_all("fn event_valid(&self, event: &VecDeque<usize>) -> bool {".as_bytes())?;
+  fd.write_all("event.front().map_or(false, |x| *x <= self.stamp)".as_bytes())?;
+  fd.write_all("}".as_bytes())?;
+
   // Reset the downstream ports every cycle.
   fd.write_all("pub fn reset_downstream(&mut self) {".as_bytes())?;
   for elem in downstream_reset {
@@ -580,7 +582,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     fd.write_all(format!("fn simulate_{}(&mut self) {{", module_name).as_bytes())?;
     if !module.is_downstream() {
       fd.write_all(
-        format!("if self.{}_event.front().map_or(false, |x| *x <= self.stamp) {{", module_name)
+        format!("if self.event_valid(&self.{}_event) {{", module_name)
           .as_bytes(),
       )?;
       fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
@@ -611,10 +613,10 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     fd.write_all(format!("super::modules::{}(self);", module_name).as_bytes())?;
     if !module.is_downstream() {
       simulators.push(module_name.clone());
-      fd.write_all(format!("self.{}_triggered = true;\n", module_name).as_bytes())?;
     } else {
       downstreams.push(module_name.clone());
     }
+    fd.write_all(format!("self.{}_triggered = true;\n", module_name).as_bytes())?;
     fd.write_all("} // close event condition\n".as_bytes())?;
     fd.write_all("} // close function\n".as_bytes())?;
   }
