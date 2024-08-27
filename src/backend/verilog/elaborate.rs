@@ -306,7 +306,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let mut res = String::new();
     let module_name = namify(module.get_name());
 
-    if let Some(out_bounds) = self.external_usage.out_bounds(&module) {
+    if let Some(out_bounds) = self.external_usage.out_bounds(module) {
       for elem in out_bounds {
         let id = namify(&elem.to_string(module.sys));
         let ty = elem.get_dtype(module.sys).unwrap();
@@ -366,13 +366,13 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     if module.is_downstream() {
       res.push_str("    // Upstream executed signals\n");
-      upstreams(&module).iter().for_each(|x| {
+      upstreams(module).iter().for_each(|x| {
         let name = namify(x.as_ref::<Module>(module.sys).unwrap().get_name());
         res.push_str(&format!("    .{}_executed({}_executed),\n", name, name));
       });
     }
 
-    if let Some(out_bounds) = self.external_usage.out_bounds(&module) {
+    if let Some(out_bounds) = self.external_usage.out_bounds(module) {
       for elem in out_bounds {
         let id = namify(&elem.to_string(module.sys));
         // Put a "external_" prefix to avoid name collision with the original combinational logic.
@@ -381,7 +381,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       }
     }
 
-    if let Some(in_bounds) = self.external_usage.in_bounds(&module) {
+    if let Some(in_bounds) = self.external_usage.in_bounds(module) {
       for elem in in_bounds {
         let id = namify(&elem.to_string(module.sys));
         // Use the original name to avoid re-naming the external signals.
@@ -784,7 +784,7 @@ module {} (
 
     if !module.is_downstream() {
       res.push_str(&format!("  assign executed = counter_pop_valid{};\n", wait_until));
-      res.push_str(&format!("  assign counter_pop_ready = executed;\n"));
+      res.push_str("  assign counter_pop_ready = executed;\n");
     } else {
       let upstream_exec = upstreams(&module)
         .iter()

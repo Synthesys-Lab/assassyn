@@ -132,14 +132,8 @@ impl Visitor<()> for ExternalUsage {
     }
 
     if !externals.is_empty() {
-      if !self
-        .expr_externally_used
-        .contains_key(&expr.get_block().get_module())
-      {
-        self
-          .expr_externally_used
-          .insert(expr.get_block().get_module(), HashSet::new());
-      }
+      self
+        .expr_externally_used.entry(expr.get_block().get_module()).or_insert_with(HashSet::new);
       self
         .expr_externally_used
         .get_mut(&expr.get_block().get_module())
@@ -147,11 +141,7 @@ impl Visitor<()> for ExternalUsage {
         .insert(expr.upcast());
 
       for elem in externals {
-        if !self.module_use_external_expr.contains_key(&elem) {
-          self
-            .module_use_external_expr
-            .insert(elem.clone(), HashSet::new());
-        }
+        self.module_use_external_expr.entry(elem).or_insert_with(|| HashSet::new());
         self
           .module_use_external_expr
           .get_mut(&elem)
@@ -171,5 +161,5 @@ pub(super) fn gather_exprs_externally_used(sys: &SysBuilder) -> ExternalUsage {
     expr_externally_used: HashMap::new(),
   };
   res.enter(sys);
-  return res;
+  res
 }
