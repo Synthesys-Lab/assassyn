@@ -1,3 +1,14 @@
+use std::collections::HashSet;
+
+use crate::{
+  builder::SysBuilder,
+  ir::{
+    node::{BaseNode, ExprRef, IsElement},
+    visitor::Visitor,
+    Operand,
+  },
+};
+
 use super::utils::select_1h;
 
 /// Gather is a data structure that gathers multiple conditional values into a single value.
@@ -64,4 +75,38 @@ impl Gather {
     self.condition.push(cond);
     self.value.push(value);
   }
+}
+
+struct GatherBuilder {
+  externally_used_exprs: Vec<BaseNode>,
+}
+
+impl Visitor<()> for GatherBuilder {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
+    if {
+      let mkey = expr.get_block().get_module().get_key();
+      expr.users().iter().any(|x| {
+        x.as_ref::<Operand>(expr.sys)
+          .unwrap()
+          .get_expr()
+          .get_block()
+          .get_module()
+          .get_key()
+          != mkey
+      })
+    } {
+      self.externally_used_exprs.push(expr.upcast());
+    }
+    None
+  }
+}
+
+
+/// Gather all expressions that are used in external modules.
+pub(super) fn gather_exprs_externally_used(sys: &SysBuilder) -> HashSet<BaseNode> {
+  let mut res = GatherBuilder {
+    externally_used_exprs: Vec::new(),
+  };
+  res.enter(sys);
+  return HashSet::from_iter(res.externally_used_exprs);
 }

@@ -18,7 +18,7 @@ use crate::{
 use self::{expr::subcode, module::Attribute};
 
 use super::{
-  gather::Gather,
+  gather::{gather_exprs_externally_used, Gather},
   utils::{
     self, bool_ty, connect_top, declare_array, declare_in, declare_logic, declare_out, reduce,
     select_1h, Edge, Field,
@@ -39,11 +39,12 @@ struct VerilogDumper<'a, 'b> {
   fifo_pushes: HashMap<String, Gather>, // fifo_name -> value
   array_stores: HashMap<String, (Gather, Gather)>, // array_name -> (idx, value)
   triggers: HashMap<String, Gather>,    // module_name -> [pred]
+  externally_used_exprs: HashSet<BaseNode>,
   current_module: String,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
-  fn new(sys: &'a SysBuilder, config: &'b Config) -> Self {
+  fn new(sys: &'a SysBuilder, config: &'b Config, externally_used_exprs: HashSet<BaseNode>) -> Self {
     Self {
       sys,
       config,
@@ -52,6 +53,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       array_stores: HashMap::new(),
       triggers: HashMap::new(),
       current_module: String::new(),
+      externally_used_exprs,
     }
   }
 
@@ -543,6 +545,7 @@ impl VerilogDumper<'_, '_> {
 }
 
 impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
+  // Dump the implentation of each module.
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.current_module = namify(module.get_name()).to_string();
 
@@ -1075,9 +1078,12 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
 
   generate_cpp_testbench(&verilog_name, sys, config)?;
 
+  let externally_used_exprs = gather_exprs_externally_used(sys);
+
   let mut vd = VerilogDumper::new(sys, config);
 
   let mut fd = File::create(fname)?;
+  
 
   for module in vd.sys.module_iter(ModuleKind::Module) {
     fd.write_all(vd.visit_module(module).unwrap().as_bytes())?;
