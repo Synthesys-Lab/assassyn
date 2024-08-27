@@ -160,6 +160,10 @@ impl Opcode {
   }
 }
 
+pub enum Metadata {
+  FIFODepth(usize),
+}
+
 pub struct Expr {
   name: Option<String>,
   pub(super) key: usize,
@@ -168,6 +172,7 @@ pub struct Expr {
   opcode: Opcode,
   pub(crate) operands: Vec<BaseNode>,
   pub(crate) user_set: HashSet<BaseNode>,
+  metadata: Vec<Metadata>,
 }
 
 impl Expr {
@@ -185,6 +190,7 @@ impl Expr {
       opcode,
       operands,
       user_set: HashSet::new(),
+      metadata: Vec::new(),
     }
   }
 
@@ -309,5 +315,9 @@ impl ExprMut<'_> {
       module_mut.get_mut().symbol_table.insert(&name, node)
     };
     self.get_mut().name = Some(name);
+  }
+
+  pub fn add_metadata(&mut self, metadata: Metadata) {
+    self.get_mut().metadata.push(metadata);
   }
 }
