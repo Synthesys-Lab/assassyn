@@ -72,17 +72,17 @@ def test_downstream():
     print(sys)
 
     config = assassyn.backend.config(
-            verilog=None,
+            verilog=utils.has_verilator(),
             sim_threshold=100,
             idle_threshold=100)
 
-    simulator_path, _ = elaborate(sys, **config)
+    simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
 
-    #raw = utils.run_verilator(verilator_path)
-    #check_raw(raw)
+    raw = utils.run_verilator(verilator_path)
+    check_raw(raw)
 
 if __name__ == '__main__':
     test_downstream()

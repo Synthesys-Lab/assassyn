@@ -1,11 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
   builder::SysBuilder,
   ir::{
-    node::{BaseNode, ExprRef, IsElement},
+    node::{BaseNode, ExprRef, IsElement, ModuleRef},
     visitor::Visitor,
-    Operand,
+    Opcode, Operand,
   },
 };
 
@@ -77,36 +77,99 @@ impl Gather {
   }
 }
 
-struct GatherBuilder {
-  externally_used_exprs: Vec<BaseNode>,
+pub(super) struct ExternalUsage {
+  module_use_external_expr: HashMap<BaseNode, HashSet<BaseNode>>,
+  expr_externally_used: HashMap<BaseNode, HashSet<BaseNode>>,
 }
 
-impl Visitor<()> for GatherBuilder {
+impl ExternalUsage {
+  pub(super) fn is_externally_used(&self, expr: &ExprRef<'_>) -> bool {
+    if let Some(used) = self
+      .expr_externally_used
+      .get(&expr.get_block().get_module())
+    {
+      used.contains(&expr.upcast())
+    } else {
+      false
+    }
+  }
+
+  pub(super) fn out_bounds(&self, module: &ModuleRef<'_>) -> Option<&HashSet<BaseNode>> {
+    self.expr_externally_used.get(&module.upcast())
+  }
+
+  pub(super) fn in_bounds(&self, module: &ModuleRef<'_>) -> Option<&HashSet<BaseNode>> {
+    self.module_use_external_expr.get(&module.upcast())
+  }
+}
+
+impl Visitor<()> for ExternalUsage {
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
-    if {
-      let mkey = expr.get_block().get_module().get_key();
-      expr.users().iter().any(|x| {
-        x.as_ref::<Operand>(expr.sys)
+    let m = expr.get_block().get_module();
+    let externals = expr
+      .users()
+      .iter()
+      .filter_map(|x| {
+        let ext = x
+          .as_ref::<Operand>(expr.sys)
           .unwrap()
           .get_expr()
           .get_block()
-          .get_module()
-          .get_key()
-          != mkey
+          .get_module();
+        if ext != m {
+          eprintln!("{}", expr);
+          eprintln!("usedby: {}", x.as_ref::<Operand>(expr.sys).unwrap().get_expr());
+          eprintln!("module: {:?} != {:?}", ext, m);
+          Some(ext)
+        } else {
+          None
+        }
       })
-    } {
-      self.externally_used_exprs.push(expr.upcast());
+      .collect::<HashSet<_>>();
+
+    if !expr.get_opcode().is_valued() || matches!(expr.get_opcode(), Opcode::Bind) {
+      return None;
+    }
+
+    if !externals.is_empty() {
+      if !self
+        .expr_externally_used
+        .contains_key(&expr.get_block().get_module())
+      {
+        self
+          .expr_externally_used
+          .insert(expr.get_block().get_module(), HashSet::new());
+      }
+      self
+        .expr_externally_used
+        .get_mut(&expr.get_block().get_module())
+        .unwrap()
+        .insert(expr.upcast());
+
+      for elem in externals {
+        if !self.module_use_external_expr.contains_key(&elem) {
+          self
+            .module_use_external_expr
+            .insert(elem.clone(), HashSet::new());
+        }
+        self
+          .module_use_external_expr
+          .get_mut(&elem)
+          .unwrap()
+          .insert(expr.upcast());
+      }
     }
     None
   }
 }
 
-
-/// Gather all expressions that are used in external modules.
-pub(super) fn gather_exprs_externally_used(sys: &SysBuilder) -> HashSet<BaseNode> {
-  let mut res = GatherBuilder {
-    externally_used_exprs: Vec::new(),
+/// Gather all expressions used by external modules and sort them by the modules to which the usage
+/// belong.
+pub(super) fn gather_exprs_externally_used(sys: &SysBuilder) -> ExternalUsage {
+  let mut res = ExternalUsage {
+    module_use_external_expr: HashMap::new(),
+    expr_externally_used: HashMap::new(),
   };
   res.enter(sys);
-  return HashSet::from_iter(res.externally_used_exprs);
+  return res;
 }
