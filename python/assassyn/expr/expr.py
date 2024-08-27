@@ -296,6 +296,15 @@ class Bind(Expr):
         self.callee = callee
         self.pushes = []
         self._push(**kwargs)
+        self.fifo_depths = {}
+
+    def set_fifo_depth(self, **kwargs):
+        """Set FIFO depths using keyword arguments."""
+        for name, depth in kwargs.items():
+            if not isinstance(depth, int):
+                raise ValueError(f"Depth for {name} must be an integer")
+            self.fifo_depths[name] = depth
+        return self
 
     def __repr__(self):
         args = []
@@ -304,7 +313,11 @@ class Bind(Expr):
         args = ', '.join(args)
         callee = self.callee.as_operand()
         lval = self.as_operand()
-        return f'{lval} = {callee}.bind([{args}])'
+        fifo_depths_str = ', '.join(f"'{k}': {v}" for k, v in self.fifo_depths.items() \
+            if v is not None)
+        fifo_depths_repr = f" /* fifo_depths={{{fifo_depths_str}}} */" \
+            if fifo_depths_str else ""
+        return f'{lval} = {callee}.bind([{args}]){fifo_depths_repr}'
 
 class AsyncCall(Expr):
     '''The class for async call operations. It is used to call a function asynchronously.'''
