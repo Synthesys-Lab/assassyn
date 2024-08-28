@@ -305,7 +305,7 @@ class Bind(Expr):
                 raise ValueError(f"Depth for {name} must be an integer")
             for push in self.pushes:
                 if push.fifo.name == name:
-                    self.fifo_depths[push.as_operand()] = depth
+                    self.fifo_depths[self.as_operand()] = depth
                     push.fifo_depth = depth
                     break
             else:
