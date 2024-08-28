@@ -90,22 +90,6 @@ class Testbench(Module):
     def __init__(self):
         super().__init__()
 
-    # what if i do this?
-    # Cycle:
-    #    7                    15
-    #      6               11 14
-    #        5           7 10 13
-    #          4       3 6 9  12
-    #            3     2 5 8
-    #              2   1 4
-    #                1 0
-    #          3 2 1 0 P P P  P
-    #        7 6 5 4   P P P  P
-    #    11 10 9 8     P P P  P
-    # 15 14 13 12      P P P  P#
-    # row [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
-    # col [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]]
-
     @module.combinational
     def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
                     row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
@@ -268,7 +252,6 @@ def systolic_array():
                 if pe_array[i+1][j].bound is None:
                     print(f"Error: pe_array[{i+1}][{j}].bound is None")
                 fwest, fnorth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
-                print("hi")
                 pe_array[i][j].bound = pe_array[i][j].pe
                 pe_array[i][j+1].bound = fwest
                 pe_array[i+1][j].bound = fnorth
@@ -283,14 +266,13 @@ def systolic_array():
                         pe_array[3][0].pe, \
                         pe_array[4][0].pe)
 
-    # simulator_path, verilator_path = elaborate(sys, verilog="verilator")
-    simulator_path = elaborate(sys)
-    # verilator_path = elaborate(sys, verilog="verilator")
+    simulator_path, verilator_path = elaborate(sys, verilog="verilator")
+
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
 
-    # raw = utils.run_verilator(verilator_path)
-    # check_raw(raw)
+    raw = utils.run_verilator(verilator_path)
+    check_raw(raw)
 
 if __name__ == '__main__':
     systolic_array()
