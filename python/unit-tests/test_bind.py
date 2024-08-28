@@ -37,7 +37,8 @@ class Rhs(Module):
 
     @module.combinational
     def build(self, sub: Bind):
-        sub.async_called(sub_b = self.rhs_b)
+        call = sub.async_called(sub_b = self.rhs_b)
+        call.bind.set_fifo_depth(sub_b = 2)
 
 class Driver(Module):
 
