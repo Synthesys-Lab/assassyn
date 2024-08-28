@@ -317,11 +317,13 @@ class Bind(Expr):
         for v in self.pushes:
             depth = self.fifo_depths.get(v.as_operand())
             depth_str = f", depth={depth}" if depth is not None else ""
-            args.append(f'{v.as_operand()} /* {v.fifo.as_operand()}={v.val.as_operand()}{depth_str} */')
+            args.append(f'{v.as_operand()}\
+                /* {v.fifo.as_operand()}={v.val.as_operand()}{depth_str} */')
         args = ', '.join(args)
         callee = self.callee.as_operand()
         lval = self.as_operand()
-        fifo_depths_str = ', '.join(f"{k}: {v}" for k, v in self.fifo_depths.items() if v is not None)
+        fifo_depths_str = ', '\
+            .join(f"{k}: {v}" for k, v in self.fifo_depths.items() if v is not None)
         fifo_depths_repr = f" /* fifo_depths={{{fifo_depths_str}}} */" if fifo_depths_str else ""
         return f'{lval} = {callee}.bind([{args}]){fifo_depths_repr}'
 

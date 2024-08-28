@@ -412,7 +412,7 @@ class CodeGen(visitor.Visitor):
     def get_source(self):
         '''Concatenate the generated source code for the given system'''
         return '\n'.join(self.header) + '\n' + '\n'.join(self.code)
-    
+
     def finalize_bind(self):
         '''Finalize the bind by setting the FIFO depths'''
         self.code.append('  // Set FIFO depths')
