@@ -539,7 +539,7 @@ impl SysBuilder {
         .get_mut()
         .bind_arg(key, push);
     }
-    return push;
+    push
   }
 
   fn indexable(&self, idx: BaseNode) -> bool {
