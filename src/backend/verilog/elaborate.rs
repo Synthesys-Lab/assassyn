@@ -166,23 +166,28 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let display = utils::DisplayInstance::from_fifo(fifo, true);
     let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));
     let fifo_width = fifo.scalar_ty().get_bits();
-    let fifo_depth = fifo.users()
-    .iter()
-    .find_map(|node| {
-        node.as_ref::<Operand>(self.sys)
-            .ok()
-            .and_then(|op| op.get_user().as_expr::<FIFOPush>(self.sys).ok())
-    })
-    .and_then(|push| {
-        push.get()
-            .metadata_iter()
-            .next()
-            .map(|m| {
-                let Metadata::FIFODepth(depth) = m;
-                *depth
-            })
-    })
-    .unwrap_or(4);
+    let fifo_depth = fifo
+      .users()
+      .iter()
+      .find_map(|node| {
+        node
+          .as_ref::<Operand>(self.sys)
+          .ok()
+          .and_then(|op| op.get_user().as_expr::<FIFOPush>(self.sys).ok())
+      })
+      .and_then(|push| {
+        push.get().metadata_iter().next().map(|m| {
+          let Metadata::FIFODepth(depth) = m;
+          *depth
+        })
+      })
+      .unwrap_or(4);
+
+    let fifo_depth = if fifo_depth > 0 && (fifo_depth & (fifo_depth - 1)) == 0 {
+      fifo_depth
+    } else {
+      fifo_depth.next_power_of_two()
+    };
 
     res.push_str(&format!("  // {}\n", fifo));
 

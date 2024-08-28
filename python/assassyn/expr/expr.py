@@ -303,6 +303,8 @@ class Bind(Expr):
         for name, depth in kwargs.items():
             if not isinstance(depth, int):
                 raise ValueError(f"Depth for {name} must be an integer")
+            if depth <= 0 or depth & (depth - 1) != 0:
+                raise ValueError(f"Depth for {name} must be a power of 2")
             for push in self.pushes:
                 if push.fifo.name == name:
                     self.fifo_depths[self.as_operand()] = depth
