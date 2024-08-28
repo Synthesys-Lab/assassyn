@@ -11,7 +11,7 @@ use proc_macro2::Span;
 use quote::quote;
 
 use crate::{
-  backend::common::{create_and_clean_dir, Config},
+  backend::common::{create_and_clean_dir, upstreams, Config},
   builder::system::{ModuleKind, SysBuilder},
   ir::{expr::subcode, node::*, visitor::Visitor, *},
 };
@@ -584,24 +584,9 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       fd.write_all(format!("if self.event_valid(&self.{}_event) {{", module_name).as_bytes())?;
       fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
     } else {
-      let mut conds = HashSet::new();
-      for (interf, _) in module.ext_interf_iter() {
-        if let Ok(expr) = interf.as_ref::<Expr>(sys) {
-          conds.insert(namify(
-            expr
-              .get_parent()
-              .as_ref::<Block>(sys)
-              .unwrap()
-              .get_module()
-              .as_ref::<Module>(sys)
-              .unwrap()
-              .get_name(),
-          ));
-        }
-      }
-      let conds = conds
+      let conds = upstreams(&module)
         .into_iter()
-        .map(|x| format!("self.{}_triggered", x))
+        .map(|x| format!("self.{}_triggered", namify(x.as_ref::<Module>(sys).unwrap().get_name())))
         .collect::<Vec<_>>();
       fd.write_all("if ".as_bytes())?;
       fd.write_all(conds.join(" && ").as_bytes())?;

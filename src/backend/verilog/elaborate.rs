@@ -10,7 +10,7 @@ use instructions::FIFOPush;
 use regex::Regex;
 
 use crate::{
-  backend::common::{create_and_clean_dir, namify, Config},
+  backend::common::{create_and_clean_dir, namify, upstreams, Config},
   builder::system::{ModuleKind, SysBuilder},
   ir::{instructions::BlockIntrinsic, node::*, visitor::Visitor, *},
 };
@@ -18,7 +18,7 @@ use crate::{
 use self::{expr::subcode, module::Attribute};
 
 use super::{
-  gather::Gather,
+  gather::{gather_exprs_externally_used, ExternalUsage, Gather},
   utils::{
     self, bool_ty, connect_top, declare_array, declare_in, declare_logic, declare_out, reduce,
     select_1h, Edge, Field,
@@ -39,11 +39,12 @@ struct VerilogDumper<'a, 'b> {
   fifo_pushes: HashMap<String, Gather>, // fifo_name -> value
   array_stores: HashMap<String, (Gather, Gather)>, // array_name -> (idx, value)
   triggers: HashMap<String, Gather>,    // module_name -> [pred]
+  external_usage: ExternalUsage,
   current_module: String,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
-  fn new(sys: &'a SysBuilder, config: &'b Config) -> Self {
+  fn new(sys: &'a SysBuilder, config: &'b Config, external_usage: ExternalUsage) -> Self {
     Self {
       sys,
       config,
@@ -52,6 +53,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       array_stores: HashMap::new(),
       triggers: HashMap::new(),
       current_module: String::new(),
+      external_usage,
     }
   }
 
@@ -303,6 +305,18 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   fn dump_module_instance(&self, module: &ModuleRef) -> String {
     let mut res = String::new();
     let module_name = namify(module.get_name());
+
+    if let Some(out_bounds) = self.external_usage.out_bounds(module) {
+      for elem in out_bounds {
+        let id = namify(&elem.to_string(module.sys));
+        let ty = elem.get_dtype(module.sys).unwrap();
+        res.push_str(&declare_logic(ty, &format!("logic_{}", id)));
+        res.push_str(&declare_logic(bool_ty(), &format!("logic_{}_valid", id)));
+      }
+    }
+
+    res.push_str(&declare_logic(bool_ty(), &format!("{}_executed", module_name)));
+
     res.push_str(&format!(
       "
   // {module}
@@ -343,19 +357,49 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           res.push_str(&connect_top(&display, &edge, &["counter_delta_ready", "counter_delta"]));
         }
         NodeKind::Expr => {
-          // TODO(@were): Implement this for downstreams.
+          // This is handled below, since we need a deduplication for the modules to which these
+          // expressions belong.
         }
         _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }
     }
 
-    let display = utils::DisplayInstance::from_module(module);
-    res.push_str(&format!(
-      "    .counter_delta_ready({}),\n",
-      display.field("counter_delta_ready")
-    ));
-    res.push_str(&format!("    .counter_pop_ready({}),\n", display.field("counter_pop_ready")));
-    res.push_str(&format!("    .counter_pop_valid({}));\n", display.field("counter_pop_valid")));
+    if module.is_downstream() {
+      res.push_str("    // Upstream executed signals\n");
+      upstreams(module).iter().for_each(|x| {
+        let name = namify(x.as_ref::<Module>(module.sys).unwrap().get_name());
+        res.push_str(&format!("    .{}_executed({}_executed),\n", name, name));
+      });
+    }
+
+    if let Some(out_bounds) = self.external_usage.out_bounds(module) {
+      for elem in out_bounds {
+        let id = namify(&elem.to_string(module.sys));
+        // Put a "external_" prefix to avoid name collision with the original combinational logic.
+        res.push_str(&format!("    .expose_{id}(logic_{id}),\n"));
+        res.push_str(&format!("    .expose_{id}_valid(logic_{id}_valid),\n"));
+      }
+    }
+
+    if let Some(in_bounds) = self.external_usage.in_bounds(module) {
+      for elem in in_bounds {
+        let id = namify(&elem.to_string(module.sys));
+        // Use the original name to avoid re-naming the external signals.
+        res.push_str(&format!("    .{id}(logic_{id}),\n"));
+        res.push_str(&format!("    .{id}_valid(logic_{id}_valid),\n"));
+      }
+    }
+
+    if !module.is_downstream() {
+      let display = utils::DisplayInstance::from_module(module);
+      res.push_str(&format!(
+        "    .counter_delta_ready({}),\n",
+        display.field("counter_delta_ready")
+      ));
+      res.push_str(&format!("    .counter_pop_ready({}),\n", display.field("counter_pop_ready")));
+      res.push_str(&format!("    .counter_pop_valid({}),\n", display.field("counter_pop_valid")));
+    }
+    res.push_str(&format!("    .expose_executed({}_executed));\n", module_name));
     res
   }
 
@@ -418,8 +462,13 @@ module top (
       res.push_str("  assign driver_counter_delta = 8'b1;\n\n");
     }
 
-    // module insts
+    // module instances
     for module in self.sys.module_iter(ModuleKind::Module) {
+      res.push_str(&self.dump_module_instance(&module));
+    }
+
+    // downstream instances
+    for module in self.sys.module_iter(ModuleKind::Downstream) {
       res.push_str(&self.dump_module_instance(&module));
     }
 
@@ -543,6 +592,7 @@ impl VerilogDumper<'_, '_> {
 }
 
 impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
+  // Dump the implentation of each module.
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.current_module = namify(module.get_name()).to_string();
 
@@ -606,17 +656,48 @@ module {} (
           res.push_str(&declare_in(bool_ty(), &display.field("counter_delta_ready")));
         }
         NodeKind::Expr => {
-          // TODO(@were): Handle this later.
+          // This is handled below, since we need a deduplication for the modules to which these
+          // expressions belong.
         }
         _ => panic!("Unknown interf kind {:?}", interf.get_kind()),
       }
       res.push('\n');
     }
 
-    res.push_str("  // self.event_q\n");
-    res.push_str("  input logic counter_pop_valid,\n");
-    res.push_str("  input logic counter_delta_ready,\n");
-    res.push_str("  output logic counter_pop_ready);\n\n");
+    if module.is_downstream() {
+      res.push_str("  // Declare upstream executed signals\n");
+      upstreams(&module).iter().for_each(|x| {
+        let name = namify(x.as_ref::<Module>(module.sys).unwrap().get_name());
+        res.push_str(&declare_in(bool_ty(), &format!("{}_executed", name)));
+      });
+    }
+
+    if let Some(out_bounds) = self.external_usage.out_bounds(&module) {
+      for elem in out_bounds {
+        let id = namify(&elem.to_string(module.sys));
+        let dtype = elem.get_dtype(module.sys).unwrap();
+        res.push_str(&declare_out(dtype, &format!("expose_{}", id)));
+        res.push_str(&declare_out(bool_ty(), &format!("expose_{}_valid", id)));
+      }
+    }
+
+    if let Some(in_bounds) = self.external_usage.in_bounds(&module) {
+      for elem in in_bounds {
+        let id = namify(&elem.to_string(module.sys));
+        let dtype = elem.get_dtype(module.sys).unwrap();
+        res.push_str(&declare_in(dtype, &id));
+        res.push_str(&declare_in(bool_ty(), &format!("{}_valid", id)));
+      }
+    }
+
+    if !module.is_downstream() {
+      res.push_str("  // self.event_q\n");
+      res.push_str("  input logic counter_pop_valid,\n");
+      res.push_str("  input logic counter_delta_ready,\n");
+      res.push_str("  output logic counter_pop_ready,\n");
+    }
+
+    res.push_str("  output logic expose_executed);\n\n");
 
     let mut wait_until: String = "".to_string();
 
@@ -678,11 +759,9 @@ module {} (
 
     for (fifo, g) in self.fifo_pushes.drain() {
       res.push_str(&format!(
-        "
-  assign fifo_{fifo}_push_valid = {cond};
-  assign fifo_{fifo}_push_data = {value};
+        "  assign fifo_{fifo}_push_valid = {cond};
+  assign fifo_{fifo}_push_data = {value};\n
 ",
-        fifo = fifo,
         cond = g.and("executed", " || "),
         value = g.select_1h()
       ));
@@ -692,10 +771,9 @@ module {} (
 
     for (a, (idx, data)) in self.array_stores.drain() {
       res.push_str(&format!(
-        "
-  assign array_{a}_w = {cond};
+        "  assign array_{a}_w = {cond};
   assign array_{a}_d = {data};
-  assign array_{a}_widx = {idx};
+  assign array_{a}_widx = {idx};\n
 ",
         a = a,
         cond = idx.and("executed", " || "),
@@ -704,14 +782,20 @@ module {} (
       ));
     }
 
-    res.push_str(&format!(
-      "
-  assign executed = counter_pop_valid{};
-  assign counter_pop_ready = executed;
-endmodule // {}
-",
-      wait_until, self.current_module
-    ));
+    if !module.is_downstream() {
+      res.push_str(&format!("  assign executed = counter_pop_valid{};\n", wait_until));
+      res.push_str("  assign counter_pop_ready = executed;\n");
+    } else {
+      let upstream_exec = upstreams(&module)
+        .iter()
+        .map(|x| format!("{}_executed", namify(x.as_ref::<Module>(module.sys).unwrap().get_name())))
+        .collect::<Vec<_>>();
+      res.push_str(&format!("  assign executed = {};\n", upstream_exec.join(" || ")));
+    }
+
+    res.push_str("  assign expose_executed = executed;\n");
+
+    res.push_str(&format!("endmodule // {}\n\n", self.current_module));
 
     Some(res)
   }
@@ -755,13 +839,23 @@ endmodule // {}
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<String> {
-    let decl = if expr.get_opcode().is_valued()
-      && !matches!(expr.get_opcode(), Opcode::FIFOPop | Opcode::Bind)
-    {
-      Some((namify(&expr.upcast().to_string(self.sys)), expr.dtype()))
-    } else {
-      None
-    };
+    let (decl, expose) =
+      if expr.get_opcode().is_valued() && !matches!(expr.get_opcode(), Opcode::Bind) {
+        let id = namify(&expr.upcast().to_string(self.sys));
+        let expose = if self.external_usage.is_externally_used(&expr) {
+          format!(
+            "  assign expose_{id} = {id};\n  assign expose_{id}_valid = {};\n",
+            self.get_pred().unwrap_or("1".to_string())
+          )
+        } else {
+          "".into()
+        };
+        (Some((id, expr.dtype())), expose)
+      } else {
+        (None, "".into())
+      };
+
+    let mut is_pop = None;
 
     let body = match expr.get_opcode() {
       Opcode::Binary { .. } => {
@@ -794,21 +888,19 @@ endmodule // {}
       }
 
       Opcode::FIFOPop => {
-        let id = namify(&expr.upcast().to_string(self.sys));
         let pop = expr.as_sub::<instructions::FIFOPop>().unwrap();
         let fifo = pop.fifo();
         let display = utils::DisplayInstance::from_fifo(&fifo, false);
-        format!(
-          "{}\n  assign {} = {};\n  assign {} = executed{};\n",
-          declare_logic(fifo.scalar_ty(), &id),
-          id,
-          display.field("pop_data"),
+        is_pop = format!(
+          "  assign {} = executed{};",
           display.field("pop_ready"),
           self
             .get_pred()
             .map(|p| format!(" && {}", p))
             .unwrap_or("".to_string())
         )
+        .into();
+        display.field("pop_data")
       }
 
       Opcode::Log => {
@@ -932,16 +1024,37 @@ endmodule // {}
 
       Opcode::PureIntrinsic { intrinsic } => {
         let call = expr.as_sub::<instructions::PureIntrinsic>().unwrap();
-        let fifo = call
-          .get()
-          .get_operand_value(0)
-          .unwrap()
-          .as_ref::<FIFO>(self.sys)
-          .unwrap();
-        let fifo_name = fifo_name!(fifo);
         match intrinsic {
-          subcode::PureIntrinsic::FIFOValid => format!("fifo_{}_pop_valid", fifo_name),
-          subcode::PureIntrinsic::FIFOPeek => format!("fifo_{}_pop_data", fifo_name),
+          subcode::PureIntrinsic::FIFOValid | subcode::PureIntrinsic::FIFOPeek => {
+            let fifo = call
+              .get()
+              .get_operand_value(0)
+              .unwrap()
+              .as_ref::<FIFO>(self.sys)
+              .unwrap();
+            let fifo_name = fifo_name!(fifo);
+            match intrinsic {
+              subcode::PureIntrinsic::FIFOValid => format!("fifo_{}_pop_valid", fifo_name),
+              subcode::PureIntrinsic::FIFOPeek => format!("fifo_{}_pop_data", fifo_name),
+              _ => unreachable!(),
+            }
+          }
+          subcode::PureIntrinsic::ValueValid => {
+            let value = call.get().get_operand_value(0).unwrap();
+            let value = value.as_ref::<Expr>(self.sys).unwrap();
+            if value.get_block().get_module().get_key()
+              != call.get().get_block().get_module().get_key()
+            {
+              format!("{}_valid", namify(&value.upcast().to_string(self.sys)))
+            } else {
+              format!(
+                "(executed{})",
+                self
+                  .get_pred()
+                  .map_or("".to_string(), |x| format!(" && {}", x))
+              )
+            }
+          }
           _ => todo!(),
         }
       }
@@ -1038,12 +1151,18 @@ endmodule // {}
       _ => panic!("Unknown OP: {:?}", expr.get_opcode()),
     };
 
-    if let Some((id, ty)) = decl {
-      format!("{}  assign {} = {};\n", declare_logic(ty, &id), id, body)
+    let mut res = if let Some((id, ty)) = decl {
+      format!("{}  assign {} = {};\n{}\n", declare_logic(ty, &id), id, body, expose)
     } else {
       body
+    };
+
+    if let Some(pop) = is_pop {
+      res.push_str(&pop);
+      res.push('\n');
     }
-    .into()
+
+    res.into()
   }
 }
 
@@ -1075,11 +1194,13 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
 
   generate_cpp_testbench(&verilog_name, sys, config)?;
 
-  let mut vd = VerilogDumper::new(sys, config);
+  let external_usage = gather_exprs_externally_used(sys);
+
+  let mut vd = VerilogDumper::new(sys, config, external_usage);
 
   let mut fd = File::create(fname)?;
 
-  for module in vd.sys.module_iter(ModuleKind::Module) {
+  for module in vd.sys.module_iter(ModuleKind::All) {
     fd.write_all(vd.visit_module(module).unwrap().as_bytes())?;
   }
 

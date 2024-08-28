@@ -1,6 +1,12 @@
-use std::{env, fs, path::PathBuf};
+use std::{collections::HashSet, env, fs, path::PathBuf};
 
-use crate::builder::SysBuilder;
+use crate::{
+  builder::SysBuilder,
+  ir::{
+    node::{BaseNode, ModuleRef},
+    Expr,
+  },
+};
 
 use super::verilog;
 
@@ -71,4 +77,15 @@ pub(super) fn create_and_clean_dir(dir: PathBuf, override_dir: bool) {
 
 pub(super) fn namify(name: &str) -> String {
   name.replace('.', "_")
+}
+
+pub(super) fn upstreams(m: &ModuleRef<'_>) -> HashSet<BaseNode> {
+  assert!(m.is_downstream());
+  let mut res = HashSet::new();
+  for (interf, _) in m.ext_interf_iter() {
+    if let Ok(expr) = interf.as_ref::<Expr>(m.sys) {
+      res.insert(expr.get_block().get_module());
+    }
+  }
+  res
 }
