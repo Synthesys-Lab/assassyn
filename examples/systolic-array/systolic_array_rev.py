@@ -109,7 +109,7 @@ class Testbench(Module):
     @module.combinational
     def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
                     row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
-        with Cycle(1):
+        with Cycle(0):
             # 1 0
             # 0 P P P  P
             #   P P P  P
@@ -118,7 +118,7 @@ class Testbench(Module):
             col1.async_called(data = Int(32)(0))
             row1.async_called(data = Int(32)(0))
 
-        with Cycle(2):
+        with Cycle(1):
             # 2 1 4
             # 1 P P P  P
             # 4 P P P  P
@@ -129,7 +129,7 @@ class Testbench(Module):
             row2.async_called(data = Int(32)(4))
             col2.async_called(data = Int(32)(4))
 
-        with Cycle(3):
+        with Cycle(2):
             # 3 2 5 8
             # 2 P P P  P
             # 5 P P P  P
@@ -142,7 +142,7 @@ class Testbench(Module):
             row3.async_called(data = Int(32)(8))
             col3.async_called(data = Int(32)(8))
 
-        with Cycle(4):
+        with Cycle(3):
             # 4  3 6 9  12
             # 3  P P P  P
             # 6  P P P  P
@@ -157,7 +157,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(12))
             col4.async_called(data = Int(32)(12))
         
-        with Cycle(5):
+        with Cycle(4):
             # 5    7 10 13
             #    P P P  P
             # 7  P P P  P
@@ -170,7 +170,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(13))
             col4.async_called(data = Int(32)(13))
 
-        with Cycle(6):
+        with Cycle(5):
             #  6    11 14
             #    P P P  P
             #    P P P  P
@@ -181,7 +181,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(14))
             col4.async_called(data = Int(32)(14))
             
-        with Cycle(7):
+        with Cycle(6):
             #   7      15
             #    P P P  P
             #    P P P  P
@@ -284,10 +284,10 @@ def systolic_array():
                         pe_array[4][0].pe)
 
     # simulator_path, verilator_path = elaborate(sys, verilog="verilator")
-    # simulator_path = elaborate(sys)
-    verilator_path = elaborate(sys, verilog="verilator")
-    # raw = utils.run_simulator(simulator_path)
-    # check_raw(raw)
+    simulator_path = elaborate(sys)
+    # verilator_path = elaborate(sys, verilog="verilator")
+    raw = utils.run_simulator(simulator_path)
+    check_raw(raw)
 
     # raw = utils.run_verilator(verilator_path)
     # check_raw(raw)
