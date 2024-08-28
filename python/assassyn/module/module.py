@@ -222,12 +222,6 @@ class Module(ModuleBase):
         '''The helper function to get the implicit FIFO setting.'''
         return self._attrs.get(Module.ATTR_EXPLICIT_FIFO, False)
 
-    @ir_builder(node_type='expr')
-    def triggered(self):
-        '''The frontend API for creating a triggered node,
-        which checks if this module is triggered this cycle.
-        NOTE: This operation is only usable in downstream modules.'''
-        return PureInstrinsic(PureInstrinsic.MODULE_TRIGGERED, self)
 
 class Port:
     '''The AST node for defining a port in modules.'''
