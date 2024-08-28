@@ -15,7 +15,7 @@ use crate::{
   ir::{instructions::BlockIntrinsic, node::*, visitor::Visitor, *},
 };
 
-use self::{expr::subcode, module::Attribute};
+use self::{expr::subcode, expr::Metadata, module::Attribute};
 
 use super::{
   gather::{gather_exprs_externally_used, ExternalUsage, Gather},
@@ -166,6 +166,24 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let display = utils::DisplayInstance::from_fifo(fifo, true);
     let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));
     let fifo_width = fifo.scalar_ty().get_bits();
+    let fifo_depth = fifo.users()
+    .iter()
+    .find_map(|node| {
+        node.as_ref::<Operand>(self.sys)
+            .ok()
+            .and_then(|op| op.get_user().as_expr::<FIFOPush>(self.sys).ok())
+    })
+    .and_then(|push| {
+        push.get()
+            .metadata_iter()
+            .next()
+            .map(|m| {
+                let Metadata::FIFODepth(depth) = m;
+                *depth
+            })
+    })
+    .unwrap_or(4);
+
     res.push_str(&format!("  // {}\n", fifo));
 
     let push_valid = display.field("push_valid"); // If external pushers have data to push
@@ -226,7 +244,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // Instantiate the FIFO
     res.push_str(&format!(
       "
-  fifo #({width}) fifo_{name}_i (
+  fifo #({width}, {depth}) fifo_{name}_i (
     .clk(clk),
     .rst_n(rst_n),
     .push_valid({push_valid}),
@@ -237,6 +255,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     .pop_ready({pop_ready}));\n\n",
       name = fifo_name,
       width = fifo_width,
+      depth = fifo_depth,
     ));
 
     res
