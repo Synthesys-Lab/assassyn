@@ -417,6 +417,8 @@ class CodeGen(visitor.Visitor):
         '''Finalize the bind by setting the FIFO depths'''
         self.code.append('  // Set FIFO depths')
         for push, depth in self.fifo_depths.items():
+            depth = depth if depth & (depth - 1) == 0 \
+                else 1 << (depth - 1).bit_length()
             res = f'''  push{push}.as_mut::<assassyn::ir::Expr>(&mut sys).unwrap()
                             .add_metadata(assassyn::ir::expr::Metadata::FIFODepth({depth}));
             '''
