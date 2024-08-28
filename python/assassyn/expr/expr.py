@@ -303,20 +303,26 @@ class Bind(Expr):
         for name, depth in kwargs.items():
             if not isinstance(depth, int):
                 raise ValueError(f"Depth for {name} must be an integer")
-            self.fifo_depths[name] = depth
+            for push in self.pushes:
+                if push.fifo.name == name:
+                    self.fifo_depths[push.as_operand()] = depth
+                    push.fifo_depth = depth
+                    break
+            else:
+                raise ValueError(f"No push found for FIFO named {name}")
         return self
 
     def __repr__(self):
         args = []
         for v in self.pushes:
-            args.append(f'{v.as_operand()} /* {v.fifo.as_operand()}={v.val.as_operand()} */')
+            depth = self.fifo_depths.get(v.as_operand())
+            depth_str = f", depth={depth}" if depth is not None else ""
+            args.append(f'{v.as_operand()} /* {v.fifo.as_operand()}={v.val.as_operand()}{depth_str} */')
         args = ', '.join(args)
         callee = self.callee.as_operand()
         lval = self.as_operand()
-        fifo_depths_str = ', '.join(f"'{k}': {v}" for k, v in self.fifo_depths.items() \
-            if v is not None)
-        fifo_depths_repr = f" /* fifo_depths={{{fifo_depths_str}}} */" \
-            if fifo_depths_str else ""
+        fifo_depths_str = ', '.join(f"{k}: {v}" for k, v in self.fifo_depths.items() if v is not None)
+        fifo_depths_repr = f" /* fifo_depths={{{fifo_depths_str}}} */" if fifo_depths_str else ""
         return f'{lval} = {callee}.bind([{args}]){fifo_depths_repr}'
 
 class AsyncCall(Expr):

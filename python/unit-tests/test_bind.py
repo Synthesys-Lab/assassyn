@@ -25,7 +25,7 @@ class Lhs(Module):
 
     @module.combinational
     def build(self, sub: Sub):
-        bound = sub.bind(sub_a = self.lhs_a)
+        bound = sub.bind(sub_a = self.lhs_a).set_fifo_depth(sub_a = 2)
         return bound
 
 class Rhs(Module):
