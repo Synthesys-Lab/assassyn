@@ -510,7 +510,7 @@ impl SysBuilder {
   }
 
   /// Add a bound argument to the given bind.
-  pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) {
+  pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) -> BaseNode {
     let port = {
       let bind = bind.as_ref::<LazyBind>(self).unwrap();
       assert!(bind.get_arg(&key).is_none(), "Argument {} already exists!", key);
@@ -539,6 +539,7 @@ impl SysBuilder {
         .get_mut()
         .bind_arg(key, push);
     }
+    return push;
   }
 
   fn indexable(&self, idx: BaseNode) -> bool {
