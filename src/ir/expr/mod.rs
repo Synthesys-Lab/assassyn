@@ -160,6 +160,7 @@ impl Opcode {
   }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Metadata {
   FIFODepth(usize),
 }
@@ -271,6 +272,10 @@ impl ExprRef<'_> {
     iter
       .position(|x| self.get_key() == x.get_key() && matches!(x.get_kind(), NodeKind::Expr))
       .unwrap()
+  }
+
+  pub fn metadata_iter(&self) -> impl Iterator<Item = &Metadata> + '_ {
+    self.get().metadata.iter()
   }
 }
 
