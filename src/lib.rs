@@ -1,3 +1,4 @@
+pub mod analysis;
 pub mod backend;
 pub mod builder;
 pub mod ir;

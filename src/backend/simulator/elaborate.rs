@@ -11,6 +11,7 @@ use proc_macro2::Span;
 use quote::quote;
 
 use crate::{
+  analysis::topo_sort,
   backend::common::{create_and_clean_dir, upstreams, Config},
   builder::system::{ModuleKind, SysBuilder},
   ir::{expr::subcode, node::*, visitor::Visitor, *},
@@ -576,7 +577,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("}".as_bytes())?;
 
   let mut simulators = vec![];
-  let mut downstreams = vec![];
   for module in sys.module_iter(ModuleKind::All) {
     let module_name = namify(module.get_name());
     fd.write_all(format!("fn simulate_{}(&mut self) {{", module_name).as_bytes())?;
@@ -595,8 +595,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     fd.write_all(format!("super::modules::{}(self);", module_name).as_bytes())?;
     if !module.is_downstream() {
       simulators.push(module_name.clone());
-    } else {
-      downstreams.push(module_name.clone());
     }
     fd.write_all(format!("self.{}_triggered = true;\n", module_name).as_bytes())?;
     fd.write_all("} // close event condition\n".as_bytes())?;
@@ -624,9 +622,11 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
 
   // TODO(@were): A downstream module can be recursively dependent to another downstream module.
   // A topological order among these downstream modules is needed.
+  let mut downstreams = topo_sort(sys);
   fd.write_all("let downstreams : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
   for downstream in downstreams {
-    fd.write_all(format!("Simulator::simulate_{},", downstream).as_bytes())?;
+    let module_ref = downstream.as_ref::<Module>(sys).unwrap();
+    fd.write_all(format!("Simulator::simulate_{},", module_ref.get_name()).as_bytes())?;
   }
   fd.write_all("];\n".as_bytes())?;
 
