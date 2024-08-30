@@ -80,7 +80,7 @@ def test_toposort():
         c=adder1.build(a, b)
         d=adder2.build(a, b)
         
-        adder3.build(c,d)
+        adder3.build(c, d)
 
     print(sys)
 

@@ -10,8 +10,8 @@ class ModuleBase:
 
     def as_operand(self):
         '''Dump the module as a right-hand side reference.'''
-        return f'_{identifierize(self)}'    
-    
+        return f'_{identifierize(self)}'
+
     @ir_builder(node_type='expr')
     def triggered(self):
         '''The frontend API for creating a triggered node,

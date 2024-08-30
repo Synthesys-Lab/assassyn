@@ -3,7 +3,7 @@ use std::vec::Vec;
 
 use crate::builder::system::{ModuleKind, SysBuilder};
 use crate::ir::node::{BaseNode, IsElement, Parented};
-use crate::ir::{Block, Expr, Module};
+use crate::ir::{Block, Expr};
 
 pub fn topo_sort(sys: &SysBuilder) -> Vec<BaseNode> {
   let mut sorted_nodes = vec![];
@@ -22,19 +22,11 @@ pub fn topo_sort(sys: &SysBuilder) -> Vec<BaseNode> {
   let mut in_degree: HashMap<usize, usize> = HashMap::new();
 
   for module in sys.module_iter(ModuleKind::Downstream) {
-    println!(
-      "\nProcessing downstream module: {}, {}, {}",
-      module.get_name(),
-      module.key,
-      module.body.get_key()
-    );
-
     in_degree.entry(module.key).or_insert(0);
 
     topo_graph.entry(module.key).or_insert_with(HashSet::new);
 
     for (ext, _) in module.ext_interf_iter() {
-      println!("  External interface: {:?}", ext);
       if let Ok(expr) = ext.as_ref::<Expr>(sys) {
         let parent_module = expr.get_parent().as_ref::<Block>(sys).unwrap().get_module();
 
@@ -52,12 +44,6 @@ pub fn topo_sort(sys: &SysBuilder) -> Vec<BaseNode> {
       }
     }
   }
-
-  // // Print the current topology diagram for debugging
-  // println!("Current topo_graph:");
-  // for (node, edges) in &topo_graph {
-  //   println!("  Node: {}, Edges: {:?}", node, edges);
-  // }
 
   // Topological sort
   let mut queue: Vec<usize> = in_degree
@@ -89,12 +75,6 @@ pub fn topo_sort(sys: &SysBuilder) -> Vec<BaseNode> {
   if sorted_nodes.len() != module_map.len() {
     panic!("Topological sort failed: graph contains a cycle or unresolved dependencies.");
   }
-
-  // // Print the current nodes sorting for debugging
-  // for node in &sorted_nodes {
-  //   let module_ref = node.as_ref::<Module>(sys).unwrap();
-  //   println!("module_name {}", module_ref.get_name());
-  // }
 
   sorted_nodes
 }
