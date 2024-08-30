@@ -24,7 +24,7 @@ pub fn topo_sort(sys: &SysBuilder) -> Vec<BaseNode> {
   for module in sys.module_iter(ModuleKind::Downstream) {
     in_degree.entry(module.key).or_insert(0);
 
-    topo_graph.entry(module.key).or_insert_with(HashSet::new);
+    topo_graph.entry(module.key).or_default();
 
     for (ext, _) in module.ext_interf_iter() {
       if let Ok(expr) = ext.as_ref::<Expr>(sys) {
@@ -34,7 +34,7 @@ pub fn topo_sort(sys: &SysBuilder) -> Vec<BaseNode> {
         if downstream_keys.contains(&parent_module.get_key()) {
           topo_graph
             .entry(parent_module.get_key())
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(module.key);
 
           *in_degree.entry(module.key).or_insert(0) += 1;
@@ -54,7 +54,7 @@ pub fn topo_sort(sys: &SysBuilder) -> Vec<BaseNode> {
 
   while let Some(node_key) = queue.pop() {
     if let Some(node) = module_map.get(&node_key) {
-      sorted_nodes.push(node.clone());
+      sorted_nodes.push(*node);
     }
 
     if let Some(neighbors) = topo_graph.get(&node_key) {
