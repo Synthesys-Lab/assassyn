@@ -24,6 +24,14 @@ class Driver(Module):
 
     @module.combinational
     def build(self, adder: Adder):
+        # The code below is equivalent
+        # cnt = RegArray(Int(32), 0)
+        # v = cnt[0]
+        # cnt[0] = v + Int(32)(1)
+        # NOTE: cnt[0]'s new value is NOT visible until next cycle.
+        # cond = v < Int(32)(100)
+        # with Condition(cond):
+        #     adder.async_called(a = v, b = v)
         cnt = RegArray(Int(32), 1)
         cnt[0] = cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(100)
