@@ -377,11 +377,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         match cast.get_opcode() {
           Cast::ZExt | Cast::BitCast => {
             // perform zero extension
-            format!(
-              "ValueCastTo::<{}>::cast(&{})",
-              dtype_to_rust_type(&dest_dtype),
-              a,
-            )
+            format!("ValueCastTo::<{}>::cast(&{})", dtype_to_rust_type(&dest_dtype), a,)
           }
           Cast::SExt => {
             format!("ValueCastTo::<{}>::cast(&{})", dtype_to_rust_type(&dest_dtype), a)

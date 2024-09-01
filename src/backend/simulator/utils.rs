@@ -31,7 +31,11 @@ pub fn camelize(name: &str) -> String {
 
 pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
   if dtype.is_int() || dtype.is_raw() {
-    let prefix = if !dtype.is_signed() || dtype.is_raw() { "u" } else { "i" };
+    let prefix = if !dtype.is_signed() || dtype.is_raw() {
+      "u"
+    } else {
+      "i"
+    };
     let bits = dtype.get_bits();
     return if (8..=64).contains(&bits) {
       let bits = bits.next_power_of_two();
