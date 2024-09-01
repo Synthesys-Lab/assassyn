@@ -38,23 +38,25 @@ class Adder(Downstream):
         super().__init__()
 
     @downstream.combinational
-    def build(self, a: Value, b: Value):
+    def build(self, a: Value, b: Value, id: str):
         a = a.optional(UInt(32)(1))
         b = b.optional(UInt(32)(1))
         c = a + b
-        log("downstream: {} + {} = {}", a, b, c)
+        log(f"downstream.{id}: {{}} + {{}} = {{}}", a, b, c)
         return c
 
 def check_raw(raw):
     cnt = 0
     for i in raw.split('\n'):
-        if 'downstream:' in i:
+        if 'downstream' in i:
             line_toks = i.split()
             c = line_toks[-1]
             a = line_toks[-3]
             b = line_toks[-5]
             assert int(a) + int(b) == int(c)
             cnt += 1
+            if 'downstream.e' in i:
+                assert int(a) == int(b)
     assert cnt == 297, f'cnt: {cnt} != 297'
 
 def test_toposort():
@@ -77,10 +79,9 @@ def test_toposort():
 
         driver.build(hs1, hs2)
         
-        c=adder1.build(a, b)
-        d=adder2.build(a, b)
-        
-        adder3.build(c, d)
+        c = adder1.build(a, b, "c")
+        d = adder2.build(a, b, "d")
+        adder3.build(c, d, "e")
 
     print(sys)
 
