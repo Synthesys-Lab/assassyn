@@ -614,7 +614,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   }
   fd.write_all("];\n".as_bytes())?;
 
-  // TODO(@were): A downstream module can be recursively dependent to another downstream module.
   // A topological order among these downstream modules is needed.
   let downstreams = topo_sort(sys);
   fd.write_all("let downstreams : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
