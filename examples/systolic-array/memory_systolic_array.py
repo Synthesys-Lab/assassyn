@@ -102,95 +102,111 @@ class ColPusher(Module):
             bound.async_called()
         return bound
 
-class Testbench(Module):
+# class Testbench(Module):
     
-    @module.constructor
-    def __init__(self):
-        super().__init__()
+#     @module.constructor
+#     def __init__(self):
+#         super().__init__()
 
-    @module.combinational
-    def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
-                    row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
-        with Cycle(0):
-            # 1 0
-            # 0 P P P  P
-            #   P P P  P
-            #   P P P  P
-            #   P P P  P        
-            col1.async_called(data = Int(32)(0))
-            row1.async_called(data = Int(32)(0))
+#     @module.combinational
+#     def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
+#                     row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
+#         with Cycle(0):
+#             # 1 0
+#             # 0 P P P  P
+#             #   P P P  P
+#             #   P P P  P
+#             #   P P P  P        
+#             col1.async_called(data = Int(32)(0))
+#             row1.async_called(data = Int(32)(0))
 
-        with Cycle(1):
-            # 2 1 4
-            # 1 P P P  P
-            # 4 P P P  P
-            #   P P P  P
-            #   P P P  P            
-            row1.async_called(data = Int(32)(1))
-            col1.async_called(data = Int(32)(1))
-            row2.async_called(data = Int(32)(4))
-            col2.async_called(data = Int(32)(4))
+#         with Cycle(1):
+#             # 2 1 4
+#             # 1 P P P  P
+#             # 4 P P P  P
+#             #   P P P  P
+#             #   P P P  P            
+#             row1.async_called(data = Int(32)(1))
+#             col1.async_called(data = Int(32)(1))
+#             row2.async_called(data = Int(32)(4))
+#             col2.async_called(data = Int(32)(4))
 
-        with Cycle(2):
-            # 3 2 5 8
-            # 2 P P P  P
-            # 5 P P P  P
-            # 8 P P P  P
-            #   P P P  P
-            row1.async_called(data = Int(32)(2))
-            col1.async_called(data = Int(32)(2))
-            row2.async_called(data = Int(32)(5))
-            col2.async_called(data = Int(32)(5))
-            row3.async_called(data = Int(32)(8))
-            col3.async_called(data = Int(32)(8))
+#         with Cycle(2):
+#             # 3 2 5 8
+#             # 2 P P P  P
+#             # 5 P P P  P
+#             # 8 P P P  P
+#             #   P P P  P
+#             row1.async_called(data = Int(32)(2))
+#             col1.async_called(data = Int(32)(2))
+#             row2.async_called(data = Int(32)(5))
+#             col2.async_called(data = Int(32)(5))
+#             row3.async_called(data = Int(32)(8))
+#             col3.async_called(data = Int(32)(8))
 
-        with Cycle(3):
-            # 4  3 6 9  12
-            # 3  P P P  P
-            # 6  P P P  P
-            # 9  P P P  P
-            # 12 P P P  P
-            row1.async_called(data = Int(32)(3))
-            col1.async_called(data = Int(32)(3))
-            row2.async_called(data = Int(32)(6))
-            col2.async_called(data = Int(32)(6))
-            row3.async_called(data = Int(32)(9))
-            col3.async_called(data = Int(32)(9))
-            row4.async_called(data = Int(32)(12))
-            col4.async_called(data = Int(32)(12))
+#         with Cycle(3):
+#             # 4  3 6 9  12
+#             # 3  P P P  P
+#             # 6  P P P  P
+#             # 9  P P P  P
+#             # 12 P P P  P
+#             row1.async_called(data = Int(32)(3))
+#             col1.async_called(data = Int(32)(3))
+#             row2.async_called(data = Int(32)(6))
+#             col2.async_called(data = Int(32)(6))
+#             row3.async_called(data = Int(32)(9))
+#             col3.async_called(data = Int(32)(9))
+#             row4.async_called(data = Int(32)(12))
+#             col4.async_called(data = Int(32)(12))
         
-        with Cycle(4):
-            # 5    7 10 13
-            #    P P P  P
-            # 7  P P P  P
-            # 10 P P P  P
-            # 13 P P P  P            
-            row2.async_called(data = Int(32)(7))
-            col2.async_called(data = Int(32)(7))
-            row3.async_called(data = Int(32)(10))
-            col3.async_called(data = Int(32)(10))
-            row4.async_called(data = Int(32)(13))
-            col4.async_called(data = Int(32)(13))
+#         with Cycle(4):
+#             # 5    7 10 13
+#             #    P P P  P
+#             # 7  P P P  P
+#             # 10 P P P  P
+#             # 13 P P P  P            
+#             row2.async_called(data = Int(32)(7))
+#             col2.async_called(data = Int(32)(7))
+#             row3.async_called(data = Int(32)(10))
+#             col3.async_called(data = Int(32)(10))
+#             row4.async_called(data = Int(32)(13))
+#             col4.async_called(data = Int(32)(13))
 
-        with Cycle(5):
-            #  6    11 14
-            #    P P P  P
-            #    P P P  P
-            # 11 P P P  P
-            # 14 P P P  P
-            row3.async_called(data = Int(32)(11))
-            col3.async_called(data = Int(32)(11))
-            row4.async_called(data = Int(32)(14))
-            col4.async_called(data = Int(32)(14))
+#         with Cycle(5):
+#             #  6    11 14
+#             #    P P P  P
+#             #    P P P  P
+#             # 11 P P P  P
+#             # 14 P P P  P
+#             row3.async_called(data = Int(32)(11))
+#             col3.async_called(data = Int(32)(11))
+#             row4.async_called(data = Int(32)(14))
+#             col4.async_called(data = Int(32)(14))
             
-        with Cycle(6):
-            #   7      15
-            #    P P P  P
-            #    P P P  P
-            #    P P P  P
-            # 15 P P P  P
-            row4.async_called(data = Int(32)(15))
-            col4.async_called(data = Int(32)(15))
+#         with Cycle(6):
+#             #   7      15
+#             #    P P P  P
+#             #    P P P  P
+#             #    P P P  P
+#             # 15 P P P  P
+#             row4.async_called(data = Int(32)(15))
+#             col4.async_called(data = Int(32)(15))
+
+# class Testbench(Module):
+#     @module.constructor
+#     def __init__(self):
+#         super().__init__()
+
+#     @module.combinational
+#     def build(self):
+#         with Cycle(0):
+
+#         with Cycle(1):
+
+#         with Cycle(2):
+
+#         with Cycle(3):
+
 
 def check_raw_1(raw):
     a = [[0 for _ in range(4)] for _ in range(4)]
@@ -323,21 +339,23 @@ class Driver(Module):
                 wdata = v.bitcast(Bits(memory.width)))
         cnt[0] = plused
         
-def impl(sys_name, width, init_file, resource_base):
+def impl(sys_name, width, init_file_row, init_file_col, resource_base):
     sys = SysBuilder(sys_name)
     with sys:
         # Build the SRAM module
-        memory_R = SRAM(init_file, width)
+        memory_R = SRAM(init_file_row, width)
         memory_R.wait_until()
         memory_R.build(width)
-        memory_C = SRAM(init_file, width)
+        memory_C = SRAM(init_file_col, width)
         memory_C.wait_until()
         memory_C.build(width)
         # Build the driver
         driver = Driver()
         driver.build(memory_R)
         driver.build(memory_C)
-
+        # Build the testbench
+        # testbench = Testbench()
+        # testbench.build()
     config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base)
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
@@ -346,6 +364,6 @@ def impl(sys_name, width, init_file, resource_base):
     # utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
-    impl('memory', 128, 'matrix.hex', f'{utils.repo_path()}/examples/systolic-array')
+    impl('memory', 128, 'matrix_row.hex', 'matrix_col.hex', f'{utils.repo_path()}/examples/systolic-array')
     # systolic_array()
 
