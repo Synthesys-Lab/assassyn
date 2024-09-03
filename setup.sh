@@ -9,10 +9,14 @@ cd `dirname $0`
 # Use the repository path to set the PYTHONPATH and ASSASSYN_HOME
 REPO_PATH=`git rev-parse --show-toplevel`
 
-SCCACHE=`which sccache`
+which sccache > /dev/null 2>&1
 
-echo "Setting up SCCACHE to $SCCACHE"
-export RUSTC_WRAPPER=$SCCACHE
+if [ $? -eq 0 ]; then
+  echo "Setting up SCCACHE to $SCCACHE"
+  export RUSTC_WRAPPER=`which sccache`
+else
+  echo "No sccache found! Skip!"
+fi
 
 echo "Adding $REPO_PATH/python to PYTHONPATH"
 export PYTHONPATH=$REPO_PATH/python:$PYTHONPATH

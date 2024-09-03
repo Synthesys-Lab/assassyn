@@ -5,10 +5,17 @@
 RESTORE_DIR=`pwd`
 
 # Go to the script directory
-cd `dirname $0`/../
+
+REPO_DIR=`dirname $0`/../
+
+cd $REPO_DIR
 
 if [ ! -d $REPO_DIR/verilator ]; then
   git clone https://github.com/verilator/verilator/
+else
+  cd $REPO_DIR/verilator
+  git pull
+  cd ..
 fi
 
 # Build Verilator
@@ -19,7 +26,7 @@ git checkout ca4858eb7f6142a0da367e0c299762d0922f1a6c
 if [ `uname` = "Darwin" ]; then
   echo "Patching Verilator for Mac OS"
   # Apply the patch for Mac OS
-  git apply ../utils/5222-gnu-20.patch
+  git apply ../scripts/5222-gnu-20.patch
 fi
 autoconf
 ./configure
