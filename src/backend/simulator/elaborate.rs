@@ -11,6 +11,7 @@ use proc_macro2::Span;
 use quote::quote;
 
 use crate::{
+  analysis::topo_sort,
   backend::common::{create_and_clean_dir, upstreams, Config},
   builder::system::{ModuleKind, SysBuilder},
   ir::{expr::subcode, node::*, visitor::Visitor, *},
@@ -313,7 +314,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         let r = slice.r();
         format!(
           "{{
-              let a = ValueCastTo::<BigUint>::cast(&({} as u64));
+              let a = ValueCastTo::<BigUint>::cast(&{});
               let mask = BigUint::parse_bytes(\"{}\".as_bytes(), 2).unwrap();
               let res = (a >> {}) & mask;
               ValueCastTo::<{}>::cast(&res)
@@ -372,18 +373,12 @@ impl Visitor<String> for ElaborateModule<'_> {
       }
       Opcode::Cast { .. } => {
         let cast = expr.as_sub::<instructions::Cast>().unwrap();
-        let src_dtype = cast.src_type();
         let dest_dtype = cast.dest_type();
         let a = dump_ref!(self.module_ctx, cast.get().sys, &cast.x());
         match cast.get_opcode() {
           Cast::ZExt | Cast::BitCast => {
             // perform zero extension
-            format!(
-              "ValueCastTo::<{}>::cast(&ValueCastTo::<{}>::cast(&{}))",
-              dtype_to_rust_type(&dest_dtype),
-              dtype_to_rust_type(&src_dtype).replace('i', "u"),
-              a,
-            )
+            format!("ValueCastTo::<{}>::cast(&{})", dtype_to_rust_type(&dest_dtype), a,)
           }
           Cast::SExt => {
             format!("ValueCastTo::<{}>::cast(&{})", dtype_to_rust_type(&dest_dtype), a)
@@ -576,7 +571,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("}".as_bytes())?;
 
   let mut simulators = vec![];
-  let mut downstreams = vec![];
   for module in sys.module_iter(ModuleKind::All) {
     let module_name = namify(module.get_name());
     fd.write_all(format!("fn simulate_{}(&mut self) {{", module_name).as_bytes())?;
@@ -595,8 +589,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     fd.write_all(format!("super::modules::{}(self);", module_name).as_bytes())?;
     if !module.is_downstream() {
       simulators.push(module_name.clone());
-    } else {
-      downstreams.push(module_name.clone());
     }
     fd.write_all(format!("self.{}_triggered = true;\n", module_name).as_bytes())?;
     fd.write_all("} // close event condition\n".as_bytes())?;
@@ -622,11 +614,12 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   }
   fd.write_all("];\n".as_bytes())?;
 
-  // TODO(@were): A downstream module can be recursively dependent to another downstream module.
   // A topological order among these downstream modules is needed.
+  let downstreams = topo_sort(sys);
   fd.write_all("let downstreams : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
   for downstream in downstreams {
-    fd.write_all(format!("Simulator::simulate_{},", downstream).as_bytes())?;
+    let module_ref = downstream.as_ref::<Module>(sys).unwrap();
+    fd.write_all(format!("Simulator::simulate_{},", module_ref.get_name()).as_bytes())?;
   }
   fd.write_all("];\n".as_bytes())?;
 

@@ -30,8 +30,12 @@ pub fn camelize(name: &str) -> String {
 }
 
 pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
-  if dtype.is_int() {
-    let prefix = if dtype.is_signed() { "i" } else { "u" };
+  if dtype.is_int() || dtype.is_raw() {
+    let prefix = if !dtype.is_signed() || dtype.is_raw() {
+      "u"
+    } else {
+      "i"
+    };
     let bits = dtype.get_bits();
     return if (8..=64).contains(&bits) {
       let bits = bits.next_power_of_two();
@@ -41,23 +45,13 @@ pub(super) fn dtype_to_rust_type(dtype: &DataType) -> String {
     } else if bits < 8 {
       format!("{}8", prefix)
     } else if bits > 64 {
-      if dtype.is_signed() {
-        "BigInt".to_string()
-      } else {
+      if !dtype.is_signed() || dtype.is_raw() {
         "BigUint".to_string()
+      } else {
+        "BigInt".to_string()
       }
     } else {
       panic!("Not implemented yet, {:?}", dtype)
-    };
-  }
-  if dtype.is_raw() {
-    let bits = dtype.get_bits();
-    return if bits == 1 {
-      "bool".to_string()
-    } else if bits < 8 {
-      "u8".to_string()
-    } else {
-      format!("u{}", dtype.get_bits().next_power_of_two())
     };
   }
   match dtype {
