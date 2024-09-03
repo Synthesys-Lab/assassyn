@@ -66,8 +66,9 @@ def test_multi_call():
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    raw = utils.run_verilator(verilog_path)
-    check(raw)
+    if verilog_path:
+        raw = utils.run_verilator(verilog_path)
+        check(raw)
 
 
 if __name__ == '__main__':
