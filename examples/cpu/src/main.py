@@ -95,11 +95,13 @@ class Execution(Module):
         memory.async_called(we = Int(1)(0), wdata = a, addr = request_addr)
         wb = writeback.bind(opcode = self.opcode, result = result, rd = self.rd_reg)
 
+        value_ow = None
+
         with Condition(self.rd_reg != Bits(5)(0)):
             log("set x{} as on-write", self.rd_reg)
-            return wb, Bits(32)(1) << self.rd_reg
+            value_ow = Bits(32)(1) << self.rd_reg
 
-        return wb, None
+        return wb, value_ow
 
     @module.wait_until
     def wait_until(
@@ -160,10 +162,14 @@ class WriteBack(Module):
         # {is_memory, is_result}
         data = cond.select1hot(self.result, self.mdata)
 
+        value_ow = None
+
         with Condition((self.rd != Bits(5)(0))):
             log("opcode: {:b}, writeback: x{} = {:x}", self.opcode, self.rd, data)
             reg_file[self.rd] = data
-            return Bits(32)(1) << self.rd
+            value_ow = Bits(32)(1) << self.rd
+
+        return value_ow
 
 class Decoder(Memory):
     
@@ -307,11 +313,11 @@ class OnwriteDS(Downstream):
         super().__init__()
 
     @downstream.combinational
-    def build(self, reg_onwrite: Array, decoder_rd: Value, writeback_rd: Value):
-        id_rd = decoder_rd.optional(Bits(32)(0))
+    def build(self, reg_onwrite: Array, exec_rd: Value, writeback_rd: Value):
+        ex_rd = exec_rd.optional(Bits(32)(0))
         wb_rd = writeback_rd.optional(Bits(32)(0))
 
-        reg_onwrite[0] = reg_onwrite[0] ^ id_rd ^ wb
+        reg_onwrite[0] = reg_onwrite[0] ^ wb_rd ^ ex_rd
 
 class Driver(Module):
     
@@ -346,15 +352,9 @@ def main():
         mem_bypass_data = RegArray(bits32, 1)
 
         writeback = WriteBack()
-        writeback.build(reg_file = reg_file)
+        wb_rd = writeback.build(reg_file = reg_file)
 
         memory_access = MemoryAccess('0to100.data')
-        memory_access.wait_until()
-        memory_access.build(
-            writeback = writeback, 
-            mem_bypass_reg = mem_bypass_reg, 
-            mem_bypass_data=mem_bypass_data
-        )
 
         exec = Execution()
         exec.wait_until(
@@ -362,7 +362,7 @@ def main():
             mem_bypass_reg = mem_bypass_reg, 
             reg_onwrite = reg_onwrite
         )
-        wb = exec.build(
+        wb, exec_rd = exec.build(
             pc = pc,
             on_branch=on_branch,
             exec_bypass_reg = exec_bypass_reg,
@@ -374,9 +374,23 @@ def main():
             writeback = writeback
         )
 
+        memory_access.wait_until()
+        memory_access.build(
+            writeback = wb, 
+            mem_bypass_reg = mem_bypass_reg, 
+            mem_bypass_data=mem_bypass_data
+        )
+
         decoder = Decoder('0to100.exe')
         decoder.wait_until()
         decoder.build(pc = pc, on_branch = on_branch, exec = exec)
+
+        onwrite_downstream = OnwriteDS()
+        onwrite_downstream.build(
+            reg_onwrite=reg_onwrite,
+            exec_rd=exec_rd,
+            writeback_rd=wb_rd,
+        )
     
         fetcher = Fetcher()
         fetcher.build(decoder, pc, on_branch)
