@@ -127,7 +127,7 @@ class Execution(Module):
 
         valid = a_valid & b_valid & rd_valid
         with Condition(~valid):
-            log("operand not ready, stall execution, x{}: {}, x{}: {}, x{}: {}", \
+            log("operand not ready, stall execution, rs1-x{}: {}, rs2-x{}: {}, rd-x{}: {}", \
                 a_reg, a_valid, \
                 b_reg, b_valid, \
                 rd_reg, rd_valid)
@@ -317,6 +317,8 @@ class OnwriteDS(Downstream):
         ex_rd = exec_rd.optional(Bits(5)(0))
         wb_rd = writeback_rd.optional(Bits(5)(0))
 
+        log("ownning: x{}, releasing: x{}", ex_rd, wb_rd)
+
         reg_onwrite[0] = reg_onwrite[0] ^ \
                         (Bits(32)(1) << wb_rd) ^ \
                         (Bits(32)(1) << ex_rd)
@@ -348,7 +350,7 @@ def check(raw):
     data_index = 0
 
     for line in raw.split('\n'):
-        if 'opcode: 110011, writeback: x10 =' in line:
+        if 'opcode: 110011, writeback: x10 =' in line or 'opcode: 0110011, writeback: x10 =' in line:
             value = int(line.split('=')[-1].strip(), 16)
             if value != accumulator:
                 accumulator = value

@@ -41,6 +41,7 @@ struct VerilogDumper<'a, 'b> {
   triggers: HashMap<String, Gather>,    // module_name -> [pred]
   external_usage: ExternalUsage,
   current_module: String,
+  before_wait_until: bool,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
@@ -54,6 +55,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       triggers: HashMap::new(),
       current_module: String::new(),
       external_usage,
+      before_wait_until: false,
     }
   }
 
@@ -700,6 +702,7 @@ module {} (
     let mut wait_until: String = "".to_string();
 
     let skip = if let Some(wu_intrin) = module.get_body().get_wait_until() {
+      self.before_wait_until = true;
       let mut skip = 0;
       let body = module.get_body();
       let body_iter = body.body_iter();
@@ -712,11 +715,12 @@ module {} (
       }
       let bi = wu_intrin.as_expr::<BlockIntrinsic>(self.sys).unwrap();
       let value = bi.value();
-      wait_until = format!(" && ({} != '0)", namify(&value.to_string(self.sys)));
+      wait_until = format!(" && ({})", namify(&value.to_string(self.sys)));
       skip
     } else {
       0
     };
+    self.before_wait_until = false;
 
     res.push_str("  logic executed;\n");
 
@@ -806,7 +810,7 @@ module {} (
         .push_back(if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
           dump_ref!(self.sys, &cond)
         } else {
-          format!("({} != '0)", dump_ref!(self.sys, &cond))
+          format!("(|{})", dump_ref!(self.sys, &cond))
         });
       1
     } else if let Some(cycle) = block.get_cycle() {
@@ -842,7 +846,7 @@ module {} (
         let id = namify(&expr.upcast().to_string(self.sys));
         let expose = if self.external_usage.is_externally_used(&expr) {
           format!(
-            "  assign expose_{id} = {id};\n  assign expose_{id}_valid = {};\n",
+            "  assign expose_{id} = {id};\n  assign expose_{id}_valid = executed && {};\n",
             self.get_pred().unwrap_or("1".to_string())
           )
         } else {
@@ -953,14 +957,21 @@ module {} (
         format_str = format_str.replace('"', "");
 
         let mut res = String::new();
+
         res.push_str(&format!(
-          "  always_ff @(posedge clk iff executed{}) ",
+          "  always_ff @(posedge clk iff {}{}) ",
+          if self.before_wait_until {
+            "1'b1"
+          } else {
+            "executed"
+          },
           self
             .get_pred()
             .map(|p| format!(" && {}", p))
             .unwrap_or("".to_string())
         ));
-        res.push_str("$display(\"%t\\t");
+
+        res.push_str(&format!("$display(\"%t\\t[{}]\\t\\t", self.current_module));
         res.push_str(&format_str);
         res.push_str("\", $time - 200, ");
         for elem in expr.operand_iter().skip(1) {
