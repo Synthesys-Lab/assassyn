@@ -583,7 +583,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         .map(|x| format!("self.{}_triggered", namify(x.as_ref::<Module>(sys).unwrap().get_name())))
         .collect::<Vec<_>>();
       fd.write_all("if ".as_bytes())?;
-      fd.write_all(conds.join(" && ").as_bytes())?;
+      fd.write_all(conds.join(" || ").as_bytes())?;
       fd.write_all(" {".as_bytes())?;
     }
     fd.write_all(format!("super::modules::{}(self);", module_name).as_bytes())?;
