@@ -331,6 +331,37 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
+def check(raw):
+    data_path = f'{utils.repo_path()}/examples/cpu/resource/0to100.data'
+    with open(data_path, 'r') as f:
+        data = []
+        for line in f:
+            line = line.split('//')[0].strip()
+            if line and not line.startswith('@'):
+                try:
+                    data.append(int(line, 16))
+                except ValueError:
+                    print(f"Warning: Skipping invalid line: {line}")
+
+    accumulator = 0
+    ideal_accumulator = 0
+    data_index = 0
+
+    for line in raw.split('\n'):
+        if 'opcode: 110011, writeback: x10 =' in line:
+            value = int(line.split('=')[-1].strip(), 16)
+            if value != accumulator:
+                accumulator = value
+                if data_index < len(data):
+                    ideal_accumulator += data[data_index]
+                    assert accumulator == ideal_accumulator,\
+                    f"Mismatch at step {data_index + 1}:\
+                    CPU result {accumulator} != Ideal result {ideal_accumulator}"
+                    data_index += 1
+
+    print(f"Final CPU sum: {accumulator} (0x{accumulator:x})")
+    print(f"Final ideal sum: {ideal_accumulator} (0x{ideal_accumulator:x})")
+    print(f"Final difference: {accumulator - ideal_accumulator}")
 
 def main():
     sys = SysBuilder('cpu')
@@ -412,9 +443,10 @@ def main():
     simulator_path, verilog_path = elaborate(sys, **conf)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
+    check(raw)
 
     raw = utils.run_verilator(verilog_path)
+    check(raw)
 
 if __name__ == '__main__':
     main()
