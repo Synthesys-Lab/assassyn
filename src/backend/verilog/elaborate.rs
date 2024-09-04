@@ -435,8 +435,6 @@ module top (
       }
     }
 
-    dbg!(&mem_init_map);
-
     // array storage element definitions
     for array in self.sys.array_iter() {
       res.push_str(&self.dump_array(&array, mem_init_map.get(&array.upcast())));

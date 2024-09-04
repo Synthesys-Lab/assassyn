@@ -117,9 +117,6 @@ impl Visitor<()> for ExternalUsage {
           .get_block()
           .get_module();
         if ext != m {
-          eprintln!("{}", expr);
-          eprintln!("usedby: {}", x.as_ref::<Operand>(expr.sys).unwrap().get_expr());
-          eprintln!("module: {:?} != {:?}", ext, m);
           Some(ext)
         } else {
           None
