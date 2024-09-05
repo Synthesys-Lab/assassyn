@@ -408,9 +408,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             open_scope = true;
             format!("if {} {{", value)
           }
-          subcode::BlockIntrinsic::Finish => {
-            format!("std::process::exit(0);")
-          }
+          subcode::BlockIntrinsic::Finish => "std::process::exit(0);".to_string(),
         }
       }
     };

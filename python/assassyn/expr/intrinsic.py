@@ -30,7 +30,7 @@ class Intrinsic(Expr):
         rhs = f'{side_effect}intrinsic.{mn}({args})'
         if valued:
             return f'{self.as_operand()} = {rhs}'
-        return rhs 
+        return rhs
 
     def __enter__(self):
         return self
