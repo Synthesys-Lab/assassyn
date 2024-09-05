@@ -388,7 +388,9 @@ impl Visitor<String> for ElaborateModule<'_> {
       Opcode::Bind => "()".into(),
       Opcode::BlockIntrinsic { intrinsic } => {
         let bi = expr.as_sub::<instructions::BlockIntrinsic>().unwrap();
-        let value = dump_ref!(self.module_ctx, self.sys, &bi.value());
+        let value = bi
+          .value()
+          .map_or("".into(), |x| dump_ref!(self.module_ctx, self.sys, &x));
         match intrinsic {
           subcode::BlockIntrinsic::Value => value,
           subcode::BlockIntrinsic::Cycled => {
@@ -405,6 +407,9 @@ impl Visitor<String> for ElaborateModule<'_> {
           subcode::BlockIntrinsic::Condition => {
             open_scope = true;
             format!("if {} {{", value)
+          }
+          subcode::BlockIntrinsic::Finish => {
+            format!("std::process::exit(0);")
           }
         }
       }

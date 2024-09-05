@@ -64,6 +64,7 @@ CG_OPCODE = {
     expr.Log.LOG: 'log',
 
     expr.intrinsic.Intrinsic.WAIT_UNTIL: 'wait_until',
+    expr.intrinsic.Intrinsic.FINISH: 'finish',
 }
 
 CG_MIDFIX = {
@@ -354,6 +355,8 @@ class CodeGen(visitor.Visitor):
             if node.opcode == expr.Intrinsic.WAIT_UNTIL:
                 cond = self.generate_rval(node.args[0])
                 res = f'sys.{ib_method}({cond});'
+            elif node.opcode == expr.Intrinsic.FINISH:
+                res = f'sys.{ib_method}();'
             else:
                 length = len(repr(node)) - 1
                 res = f'  // ^{"~" * length}: Support the instruction above'

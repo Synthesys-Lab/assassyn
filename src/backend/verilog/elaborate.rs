@@ -739,7 +739,7 @@ module {} (
       }
       let bi = wu_intrin.as_expr::<BlockIntrinsic>(self.sys).unwrap();
       let value = bi.value();
-      wait_until = format!(" && ({})", namify(&value.to_string(self.sys)));
+      wait_until = format!(" && ({})", namify(&value?.to_string(self.sys)));
       skip
     } else {
       0
@@ -1181,7 +1181,13 @@ module {} (
           .join(" | ")
       }
 
-      _ => panic!("Unknown OP: {:?}", expr.get_opcode()),
+      Opcode::BlockIntrinsic { intrinsic } => match intrinsic {
+        subcode::BlockIntrinsic::Finish => {
+          let pred = self.get_pred().unwrap_or("1".to_string());
+          format!(" always_ff @(posedge clk iff executed && {}) $finish();\n", pred)
+        }
+        _ => panic!("Unknown block intrinsic: {:?}", intrinsic),
+      },
     };
 
     let mut res = if let Some((id, ty)) = decl {

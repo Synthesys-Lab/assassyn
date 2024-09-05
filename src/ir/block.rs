@@ -75,19 +75,25 @@ impl BlockRef<'_> {
   pub fn get_value(&self) -> Option<BaseNode> {
     self
       .get_block_intrinsic(self.get_num_exprs() - 1, subcode::BlockIntrinsic::Value)
-      .map(|x| x.value())
+      .map(|x| x.value().unwrap())
   }
 
   pub fn get_cycle(&self) -> Option<usize> {
     self
       .get_block_intrinsic(0, subcode::BlockIntrinsic::Cycled)
-      .map(|x| x.value().as_ref::<IntImm>(self.sys).unwrap().get_value() as usize)
+      .map(|x| {
+        x.value()
+          .unwrap()
+          .as_ref::<IntImm>(self.sys)
+          .unwrap()
+          .get_value() as usize
+      })
   }
 
   pub fn get_condition(&self) -> Option<BaseNode> {
     self
       .get_block_intrinsic(0, subcode::BlockIntrinsic::Condition)
-      .map(|x| x.value())
+      .map(|x| x.value().unwrap())
   }
 
   pub fn get_wait_until(&self) -> Option<BaseNode> {

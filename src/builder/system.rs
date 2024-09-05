@@ -784,6 +784,12 @@ impl SysBuilder {
     self.create_cast_impl(src, dest_ty, subcode::Cast::ZExt)
   }
 
+  /// Create a halt operation to terminate the program.
+  pub fn create_finish(&mut self) -> BaseNode {
+    let intrinsic = subcode::BlockIntrinsic::Finish;
+    self.create_expr(DataType::void(), Opcode::BlockIntrinsic { intrinsic }, vec![], true)
+  }
+
   pub(crate) fn dispose(&mut self, node: BaseNode) {
     self.slab.remove(node.get_key());
   }
