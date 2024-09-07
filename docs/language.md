@@ -42,18 +42,20 @@ Hardware design is unique to software programming in many ways. Here we characte
 differences:
 
 1. Excessive concurrency: Transistors that build different hardware modules can be concurrently
-   busy, which is also the source of high performance. However, this also makes the hardware design
-   hard to debug. Though we do have parallel programming in software, they are managed in a relatively
-   heavy-weighted way, like threads, processes, and tasks. Therefore, a clear way that manages the
-   concurrency in a light-weighted way is highly desirable.
+busy, which is also the source of high performance. However, this also makes the hardware design
+hard to debug. Though we do have parallel programming in software, they are managed in a relatively
+heavy-weighted way, like threads, processes, and tasks. Therefore, a clear way that manages the
+concurrency in a light-weighted way is highly desirable.
+
 2. Data write: In software programming, a variable write is visible to users immediately. However,
-   in hardware design, a variable can only be written once, and will be only visible in the next cycle.
-   In this language, the "write-once" rule will be double-enforced by both the compiler[^2] and the
-   generated simulator runtime.
+in hardware design, a variable can only be written once, and will be only visible in the next cycle.
+In this language, the "write-once" rule will be double-enforced by both the compiler[^2] and the
+generated simulator runtime.
+
 3. Resource Constraint: In software programming, different functionalities can share the same
-   computing resources through the ISA, while hardware design is to instantiate these
-   computing resources. In this language, the time-multiplexed resource sharing,
-   and the dedicated allocation should be well abstracted.
+computing resources through the ISA, while hardware design is to instantiate these
+computing resources. In this language, the time-multiplexed resource sharing,
+and the dedicated allocation should be well abstracted.
 
 ## Language & System Components
 
@@ -72,8 +74,8 @@ A system may have a `driver` module (see more details in the next paragraph to e
 which is invoked every cycle to drive the whole system. This "driver" serves like a `main`
 function, which is both the program entrance and drives the system execution.
 
-To build a system, `SysBuilder` should be used:
 
+To build a system, `SysBuilder` should be used:
 ````Python
 from assassyn import *
 from assassyn.frontend import *
@@ -164,41 +166,35 @@ read/write to arrays, and asynchronous module invocations.
 
 1. Types: Currently, we support `{Int/UInt/Bits}(bit)` and `Float` types.
 2. Values start with ports, arrays, and constants, and can be built by operations among them.
-   * Ports are the inputs of a module, which are typically scalars.
-   * Arrays are first delared by `RegArray(type, size)`, where `size` should be a constant in the IR.
-   * Constants can be declared by `type(value)`, e.g. `Int(32)(1)`.
+    * Ports are the inputs of a module, which are typically scalars.
+    * Arrays are first delared by `RegArray(type, size)`, where `size` should be a constant in the IR.
+    * Constants can be declared by `type(value)`, e.g. `Int(32)(1)`.
 3. Expressions
-   * Arithmetic operations: `+`, `-`, `*`, `/`, `%`, `**`, `&`, `|`, `^`, `~`, `<<`, `>>`.
-   * Comparison operations: `==`, `!=`, `>`, `>=`, `<`, `<=`.
-   * Port FIFO methods: `Port.{pop/push/peek/valid}`.
-   * Addressing: `array[index]` for both left and right value.
-   * Slicing: `array[start:end]` for only right value. Unlike Python, the slicing is inclusive on both.
-   * Concatenation: `a.concat(b)`, where `a` is the msb, and `b` is the lsb.
-   * Module invocation: `module.async_called(**kwargs)`. Since the ports are declared in the constructor, which are unordered, therefore, we use the named arguments to feed the parameters.
-   * Binds: `module.bind(**kwargs)`. This is like function binding in functional programming, where fixes several parameters fed to the module, and returns a handle to this module without invoking it.
+    * Arithmetic operations: `+`, `-`, `*`, `/`, `%`, `**`, `&`, `|`, `^`, `~`, `<<`, `>>`.
+    * Comparison operations: `==`, `!=`, `>`, `>=`, `<`, `<=`.
+    * Port FIFO methods: `Port.{pop/push/peek/valid}`.
+    * Addressing: `array[index]` for both left and right value.
+    * Slicing: `array[start:end]` for only right value. Unlike Python, the slicing is inclusive on both.
+    * Concatenation: `a.concat(b)`, where `a` is the msb, and `b` is the lsb.
+    * Module invocation: `module.async_called(**kwargs)`. Since the ports are declared in the constructor, which are unordered, therefore, we use the named arguments to feed the parameters.
+    * Binds: `module.bind(**kwargs)`. This is like function binding in functional programming, where fixes several parameters fed to the module, and returns a handle to this module without invoking it.
 4. Scopes and Conditional Execution:
-   * We support if-statement (without else) in our combinational logic.
-
-````Python
+    * We support if-statement (without else) in our combinational logic.
+```` Python
 with Conditional(cond):
     # do something
 ````
-
-NOTE: with Condition(cond) is a compilation-time IR builder API.  If you use `if` statement, it is a runtime API. Refer to the usage in `test_async_call.py` and `test_eager_bind.py`  to differentiate these two.
-
+    * NOTE: With Condition(cond) is a compilation-time IR builder API.  If you use `if` statement, it is a runtime API. Refer to the usage in `test_async_call.py` and `test_eager_bind.py`  to differentiate these two.
     * Besides, we also support cycle-speicific operation to write testbenches.
-
-````Python
+```` Python
 with Cycle(1):
     # do something
 with Cycle(2):
     # do something
 ````
-
 5. Array Operations: This is a supplimentary description to expression addressing. All the array reads are immediate, while all the array writes are chronological --- the values are only visible next cycle. No two array writes within the same cycle are allowed. The generated simulator will enforce this.
 
 [^1]: The name "Assasyn" stands for "**As**ynchronous **S**emantics for **A**rchitectural
-       **S**imulation and **Syn**thesis".
-    
+**S**imulation and **Syn**thesis".
 [^2]: I have the ambition to build a formal verification to statically enforce this rule, but for
-       now, we only have a runtime check.
+now, we only have a runtime check.
