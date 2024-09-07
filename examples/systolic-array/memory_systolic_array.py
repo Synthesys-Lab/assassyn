@@ -192,22 +192,6 @@ class ColPusher(Module):
 #             row4.async_called(data = Int(32)(15))
 #             col4.async_called(data = Int(32)(15))
 
-# class Testbench(Module):
-#     @module.constructor
-#     def __init__(self):
-#         super().__init__()
-
-#     @module.combinational
-#     def build(self):
-#         with Cycle(0):
-
-#         with Cycle(1):
-
-#         with Cycle(2):
-
-#         with Cycle(3):
-
-
 def check_raw_1(raw):
     a = [[0 for _ in range(4)] for _ in range(4)]
     b = [[0 for _ in range(4)] for _ in range(4)]
@@ -318,6 +302,7 @@ def systolic_array():
     # raw = utils.run_verilator(verilator_path)
     # check_raw(raw)
 
+
 class Driver(Module):
 
     @module.constructor
@@ -325,19 +310,30 @@ class Driver(Module):
         super().__init__()
 
     @module.combinational
-    def build(self, memory: SRAM):
-        cnt = RegArray(Int(memory.width), 1)
+    def build(self, memory_R: SRAM, memory_C: SRAM):
+        cnt = RegArray(Int(memory_R.width), 1)
         v = cnt[0]
-        we = v[0:0]
-        plused = v + Int(memory.width)(1)
-        waddr = plused[0:9]
-        raddr = v[0:9]
-        addr = we.select(waddr, raddr).bitcast(Int(10))
-        memory.async_called(
-                we = we.bitcast(Int(1)), 
-                addr = addr, 
-                wdata = v.bitcast(Bits(memory.width)))
-        cnt[0] = plused
+        we = Int(1)(0)
+        raddr = v[0:9]  
+        addr = raddr.bitcast(Int(10)) 
+        cond = cnt[0] < Int(128)(4)
+        with Condition(cond):
+            memory_R.async_called(
+                we = we, 
+                addr = addr,
+                # wdata = v.bitcast(Bits(memory.width))
+                )  
+            log('Read addr {} from memory_R', addr)
+
+        with Condition(cond):
+            memory_C.async_called(
+                we = we, 
+                addr = addr,
+                # wdata = v.bitcast(Bits(memory.width))
+                )  
+            log('Read addr {} from memory_C', addr)
+
+        cnt[0] = cnt[0] + Int(memory_R.width)(1)
         
 def impl(sys_name, width, init_file_row, init_file_col, resource_base):
     sys = SysBuilder(sys_name)
@@ -351,16 +347,15 @@ def impl(sys_name, width, init_file_row, init_file_col, resource_base):
         memory_C.build(width)
         # Build the driver
         driver = Driver()
-        driver.build(memory_R)
-        driver.build(memory_C)
-        # Build the testbench
-        # testbench = Testbench()
-        # testbench.build()
+        driver.build(memory_R, memory_C)
+
     config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base)
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
-    utils.run_simulator(simulator_path)
+    raw = utils.run_simulator(simulator_path)
+
+    print(raw)
     # utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
