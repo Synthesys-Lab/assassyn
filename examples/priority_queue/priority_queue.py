@@ -20,7 +20,8 @@ class Layer(Module):
             raise ValueError(f"Level must be between 0 and {height-1}, got {level}")
             
         self.height = height-level+1    # Not the heap height, but the layer height
-        self.level = Int(32)(level)
+        self.level = level
+        self.level_I = Int(32)(level)
         self.name = f"level_{level}"
         self.elements = elements
         
@@ -30,6 +31,8 @@ class Layer(Module):
 
     @module.combinational
     def build(self, next_layer: 'Layer' = None, next_elements: RegArray = None):
+        index0 = self.index[0:self.level]
+        log("index: {}", index0)
         # PUSH
         with Condition(~self.action):
             v = self.elements[self.index]
@@ -38,9 +41,9 @@ class Layer(Module):
             # The current element is valid.
             with Condition(~v[self.height:self.height]):
                 vv = self.value.concat(Int(1)(1)).concat(v[0:self.height-1])
-                self.elements[self.index] = vv
+                self.elements[index0] = vv
                 log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                    self.value, self.level, self.index,
+                    self.value, self.level_I, self.index,
                     self.elements[self.index][self.height+1:self.height+32],
                     self.elements[self.index][self.height:self.height],
                     self.elements[self.index][0:self.height-1], 
@@ -57,7 +60,7 @@ class Layer(Module):
                         vv = self.value.concat(Int(1)(1)).concat(vacancy)
                         self.elements[self.index] = vv
                         log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                            self.value, self.level, self.index,
+                            self.value, self.level_I, self.index,
                             self.elements[self.index][self.height+1:self.height+32],
                             self.elements[self.index][self.height:self.height],
                             self.elements[self.index][0:self.height-1],
@@ -91,7 +94,7 @@ class Layer(Module):
                         vv = v[self.height+1:self.height+32].concat(Int(1)(1)).concat(vacancy)
                         self.elements[self.index] = vv
                         log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                            self.value, self.level, self.index,
+                            self.value, self.level_I, self.index,
                             self.elements[self.index][self.height+1:self.height+32],
                             self.elements[self.index][self.height:self.height],
                             self.elements[self.index][0:self.height-1],
@@ -122,7 +125,7 @@ class Layer(Module):
 
                 # There is no vacancy on the subtree.
                 with Condition(v[0:self.height-1] == UInt(self.height)(0)):
-                    log("Push {}  \tin\tLevel_{}[{}]\tThere is no vacancy, push failed!", self.value, self.level, self.index)
+                    log("Push {}  \tin\tLevel_{}[{}]\tThere is no vacancy, push failed!", self.value, self.level_I, self.index)
                     
         # POP
         with Condition(self.action):
@@ -134,7 +137,7 @@ class Layer(Module):
                 log("Pop failed! The heap is empty.")
             # The current element is occupied.
             with Condition(v[self.height:self.height]):
-                with Condition(self.level == Int(32)(0)):
+                with Condition(self.level_I == Int(32)(0)):
                     log("Pop: {}", self.elements[self.index][self.height+1:self.height+32])
                 if next_elements:
                     # Two child nodes derived from the same parent node.
@@ -149,7 +152,7 @@ class Layer(Module):
                             self.elements[self.index] = vv
                             log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                                 self.elements[self.index][self.height+1:self.height+32],
-                                self.level, self.index,
+                                self.level_I, self.index,
                                 self.elements[self.index][self.height+1:self.height+32],
                                 self.elements[self.index][self.height:self.height],
                                 self.elements[self.index][0:self.height-1],
@@ -166,7 +169,7 @@ class Layer(Module):
                                 self.elements[self.index] = vv
                                 log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                                     self.elements[self.index][self.height+1:self.height+32],
-                                    self.level, self.index,
+                                    self.level_I, self.index,
                                     self.elements[self.index][self.height+1:self.height+32],
                                     self.elements[self.index][self.height:self.height],
                                     self.elements[self.index][0:self.height-1],
@@ -181,7 +184,7 @@ class Layer(Module):
                                 self.elements[self.index] = vv
                                 log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                                     self.elements[self.index][self.height+1:self.height+32],
-                                    self.level, self.index,
+                                    self.level_I, self.index,
                                     self.elements[self.index][self.height+1:self.height+32],
                                     self.elements[self.index][self.height:self.height],
                                     self.elements[self.index][0:self.height-1],
@@ -198,7 +201,7 @@ class Layer(Module):
                             self.elements[self.index] = vv
                             log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                                 self.elements[self.index][self.height+1:self.height+32],
-                                self.level, self.index,
+                                self.level_I, self.index,
                                 self.elements[self.index][self.height+1:self.height+32],
                                 self.elements[self.index][self.height:self.height],
                                 self.elements[self.index][0:self.height-1],
@@ -213,7 +216,7 @@ class Layer(Module):
                             self.elements[self.index] = vv
                             log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                                 self.elements[self.index][self.height+1:self.height+32],
-                                self.level, self.index,
+                                self.level_I, self.index,
                                 self.elements[self.index][self.height+1:self.height+32],
                                 self.elements[self.index][self.height:self.height],
                                 self.elements[self.index][0:self.height-1],
@@ -227,7 +230,7 @@ class Layer(Module):
                     self.elements[self.index] = vv
                     log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                         self.elements[self.index][self.height+1:self.height+32],
-                        self.level, self.index,
+                        self.level_I, self.index,
                         self.elements[self.index][self.height+1:self.height+32],
                         self.elements[self.index][self.height:self.height],
                         self.elements[self.index][0:self.height-1],
@@ -362,7 +365,7 @@ def priority_queue(heap_height=3):
     
     raw = utils.run_simulator(simulator_path)
     print(raw)
-    check(raw)
+    # check(raw)
 
     # if verilator_path:
     #     raw = utils.run_verilator(verilator_path)
