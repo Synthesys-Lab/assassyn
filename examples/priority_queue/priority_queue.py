@@ -25,28 +25,29 @@ class Layer(Module):
         self.name = f"level_{level}"
         self.elements = elements
         
-        self.action = Port(Int(1))    # 0 means push, 1 means pop
+        self.action = Port(Int(1))      # 0 means push, 1 means pop
         self.index = Port(Int(32))
         self.value = Port(Int(32))
 
     @module.combinational
-    def build(self, next_layer: 'Layer' = None, next_elements: RegArray = None):
-        index0 = self.index[0:self.level]
-        log("index: {}", index0)
+    def build(self, next_layer: 'Layer' = None, next_elements: RegArray = None):        
+        index_bit = max(self.level, 1)        
+        index0 = self.index[0:index_bit-1].bitcast(Int(index_bit))
+        log("index: {}\tbits:{}", index0, Int(20)(self.level+1))
         # PUSH
         with Condition(~self.action):
-            v = self.elements[self.index]
-            index1 = (self.index * Int(32)(2))[0:31].bitcast(Int(32))
+            v = self.elements[index0]
+            index1 = (index0 * Int(32)(2))[0:31].bitcast(Int(32))
             index2 = index1 + Int(32)(1)
             # The current element is valid.
             with Condition(~v[self.height:self.height]):
                 vv = self.value.concat(Int(1)(1)).concat(v[0:self.height-1])
                 self.elements[index0] = vv
                 log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                    self.value, self.level_I, self.index,
-                    self.elements[self.index][self.height+1:self.height+32],
-                    self.elements[self.index][self.height:self.height],
-                    self.elements[self.index][0:self.height-1], 
+                    self.value, self.level_I, index0,
+                    self.elements[index0][self.height+1:self.height+32],
+                    self.elements[index0][self.height:self.height],
+                    self.elements[index0][0:self.height-1], 
                     vv[self.height+1:self.height+32],
                     vv[self.height:self.height],
                     vv[0:self.height-1])
@@ -58,12 +59,12 @@ class Layer(Module):
                     # The new enter value is smaller than the original one.
                     with Condition(self.value < v[self.height+1:self.height+32].bitcast(Int(32))):
                         vv = self.value.concat(Int(1)(1)).concat(vacancy)
-                        self.elements[self.index] = vv
+                        self.elements[index0] = vv
                         log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                            self.value, self.level_I, self.index,
-                            self.elements[self.index][self.height+1:self.height+32],
-                            self.elements[self.index][self.height:self.height],
-                            self.elements[self.index][0:self.height-1],
+                            self.value, self.level_I, index0,
+                            self.elements[index0][self.height+1:self.height+32],
+                            self.elements[index0][self.height:self.height],
+                            self.elements[index0][0:self.height-1],
                             vv[self.height+1:self.height+32],
                             vv[self.height:self.height],
                             vv[0:self.height-1])
@@ -74,30 +75,34 @@ class Layer(Module):
                             v2 = next_elements[index2]
                             # The first element is valid.
                             with Condition(~v1[self.height-1:self.height-1]):
-                                next_layer.async_called(action=Int(1)(0), index=index1, value=v[self.height+1:self.height+32].bitcast(Int(32)))
+                                next_layer.async_called(action=Int(1)(0), index=index1,
+                                                        value=v[self.height+1:self.height+32].bitcast(Int(32)))
                             # The first element is occupied.
                             with Condition(v1[self.height-1:self.height-1]):
                                 # The second element is valid.
                                 with Condition(~v2[self.height-1:self.height-1]):
-                                    next_layer.async_called(action=Int(1)(0), index=index2, value=v[self.height+1:self.height+32].bitcast(Int(32)))
+                                    next_layer.async_called(action=Int(1)(0), index=index2,
+                                                            value=v[self.height+1:self.height+32].bitcast(Int(32)))
                                 # The second element is occupied.
                                 with Condition(v1[self.height-1:self.height-1]):
                                     # The vacancy of first element is no less than second.
                                     with Condition(v1[0:self.height-2] >= v2[0:self.height-2]):
-                                        next_layer.async_called(action=Int(1)(0), index=index1, value=v[self.height+1:self.height+32].bitcast(Int(32)))
+                                        next_layer.async_called(action=Int(1)(0), index=index1,
+                                                                value=v[self.height+1:self.height+32].bitcast(Int(32)))
                                     # The vacancy of first element is less than second.
                                     with Condition(v1[0:self.height-2] < v2[0:self.height-2]):
-                                        next_layer.async_called(action=Int(1)(0), index=index2, value=v[self.height+1:self.height+32].bitcast(Int(32)))
+                                        next_layer.async_called(action=Int(1)(0), index=index2,
+                                                                value=v[self.height+1:self.height+32].bitcast(Int(32)))
 
                     # The new enter value is not smaller than the original one.
                     with Condition(self.value >= v[self.height+1:self.height+32].bitcast(Int(32))):
                         vv = v[self.height+1:self.height+32].concat(Int(1)(1)).concat(vacancy)
-                        self.elements[self.index] = vv
+                        self.elements[index0] = vv
                         log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                            self.value, self.level_I, self.index,
-                            self.elements[self.index][self.height+1:self.height+32],
-                            self.elements[self.index][self.height:self.height],
-                            self.elements[self.index][0:self.height-1],
+                            self.value, self.level_I, index0,
+                            self.elements[index0][self.height+1:self.height+32],
+                            self.elements[index0][self.height:self.height],
+                            self.elements[index0][0:self.height-1],
                             vv[self.height+1:self.height+32],
                             vv[self.height:self.height],
                             vv[0:self.height-1])
@@ -125,12 +130,12 @@ class Layer(Module):
 
                 # There is no vacancy on the subtree.
                 with Condition(v[0:self.height-1] == UInt(self.height)(0)):
-                    log("Push {}  \tin\tLevel_{}[{}]\tThere is no vacancy, push failed!", self.value, self.level_I, self.index)
+                    log("Push {}  \tin\tLevel_{}[{}]\tThere is no vacancy, push failed!", self.value, self.level_I, index0)
                     
         # POP
         with Condition(self.action):
-            v = self.elements[self.index]
-            index1 = (self.index * Int(32)(2))[0:31].bitcast(Int(32))
+            v = self.elements[index0]
+            index1 = (index0 * Int(32)(2))[0:31].bitcast(Int(32))
             index2 = index1 + Int(32)(1)            
             # The current element is valid.
             with Condition(~v[self.height:self.height]):
@@ -138,7 +143,7 @@ class Layer(Module):
             # The current element is occupied.
             with Condition(v[self.height:self.height]):
                 with Condition(self.level_I == Int(32)(0)):
-                    log("Pop: {}", self.elements[self.index][self.height+1:self.height+32])
+                    log("Pop: {}", self.elements[index0][self.height+1:self.height+32])
                 if next_elements:
                     # Two child nodes derived from the same parent node.
                     v1 = next_elements[index1]
@@ -149,13 +154,13 @@ class Layer(Module):
                         with Condition(~v2[self.height-1:self.height-1]):
                             vacancy = v[0:self.height-1].bitcast(Int(self.height))+Int(self.height)(1)
                             vv = v1[self.height:self.height+31].concat(Int(1)(1)).concat(vacancy)
-                            self.elements[self.index] = vv
+                            self.elements[index0] = vv
                             log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                                self.elements[self.index][self.height+1:self.height+32],
-                                self.level_I, self.index,
-                                self.elements[self.index][self.height+1:self.height+32],
-                                self.elements[self.index][self.height:self.height],
-                                self.elements[self.index][0:self.height-1],
+                                self.elements[index0][self.height+1:self.height+32],
+                                self.level_I, index0,
+                                self.elements[index0][self.height+1:self.height+32],
+                                self.elements[index0][self.height:self.height],
+                                self.elements[index0][0:self.height-1],
                                 vv[self.height+1:self.height+32],
                                 vv[self.height:self.height],
                                 vv[0:self.height-1])
@@ -166,13 +171,13 @@ class Layer(Module):
                             with Condition(v1[self.height:self.height+31] >= v2[self.height:self.height+31]):
                                 vacancy = v[0:self.height-1].bitcast(Int(self.height))+Int(self.height)(1)
                                 vv = v2[self.height:self.height+31].concat(Int(1)(1)).concat(vacancy)
-                                self.elements[self.index] = vv
+                                self.elements[index0] = vv
                                 log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                                    self.elements[self.index][self.height+1:self.height+32],
-                                    self.level_I, self.index,
-                                    self.elements[self.index][self.height+1:self.height+32],
-                                    self.elements[self.index][self.height:self.height],
-                                    self.elements[self.index][0:self.height-1],
+                                    self.elements[index0][self.height+1:self.height+32],
+                                    self.level_I, index0,
+                                    self.elements[index0][self.height+1:self.height+32],
+                                    self.elements[index0][self.height:self.height],
+                                    self.elements[index0][0:self.height-1],
                                     vv[self.height+1:self.height+32],
                                     vv[self.height:self.height],
                                     vv[0:self.height-1])
@@ -181,13 +186,13 @@ class Layer(Module):
                             with Condition(v1[self.height:self.height+31] < v2[self.height:self.height+31]):
                                 vacancy = v[0:self.height-1].bitcast(Int(self.height))+Int(self.height)(1)
                                 vv = v1[self.height:self.height+31].concat(Int(1)(1)).concat(vacancy)
-                                self.elements[self.index] = vv
+                                self.elements[index0] = vv
                                 log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                                    self.elements[self.index][self.height+1:self.height+32],
-                                    self.level_I, self.index,
-                                    self.elements[self.index][self.height+1:self.height+32],
-                                    self.elements[self.index][self.height:self.height],
-                                    self.elements[self.index][0:self.height-1],
+                                    self.elements[index0][self.height+1:self.height+32],
+                                    self.level_I, index0,
+                                    self.elements[index0][self.height+1:self.height+32],
+                                    self.elements[index0][self.height:self.height],
+                                    self.elements[index0][0:self.height-1],
                                     vv[self.height+1:self.height+32],
                                     vv[self.height:self.height],
                                     vv[0:self.height-1])
@@ -198,13 +203,13 @@ class Layer(Module):
                         with Condition(v2[self.height-1:self.height-1]):
                             vacancy = v[0:self.height-1].bitcast(Int(self.height))+Int(self.height)(1)
                             vv = v2[self.height:self.height+31].concat(Int(1)(1)).concat(vacancy)
-                            self.elements[self.index] = vv
+                            self.elements[index0] = vv
                             log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                                self.elements[self.index][self.height+1:self.height+32],
-                                self.level_I, self.index,
-                                self.elements[self.index][self.height+1:self.height+32],
-                                self.elements[self.index][self.height:self.height],
-                                self.elements[self.index][0:self.height-1],
+                                self.elements[index0][self.height+1:self.height+32],
+                                self.level_I, index0,
+                                self.elements[index0][self.height+1:self.height+32],
+                                self.elements[index0][self.height:self.height],
+                                self.elements[index0][0:self.height-1],
                                 vv[self.height+1:self.height+32],
                                 vv[self.height:self.height],
                                 vv[0:self.height-1])
@@ -213,13 +218,13 @@ class Layer(Module):
                         with Condition(~v2[self.height-1:self.height-1]):
                             vacancy = v[0:self.height-1].bitcast(Int(self.height))+Int(self.height)(1)
                             vv = Int(32)(0).concat(Int(1)(0)).concat(vacancy)
-                            self.elements[self.index] = vv
+                            self.elements[index0] = vv
                             log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                                self.elements[self.index][self.height+1:self.height+32],
-                                self.level_I, self.index,
-                                self.elements[self.index][self.height+1:self.height+32],
-                                self.elements[self.index][self.height:self.height],
-                                self.elements[self.index][0:self.height-1],
+                                self.elements[index0][self.height+1:self.height+32],
+                                self.level_I, index0,
+                                self.elements[index0][self.height+1:self.height+32],
+                                self.elements[index0][self.height:self.height],
+                                self.elements[index0][0:self.height-1],
                                 vv[self.height+1:self.height+32],
                                 vv[self.height:self.height],
                                 vv[0:self.height-1])
@@ -227,13 +232,13 @@ class Layer(Module):
                 if next_elements is None:
                     vacancy = v[0:self.height-1].bitcast(Int(self.height))+Int(self.height)(1)
                     vv = Int(32)(0).concat(Int(1)(0)).concat(vacancy)
-                    self.elements[self.index] = vv
+                    self.elements[index0] = vv
                     log("Pop  {}  \tfrom\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                        self.elements[self.index][self.height+1:self.height+32],
-                        self.level_I, self.index,
-                        self.elements[self.index][self.height+1:self.height+32],
-                        self.elements[self.index][self.height:self.height],
-                        self.elements[self.index][0:self.height-1],
+                        self.elements[index0][self.height+1:self.height+32],
+                        self.level_I, index0,
+                        self.elements[index0][self.height+1:self.height+32],
+                        self.elements[index0][self.height:self.height],
+                        self.elements[index0][0:self.height-1],
                         vv[self.height+1:self.height+32],
                         vv[self.height:self.height],
                         vv[0:self.height-1])
@@ -313,7 +318,7 @@ def check(raw):
     for i in raw.split('\n'):
         if f'Pop:' in i:
             line_toks = i.split()
-            value = line_toks[5]
+            value = line_toks[-1]
             outputs.append(int(value))
             cnt += 1    
     for i in range(len(pops)):
@@ -364,12 +369,12 @@ def priority_queue(heap_height=3):
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
     
     raw = utils.run_simulator(simulator_path)
-    print(raw)
-    # check(raw)
+    # print(raw)
+    check(raw)
 
-    # if verilator_path:
-    #     raw = utils.run_verilator(verilator_path)
-        # check(raw)
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
+        check(raw)
     
     
 if __name__ == '__main__':
