@@ -79,10 +79,7 @@ class ColPusher(Module):
     @module.combinational
     def build(self, dest: Bind):
         log("Pushes {}", self.data)
-        bound = dest.bind(west = self.data)
-        if bound.is_fully_bound():
-            bound.async_called()
-        return bound
+        dest.async_called(west = self.data)
 
 class Testbench(Module):
     
@@ -271,9 +268,11 @@ def systolic_array():
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
+    print(raw)
 
     raw = utils.run_verilator(verilator_path)
     check_raw(raw)
+    print(raw)
 
 if __name__ == '__main__':
     systolic_array()

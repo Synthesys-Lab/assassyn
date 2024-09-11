@@ -35,21 +35,21 @@ class ComputePE(Module):
     @module.constructor
     def __init__(self):
         super().__init__(disable_arbiter_rewrite=True)
-        self.east = Port(Int(32))
-        self.south = Port(Int(32))
+        self.west = Port(Int(32))
+        self.north = Port(Int(32))
 
     @module.combinational
     def build(self, west: Bind, north: Bind):
         acc = RegArray(Int(32), 1)
         val = acc[0]
-        mul = (self.east * self.south)
+        mul = (self.west * self.north)
         c = mul[0:31].bitcast(Int(32))
         mac = val + c
-        log("Mac value: {} * {} + {} = {}", self.east, self.south, val, mac)
+        log("Mac value: {} * {} + {} = {}", self.west, self.north, val, mac)
         acc[0] = mac
 
-        bound_west = west.bind(east = self.east)
-        bound_north = north.bind(south = self.south)
+        bound_west = west.bind(west = self.west)
+        bound_north = north.bind(north = self.north)
         if bound_west.is_fully_bound():
             bound_west.async_called()
         if bound_north.is_fully_bound():
@@ -67,7 +67,7 @@ class RowPusher(Module):
     @module.combinational
     def build(self, dest: Bind):
         log("Pushes {}", self.data)
-        dest.async_called(south = self.data)
+        dest.async_called(north = self.data)
 
 class ColPusher(Module):
 
@@ -79,10 +79,7 @@ class ColPusher(Module):
     @module.combinational
     def build(self, dest: Bind):
         log("Pushes {}", self.data)
-        bound = dest.bind(east = self.data)
-        if bound.is_fully_bound():
-            bound.async_called()
-        return bound
+        dest.async_called(west = self.data)
 
 class Testbench(Module):
     
@@ -93,7 +90,7 @@ class Testbench(Module):
     @module.combinational
     def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
                     row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
-        with Cycle(0):
+        with Cycle(1):
             # 1 0
             # 0 P P P  P
             #   P P P  P
@@ -102,7 +99,7 @@ class Testbench(Module):
             col1.async_called(data = Int(32)(0))
             row1.async_called(data = Int(32)(0))
 
-        with Cycle(1):
+        with Cycle(2):
             # 2 1 4
             # 1 P P P  P
             # 4 P P P  P
@@ -113,7 +110,7 @@ class Testbench(Module):
             row2.async_called(data = Int(32)(4))
             col2.async_called(data = Int(32)(4))
 
-        with Cycle(2):
+        with Cycle(3):
             # 3 2 5 8
             # 2 P P P  P
             # 5 P P P  P
@@ -126,7 +123,7 @@ class Testbench(Module):
             row3.async_called(data = Int(32)(8))
             col3.async_called(data = Int(32)(8))
 
-        with Cycle(3):
+        with Cycle(4):
             # 4  3 6 9  12
             # 3  P P P  P
             # 6  P P P  P
@@ -141,7 +138,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(12))
             col4.async_called(data = Int(32)(12))
         
-        with Cycle(4):
+        with Cycle(5):
             # 5    7 10 13
             #    P P P  P
             # 7  P P P  P
@@ -154,7 +151,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(13))
             col4.async_called(data = Int(32)(13))
 
-        with Cycle(5):
+        with Cycle(6):
             #  6    11 14
             #    P P P  P
             #    P P P  P
@@ -165,7 +162,7 @@ class Testbench(Module):
             row4.async_called(data = Int(32)(14))
             col4.async_called(data = Int(32)(14))
             
-        with Cycle(6):
+        with Cycle(7):
             #   7      15
             #    P P P  P
             #    P P P  P
@@ -217,7 +214,7 @@ def systolic_array():
         # First Column Pushers
         for i in range(1, 5):
             pe_array[i][0].pe = ColPusher()
-            if pe_array[i][1].bound is not None:  # Ensure bound is initialized before using it
+            if pe_array[i][1].bound is not None:  
                 bound = pe_array[i][0].pe.build(pe_array[i][1].bound)
                 pe_array[i][0].bound = bound
             else:
@@ -234,13 +231,13 @@ def systolic_array():
 
         # Last Column Sink
         for i in range(1, 5):
-            pe_array[i][5].pe = Sink('east')
+            pe_array[i][5].pe = Sink('west')
             pe_array[i][5].pe.build()
             pe_array[i][5].bound = pe_array[i][5].pe
 
         # Last Row Sink
         for i in range(1, 5):
-            pe_array[5][i].pe = Sink('south')
+            pe_array[5][i].pe = Sink('north')
             pe_array[5][i].pe.build()
             pe_array[5][i].bound = pe_array[5][i].pe
 
@@ -248,7 +245,7 @@ def systolic_array():
         for i in range(1, 5):
             for j in range(1, 5):
                 if pe_array[i][j+1].bound is None:
-                    print(f"1Error: pe_array[{i}][{j+1}].bound is None")
+                    print(f"Error: pe_array[{i}][{j+1}].bound is None")
                 if pe_array[i+1][j].bound is None:
                     print(f"Error: pe_array[{i+1}][{j}].bound is None")
                 fwest, fnorth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
@@ -270,9 +267,11 @@ def systolic_array():
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
+    print(raw)
 
     raw = utils.run_verilator(verilator_path)
     check_raw(raw)
+    print(raw)
 
 if __name__ == '__main__':
     systolic_array()
