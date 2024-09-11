@@ -289,4 +289,4 @@ def priority_queue(heap_height=3):
     
     
 if __name__ == '__main__':
-    priority_queue(heap_height=2)
+    priority_queue(heap_height=3)
