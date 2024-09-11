@@ -54,7 +54,7 @@ class Layer(Module):
             with Condition(v[self.height:self.height]):                                            
                 # There is no vacancy on the subtree.
                 with Condition(v[0:self.height-1] == UInt(self.height)(0)):
-                    log("Push {}  \tin\tLevel_{}[{}]\tThere is no vacancy, push failed!", self.value, self.level_I, index0)
+                    log("Push {}  \tPush failed, There is no vacancy!", self.value)
                     
                 # There is vacancy on the subtree.
                 with Condition(v[0:self.height-1] > UInt(self.height)(0)):
@@ -94,13 +94,12 @@ class Layer(Module):
                             index_next = (v1[0:self.height-2] < v2[0:self.height-2]).select(index2, index1)
                             next_layer.async_called(action=Int(1)(0), index=index_next, value=value_next)
 
-
         # POP
         with Condition(self.action):
             v = self.elements[index0]         
             # The current element is valid.
             with Condition(~v[self.height:self.height]):
-                log("Pop failed! The heap is empty.")
+                log("Pop\t\tPop failed! The heap is empty.")
             # The current element is occupied.
             with Condition(v[self.height:self.height]):
                 with Condition(self.level_I == Int(32)(0)):
@@ -222,9 +221,15 @@ class Testbench(Module):
         with Cycle(23):
             pop.async_called()
 
-def check(raw):
+def check(raw,heap_height):
     cnt = 0
-    pops = [29, 7, 40, 87, 93, 100]
+    if heap_height == 1:
+        pops = [40, 7]
+    elif heap_height == 2:
+        pops = [40, 7, 93, 100]
+    else:
+        pops = [29, 7, 40, 87, 93, 100]
+        
     outputs = []
     for i in raw.split('\n'):
         if f'Pop:' in i:
@@ -236,8 +241,7 @@ def check(raw):
         assert pops[i] == outputs[i] 
     assert cnt == len(pops), f'cnt: {cnt} != {len(pops)}'
 
-def priority_queue(heap_height=3):
-    
+def priority_queue(heap_height=3):    
     # Build a layer with the given heap height and layer level.
     def build_layer(heap_height: int, level: int):
         element_type = Bits(32 + 1 + (heap_height-level+1))  # value + occupied + vacancy
@@ -253,14 +257,11 @@ def priority_queue(heap_height=3):
     
     sys = SysBuilder('priority_queue')
     
-    with sys:
-        
+    with sys:        
         # Generate arrays, each containing a RegArray.
-        arrays = [build_layer(heap_height, i) for i in range(heap_height)] 
-        
+        arrays = [build_layer(heap_height, i) for i in range(heap_height)]         
         # Create a list of layers, num_layers is determined by heap_height.
-        layers = [Layer(height=heap_height, level=i, elements=arrays[i]) for i in range(heap_height)]
-        
+        layers = [Layer(height=heap_height, level=i, elements=arrays[i]) for i in range(heap_height)]        
         # Establish the relationships between layers
         for i in range(heap_height):
             if i == heap_height - 1:
@@ -280,12 +281,12 @@ def priority_queue(heap_height=3):
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
     
     raw = utils.run_simulator(simulator_path)
-    check(raw)
+    check(raw, heap_height=heap_height)
 
     if verilator_path:
         raw = utils.run_verilator(verilator_path)
-        check(raw)
+        check(raw, heap_height=heap_height)
     
     
 if __name__ == '__main__':
-    priority_queue(heap_height=3)
+    priority_queue(heap_height=2)
