@@ -66,7 +66,7 @@ class RowPusher(Module):
 
     @module.combinational
     def build(self, dest: Bind):
-        log("Pushes {}", self.data)
+        log("Row Pushes {}", self.data)
         dest.async_called(north = self.data)
 
 class ColPusher(Module):
@@ -78,7 +78,7 @@ class ColPusher(Module):
 
     @module.combinational
     def build(self, dest: Bind):
-        log("Pushes {}", self.data)
+        log("Col Pushes {}", self.data)
         dest.async_called(west = self.data)
 
 class Testbench(Module):
@@ -249,7 +249,6 @@ def systolic_array():
                 if pe_array[i+1][j].bound is None:
                     print(f"Error: pe_array[{i+1}][{j}].bound is None")
                 fwest, fnorth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
-                pe_array[i][j].bound = pe_array[i][j].pe
                 pe_array[i][j+1].bound = fwest
                 pe_array[i+1][j].bound = fnorth
 

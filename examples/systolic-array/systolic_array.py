@@ -66,7 +66,7 @@ class RowPusher(Module):
 
     @module.combinational
     def build(self, dest: Bind):
-        log("Pushes {}", self.data)
+        log("Row Pushes {}", self.data)
         dest.async_called(north = self.data)
 
 class ColPusher(Module):
@@ -78,7 +78,7 @@ class ColPusher(Module):
 
     @module.combinational
     def build(self, dest: Bind):
-        log("Pushes {}", self.data)
+        log("Col Pushes {}", self.data)
         dest.async_called(west = self.data)
 
 class Testbench(Module):
