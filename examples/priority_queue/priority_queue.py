@@ -1,6 +1,11 @@
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
+import time
+import random
+import heapq
+
+current_seed = int(time.time())
 
 class Layer(Module):
     """
@@ -174,61 +179,66 @@ class Heap_Pop(Module):
     @module.combinational
     def build(self, layer: Layer):
         bound = layer.bind(action=Int(1)(1), index=Int(32)(0), value=Int(32)(1))
-        bound.async_called()
-        
+        bound.async_called()        
         
 class Testbench(Module):
     
     @module.constructor
-    def __init__(self):
+    def __init__(self, heap_height):
         super().__init__(disable_arbiter_rewrite=True)
+        self.size = 2 ** heap_height - 1
 
     @module.combinational
     def build(self, push: Heap_Push, pop: Heap_Pop):
-        with Cycle(1):
-            push.async_called(push_value=Int(32)(40))
-            
-        with Cycle(3):
-            push.async_called(push_value=Int(32)(100))
-            
-        with Cycle(5):
-            push.async_called(push_value=Int(32)(93))
-            
-        with Cycle(7):
-            push.async_called(push_value=Int(32)(29))
-            
-        with Cycle(9):
-            pop.async_called()
-            
-        with Cycle(11):
-            push.async_called(push_value=Int(32)(7))
-            
-        with Cycle(13):
-            push.async_called(push_value=Int(32)(87))
-            
-        with Cycle(15):
-            pop.async_called()
-            
-        with Cycle(17):
-            pop.async_called()
-            
-        with Cycle(19):
-            pop.async_called()
-            
-        with Cycle(21):
-            pop.async_called()
-            
-        with Cycle(23):
-            pop.async_called()
+        random.seed(current_seed)
+        cnt = 0
+        for i in range(15):
+            with Cycle(i * 2 + 1):
+                if cnt == 0:
+                    random_integer = random.randint(1, 100)
+                    push.async_called(push_value=Int(32)(random_integer))
+                    cnt += 1
+                
+                elif cnt == self.size:
+                    pop.async_called()
+                    cnt -= 1
+                    
+                else:
+                    if random.randint(0, 1) == 0:
+                        random_integer = random.randint(1, 100)
+                        push.async_called(push_value=Int(32)(random_integer))
+                        cnt += 1
+                    else:
+                        pop.async_called()
+                        cnt -= 1
 
 def check(raw,heap_height):
+    random.seed(current_seed)
+    size = 2 ** heap_height - 1
     cnt = 0
-    if heap_height == 1:
-        pops = [40, 7]
-    elif heap_height == 2:
-        pops = [40, 7, 93, 100]
-    else:
-        pops = [29, 7, 40, 87, 93, 100]
+    heap = []
+    pops = []
+
+    for i in range(15):
+        if cnt == 0:
+            random_integer = random.randint(1, 100)
+            heapq.heappush(heap, random_integer)
+            cnt += 1
+        
+        elif cnt == size:
+            smallest = heapq.heappop(heap)
+            pops.append(smallest)
+            cnt -= 1
+            
+        else:
+            if random.randint(0, 1) == 0:
+                random_integer = random.randint(1, 100)
+                heapq.heappush(heap, random_integer)
+                cnt += 1
+            else:
+                smallest = heapq.heappop(heap)
+                pops.append(smallest)
+                cnt -= 1
         
     outputs = []
     for i in raw.split('\n'):
@@ -236,10 +246,11 @@ def check(raw,heap_height):
             line_toks = i.split()
             value = line_toks[-1]
             outputs.append(int(value))
-            cnt += 1    
+            cnt += 1
+
     for i in range(len(pops)):
         assert pops[i] == outputs[i] 
-    assert cnt == len(pops), f'cnt: {cnt} != {len(pops)}'
+    assert len(outputs) == len(pops), f'heap pops: {len(outputs)} != {len(pops)}'
 
 def priority_queue(heap_height=3):    
     # Build a layer with the given heap height and layer level.
@@ -275,7 +286,7 @@ def priority_queue(heap_height=3):
         heap_pop = Heap_Pop()
         heap_pop.build(layers[0])
         
-        testbench = Testbench()
+        testbench = Testbench(heap_height=heap_height)
         testbench.build(heap_push, heap_pop)
     
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
@@ -285,8 +296,7 @@ def priority_queue(heap_height=3):
 
     if verilator_path:
         raw = utils.run_verilator(verilator_path)
-        check(raw, heap_height=heap_height)
-    
+        check(raw, heap_height=heap_height)    
     
 if __name__ == '__main__':
     priority_queue(heap_height=3)
