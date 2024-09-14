@@ -158,7 +158,7 @@ class Layer(Module):
                         vv = Int(32)(0).concat(Int(1)(0)).concat(v[0:self.height-1])
                         self.elements[index0] = vv
 
-class Heap_Push(Module):
+class HeapPush(Module):
     
     @module.constructor
     def __init__(self):
@@ -170,7 +170,7 @@ class Heap_Push(Module):
         bound = layer.bind(action=Int(1)(0), index=Int(32)(0))
         bound.async_called(value=self.push_value)
         
-class Heap_Pop(Module):
+class HeapPop(Module):
     
     @module.constructor
     def __init__(self):
@@ -189,7 +189,7 @@ class Testbench(Module):
         self.size = 2 ** heap_height - 1
 
     @module.combinational
-    def build(self, push: Heap_Push, pop: Heap_Pop):
+    def build(self, push: HeapPush, pop: HeapPop):
         random.seed(current_seed)
         cnt = 0
         for i in range(15):
@@ -197,20 +197,17 @@ class Testbench(Module):
                 if cnt == 0:
                     random_integer = random.randint(1, 100)
                     push.async_called(push_value=Int(32)(random_integer))
-                    cnt += 1
-                
+                    cnt += 1                
                 elif cnt == self.size:
                     pop.async_called()
-                    cnt -= 1
-                    
+                    cnt -= 1                    
+                elif random.randint(0, 1) == 0:
+                    random_integer = random.randint(1, 100)
+                    push.async_called(push_value=Int(32)(random_integer))
+                    cnt += 1
                 else:
-                    if random.randint(0, 1) == 0:
-                        random_integer = random.randint(1, 100)
-                        push.async_called(push_value=Int(32)(random_integer))
-                        cnt += 1
-                    else:
-                        pop.async_called()
-                        cnt -= 1
+                    pop.async_called()
+                    cnt -= 1
 
 def check(raw,heap_height):
     random.seed(current_seed)
@@ -223,22 +220,19 @@ def check(raw,heap_height):
         if cnt == 0:
             random_integer = random.randint(1, 100)
             heapq.heappush(heap, random_integer)
-            cnt += 1
-        
+            cnt += 1        
         elif cnt == size:
             smallest = heapq.heappop(heap)
             pops.append(smallest)
-            cnt -= 1
-            
+            cnt -= 1            
+        elif random.randint(0, 1) == 0:
+            random_integer = random.randint(1, 100)
+            heapq.heappush(heap, random_integer)
+            cnt += 1
         else:
-            if random.randint(0, 1) == 0:
-                random_integer = random.randint(1, 100)
-                heapq.heappush(heap, random_integer)
-                cnt += 1
-            else:
-                smallest = heapq.heappop(heap)
-                pops.append(smallest)
-                cnt -= 1
+            smallest = heapq.heappop(heap)
+            pops.append(smallest)
+            cnt -= 1
         
     outputs = []
     for i in raw.split('\n'):
@@ -280,10 +274,10 @@ def priority_queue(heap_height=3):
             else:
                 layers[i].build(layers[i+1], arrays[i+1])
         
-        heap_push = Heap_Push()
+        heap_push = HeapPush()
         heap_push.build(layers[0])
         
-        heap_pop = Heap_Pop()
+        heap_pop = HeapPop()
         heap_pop.build(layers[0])
         
         testbench = Testbench(heap_height=heap_height)
