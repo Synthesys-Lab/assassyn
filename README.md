@@ -26,7 +26,7 @@ Refer `python/unit-tests/README.md` for more details on the feature-case corresp
 the following command.
 
 ````sh
-$ ./utils/build-verilator.sh
+$ ./scripts/build-verilator.sh
 $ source setup.sh # Re-run the script since it has a different environment variable for verilator
 ````
 
