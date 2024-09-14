@@ -56,7 +56,7 @@ def check(raw):
             assert c == a + b, f'{a} + {b} = {c}'
 
 
-def test_memory_iterator(sys_name, width, init_file, resource_base):
+def state_machine(sys_name, width, init_file, resource_base):
     sys = SysBuilder(sys_name)
     with sys:
         # Build the SRAM module
@@ -78,6 +78,8 @@ def test_memory_iterator(sys_name, width, init_file, resource_base):
         raw = utils.run_verilator(verilator_path)
         check(raw)
 
+def test_memory():
+    state_machine('memory', 32, 'init.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 if __name__ == "__main__":
-    test_memory_iterator('memory', 32, 'init.hex', f'{utils.repo_path()}/python/unit-tests/resources')
+        test_memory()
