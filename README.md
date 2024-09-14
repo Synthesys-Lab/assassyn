@@ -37,7 +37,7 @@ all other Python scripts.
 $ python python/unit-tests/test_driver.py 
 ````
 
-Refer our [developer doc](./docs/developers.md) for more details on tooling.
+Refer our [developer doc](./docs/developer/README.md) for more details on tooling.
 
 ## Why yet another RTL generator?
 
