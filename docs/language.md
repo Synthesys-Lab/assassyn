@@ -99,7 +99,7 @@ and a basic block. Basic block is a very common concept in compiler design, whic
 region of code starts with a label which can be the destination of a jump,
 ends with a jump operation. This is used to support control flows (if-then-else, loops, etc.).
 However, in a physical circuit, no operations can move backward --- you can only have a cyclic
-graphs in combinational logics.
+graphs in sequential logics.
 
 NOTE: For simplicity, we currently regard all the operations within a module is combinational,
 which means everything is done within one cycle. Our future goal will automatically partition
