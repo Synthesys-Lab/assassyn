@@ -4,8 +4,7 @@
 RESTORE_DIR=`pwd`
 
 # Go to the setup.sh directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
-cd "$SCRIPT_DIR"
+cd `dirname $0`
 
 
 # Use the repository path to set the PYTHONPATH and ASSASSYN_HOME
