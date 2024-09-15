@@ -194,20 +194,16 @@ class Testbench(Module):
         cnt = 0
         for i in range(15):
             with Cycle(i * 2 + 1):
-                if cnt == 0:
+                op = random.randint(0, 1)
+                if cnt == 0 or op == 0:
                     random_integer = random.randint(1, 100)
                     push.async_called(push_value=Int(32)(random_integer))
                     cnt += 1                
-                elif cnt == self.size:
-                    pop.async_called()
-                    cnt -= 1                    
-                elif random.randint(0, 1) == 0:
-                    random_integer = random.randint(1, 100)
-                    push.async_called(push_value=Int(32)(random_integer))
-                    cnt += 1
-                else:
+                elif cnt == self.size or op == 1:
                     pop.async_called()
                     cnt -= 1
+                else:
+                    assert False, "Unreachable branch of heap operation."
 
 def check(raw,heap_height):
     random.seed(current_seed)
@@ -217,22 +213,17 @@ def check(raw,heap_height):
     pops = []
 
     for i in range(15):
-        if cnt == 0:
+        op = random.randint(0, 1)
+        if cnt == 0 or op == 0:
             random_integer = random.randint(1, 100)
             heapq.heappush(heap, random_integer)
             cnt += 1        
-        elif cnt == size:
-            smallest = heapq.heappop(heap)
-            pops.append(smallest)
-            cnt -= 1            
-        elif random.randint(0, 1) == 0:
-            random_integer = random.randint(1, 100)
-            heapq.heappush(heap, random_integer)
-            cnt += 1
-        else:
+        elif cnt == size or op == 1:
             smallest = heapq.heappop(heap)
             pops.append(smallest)
             cnt -= 1
+        else:
+            assert False, "Unreachable branch of heap operation."
         
     outputs = []
     for i in raw.split('\n'):
