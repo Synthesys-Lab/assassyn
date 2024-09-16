@@ -983,7 +983,7 @@ module {} (
         let mut res = String::new();
 
         res.push_str(&format!(
-          "  always_ff @(posedge clk iff {}{}) ",
+          "  always_ff @(posedge clk) if ({}{})",
           if self.before_wait_until {
             "1'b1"
           } else {
@@ -1184,7 +1184,7 @@ module {} (
       Opcode::BlockIntrinsic { intrinsic } => match intrinsic {
         subcode::BlockIntrinsic::Finish => {
           let pred = self.get_pred().unwrap_or("1".to_string());
-          format!(" always_ff @(posedge clk iff executed && {}) $finish();\n", pred)
+          format!(" always_ff @(posedge clk) if (executed && {}) $finish();\n", pred)
         }
         _ => panic!("Unknown block intrinsic: {:?}", intrinsic),
       },

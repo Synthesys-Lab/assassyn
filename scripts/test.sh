@@ -30,4 +30,8 @@ test_case "python systolic_array.py"
 cd $REPO_DIR/examples/cpu
 test_case "python src/main.py"
 
+# A Priority Queue
+cd $REPO_DIR/examples/priority-queue
+test_case "python main.py"
+
 cd $RESTORE_DIR

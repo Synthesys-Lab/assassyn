@@ -81,3 +81,4 @@ jobs:
         run: |
           python3 examples/systolic-array/systolic_array.py;
           python3 examples/cpu/src/main.py
+          python3 examples/priority_queue/main.py
