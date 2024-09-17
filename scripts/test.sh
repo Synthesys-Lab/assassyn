@@ -31,7 +31,9 @@ cd $REPO_DIR/examples/cpu
 test_case "python src/main.py"
 
 # A Priority Queue
-cd $REPO_DIR/examples/priority-queue
+cd $REPO_DIR/examples/priority_queue
 test_case "python main.py"
+
+# TODO(@were): Test memory engine.
 
 cd $RESTORE_DIR
