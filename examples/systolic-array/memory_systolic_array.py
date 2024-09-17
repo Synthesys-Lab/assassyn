@@ -15,18 +15,127 @@ from systolic_array_rev import ProcElem, Sink, ColPusher, RowPusher, ComputePE, 
 #  [Pusher] [Compute PE]  [Compute PE]  [Compute PE]  [Compute PE]  [Sink]
 #           [Sink]        [Sink]        [Sink]        [Sink]
 
-class SRAM(Memory):
+class SRAM_R(Memory):
 
     @module.constructor
     def __init__(self, init_file, width):
         super().__init__(width=width, depth=1024, latency=(1, 1), init_file=init_file)
 
     @module.combinational
-    def build(self, width):
+    def build(self, width, \
+              row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher
+              ):
         super().build()
         read = ~self.we
+        cnt = RegArray(Int(width), 1)
+        buffer = RegArray(Int(width), 4)
         with Condition(read):
-            rdata = self.rdata.bitcast(Int(width))
+            rdata = self.rdata.bitcast(Int(128))
+            
+            with Cycle(2):
+                buffer[0] = rdata
+            
+            with Cycle(3):
+                buffer[1] = rdata
+                row1.async_called(data = Int(32)(0))
+                log("Row Buffer data (hex): {:#034x}", buffer[0]) 
+            
+            with Cycle(4):
+                buffer[2] = rdata
+                row1.async_called(data = Int(32)(1))
+                row2.async_called(data = Int(32)(4))
+                log("Row Buffer data (hex): {:#034x}", buffer[1]) 
+            
+            with Cycle(5):
+                buffer[3] = rdata
+                row1.async_called(data = Int(32)(2))
+                row2.async_called(data = Int(32)(5))
+                row3.async_called(data = Int(32)(8))
+                log("Row Buffer data (hex): {:#034x}", buffer[2]) 
+            
+            with Cycle(6):
+                log("Row Buffer data (hex): {:#034x}", buffer[3])
+                row1.async_called(data = Int(32)(3))
+                row2.async_called(data = Int(32)(6))
+                row3.async_called(data = Int(32)(9))
+                row4.async_called(data = Int(32)(12))
+
+            with Cycle(7):
+                row2.async_called(data = Int(32)(7))
+                row3.async_called(data = Int(32)(10))
+                row4.async_called(data = Int(32)(13))
+
+            with Cycle(8):
+                row3.async_called(data = Int(32)(11))
+                row4.async_called(data = Int(32)(14))
+
+            with Cycle(9):
+                row4.async_called(data = Int(32)(15))
+        
+        cnt[0] = cnt[0] + Int(width)(1)
+
+    @module.wait_until
+    def wait_until(self):
+        return self.validate_all_ports()
+    
+class SRAM_C(Memory):
+
+    @module.constructor
+    def __init__(self, init_file, width):
+        super().__init__(width=width, depth=1024, latency=(1, 1), init_file=init_file)
+
+    @module.combinational
+    def build(self, width, \
+              col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher
+              ):
+        super().build()
+        read = ~self.we
+        cnt = RegArray(Int(width), 1)
+        buffer = RegArray(Int(width), 4)
+        with Condition(read):
+            rdata = self.rdata.bitcast(Int(128))
+            
+            with Cycle(2):
+                buffer[0] = rdata
+            
+            with Cycle(3):
+                buffer[1] = rdata
+                col1.async_called(data = Int(32)(0))
+                log("Col Buffer data (hex): {:#034x}", buffer[0]) 
+            
+            with Cycle(4):
+                buffer[2] = rdata
+                col1.async_called(data = Int(32)(1))
+                col2.async_called(data = Int(32)(4))
+                log("Col Buffer data (hex): {:#034x}", buffer[1]) 
+            
+            with Cycle(5):
+                buffer[3] = rdata
+                col1.async_called(data = Int(32)(2))
+                col2.async_called(data = Int(32)(5))
+                col3.async_called(data = Int(32)(8))
+                log("Col Buffer data (hex): {:#034x}", buffer[2]) 
+            
+            with Cycle(6):
+                log("Row Buffer data (hex): {:#034x}", buffer[3])
+                col1.async_called(data = Int(32)(3))
+                col2.async_called(data = Int(32)(6))
+                col3.async_called(data = Int(32)(9))
+                col4.async_called(data = Int(32)(12))
+
+            with Cycle(7):
+                col2.async_called(data = Int(32)(7))
+                col3.async_called(data = Int(32)(10))
+                col4.async_called(data = Int(32)(13))
+
+            with Cycle(8):
+                col3.async_called(data = Int(32)(11))
+                col4.async_called(data = Int(32)(14))
+
+            with Cycle(9):
+                col4.async_called(data = Int(32)(15))
+
+        cnt[0] = cnt[0] + Int(width)(1)
 
     @module.wait_until
     def wait_until(self):
@@ -39,46 +148,37 @@ class Driver(Module):
         super().__init__()
 
     @module.combinational
-    def build(self, memory_R: SRAM, memory_C: SRAM, \
-              col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
-              row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
+    def build(self, memory_R: SRAM_R, memory_C: SRAM_C):
         cnt = RegArray(Int(memory_R.width), 1)
         v = cnt[0]
         we = Int(1)(0)
         raddr = v[0:9]  
         addr = raddr.bitcast(Int(10)) 
-        cond = cnt[0] < Int(128)(4)
+        cond = cnt[0] >= Int(128)(4)
 
+        memory_R.async_called(
+            we = we, 
+            addr = addr,
+            wdata = Bits(memory_R.width)(0)
+            )  
+            
+        memory_C.async_called(
+            we = we, 
+            addr = addr,
+            wdata = Bits(memory_C.width)(0)
+            )  
+        
         with Condition(cond):
-            memory_R.async_called(
-                we = we, 
-                addr = addr,
-                # wdata = v.bitcast(Bits(memory.width))
-                )  
-            log('Read addr {} from memory_R', addr)
-
-        with Condition(cond):
-            memory_C.async_called(
-                we = we, 
-                addr = addr,
-                # wdata = v.bitcast(Bits(memory.width))
-                )  
-            log('Read addr {} from memory_C', addr)
+            log('Asyn Call to Empty Memory')
 
         cnt[0] = cnt[0] + Int(memory_R.width)(1)
+
         
 def mem_systolic_array(sys_name, width, init_file_row, init_file_col, resource_base):
     sys = SysBuilder(sys_name)
     pe_array = [[ProcElem() for _ in range(6)] for _ in range(6)]
 
     with sys:
-        # Build the SRAM module
-        memory_R = SRAM(init_file_row, width)
-        memory_R.wait_until()
-        memory_R.build(width)
-        memory_C = SRAM(init_file_col, width)
-        memory_C.wait_until()
-        memory_C.build(width)
 
         # Init ComputePE
         for i in range(1, 5):
@@ -129,20 +229,29 @@ def mem_systolic_array(sys_name, width, init_file_row, init_file_col, resource_b
                 fwest, fnorth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
                 pe_array[i][j+1].bound = fwest
                 pe_array[i+1][j].bound = fnorth
+
+        # Build the SRAM module
+        memory_R = SRAM_R(init_file_row, width)
+        memory_R.wait_until()
+        memory_R.build(width, \
+                       pe_array[0][1].pe, \
+                       pe_array[0][2].pe, \
+                       pe_array[0][3].pe, \
+                       pe_array[0][4].pe)
+        
+        memory_C = SRAM_C(init_file_col, width)
+        memory_C.wait_until()
+        memory_C.build(width, \
+                       pe_array[1][0].pe, \
+                       pe_array[2][0].pe, \
+                       pe_array[3][0].pe, \
+                       pe_array[4][0].pe)
         
         # Build the driver
         driver = Driver()
-        driver.build(memory_R, memory_C, 
-                     pe_array[0][1].pe, \
-                     pe_array[0][2].pe, \
-                     pe_array[0][3].pe, \
-                     pe_array[0][4].pe, \
-                     pe_array[1][0].pe, \
-                     pe_array[2][0].pe, \
-                     pe_array[3][0].pe, \
-                     pe_array[4][0].pe)
+        driver.build(memory_R, memory_C)
 
-    config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base)
+    config = backend.config(sim_threshold=20, idle_threshold=20, resource_base=resource_base)
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
@@ -152,4 +261,3 @@ def mem_systolic_array(sys_name, width, init_file_row, init_file_col, resource_b
 
 if __name__ == '__main__':
     mem_systolic_array('memory', 128, 'matrix_row.hex', 'matrix_col.hex', f'{utils.repo_path()}/examples/systolic-array/resource')
-
