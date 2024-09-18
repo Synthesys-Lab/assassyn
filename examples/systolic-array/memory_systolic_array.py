@@ -1,6 +1,7 @@
 import pytest
 import re
 from assassyn import backend
+from assassyn.dtype import *
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
@@ -34,43 +35,43 @@ class SRAM_R(Memory):
             
             with Cycle(2):
                 buffer[0] = rdata
-            
+                
             with Cycle(3):
                 buffer[1] = rdata
-                row1.async_called(data = Int(32)(0))
+                row1.async_called(data = buffer[0][96:127].bitcast(Int(32)))
                 log("Row Buffer data (hex): {:#034x}", buffer[0]) 
             
             with Cycle(4):
                 buffer[2] = rdata
-                row1.async_called(data = Int(32)(1))
-                row2.async_called(data = Int(32)(4))
+                row1.async_called(data = buffer[0][64:95].bitcast(Int(32)))
+                row2.async_called(data = buffer[1][96:127].bitcast(Int(32)))
                 log("Row Buffer data (hex): {:#034x}", buffer[1]) 
             
             with Cycle(5):
                 buffer[3] = rdata
-                row1.async_called(data = Int(32)(2))
-                row2.async_called(data = Int(32)(5))
-                row3.async_called(data = Int(32)(8))
+                row1.async_called(data = buffer[0][32:63].bitcast(Int(32)))
+                row2.async_called(data = buffer[1][64:95].bitcast(Int(32)))
+                row3.async_called(data = buffer[2][96:127].bitcast(Int(32)))
                 log("Row Buffer data (hex): {:#034x}", buffer[2]) 
             
             with Cycle(6):
                 log("Row Buffer data (hex): {:#034x}", buffer[3])
-                row1.async_called(data = Int(32)(3))
-                row2.async_called(data = Int(32)(6))
-                row3.async_called(data = Int(32)(9))
-                row4.async_called(data = Int(32)(12))
+                row1.async_called(data = buffer[0][0:31].bitcast(Int(32)))
+                row2.async_called(data = buffer[1][32:63].bitcast(Int(32)))
+                row3.async_called(data = buffer[2][64:95].bitcast(Int(32)))
+                row4.async_called(data = buffer[3][96:127].bitcast(Int(32)))
 
             with Cycle(7):
-                row2.async_called(data = Int(32)(7))
-                row3.async_called(data = Int(32)(10))
-                row4.async_called(data = Int(32)(13))
+                row2.async_called(data = buffer[1][0:31].bitcast(Int(32)))
+                row3.async_called(data = buffer[2][32:63].bitcast(Int(32)))
+                row4.async_called(data = buffer[3][64:95].bitcast(Int(32)))
 
             with Cycle(8):
-                row3.async_called(data = Int(32)(11))
-                row4.async_called(data = Int(32)(14))
+                row3.async_called(data = buffer[2][0:31].bitcast(Int(32)))
+                row4.async_called(data = buffer[3][32:63].bitcast(Int(32)))
 
             with Cycle(9):
-                row4.async_called(data = Int(32)(15))
+                row4.async_called(data = buffer[3][0:31].bitcast(Int(32)))
         
         cnt[0] = cnt[0] + Int(width)(1)
 
@@ -97,43 +98,43 @@ class SRAM_C(Memory):
             
             with Cycle(2):
                 buffer[0] = rdata
-            
+                
             with Cycle(3):
                 buffer[1] = rdata
-                col1.async_called(data = Int(32)(0))
+                col1.async_called(data = buffer[0][96:127].bitcast(Int(32)))
                 log("Col Buffer data (hex): {:#034x}", buffer[0]) 
             
             with Cycle(4):
                 buffer[2] = rdata
-                col1.async_called(data = Int(32)(1))
-                col2.async_called(data = Int(32)(4))
+                col1.async_called(data = buffer[0][64:95].bitcast(Int(32)))
+                col2.async_called(data = buffer[1][96:127].bitcast(Int(32)))
                 log("Col Buffer data (hex): {:#034x}", buffer[1]) 
             
             with Cycle(5):
                 buffer[3] = rdata
-                col1.async_called(data = Int(32)(2))
-                col2.async_called(data = Int(32)(5))
-                col3.async_called(data = Int(32)(8))
+                col1.async_called(data = buffer[0][32:63].bitcast(Int(32)))
+                col2.async_called(data = buffer[1][64:95].bitcast(Int(32)))
+                col3.async_called(data = buffer[2][96:127].bitcast(Int(32)))
                 log("Col Buffer data (hex): {:#034x}", buffer[2]) 
             
             with Cycle(6):
-                log("Row Buffer data (hex): {:#034x}", buffer[3])
-                col1.async_called(data = Int(32)(3))
-                col2.async_called(data = Int(32)(6))
-                col3.async_called(data = Int(32)(9))
-                col4.async_called(data = Int(32)(12))
+                log("Col Buffer data (hex): {:#034x}", buffer[3])
+                col1.async_called(data = buffer[0][0:31].bitcast(Int(32)))
+                col2.async_called(data = buffer[1][32:63].bitcast(Int(32)))
+                col3.async_called(data = buffer[2][64:95].bitcast(Int(32)))
+                col4.async_called(data = buffer[3][96:127].bitcast(Int(32)))
 
             with Cycle(7):
-                col2.async_called(data = Int(32)(7))
-                col3.async_called(data = Int(32)(10))
-                col4.async_called(data = Int(32)(13))
+                col2.async_called(data = buffer[1][0:31].bitcast(Int(32)))
+                col3.async_called(data = buffer[2][32:63].bitcast(Int(32)))
+                col4.async_called(data = buffer[3][64:95].bitcast(Int(32)))
 
             with Cycle(8):
-                col3.async_called(data = Int(32)(11))
-                col4.async_called(data = Int(32)(14))
+                col3.async_called(data = buffer[2][0:31].bitcast(Int(32)))
+                col4.async_called(data = buffer[3][32:63].bitcast(Int(32)))
 
             with Cycle(9):
-                col4.async_called(data = Int(32)(15))
+                col4.async_called(data = buffer[3][0:31].bitcast(Int(32)))
 
         cnt[0] = cnt[0] + Int(width)(1)
 
@@ -257,6 +258,7 @@ def mem_systolic_array(sys_name, width, init_file_row, init_file_col, resource_b
 
     raw = utils.run_simulator(simulator_path)
     print(raw)
+    check_raw(raw)
     # utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
