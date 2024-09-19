@@ -251,7 +251,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // Instantiate the FIFO
     res.push_str(&format!(
       "
-  fifo #({width}, {depth}) fifo_{name}_i (
+  fifo #({fifo_width}, {fifo_depth}) fifo_{fifo_name}_i (
     .clk(clk),
     .rst_n(rst_n),
     .push_valid({push_valid}),
@@ -259,10 +259,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     .push_ready({push_ready}),
     .pop_valid({pop_valid}),
     .pop_data({pop_data}),
-    .pop_ready({pop_ready}));\n\n",
-      name = fifo_name,
-      width = fifo_width,
-      depth = fifo_depth,
+    .pop_ready({pop_ready}));\n\n"
     ));
 
     res

@@ -92,12 +92,15 @@ class Layer(Module):
                             valid_ab = (~v2[self.height-1:self.height-1]).concat(~v1[self.height-1:self.height-1]).bitcast(Int(2))
                             pred = ((~valid_ab) + Int(2)(1)) & valid_ab
                             index_next = pred.select1hot(index1, index2)
-                            next_layer.async_called(action=Int(1)(0), index=index_next, value=value_next)
+                            call = next_layer.async_called(action=Int(1)(0), index=index_next, value=value_next)
+                            call.bind.set_fifo_depth(action=1, index=1, value=1)
+
 
                         # Two child nodes are both occupied.
                         with Condition(v1[self.height-1:self.height-1] & v2[self.height-1:self.height-1]):
                             index_next = (v1[0:self.height-2] < v2[0:self.height-2]).select(index2, index1)
-                            next_layer.async_called(action=Int(1)(0), index=index_next, value=value_next)
+                            call = next_layer.async_called(action=Int(1)(0), index=index_next, value=value_next)
+                            call.bind.set_fifo_depth(action=1, index=1, value=1)
 
         # POP
         with Condition(self.action):
@@ -139,7 +142,8 @@ class Layer(Module):
                         vv = value_update.concat(Int(1)(1)).concat(vacancy)
                         self.elements[index0] = vv
 
-                        next_layer.async_called(action=Int(1)(1), index=index_next, value=Int(32)(0))
+                        call = next_layer.async_called(action=Int(1)(1), index=index_next, value=Int(32)(0))
+                        call.bind.set_fifo_depth(action=1, index=1, value=1)
                         
                     # One child is valid, another is occupied.
                     with Condition(v1[self.height-1:self.height-1] ^ v2[self.height-1:self.height-1]):
@@ -151,7 +155,8 @@ class Layer(Module):
                         vv = value_update.concat(Int(1)(1)).concat(vacancy)
                         self.elements[index0] = vv
 
-                        next_layer.async_called(action=Int(1)(1), index=index_next, value=Int(32)(0))
+                        call = next_layer.async_called(action=Int(1)(1), index=index_next, value=Int(32)(0))
+                        call.bind.set_fifo_depth(action=1, index=1, value=1)
 
                     # Two child nodes are both valid.
                     with Condition(~v1[self.height-1:self.height-1] & ~v2[self.height-1:self.height-1]):
@@ -168,7 +173,9 @@ class HeapPush(Module):
     @module.combinational
     def build(self, layer: Layer):
         bound = layer.bind(action=Int(1)(0), index=Int(32)(0))
-        bound.async_called(value=self.push_value)
+        call = bound.async_called(value=self.push_value)
+        call.bind.set_fifo_depth(action=1, index=1, value=1)
+
         
 class HeapPop(Module):
     
@@ -179,7 +186,8 @@ class HeapPop(Module):
     @module.combinational
     def build(self, layer: Layer):
         bound = layer.bind(action=Int(1)(1), index=Int(32)(0), value=Int(32)(1))
-        bound.async_called()        
+        call = bound.async_called()        
+        call.bind.set_fifo_depth(action=1, index=1, value=1)
         
 class Testbench(Module):
     
