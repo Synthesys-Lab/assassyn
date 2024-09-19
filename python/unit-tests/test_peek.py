@@ -34,11 +34,10 @@ class Driver(Module):
 
 def check(raw):
     for i in raw.split('\n'):
-        if "peeker:" in i:
+        if "peek:" in i:
             line_toks = i.split()
-            assert line_toks[-1] == line_toks[-2], \
-                f"peek: {line_toks[-2]}, pop: {line_toks[-1]}"
-            break
+            assert line_toks[-1] == line_toks[-3], \
+                f"peek: {line_toks[-3]}, pop: {line_toks[-1]}"
 
 def test_peek():
     sys = SysBuilder("peek")
@@ -54,8 +53,9 @@ def test_peek():
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    raw = utils.run_verilator(verilator_path)
-    check(raw)
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
+        check(raw)
 
 if __name__ == '__main__':
     test_peek()

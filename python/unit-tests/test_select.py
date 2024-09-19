@@ -12,20 +12,23 @@ class Driver(Module):
 
     @module.combinational
     def build(self):
-        rng0 = RegArray(Int(32), 1)
-        rng1 = RegArray(Int(32), 1)
+        rng0 = RegArray(UInt(32), 1)
+        rng1 = RegArray(UInt(32), 1)
 
         v0 = rng0[0]
         v1 = rng1[0]
 
-        v0 = v0 * Int(32)(12345)
-        v1 = v1 * Int(32)(54321)
+        v0 = v0 * UInt(32)(12345)
+        v1 = v1 * UInt(32)(54321)
         
-        rand0 = v0 + Int(32)(67890)
-        rand1 = v1 + Int(32)(9876)
+        rand0 = v0 + UInt(32)(67890)
+        rand1 = v1 + UInt(32)(9876)
 
-        rand0 = rand0[0: 31].bitcast(Int(32))
-        rand1 = rand1[0: 31].bitcast(Int(32))
+        rand0 = rand0[0: 31].bitcast(UInt(32))
+        rand1 = rand1[0: 31].bitcast(UInt(32))
+
+        rng0[0] = rand0
+        rng1[0] = rand1
 
         gt = rand0 > rand1
         mux = gt.select(rand0, rand1)

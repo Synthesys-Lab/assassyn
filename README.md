@@ -26,7 +26,7 @@ Refer `python/unit-tests/README.md` for more details on the feature-case corresp
 the following command.
 
 ````sh
-$ ./utils/build-verilator.sh
+$ ./scripts/build-verilator.sh
 $ source setup.sh # Re-run the script since it has a different environment variable for verilator
 ````
 
@@ -37,7 +37,7 @@ all other Python scripts.
 $ python python/unit-tests/test_driver.py 
 ````
 
-Refer our [developer doc](./docs/developers.md) for more details on tooling.
+Refer our [developer doc](./docs/developer/README.md) for more details on tooling.
 
 ## Why yet another RTL generator?
 

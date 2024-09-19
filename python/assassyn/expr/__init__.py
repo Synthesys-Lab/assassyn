@@ -2,5 +2,5 @@
 
 #pylint: disable=wildcard-import
 from .expr import *
-from .intrinsic import Intrinsic
+from .intrinsic import Intrinsic, finish
 from . import comm

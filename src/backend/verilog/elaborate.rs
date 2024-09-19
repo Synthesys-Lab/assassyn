@@ -15,7 +15,7 @@ use crate::{
   ir::{instructions::BlockIntrinsic, node::*, visitor::Visitor, *},
 };
 
-use self::{expr::subcode, module::Attribute};
+use self::{expr::subcode, expr::Metadata, module::Attribute};
 
 use super::{
   gather::{gather_exprs_externally_used, ExternalUsage, Gather},
@@ -41,6 +41,7 @@ struct VerilogDumper<'a, 'b> {
   triggers: HashMap<String, Gather>,    // module_name -> [pred]
   external_usage: ExternalUsage,
   current_module: String,
+  before_wait_until: bool,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
@@ -54,6 +55,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       triggers: HashMap::new(),
       current_module: String::new(),
       external_usage,
+      before_wait_until: false,
     }
   }
 
@@ -166,6 +168,29 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let display = utils::DisplayInstance::from_fifo(fifo, true);
     let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));
     let fifo_width = fifo.scalar_ty().get_bits();
+    let fifo_depth = fifo
+      .users()
+      .iter()
+      .find_map(|node| {
+        node
+          .as_ref::<Operand>(self.sys)
+          .ok()
+          .and_then(|op| op.get_user().as_expr::<FIFOPush>(self.sys).ok())
+      })
+      .and_then(|push| {
+        push.get().metadata_iter().next().map(|m| {
+          let Metadata::FIFODepth(depth) = m;
+          *depth
+        })
+      })
+      .unwrap_or(4);
+
+    let fifo_depth = if fifo_depth > 0 && (fifo_depth & (fifo_depth - 1)) == 0 {
+      fifo_depth
+    } else {
+      fifo_depth.next_power_of_two()
+    };
+
     res.push_str(&format!("  // {}\n", fifo));
 
     let push_valid = display.field("push_valid"); // If external pushers have data to push
@@ -226,7 +251,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // Instantiate the FIFO
     res.push_str(&format!(
       "
-  fifo #({width}) fifo_{name}_i (
+  fifo #({fifo_width}, {fifo_depth}) fifo_{fifo_name}_i (
     .clk(clk),
     .rst_n(rst_n),
     .push_valid({push_valid}),
@@ -234,9 +259,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     .push_ready({push_ready}),
     .pop_valid({pop_valid}),
     .pop_data({pop_data}),
-    .pop_ready({pop_ready}));\n\n",
-      name = fifo_name,
-      width = fifo_width,
+    .pop_ready({pop_ready}));\n\n"
     ));
 
     res
@@ -434,8 +457,6 @@ module top (
         }
       }
     }
-
-    dbg!(&mem_init_map);
 
     // array storage element definitions
     for array in self.sys.array_iter() {
@@ -702,6 +723,7 @@ module {} (
     let mut wait_until: String = "".to_string();
 
     let skip = if let Some(wu_intrin) = module.get_body().get_wait_until() {
+      self.before_wait_until = true;
       let mut skip = 0;
       let body = module.get_body();
       let body_iter = body.body_iter();
@@ -714,11 +736,12 @@ module {} (
       }
       let bi = wu_intrin.as_expr::<BlockIntrinsic>(self.sys).unwrap();
       let value = bi.value();
-      wait_until = format!(" && ({} != '0)", namify(&value.to_string(self.sys)));
+      wait_until = format!(" && ({})", namify(&value?.to_string(self.sys)));
       skip
     } else {
       0
     };
+    self.before_wait_until = false;
 
     res.push_str("  logic executed;\n");
 
@@ -808,7 +831,7 @@ module {} (
         .push_back(if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
           dump_ref!(self.sys, &cond)
         } else {
-          format!("({} != '0)", dump_ref!(self.sys, &cond))
+          format!("(|{})", dump_ref!(self.sys, &cond))
         });
       1
     } else if let Some(cycle) = block.get_cycle() {
@@ -844,7 +867,7 @@ module {} (
         let id = namify(&expr.upcast().to_string(self.sys));
         let expose = if self.external_usage.is_externally_used(&expr) {
           format!(
-            "  assign expose_{id} = {id};\n  assign expose_{id}_valid = {};\n",
+            "  assign expose_{id} = {id};\n  assign expose_{id}_valid = executed && {};\n",
             self.get_pred().unwrap_or("1".to_string())
           )
         } else {
@@ -955,14 +978,21 @@ module {} (
         format_str = format_str.replace('"', "");
 
         let mut res = String::new();
+
         res.push_str(&format!(
-          "  always_ff @(posedge clk iff executed{}) ",
+          "  always_ff @(posedge clk) if ({}{})",
+          if self.before_wait_until {
+            "1'b1"
+          } else {
+            "executed"
+          },
           self
             .get_pred()
             .map(|p| format!(" && {}", p))
             .unwrap_or("".to_string())
         ));
-        res.push_str("$display(\"%t\\t");
+
+        res.push_str(&format!("$display(\"%t\\t[{}]\\t\\t", self.current_module));
         res.push_str(&format_str);
         res.push_str("\", $time - 200, ");
         for elem in expr.operand_iter().skip(1) {
@@ -1148,7 +1178,13 @@ module {} (
           .join(" | ")
       }
 
-      _ => panic!("Unknown OP: {:?}", expr.get_opcode()),
+      Opcode::BlockIntrinsic { intrinsic } => match intrinsic {
+        subcode::BlockIntrinsic::Finish => {
+          let pred = self.get_pred().unwrap_or("1".to_string());
+          format!(" always_ff @(posedge clk) if (executed && {}) $finish();\n", pred)
+        }
+        _ => panic!("Unknown block intrinsic: {:?}", intrinsic),
+      },
     };
 
     let mut res = if let Some((id, ty)) = decl {

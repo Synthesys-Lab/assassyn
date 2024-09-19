@@ -77,5 +77,6 @@ register_subcode!(
     Condition(condition "condition"),
     Cycled(cycled "cycled"),
     WaitUntil(wait_until "wait_until"),
+    Finish(finish "finish"),
   }
 );

@@ -510,7 +510,7 @@ impl SysBuilder {
   }
 
   /// Add a bound argument to the given bind.
-  pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) {
+  pub fn bind_arg(&mut self, bind: BaseNode, key: String, value: BaseNode) -> BaseNode {
     let port = {
       let bind = bind.as_ref::<LazyBind>(self).unwrap();
       assert!(bind.get_arg(&key).is_none(), "Argument {} already exists!", key);
@@ -539,6 +539,7 @@ impl SysBuilder {
         .get_mut()
         .bind_arg(key, push);
     }
+    push
   }
 
   fn indexable(&self, idx: BaseNode) -> bool {
@@ -781,6 +782,12 @@ impl SysBuilder {
   /// Create a zext operation.
   pub fn create_zext(&mut self, src: BaseNode, dest_ty: DataType) -> BaseNode {
     self.create_cast_impl(src, dest_ty, subcode::Cast::ZExt)
+  }
+
+  /// Create a halt operation to terminate the program.
+  pub fn create_finish(&mut self) -> BaseNode {
+    let intrinsic = subcode::BlockIntrinsic::Finish;
+    self.create_expr(DataType::void(), Opcode::BlockIntrinsic { intrinsic }, vec![], true)
   }
 
   pub(crate) fn dispose(&mut self, node: BaseNode) {

@@ -388,7 +388,9 @@ impl Visitor<String> for ElaborateModule<'_> {
       Opcode::Bind => "()".into(),
       Opcode::BlockIntrinsic { intrinsic } => {
         let bi = expr.as_sub::<instructions::BlockIntrinsic>().unwrap();
-        let value = dump_ref!(self.module_ctx, self.sys, &bi.value());
+        let value = bi
+          .value()
+          .map_or("".into(), |x| dump_ref!(self.module_ctx, self.sys, &x));
         match intrinsic {
           subcode::BlockIntrinsic::Value => value,
           subcode::BlockIntrinsic::Cycled => {
@@ -406,6 +408,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             open_scope = true;
             format!("if {} {{", value)
           }
+          subcode::BlockIntrinsic::Finish => "std::process::exit(0);".to_string(),
         }
       }
     };
@@ -583,7 +586,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         .map(|x| format!("self.{}_triggered", namify(x.as_ref::<Module>(sys).unwrap().get_name())))
         .collect::<Vec<_>>();
       fd.write_all("if ".as_bytes())?;
-      fd.write_all(conds.join(" && ").as_bytes())?;
+      fd.write_all(conds.join(" || ").as_bytes())?;
       fd.write_all(" {".as_bytes())?;
     }
     fd.write_all(format!("super::modules::{}(self);", module_name).as_bytes())?;

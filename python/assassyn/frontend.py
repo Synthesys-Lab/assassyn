@@ -4,7 +4,7 @@
 from .array import RegArray, Array
 from .dtype import DType, Int, UInt, Float, Bits
 from .builder import SysBuilder, ir_builder, Singleton
-from .expr import Expr, log, concat
+from .expr import Expr, log, concat, finish
 from .module import Module, Port, Memory, Downstream
 from .block import Condition, Cycle
 from . import module

@@ -5,27 +5,32 @@ from ..builder import ir_builder
 from .expr import Expr
 
 INTRIN_INFO = {
-    # Intrinsic operations opcode: (mnemonic, num of args, side effect)
-    900: ('wait_until', 1, True)
+    # Intrinsic operations opcode: (mnemonic, num of args, valued, side effect)
+    900: ('wait_until', 1, False, True),
+    901: ('finish', 0, False, True)
 }
 
 class Intrinsic(Expr):
     '''The class for intrinsic operations'''
 
     WAIT_UNTIL = 900
+    FINISH = 901
 
     def __init__(self, opcode, *args):
         super().__init__(opcode)
-        _, num_args, _ = INTRIN_INFO[opcode]
+        _, num_args, _, _ = INTRIN_INFO[opcode]
         if num_args is not None:
             assert len(args) == num_args
         self.args = args
 
     def __repr__(self):
         args = {", ".join(i.as_operand() for i in self.args[0:])}
-        mn, _, side_effect = INTRIN_INFO[self.opcode]
+        mn, _, valued, side_effect = INTRIN_INFO[self.opcode]
         side_effect = ['', 'side effect '][side_effect]
-        return f'{self.as_operand()} = {side_effect}intrinsic.{mn}({args})'
+        rhs = f'{side_effect}intrinsic.{mn}({args})'
+        if valued:
+            return f'{self.as_operand()} = {rhs}'
+        return rhs
 
     def __enter__(self):
         return self
@@ -45,3 +50,8 @@ def _wait_until(cond):
 def is_wait_until(expr):
     '''Check if the expression is a wait-until intrinsic.'''
     return isinstance(expr, Intrinsic) and expr.opcode == Intrinsic.WAIT_UNTIL
+
+@ir_builder(node_type='expr')
+def finish():
+    '''Finish the simulation.'''
+    return Intrinsic(Intrinsic.FINISH)

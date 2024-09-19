@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use crate::ir::node::BaseNode;
 use crate::ir::{expr::subcode, Opcode};
 
 use super::BlockIntrinsic;
@@ -11,6 +12,10 @@ impl BlockIntrinsic<'_> {
       Opcode::BlockIntrinsic { intrinsic } => intrinsic,
       _ => panic!("Expecting Opcode::BlockIntrinsic, but got {:?}", self.expr.get_opcode()),
     }
+  }
+
+  pub fn value(&self) -> Option<BaseNode> {
+    return self.get().get_operand_value(0);
   }
 }
 
@@ -24,10 +29,15 @@ impl Display for BlockIntrinsic<'_> {
         subcode::BlockIntrinsic::Condition => "if",
         subcode::BlockIntrinsic::WaitUntil => "wait_until",
         subcode::BlockIntrinsic::Cycled => "cycled",
+        subcode::BlockIntrinsic::Finish => "halt",
       },
-      self.value().to_string(self.get().sys),
+      self
+        .value()
+        .map_or("".into(), |x| x.to_string(self.get().sys)),
       match self.get_subcode() {
-        subcode::BlockIntrinsic::Value | subcode::BlockIntrinsic::WaitUntil => "",
+        subcode::BlockIntrinsic::Value
+        | subcode::BlockIntrinsic::WaitUntil
+        | subcode::BlockIntrinsic::Finish => "",
         subcode::BlockIntrinsic::Condition | subcode::BlockIntrinsic::Cycled => "{",
       },
     )

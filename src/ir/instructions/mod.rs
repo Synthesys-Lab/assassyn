@@ -95,7 +95,7 @@ register_opcode!(
   Slice => { (x, 0, BaseNode) (l_intimm, 1, node::IntImm) (r_intimm, 2, node::IntImm) },
   Concat => { (msb, 0, BaseNode) (lsb, 1, BaseNode) },
   Cast { cast } => { (x, 0, BaseNode) }, // NOTE: This "," cannot be omitted!
-  BlockIntrinsic { intrinsic } => { (value, 0, BaseNode) },
+  BlockIntrinsic { intrinsic } => { },
   PureIntrinsic { intrinsic } => { },
   Log => { },
 );

@@ -16,13 +16,6 @@ use super::{block::Block, node::BaseNode};
 
 pub mod subcode;
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
-pub enum BindKind {
-  KVBind,
-  Sequential,
-  Unknown,
-}
-
 macro_rules! find_opcode_attr {
   ( $target:ident; $($ky:ident),* ) => {
     find_opcode_attr!(@find $target ; $($ky),*)
@@ -167,6 +160,11 @@ impl Opcode {
   }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum Metadata {
+  FIFODepth(usize),
+}
+
 pub struct Expr {
   name: Option<String>,
   pub(super) key: usize,
@@ -175,6 +173,7 @@ pub struct Expr {
   opcode: Opcode,
   pub(crate) operands: Vec<BaseNode>,
   pub(crate) user_set: HashSet<BaseNode>,
+  metadata: Vec<Metadata>,
 }
 
 impl Expr {
@@ -192,6 +191,7 @@ impl Expr {
       opcode,
       operands,
       user_set: HashSet::new(),
+      metadata: Vec::new(),
     }
   }
 
@@ -207,7 +207,7 @@ impl Expr {
     if let Some(x) = self.name.clone() {
       x
     } else {
-      format!("_{}", self.key)
+      format!("var_{}", self.key)
     }
   }
 }
@@ -273,6 +273,10 @@ impl ExprRef<'_> {
       .position(|x| self.get_key() == x.get_key() && matches!(x.get_kind(), NodeKind::Expr))
       .unwrap()
   }
+
+  pub fn metadata_iter(&self) -> impl Iterator<Item = &Metadata> + '_ {
+    self.get().metadata.iter()
+  }
 }
 
 impl ExprMut<'_> {
@@ -316,5 +320,9 @@ impl ExprMut<'_> {
       module_mut.get_mut().symbol_table.insert(&name, node)
     };
     self.get_mut().name = Some(name);
+  }
+
+  pub fn add_metadata(&mut self, metadata: Metadata) {
+    self.get_mut().metadata.push(metadata);
   }
 }

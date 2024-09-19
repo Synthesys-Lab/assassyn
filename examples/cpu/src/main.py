@@ -95,11 +95,13 @@ class Execution(Module):
         memory.async_called(we = Int(1)(0), wdata = a, addr = request_addr)
         wb = writeback.bind(opcode = self.opcode, result = result, rd = self.rd_reg)
 
-        with Condition(self.rd_reg != Bits(5)(0)):
-            log("set x{} as on-write", self.rd_reg)
-            return wb, Bits(32)(1) << self.rd_reg
+        return_rd = None
 
-        return wb, None
+        with Condition(self.rd_reg != Bits(5)(0)):
+            return_rd = self.rd_reg
+            log("set x{} as on-write", return_rd)
+
+        return wb, return_rd
 
     @module.wait_until
     def wait_until(
@@ -114,18 +116,18 @@ class Execution(Module):
 
         on_write = reg_onwrite[0]
 
-        a_valid = (~(on_write >> a_reg & Bits(32)(1)))[0:0] | \
-            (exec_bypass_reg[0] == a_reg) | \
-            (mem_bypass_reg[0] == a_reg)
-        b_valid = (~(on_write >> b_reg & Bits(32)(1)))[0:0] | \
-            (exec_bypass_reg[0] == b_reg) | \
-            (mem_bypass_reg[0] == b_reg)
+        a_valid = (((~(on_write >> self.a_reg.peek())) & Bits(32)(1)))[0:0] | \
+            (exec_bypass_reg[0] == self.a_reg.peek()) | \
+            (mem_bypass_reg[0] == self.a_reg.peek())
+        b_valid = (((~(on_write >> self.b_reg.peek())) & Bits(32)(1)))[0:0] | \
+            (exec_bypass_reg[0] == self.b_reg.peek()) | \
+            (mem_bypass_reg[0] == self.b_reg.peek())
 
-        rd_valid = (~(on_write >> rd_reg & Bits(32)(1)))[0:0]
+        rd_valid = (((~(on_write >> self.rd_reg.peek())) & Bits(32)(1)))[0:0]
 
         valid = a_valid & b_valid & rd_valid
         with Condition(~valid):
-            log("operand not ready, stall execution, x{}: {}, x{}: {}, x{}: {}", \
+            log("operand not ready, stall execution, rs1-x{}: {}, rs2-x{}: {}, rd-x{}: {}", \
                 a_reg, a_valid, \
                 b_reg, b_valid, \
                 rd_reg, rd_valid)
@@ -160,10 +162,14 @@ class WriteBack(Module):
         # {is_memory, is_result}
         data = cond.select1hot(self.result, self.mdata)
 
+        return_rd = None
+
         with Condition((self.rd != Bits(5)(0))):
             log("opcode: {:b}, writeback: x{} = {:x}", self.opcode, self.rd, data)
             reg_file[self.rd] = data
-            return Bits(32)(1) << self.rd
+            return_rd = self.rd
+
+        return return_rd
 
 class Decoder(Memory):
     
@@ -307,11 +313,15 @@ class OnwriteDS(Downstream):
         super().__init__()
 
     @downstream.combinational
-    def build(self, reg_onwrite: Array, decoder_rd: Value, writeback_rd: Value):
-        id_rd = decoder_rd.optional(Bits(32)(0))
-        wb_rd = writeback_rd.optional(Bits(32)(0))
+    def build(self, reg_onwrite: Array, exec_rd: Value, writeback_rd: Value):
+        ex_rd = exec_rd.optional(Bits(5)(0))
+        wb_rd = writeback_rd.optional(Bits(5)(0))
 
-        reg_onwrite[0] = reg_onwrite[0] ^ id_rd ^ wb
+        log("ownning: x{}, releasing: x{}", ex_rd, wb_rd)
+
+        reg_onwrite[0] = reg_onwrite[0] ^ \
+                        (Bits(32)(1) << wb_rd) ^ \
+                        (Bits(32)(1) << ex_rd)
 
 class Driver(Module):
     
@@ -323,6 +333,37 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
+def check(raw):
+    data_path = f'{utils.repo_path()}/examples/cpu/resource/0to100.data'
+    with open(data_path, 'r') as f:
+        data = []
+        for line in f:
+            line = line.split('//')[0].strip()
+            if line and not line.startswith('@'):
+                try:
+                    data.append(int(line, 16))
+                except ValueError:
+                    print(f"Warning: Skipping invalid line: {line}")
+
+    accumulator = 0
+    ideal_accumulator = 0
+    data_index = 0
+
+    for line in raw.split('\n'):
+        if 'opcode: 110011, writeback: x10 =' in line or 'opcode: 0110011, writeback: x10 =' in line:
+            value = int(line.split('=')[-1].strip(), 16)
+            if value != accumulator:
+                accumulator = value
+                if data_index < len(data):
+                    ideal_accumulator += data[data_index]
+                    assert accumulator == ideal_accumulator,\
+                    f"Mismatch at step {data_index + 1}:\
+                    CPU result {accumulator} != Ideal result {ideal_accumulator}"
+                    data_index += 1
+
+    print(f"Final CPU sum: {accumulator} (0x{accumulator:x})")
+    print(f"Final ideal sum: {ideal_accumulator} (0x{ideal_accumulator:x})")
+    print(f"Final difference: {accumulator - ideal_accumulator}")
 
 def main():
     sys = SysBuilder('cpu')
@@ -346,15 +387,9 @@ def main():
         mem_bypass_data = RegArray(bits32, 1)
 
         writeback = WriteBack()
-        writeback.build(reg_file = reg_file)
+        wb_rd = writeback.build(reg_file = reg_file)
 
         memory_access = MemoryAccess('0to100.data')
-        memory_access.wait_until()
-        memory_access.build(
-            writeback = writeback, 
-            mem_bypass_reg = mem_bypass_reg, 
-            mem_bypass_data=mem_bypass_data
-        )
 
         exec = Execution()
         exec.wait_until(
@@ -362,7 +397,7 @@ def main():
             mem_bypass_reg = mem_bypass_reg, 
             reg_onwrite = reg_onwrite
         )
-        wb = exec.build(
+        wb, exec_rd = exec.build(
             pc = pc,
             on_branch=on_branch,
             exec_bypass_reg = exec_bypass_reg,
@@ -374,15 +409,30 @@ def main():
             writeback = writeback
         )
 
+        memory_access.wait_until()
+        memory_access.build(
+            writeback = wb, 
+            mem_bypass_reg = mem_bypass_reg, 
+            mem_bypass_data=mem_bypass_data
+        )
+
         decoder = Decoder('0to100.exe')
         decoder.wait_until()
         decoder.build(pc = pc, on_branch = on_branch, exec = exec)
+
+        onwrite_downstream = OnwriteDS()
     
         fetcher = Fetcher()
         fetcher.build(decoder, pc, on_branch)
 
         driver = Driver()
         driver.build(fetcher)
+
+        onwrite_downstream.build(
+            reg_onwrite=reg_onwrite,
+            exec_rd=exec_rd,
+            writeback_rd=wb_rd,
+        )
 
     print(sys)
     conf = config(
@@ -395,9 +445,10 @@ def main():
     simulator_path, verilog_path = elaborate(sys, **conf)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
+    check(raw)
 
     raw = utils.run_verilator(verilog_path)
+    check(raw)
 
 if __name__ == '__main__':
     main()
