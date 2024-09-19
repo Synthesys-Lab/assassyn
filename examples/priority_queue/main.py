@@ -66,10 +66,7 @@ class Layer(Module):
                 element_update = self.value.concat(ONE).concat(vacancy0)
                 self.elements[index0] = element_update
                 log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                    self.value, self.level_I, index0, value0, valid0, vacancy0,
-                    element_update[self.height+1:self.height+32],
-                    element_update[self.height:self.height],
-                    element_update[0:self.height-1])
+                    self.value, self.level_I, index0, value0, valid0, vacancy0, self.value, ONE, vacancy0)
                 
             # The current element is occupied.
             with Condition(valid0):                                            
@@ -87,10 +84,7 @@ class Layer(Module):
                     element_update = value_current.concat(ONE).concat(vacancy)
                     self.elements[index0] = element_update
                     log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                        self.value, self.level_I, index0, value0, valid0, vacancy0,
-                        element_update[self.height+1:self.height+32],
-                        element_update[self.height:self.height],
-                        element_update[0:self.height-1])
+                        self.value, self.level_I, index0, value0, valid0, vacancy0, value_current, ONE, vacancy)
                     
                     # Call next layer
                     if next_elements:
