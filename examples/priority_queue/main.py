@@ -24,7 +24,7 @@ class Layer(Module):
         if level < 0 or level >= height:
             raise ValueError(f"Level must be between 0 and {height-1}, got {level}")
             
-        self.height = height-level+1    # Not the heap height, but the layer height
+        self.height = height-level+1    # Not the heap height, but the layer height. TODO: Vacancy can be reduced by 1 in the future.
         self.level = level
         self.level_I = Int(32)(level)
         self.name = f"level_{level}"
@@ -229,9 +229,6 @@ def check(raw,heap_height):
             value = line_toks[-1]
             outputs.append(int(value))
             cnt += 1
-            
-    print(pops)
-    print(outputs)
 
     for i in range(len(pops)):
         assert pops[i] == outputs[i] 
@@ -240,7 +237,7 @@ def check(raw,heap_height):
 def priority_queue(heap_height=3):    
     # Build a layer with the given heap height and layer level.
     def build_layer(heap_height: int, level: int):
-        element_type = Bits(32 + 1 + (heap_height-level+1))  # value + occupied + vacancy
+        element_type = Bits(32 + 1 + (heap_height-level+1))  # value + occupied + vacancy. TODO: Vacancy can be reduced by 1 in the future.
         size = 2 ** level
         vacancy = 2 ** (heap_height - level) - 2
         initializer = [vacancy] * size
