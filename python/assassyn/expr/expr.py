@@ -317,8 +317,9 @@ class Bind(Expr):
         for v in self.pushes:
             depth = self.fifo_depths.get(v.as_operand())
             depth_str = f", depth={depth}" if depth is not None else ""
-            args.append(f'{v.as_operand()}\
-                /* {v.fifo.as_operand()}={v.val.as_operand()}{depth_str} */')
+            operand = v.as_operand()
+            operand = f'{operand} /* {v.fifo.as_operand()}={v.val.as_operand()}{depth_str} */'
+            args.append(operand)
         args = ', '.join(args)
         callee = self.callee.as_operand()
         lval = self.as_operand()

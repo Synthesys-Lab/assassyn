@@ -105,7 +105,8 @@ impl Display for Bind<'_> {
       })
       .collect::<Vec<String>>()
       .join(", ");
-    write!(f, "bind {} {{ {} }}", callee.get_name(), arg_list)
+    let lhs = self.expr.upcast().to_string(self.expr.sys);
+    write!(f, "{} = bind {} {{ {} }}", lhs, callee.get_name(), arg_list)
   }
 }
 
