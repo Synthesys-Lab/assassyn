@@ -99,6 +99,12 @@ class Record(DType):
         #pylint: disable=import-outside-toplevel
         return RecordValue(self, **kwargs)
 
+    def view(self, value):
+        '''Create a view of RecordValue for the given value. For now, users should ensure the
+        bits value has the same length as the record type.
+        '''
+        return RecordValue(self, self, value)
+
     def __repr__(self):
         fields = list(f'{name}: {dtype}' for name, (dtype, _) in self.fields.items())
         fields = ', '.join(fields)
@@ -146,7 +152,15 @@ class RecordValue:
     '''The value class for the record type. Remember, this is a right-value object, so each
     field of this record is immutable!'''
 
-    def __init__(self, dtype, **kwargs):
+    def __init__(self, dtype, *args, **kwargs):
+
+        if args:
+            assert len(args) == 1, "Expecting only one argument!"
+            # TODO(@were): Strictly check the dtype
+            # assert args[0].dtype == dtype, "Expecting the same Record type!"
+            self.payload = args[0]
+            self.dtype = dtype
+            return
 
         assert isinstance(dtype, Record), "Expecting a Record type!"
 
