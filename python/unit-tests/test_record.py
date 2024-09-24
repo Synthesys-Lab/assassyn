@@ -75,7 +75,6 @@ def test_record():
     simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
     check_raw(raw)
 
     if verilator_path:
