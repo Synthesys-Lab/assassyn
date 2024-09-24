@@ -148,3 +148,44 @@ class Value:
         NOTE: This operation is only usable in downstream modules.'''
         from .expr import PureInstrinsic
         return PureInstrinsic(PureInstrinsic.VALUE_VALID, self)
+
+class RecordValue:
+    '''The value class for the record type. Remember, this is a right-value object, so each
+    field of this record is immutable!'''
+
+    def __init__(self, dtype, **kwargs):
+
+        from .dtype import Record
+        assert isinstance(dtype, Record), "Expecting a Record type!"
+
+        ordered_values = []
+        fields_set = set(dtype.fields.keys())
+        # TODO(@were): Check all the values are already in bits type
+        for name, value in kwargs.items():
+            assert name in dtype.fields, f'Field {name} not found in {dtype.fields} of this Record'
+            fields_set.remove(name)
+            _, attr_slice = dtype.fields[name]
+            ordered_values.append((attr_slice, value))
+
+        assert not fields_set, f'Fields are not fully initialized, missing: {fields_set}'
+        ordered_values.sort(key=lambda x: x[0].start)
+
+        from .expr import concat
+        payload = concat(*[v for _, v in ordered_values])
+
+        self.payload = payload
+        self.dtype = dtype
+
+    def as_operand(self):
+        '''Return the payload as an operand'''
+        return self.payload.as_operand()
+
+    def __repr__(self):
+        return f'RecordValue({self.dtype}, {self.payload})'
+
+    # A Python TIP: __getattr__ is a "fallback" method, when "name" attribute is not found in the
+    # self object. However, __getattribute__ is a "hook" method, which is called when every a.b
+    # field access is made. If you do anything like self.a in __getattribute__, it will cause a
+    # infinite recursion.
+    def __getattr__(self, name):
+        return self.dtype.attributize(self.payload, name)

@@ -7,6 +7,7 @@ from functools import reduce
 from ..builder import ir_builder
 from ..value import Value
 from ..utils import identifierize
+from ..dtype import Record, Bits
 
 class Expr(Value):
     '''The frontend base node for expressions'''
@@ -110,9 +111,13 @@ class FIFOPop(Expr):
     def __init__(self, fifo):
         super().__init__(FIFOPop.FIFO_POP)
         self.fifo = fifo
+        self.dtype = fifo.dtype
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.fifo.as_operand()}.pop()'
+
+    def __getattr__(self, name):
+        return self.dtype.attributize(self, name)
 
 
 class ArrayWrite(Expr):
@@ -120,13 +125,14 @@ class ArrayWrite(Expr):
 
     ARRAY_WRITE = 401
 
-    def __init__(self, arr, idx, val):
+    def __init__(self, arr, idx: Value, val: Value):
         super().__init__(ArrayWrite.ARRAY_WRITE)
         self.arr = arr
         self.idx = idx
         self.val = val
 
     def __repr__(self):
+        print(type(self.val))
         return f'{self.arr.as_operand()}[{self.idx.as_operand()}] = {self.val.as_operand()}'
 
 
@@ -135,13 +141,17 @@ class ArrayRead(Expr):
 
     ARRAY_READ = 400
 
-    def __init__(self, arr, idx):
+    def __init__(self, arr, idx: Value):
         super().__init__(ArrayRead.ARRAY_READ)
         self.arr = arr
         self.idx = idx
+        self.dtype = arr.scalar_ty
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.arr.as_operand()}[{self.idx.as_operand()}]'
+
+    def __getattr__(self, name):
+        return self.dtype.attributize(self, name)
 
 class Log(Expr):
     '''The class for log operation. NOTE: This operation is just like verilog $display, which is
@@ -169,6 +179,7 @@ class Slice(Expr):
         from ..dtype import to_uint
         self.l = to_uint(l)
         self.r = to_uint(r)
+        self.dtype = Bits(r - l + 1)
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.x.as_operand()}[{self.l}:{self.r}]'
