@@ -7,7 +7,7 @@ from functools import reduce
 from ..builder import ir_builder
 from ..value import Value
 from ..utils import identifierize
-from ..dtype import Record, Bits
+from ..dtype import Bits
 
 class Expr(Value):
     '''The frontend base node for expressions'''
@@ -132,7 +132,6 @@ class ArrayWrite(Expr):
         self.val = val
 
     def __repr__(self):
-        print(type(self.val))
         return f'{self.arr.as_operand()}[{self.idx.as_operand()}] = {self.val.as_operand()}'
 
 

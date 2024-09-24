@@ -18,18 +18,18 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
   let runtime = quote! {
     pub trait Cycled {
       fn cycle(&self) -> usize;
-      fn pusher(&self) -> String;
+      fn pusher(&self) -> &'static str;
     }
 
     pub struct ArrayWrite<T: Sized + Default + Clone> {
       cycle: usize,
       addr: usize,
       data: T,
-      pusher: String,
+      pusher: &'static str,
     }
 
     impl <T: Sized + Default + Clone> ArrayWrite<T> {
-      pub fn new(cycle: usize, addr: usize, data: T, pusher: String) -> Self {
+      pub fn new(cycle: usize, addr: usize, data: T, pusher: &'static str) -> Self {
         ArrayWrite { cycle, addr, data, pusher }
       }
     }
@@ -62,22 +62,22 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
     pub struct FIFOPush<T: Sized> {
       cycle: usize,
       data: T,
-      pusher: String,
+      pusher: &'static str,
     }
 
     impl <T: Sized> FIFOPush<T> {
-      pub fn new(cycle: usize, data: T, pusher: String) -> Self {
+      pub fn new(cycle: usize, data: T, pusher: &'static str) -> Self {
         FIFOPush { cycle, data, pusher }
       }
     }
 
     pub struct FIFOPop {
       cycle: usize,
-      pusher: String,
+      pusher: &'static str,
     }
 
     impl FIFOPop {
-      pub fn new(cycle: usize, pusher: String) -> Self {
+      pub fn new(cycle: usize, pusher: &'static str) -> Self {
         FIFOPop { cycle, pusher }
       }
     }
@@ -119,8 +119,8 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       fn cycle(&self) -> usize {
         self.cycle
       }
-      fn pusher(&self) -> String {
-        self.pusher.clone()
+      fn pusher(&self) -> &'static str {
+        self.pusher
       }
     }
 
@@ -128,8 +128,8 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       fn cycle(&self) -> usize {
         self.cycle
       }
-      fn pusher(&self) -> String {
-        self.pusher.clone()
+      fn pusher(&self) -> &'static str {
+        self.pusher
       }
     }
 
@@ -137,8 +137,8 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       fn cycle(&self) -> usize {
         self.cycle
       }
-      fn pusher(&self) -> String {
-        self.pusher.clone()
+      fn pusher(&self) -> &'static str {
+        self.pusher
       }
     }
 

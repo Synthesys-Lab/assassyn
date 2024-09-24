@@ -228,7 +228,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         quote::quote! {
           let stamp = sim.stamp;
           sim.#array.write.push(
-            ArrayWrite::new(stamp + 50, #idx as usize, #value.clone(), #module_writer.to_string()));
+            ArrayWrite::new(stamp + 50, #idx as usize, #value.clone(), #module_writer));
         }
         .to_string()
       }
@@ -245,7 +245,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         let module_name = &self.module_name;
         quote::quote! {{
           let stamp = sim.stamp;
-          sim.#fifo_id.pop.push(FIFOPop::new(stamp + 50, #module_name.to_string()));
+          sim.#fifo_id.pop.push(FIFOPop::new(stamp + 50, #module_name));
           sim.#fifo_id.payload.front().unwrap().clone()
         }}
         .to_string()
@@ -290,7 +290,7 @@ impl Visitor<String> for ElaborateModule<'_> {
         quote::quote! {
           let stamp = sim.stamp;
           sim.#fifo_id.push.push(
-            FIFOPush::new(stamp + 50, #value.clone(), #module_writer.to_string()));
+            FIFOPush::new(stamp + 50, #value.clone(), #module_writer));
         }
         .to_string()
       }

@@ -98,7 +98,9 @@ def generate_dtype(ty: dtype.DType):
         return f'{prefix}::int_ty({ty.bits})'
     if isinstance(ty, dtype.UInt):
         return f'{prefix}::uint_ty({ty.bits})'
-    assert isinstance(ty, dtype.Bits), f'{ty} is given'
+    if isinstance(ty, dtype.Bits):
+        return f'{prefix}::bits_ty({ty.bits})'
+    assert isinstance(ty, dtype.Record), 'Expecting a record type, but got {ty}'
     return f'{prefix}::bits_ty({ty.bits})'
 
 def generate_init_value(init_value, ty: dtype.DType):

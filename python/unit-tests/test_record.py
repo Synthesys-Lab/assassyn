@@ -13,8 +13,10 @@ class Adder(Module):
 
     @module.combinational
     def build(self):
-        c = self.a.payload + self.b.payload
-        log("Adder: {} + {} = {}", self.a, self.b, c)
+        valid = self.a.is_odd & self.b.is_odd
+        with Condition(valid):
+            c = self.a.payload + self.b.payload
+            log("Adder: {} + {} = {}", self.a.payload, self.b.payload, c)
 
 class Driver(Module):
 
@@ -27,13 +29,13 @@ class Driver(Module):
         cnt = RegArray(record_ty, 1)
 
         value = cnt[0].payload
-        valid = cnt[0].valid
+        valid = cnt[0].is_odd
 
+        is_odd = value[0:0]
         new_value = value + Int(32)(1)
-        valid = (value & Int(32)(1))[0:0]
 
         # `bundle` is a syntactical salt to create a new record.
-        new_record = record_ty.bundle(valid=valid, payload=new_value)
+        new_record = record_ty.bundle(is_odd=is_odd, payload=new_value)
 
         cnt[0] = new_record
 
@@ -47,7 +49,7 @@ def check_raw(raw):
             c = line_toks[-1]
             a = line_toks[-3]
             b = line_toks[-5]
-            assert int(a) + int(b) == int(c)
+            assert int(a) + int(b) == int(c), f'{a} + {b} != {c}'
             cnt += 1
     assert cnt == 100, f'cnt: {cnt} != 100'
 
@@ -55,7 +57,7 @@ def check_raw(raw):
 def test_async_call():
     sys = SysBuilder('record')
     with sys:
-        record_ty = Record(valid=Bits(1), payload=Int(32))
+        record_ty = Record(is_odd=Bits(1), payload=Int(32))
 
         adder = Adder(record_ty)
         adder.build()
@@ -74,6 +76,7 @@ def test_async_call():
     simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
+    print(raw)
     check_raw(raw)
 
     if verilator_path:

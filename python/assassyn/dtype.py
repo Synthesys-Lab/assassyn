@@ -1,8 +1,8 @@
+'''Data type module for assassyn frontend'''
+
 from .builder import ir_builder
 
 #pylint: disable=too-few-public-methods,useless-parent-delegation
-
-'''Data type module for assassyn frontend'''
 
 class DType:
     '''Base class for data type'''
@@ -83,6 +83,11 @@ class Record(DType):
     '''Record data type'''
 
     def __init__(self, **kwargs):
+        '''Instantiate a record type with fields in kwargs.
+        NOTE: After Python-3.6, the order of fields is guaranteed to be the same as the order fed to
+        the argument. Thus, we can make the asumption that the order of feeding the arguments 
+        is from msb to lsb.
+        '''
         self.bits = 0
         self.fields = {}
 
@@ -108,7 +113,6 @@ class Record(DType):
         fields = ', '.join(fields)
         return f'record {{ {fields} }}'
 
-    @ir_builder(node_type='expr')
     def attributize(self, value, name):
         '''The reflective function for creating corresponding attributes of the host value'''
         assert name in self.fields, f'Field {name} not found in {self.fields} of this Record'
