@@ -7,7 +7,6 @@ from functools import reduce
 from ..builder import ir_builder
 from ..value import Value
 from ..utils import identifierize
-from ..dtype import Bits
 
 class Expr(Value):
     '''The frontend base node for expressions'''
@@ -178,6 +177,8 @@ class Slice(Expr):
         from ..dtype import to_uint
         self.l = to_uint(l)
         self.r = to_uint(r)
+        # pylint: disable=import-outside-toplevel
+        from ..dtype import Bits
         self.dtype = Bits(r - l + 1)
 
     def __repr__(self):

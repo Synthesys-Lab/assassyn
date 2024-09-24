@@ -15,3 +15,8 @@ class Const(Value):
     def as_operand(self):
         '''Dump the constant as an operand.'''
         return repr(self)
+
+def _const_impl(dtype, value: int):
+    '''The syntax sugar for creating a constant'''
+    #pylint: disable=import-outside-toplevel
+    return Const(dtype, value)

@@ -26,10 +26,9 @@ class Driver(Module):
 
     @module.combinational
     def build(self, adder: Adder, record_ty: Record):
-        cnt = RegArray(record_ty, 1)
+        bundle = RegArray(record_ty, 1)
 
-        value = cnt[0].payload
-        valid = cnt[0].is_odd
+        value = bundle[0].payload
 
         is_odd = value[0:0]
         new_value = value + Int(32)(1)
@@ -37,7 +36,7 @@ class Driver(Module):
         # `bundle` is a syntactical salt to create a new record.
         new_record = record_ty.bundle(is_odd=is_odd, payload=new_value)
 
-        cnt[0] = new_record
+        bundle[0] = new_record
 
         adder.async_called(a = new_record, b = new_record)
 
@@ -51,10 +50,10 @@ def check_raw(raw):
             b = line_toks[-5]
             assert int(a) + int(b) == int(c), f'{a} + {b} != {c}'
             cnt += 1
-    assert cnt == 100, f'cnt: {cnt} != 100'
+    assert cnt == 99, f'cnt: {cnt} != 99'
 
 
-def test_async_call():
+def test_record():
     sys = SysBuilder('record')
     with sys:
         record_ty = Record(is_odd=Bits(1), payload=Int(32))
@@ -85,4 +84,5 @@ def test_async_call():
 
 
 if __name__ == '__main__':
-    test_async_call()
+    test_record()
+
