@@ -41,48 +41,47 @@ class Layer(Module):
         
         index_bit = max(self.level, 1)        
         index0 = self.index[0:index_bit-1].bitcast(Int(index_bit))
-        value0 = self.elements[index0][self.height+1:self.height+32].bitcast(Int(32))
-        valid0 = self.elements[index0][self.height:self.height]
-        vacancy0 = self.elements[index0][0:self.height-1].bitcast(Int(self.height))
+        type0 = self.elements[index0].dtype
+        value0 = self.elements[index0].value
+        valid0 = self.elements[index0].is_occupied
+        vacancy0 = self.elements[index0].vacancy
         
         if next_elements:
             # Two child nodes derived from the same parent node.
             index1 = (index0 * Int(32)(2))[0:31].bitcast(Int(32))
             index2 = index1 + Int(32)(1)
-            # Extract values from structs
-            value1 = next_elements[index1][self.height:self.height+31]
-            value2 = next_elements[index2][self.height:self.height+31]
-            # Extract valids from structs
-            valid1 = next_elements[index1][self.height-1:self.height-1]
-            valid2 = next_elements[index2][self.height-1:self.height-1]
-            # Extract vacancys from structs
-            vacancy1 = next_elements[index1][0:self.height-2]
-            vacancy2 = next_elements[index2][0:self.height-2]
+            # Extract datas from Records
+            value1 = next_elements[index1].value
+            value2 = next_elements[index2].value
+            valid1 = next_elements[index1].is_occupied
+            valid2 = next_elements[index2].is_occupied
+            vacancy1 = next_elements[index1].vacancy
+            vacancy2 = next_elements[index2].vacancy
 
         # PUSH
         with Condition(~self.action):
             # The current element is valid.
             with Condition(~valid0):
-                element_update = self.value.concat(ONE).concat(vacancy0)
-                self.elements[index0] = element_update
+                # element_update = self.value.concat(ONE).concat(vacancy0)
+                self.elements[index0] = type0.bundle(value=self.value, is_occupied=ONE, vacancy=vacancy0)
                 log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                     self.value, self.level_I, index0, value0, valid0, vacancy0, self.value, ONE, vacancy0)
                 
             # The current element is occupied.
-            with Condition(valid0):                                            
+            with Condition(valid0):
                 # There is no vacancy on the subtree.
                 with Condition(vacancy0 == Int(self.height)(0)):
                     log("Push {}  \tPush failed, There is no vacancy!", self.value)
                     
                 # There is vacancy on the subtree.
                 with Condition(vacancy0 > Int(self.height)(0)):
-                    vacancy = vacancy0 - Int(self.height)(1)    
+                    vacancy = vacancy0 - Int(self.height)(1)
                     # value write to current level
                     value_current = (self.value > value0).select(value0, self.value)
                     # value write to next level
                     value_next = (self.value > value0).select(self.value, value0)
-                    element_update = value_current.concat(ONE).concat(vacancy)
-                    self.elements[index0] = element_update
+                    # element_update = value_current.concat(ONE).concat(vacancy)
+                    self.elements[index0] = type0.bundle(value=value_current, is_occupied=ONE, vacancy=vacancy)
                     log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                         self.value, self.level_I, index0, value0, valid0, vacancy0, value_current, ONE, vacancy)
                     
@@ -118,8 +117,8 @@ class Layer(Module):
                     
                 # Call next layer                                        
                 if next_elements is None:
-                    element_update = Int(32)(0).concat(ZERO).concat(vacancy0)
-                    self.elements[index0] = element_update
+                    # element_update = Int(32)(0).concat(ZERO).concat(vacancy0)
+                    self.elements[index0] = type0.bundle(value=Int(32)(0), is_occupied=ZERO, vacancy=vacancy0)
                     
                 if next_elements:                    
                     # Two child nodes are both occupied.
@@ -128,8 +127,8 @@ class Layer(Module):
                         value_update = (value1 < value2).select(value1, value2)
                         index_next = (value1 < value2).select(index1, index2)                        
                         vacancy = vacancy0 + Int(self.height)(1)
-                        element_update = value_update.concat(ONE).concat(vacancy)
-                        self.elements[index0] = element_update
+                        # element_update = value_update.concat(ONE).concat(vacancy)
+                        self.elements[index0] = type0.bundle(value=value_update, is_occupied=ONE, vacancy=vacancy)
 
                         call = next_layer.async_called(action=ONE, index=index_next, value=Int(32)(0))
                         call.bind.set_fifo_depth(action=1, index=1, value=1)
@@ -141,16 +140,16 @@ class Layer(Module):
                         index_next = pred.select1hot(index1, index2)
                         value_update = pred.select1hot(value1, value2)
                         vacancy = vacancy0 + Int(self.height)(1)
-                        element_update = value_update.concat(ONE).concat(vacancy)
-                        self.elements[index0] = element_update
+                        # element_update = value_update.concat(ONE).concat(vacancy)
+                        self.elements[index0] = type0.bundle(value=value_update, is_occupied=ONE, vacancy=vacancy)
 
                         call = next_layer.async_called(action=ONE, index=index_next, value=Int(32)(0))
                         call.bind.set_fifo_depth(action=1, index=1, value=1)
 
                     # Two child nodes are both valid.
                     with Condition(~valid1 & ~valid2):
-                        element_update = Int(32)(0).concat(ZERO).concat(vacancy0)
-                        self.elements[index0] = element_update
+                        # element_update = Int(32)(0).concat(ZERO).concat(vacancy0)
+                        self.elements[index0] = type0.bundle(value=Int(32)(0), is_occupied=ZERO, vacancy=vacancy0)
 
 class HeapPush(Module):
     
@@ -192,10 +191,10 @@ class Testbench(Module):
         for i in range(15):
             with Cycle(i * 2 + 1):
                 op = random.randint(0, 1)
-                if cnt == 0 or op == 0:
+                if cnt == 0 or (op == 0 and cnt<self.size):
                     random_integer = random.randint(1, 100)
                     push.async_called(push_value=Int(32)(random_integer))
-                    cnt += 1                
+                    cnt += 1
                 elif cnt == self.size or op == 1:
                     pop.async_called()
                     cnt -= 1
@@ -211,7 +210,7 @@ def check(raw,heap_height):
 
     for i in range(15):
         op = random.randint(0, 1)
-        if cnt == 0 or op == 0:
+        if cnt == 0 or (op == 0 and cnt<size):
             random_integer = random.randint(1, 100)
             heapq.heappush(heap, random_integer)
             cnt += 1        
@@ -237,7 +236,7 @@ def check(raw,heap_height):
 def priority_queue(heap_height=3):    
     # Build a layer with the given heap height and layer level.
     def build_layer(heap_height: int, level: int):
-        element_type = Bits(32 + 1 + (heap_height-level+1))  # value + occupied + vacancy. TODO: Vacancy can be reduced by 1 in the future.
+        element_type = Record(value=Int(32), is_occupied=Bits(1), vacancy=Int(heap_height-level+1)) # value + occupied + vacancy. TODO: Vacancy can be reduced by 1 in the future.
         size = 2 ** level
         vacancy = 2 ** (heap_height - level) - 2
         initializer = [vacancy] * size
@@ -250,7 +249,7 @@ def priority_queue(heap_height=3):
     
     sys = SysBuilder('priority_queue')
     
-    with sys:        
+    with sys:
         # Generate arrays, each containing a RegArray.
         arrays = [build_layer(heap_height, i) for i in range(heap_height)]         
         # Create a list of layers, num_layers is determined by heap_height.
@@ -273,6 +272,7 @@ def priority_queue(heap_height=3):
     
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
     
+    print(f"Seed is {current_seed}.") # For reproducing when problems occur    
     raw = utils.run_simulator(simulator_path)
     check(raw, heap_height=heap_height)
 
