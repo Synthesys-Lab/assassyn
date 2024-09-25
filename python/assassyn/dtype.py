@@ -87,7 +87,7 @@ class Record(DType):
         bits = 0
         self.fields = {}
 
-        for name, dtype in kwargs.items():
+        for name, dtype in reversed(list(kwargs.items())):
             assert isinstance(dtype, DType)
             self.fields[name] = (dtype, slice(bits, bits + dtype.bits - 1))
             bits += dtype.bits
@@ -103,7 +103,7 @@ class Record(DType):
         '''Create a view of RecordValue for the given value. For now, users should ensure the
         bits value has the same length as the record type.
         '''
-        return RecordValue(self, self, value)
+        return RecordValue(self, value)
 
     def __repr__(self):
         fields = list(f'{name}: {dtype}' for name, (dtype, _) in self.fields.items())
