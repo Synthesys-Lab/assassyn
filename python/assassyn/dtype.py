@@ -1,6 +1,6 @@
 '''Data type module for assassyn frontend'''
 
-#pylint: disable=too-few-public-methods,useless-parent-delegation
+#pylint: disable=too-few-public-methods,useless-parent-delegation,cyclic-import
 
 class DType:
     '''Base class for data type'''

@@ -3,7 +3,7 @@
 
 from .builder import ir_builder
 
-#pylint: disable=import-outside-toplevel
+#pylint: disable=import-outside-toplevel,cyclic-import
 
 class Value:
     '''Base class for overloading arithmetic operations in the frontend'''
@@ -126,8 +126,15 @@ class Value:
 
     @ir_builder(node_type='expr')
     def concat(self, other):
+        #pylint: disable=no-member
         '''The frontend API to create a bitwise-concat operation'''
         from .expr import Concat
+        from .const import Const
+        from .dtype import Bits
+        if isinstance(self, Const) and isinstance(other, Const):
+            shift = other.dtype.bits
+            return Bits(shift + self.dtype.bits)((self.value << shift) | other.value)
+
         return Concat(self, other)
 
     @ir_builder(node_type='expr')

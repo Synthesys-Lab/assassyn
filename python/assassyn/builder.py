@@ -15,13 +15,16 @@ class Singleton(type):
 def ir_builder(func, node_type=None, *args, **kwargs):
     '''The decorator annotates the function whose return value will be inserted into the AST.'''
     res = func(*args, **kwargs)
-    module_symtab = Singleton.builder.is_direct_call(inspect.currentframe())
-    Singleton.builder.insert_point[node_type].append(res)
-    # This is to have a symbol table for the module currently being built,
-    # so that we can name those named expressions.
-    if module_symtab is not None:
-        Singleton.builder.named_expr.append(res)
-        Singleton.builder.module_symtab = module_symtab
+    #pylint: disable=cyclic-import,import-outside-toplevel
+    from .const import Const
+    if not isinstance(res, Const):
+        module_symtab = Singleton.builder.is_direct_call(inspect.currentframe())
+        Singleton.builder.insert_point[node_type].append(res)
+        # This is to have a symbol table for the module currently being built,
+        # so that we can name those named expressions.
+        if module_symtab is not None:
+            Singleton.builder.named_expr.append(res)
+            Singleton.builder.module_symtab = module_symtab
     return res
 
 #pylint: disable=too-many-instance-attributes
