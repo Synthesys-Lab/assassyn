@@ -56,7 +56,10 @@ def check_raw(raw):
 def test_record():
     sys = SysBuilder('record')
     with sys:
-        record_ty = Record(is_odd=Bits(1), payload=Int(32))
+        record_ty = Record({
+            (0, 0): ('is_odd', Bits),
+            (1, 32): ('payload', Int),
+        })
 
         adder = Adder(record_ty)
         adder.build()

@@ -78,19 +78,48 @@ class Bits(DType):
 class Record(DType):
     '''Record data type'''
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         '''Instantiate a record type with fields in kwargs.
         NOTE: After Python-3.6, the order of fields is guaranteed to be the same as the order fed to
         the argument. Thus, we can make the asumption that the order of feeding the arguments 
         is from msb to lsb.
+
+        Args:
+        *args: A dictionary of fields { (start, end): (name, dtype1) }
+        **kwargs: A dictionary of fields { name: dtype2 }
+
+        These two arguments are mutually exclusive.
+        NOTE: dtype1 is the class of dtype or instance of dtype,
+        while dtype2 is the instance of dtype.
         '''
+
         bits = 0
         self.fields = {}
 
-        for name, dtype in reversed(list(kwargs.items())):
-            assert isinstance(dtype, DType)
-            self.fields[name] = (dtype, slice(bits, bits + dtype.bits - 1))
-            bits += dtype.bits
+        if args:
+            assert len(args) == 1, "Expecting only one argument!"
+            assert isinstance(args[0], dict), "Expecting a dictionary!"
+            assert not kwargs, "Expecting no keyword arguments!"
+            fields = args[0]
+            for (start, end), (name, dtype) in fields.items():
+                assert isinstance(start, int) and isinstance(end, int)
+                assert 0 <= start <= end
+                bitwidth = end - start + 1
+                if dtype in [Int, UInt, Bits]:
+                    dtype = dtype(bitwidth)
+                elif isinstance(dtype, DType):
+                    assert dtype.bits == bitwidth, f'Expecting {bitwidth} bits for {dtype}'
+                else:
+                    assert False, f'{dtype} cannot be constructed in Record'
+                self.fields[name] = (dtype, slice(bits, bits + bitwidth - 1))
+                bits += bitwidth
+        elif kwargs:
+            for name, dtype in reversed(kwargs.items()):
+                assert isinstance(dtype, DType)
+                self.fields[name] = (dtype, slice(bits, bits + dtype.bits - 1))
+                bits += dtype.bits
+        else:
+            assert False, 'No fields provided for Record'
 
         super().__init__(bits)
 
