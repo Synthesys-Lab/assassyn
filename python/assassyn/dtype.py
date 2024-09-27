@@ -223,5 +223,14 @@ class RecordValue:
     # self object. However, __getattribute__ is a "hook" method, which is called when every a.b
     # field access is made. If you do anything like self.a in __getattribute__, it will cause a
     # infinite recursion.
+    #
+    # This is about an design decision in Python frontend: If you see this later, DO NOT try to
+    # unify the `__getattr__` in `ArrayRead` and `FIFOPop` by creating an instance of `RecordValue`,
+    # unless you read below and come up with a better design.
+    #`RecordValue` is a virtual node which does not exist in the AST, the `ir_builder` decorator
+    # can only push the generated node into the AST, which is the `ArrayRead` or `FIFOPop` node.
+    # If you return a `RecordValue` that wraps these two nodes, this `RecordValue` will be pushed
+    # into the AST, which is not what we want. Unless we can have a divergence in the returned
+    # object and the wrapped object.
     def __getattr__(self, name):
         return self.dtype.attributize(self.payload, name)
