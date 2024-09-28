@@ -124,6 +124,7 @@ class Record(DType):
                 assert isinstance(dtype, DType)
                 self.fields[name] = (dtype, slice(bits, bits + dtype.bits - 1))
                 bits += dtype.bits
+            self.readonly = False
         else:
             assert False, 'No fields provided for Record'
 
