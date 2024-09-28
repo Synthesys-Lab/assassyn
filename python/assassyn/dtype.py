@@ -113,6 +113,13 @@ class Record(DType):
                     assert False, f'{dtype} cannot be constructed in Record'
                 self.fields[name] = (dtype, slice(bits, bits + bitwidth - 1))
                 bits += bitwidth
+            mask = [None] * bits
+            for (start, end), (name, _) in fields.items():
+                for i in range(start, end + 1):
+                    assert mask[i] is None, f'Field {mask[i]} and {name} overlap'
+                    mask[i] = name
+            for i in range(bits):
+                assert mask[i] is not None, f'Field at bit {i} is missing'
         elif kwargs:
             for name, dtype in reversed(kwargs.items()):
                 assert isinstance(dtype, DType)
