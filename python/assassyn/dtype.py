@@ -131,7 +131,7 @@ class Record(DType):
 
     def bundle(self, **kwargs):
         '''The syntax sugar for creating a record'''
-        assert self.readonly, 'Cannot bundle a readonly record'
+        assert not self.readonly, 'Cannot bundle a readonly record'
         return RecordValue(self, **kwargs)
 
     def view(self, value):
