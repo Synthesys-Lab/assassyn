@@ -118,8 +118,7 @@ class Record(DType):
                 for i in range(start, end + 1):
                     assert mask[i] is None, f'Field {mask[i]} and {name} overlap'
                     mask[i] = name
-            for i in range(bits):
-                assert mask[i] is not None, f'Field at bit {i} is missing'
+            self.readonly = any(i is None for i in mask)
         elif kwargs:
             for name, dtype in reversed(kwargs.items()):
                 assert isinstance(dtype, DType)
@@ -132,7 +131,7 @@ class Record(DType):
 
     def bundle(self, **kwargs):
         '''The syntax sugar for creating a record'''
-        #pylint: disable=import-outside-toplevel
+        assert self.readonly, 'Cannot bundle a readonly record'
         return RecordValue(self, **kwargs)
 
     def view(self, value):
