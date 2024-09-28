@@ -111,7 +111,7 @@ class Record(DType):
                     assert dtype.bits == bitwidth, f'Expecting {bitwidth} bits for {dtype}'
                 else:
                     assert False, f'{dtype} cannot be constructed in Record'
-                self.fields[name] = (dtype, slice(bits, bits + bitwidth - 1))
+                self.fields[name] = (dtype, slice(start, end))
                 bits += bitwidth
             mask = [None] * bits
             for (start, end), (name, _) in fields.items():
