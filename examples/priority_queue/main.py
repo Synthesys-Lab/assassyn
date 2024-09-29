@@ -184,11 +184,11 @@ class Testbench(Module):
         for i in range(15):
             with Cycle(i * 2 + 1):
                 op = random.randint(0, 1)
-                if cnt == 0 or (op == 0 and cnt<self.size):
+                if cnt==0 or (op==0 and cnt<self.size):
                     random_integer = random.randint(1, 100)
                     push.async_called(push_value=Int(32)(random_integer))
                     cnt += 1
-                elif cnt == self.size or op == 1:
+                elif cnt==self.size or op==1:
                     pop.async_called()
                     cnt -= 1
                 else:
@@ -203,11 +203,11 @@ def check(raw,heap_height):
 
     for i in range(15):
         op = random.randint(0, 1)
-        if cnt == 0 or (op == 0 and cnt<size):
+        if cnt==0 or (op==0 and cnt<size):
             random_integer = random.randint(1, 100)
             heapq.heappush(heap, random_integer)
             cnt += 1        
-        elif cnt == size or op == 1:
+        elif cnt==size or op==1:
             smallest = heapq.heappop(heap)
             pops.append(smallest)
             cnt -= 1
@@ -229,7 +229,11 @@ def check(raw,heap_height):
 def priority_queue(heap_height=3):    
     # Build a layer with the given heap height and layer level.
     def build_layer(heap_height: int, level: int):
-        element_type = Record(value=Int(32), is_occupied=Bits(1), vacancy=Int(heap_height-level+1)) # TODO: Vacancy can be reduced by 1 in the future.
+        element_type = Record({  # TODO: Vacancy can be reduced by 1 in the future.
+            (0, heap_height-level): ('vacancy', Int),
+            (heap_height-level+1, heap_height-level+1): ('is_occupied', Bits),
+            (heap_height-level+2, heap_height-level+33):('value', Int),
+        })
         size = 2 ** level
         vacancy = 2 ** (heap_height - level) - 2
         initializer = [vacancy] * size
