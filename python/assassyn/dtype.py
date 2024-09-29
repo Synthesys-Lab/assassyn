@@ -112,7 +112,7 @@ class Record(DType):
                 else:
                     assert False, f'{dtype} cannot be constructed in Record'
                 self.fields[name] = (dtype, slice(start, end))
-                bits += max(bits, end+1)
+                bits = max(bits, end+1)
             mask = [None] * bits
             for (start, end), (name, _) in fields.items():
                 for i in range(start, end + 1):
