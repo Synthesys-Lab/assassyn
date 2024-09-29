@@ -74,8 +74,8 @@ A system may have a `driver` module (see more details in the next paragraph to e
 which is invoked every cycle to drive the whole system. This "driver" serves like a `main`
 function, which is both the program entrance and drives the system execution.
 
-
 To build a system, `SysBuilder` should be used:
+
 ````Python
 from assassyn import *
 from assassyn.frontend import *
@@ -164,7 +164,10 @@ cyclic dependences.
 In each module, we have several operations to describe the behaviors, including arithmetics,
 read/write to arrays, and asynchronous module invocations.
 
-1. Types: Currently, we support `{Int/UInt/Bits}(bit)` and `Float` types.
+1. Types: Currently, we support `{Int/UInt/Bits}(bit)`, `Float`, and `Record` types.
+    * **Record**: A `Record` type allows multiple fields to be bundled together, each field having its own data type and bit width. Records can be defined either by specifying the field bit ranges manually or by field name directly.
+        * Use `bundle()` for packing values when fields are continuously aligned.
+        * Use `view()` to create a view of non-continuous or even continuous fields from a given value.
 2. Values start with ports, arrays, and constants, and can be built by operations among them.
     * Ports are the inputs of a module, which are typically scalars.
     * Arrays are first delared by `RegArray(type, size)`, where `size` should be a constant in the IR.
@@ -180,18 +183,22 @@ read/write to arrays, and asynchronous module invocations.
     * Binds: `module.bind(**kwargs)`. This is like function binding in functional programming, where fixes several parameters fed to the module, and returns a handle to this module without invoking it.
 4. Scopes and Conditional Execution:
     * We support if-statement (without else) in our combinational logic.
+
 ```` Python
 with Conditional(cond):
     # do something
 ````
+
     * NOTE: With Condition(cond) is a compilation-time IR builder API.  If you use `if` statement, it is a runtime API. Refer to the usage in `test_async_call.py` and `test_eager_bind.py`  to differentiate these two.
     * Besides, we also support cycle-speicific operation to write testbenches.
+
 ```` Python
 with Cycle(1):
     # do something
 with Cycle(2):
     # do something
 ````
+
 5. Array Operations: This is a supplimentary description to expression addressing. All the array reads are immediate, while all the array writes are chronological --- the values are only visible next cycle. No two array writes within the same cycle are allowed. The generated simulator will enforce this.
 
 [^1]: The name "Assasyn" stands for "**As**ynchronous **S**emantics for **A**rchitectural
