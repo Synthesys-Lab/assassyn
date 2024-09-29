@@ -33,23 +33,18 @@ class Execution(Module):
         log("executing: {:b}", self.opcode)
 
         op_check = OpcodeChecker(self.opcode)
-        op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret', 'ebreak')
+        op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
 
-        is_lui      = op_check.lui
-        is_addi     = op_check.addi
-        is_add      = op_check.add
-        is_lw       = op_check.lw
-        is_bne      = op_check.bne
-        is_ebreak   = op_check.ebreak
+        is_lui  = op_check.lui
+        is_addi = op_check.addi
+        is_add  = op_check.add
+        is_lw   = op_check.lw
+        is_bne  = op_check.bne
         # is_ret  = op_check.ret
 
         # Instruction attributes
         uses_imm = is_addi | is_bne
         is_branch = is_bne
-
-        with Condition(is_ebreak):
-            log("EBREAK instruction executed, ending simulation")
-            finish()
 
         a = (exec_bypass_reg[0] == self.a_reg).select(
             exec_bypass_data[0], 
@@ -186,7 +181,6 @@ class Decoder(Memory):
     def build(self, pc: Array, on_branch: Array, exec: Module):
         super().build()
         inst = self.rdata
-        log("inst: 0x{:x}", inst)
         with Condition(~on_branch[0]):
             # Slice the fields
             opcode = inst[0:6]
@@ -203,17 +197,16 @@ class Decoder(Memory):
             b_imm = (sign.select(Bits(19)(0x7ffff), Bits(19)(0))).concat(b_imm)
 
             op_check = OpcodeChecker(opcode)
-            op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret', 'ebreak')
+            op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
 
-            is_lui      = op_check.lui
-            is_addi     = op_check.addi
-            is_add      = op_check.add
-            is_lw       = op_check.lw
-            is_bne      = op_check.bne
-            is_ret      = op_check.ret
-            is_ebreak   = op_check.ebreak 
+            is_lui  = op_check.lui
+            is_addi = op_check.addi
+            is_add  = op_check.add
+            is_lw   = op_check.lw
+            is_bne  = op_check.bne
+            is_ret  = op_check.ret
 
-            supported = is_lui | is_addi | is_add | is_lw | is_bne | is_ret | is_ebreak
+            supported = is_lui | is_addi | is_add | is_lw | is_bne | is_ret
             write_rd = is_lui | is_addi | is_add | is_lw
             read_rs1 = is_lui | is_addi | is_add | is_bne | is_lw
             read_rs2 = is_add | is_bne
@@ -239,9 +232,6 @@ class Decoder(Memory):
             )
             
             rd_reg = write_rd.select(rd, Bits(5)(0))
-
-            with Condition(is_ebreak):
-                log("ebreak instruction encountered")
 
             exec.async_called(
                 opcode = opcode, 
@@ -447,8 +437,8 @@ def main():
     print(sys)
     conf = config(
         verilog=utils.has_verilator(),
-        sim_threshold=10000,
-        idle_threshold=10000,
+        sim_threshold=500,
+        idle_threshold=500,
         resource_base=f'{utils.repo_path()}/examples/cpu/resource'
     )
 
