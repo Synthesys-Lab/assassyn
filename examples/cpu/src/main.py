@@ -16,6 +16,7 @@ class Execution(Module):
         self.a_reg = Port(Bits(5))
         self.b_reg = Port(Bits(5))
         self.rd_reg = Port(Bits(5))
+        self.is_ebreak = Port(Bits(1))
 
     @module.combinational
     def build(
@@ -33,14 +34,13 @@ class Execution(Module):
         log("executing: {:b}", self.opcode)
 
         op_check = OpcodeChecker(self.opcode)
-        op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret', 'ebreak')
+        op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
 
         is_lui    = op_check.lui
         is_addi   = op_check.addi
         is_add    = op_check.add
         is_lw     = op_check.lw
-        is_bne    = op_check.bne
-        is_ebreak = op_check.ebreak
+        is_bne    = self.is_bne
 
         # Instruction attributes
         uses_imm = is_addi | is_bne
@@ -92,17 +92,18 @@ class Execution(Module):
             log("addr: {:x}, lineno: {:x}", result, request_addr)
 
         memory.async_called(we = Int(1)(0), wdata = a, addr = request_addr)
-        wb = writeback.bind(opcode = self.opcode, result = result, rd = self.rd_reg)
+        wb = writeback.bind(
+            opcode = self.opcode, 
+            result = result, 
+            rd = self.rd_reg, 
+            is_ebreak = self.is_ebreak
+        )
 
         return_rd = None
 
         with Condition(self.rd_reg != Bits(5)(0)):
             return_rd = self.rd_reg
             log("set x{} as on-write", return_rd)
-
-        with Condition(is_ebreak):
-            log("EBREAK instruction executed, ending simulation")
-            finish()
 
         return wb, return_rd
 
@@ -146,6 +147,7 @@ class WriteBack(Module):
         self.result = Port(Bits(32))
         self.rd     = Port(Bits(5)) 
         self.mdata  = Port(Bits(32))
+        self.is_ebreak = Port(Bits(1))
 
     @module.combinational
     def build(self, reg_file: Array):
@@ -166,6 +168,10 @@ class WriteBack(Module):
         data = cond.select1hot(self.result, self.mdata)
 
         return_rd = None
+
+        with Condition(self.is_ebreak):
+            log("EBREAK instruction, finishing simulation")
+            finish()
 
         with Condition((self.rd != Bits(5)(0))):
             log("opcode: {:b}, writeback: x{} = {:x}", self.opcode, self.rd, data)
@@ -211,16 +217,21 @@ class Decoder(Memory):
             is_ebreak = op_check.ebreak
 
             supported = is_lui | is_addi | is_add | is_lw | is_bne | is_ret | is_ebreak
-            write_rd = is_lui | is_addi | is_add | is_lw
-            read_rs1 = is_lui | is_addi | is_add | is_bne | is_lw
-            read_rs2 = is_add | is_bne
+            write_rd = is_lui | is_addi | is_add | is_lw & ~is_ebreak
+            read_rs1 = is_lui | is_addi | is_add | is_bne | is_lw & ~is_ebreak
+            read_rs2 = is_add | is_bne & ~is_ebreak
             read_i_imm = is_addi | is_lw
             read_u_imm = is_lui
             read_b_imm = is_bne
+
+            opcode = is_ebreak.select(Opcode.ADD, opcode)
             
             with Condition(is_bne):
                 log("set on-branch!")
                 on_branch[0] = Bits(1)(1)
+            
+            with Condition(is_ebreak):
+                log("ebreak instruction encountered, treating as ADD x0, x0, x0")
 
             reg_a = read_rs1.select(rs1, Bits(5)(0))
             reg_b = read_rs2.select(rs2, Bits(5)(0))
@@ -241,7 +252,8 @@ class Decoder(Memory):
                 imm_value = imm_value, 
                 a_reg = reg_a, 
                 b_reg = reg_b, 
-                rd_reg = rd_reg
+                rd_reg = rd_reg,
+                is_ebreak = is_ebreak.bitcast(Bits(1)),
             )
 
             with Condition(is_lui):
