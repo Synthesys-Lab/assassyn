@@ -40,7 +40,7 @@ class Execution(Module):
         is_addi   = op_check.addi
         is_add    = op_check.add
         is_lw     = op_check.lw
-        is_bne    = self.is_bne
+        is_bne    = op_check.bne
 
         # Instruction attributes
         uses_imm = is_addi | is_bne
