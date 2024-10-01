@@ -6,6 +6,15 @@ from assassyn import utils
 
 from opcodes import *
 
+supported_opcodes = {
+  'lui'  : 0b0110111,
+  'addi' : 0b0010011,
+  'add'  : 0b0110011,
+  'lw'   : 0b0000011,
+  'bne'  : 0b1100011,
+  'ret'  : 0b1101111,
+}
+
 class Execution(Module):
     
     @module.constructor
