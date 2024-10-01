@@ -6,14 +6,122 @@ from assassyn import utils
 
 from opcodes import *
 
-supported_opcodes = {
-  'lui'  : 0b0110111,
-  'addi' : 0b0010011,
-  'add'  : 0b0110011,
-  'lw'   : 0b0000011,
-  'bne'  : 0b1100011,
-  'ret'  : 0b1101111,
-}
+rv_r_type = Record({
+    (0, 6): ('opcode', Bits),
+    (7, 11): ('rd', Bits),
+    (12, 14): ('funct3', Bits),
+    (15, 19): ('rs1', Bits),
+    (20, 24): ('rs2', Bits),
+    (25, 31): ('funct7', Bits),
+})
+
+rv_i_type = Record({
+    (0, 6): ('opcode', Bits),
+    (7, 11): ('rd', Bits),
+    (12, 14): ('funct3', Bits),
+    (15, 19): ('rs1', Bits),
+    (20, 31): ('imm', Bits),
+})
+
+rv_s_type = Record({
+    (0, 6): ('opcode', Bits),
+    (7, 11): ('imm4_0', Bits),
+    (12, 14): ('funct3', Bits),
+    (15, 19): ('rs1', Bits),
+    (20, 24): ('rs2', Bits),
+    (25, 31): ('imm11_5', Bits),
+})
+
+rv_u_type = Record({
+    (0, 6): ('opcode', Bits),
+    (7, 11): ('rd', Bits),
+    (12, 31): ('imm', Bits),
+})
+
+
+supported_opcodes = [
+  # mn,     opcode,    type
+  ('lui' , 0b0110111, rv_u_type),
+  ('addi', 0b0010011, rv_i_type),
+  ('add' , 0b0110011, rv_r_type),
+  ('lw'  , 0b0000011, rv_i_type),
+  ('bne' , 0b1100011, rv_s_type),
+  ('ret' , 0b1101111, rv_u_type),
+]
+
+deocder_signals = Record(
+  memory_read=Bits(1),
+  invoke_adder=Bits(1),
+  is_branch=Bits(1),
+  rs1_reg=Bits(5),
+  rs1_valid=Bits(1),
+  rs2_reg=Bits(5),
+  rs2_valid=Bits(1),
+  rd_reg=Bits(5),
+  rd_valid=Bits(1),
+  imm_valid=Bits(1),
+  imm_value=Bits(32),
+)
+
+def decode_logic(inst):
+    r_inst = rv_r_type.view(inst)
+    i_inst = rv_i_type.view(inst)
+    s_inst = rv_s_type.view(inst)
+    u_inst = rv_u_type.view(inst)
+
+    eqs = {}
+
+    inst_types = [
+        [Bits(1)(0), rv_r_type],
+        [Bits(1)(0), rv_i_type],
+        [Bits(1)(0), rv_s_type],
+        [Bits(1)(0), rv_u_type]]
+
+    # Check if the given instruction's opcode equals one of the supported opcodes
+    for mn, (opcode, cur_type) in supported_opcodes.items():
+        eq = r_inst.opcode == Bits(7)(opcode)
+        eqs[mn] = eq
+        for i in range(len(inst_types)):
+            is_type, inst_type = inst_types[i]
+            if cur_type is inst_type:
+                inst_types[i][0] = is_type | eq
+
+    # Extract all the instruction types
+    is_r_type, is_i_type, is_s_type, is_u_type = [i[0] for i in inst_types]
+    # Extract all the signals
+    memory_read = eqs['lw']
+    invoke_adder = eqs['addi'] | eqs['add'] | eqs['lw'] | eqs['bne']
+    is_branch = eqs['bne']
+    # Extract all the operands according to the instruction types
+    # rs1
+    rs1_valid = is_r_type | is_i_type | is_s_type
+    rs1_reg = rs1_valid.select(r_inst.rs1, Bits(5)(0))
+    # rs2
+    rs2_valid = is_r_type | is_s_type
+    rs2_reg = rs2_valid.select(r_inst.rs2, Bits(5)(0))
+    # rd
+    rd_valid = is_r_type | is_i_type | is_u_type
+    rd_reg = rd_valid.select(r_inst.rd, Bits(5)(0))
+    # imm
+    imm_valid = is_i_type | is_u_type | is_s_type
+    i_imm = i_inst.imm
+    u_imm = u_inst.imm
+    s_imm = concat(s_inst.imm11_5, s_inst.imm4_0)
+    imm_value = is_i_type.select(i_imm, is_u_type.select(u_imm, s_imm))
+
+    return deocder_signals.bundle(
+        memory_read=memory_read,
+        invoke_adder=invoke_adder,
+        is_branch=is_branch,
+        rs1_reg=rs1_reg,
+        rs1_valid=rs1_valid,
+        rs2_reg=rs2_reg,
+        rs2_valid=rs2_valid,
+        rd_reg=rd_reg,
+        rd_valid=rd_valid,
+        imm_valid=imm_valid,
+        imm_value=imm_value)
+
 
 class Execution(Module):
     
@@ -195,42 +303,11 @@ class Decoder(Memory):
     @module.combinational
     def build(self, pc: Array, on_branch: Array, exec: Module):
         super().build()
-        inst = self.rdata
         with Condition(~on_branch[0]):
-            # Slice the fields
-            opcode = inst[0:6]
-            rd = inst[7:11]
-            rs1 = inst[15:19]
-            rs2 = inst[20:24]
-            i_imm = inst[20:31]
-            
-            u_imm = inst[12:31].concat(Bits(12)(0)) 
+            inst = self.rdata
+            signals = decode_logic(inst)
 
-            sign = inst[31:31]
-            b_imm = concat(inst[31:31], inst[7:7], inst[25:30], inst[8:11], Bits(1)(0))
-            b_imm = (sign.select(Bits(19)(0x7ffff), Bits(19)(0))).concat(b_imm)
-
-            op_check = OpcodeChecker(opcode)
-            op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret', 'ebreak')
-
-            is_lui    = op_check.lui
-            is_addi   = op_check.addi
-            is_add    = op_check.add
-            is_lw     = op_check.lw
-            is_bne    = op_check.bne
-            is_ret    = op_check.ret
-            is_ebreak = op_check.ebreak
-
-            supported = is_lui | is_addi | is_add | is_lw | is_bne | is_ret | is_ebreak
-            write_rd = is_lui | is_addi | is_add | is_lw
-            read_rs1 = is_lui | is_addi | is_add | is_bne | is_lw
-            read_rs2 = is_add | is_bne
-            read_i_imm = is_addi | is_lw
-            read_u_imm = is_lui
-            read_b_imm = is_bne
-            
-            with Condition(is_bne):
-                log("set on-branch!")
+            with Condition(signals.is_branch):
                 on_branch[0] = Bits(1)(1)
 
             reg_a = read_rs1.select(rs1, Bits(5)(0))
