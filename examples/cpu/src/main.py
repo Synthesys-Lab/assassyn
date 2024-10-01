@@ -16,6 +16,7 @@ class Execution(Module):
         self.a_reg = Port(Bits(5))
         self.b_reg = Port(Bits(5))
         self.rd_reg = Port(Bits(5))
+        self.name = "Executor"
 
     @module.combinational
     def build(
@@ -30,8 +31,6 @@ class Execution(Module):
         memory: Memory, 
         writeback: Module
     ):
-        log("executing: {:b}", self.opcode)
-
         op_check = OpcodeChecker(self.opcode)
         op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret', 'ebreak')
 
@@ -57,13 +56,14 @@ class Execution(Module):
         
         rhs = uses_imm.select(self.imm_value, b)
 
-        invokde_adder = is_add | is_addi | is_lw
+        invoke_adder = is_add | is_addi | is_lw
 
         result = (a.bitcast(Int(32)) + rhs.bitcast(Int(32))).bitcast(Bits(32))
-        result = (concat(invokde_adder, is_lui, is_branch)).select1hot(
+        result = (concat(invoke_adder, is_lui, is_branch)).select1hot(
             Bits(32)(0), self.imm_value, result
         )
-        log("{:b}: a: {:x}, b:{:x}, res: {:x}", self.opcode, a, rhs, result)
+        with Condition(invoke_adder):
+            log("adder({:b})   | a: {:x} | b:{:x} | res: {:x}", self.opcode, a, rhs, result)
 
         produced_by_exec = is_lui | is_addi | is_add
 
@@ -72,13 +72,14 @@ class Execution(Module):
 
         with Condition(is_branch):
             on_branch[0] = Bits(1)(0)
-            log("reset on-branch")
+            log("clear-br({:b})| on_branch = 0", self.opcode)
         
         with Condition(is_bne):
-            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) \
+            dest_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) \
                       + self.imm_value.bitcast(Int(32))).bitcast(Bits(32))
-            br_dest = (a != b).select(new_pc, pc[0])
-            log("if {} != {}: branch to {}; actual: {}", a, b, new_pc, br_dest)
+            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(4)).bitcast(Bits(32))
+            br_dest = (a != b).select(dest_pc, new_pc)
+            log("bne({:b})     | {} != {} | to {} | else {}", self.opcode, a, b, dest_pc, new_pc)
             pc[0] = br_dest
 
         is_memory = is_lw
@@ -89,7 +90,7 @@ class Execution(Module):
         mem_bypass_reg[0] = is_memory_read.select(self.rd_reg, Bits(5)(0))
 
         with Condition(is_memory):
-            log("addr: {:x}, lineno: {:x}", result, request_addr)
+            log("mem-read      | addr: {:x} | lineno: {:x}", result, request_addr)
 
         memory.async_called(we = Int(1)(0), wdata = a, addr = request_addr)
         wb = writeback.bind(opcode = self.opcode, result = result, rd = self.rd_reg)
@@ -98,10 +99,10 @@ class Execution(Module):
 
         with Condition(self.rd_reg != Bits(5)(0)):
             return_rd = self.rd_reg
-            log("set x{} as on-write", return_rd)
+            log("with-rd({:07b})| own x{}", self.opcode, self.rd_reg)
 
         with Condition(is_ebreak):
-            log("EBREAK instruction executed, ending simulation")
+            log('ebreak({:07b}) | halt', self.opcode)
             finish()
 
         return wb, return_rd
@@ -130,7 +131,7 @@ class Execution(Module):
 
         valid = a_valid & b_valid & rd_valid
         with Condition(~valid):
-            log("operand not ready, stall execution, rs1-x{}: {}, rs2-x{}: {}, rd-x{}: {}", \
+            log("scoreboard | rs1-x{}: {}, rs2-x{}: {}, rd-x{}: {}", \
                 a_reg, a_valid, \
                 b_reg, b_valid, \
                 rd_reg, rd_valid)
@@ -146,6 +147,7 @@ class WriteBack(Module):
         self.result = Port(Bits(32))
         self.rd     = Port(Bits(5)) 
         self.mdata  = Port(Bits(32))
+        self.name = 'WriteBack'
 
     @module.combinational
     def build(self, reg_file: Array):
@@ -179,6 +181,7 @@ class Decoder(Memory):
     @module.constructor
     def __init__(self, init_file):
         super().__init__(width=32, depth=1024, latency=(1, 1), init_file=init_file)
+        self.name = 'Decoder'
 
     @module.combinational
     def build(self, pc: Array, on_branch: Array, exec: Module):
@@ -187,7 +190,6 @@ class Decoder(Memory):
         with Condition(~on_branch[0]):
             # Slice the fields
             opcode = inst[0:6]
-            log("decoding: {:b}", opcode)
             rd = inst[7:11]
             rs1 = inst[15:19]
             rs2 = inst[20:24]
@@ -245,19 +247,19 @@ class Decoder(Memory):
             )
 
             with Condition(is_lui):
-                log("lui:   rd: x{}, imm: 0x{:x}", rd, imm_value)
+                log("lui({:07b})    | rd: x{} |          | imm: 0x{:x}", opcode, rd, imm_value)
             with Condition(is_lw):
-                log("lw:    rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm)
+                log("lw({:07b})     | rd: x{} | rs1: x{} | imm: {}", opcode, rd, rs1, i_imm)
             with Condition(is_addi):
-                log("addi:  rd: x{}, rs1: x{}, imm: {}", rd, rs1, i_imm)
+                log("addi({:07b})   | rd: x{} | rs1: x{} | imm: {}", opcode, rd, rs1, i_imm)
             with Condition(is_add):
-                log("add:   rd: x{}, rs1: x{}, rs2: x{}", rd, rs1, rs2)
+                log("add({:07b})    | rd: x{} | rs1: x{} | rs2: x{}", opcode, rd, rs1, rs2)
             with Condition(is_bne):
-                log("bne:   rs1:x{}, rs2: x{}, imm: {}", rs1, rs2, b_imm.bitcast(Int(32)))
+                log("bne({:07b})    |         | rs1: x{} | rs2: x{}, imm: {}", opcode, rs1, rs2, b_imm.bitcast(Int(32)))
             with Condition(is_ret):
-                log("ret")
+                log("ret({:07b})    | ret", opcode)
             with Condition(is_ebreak):
-                log("ebreak")
+                log("ebreak({:07b}) | ", opcode)
                 finish()
             
             with Condition(~supported):
@@ -275,6 +277,7 @@ class MemoryAccess(Memory):
     @module.constructor
     def __init__(self, init_file):
         super().__init__(width=32, depth=65536 * 2, latency=(1, 1), init_file=init_file)
+        self.name = 'memaccess'
 
     @module.combinational
     def build(
@@ -285,10 +288,10 @@ class MemoryAccess(Memory):
     ):
         super().build()
         data = self.rdata
-        log("mem-data: 0x{:x}", data)
+        log("mem.wdata       | 0x{:x}", data)
         writeback.async_called(mdata = data)
         with Condition(mem_bypass_reg[0] != Bits(5)(0)):
-            log("bypass memory data: x{} = {}", mem_bypass_reg[0], data)
+            log("mem.bypass      | x{} = {}", mem_bypass_reg[0], data)
         mem_bypass_data[0] = (mem_bypass_reg[0] != Bits(5)(0)).select(data, Bits(32)(0))
 
     @module.wait_until
@@ -300,30 +303,32 @@ class Fetcher(Module):
     @module.constructor
     def __init__(self):
         super().__init__()
+        self.name = 'Fetcher'
 
     @module.combinational
     def build(self, decoder: Memory, pc: Array, on_branch: Array):
         with Condition(~on_branch[0]):
-            log("Fetching instruction at PC: 0x{:x}", pc[0])
+            log("fetching        | *inst[0x{:x}]", pc[0])
             to_fetch = pc[0][2:11].bitcast(Int(10))
             decoder.async_called(we = Int(1)(0), wdata = Bits(32)(0), addr = to_fetch)
             pc[0] = (pc[0].bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
 
         with Condition(on_branch[0]):
-            log("on a branch, stall fetching, pc freeze at 0x{:x}", pc[0])
+            log("fetching        | on branch, pc freeze at 0x{:x}", pc[0])
 
 class OnwriteDS(Downstream):
     
     @downstream.constructor
     def __init__(self):
         super().__init__()
+        self.name = 'Onwrite'
 
     @downstream.combinational
     def build(self, reg_onwrite: Array, exec_rd: Value, writeback_rd: Value):
         ex_rd = exec_rd.optional(Bits(5)(0))
         wb_rd = writeback_rd.optional(Bits(5)(0))
 
-        log("ownning: x{}, releasing: x{}", ex_rd, wb_rd)
+        log("scoreboard      | ownning: x{} | releasing: x{}", ex_rd, wb_rd)
 
         reg_onwrite[0] = reg_onwrite[0] ^ \
                         (Bits(32)(1) << wb_rd) ^ \
