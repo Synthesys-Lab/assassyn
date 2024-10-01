@@ -38,6 +38,17 @@ rv_u_type = Record({
     (12, 31): ('imm', Bits),
 })
 
+rv_b_type = Record({
+    (0, 6): ('opcode', Bits),
+    (7, 7): ('imm11', Bits),
+    (8, 11): ('imm4_1', Bits),
+    (12, 14): ('funct3', Bits),
+    (15, 19): ('rs1', Bits),
+    (20, 24): ('rs2', Bits),
+    (25, 30): ('imm10_5', Bits),
+    (31, 31): ('imm12', Bits),
+})
+
 
 supported_opcodes = [
   # mn,     opcode,    type
@@ -45,7 +56,7 @@ supported_opcodes = [
   ('addi'  , 0b0010011, rv_i_type),
   ('add'   , 0b0110011, rv_r_type),
   ('lw'    , 0b0000011, rv_i_type),
-  ('bne'   , 0b1100011, rv_s_type),
+  ('bne'   , 0b1100011, rv_b_type),
   ('ret'   , 0b1101111, rv_u_type),
   ('ebreak', 0b1110011, rv_i_type),
 ]
@@ -68,25 +79,32 @@ def decode_logic(inst):
     r_inst = rv_r_type.view(inst)
     i_inst = rv_i_type.view(inst)
     s_inst = rv_s_type.view(inst)
+    b_inst = rv_b_type.view(inst)
     u_inst = rv_u_type.view(inst)
+
+    i_imm = Bits(20)(0).concat(i_inst.imm)
+    u_imm = Bits(12)(0).concat(u_inst.imm)
+    s_imm_raw = concat(s_inst.imm11_5, s_inst.imm4_0)
+    s_imm = Bits(20)(0).concat(s_imm_raw)
+    b_imm_raw = concat(b_inst.imm12, b_inst.imm11, b_inst.imm10_5, b_inst.imm4_1)
+    b_imm = concat(Bits(19)(0), b_imm_raw, Bits(1)(0))
 
     eqs = {}
 
-    inst_types = [
-        [Bits(1)(0), rv_r_type],
-        [Bits(1)(0), rv_i_type],
-        [Bits(1)(0), rv_s_type],
-        [Bits(1)(0), rv_u_type]]
+    inst_types = {
+       rv_r_type: Bits(1)(0),
+       rv_i_type: Bits(1)(0),
+       rv_s_type: Bits(1)(0),
+       rv_b_type: Bits(1)(0),
+       rv_u_type: Bits(1)(0)
+    }
 
     # Check if the given instruction's opcode equals one of the supported opcodes
     for mn, opcode, cur_type in supported_opcodes:
         wrapped_opcode = Bits(7)(opcode)
         eq = r_inst.opcode == wrapped_opcode
         eqs[mn] = eq
-        for i in range(len(inst_types)):
-            is_type, inst_type = inst_types[i]
-            if cur_type is inst_type:
-                inst_types[i][0] = is_type | eq
+        inst_types[cur_type] = inst_types[cur_type] | eq
 
         pad = 6 - len(mn)
         pad = ' ' * pad
@@ -97,39 +115,40 @@ def decode_logic(inst):
 
         if cur_type is rv_i_type:
             with Condition(eq):
-                log(f"i.{mn}.{{:07b}}{pad} | rd: x{{}} | rs1: x{{}} |            | imm: 0x{{:x}}", wrapped_opcode, i_inst.rd, i_inst.rs1, i_inst.imm)
+                log(f"i.{mn}.{{:07b}}{pad} | rd: x{{}} | rs1: x{{}} |            | imm: 0x{{:x}}", wrapped_opcode, i_inst.rd, i_inst.rs1, i_imm)
 
         if cur_type is rv_s_type:
             with Condition(eq):
-                log(f"s.{mn}.{{:07b}}{pad} | imm5: 0x{{:x}} | rs1: x{{}} | rs2: x{{}} | imm7: 0x{{:x}}", wrapped_opcode, s_inst.imm4_0, s_inst.rs1, s_inst.rs2, s_inst.imm11_5)
+                log(f"s.{mn}.{{:07b}}{pad} |           | rs1: x{{}} | rs2: x{{}} | imm: 0x{{:x}}", wrapped_opcode, s_inst.rs1, s_inst.rs2, s_imm)
 
         if cur_type is rv_u_type:
             with Condition(eq):
-                log(f"u.{mn}.{{:07b}}{pad} | rd: x{{}} |            |            | imm: 0x{{:x}}", wrapped_opcode, u_inst.rd, u_inst.imm)
+                log(f"u.{mn}.{{:07b}}{pad} | rd: x{{}} |            |            | imm: 0x{{:x}}", wrapped_opcode, u_inst.rd, u_imm)
+
+        if cur_type is rv_b_type:
+            with Condition(eq):
+                log(f"b.{mn}.{{:07b}}{pad} |           | rs1: x{{}} | rs2: x{{}} | imm: 0x{{:x}}", wrapped_opcode, b_inst.rs1, b_inst.rs2, b_imm)
 
 
     # Extract all the instruction types
-    is_r_type, is_i_type, is_s_type, is_u_type = [i[0] for i in inst_types]
+    is_r_type, is_i_type, is_s_type, is_b_type, is_u_type = inst_types[rv_r_type], inst_types[rv_i_type], inst_types[rv_s_type], inst_types[rv_b_type], inst_types[rv_u_type]
     # Extract all the signals
     memory_read = eqs['lw']
     invoke_adder = eqs['addi'] | eqs['add'] | eqs['lw'] | eqs['bne']
     is_branch = eqs['bne'] | eqs['ret'] | eqs['ebreak']
     # Extract all the operands according to the instruction types
     # rs1
-    rs1_valid = is_r_type | is_i_type | is_s_type
+    rs1_valid = is_r_type | is_i_type | is_s_type | is_b_type
     rs1_reg = rs1_valid.select(r_inst.rs1, Bits(5)(0))
     # rs2
-    rs2_valid = is_r_type | is_s_type
+    rs2_valid = is_r_type | is_s_type | is_b_type
     rs2_reg = rs2_valid.select(r_inst.rs2, Bits(5)(0))
     # rd
     rd_valid = is_r_type | is_i_type | is_u_type
     rd_reg = rd_valid.select(r_inst.rd, Bits(5)(0))
     # imm
-    imm_valid = is_i_type | is_u_type | is_s_type
-    i_imm = Bits(20)(0).concat(i_inst.imm)
-    u_imm = Bits(12)(0).concat(u_inst.imm)
-    s_imm = Bits(20)(0).concat(concat(s_inst.imm11_5, s_inst.imm4_0))
-    imm_value = is_i_type.select(i_imm, is_u_type.select(u_imm, s_imm))
+    imm_valid = is_i_type | is_u_type | is_s_type | is_b_type
+    imm_value = is_i_type.select(i_imm, is_u_type.select(u_imm, is_s_type.select(s_imm, b_imm)))
     imm_value = eqs['lui'].select(u_inst.imm.concat(Bits(12)(0)), imm_value)
 
     return deocder_signals.bundle(
@@ -219,8 +238,10 @@ class Execution(Module):
             log("clear-br({:b})| on_branch = 0", self.opcode)
         
         with Condition(is_bne):
-            dest_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) \
-                      + self.imm_value.bitcast(Int(32))).bitcast(Bits(32))
+            delta = self.imm_value[0:12]
+            delta = delta[12:12].select(Bits(19)(1), Bits(19)(0)).concat(delta).bitcast(Int(32))
+            log('delta: {:x}', delta)
+            dest_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) + delta).bitcast(Bits(32))
             new_pc = (pc[0].bitcast(Int(32)) - Int(32)(4)).bitcast(Bits(32))
             br_dest = (a != b).select(dest_pc, new_pc)
             log("bne({:b})     | {} != {} | to {} | else {}", self.opcode, a, b, dest_pc, new_pc)
