@@ -1,5 +1,4 @@
 pub mod attrs;
-pub mod memory;
 pub mod meta;
 
 use std::collections::{HashMap, HashSet};
