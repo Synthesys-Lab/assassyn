@@ -1,12 +1,14 @@
 '''Memory module, a special and subclass of Module.'''
 
 from .module import Module
-from ..block import SRAMBox
-from ..dtype import Bits
 from ..array import RegArray
-from ..block import Condition
+from ..block import SRAMBox, Condition
+from ..builder import ir_builder
+from ..dtype import Bits
 
 
+#pylint: disable=too-many-arguments, invalid-name
+@ir_builder(node_type='expr')
 def SRAM(width, depth, init_file, we, re, addr, wdata, user: Module):
     '''The constructor for the SRAM module.
     # Arguments
@@ -22,11 +24,14 @@ def SRAM(width, depth, init_file, we, re, addr, wdata, user: Module):
     # Returns
     bound: Bind: The bound handle of the user module.
     '''
-    with SRAMBox(width, depth, init_file, we, re, addr, wdata) as sram:
-        payload = RegArray(Bits(width), depth, attr=[sram])
+    sram = SRAMBox(width, depth, init_file, we, re, addr, wdata)
+    with sram:
         # TODO(@were): Put this into the block box scope.
+        payload = RegArray(Bits(width), depth, attr=[sram])
         with Condition(we):
-            self.payload[addr] = wdata
+            payload[addr] = wdata
         with Condition(re):
-            bound = user.bind(rdata=self.payload[addr])
-    return bound
+            bound = user.bind(rdata=payload[addr])
+        sram.bound = bound
+
+    return sram

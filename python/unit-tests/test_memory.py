@@ -6,13 +6,13 @@ from assassyn import utils
 
 class MemUser(Module):
 
+    @module.constructor
     def __init__(self):
         super().__init__()
         self.rdata = Port(Bits(32))
 
     @module.combinational
     def build(self):
-        super().build()
         width = self.rdata.dtype.bits
         rdata = self.rdata.bitcast(Int(width))
         k = Int(width)(128)
@@ -28,18 +28,18 @@ class Driver(Module):
 
     @module.combinational
     def build(self, width, init_file, user):
-        cnt = RegArray(Int(memory.width), 1)
+        cnt = RegArray(Int(width), 1)
         v = cnt[0]
         we = v[0:0]
         re = ~we
-        plused = v + Int(memory.width)(1)
+        plused = v + Int(width)(1)
         waddr = plused[0:8]
         raddr = v[0:8]
         addr = we.select(waddr, raddr).bitcast(Int(9))
         sram = SRAM(width, 512, init_file, we, re, addr, v.bitcast(Bits(width)), user)
-        sram.bound.async_called()
+        bound = sram.bound
+        bound.async_called()
         cnt[0] = plused
-        return sram
 
 def check(raw):
     for line in raw.splitlines():
@@ -55,11 +55,11 @@ def check(raw):
 def impl(sys_name, width, init_file, resource_base):
     sys = SysBuilder(sys_name)
     with sys:
-        user = MemUser(sram.o_data)
+        user = MemUser()
         user.build()
         # Build the driver
         driver = Driver()
-        driver.build(memory)
+        driver.build(width, init_file, user)
 
     config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
 
@@ -83,6 +83,6 @@ def test_memory_wide():
     impl('memory_wide', 256, None, None)
 
 if __name__ == "__main__":
-    #test_memory()
+    test_memory()
     #test_memory_init()
-    test_memory_wide()
+    #test_memory_wide()

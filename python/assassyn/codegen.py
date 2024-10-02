@@ -255,6 +255,8 @@ class CodeGen(visitor.Visitor):
                 self.code.append('  // cycled block')
                 self.code.append(f'  let {block_var} = sys.create_cycled_block({node.cycle});')
                 self.code.append(f'  sys.set_current_block({block_var});')
+            elif isinstance(node, block.SRAMBox):
+                self.code.append('  // sram block')
 
         for elem in node.iter():
             self.dispatch(elem)
@@ -377,22 +379,23 @@ class CodeGen(visitor.Visitor):
 
 
     def generate_array_attr(self, node: Array):
+        '''Generate the array attributes for the given array'''
         attrs = []
-        path = 'assassyn::ir::memory::ArrayAttr'
+        path = 'assassyn::ir::array::ArrayAttr'
         for attr in node.attr:
             if attr == Array.FULLY_PARTITIONED:
                 self.code.append(f'{path}::FullyPartitioned')
             elif isinstance(attr, block.SRAMBox):
                 # (width, depth, init_file, we, re, addr, wdata)
-                params = ['assassyn::ir::memory::MemoryParams {']
+                params = ['assassyn::ir::array::MemoryParams {']
                 params.append(f'width: {attr.width},')
                 params.append(f'depth: {attr.depth},')
                 if attr.init_file is not None:
                     params.append(f'init_file: Some("{attr.init_file}".into()),')
-                params.append('..Default::default(),')
+                params.append('..Default::default()')
                 params.append('}')
                 params = '\n'.join(params)
-                self.code.append(f'{path}::MemoryParams({params})')
+                attrs.append(f'{path}::MemoryParams({params})')
             else:
                 assert False, f'Unsupported memory attribute {attr}'
         return ', '.join(attrs)

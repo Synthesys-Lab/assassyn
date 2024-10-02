@@ -81,8 +81,9 @@ class CycledBlock(Block):
         return res
 
 class SRAMBox(Block):
+    '''A virtual block for SRAM blackbox.'''
 
-    def __init__(self, width, depth, init_file, we, re, addr, wdata):
+    def __init__(self, width, depth, init_file, we, re, addr, wdata): #pylint: disable=too-many-arguments
         super().__init__(Block.SRAM)
         self.width = width
         self.depth = depth
@@ -94,6 +95,9 @@ class SRAMBox(Block):
 
     def __repr__(self):
         ident = Singleton.repr_ident * ' '
+        width = self.width
+        depth = self.depth
+        init_file = self.init_file
         res = f'SRAMBox {{ b{width}x{depth}, init_file: {init_file} }} {{\n'
         res = res + super().__repr__()
         res = res + f'\n{ident}}}'
