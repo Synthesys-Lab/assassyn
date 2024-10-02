@@ -25,13 +25,11 @@ def combinational(
     '''A decorator for marking a function as combinational logic description.'''
     module_self = args[0]
     assert isinstance(module_self, Downstream)
-    Singleton.builder.cur_module = module_self
-    Singleton.builder.builder_func = func
+    Singleton.builder.enter_context_of('module', module_self)
     module_self.body = Block(Block.MODULE_ROOT)
     with module_self.body:
         res = func(*args, **kwargs)
-    Singleton.builder.cleanup_symtab()
-    Singleton.builder.cur_module = None
+    Singleton.builder.exit_context_of('module')
     return res
 
 class Downstream(ModuleBase):

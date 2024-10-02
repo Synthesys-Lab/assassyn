@@ -187,14 +187,19 @@ class CodeGen(visitor.Visitor):
         self.code.append('  // TODO: Support array attributes')
         for elem in node.arrays:
             self.visit_array(elem)
+        self.code.append('  // Declare modules')
         for elem in node.modules:
             lval = elem.as_operand()
             name = elem.name.lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
             self.code.append(f'  let {lval} = sys.create_module("{name}", vec![{ports}]);')
             self.emit_module_attrs(elem, lval)
+        self.code.append('  // Declare downstream modules')
+        for elem in node.downstreams:
+            var = self.generate_rval(elem)
+            self.code.append(f'  let {var} = sys.create_downstream("{elem.name}");')
         self.code.append('  // Gathered binds')
-        for elem in node.modules:
+        for elem in node.modules + node.downstreams:
             bind_emitter = EmitBinds(self)
             name = self.generate_rval(elem)
             self.code.append('  // Set the current module redundantly to emit related binds')
@@ -208,8 +213,7 @@ class CodeGen(visitor.Visitor):
         for elem in node.downstreams:
             self.code.append('  // Emit downstream modules')
             var = self.generate_rval(elem)
-            self.code.append(
-                    f'  let {var} = sys.create_downstream("{elem.name}");')
+            self.code.append(f'  sys.set_current_module({var});')
             self.visit_module(elem)
 
         config = self.emit_config()

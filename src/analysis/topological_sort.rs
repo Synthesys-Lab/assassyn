@@ -39,8 +39,6 @@ pub fn topo_sort(sys: &SysBuilder) -> Vec<BaseNode> {
 
           *in_degree.entry(module.key).or_insert(0) += 1;
         }
-      } else {
-        println!("Failed to convert external interface to expression.");
       }
     }
   }

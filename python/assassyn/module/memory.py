@@ -1,6 +1,6 @@
 '''Memory module, a special and subclass of Module.'''
 
-from .downstream import Downstream, combinational
+from .downstream import Downstream, combinational, constructor
 from ..array import RegArray
 from ..block import Condition
 from ..builder import ir_builder
@@ -9,12 +9,17 @@ from ..dtype import Bits
 
 class SRAM(Downstream):
 
+    @constructor
     def __init__(self, width, depth, init_file):
         super().__init__()
         self.width = width
         self.depth = depth
         self.init_file = init_file
         self.payload = RegArray(Bits(width), depth, attr=[self])
+        self.we = None
+        self.re = None
+        self.addr = None
+        self.wdata = None
 
     @combinational
     def build(self, we, re, addr, wdata, user):
@@ -37,9 +42,9 @@ class SRAM(Downstream):
         self.wdata = wdata
 
         with Condition(we):
-            payload[addr] = wdata
+            self.payload[addr] = wdata
         with Condition(re):
-            self.bound = user.bind(rdata=payload[addr])
+            self.bound = user.bind(rdata=self.payload[addr])
 
         return self.bound
 

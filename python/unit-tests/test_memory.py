@@ -32,12 +32,22 @@ class Driver(Module):
         v = cnt[0]
         we = v[0:0]
         re = ~we
-        plused = v + Int(sram.width)(1)
+        plused = v + Int(width)(1)
         waddr = plused[0:8]
         raddr = v[0:8]
         addr = we.select(waddr, raddr).bitcast(Int(9))
-        sram = SRAM(width, 512, init_file, we, re, addr, v.bitcast(Bits(width)), user)
-        return sram.bound
+        sram = SRAM(width, 512, init_file)
+        sram.build(we, re, addr, v.bitcast(Bits(width)), user)
+        return cnt, sram, plused
+
+class DriverDown(Downstream):
+
+    @downstream.constructor
+    def __init__(self):
+        super().__init__()
+
+    @downstream.combinational
+    def build(self, sram, cnt, plused):
         bound = sram.bound
         bound.async_called()
         cnt[0] = plused
@@ -61,7 +71,10 @@ def impl(sys_name, width, init_file, resource_base):
         user.build()
         # Build the driver
         driver = Driver()
-        driver.build(width, init_file, user)
+        cnt, sram, plused = driver.build(width, init_file, user)
+        # Build the downstream
+        downstream = DriverDown()
+        downstream.build(sram, cnt, plused)
 
     config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
 
