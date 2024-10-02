@@ -14,7 +14,6 @@ class Block:
     def __init__(self, kind: int):
         self.kind = kind
         self._body = []
-        self._restore = None
         self.parent = None
 
     def __repr__(self):
@@ -23,6 +22,11 @@ class Block:
         body = ident + ('\n' + ident).join(repr(elem) for elem in self.iter())
         Singleton.repr_ident -= 2
         return body
+
+    @property
+    def body(self):
+        '''Get the body of the block.'''
+        return self._body
 
     def as_operand(self):
         '''Dump the block as an operand.'''
@@ -38,19 +42,17 @@ class Block:
 
     def __enter__(self):
         '''Designate the scope of entering the block.'''
-        assert self._restore is None, "A block cannot be used twice!"
-        parent = Singleton.builder.get_current_block()
+        parent = Singleton.builder.current_block
         if parent is None:
-            parent = Singleton.builder.get_current_module()
+            parent = Singleton.builder.current_module
         assert parent is not None
         self.parent = parent
-        self._restore = Singleton.builder.insert_point['expr']
-        Singleton.builder.insert_point['expr'] = self._body
+        Singleton.builder.enter_context_of('block', self)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         '''Designate the scope of exiting the block.'''
-        Singleton.builder.insert_point['expr'] = self._restore
+        Singleton.builder.exit_context_of('block')
 
 class CondBlock(Block):
     '''The inherited class of the block for conditional block.'''
@@ -79,30 +81,6 @@ class CycledBlock(Block):
         res = res + super().__repr__()
         res = res + f'\n{ident}}}'
         return res
-
-class SRAMBox(Block):
-    '''A virtual block for SRAM blackbox.'''
-
-    def __init__(self, width, depth, init_file, we, re, addr, wdata): #pylint: disable=too-many-arguments
-        super().__init__(Block.SRAM)
-        self.width = width
-        self.depth = depth
-        self.init_file = init_file
-        self.we = we
-        self.re = re
-        self.addr = addr
-        self.wdata = wdata
-
-    def __repr__(self):
-        ident = Singleton.repr_ident * ' '
-        width = self.width
-        depth = self.depth
-        init_file = self.init_file
-        res = f'SRAMBox {{ b{width}x{depth}, init_file: {init_file} }} {{\n'
-        res = res + super().__repr__()
-        res = res + f'\n{ident}}}'
-        return res
-
 
 @ir_builder(node_type='expr')
 def Condition(cond): # pylint: disable=invalid-name

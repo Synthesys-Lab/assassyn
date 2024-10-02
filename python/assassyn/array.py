@@ -6,7 +6,7 @@ from .expr import ArrayRead, ArrayWrite
 from .value import Value
 from .utils import identifierize
 
-@ir_builder(node_type='array')
+@ir_builder
 def RegArray( #pylint: disable=invalid-name
         scalar_ty: DType,
         size: int,
@@ -59,14 +59,14 @@ class Array:
     def __repr__(self):
         return f'array {self.name}[{self.scalar_ty}; {self.size}] = {self.initializer}'
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __getitem__(self, index):
         if isinstance(index, int):
             index = to_uint(index)
         assert isinstance(index, Value), f'Invalid index given: {index}'
         return ArrayRead(self, index)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __setitem__(self, index, value):
         if isinstance(index, int):
             index = to_uint(index)

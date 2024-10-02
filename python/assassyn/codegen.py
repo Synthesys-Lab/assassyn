@@ -255,8 +255,6 @@ class CodeGen(visitor.Visitor):
                 self.code.append('  // cycled block')
                 self.code.append(f'  let {block_var} = sys.create_cycled_block({node.cycle});')
                 self.code.append(f'  sys.set_current_block({block_var});')
-            elif isinstance(node, block.SRAMBox):
-                self.code.append('  // sram block')
 
         for elem in node.iter():
             self.dispatch(elem)
@@ -385,7 +383,7 @@ class CodeGen(visitor.Visitor):
         for attr in node.attr:
             if attr == Array.FULLY_PARTITIONED:
                 self.code.append(f'{path}::FullyPartitioned')
-            elif isinstance(attr, block.SRAMBox):
+            elif isinstance(attr, module.SRAM):
                 # (width, depth, init_file, we, re, addr, wdata)
                 params = ['assassyn::ir::array::MemoryParams {']
                 params.append(f'width: {attr.width},')

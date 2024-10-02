@@ -32,14 +32,16 @@ class Driver(Module):
         v = cnt[0]
         we = v[0:0]
         re = ~we
-        plused = v + Int(width)(1)
+        plused = v + Int(sram.width)(1)
         waddr = plused[0:8]
         raddr = v[0:8]
         addr = we.select(waddr, raddr).bitcast(Int(9))
         sram = SRAM(width, 512, init_file, we, re, addr, v.bitcast(Bits(width)), user)
+        return sram.bound
         bound = sram.bound
         bound.async_called()
         cnt[0] = plused
+
 
 def check(raw):
     for line in raw.splitlines():

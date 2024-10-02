@@ -12,7 +12,7 @@ class ModuleBase:
         '''Dump the module as a right-hand side reference.'''
         return f'_{identifierize(self)}'
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def triggered(self):
         '''The frontend API for creating a triggered node,
         which checks if this module is triggered this cycle.

@@ -219,7 +219,7 @@ class Cast(Expr):
         method = Cast.SUBCODES[self.opcode]
         return f'{self.as_operand()} = {method} {self.x.as_operand()} to {self.dtype}'
 
-@ir_builder(node_type='expr')
+@ir_builder
 def log(*args):
     '''The exposed frontend function to instantiate a log operation'''
     assert isinstance(args[0], str)
@@ -296,7 +296,7 @@ class Bind(Expr):
         cnt = sum(i.name in fifo_names for i in ports)
         return cnt == len(ports)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def async_called(self, **kwargs):
         '''The exposed frontend function to instantiate an async call operation'''
         self._push(**kwargs)

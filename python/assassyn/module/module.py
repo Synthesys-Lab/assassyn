@@ -14,7 +14,7 @@ def constructor(func, *args, **kwargs):
     '''A decorator for marking a function as a constructor of a module.'''
     builder = Singleton.builder
     module_self = args[0]
-    builder.insert_point['module'].append(module_self)
+    builder.modules.append(module_self)
     func(*args, **kwargs)
     for key in ['body', '_pop_cache', '_wait_until', '_finalized']:
         assert hasattr(module_self, key), 'Did you forget to call `super().__init__?`'
@@ -124,13 +124,13 @@ class Module(ModuleBase):
         '''The helper function to get all the ports in the module.'''
         return [v for _, v in self.__dict__.items() if isinstance(v, Port)]
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def async_called(self, **kwargs):
         '''The frontend API for creating an async call operation to this `self` module.'''
         bind = self.bind(**kwargs)
         return AsyncCall(bind)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def bind(self, **kwargs):
         '''The frontend API for creating a bind operation to this `self` module.'''
         bound = Bind(self, **kwargs)
@@ -231,22 +231,22 @@ class Port:
         self.dtype = dtype
         self.name = self.module = None
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def valid(self):
         '''The frontend API for creating a FIFO.valid operation.'''
         return PureInstrinsic(PureInstrinsic.FIFO_VALID, self)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def peek(self):
         '''The frontend API for creating a FIFO.peek operation.'''
         return PureInstrinsic(PureInstrinsic.FIFO_PEEK, self)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def pop(self):
         '''The frontend API for creating a pop operation.'''
         return FIFOPop(self)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def push(self, v):
         '''The frontend API for creating a push operation.'''
         return FIFOPush(self, v)
@@ -267,14 +267,12 @@ def combinational(
     '''A decorator for marking a function as combinational logic description.'''
     module_self = args[0]
     assert isinstance(module_self, Module)
-    Singleton.builder.cur_module = module_self
-    Singleton.builder.builder_func = func
     module_self.body = Block(Block.MODULE_ROOT)
+    Singleton.builder.enter_context_of('module', module_self)
     # TODO(@were): Make implicit pop more robust.
     with module_self.body:
         module_self.implicit_pop()
         res = func(*args, **kwargs)
         module_self.implicit_restore()
-    Singleton.builder.cleanup_symtab()
-    Singleton.builder.cur_module = None
+    Singleton.builder.exit_context_of('module')
     return res
