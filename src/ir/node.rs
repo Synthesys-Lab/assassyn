@@ -9,6 +9,7 @@ use self::user::Operand;
 use super::super::ir::visitor::Visitor;
 use super::ir_printer::IRPrinter;
 
+use array::Array;
 use instructions::call::LazyBind;
 use paste::paste;
 

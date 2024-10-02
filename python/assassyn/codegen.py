@@ -8,7 +8,7 @@ from . import block
 from . import const
 from .builder import SysBuilder
 from .array import Array
-from .module import Module, Port, Memory
+from .module import Module, Port
 from .block import Block
 from .expr import Expr
 from .utils import identifierize
@@ -142,18 +142,19 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
         if m.disable_arbiter_rewrite:
             self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
-        if isinstance(m, Memory):
-            width = f'width: {m.width}'
-            depth = f'depth: {m.depth}'
-            lat = f'lat: {m.latency[0]}..={m.latency[1]}'
-            if m.init_file is not None:
-                init_file = f'init_file: Some("{m.init_file}".into())'
-            else:
-                init_file = 'init_file: None'
-            array = f'array: {m.payload.name}'
-            params = ', '.join([width, depth, lat, init_file, array])
-            params = f'assassyn::ir::module::memory::MemoryParams{{ {params} }}'
-            self.code.append(f'{module_mut}.add_attr({path}::Memory({params}));')
+        # FIXME(@were): Support memory attributes.
+        # if isinstance(m):
+        #     width = f'width: {m.width}'
+        #     depth = f'depth: {m.depth}'
+        #     lat = f'lat: {m.latency[0]}..={m.latency[1]}'
+        #     if m.init_file is not None:
+        #         init_file = f'init_file: Some("{m.init_file}".into())'
+        #     else:
+        #         init_file = 'init_file: None'
+        #     array = f'array: {m.payload.name}'
+        #     params = ', '.join([width, depth, lat, init_file, array])
+        #     params = f'assassyn::ir::module::memory::MemoryParams{{ {params} }}'
+        #     self.code.append(f'{module_mut}.add_attr({path}::Memory({params}));')
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''

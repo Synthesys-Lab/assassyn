@@ -1,4 +1,3 @@
-use super::memory::MemoryParams;
 use super::Module;
 
 macro_rules! define_attrs {
@@ -35,8 +34,6 @@ define_attrs!(
   NoArbiter,
   // This module's timing is systolic.
   Systolic,
-  // This module is a memory module.
-  Memory(MemoryParams),
   // This module is a downstream module, which is combinationally connected to the upstream module.
   Downstream,
 );

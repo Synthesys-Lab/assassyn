@@ -5,7 +5,8 @@ from .array import RegArray, Array
 from .dtype import DType, Int, UInt, Float, Bits, Record
 from .builder import SysBuilder, ir_builder, Singleton
 from .expr import Expr, log, concat, finish
-from .module import Module, Port, Memory, Downstream
+from .module import Module, Port, Downstream
+from .module.memory import SRAM
 from .block import Condition, Cycle
 from . import module
 from .module import downstream
