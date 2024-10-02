@@ -628,20 +628,17 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   // generate memory initializations
   for array in sys.array_iter() {
     for attr in array.get_attrs() {
-      match attr {
-        ArrayAttr::MemoryParams(mp) => {
-          if let Some(init_file) = &mp.init_file {
-            let init_file_path = config.resource_base.join(init_file);
-            let init_file_path = init_file_path.to_str().unwrap();
-            let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
-            fd.write_all(
-              quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }
-                .to_string()
-                .as_bytes(),
-            )?;
-          }
+      if let ArrayAttr::MemoryParams(mp) = attr {
+        if let Some(init_file) = &mp.init_file {
+          let init_file_path = config.resource_base.join(init_file);
+          let init_file_path = init_file_path.to_str().unwrap();
+          let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
+          fd.write_all(
+            quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }
+              .to_string()
+              .as_bytes(),
+          )?;
         }
-        _ => {}
       }
     }
   }
