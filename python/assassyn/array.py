@@ -1,12 +1,11 @@
 '''The module provides the Array class for representing register arrays in the IR.'''
 
-from .builder import ir_builder
+from .builder import ir_builder, Singleton
 from .dtype import DType, to_uint
 from .expr import ArrayRead, ArrayWrite
 from .value import Value
 from .utils import identifierize
 
-@ir_builder
 def RegArray( #pylint: disable=invalid-name
         scalar_ty: DType,
         size: int,
@@ -27,6 +26,7 @@ def RegArray( #pylint: disable=invalid-name
     res = Array(scalar_ty, size, attr, initializer)
     if name is not None:
         res.name = name
+    Singleton.builder.arrays.append(res)
     return res
 
 class Array:

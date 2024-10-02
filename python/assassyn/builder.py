@@ -9,6 +9,7 @@ class Singleton(type):
     builder = None
     repr_ident = None
     id_slice = slice(-6, -1)
+    with_py_loc = False
 
 @decorator
 def ir_builder(func, *args, **kwargs):
@@ -18,9 +19,8 @@ def ir_builder(func, *args, **kwargs):
     from .const import Const
     if not isinstance(res, Const):
         Singleton.builder.insert_point.append(res)
-    print(inspect.stack()[1].filename)
-    print(inspect.stack()[1].function)
-    print(inspect.stack()[1].lineno)
+    stack_entry = inspect.stack()[2]
+    res.loc = (stack_entry.filename, stack_entry.lineno, stack_entry.function)
     return res
 
 #pylint: disable=too-many-instance-attributes
