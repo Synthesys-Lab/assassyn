@@ -444,20 +444,20 @@ module top (
 
     // memory initializations mapS
     // FIXME(@were): Fix the memory initialization.
-    let mem_init_map: HashMap<BaseNode, String> = HashMap::new(); // array -> init_file_path
-                                                                  // for module in self.sys.module_iter(ModuleKind::Module) {
-                                                                  //   for attr in module.get_attrs() {
-                                                                  //     if let Attribute::Memory(param) = attr {
-                                                                  //       if let Some(init_file) = &param.init_file {
-                                                                  //         let mut init_file_path = self.config.resource_base.clone();
-                                                                  //         init_file_path.push(init_file);
-                                                                  //         let init_file_path = init_file_path.to_str().unwrap();
-                                                                  //         let array = param.array.as_ref::<Array>(self.sys).unwrap();
-                                                                  //         mem_init_map.insert(array.upcast(), init_file_path.to_string());
-                                                                  //       }
-                                                                  //     }
-                                                                  //   }
-                                                                  // }
+    let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new();
+    // array -> init_file_path
+    for array in self.sys.array_iter() {
+      for attr in array.get_attrs() {
+        if let ArrayAttr::MemoryParams(mp) = attr {
+          if let Some(init_file) = &mp.init_file {
+            let mut init_file_path = self.config.resource_base.clone();
+            init_file_path.push(init_file);
+            let init_file_path = init_file_path.to_str().unwrap();
+            mem_init_map.insert(array.upcast(), init_file_path.to_string());
+          }
+        }
+      }
+    }
 
     // array storage element definitions
     for array in self.sys.array_iter() {

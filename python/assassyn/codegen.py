@@ -142,19 +142,6 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
         if m.disable_arbiter_rewrite:
             self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
-        # FIXME(@were): Support memory attributes.
-        # if isinstance(m):
-        #     width = f'width: {m.width}'
-        #     depth = f'depth: {m.depth}'
-        #     lat = f'lat: {m.latency[0]}..={m.latency[1]}'
-        #     if m.init_file is not None:
-        #         init_file = f'init_file: Some("{m.init_file}".into())'
-        #     else:
-        #         init_file = 'init_file: None'
-        #     array = f'array: {m.payload.name}'
-        #     params = ', '.join([width, depth, lat, init_file, array])
-        #     params = f'assassyn::ir::module::memory::MemoryParams{{ {params} }}'
-        #     self.code.append(f'{module_mut}.add_attr({path}::Memory({params}));')
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''
@@ -389,13 +376,35 @@ class CodeGen(visitor.Visitor):
         self.code.append(res)
 
 
+    def generate_array_attr(self, node: Array):
+        attrs = []
+        path = 'assassyn::ir::memory::ArrayAttr'
+        for attr in node.attr:
+            if attr == Array.FULLY_PARTITIONED:
+                self.code.append(f'{path}::FullyPartitioned')
+            elif isinstance(attr, block.SRAMBox):
+                # (width, depth, init_file, we, re, addr, wdata)
+                params = ['assassyn::ir::memory::MemoryParams {']
+                params.append(f'width: {attr.width},')
+                params.append(f'depth: {attr.depth},')
+                if attr.init_file is not None:
+                    params.append(f'init_file: Some("{attr.init_file}".into()),')
+                params.append('..Default::default(),')
+                params.append('}')
+                params = '\n'.join(params)
+                self.code.append(f'{path}::MemoryParams({params})')
+            else:
+                assert False, f'Unsupported memory attribute {attr}'
+        return ', '.join(attrs)
+
+
     def visit_array(self, node: Array):
         name = node.name if f'{id(node)}' in node.name else self.generate_rval(node)
         size = node.size
         ty = generate_dtype(node.scalar_ty)
         init = self.generate_init_value(node.initializer, ty)
         self.code.append(f'  // {node}')
-        attrs = ', '.join(f'assassyn::ir::data::ArrayAttr::{CG_ARRAY_ATTR[i]}' for i in node.attr)
+        attrs = self.generate_array_attr(node)
         attrs = f'vec![{attrs}]'
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         self.code.append(array_decl)

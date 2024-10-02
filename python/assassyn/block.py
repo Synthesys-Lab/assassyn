@@ -9,6 +9,7 @@ class Block:
     MODULE_ROOT = 0
     CONDITIONAL = 1
     CYCLE       = 2
+    SRAM        = 3
 
     def __init__(self, kind: int):
         self.kind = kind
@@ -78,6 +79,26 @@ class CycledBlock(Block):
         res = res + super().__repr__()
         res = res + f'\n{ident}}}'
         return res
+
+class SRAMBox(Block):
+
+    def __init__(self, width, depth, init_file, we, re, addr, wdata):
+        super().__init__(Block.SRAM)
+        self.width = width
+        self.depth = depth
+        self.init_file = init_file
+        self.we = we
+        self.re = re
+        self.addr = addr
+        self.wdata = wdata
+
+    def __repr__(self):
+        ident = Singleton.repr_ident * ' '
+        res = f'SRAMBox {{ b{width}x{depth}, init_file: {init_file} }} {{\n'
+        res = res + super().__repr__()
+        res = res + f'\n{ident}}}'
+        return res
+
 
 @ir_builder(node_type='expr')
 def Condition(cond): # pylint: disable=invalid-name

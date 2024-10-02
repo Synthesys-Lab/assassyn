@@ -9,7 +9,6 @@ use std::ops::RangeInclusive;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MemoryParams {
-  pub array: BaseNode,
   pub width: usize,
   pub depth: usize,
   pub lat: RangeInclusive<usize>,
@@ -19,10 +18,9 @@ pub struct MemoryParams {
 impl Default for MemoryParams {
   fn default() -> Self {
     Self {
-      array: BaseNode::unknown(),
       width: 0,
       depth: 0,
-      lat: 0..=0,
+      lat: 1..=1,
       init_file: None,
     }
   }
@@ -30,19 +28,21 @@ impl Default for MemoryParams {
 
 impl MemoryParams {
   pub fn new(
-    array: BaseNode,
     width: usize,
     depth: usize,
     lat: RangeInclusive<usize>,
     init_file: Option<String>,
   ) -> Self {
     Self {
-      array,
       width,
       depth,
       lat,
       init_file,
     }
+  }
+
+  pub fn is_sram(&self) -> bool {
+    return self.lat.start().eq(&1) && self.lat.end().eq(&1);
   }
 }
 
@@ -58,8 +58,6 @@ impl Display for MemoryParams {
     )
   }
 }
-
-
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ArrayAttr {

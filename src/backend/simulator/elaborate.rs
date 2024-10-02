@@ -626,24 +626,25 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("];\n".as_bytes())?;
 
   // generate memory initializations
-  // FIXME(@were): Support memory initialization in array.
-  // for module in sys.module_iter(ModuleKind::Module) {
-  //   for attr in module.get_attrs() {
-  //     if let Attribute::Memory(param) = attr {
-  //       if let Some(init_file) = &param.init_file {
-  //         let init_file_path = config.resource_base.join(init_file);
-  //         let init_file_path = init_file_path.to_str().unwrap();
-  //         let array = param.array.as_ref::<Array>(sys).unwrap();
-  //         let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
-  //         fd.write_all(
-  //           quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }
-  //             .to_string()
-  //             .as_bytes(),
-  //         )?;
-  //       }
-  //     }
-  //   }
-  // }
+  for array in sys.array_iter() {
+    for attr in array.get_attrs() {
+      match attr {
+        ArrayAttr::MemoryParams(mp) => {
+          if let Some(init_file) = &mp.init_file {
+            let init_file_path = config.resource_base.join(init_file);
+            let init_file_path = init_file_path.to_str().unwrap();
+            let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
+            fd.write_all(
+              quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }
+                .to_string()
+                .as_bytes(),
+            )?;
+          }
+        }
+        _ => {}
+      }
+    }
+  }
 
   let sim_threshold = config.sim_threshold;
 
