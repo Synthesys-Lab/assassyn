@@ -271,6 +271,15 @@ class PureInstrinsic(Expr):
             return f'{self.as_operand()} = {fifo}.{self.OPERATORS[self.opcode]}()'
         raise NotImplementedError
 
+    def __getattr__(self, name):
+        if self.opcode == PureInstrinsic.FIFO_PEEK:
+            from ..module import Port
+            port = self.args[0]
+            assert isinstance(port, Port)
+            return port.dtype.attributize(self, name)
+
+        assert False, f"Cannot access attribute {name} on {self}"
+
 
 class Bind(Expr):
     '''The class for binding operations. Function bind is a functional programming concept like
