@@ -36,12 +36,9 @@ class Module(ModuleBase):
       ATTR_TIMING: 'timing',
     }
 
-    def __init__(
-            self,
-            no_arbiter=False,
-            **ports):
+    def __init__(self, ports, no_arbiter=False):
         '''Construct the module with the given attributes.
-        
+
         Args:
           - explicit_fifo(bool): If this module explicitly pops FIFO values.
           - timing(Timing): The timing policy of this module.

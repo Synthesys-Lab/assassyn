@@ -5,22 +5,24 @@ import assassyn
 
 class Adder(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.a = Port(Int(32))
-        self.b = Port(Int(32))
+        super().__init__(
+            ports={
+                'a': Port(Int(32)),
+                'b': Port(Int(32)),
+            },
+        )
 
     @module.combinational
     def build(self):
-        c = self.a + self.b
-        log("Adder: {} + {} = {}", self.a, self.b, c)
+        a, b = self.pop_all_ports(True)
+        c = a + b
+        log("Adder: {} + {} = {}", a, b, c)
 
 class Driver(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(ports={})
 
     @module.combinational
     def build(self, adder: Adder):

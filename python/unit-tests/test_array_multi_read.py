@@ -6,9 +6,8 @@ from assassyn import utils
 
 class ModA(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(a = Port(Int(32)))
         self.a = Port(Int(32))
 
     @module.combinational

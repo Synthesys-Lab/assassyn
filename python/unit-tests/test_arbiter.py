@@ -9,8 +9,8 @@ class Squarer(Module):
     
     def __init__(self):
         super().__init__(
+            ports={'a': Port(Int(32))},
             no_arbiter=True,
-            a=Port(Int(32)),
         )
 
     @module.combinational
@@ -21,12 +21,15 @@ class Squarer(Module):
 
 
 class Arbiter(Module):
-    
+
     def __init__(self):
+        ports={
+            'a0': Port(Int(32)),
+            'a1': Port(Int(32))
+        }
         super().__init__(
+            ports=ports,
             no_arbiter=True,
-            a0=Port(Int(32)),
-            a1=Port(Int(32)),
         )
 
     @module.combinational
@@ -61,7 +64,7 @@ class Arbiter(Module):
 class Driver(Module):
     
         def __init__(self):
-            super().__init__()
+            super().__init__(ports={})
 
         @module.combinational
         def build(self, arb: Arbiter):
