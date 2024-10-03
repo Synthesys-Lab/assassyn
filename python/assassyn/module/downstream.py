@@ -8,16 +8,6 @@ from ..block import Block
 from ..builder import Singleton
 
 @decorator
-def constructor(func, *args, **kwargs):
-    '''Constructor decorator for the Downstream class.'''
-    func(*args, **kwargs)
-    builder = Singleton.builder
-    module_self = args[0]
-    builder.downstreams.append(module_self)
-
-
-@decorator
-#pylint: disable=keyword-arg-before-vararg
 def combinational(
         func,
         *args,
@@ -41,11 +31,16 @@ class Downstream(ModuleBase):
         self.name = self.name + self.as_operand()
         self.body = None
 
-    def __repr__(self):
+        Singleton.builder.downstreams.append(self)
+
+    def _repr_impl(self, head):
         var_id = self.as_operand()
-        body = self.body.__repr__() if self.body is not None else ''
-        return f'''  #[downstream]
+        body = repr(self.body) if self.body is not None else ''
+        return f'''  #[{head}]
   {var_id} = module {self.name} {{
 {body}
   }}
 '''
+
+    def __repr__(self):
+        return self._repr_impl('downstream')

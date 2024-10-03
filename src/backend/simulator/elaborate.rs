@@ -47,7 +47,7 @@ macro_rules! fifo_name {
 
 fn dump_rval_ref(module_ctx: BaseNode, sys: &SysBuilder, node: &BaseNode) -> String {
   NodeRefDumper::new(module_ctx)
-    .dispatch(sys, &node, vec![])
+    .dispatch(sys, node, vec![])
     .unwrap()
 }
 
@@ -118,6 +118,7 @@ fn externally_used_combinational(expr: &ExprRef<'_>) -> bool {
   if matches!(expr.get_opcode(), Opcode::FIFOPush) {
     return false;
   }
+  let this_module = expr.get_block().get_module();
   let res = expr
     .users()
     .iter()
@@ -133,7 +134,7 @@ fn externally_used_combinational(expr: &ExprRef<'_>) -> bool {
         None
       }
     })
-    .any(|user| user.get_parent() != expr.get_parent());
+    .any(|user| user.get_block().get_module() != this_module);
   res
 }
 
@@ -296,7 +297,8 @@ impl Visitor<String> for ElaborateModule<'_> {
         ));
         res.push_str("println!(");
         for elem in expr.operand_iter() {
-          res.push_str(&format!("{}, ", dump_rval_ref(self.module_ctx, self.sys, elem.get_value())));
+          res
+            .push_str(&format!("{}, ", dump_rval_ref(self.module_ctx, self.sys, elem.get_value())));
         }
         res.push(')');
         res
@@ -525,6 +527,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         .filter_map(|(x, _)| x.as_ref::<Expr>(sys).ok())
         .filter(|x| externally_used_combinational(x))
       {
+        eprintln!("Found combinational expr externally used: {}", expr);
         expr_validities.insert(expr.upcast());
       }
     }

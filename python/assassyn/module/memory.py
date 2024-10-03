@@ -1,15 +1,14 @@
 '''Memory module, a special and subclass of Module.'''
 
-from .downstream import Downstream, combinational, constructor
+from .downstream import Downstream, combinational
 from ..array import RegArray
 from ..block import Condition
-from ..builder import ir_builder
 from ..dtype import Bits
 
 
-class SRAM(Downstream):
+class SRAM(Downstream): # pylint: disable=too-many-instance-attributes
+    '''The SRAM module, a subclass of Downstream.'''
 
-    @constructor
     def __init__(self, width, depth, init_file):
         super().__init__()
         self.width = width
@@ -20,9 +19,10 @@ class SRAM(Downstream):
         self.re = None
         self.addr = None
         self.wdata = None
+        self.bound = None
 
     @combinational
-    def build(self, we, re, addr, wdata, user):
+    def build(self, we, re, addr, wdata, user): #pylint: disable=too-many-arguments
         '''The constructor for the SRAM module.
 
         # Arguments
@@ -49,10 +49,4 @@ class SRAM(Downstream):
         return self.bound
 
     def __repr__(self):
-        var_id = self.as_operand()
-        body = self.body.__repr__() if self.body is not None else ''
-        return f'''  #[downstream.SRAM]
-  {var_id} = module {self.name} {{
-{body}
-  }}
-'''
+        return self._repr_impl('downstream.SRAM')

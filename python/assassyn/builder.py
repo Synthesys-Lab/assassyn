@@ -1,7 +1,6 @@
 '''The module provides the implementation of a class that is both IR builder and the system.'''
 
 import inspect
-import types
 from decorator import decorator
 
 class Singleton(type):

@@ -7,7 +7,7 @@ from ..dtype import DType
 from ..block import Block
 from ..expr import Bind, FIFOPop, PureInstrinsic, FIFOPush, AsyncCall
 from ..expr.intrinsic import wait_until
-from .base import ModuleBase, name_ports_of_module
+from .base import ModuleBase
 
 def _reserved_module_name(name):
     return name in ['Driver', 'Testbench']
@@ -18,14 +18,17 @@ class Timing:
     SYSTOLIC = 1
     BACKPRESSURE = 2
 
-    def __repr__(self):
-        return ['undefined', 'systolic', 'backpressure'][self.ty]
+    @staticmethod
+    def to_string(value):
+        '''The helper function to convert the timing policy to string.'''
+        return [None, 'systolic', 'backpressure'][value]
 
 class Module(ModuleBase):
     '''The AST node for defining a module.'''
 
     ATTR_DISABLE_ARBITER = 1
     ATTR_TIMING = 2
+    ATTR_MEMORY = 3
 
     MODULE_ATTR_STR = {
       ATTR_DISABLE_ARBITER: 'no_arbiter',
@@ -53,12 +56,15 @@ class Module(ModuleBase):
             self.name = self.name + self.as_operand()
 
         self._attrs = {}
+        if no_arbiter:
+            self._attrs[Module.ATTR_DISABLE_ARBITER] = True
 
         self._ports = []
-        for name, dtype in ports.items():
-            setattr(self, name, Port(dtype))
-            getattr(self, name).name = name
-            getattr(self, name).module = self
+        for name, port in ports.items():
+            assert isinstance(port, Port)
+            setattr(self, name, port)
+            port.name = name
+            port.module = self
             self._ports.append(getattr(self, name))
 
         assert Singleton.builder is not None, 'Cannot instantitate a module outside of a system!'
@@ -90,11 +96,6 @@ class Module(ModuleBase):
         res = [port.pop() for port in self.ports]
 
         return res if len(res) > 1 else res[0]
-
-    @property
-    def ports(self):
-        '''The helper function to get all the ports in the module.'''
-        return [v for _, v in self.__dict__.items() if isinstance(v, Port)]
 
     @ir_builder
     def async_called(self, **kwargs):
@@ -134,7 +135,7 @@ class Module(ModuleBase):
         '''The helper function to get the timing policy of this module.'''
         return self._attrs.get(Module.ATTR_TIMING, None)
 
-    @property.setter
+    @timing.setter
     def timing(self, value):
         '''The helper function to set the timing policy of this module.'''
         assert Module.ATTR_TIMING not in self._attrs, 'Cannot set timing twice!'
@@ -193,8 +194,6 @@ def combinational(
     Singleton.builder.enter_context_of('module', module_self)
     # TODO(@were): Make implicit pop more robust.
     with module_self.body:
-        module_self.implicit_pop()
         res = func(*args, **kwargs)
-        module_self.implicit_restore()
     Singleton.builder.exit_context_of('module')
     return res
