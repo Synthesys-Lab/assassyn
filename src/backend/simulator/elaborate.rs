@@ -533,7 +533,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     .into_iter()
     .map(|x| x.as_ref::<Expr>(sys).unwrap())
   {
-    eprintln!("Expr: {}", expr);
     let name = namify(&expr.get_name());
     let dtype = dtype_to_rust_type(&expr.dtype());
     fd.write_all(format!("pub {}_value : Option<{}>,", name, dtype).as_bytes())?;
