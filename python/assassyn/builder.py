@@ -50,11 +50,6 @@ class SysBuilder:
         '''Exit the context of the given type.'''
         self._ctx_stack[ty].pop()
 
-    def finalize(self):
-        '''Finalize the modules underneath this system builder.'''
-        for module in self.modules:
-            module.finalized = True
-
     def __init__(self, name):
         self.name = name
         self.modules = []

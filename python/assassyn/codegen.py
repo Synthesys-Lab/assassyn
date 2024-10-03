@@ -140,7 +140,7 @@ class CodeGen(visitor.Visitor):
         path = 'assassyn::ir::module::Attribute'
         if m.is_systolic:
             self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
-        if m.disable_arbiter_rewrite:
+        if m.no_arbiter:
             self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
 
     def emit_config(self):
