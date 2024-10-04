@@ -7,12 +7,16 @@ from assassyn import utils
 
 
 class Adder(Module):
-    @module.constructor
+  
     def __init__(self):
-        super().__init__()
-        self.add_a = Port(Int(32))
-        self.add_b = Port(Int(32))
-    
+        ports={
+            'add_a': Port(Int(32)),
+            'add_b': Port(Int(32))
+        }
+        super().__init__(
+            ports=ports ,
+        )
+
     @module.combinational
     def build(self):
         c = self.add_a + self.add_b
@@ -20,10 +24,11 @@ class Adder(Module):
 
 
 class Driver(Module):
-    @module.constructor
     def __init__(self):
-        super().__init__()
-    
+        super().__init__(
+            ports={} ,
+        )
+        
     @module.combinational
     def build(self, add: Adder):
         cnt = RegArray(Int(32), 1)

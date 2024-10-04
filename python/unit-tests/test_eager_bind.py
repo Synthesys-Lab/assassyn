@@ -7,11 +7,14 @@ from assassyn.expr import Bind
 
 class Sub(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.sub_a = Port(Int(32))
-        self.sub_b = Port(Int(32))
+        ports={
+            'sub_a': Port(Int(32)),
+            'sub_b': Port(Int(32))
+        }
+        super().__init__(
+            ports=ports ,
+        )
 
     @module.combinational
     def build(self):
@@ -19,11 +22,13 @@ class Sub(Module):
         log("Subtractor: {} - {} = {}", self.sub_a, self.sub_b, c)
 
 class Lhs(Module):
-
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.lhs_a = Port(Int(32))
+        ports={
+            'lhs_a': Port(Int(32)), 
+        }
+        super().__init__(
+            ports=ports ,
+        ) 
 
     @module.combinational
     def build(self, sub: Sub):
@@ -31,12 +36,14 @@ class Lhs(Module):
         return bound
 
 class Rhs(Module):
-
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.rhs_b = Port(Int(32))
-
+        ports={
+            'rhs_b': Port(Int(32)), 
+        }
+        super().__init__(
+            ports=ports ,
+        )  
+        
     @module.combinational
     def build(self, sub: Bind):
         bound = sub.bind(sub_b = self.rhs_b)
@@ -45,9 +52,10 @@ class Rhs(Module):
 
 class Driver(Module):
 
-    @module.constructor
-    def __init__(self):
-        super().__init__()
+    def __init__(self): 
+        super().__init__(
+            ports={} ,
+        )  
 
     @module.combinational
     def build(self, lhs: Lhs, rhs: Rhs):

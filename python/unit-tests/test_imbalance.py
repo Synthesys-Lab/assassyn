@@ -6,12 +6,14 @@ from assassyn import utils
 from assassyn.expr import Bind
 
 class Sub(Module):
-
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.sub_a = Port(Int(32))
-        self.sub_b = Port(Int(32))
+        ports={
+            'sub_a': Port(Int(32)),
+            'sub_b': Port(Int(32))
+        }
+        super().__init__(
+            ports=ports, 
+        ) 
 
     @module.combinational
     def build(self):
@@ -20,22 +22,21 @@ class Sub(Module):
 
 class Lhs(Module):
 
-    @module.constructor
+    
     def __init__(self):
-        super().__init__()
-        self.lhs_a = Port(Int(32))
-
+        super().__init__(
+            ports={'lhs_a': Port(Int(32))}, 
+        )
+        
     @module.combinational
     def build(self, sub: Sub):
         bound = sub.bind(sub_a = self.lhs_a)
         return bound
 
 class Driver(Module):
-
-    @module.constructor
     def __init__(self):
-        super().__init__()
-
+            super().__init__(ports={})
+             
     @module.combinational
     def build(self, lhs: Lhs, rhs: Bind):
         cnt = RegArray(Int(32), 1)

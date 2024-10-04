@@ -7,11 +7,14 @@ from assassyn.frontend import *
 
 class Adder(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.add_a = Port(Int(32))
-        self.add_b = Port(Int(32))
+        ports={
+            'add_a': Port(Int(32)),
+            'add_b': Port(Int(32))
+        }
+        super().__init__(
+            ports=ports, 
+        )
 
     @module.combinational
     def build(self):
@@ -20,9 +23,8 @@ class Adder(Module):
 
 class Driver(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
+            super().__init__(ports={})
 
     @module.combinational
     def build(self, adder: Adder):

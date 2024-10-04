@@ -6,11 +6,10 @@ from assassyn import utils
 
 class MemUser(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.rdata = Port(Bits(32))
-
+        super().__init__(
+            ports={'rdata': Port(Bits(32))}, 
+        )
     @module.combinational
     def build(self):
         width = self.rdata.dtype.bits
@@ -22,9 +21,8 @@ class MemUser(Module):
 
 class Driver(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
+            super().__init__(ports={})
 
     @module.combinational
     def build(self, width, init_file, user):
@@ -43,9 +41,8 @@ class Driver(Module):
 
 class DriverDown(Downstream):
 
-    @downstream.constructor
     def __init__(self):
-        super().__init__()
+            super().__init__(ports={})
 
     @downstream.combinational
     def build(self, sram):

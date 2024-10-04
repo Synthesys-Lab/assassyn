@@ -4,10 +4,11 @@ from assassyn import utils
 
 class Driver(Module):
 
-    @module.constructor
-    def __init__(self):
-        super().__init__()
-
+    def __init__(self): 
+        super().__init__(
+            ports={} ,
+        )  
+        
     @module.combinational
     def build(self):
         cnt = RegArray(Int(32), 1)

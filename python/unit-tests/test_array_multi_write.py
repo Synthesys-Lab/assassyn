@@ -7,10 +7,9 @@ from assassyn import utils
 
 class ModA(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.a = Port(Int(32))
+        super().__init__(ports={'a': Port(Int(32))})
+
 
     @module.combinational
     def build(self, arr: Array):
@@ -22,10 +21,8 @@ class ModA(Module):
 
 class ModC(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.a = Port(Int(32))
+        super().__init__(ports={'a': Port(Int(32))})
 
     @module.combinational
     def build(self, arr: Array):
@@ -34,9 +31,8 @@ class ModC(Module):
 
 class Driver(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(ports={})
     
     @module.combinational
     def build(self, mod_a: ModA, mod_c: ModC):

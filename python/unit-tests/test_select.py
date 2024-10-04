@@ -6,9 +6,8 @@ from assassyn import utils
 
 class Driver(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
+            super().__init__(ports={})
 
     @module.combinational
     def build(self):

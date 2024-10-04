@@ -5,10 +5,9 @@ from assassyn import utils
 
 
 class Driver(Module):
-
-    @module.constructor
+ 
     def __init__(self):
-        super().__init__()
+        super().__init__(ports={})
 
     @module.combinational
     def build(self, lhs: Module, rhs: Module):
@@ -20,11 +19,10 @@ class Driver(Module):
 
 
 class ForwardData(Module):
-
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.data = Port(UInt(32))
+        super().__init__(
+            ports={'data': Port(UInt(32))},
+        ) 
 
     @module.combinational
     def build(self):
@@ -33,9 +31,8 @@ class ForwardData(Module):
 
 class Adder(Downstream):
 
-    @downstream.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(ports={})
 
     @downstream.combinational
     def build(self, a: Value, b: Value):
