@@ -16,8 +16,9 @@ class Sub(Module):
 
     @module.combinational
     def build(self):
-        c = self.sub_a - self.sub_b
-        log("Subtractor: {} - {} = {}", self.sub_a, self.sub_b, c)
+        a, b = self.pop_all_ports(False)
+        c = a - b
+        log("Subtractor: {} - {} = {}", a, b, c)
 
 class Lhs(Module):
     def __init__(self):
@@ -27,7 +28,8 @@ class Lhs(Module):
 
     @module.combinational
     def build(self, sub: Sub):
-        bound = sub.bind(sub_a = self.lhs_a)
+        lhs_a = self.pop_all_ports(True)
+        bound = sub.bind(sub_a = lhs_a)
         return bound
 
 class Rhs(Module):
@@ -38,7 +40,8 @@ class Rhs(Module):
         
     @module.combinational
     def build(self, sub: Bind):
-        call = sub.async_called(sub_b = self.rhs_b)
+        rhs_b = self.pop_all_ports(True)
+        call = sub.async_called(sub_b = rhs_b)
         call.bind.set_fifo_depth(sub_a = 2, sub_b = 2)
 
 class Driver(Module):

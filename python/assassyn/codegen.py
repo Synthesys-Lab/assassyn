@@ -74,10 +74,6 @@ CG_MIDFIX = {
     expr.PureInstrinsic.FIFO_VALID: 'fifo',
 }
 
-CG_ARRAY_ATTR = {
-    Array.FULLY_PARTITIONED: 'FullyPartitioned',
-}
-
 CG_SIMULATOR = {
     'verilator': 'Verilator',
     'vcs': 'VCS',
@@ -386,7 +382,7 @@ class CodeGen(visitor.Visitor):
         path = 'assassyn::ir::array::ArrayAttr'
         for attr in node.attr:
             if attr == Array.FULLY_PARTITIONED:
-                self.code.append(f'{path}::FullyPartitioned')
+                attrs.append(f'{path}::FullyPartitioned')
             elif isinstance(attr, module.SRAM):
                 # (width, depth, init_file, we, re, addr, wdata)
                 params = ['assassyn::ir::array::MemoryParams {']

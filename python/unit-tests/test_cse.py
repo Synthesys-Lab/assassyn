@@ -10,8 +10,8 @@ class Adder(Module):
   
     def __init__(self):
         ports={
-            'add_a': Port(Int(32)),
-            'add_b': Port(Int(32))
+            'a': Port(Int(32)),
+            'b': Port(Int(32))
         }
         super().__init__(
             ports=ports ,
@@ -19,8 +19,9 @@ class Adder(Module):
 
     @module.combinational
     def build(self):
-        c = self.add_a + self.add_b
-        log("Adder: {} + {} = {}", self.add_a, self.add_b, c)
+        a, b = self.pop_all_ports(True)
+        c = a + b
+        log("Adder: {} + {} = {}", a, b, c)
 
 
 class Driver(Module):
@@ -35,7 +36,7 @@ class Driver(Module):
         cnt[0] = cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(100)
         with Condition(cond):
-            add.async_called(add_a = cnt[0], add_b = cnt[0])
+            add.async_called(a = cnt[0], b = cnt[0])
         with Condition(cond):
             log("Done")
 

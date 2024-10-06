@@ -8,13 +8,13 @@ class ModA(Module):
 
  
     def __init__(self):
-        
         super().__init__(ports={'a': Port(Int(32))})
 
     @module.combinational
     def build(self, arr: Array):
-        with Condition(self.a[0: 0]):
-            arr[0] = self.a
+        a = self.pop_all_ports(True)
+        with Condition(a[0: 0]):
+            arr[0] = a
 
 
 class ModB(Module):
@@ -27,8 +27,9 @@ class ModB(Module):
 
     @module.combinational
     def build(self, arr: Array):
-        with Condition(~self.a[0: 0]):
-            arr[0] = self.a
+        a = self.pop_all_ports(True)
+        with Condition(~a[0: 0]):
+            arr[0] = a
 
 class ModC(Module):
     
@@ -40,8 +41,9 @@ class ModC(Module):
 
     @module.combinational
     def build(self, arr: Array):
+        a = self.pop_all_ports(True)
         v = arr[0]
-        log("a = {} arr = {}", self.a, v)
+        log("a = {} arr = {}", a, v)
     
 class Driver(Module):
      

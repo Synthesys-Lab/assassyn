@@ -19,9 +19,9 @@ class Adder(Module):
         
     @module.combinational
     def build(self):
-        # c = self.msb.concat(self.lsb) 
-        c = concat(self.msb, self.lsb)
-        log("concat: {} << 32 + {} = {}", self.msb, self.lsb, c)
+        msb, lsb = self.pop_all_ports(True)
+        c = concat(msb, lsb)
+        log("concat: {} << 32 + {} = {}", msb, lsb, c)
 
 
 class Driver(Module):

@@ -13,11 +13,12 @@ class ModA(Module):
 
     @module.combinational
     def build(self, arr: Array):
-        v = self.a[0: 0]
+        a = self.pop_all_ports(True)
+        v = a[0: 0]
         with Condition(v):
-            arr[0] = self.a
+            arr[0] = a
         with Condition(~v):
-            arr[0] = self.a + Int(32)(1)
+            arr[0] = a + Int(32)(1)
 
 class ModC(Module):
 
@@ -26,8 +27,9 @@ class ModC(Module):
 
     @module.combinational
     def build(self, arr: Array):
+        a = self.pop_all_ports(True)
         v = arr[0]
-        log("a = {} arr = {}", self.a, v)
+        log("a = {} arr = {}", a, v)
 
 class Driver(Module):
     
