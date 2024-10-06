@@ -24,8 +24,7 @@ class SRAM_R(Memory):
 
     @module.combinational
     def build(self, width, \
-              row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher
-              ):
+              row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
         super().build()
         read = ~self.we
         cnt = RegArray(Int(width), 1)

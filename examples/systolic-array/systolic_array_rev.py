@@ -20,72 +20,65 @@ class ProcElem():
 
 class Sink(Module):
     
-    @module.constructor
     def __init__(self, port_name='_v'):
-        super().__init__()
-        setattr(self, port_name, Port(Int(32)))
-        self.port_name = port_name
+        super().__init__(no_arbiter=True, ports={port_name: Port(Int(32))})
 
     @module.combinational
     def build(self):
-        log("Sink: {}", getattr(self, self.port_name))
+        data = self.pop_all_ports(False)
+        log("Sink: {}", data)
 
 class ComputePE(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__(disable_arbiter_rewrite=True)
-        self.west = Port(Int(32))
-        self.north = Port(Int(32))
+        super().__init__(no_arbiter=True, ports={'west': Port(Int(32)), 'north': Port(Int(32))})
 
     @module.combinational
-    def build(self, west: Bind, north: Bind):
+    def build(self, east: Bind, south: Bind):
+        west, north = self.pop_all_ports(False)
         acc = RegArray(Int(32), 1)
         val = acc[0]
-        mul = (self.west * self.north)
+        mul = (west * north)
         c = mul[0:31].bitcast(Int(32))
         mac = val + c
-        log("Mac value: {} * {} + {} = {}", self.west, self.north, val, mac)
+        log("Mac value: {} * {} + {} = {}", west, north, val, mac)
         acc[0] = mac
 
-        bound_west = west.bind(west = self.west)
-        bound_north = north.bind(north = self.north)
-        if bound_west.is_fully_bound():
-            bound_west.async_called()
-        if bound_north.is_fully_bound():
-            bound_north.async_called()
+        bound_east = east.bind(west = west)
+        bound_south = south.bind(north = north)
+        if bound_east.is_fully_bound():
+            bound_east.async_called()
+        if bound_south.is_fully_bound():
+            bound_south.async_called()
 
-        return bound_west, bound_north
+        return bound_east, bound_south
 
 class RowPusher(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__(disable_arbiter_rewrite=True)
-        self.data = Port(Int(32))
+        super().__init__(no_arbiter=True, ports={'data': Port(Int(32))})
 
     @module.combinational
     def build(self, dest: Bind):
-        log("Row Pushes {}", self.data)
-        dest.async_called(north = self.data)
+        data = self.pop_all_ports(False)
+        log("Row Pushes {}", data)
+        dest.async_called(north = data)
 
 class ColPusher(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__(disable_arbiter_rewrite=True)
-        self.data = Port(Int(32))
+        super().__init__(no_arbiter=True, ports={'data': Port(Int(32))})
 
     @module.combinational
     def build(self, dest: Bind):
-        log("Col Pushes {}", self.data)
-        dest.async_called(west = self.data)
+        data = self.pop_all_ports(False)
+        log("Col Pushes {}", data)
+        dest.async_called(west = data)
 
 class Testbench(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(ports={}, no_arbiter=True)
 
     @module.combinational
     def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
@@ -266,11 +259,9 @@ def systolic_array():
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
-    print(raw)
 
     raw = utils.run_verilator(verilator_path)
     check_raw(raw)
-    print(raw)
 
 if __name__ == '__main__':
     systolic_array()
