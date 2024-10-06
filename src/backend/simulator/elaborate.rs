@@ -103,13 +103,14 @@ impl Visitor<String> for NodeRefDumper {
             let field_id = format!("{}_value", raw);
             let panic_log = format!("Value {} invalid!", raw);
             let value_field = syn::Ident::new(&field_id, Span::call_site());
-            quote!{
+            quote! {
               if let Some(x) = &sim.#value_field {
                 x
               } else {
                 panic!(#panic_log);
               }.clone()
-            }.to_string()
+            }
+            .to_string()
           } else {
             raw
           }
