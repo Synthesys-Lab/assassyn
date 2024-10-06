@@ -4,6 +4,7 @@ use crate::{
     SysBuilder,
   },
   ir::{
+    module,
     node::{BaseNode, IsElement, ModuleRef},
     visitor::Visitor,
     Module,
@@ -19,6 +20,14 @@ impl Visitor<()> for GatherModulesToRewrite {
     match module.get_name() {
       "driver" | "testbench" => {} // Both driver and testbench are unconditionally executed, skip!
       _ => {
+        // Skip the module if it has the systolic attribute.
+        if module
+          .get_attrs()
+          .iter()
+          .any(|x| matches!(x, module::Attribute::Systolic))
+        {
+          return None;
+        }
         if module.get_body().get_wait_until().is_none() {
           if module.get_num_inputs() == 0 {
             eprintln!(

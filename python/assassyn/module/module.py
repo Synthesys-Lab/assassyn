@@ -136,6 +136,8 @@ class Module(ModuleBase):
     def timing(self, value):
         '''The helper function to set the timing policy of this module.'''
         assert Module.ATTR_TIMING not in self._attrs, 'Cannot set timing twice!'
+        if isinstance(value, str):
+            value = {'systolic': Timing.SYSTOLIC, 'backpressure': Timing.BACKPRESSURE}[value]
         self._attrs[Module.ATTR_TIMING] = value
 
     @property
