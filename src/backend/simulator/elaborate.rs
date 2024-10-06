@@ -100,7 +100,17 @@ impl Visitor<String> for NodeRefDumper {
         let id = {
           let raw = namify(&expr.get_name());
           if self.module_ctx != expr.get_parent().as_ref::<Block>(sys).unwrap().get_module() {
-            format!("sim.{}_value.unwrap()", raw)
+            let field_id = format!("{}_value", raw);
+            let panic_log = format!("Value {} invalid!", raw);
+            let value_field = syn::Ident::new(&field_id, Span::call_site());
+            quote! {
+              if let Some(x) = &sim.#value_field {
+                x
+              } else {
+                panic!(#panic_log);
+              }.clone()
+            }
+            .to_string()
           } else {
             raw
           }
@@ -527,7 +537,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         .filter_map(|(x, _)| x.as_ref::<Expr>(sys).ok())
         .filter(|x| externally_used_combinational(x))
       {
-        eprintln!("Found combinational expr externally used: {}", expr);
         expr_validities.insert(expr.upcast());
       }
     }

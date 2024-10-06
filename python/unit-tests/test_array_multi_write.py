@@ -7,36 +7,34 @@ from assassyn import utils
 
 class ModA(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.a = Port(Int(32))
+        super().__init__(ports={'a': Port(Int(32))})
+
 
     @module.combinational
     def build(self, arr: Array):
-        v = self.a[0: 0]
+        a = self.pop_all_ports(True)
+        v = a[0: 0]
         with Condition(v):
-            arr[0] = self.a
+            arr[0] = a
         with Condition(~v):
-            arr[0] = self.a + Int(32)(1)
+            arr[0] = a + Int(32)(1)
 
 class ModC(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.a = Port(Int(32))
+        super().__init__(ports={'a': Port(Int(32))})
 
     @module.combinational
     def build(self, arr: Array):
+        a = self.pop_all_ports(True)
         v = arr[0]
-        log("a = {} arr = {}", self.a, v)
+        log("a = {} arr = {}", a, v)
 
 class Driver(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(ports={})
     
     @module.combinational
     def build(self, mod_a: ModA, mod_c: ModC):

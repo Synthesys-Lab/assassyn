@@ -5,47 +5,51 @@ from assassyn.expr import Bind
 
 class Sub(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.sub_a = Port(Int(32))
-        self.sub_b = Port(Int(32))
+        ports={
+            'sub_a': Port(Int(32)),
+            'sub_b': Port(Int(32))
+        }
+        super().__init__(
+            ports=ports ,
+        )
 
     @module.combinational
     def build(self):
-        c = self.sub_a - self.sub_b
-        log("Subtractor: {} - {} = {}", self.sub_a, self.sub_b, c)
+        a, b = self.pop_all_ports(False)
+        c = a - b
+        log("Subtractor: {} - {} = {}", a, b, c)
 
 class Lhs(Module):
-
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.lhs_a = Port(Int(32))
+        super().__init__(
+            ports={'lhs_a': Port(Int(32))},
+        )
 
     @module.combinational
     def build(self, sub: Sub):
-        bound = sub.bind(sub_a = self.lhs_a)
+        lhs_a = self.pop_all_ports(True)
+        bound = sub.bind(sub_a = lhs_a)
         return bound
 
 class Rhs(Module):
-
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.rhs_b = Port(Int(32))
-
+        super().__init__(
+            ports={'rhs_b': Port(Int(32))},
+        ) 
+        
     @module.combinational
     def build(self, sub: Bind):
-        call = sub.async_called(sub_b = self.rhs_b)
+        rhs_b = self.pop_all_ports(True)
+        call = sub.async_called(sub_b = rhs_b)
         call.bind.set_fifo_depth(sub_a = 2, sub_b = 2)
 
 class Driver(Module):
-
-    @module.constructor
     def __init__(self):
-        super().__init__()
-
+        super().__init__(
+            ports={},
+        )
+ 
     @module.combinational
     def build(self, lhs: Lhs, rhs: Rhs):
         cnt = RegArray(Int(32), 1)

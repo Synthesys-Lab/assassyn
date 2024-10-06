@@ -4,25 +4,29 @@ from assassyn import utils
 import assassyn
 
 class Adder(Module):
-
-    @module.constructor
+ 
     def __init__(self, record_ty):
-        super().__init__()
-        self.a = Port(record_ty)
-        self.b = Port(record_ty)
+        ports={
+            'a': Port(record_ty),
+            'b': Port(record_ty)
+        }
+        super().__init__(
+            ports=ports, 
+        )
 
     @module.combinational
     def build(self):
-        valid = self.a.is_odd & self.b.is_odd
+        a, b = self.pop_all_ports(True)
+        print(a.dtype, type(a.dtype))
+        valid = a.is_odd & b.is_odd
         with Condition(valid):
-            c = self.a.payload + self.b.payload
-            log("Adder: {} + {} = {}", self.a.payload, self.b.payload, c)
+            c = a.payload + b.payload
+            log("Adder: {} + {} = {}", a.payload, b.payload, c)
 
 class Driver(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
+            super().__init__(ports={})
 
     @module.combinational
     def build(self, adder: Adder, record_ty: Record):

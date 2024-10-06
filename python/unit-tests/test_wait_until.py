@@ -5,36 +5,34 @@ from assassyn import utils
 
 class Squarer(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.a = Port(Int(32))
+        super().__init__(
+            ports={'a': Port(Int(32))},
+        )
 
     @module.combinational
     def build(self):
-        b = self.a * self.a
-        log("Multiplier: {} ^ 2 = {}", self.a, b)
+        a = self.pop_all_ports(True)
+        b = a * a
+        log("Multiplier: {} ^ 2 = {}", a, b)
 
 class Agent(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.a = Port(Int(32))
-
-    @module.wait_until
-    def wait_until(self, lock: Array):
-        return lock[0]
+        super().__init__(
+            ports={'a': Port(Int(32))},
+        )
 
     @module.combinational
-    def build(self, sqr: Squarer):
-        sqr.async_called(a = self.a)
+    def build(self, lock, sqr: Squarer):
+        wait_until(lock[0])
+        a = self.pop_all_ports(False)
+        sqr.async_called(a = a)
 
 class Driver(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(ports={})
 
     @module.combinational
     def build(self, agent: Agent, lock: Array):
@@ -74,8 +72,7 @@ def test_wait_until():
         lock = RegArray(UInt(1), 1)
 
         agent = Agent()
-        agent.wait_until(lock)
-        agent.build(sqr)
+        agent.build(lock, sqr)
 
         driver = Driver()
         driver.build(agent, lock)

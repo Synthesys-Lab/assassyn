@@ -6,15 +6,15 @@ from assassyn import utils
 
 class MemUser(Module):
 
-    @module.constructor
-    def __init__(self):
-        super().__init__()
-        self.rdata = Port(Bits(32))
-
+    def __init__(self, width):
+        super().__init__(
+            ports={'rdata': Port(Bits(width))}, 
+        )
     @module.combinational
     def build(self):
         width = self.rdata.dtype.bits
-        rdata = self.rdata.bitcast(Int(width))
+        rdata = self.pop_all_ports(False)
+        rdata = rdata.bitcast(Int(width))
         k = Int(width)(128)
         delta = rdata + k
         log('{} + {} = {}', rdata, k, delta)
@@ -22,9 +22,8 @@ class MemUser(Module):
 
 class Driver(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
+            super().__init__(ports={})
 
     @module.combinational
     def build(self, width, init_file, user):
@@ -43,9 +42,8 @@ class Driver(Module):
 
 class DriverDown(Downstream):
 
-    @downstream.constructor
     def __init__(self):
-        super().__init__()
+            super().__init__()
 
     @downstream.combinational
     def build(self, sram):
@@ -67,7 +65,7 @@ def check(raw):
 def impl(sys_name, width, init_file, resource_base):
     sys = SysBuilder(sys_name)
     with sys:
-        user = MemUser()
+        user = MemUser(width)
         user.build()
         # Build the driver
         driver = Driver()
@@ -98,6 +96,6 @@ def test_memory_wide():
     impl('memory_wide', 256, None, None)
 
 if __name__ == "__main__":
-    test_memory()
+    #test_memory()
     #test_memory_init()
-    #test_memory_wide()
+    test_memory_wide()

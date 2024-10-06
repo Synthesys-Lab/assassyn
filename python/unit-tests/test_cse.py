@@ -7,30 +7,36 @@ from assassyn import utils
 
 
 class Adder(Module):
-    @module.constructor
+  
     def __init__(self):
-        super().__init__()
-        self.add_a = Port(Int(32))
-        self.add_b = Port(Int(32))
-    
+        ports={
+            'a': Port(Int(32)),
+            'b': Port(Int(32))
+        }
+        super().__init__(
+            ports=ports ,
+        )
+
     @module.combinational
     def build(self):
-        c = self.add_a + self.add_b
-        log("Adder: {} + {} = {}", self.add_a, self.add_b, c)
+        a, b = self.pop_all_ports(True)
+        c = a + b
+        log("Adder: {} + {} = {}", a, b, c)
 
 
 class Driver(Module):
-    @module.constructor
     def __init__(self):
-        super().__init__()
-    
+        super().__init__(
+            ports={} ,
+        )
+        
     @module.combinational
     def build(self, add: Adder):
         cnt = RegArray(Int(32), 1)
         cnt[0] = cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(100)
         with Condition(cond):
-            add.async_called(add_a = cnt[0], add_b = cnt[0])
+            add.async_called(a = cnt[0], b = cnt[0])
         with Condition(cond):
             log("Done")
 
