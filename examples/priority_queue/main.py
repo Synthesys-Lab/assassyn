@@ -16,9 +16,12 @@ class Layer(Module):
                     If level is 0, it represents the top layer, and if level equals height-1, it represents the bottom layer.
     :raises ValueError: If height is no more than 0, or if level is out of the valid range.
     """
-    @module.constructor
     def __init__(self, height:int, level:int, elements:RegArray):
-        super().__init__(disable_arbiter_rewrite=True)
+        super().__init__(ports={
+            'action': Port(Int(1)),      # 0 means push, 1 means pop
+            'index': Port(Int(32)),
+            'value': Port(Int(32))
+        }, no_arbiter=True)
         if height <= 0:
             raise ValueError(f"Height must be a positive integer, got {height}")        
         if level < 0 or level >= height:
@@ -30,22 +33,20 @@ class Layer(Module):
         self.name = f"level_{level}"
         self.elements = elements
         
-        self.action = Port(Int(1))      # 0 means push, 1 means pop
-        self.index = Port(Int(32))
-        self.value = Port(Int(32))
-
     @module.combinational
     def build(self, next_layer: 'Layer' = None, next_elements: RegArray = None):    
+        action, index, value = self.pop_all_ports(True)
+
         ZERO = Int(1)(0)
         ONE = Int(1)(1)
         
         index_bit = max(self.level, 1)        
-        index0 = self.index[0:index_bit-1].bitcast(Int(index_bit))
+        index0 = index[0:index_bit-1].bitcast(Int(index_bit))
         type0 = self.elements[index0].dtype
         value0 = self.elements[index0].value
         occupied0 = self.elements[index0].is_occupied
         vacancy0 = self.elements[index0].vacancy
-        
+
         if next_elements:
             # Two child nodes derived from the same parent node.
             index1 = (index0 * Int(32)(2))[0:31].bitcast(Int(32))
@@ -59,29 +60,29 @@ class Layer(Module):
             vacancy2 = next_elements[index2].vacancy
 
         # PUSH
-        with Condition(~self.action):
+        with Condition(~action):
             # The current element is valid.
             with Condition(~occupied0):
-                self.elements[index0] = type0.bundle(value=self.value, is_occupied=ONE, vacancy=vacancy0)
+                self.elements[index0] = type0.bundle(value=value, is_occupied=ONE, vacancy=vacancy0)
                 log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                    self.value, self.level_I, index0, value0, occupied0, vacancy0, self.value, ONE, vacancy0)
-                
+                    value, self.level_I, index0, value0, occupied0, vacancy0, value, ONE, vacancy0)
+
             # The current element is occupied.
             with Condition(occupied0):
                 # There is no vacancy on the subtree.
                 with Condition(vacancy0 == Int(self.height)(0)):
-                    log("Push {}  \tPush failed, There is no vacancy!", self.value)
+                    log("Push {}  \tPush failed, There is no vacancy!", value)
                     
                 # There is vacancy on the subtree.
                 with Condition(vacancy0 > Int(self.height)(0)):
                     vacancy = vacancy0 - Int(self.height)(1)
                     # value write to current level
-                    value_current = (self.value > value0).select(value0, self.value)
+                    value_current = (value > value0).select(value0, value)
                     # value write to next level
-                    value_next = (self.value > value0).select(self.value, value0)
+                    value_next = (value > value0).select(value, value0)
                     self.elements[index0] = type0.bundle(value=value_current, is_occupied=ONE, vacancy=vacancy)
                     log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
-                        self.value, self.level_I, index0, value0, occupied0, vacancy0, value_current, ONE, vacancy)
+                        value, self.level_I, index0, value0, occupied0, vacancy0, value_current, ONE, vacancy)
                     
                     # Call next layer
                     if next_elements:
@@ -100,7 +101,7 @@ class Layer(Module):
                             call.bind.set_fifo_depth(action=1, index=1, value=1)
 
         # POP
-        with Condition(self.action):
+        with Condition(action):
             # The current element is valid.
             with Condition(~occupied0):
                 log("Pop\t\tPop failed! The heap is empty.")
@@ -146,23 +147,23 @@ class Layer(Module):
 
 class HeapPush(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__(disable_arbiter_rewrite=True)
-        self.push_value = Port(Int(32))
+        super().__init__(
+            ports={'push_value': Port(Int(32))},
+            no_arbiter=True)
 
     @module.combinational
     def build(self, layer: Layer):
+        push_value = self.pop_all_ports(True)
         bound = layer.bind(action=Int(1)(0), index=Int(32)(0))
-        call = bound.async_called(value=self.push_value)
+        call = bound.async_called(value=push_value)
         call.bind.set_fifo_depth(action=1, index=1, value=1)
 
         
 class HeapPop(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__(disable_arbiter_rewrite=True)
+        super().__init__(ports={}, no_arbiter=True)
 
     @module.combinational
     def build(self, layer: Layer):
@@ -172,9 +173,8 @@ class HeapPop(Module):
         
 class Testbench(Module):
     
-    @module.constructor
     def __init__(self, heap_height):
-        super().__init__(disable_arbiter_rewrite=True)
+        super().__init__(no_arbiter=True, ports={})
         self.size = 2 ** heap_height - 1
 
     @module.combinational
