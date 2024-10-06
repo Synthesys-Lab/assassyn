@@ -164,7 +164,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   }
 
   fn dump_fifo(&self, fifo: &FIFORef) -> String {
-
     let mut res = String::new();
     let display = utils::DisplayInstance::from_fifo(fifo, true);
     let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));
