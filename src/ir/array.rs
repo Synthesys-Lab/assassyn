@@ -50,7 +50,7 @@ impl Display for MemoryParams {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(
       f,
-      "width: {} depth: {} lat: [{:?}], file: {}",
+      "width: {}, depth: {}, lat: [{:?}], file: {}",
       self.width,
       self.depth,
       self.lat,
@@ -63,6 +63,15 @@ impl Display for MemoryParams {
 pub enum ArrayAttr {
   FullyPartitioned,
   MemoryParams(MemoryParams),
+}
+
+impl Display for ArrayAttr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ArrayAttr::FullyPartitioned => write!(f, "FullyPartitioned"),
+      ArrayAttr::MemoryParams(params) => write!(f, "MemoryParams({})", params),
+    }
+  }
 }
 
 pub struct Array {

@@ -96,6 +96,6 @@ def test_memory_wide():
     impl('memory_wide', 256, None, None)
 
 if __name__ == "__main__":
-    #test_memory()
-    #test_memory_init()
+    test_memory()
+    test_memory_init()
     test_memory_wide()

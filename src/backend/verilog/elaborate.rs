@@ -658,7 +658,7 @@ module {} (
         NodeKind::Array => {
           let array = interf.as_ref::<Array>(self.sys).unwrap();
           let display = utils::DisplayInstance::from_array(&array);
-          res.push_str(&format!("  // {}\n", array));
+          res.push_str(&format!("  /* {} */\n", array));
           if self.sys.user_contains_opcode(ops, Opcode::Load) {
             res.push_str(&declare_array("input", &array, &display.field("q"), ","));
           }
