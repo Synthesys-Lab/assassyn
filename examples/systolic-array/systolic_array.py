@@ -21,23 +21,17 @@ class ProcElem():
 class Sink(Module):
     
     def __init__(self, port_name='_v'):
-        super().__init__(
-            no_arbiter=True,
-            ports={port_name: Port(Int(32))}
-        )
-        self.port_name = port_name
+        super().__init__(no_arbiter=True, ports={port_name: Port(Int(32))})
 
     @module.combinational
     def build(self):
-        x = self.pop_all_ports(False)
-        log("Sink: {}", x)
+        data = self.pop_all_ports(False)
+        log("Sink: {}", data)
 
 class ComputePE(Module):
 
     def __init__(self):
-        super().__init__(no_arbiter=True,
-                         ports={'west': Port(Int(32)),
-                                'north': Port(Int(32))})
+        super().__init__(no_arbiter=True, ports={'west': Port(Int(32)), 'north': Port(Int(32))})
 
     @module.combinational
     def build(self, east: Bind, south: Bind):
@@ -50,61 +44,40 @@ class ComputePE(Module):
         log("Mac value: {} * {} + {} = {}", west, north, val, mac)
         acc[0] = mac
 
-        bound_east = east.bind(west = west)
-        bound_south = south.bind(north = north)
-        if bound_east.is_fully_bound():
-            bound_east.async_called()
-        if bound_south.is_fully_bound():
-            bound_south.async_called()
+        res_east = east.bind(west = west)
+        res_south = south.bind(north = north)
+        if res_east.is_fully_bound():
+            res_east = res_east.async_called()
+        if res_south.is_fully_bound():
+            res_south = res_south.async_called()
 
-        return bound_east, bound_south
+        return res_east, res_south
 
-class RowPusher(Module):
+class Pusher(Module):
 
-    def __init__(self):
+    def __init__(self, prefix, idx):
         super().__init__(no_arbiter=True, ports={'data': Port(Int(32))})
+        self.name = f'{prefix}_Pusher_{idx}'
 
     @module.combinational
-    def build(self, dest: Bind):
+    def build(self, direction: str, dest: Bind):
         data = self.pop_all_ports(False)
-        log("Row Pushes {}", data)
-        dest.async_called(north = data)
-
-class ColPusher(Module):
-
-    def __init__(self):
-        super().__init__(no_arbiter=True, ports={'data': Port(Int(32))})
-
-    @module.combinational
-    def build(self, dest: Bind):
-        data = self.pop_all_ports(False)
-        log("Col Pushes {}", data)
-        dest.async_called(west = data)
+        log(f"{self.name} pushes {{}}", data)
+        kwargs = {direction: data}
+        new_bind = dest.bind(**kwargs)
+        if new_bind.is_fully_bound():
+            res = new_bind.async_called()
+            return res
+        return new_bind
 
 class Testbench(Module):
     
     def __init__(self):
         super().__init__(ports={}, no_arbiter=True)
 
-    # what if i do this?
-    # Cycle:
-    #    7                    15
-    #      6               11 14
-    #        5           7 10 13
-    #          4       3 6 9  12
-    #            3     2 5 8
-    #              2   1 4
-    #                1 0
-    #          3 2 1 0 P P P  P
-    #        7 6 5 4   P P P  P
-    #    11 10 9 8     P P P  P
-    # 15 14 13 12      P P P  P#
-    # row [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]
-    # col [[0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15]]
-
     @module.combinational
-    def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
-                    row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
+    def build(self, col1: Pusher, col2: Pusher, col3: Pusher, col4: Pusher, \
+                    row1: Pusher, row2: Pusher, row3: Pusher, row4: Pusher):
         with Cycle(1):
             # 1 0
             # 0 P P P  P
@@ -222,36 +195,38 @@ def systolic_array():
             for j in range(1, 5):
                 pe_array[i][j].pe = ComputePE()
 
-        # Last Column Sink
         for i in range(1, 5):
+            for j in range(1, 5):
+                pe_array[i][j].bound = pe_array[i][j].pe
+
+        for i in range(1, 5):
+            # Build column pushers
+            row_pusher = Pusher('row', i)
+            col_pusher = Pusher('col', i)
+            pe_array[i][0].pe = row_pusher
+            pe_array[0][i].pe = col_pusher
+
+            pe_array[i][1].bound = row_pusher.build('west', pe_array[i][1].bound)
+            pe_array[1][i].bound = col_pusher.build('north', pe_array[1][i].bound)
+
+        for i in range(1, 5):
+            # Last Column Sink
             pe_array[i][5].pe = Sink('west')
             pe_array[i][5].pe.build()
             pe_array[i][5].bound = pe_array[i][5].pe
 
-        # Last Row Sink
-        for i in range(1, 5):
+            # Last Row Sink
             pe_array[5][i].pe = Sink('north')
             pe_array[5][i].pe.build()
             pe_array[5][i].bound = pe_array[5][i].pe
 
         # Build ComputePEs
-        for i in range(4, 0, -1):
-            for j in range(4, 0, -1):
-                feast, fsouth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
-                pe_array[i][j].bound = pe_array[i][j].pe
-                pe_array[i][j+1].bound = feast
-                pe_array[i+1][j].bound = fsouth
-
-        # First Column Pushers
         for i in range(1, 5):
-            pe_array[i][0].pe = ColPusher()
-            bound = pe_array[i][0].pe.build(pe_array[i][1].bound)
-            pe_array[i][0].bound = bound
-
-        # First Row Pushers
-        for i in range(1, 5):
-            pe_array[0][i].pe = RowPusher()
-            pe_array[0][i].pe.build(pe_array[1][i].bound)
+            for j in range(1, 5):
+                fwest, fnorth = pe_array[i][j].pe.build(
+                        pe_array[i][j + 1].bound, pe_array[i + 1][j].bound)
+                pe_array[i][j + 1].bound = fwest
+                pe_array[i + 1][j].bound = fnorth
 
         testbench = Testbench()
         testbench.build(pe_array[0][1].pe, \
