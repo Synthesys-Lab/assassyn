@@ -86,7 +86,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let d = display.field("d");
     // array buffer
     let q = display.field("q");
-    res.push_str(&format!("  // {}\n", array));
+    res.push_str(&format!("  /* {} */\n", array));
     res.push_str(&declare_array("", array, &q, ";"));
 
     let mut seen = HashSet::new();
@@ -164,6 +164,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
   }
 
   fn dump_fifo(&self, fifo: &FIFORef) -> String {
+
     let mut res = String::new();
     let display = utils::DisplayInstance::from_fifo(fifo, true);
     let fifo_name = namify(&format!("{}_{}", fifo.get_module().get_name(), fifo_name!(fifo)));

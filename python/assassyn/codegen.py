@@ -179,10 +179,6 @@ class CodeGen(visitor.Visitor):
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
         self.code.append(
                 '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
-        self.code.append('  // TODO: Support initial values')
-        self.code.append('  // TODO: Support array attributes')
-        for elem in node.arrays:
-            self.visit_array(elem)
         self.code.append('  // Declare modules')
         for elem in node.modules:
             lval = elem.as_operand()
@@ -194,6 +190,9 @@ class CodeGen(visitor.Visitor):
         for elem in node.downstreams:
             var = self.generate_rval(elem)
             self.code.append(f'  let {var} = sys.create_downstream("{elem.name}");')
+        self.code.append('  // declare arrays')
+        for elem in node.arrays:
+            self.visit_array(elem)
         self.code.append('  // Gathered binds')
         for elem in node.modules + node.downstreams:
             bind_emitter = EmitBinds(self)
@@ -390,6 +389,7 @@ class CodeGen(visitor.Visitor):
                 params.append(f'depth: {attr.depth},')
                 if attr.init_file is not None:
                     params.append(f'init_file: Some("{attr.init_file}".into()),')
+                params.append(f'module: {self.generate_rval(attr)},')
                 params.append('..Default::default()')
                 params.append('}')
                 params = '\n'.join(params)

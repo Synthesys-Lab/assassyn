@@ -4,7 +4,6 @@ use crate::builder::SysBuilder;
 
 use super::{node::BaseNode, DataType, Typed};
 
-use std::fmt::Display;
 use std::ops::RangeInclusive;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -13,6 +12,7 @@ pub struct MemoryParams {
   pub depth: usize,
   pub lat: RangeInclusive<usize>,
   pub init_file: Option<String>,
+  pub module: BaseNode,
 }
 
 impl Default for MemoryParams {
@@ -22,6 +22,7 @@ impl Default for MemoryParams {
       depth: 0,
       lat: 1..=1,
       init_file: None,
+      module: BaseNode::unknown(),
     }
   }
 }
@@ -32,29 +33,29 @@ impl MemoryParams {
     depth: usize,
     lat: RangeInclusive<usize>,
     init_file: Option<String>,
+    module: BaseNode,
   ) -> Self {
     Self {
       width,
       depth,
       lat,
       init_file,
+      module,
     }
   }
 
   pub fn is_sram(&self) -> bool {
     return self.lat.start().eq(&1) && self.lat.end().eq(&1);
   }
-}
 
-impl Display for MemoryParams {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(
-      f,
-      "width: {}, depth: {}, lat: [{:?}], file: {}",
+  pub fn to_string(&self, sys: &SysBuilder) -> String {
+    format!(
+      "width: {}, depth: {}, lat: [{:?}], file: {}, module: {}",
       self.width,
       self.depth,
       self.lat,
-      self.init_file.clone().map_or("None".to_string(), |x| x)
+      self.init_file.clone().map_or("None".to_string(), |x| x),
+      self.module.to_string(sys)
     )
   }
 }
@@ -65,11 +66,11 @@ pub enum ArrayAttr {
   MemoryParams(MemoryParams),
 }
 
-impl Display for ArrayAttr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl ArrayAttr {
+  pub fn to_string(&self, sys: &SysBuilder) -> String {
     match self {
-      ArrayAttr::FullyPartitioned => write!(f, "FullyPartitioned"),
-      ArrayAttr::MemoryParams(params) => write!(f, "MemoryParams({})", params),
+      ArrayAttr::FullyPartitioned => "FullyPartitioned".into(),
+      ArrayAttr::MemoryParams(params) => format!("MemoryParams({})", params.to_string(sys)),
     }
   }
 }

@@ -94,7 +94,7 @@ impl Visitor<String> for IRPrinter {
     let attrs = array
       .get_attrs()
       .iter()
-      .map(|x| x.to_string())
+      .map(|x| x.to_string(array.sys))
       .collect::<Vec<_>>()
       .join(", ");
     if !attrs.is_empty() {
