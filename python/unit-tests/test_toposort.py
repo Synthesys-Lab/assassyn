@@ -28,13 +28,13 @@ class ForwardData(Module):
 
     @module.combinational
     def build(self):
-        return self.data
+        return self.pop_all_ports(True)
 
 
 class Adder(Downstream):
 
     def __init__(self):
-            super().__init__(ports={})
+            super().__init__()
 
     @downstream.combinational
     def build(self, a: Value, b: Value, id: str):

@@ -28,6 +28,7 @@ class Int(DType):
     '''Signed integer data type'''
 
     def __init__(self, bits: int):
+        assert isinstance(bits, int), 'Expecting an integer for the bitwidth'
         super().__init__(bits)
 
     def __repr__(self):
@@ -42,6 +43,7 @@ class UInt(DType):
     '''Un-signed integer data type'''
 
     def __init__(self, bits: int):
+        assert isinstance(bits, int), 'Expecting an integer for the bitwidth'
         super().__init__(bits)
 
     def __repr__(self):

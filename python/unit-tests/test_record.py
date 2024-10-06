@@ -7,8 +7,8 @@ class Adder(Module):
  
     def __init__(self, record_ty):
         ports={
-            'a': Port(Int(record_ty)),
-            'b': Port(Int(record_ty))
+            'a': Port(record_ty),
+            'b': Port(record_ty)
         }
         super().__init__(
             ports=ports, 
@@ -16,10 +16,12 @@ class Adder(Module):
 
     @module.combinational
     def build(self):
-        valid = self.a.is_odd & self.b.is_odd
+        a, b = self.pop_all_ports(True)
+        print(a.dtype, type(a.dtype))
+        valid = a.is_odd & b.is_odd
         with Condition(valid):
-            c = self.a.payload + self.b.payload
-            log("Adder: {} + {} = {}", self.a.payload, self.b.payload, c)
+            c = a.payload + b.payload
+            log("Adder: {} + {} = {}", a.payload, b.payload, c)
 
 class Driver(Module):
 

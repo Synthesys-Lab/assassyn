@@ -527,7 +527,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         .filter_map(|(x, _)| x.as_ref::<Expr>(sys).ok())
         .filter(|x| externally_used_combinational(x))
       {
-        eprintln!("Found combinational expr externally used: {}", expr);
         expr_validities.insert(expr.upcast());
       }
     }

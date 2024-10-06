@@ -9,8 +9,8 @@ class Adder(Module):
     
     def __init__(self):
         ports={
-            'add_a': Port(Int(32)),
-            'add_b': Port(Int(32))
+            'a': Port(Int(32)),
+            'b': Port(Int(32))
         }
         super().__init__(
             ports=ports, 
@@ -18,8 +18,9 @@ class Adder(Module):
 
     @module.combinational
     def build(self):
-        c = self.add_a + self.add_b
-        log("adder: {} + {} = {}", self.add_a, self.add_b, c)
+        a, b = self.pop_all_ports(True)
+        c = a + b 
+        log("adder: {} + {} = {}", a, b, c)
 
 class Driver(Module):
     
@@ -38,8 +39,8 @@ class Driver(Module):
         cnt[0] = v
         is_odd = v[0: 0]
         with Condition(is_odd):
-            adder.async_called(add_a = odd, add_b = odd2)
-            adder.async_called(add_a = even2, add_b = even)
+            adder.async_called(a = odd, b = odd2)
+            adder.async_called(a = even2, b = even)
 
 def check(raw):
     for i in raw.split('\n'):

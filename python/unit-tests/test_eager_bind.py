@@ -9,8 +9,8 @@ class Sub(Module):
 
     def __init__(self):
         ports={
-            'sub_a': Port(Int(32)),
-            'sub_b': Port(Int(32))
+            'a': Port(Int(32)),
+            'b': Port(Int(32))
         }
         super().__init__(
             ports=ports ,
@@ -18,8 +18,9 @@ class Sub(Module):
 
     @module.combinational
     def build(self):
-        c = self.sub_a - self.sub_b
-        log("Subtractor: {} - {} = {}", self.sub_a, self.sub_b, c)
+        a, b = self.pop_all_ports(True)
+        c = a - b
+        log("Subtractor: {} - {} = {}", a, b, c)
 
 class Lhs(Module):
     def __init__(self):
@@ -32,7 +33,8 @@ class Lhs(Module):
 
     @module.combinational
     def build(self, sub: Sub):
-        bound = sub.bind(sub_a = self.lhs_a)
+        a = self.pop_all_ports(True)
+        bound = sub.bind(a = a)
         return bound
 
 class Rhs(Module):
@@ -46,7 +48,8 @@ class Rhs(Module):
         
     @module.combinational
     def build(self, sub: Bind):
-        bound = sub.bind(sub_b = self.rhs_b)
+        b = self.pop_all_ports(True)
+        bound = sub.bind(b = b)
         if bound.is_fully_bound():
             bound.async_called()
 
