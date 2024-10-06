@@ -44,36 +44,31 @@ class ComputePE(Module):
         log("Mac value: {} * {} + {} = {}", west, north, val, mac)
         acc[0] = mac
 
-        bound_east = east.bind(west = west)
-        bound_south = south.bind(north = north)
-        if bound_east.is_fully_bound():
-            bound_east.async_called()
-        if bound_south.is_fully_bound():
-            bound_south.async_called()
+        res_east = east.bind(west = west)
+        res_south = south.bind(north = north)
+        if res_east.is_fully_bound():
+            res_east = res_east.async_called()
+        if res_south.is_fully_bound():
+            res_south = res_south.async_called()
 
-        return bound_east, bound_south
+        return res_east, res_south
 
-class RowPusher(Module):
+class Pusher(Module):
 
-    def __init__(self):
+    def __init__(self, prefix, idx):
         super().__init__(no_arbiter=True, ports={'data': Port(Int(32))})
+        self.name = f'{prefix}_Pusher_{idx}'
 
     @module.combinational
-    def build(self, dest: Bind):
+    def build(self, direction: str, dest: Bind):
         data = self.pop_all_ports(False)
-        log("Row Pushes {}", data)
-        dest.async_called(north = data)
-
-class ColPusher(Module):
-
-    def __init__(self):
-        super().__init__(no_arbiter=True, ports={'data': Port(Int(32))})
-
-    @module.combinational
-    def build(self, dest: Bind):
-        data = self.pop_all_ports(False)
-        log("Col Pushes {}", data)
-        dest.async_called(west = data)
+        log(f"{self.name} pushes {{}}", data)
+        kwargs = {direction: data}
+        new_bind = dest.bind(**kwargs)
+        if new_bind.is_fully_bound():
+            res = new_bind.async_called()
+            return res
+        return new_bind
 
 class Testbench(Module):
     
@@ -81,8 +76,8 @@ class Testbench(Module):
         super().__init__(ports={}, no_arbiter=True)
 
     @module.combinational
-    def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher, \
-                    row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
+    def build(self, col1: Pusher, col2: Pusher, col3: Pusher, col4: Pusher, \
+                    row1: Pusher, row2: Pusher, row3: Pusher, row4: Pusher):
         with Cycle(1):
             # 1 0
             # 0 P P P  P
@@ -204,32 +199,23 @@ def systolic_array():
             for j in range(1, 5):
                 pe_array[i][j].bound = pe_array[i][j].pe
 
-        # First Column Pushers
         for i in range(1, 5):
-            pe_array[i][0].pe = ColPusher()
-            if pe_array[i][1].bound is not None:  
-                bound = pe_array[i][0].pe.build(pe_array[i][1].bound)
-                pe_array[i][0].bound = bound
-            else:
-                print(f"Error: pe_array[{i}][1].bound is not initialized!")
+            # Build column pushers
+            row_pusher = Pusher('row', i)
+            col_pusher = Pusher('col', i)
+            pe_array[i][0].pe = row_pusher
+            pe_array[0][i].pe = col_pusher
 
-        # First Row Pushers
-        for i in range(1, 5):
-            pe_array[0][i].pe = RowPusher()
-            if pe_array[1][i].bound is not None:
-                bound = pe_array[0][i].pe.build(pe_array[1][i].bound)
-                pe_array[0][i].bound = bound
-            else:
-                print(f"Error: pe_array[1][{i}].bound is not initialized!")
+            pe_array[i][1].bound = row_pusher.build('west', pe_array[i][1].bound)
+            pe_array[1][i].bound = col_pusher.build('north', pe_array[1][i].bound)
 
-        # Last Column Sink
         for i in range(1, 5):
+            # Last Column Sink
             pe_array[i][5].pe = Sink('west')
             pe_array[i][5].pe.build()
             pe_array[i][5].bound = pe_array[i][5].pe
 
-        # Last Row Sink
-        for i in range(1, 5):
+            # Last Row Sink
             pe_array[5][i].pe = Sink('north')
             pe_array[5][i].pe.build()
             pe_array[5][i].bound = pe_array[5][i].pe
@@ -237,13 +223,10 @@ def systolic_array():
         # Build ComputePEs
         for i in range(1, 5):
             for j in range(1, 5):
-                if pe_array[i][j+1].bound is None:
-                    print(f"Error: pe_array[{i}][{j+1}].bound is None")
-                if pe_array[i+1][j].bound is None:
-                    print(f"Error: pe_array[{i+1}][{j}].bound is None")
-                fwest, fnorth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
-                pe_array[i][j+1].bound = fwest
-                pe_array[i+1][j].bound = fnorth
+                fwest, fnorth = pe_array[i][j].pe.build(
+                        pe_array[i][j + 1].bound, pe_array[i + 1][j].bound)
+                pe_array[i][j + 1].bound = fwest
+                pe_array[i + 1][j].bound = fnorth
 
         testbench = Testbench()
         testbench.build(pe_array[0][1].pe, \
