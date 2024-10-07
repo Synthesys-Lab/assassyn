@@ -16,23 +16,13 @@ from systolic_array import ProcElem, Sink, Pusher, ComputePE, check_raw, build_p
 #  [Pusher] [Compute PE]  [Compute PE]  [Compute PE]  [Compute PE]  [Sink]
 #           [Sink]        [Sink]        [Sink]        [Sink]
 
-class SRAM_R(SRAM):
-
-    def __init__(self, init_file, width):
-        super().__init__(width=width, depth=1024, init_file=init_file)
-
-class SRAM_C(SRAM):
-
-    def __init__(self, init_file, width):
-        super().__init__(width=width, depth=1024, init_file=init_file)
-
-class RDistributor(Module):
+class Distributor(Module):
 
     def __init__(self):
         super().__init__(no_arbiter=True, ports={'rdata': Port(Bits(128))})
 
     @module.combinational
-    def build(self, row1, row2, row3, row4):
+    def build(self, pushers):
 
         width = 128
 
@@ -57,105 +47,40 @@ class RDistributor(Module):
 
             with Condition(sm_cnt == sm_ity(1)):
                 buffer[1] = rdata
-                row1.async_called(data = buffer[0][96:127].bitcast(Int(32)))
+                pushers[0].async_called(data = buffer[0][96:127].bitcast(Int(32)))
                 log("Row Buffer data (hex): {:#034x}", buffer[0]) 
 
             with Condition(sm_cnt == sm_ity(2)):
                 buffer[2] = rdata
-                row1.async_called(data = buffer[0][64:95].bitcast(Int(32)))
-                row2.async_called(data = buffer[1][96:127].bitcast(Int(32)))
+                pushers[0].async_called(data = buffer[0][64:95].bitcast(Int(32)))
+                pushers[1].async_called(data = buffer[1][96:127].bitcast(Int(32)))
                 log("Row Buffer data (hex): {:#034x}", buffer[1]) 
 
             with Condition(sm_cnt == sm_ity(3)):
                 buffer[3] = rdata
-                row1.async_called(data = buffer[0][32:63].bitcast(Int(32)))
-                row2.async_called(data = buffer[1][64:95].bitcast(Int(32)))
-                row3.async_called(data = buffer[2][96:127].bitcast(Int(32)))
+                pushers[0].async_called(data = buffer[0][32:63].bitcast(Int(32)))
+                pushers[1].async_called(data = buffer[1][64:95].bitcast(Int(32)))
+                pushers[2].async_called(data = buffer[2][96:127].bitcast(Int(32)))
                 log("Row Buffer data (hex): {:#034x}", buffer[2]) 
 
         with Condition(sm_cnt == sm_ity(4)):
             log("Row Buffer data (hex): {:#034x}", buffer[3])
-            row1.async_called(data = buffer[0][0:31].bitcast(Int(32)))
-            row2.async_called(data = buffer[1][32:63].bitcast(Int(32)))
-            row3.async_called(data = buffer[2][64:95].bitcast(Int(32)))
-            row4.async_called(data = buffer[3][96:127].bitcast(Int(32)))
+            pushers[0].async_called(data = buffer[0][0:31].bitcast(Int(32)))
+            pushers[1].async_called(data = buffer[1][32:63].bitcast(Int(32)))
+            pushers[2].async_called(data = buffer[2][64:95].bitcast(Int(32)))
+            pushers[3].async_called(data = buffer[3][96:127].bitcast(Int(32)))
 
         with Condition(sm_cnt == sm_ity(5)):
-            row2.async_called(data = buffer[1][0:31].bitcast(Int(32)))
-            row3.async_called(data = buffer[2][32:63].bitcast(Int(32)))
-            row4.async_called(data = buffer[3][64:95].bitcast(Int(32)))
+            pushers[1].async_called(data = buffer[1][0:31].bitcast(Int(32)))
+            pushers[2].async_called(data = buffer[2][32:63].bitcast(Int(32)))
+            pushers[3].async_called(data = buffer[3][64:95].bitcast(Int(32)))
 
         with Condition(sm_cnt == sm_ity(6)):
-            row3.async_called(data = buffer[2][0:31].bitcast(Int(32)))
-            row4.async_called(data = buffer[3][32:63].bitcast(Int(32)))
+            pushers[2].async_called(data = buffer[2][0:31].bitcast(Int(32)))
+            pushers[3].async_called(data = buffer[3][32:63].bitcast(Int(32)))
 
         with Condition(sm_cnt == sm_ity(7)):
-            row4.async_called(data = buffer[3][0:31].bitcast(Int(32)))
-
-
-class CDistributor(Module):
-
-    def __init__(self):
-        super().__init__(no_arbiter=True, ports={'rdata': Port(Bits(128))})
-
-    @module.combinational
-    def build(self, col1, col2, col3, col4):
-
-        width = 128
-        sm_ity = Int(8)
-        buffer = RegArray(Int(width), 4)
-
-        cnt = RegArray(sm_ity, 1, initializer=[0])
-        sm_cnt = cnt[0]
-        cnt[0] = sm_cnt + sm_ity(1)
-
-        self.timing = 'systolic'
-
-        with Condition(sm_cnt < sm_ity(4)):
-            rdata = self.rdata.pop()
-            rdata = rdata.bitcast(Int(128))
-
-            with Condition(sm_cnt == sm_ity(0)):
-                buffer[0] = rdata
-
-            with Condition(sm_cnt == sm_ity(1)):
-                buffer[1] = rdata
-                col1.async_called(data = buffer[0][96:127].bitcast(Int(32)))
-                log("Col Buffer data (hex): {:#034x}", buffer[0]) 
-
-            with Condition(sm_cnt == sm_ity(2)):
-                buffer[2] = rdata
-                col1.async_called(data = buffer[0][64:95].bitcast(Int(32)))
-                col2.async_called(data = buffer[1][96:127].bitcast(Int(32)))
-                log("Col Buffer data (hex): {:#034x}", buffer[1]) 
-
-            with Condition(sm_cnt == sm_ity(3)):
-                buffer[3] = rdata
-                col1.async_called(data = buffer[0][32:63].bitcast(Int(32)))
-                col2.async_called(data = buffer[1][64:95].bitcast(Int(32)))
-                col3.async_called(data = buffer[2][96:127].bitcast(Int(32)))
-                log("Col Buffer data (hex): {:#034x}", buffer[2]) 
-
-        with Condition(sm_cnt == sm_ity(4)):
-            log("Col Buffer data (hex): {:#034x}", buffer[3])
-            col1.async_called(data = buffer[0][0:31].bitcast(Int(32)))
-            col2.async_called(data = buffer[1][32:63].bitcast(Int(32)))
-            col3.async_called(data = buffer[2][64:95].bitcast(Int(32)))
-            col4.async_called(data = buffer[3][96:127].bitcast(Int(32)))
-
-        with Condition(sm_cnt == sm_ity(5)):
-            col2.async_called(data = buffer[1][0:31].bitcast(Int(32)))
-            col3.async_called(data = buffer[2][32:63].bitcast(Int(32)))
-            col4.async_called(data = buffer[3][64:95].bitcast(Int(32)))
-
-        with Condition(sm_cnt == sm_ity(6)):
-            col3.async_called(data = buffer[2][0:31].bitcast(Int(32)))
-            col4.async_called(data = buffer[3][32:63].bitcast(Int(32)))
-
-        with Condition(sm_cnt == sm_ity(7)):
-            col4.async_called(data = buffer[3][0:31].bitcast(Int(32)))
-
-
+            pushers[3].async_called(data = buffer[3][0:31].bitcast(Int(32)))
 
 class Driver(Module):
 
@@ -163,7 +88,7 @@ class Driver(Module):
         super().__init__(no_arbiter=True, ports={})
 
     @module.combinational
-    def build(self, memory_R: SRAM_R, memory_C: SRAM_C, rd: RDistributor, cd: CDistributor):
+    def build(self, memory_R: SRAM, memory_C: SRAM, rd: Distributor, cd: Distributor):
         cnt = RegArray(Int(8), 1, initializer=[0])
         v = cnt[0]
         raddr = v[0:9]  
@@ -179,12 +104,10 @@ class Driver(Module):
         return compute
 
 
-
 class Invoker(Downstream):
 
     def __init__(self):
         super().__init__()
-
 
     @downstream.combinational
     def build(self, rd, cd, compute):
@@ -203,18 +126,18 @@ def mem_systolic_array(sys_name, init_file_row, init_file_col, resource_base):
         pe_array = build_pe_array()
 
         # Build the SRAM module
-        memory_R = SRAM_R(init_file_row, 128)
-        memory_C = SRAM_C(init_file_col, 128)
+        memory_R = SRAM(width=128, depth=1024, init_file=init_file_row) 
+        memory_C = SRAM(width=128, depth=1024, init_file=init_file_col)
 
         # Build the Distributor
-        rd = RDistributor()
-        cd = CDistributor()
+        rd = Distributor()
+        cd = Distributor()
 
         # Build the driver
         driver = Driver()
         compute = driver.build(memory_R, memory_C, rd, cd)
-        rd.build(*[pe_array[0][i].pe for i in range(1, 5)])
-        cd.build(*[pe_array[i][0].pe for i in range(1, 5)])
+        rd.build([pe_array[0][i].pe for i in range(1, 5)])
+        cd.build([pe_array[i][0].pe for i in range(1, 5)])
 
         # Invoke the Distributor
         invoker = Invoker()

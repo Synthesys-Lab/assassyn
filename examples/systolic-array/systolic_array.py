@@ -172,6 +172,7 @@ def build_pe_array():
     for i in range(1, 5):
         for j in range(1, 5):
             res[i][j].pe = ComputePE()
+            res[i][j].pe.name = f'pe_{i}_{j}'
 
     for i in range(1, 5):
         for j in range(1, 5):
