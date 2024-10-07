@@ -390,13 +390,12 @@ class MemoryAccess(Module):
         with Condition(self.rdata.valid()):
             data = self.rdata.pop()
             log("mem.rdata        | 0x{:x}", data)
-            writeback.async_called(mdata = data)
             with Condition(mem_bypass_reg[0] != Bits(5)(0)):
                 log("mem.bypass       | x{:02} = 0x{:x}", mem_bypass_reg[0], data)
             mem_bypass_data[0] = (mem_bypass_reg[0] != Bits(5)(0)).select(data, Bits(32)(0))
 
-        with Condition(~self.rdata.valid()):
-            writeback.callee.async_called(mdata = Bits(32)(0))
+        arg = self.rdata.valid().select(self.rdata.peek(), Bits(32)(0))
+        writeback.async_called(mdata = arg)
 
 class Fetcher(Module):
     
