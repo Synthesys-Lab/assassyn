@@ -38,49 +38,27 @@ class Distributor(Module):
 
         self.timing = 'systolic'
 
+        buffer_idx = [slice(i * 32, i * 32 + 31) for i in range(3, -1, -1)]
+        print(buffer_idx)
+
+        buffer_related = []
+
         with Condition(cond):
             rdata = self.rdata.pop()
             rdata = rdata.bitcast(Int(128))
 
-            with Condition(sm_cnt == sm_ity(0)):
-                buffer[0] = rdata
+            for i in range(4):
+                with Condition(sm_cnt == sm_ity(i)):
+                    buffer[i] = rdata
+                    for p_idx, b_idx in zip(buffer_related, reversed(buffer_related)):
+                        pushers[p_idx].async_called(data = buffer[p_idx][buffer_idx[b_idx]].bitcast(Int(32)))
+                buffer_related.append(i)
 
-            with Condition(sm_cnt == sm_ity(1)):
-                buffer[1] = rdata
-                pushers[0].async_called(data = buffer[0][96:127].bitcast(Int(32)))
-                log("Row Buffer data (hex): {:#034x}", buffer[0]) 
-
-            with Condition(sm_cnt == sm_ity(2)):
-                buffer[2] = rdata
-                pushers[0].async_called(data = buffer[0][64:95].bitcast(Int(32)))
-                pushers[1].async_called(data = buffer[1][96:127].bitcast(Int(32)))
-                log("Row Buffer data (hex): {:#034x}", buffer[1]) 
-
-            with Condition(sm_cnt == sm_ity(3)):
-                buffer[3] = rdata
-                pushers[0].async_called(data = buffer[0][32:63].bitcast(Int(32)))
-                pushers[1].async_called(data = buffer[1][64:95].bitcast(Int(32)))
-                pushers[2].async_called(data = buffer[2][96:127].bitcast(Int(32)))
-                log("Row Buffer data (hex): {:#034x}", buffer[2]) 
-
-        with Condition(sm_cnt == sm_ity(4)):
-            log("Row Buffer data (hex): {:#034x}", buffer[3])
-            pushers[0].async_called(data = buffer[0][0:31].bitcast(Int(32)))
-            pushers[1].async_called(data = buffer[1][32:63].bitcast(Int(32)))
-            pushers[2].async_called(data = buffer[2][64:95].bitcast(Int(32)))
-            pushers[3].async_called(data = buffer[3][96:127].bitcast(Int(32)))
-
-        with Condition(sm_cnt == sm_ity(5)):
-            pushers[1].async_called(data = buffer[1][0:31].bitcast(Int(32)))
-            pushers[2].async_called(data = buffer[2][32:63].bitcast(Int(32)))
-            pushers[3].async_called(data = buffer[3][64:95].bitcast(Int(32)))
-
-        with Condition(sm_cnt == sm_ity(6)):
-            pushers[2].async_called(data = buffer[2][0:31].bitcast(Int(32)))
-            pushers[3].async_called(data = buffer[3][32:63].bitcast(Int(32)))
-
-        with Condition(sm_cnt == sm_ity(7)):
-            pushers[3].async_called(data = buffer[3][0:31].bitcast(Int(32)))
+        for i in range(4, 8):
+            with Condition(sm_cnt == sm_ity(i)):
+                for p_idx, b_idx in zip(buffer_related, reversed(buffer_related)):
+                    pushers[p_idx].async_called(data = buffer[p_idx][buffer_idx[b_idx]].bitcast(Int(32)))
+            buffer_related = buffer_related[1:]
 
 class Driver(Module):
 
