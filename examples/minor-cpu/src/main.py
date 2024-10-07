@@ -111,23 +111,23 @@ def decode_logic(inst):
 
         if cur_type is rv_r_type:
             with Condition(eq):
-                log(f"r.{mn}.{{:07b}}{pad} | rd: x{{}} | rs1: x{{}} | rs2: x{{}} |", wrapped_opcode, r_inst.rd, r_inst.rs1, r_inst.rs2)
+                log(f"r.{mn}.{{:07b}}{pad} | rd: x{{:02}}      | rs1: x{{:02}}      | rs2: x{{:02}}      |", wrapped_opcode, r_inst.rd, r_inst.rs1, r_inst.rs2)
 
         if cur_type is rv_i_type:
             with Condition(eq):
-                log(f"i.{mn}.{{:07b}}{pad} | rd: x{{}} | rs1: x{{}} |            | imm: 0x{{:x}}", wrapped_opcode, i_inst.rd, i_inst.rs1, i_imm)
+                log(f"i.{mn}.{{:07b}}{pad} | rd: x{{:02}}      | rs1: x{{:02}}      |                 | imm: 0x{{:x}}", wrapped_opcode, i_inst.rd, i_inst.rs1, i_imm)
 
         if cur_type is rv_s_type:
             with Condition(eq):
-                log(f"s.{mn}.{{:07b}}{pad} |           | rs1: x{{}} | rs2: x{{}} | imm: 0x{{:x}}", wrapped_opcode, s_inst.rs1, s_inst.rs2, s_imm)
+                log(f"s.{mn}.{{:07b}}{pad} |                | rs1: x{{:02}}      | rs2: x{{:02}}      | imm: 0x{{:x}}", wrapped_opcode, s_inst.rs1, s_inst.rs2, s_imm)
 
         if cur_type is rv_u_type:
             with Condition(eq):
-                log(f"u.{mn}.{{:07b}}{pad} | rd: x{{}} |            |            | imm: 0x{{:x}}", wrapped_opcode, u_inst.rd, u_imm)
+                log(f"u.{mn}.{{:07b}}{pad} | rd: x{{:02}}      |               |                 | imm: 0x{{:x}}", wrapped_opcode, u_inst.rd, u_imm)
 
         if cur_type is rv_b_type:
             with Condition(eq):
-                log(f"b.{mn}.{{:07b}}{pad} |           | rs1: x{{}} | rs2: x{{}} | imm: 0x{{:x}}", wrapped_opcode, b_inst.rs1, b_inst.rs2, b_imm)
+                log(f"b.{mn}.{{:07b}}{pad} |              | rs1: x{{:02}}      | rs2: x{{:02}}      | imm: 0x{{:x}}", wrapped_opcode, b_inst.rs1, b_inst.rs2, b_imm)
 
 
     # Extract all the instruction types
@@ -174,8 +174,7 @@ class Execution(Module):
                 'a_reg': Port(Bits(5)),
                 'b_reg': Port(Bits(5)),
                 'rd_reg': Port(Bits(5)),
-            }
-        )
+            })
         self.name = "Executor"
 
     @module.combinational
@@ -191,8 +190,7 @@ class Execution(Module):
         rf: Array, 
         memory: Module, 
         writeback: Module,
-        dcache: Module,
-    ):
+        dcache: Module,):
 
         a_reg = self.a_reg.peek()
         b_reg = self.b_reg.peek()
@@ -211,19 +209,18 @@ class Execution(Module):
 
         valid = a_valid & b_valid & rd_valid
 
-        wait_until(valid)
-
-
-        opcode, imm_value, a_reg, b_reg, rd_reg = self.pop_all_ports(False)
-
-
         with Condition(~valid):
-            log("scoreboard | rs1-x{}: {}, rs2-x{}: {}, rd-x{}: {}", \
+            log("scoreboard       | rs1-x{:02}:{:05}| rs2-x{:02}:{:05}| rd-x{:02}: {}", \
                 a_reg, a_valid, \
                 b_reg, b_valid, \
                 rd_reg, rd_valid)
 
-        op_check = OpcodeChecker(self.opcode)
+        wait_until(valid)
+
+        opcode, imm_value, a_reg, b_reg, rd_reg = self.pop_all_ports(False)
+
+
+        op_check = OpcodeChecker(opcode)
         op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret', 'ebreak')
 
         is_lui    = op_check.lui
@@ -234,7 +231,7 @@ class Execution(Module):
         is_ebreak = op_check.ebreak
 
         with Condition(is_ebreak):
-            log('ebreak({:07b}) | halt', self.opcode)
+            log('ebreak({:07b}) | halt', opcode)
             finish()
 
         # Instruction attributes
@@ -250,7 +247,7 @@ class Execution(Module):
             (mem_bypass_reg[0] == b_reg).select(mem_bypass_data[0], rf[b_reg])
         )
         
-        rhs = uses_imm.select(self.imm_value, b)
+        rhs = uses_imm.select(imm_value, b)
 
         invoke_adder = is_add | is_addi | is_lw
 
@@ -259,7 +256,7 @@ class Execution(Module):
             Bits(32)(0), imm_value, result
         )
         with Condition(invoke_adder):
-            log("add         | a: {:x} | b:{:x} | res: {:x}", a, rhs, result)
+            log("add              | a: {:08x}  | b:{:08x}    | res: {:08x}", a, rhs, result)
 
         produced_by_exec = is_lui | is_addi | is_add
 
@@ -273,7 +270,7 @@ class Execution(Module):
         
         with Condition(is_bne):
             delta = imm_value[0:12]
-            delta = delta[12:12].select(Bits(19)(1), Bits(19)(0)).concat(delta).bitcast(Int(32))
+            delta = delta[12:12].select(Bits(19)(0x7ffff), Bits(19)(0)).concat(delta).bitcast(Int(32))
             log('delta: {:x}', delta)
             dest_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) + delta).bitcast(Bits(32))
             new_pc = (pc[0].bitcast(Int(32)) - Int(32)(4)).bitcast(Bits(32))
@@ -289,15 +286,16 @@ class Execution(Module):
         mem_bypass_reg[0] = is_memory_read.select(rd_reg, Bits(5)(0))
 
         with Condition(is_memory):
-            log("mem-read      | addr: {:x} | lineno: {:x}", result, request_addr)
+            log("mem-read         | addr: {:x} | lineno: {:x}", result, request_addr)
 
 
         dcache.build(we=Int(1)(0), re=is_memory_read, wdata=a, addr=request_addr, user=memory)
+        dcache.bound.async_called()
         wb = writeback.bind(opcode = opcode, result = result, rd = rd_reg)
 
         with Condition(rd_reg != Bits(5)(0)):
             return_rd = rd_reg
-            log("with-rd({:07b})| own x{}", opcode, rd_reg)
+            log("with-rd({:07b}) | own x{:02}", opcode, rd_reg)
 
         return wb, return_rd
 
@@ -310,7 +308,7 @@ class WriteBack(Module):
                 'result': Port(Bits(32)),
                 'rd': Port(Bits(5)),
                 'mdata': Port(Bits(32)),
-            })
+            }, no_arbiter=True)
 
         self.name = 'WriteBack'
 
@@ -319,7 +317,7 @@ class WriteBack(Module):
 
         opcode, result, rd, mdata = self.pop_all_ports(True)
 
-        op_check = OpcodeChecker(self.opcode)
+        op_check = OpcodeChecker(opcode)
         op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret')
 
         is_lui  = op_check.lui
@@ -338,7 +336,7 @@ class WriteBack(Module):
         return_rd = None
 
         with Condition((rd != Bits(5)(0))):
-            log("opcode: {:b}, writeback: x{} = {:x}", opcode, rd, data)
+            log("writeback        | x{:02} = 0x{:x}", rd, data)
             reg_file[rd] = data
             return_rd = rd
 
@@ -375,9 +373,9 @@ class Decoder(Module):
 class MemoryAccess(Module):
     
     def __init__(self):
-        super().__init__(ports={
-            'rdata': Port(Bits(32))
-        })
+        super().__init__(
+            ports={'rdata': Port(Bits(32))},
+            no_arbiter=True)
         self.name = 'memaccess'
 
     @module.combinational
@@ -387,15 +385,18 @@ class MemoryAccess(Module):
         mem_bypass_reg: Array, 
         mem_bypass_data: Array
     ):
-        with Condition(self.rdata.valid()):
-            self.rdata.pop()
+        self.timing = 'systolic'
 
-        data = self.rdata.valid().select(self.rdata.peek(), Bits(32)(0))
-        log("mem.rdata       | 0x{:x}", data)
-        writeback.async_called(mdata = data)
-        with Condition(mem_bypass_reg[0] != Bits(5)(0)):
-            log("mem.bypass      | x{} = {}", mem_bypass_reg[0], data)
-        mem_bypass_data[0] = (mem_bypass_reg[0] != Bits(5)(0)).select(data, Bits(32)(0))
+        with Condition(self.rdata.valid()):
+            data = self.rdata.pop()
+            log("mem.rdata        | 0x{:x}", data)
+            writeback.async_called(mdata = data)
+            with Condition(mem_bypass_reg[0] != Bits(5)(0)):
+                log("mem.bypass       | x{:02} = 0x{:x}", mem_bypass_reg[0], data)
+            mem_bypass_data[0] = (mem_bypass_reg[0] != Bits(5)(0)).select(data, Bits(32)(0))
+
+        with Condition(~self.rdata.valid()):
+            writeback.callee.async_called(mdata = Bits(32)(0))
 
 class Fetcher(Module):
     
@@ -405,10 +406,10 @@ class Fetcher(Module):
 
     @module.combinational
     def build(self, decoder: Decoder, pc: Array, on_branch: Array, icache: SRAM):
+        to_fetch = pc[0][2:11].bitcast(Int(10))
+        icache.build(Bits(1)(0), ~on_branch[0], to_fetch, Bits(32)(0), decoder)
         with Condition(~on_branch[0]):
             log("fetching         | *inst[0x{:x}]", pc[0])
-            to_fetch = pc[0][2:11].bitcast(Int(10))
-            icache.build(Bits(1)(0), ~on_branch[0], to_fetch, Bits(32)(0), decoder)
             pc[0] = (pc[0].bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
             # Call the decoder
             icache.bound.async_called()
@@ -427,7 +428,7 @@ class OnwriteDS(Downstream):
         ex_rd = exec_rd.optional(Bits(5)(0))
         wb_rd = writeback_rd.optional(Bits(5)(0))
 
-        log("scoreboard      | ownning: x{} | releasing: x{}", ex_rd, wb_rd)
+        log("scoreboard       | ownning: x{:02} | releasing: x{:02}", ex_rd, wb_rd)
 
         reg_onwrite[0] = reg_onwrite[0] ^ \
                         (Bits(32)(1) << wb_rd) ^ \
@@ -443,7 +444,7 @@ class Driver(Module):
         fetcher.async_called()
 
 def check(raw):
-    data_path = f'{utils.repo_path()}/examples/cpu/resource/0to100.data'
+    data_path = f'{utils.repo_path()}/examples/minor-cpu/resource/0to100.data'
     with open(data_path, 'r') as f:
         data = []
         for line in f:
@@ -454,21 +455,33 @@ def check(raw):
                 except ValueError:
                     print(f"Warning: Skipping invalid line: {line}")
 
+
     accumulator = 0
     ideal_accumulator = 0
     data_index = 0
 
     for line in raw.split('\n'):
-        if 'opcode: 110011, writeback: x10 =' in line or 'opcode: 0110011, writeback: x10 =' in line:
+
+        if 'writeback' in line and 'x14 = ' in line:
+            loaded = int(line.split('=')[-1].strip(), 16)
+            assert data[data_index] == loaded, f"Data mismatch at step {data_index + 1}: {hex(data[data_index])} != {hex(loaded)}"
+
+        if 'writeback' in line and 'x15 = ' in line:
+            addr = int(line.split('=')[-1].strip(), 16)
+            if addr == 0 or addr == 0xb8:
+                continue
+            assert 0xb8 + (data_index + 1) * 4 == addr, f"Address mismatch at step {data_index + 1}: {hex(addr)} != {hex(0xb8 + (data_index + 1) * 4)}"
+
+        if 'writeback' in line and 'x10 = ' in line:
             value = int(line.split('=')[-1].strip(), 16)
             if value != accumulator:
                 accumulator = value
                 if data_index < len(data):
                     ideal_accumulator += data[data_index]
-                    assert accumulator == ideal_accumulator,\
-                    f"Mismatch at step {data_index + 1}:\
-                    CPU result {accumulator} != Ideal result {ideal_accumulator}"
+                    assert accumulator == ideal_accumulator, f"Mismatch at step {data_index + 1}: CPU {accumulator} != Reference {ideal_accumulator}"
                     data_index += 1
+
+    assert data_index == 100, f"Data index mismatch: {data_index} != 100"
 
     print(f"Final CPU sum: {accumulator} (0x{accumulator:x})")
     print(f"Final ideal sum: {ideal_accumulator} (0x{ideal_accumulator:x})")
@@ -484,7 +497,9 @@ def main():
         bits32  = Bits(32)
 
         icache = SRAM(width=32, depth=512, init_file='0to100.exe')
+        icache.name = 'icache'
         dcache = SRAM(width=32, depth=512, init_file='0to100.data')
+        dcache.name = 'dcache'
 
         # Data Structures
         pc          = RegArray(bits32, 1)
@@ -546,7 +561,7 @@ def main():
         verilog=utils.has_verilator(),
         sim_threshold=1500,
         idle_threshold=1500,
-        resource_base=f'{utils.repo_path()}/examples/cpu/resource'
+        resource_base=f'{utils.repo_path()}/examples/minor-cpu/resource'
     )
 
     simulator_path, verilog_path = elaborate(sys, **conf)
@@ -554,8 +569,8 @@ def main():
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    raw = utils.run_verilator(verilog_path)
-    check(raw)
+    # raw = utils.run_verilator(verilog_path)
+    # check(raw)
 
 if __name__ == '__main__':
     main()

@@ -156,13 +156,16 @@ impl Visitor<String> for ElaborateModule<'_> {
     res.push_str(&format!("\n// Elaborating module {}\n", namify(module.get_name())));
     // Dump the function signature.
     // First, some common function parameters are dumped.
-    res.push_str(&format!("pub fn {}(sim: &mut Simulator) {{\n", namify(module.get_name())));
+    res.push_str(&format!(
+      "pub fn {}(sim: &mut Simulator) -> bool {{\n",
+      namify(module.get_name())
+    ));
     self.indent += 2;
 
     res.push_str(&self.visit_block(module.get_body()).unwrap());
 
     self.indent -= 2;
-    res.push_str("}\n");
+    res.push_str(" true }\n");
     res.into()
   }
 
@@ -404,11 +407,7 @@ impl Visitor<String> for ElaborateModule<'_> {
             format!("if sim.stamp / 100 == ({} as usize) {{", value)
           }
           subcode::BlockIntrinsic::WaitUntil => {
-            format!(
-              "if !{} {{ let stamp = sim.stamp; sim.{}_event.push_back(stamp + 100); return; }}",
-              value,
-              namify(&self.module_name),
-            )
+            format!("if !{} {{ return false; }}", value,)
           }
           subcode::BlockIntrinsic::Condition => {
             open_scope = true;
@@ -588,7 +587,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     fd.write_all(format!("fn simulate_{}(&mut self) {{", module_name).as_bytes())?;
     if !module.is_downstream() {
       fd.write_all(format!("if self.event_valid(&self.{}_event) {{", module_name).as_bytes())?;
-      fd.write_all(format!("self.{}_event.pop_front();", module_name).as_bytes())?;
     } else {
       let conds = upstreams(&module)
         .into_iter()
@@ -598,11 +596,12 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
       fd.write_all(conds.join(" || ").as_bytes())?;
       fd.write_all(" {".as_bytes())?;
     }
-    fd.write_all(format!("super::modules::{}(self);", module_name).as_bytes())?;
+    fd.write_all(format!("let succ = super::modules::{}(self);", module_name).as_bytes())?;
     if !module.is_downstream() {
+      fd.write_all(format!("if succ {{ self.{}_event.pop_front(); }}", module_name).as_bytes())?;
       simulators.push(module_name.clone());
     }
-    fd.write_all(format!("self.{}_triggered = true;\n", module_name).as_bytes())?;
+    fd.write_all(format!("self.{}_triggered = succ;\n", module_name).as_bytes())?;
     fd.write_all("} // close event condition\n".as_bytes())?;
     fd.write_all("} // close function\n".as_bytes())?;
   }
