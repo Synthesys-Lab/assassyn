@@ -117,11 +117,8 @@ impl Visitor<String> for NodeRefDumper {
         };
         // Lazy evaluation for FIFO peek.
         if let Ok(pure) = expr.as_sub::<PureIntrinsic>() {
-          match pure.get_subcode() {
-            subcode::PureIntrinsic::FIFOPeek => {
-              id.push_str(".clone().unwrap()");
-            }
-            _ => {}
+          if pure.get_subcode() == subcode::PureIntrinsic::FIFOPeek {
+            id.push_str(".clone().unwrap()");
           }
         }
         id.into()
