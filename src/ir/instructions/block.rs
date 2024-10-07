@@ -72,3 +72,12 @@ impl Display for PureIntrinsic<'_> {
     )
   }
 }
+
+impl PureIntrinsic<'_> {
+  pub fn get_subcode(&self) -> subcode::PureIntrinsic {
+    match self.expr.get_opcode() {
+      Opcode::PureIntrinsic { intrinsic } => intrinsic,
+      _ => panic!("Expecting Opcode::PureIntrinsic, but got {:?}", self.expr.get_opcode()),
+    }
+  }
+}

@@ -13,7 +13,7 @@ use crate::{
   analysis::topo_sort,
   backend::common::{create_and_clean_dir, upstreams, Config},
   builder::system::{ModuleKind, SysBuilder},
-  ir::{expr::subcode, node::*, visitor::Visitor, *},
+  ir::{expr::subcode, instructions::PureIntrinsic, node::*, visitor::Visitor, *},
 };
 
 use super::utils::{dtype_to_rust_type, namify};
@@ -97,7 +97,7 @@ impl Visitor<String> for NodeRefDumper {
       NodeKind::Module => Some(namify(node.as_ref::<Module>(sys).unwrap().get_name())),
       NodeKind::Expr => {
         let expr = node.as_ref::<Expr>(sys).unwrap();
-        let id = {
+        let mut id = {
           let raw = namify(&expr.get_name());
           if self.module_ctx != expr.get_parent().as_ref::<Block>(sys).unwrap().get_module() {
             let field_id = format!("{}_value", raw);
@@ -115,7 +115,15 @@ impl Visitor<String> for NodeRefDumper {
             raw
           }
         };
-
+        // Lazy evaluation for FIFO peek.
+        if let Ok(pure) = expr.as_sub::<PureIntrinsic>() {
+          match pure.get_subcode() {
+            subcode::PureIntrinsic::FIFOPeek => {
+              id.push_str(".clone().unwrap()");
+            }
+            _ => {}
+          }
+        }
         id.into()
       }
       _ => Some(namify(node.to_string(sys).as_str()).to_string()),
@@ -264,7 +272,7 @@ impl Visitor<String> for ElaborateModule<'_> {
           subcode::PureIntrinsic::FIFOPeek => {
             let port_self =
               dump_rval_ref(self.module_ctx, self.sys, &call.get().get_operand_value(0).unwrap());
-            format!("sim.{}.front().unwrap().clone()", port_self)
+            format!("sim.{}.front().cloned()", port_self)
           }
           subcode::PureIntrinsic::FIFOValid => {
             let port_self =
