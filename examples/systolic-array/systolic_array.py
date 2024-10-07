@@ -76,16 +76,20 @@ class Testbench(Module):
         super().__init__(ports={}, no_arbiter=True)
 
     @module.combinational
-    def build(self, col1: Pusher, col2: Pusher, col3: Pusher, col4: Pusher, \
-                    row1: Pusher, row2: Pusher, row3: Pusher, row4: Pusher):
+    def build(self, rows, cols):
+
+        def build_call(x, data):
+            for row, col, data in zip(rows[x], cols[x], data):
+                row.async_called(data = Int(32)(data))
+                col.async_called(data = Int(32)(data))
+
         with Cycle(1):
             # 1 0
             # 0 P P P  P
             #   P P P  P
             #   P P P  P
             #   P P P  P        
-            col1.async_called(data = Int(32)(0))
-            row1.async_called(data = Int(32)(0))
+            build_call(slice(0, 1), [0])
 
         with Cycle(2):
             # 2 1 4
@@ -93,10 +97,7 @@ class Testbench(Module):
             # 4 P P P  P
             #   P P P  P
             #   P P P  P            
-            row1.async_called(data = Int(32)(1))
-            col1.async_called(data = Int(32)(1))
-            row2.async_called(data = Int(32)(4))
-            col2.async_called(data = Int(32)(4))
+            build_call(slice(0, 2), [1, 4])
 
         with Cycle(3):
             # 3 2 5 8
@@ -104,12 +105,7 @@ class Testbench(Module):
             # 5 P P P  P
             # 8 P P P  P
             #   P P P  P
-            row1.async_called(data = Int(32)(2))
-            col1.async_called(data = Int(32)(2))
-            row2.async_called(data = Int(32)(5))
-            col2.async_called(data = Int(32)(5))
-            row3.async_called(data = Int(32)(8))
-            col3.async_called(data = Int(32)(8))
+            build_call(slice(0, 3), [2, 5, 8])
 
         with Cycle(4):
             # 4  3 6 9  12
@@ -117,14 +113,7 @@ class Testbench(Module):
             # 6  P P P  P
             # 9  P P P  P
             # 12 P P P  P
-            row1.async_called(data = Int(32)(3))
-            col1.async_called(data = Int(32)(3))
-            row2.async_called(data = Int(32)(6))
-            col2.async_called(data = Int(32)(6))
-            row3.async_called(data = Int(32)(9))
-            col3.async_called(data = Int(32)(9))
-            row4.async_called(data = Int(32)(12))
-            col4.async_called(data = Int(32)(12))
+            build_call(slice(0, 4), [3, 6, 9, 12])
         
         with Cycle(5):
             # 5    7 10 13
@@ -132,12 +121,7 @@ class Testbench(Module):
             # 7  P P P  P
             # 10 P P P  P
             # 13 P P P  P            
-            row2.async_called(data = Int(32)(7))
-            col2.async_called(data = Int(32)(7))
-            row3.async_called(data = Int(32)(10))
-            col3.async_called(data = Int(32)(10))
-            row4.async_called(data = Int(32)(13))
-            col4.async_called(data = Int(32)(13))
+            build_call(slice(1, 4), [7, 10, 13])
 
         with Cycle(6):
             #  6    11 14
@@ -145,10 +129,7 @@ class Testbench(Module):
             #    P P P  P
             # 11 P P P  P
             # 14 P P P  P
-            row3.async_called(data = Int(32)(11))
-            col3.async_called(data = Int(32)(11))
-            row4.async_called(data = Int(32)(14))
-            col4.async_called(data = Int(32)(14))
+            build_call(slice(2, 4), [11, 14])
             
         with Cycle(7):
             #   7      15
@@ -156,8 +137,7 @@ class Testbench(Module):
             #    P P P  P
             #    P P P  P
             # 15 P P P  P
-            row4.async_called(data = Int(32)(15))
-            col4.async_called(data = Int(32)(15))
+            build_call(slice(3, 4), [15])
 
 def check_raw(raw):
     a = [[0 for _ in range(4)] for _ in range(4)]
@@ -200,16 +180,16 @@ def systolic_array():
                 pe_array[i][j].bound = pe_array[i][j].pe
 
         for i in range(1, 5):
-            # Build column pushers
+            # Build Column Pushers
             row_pusher = Pusher('row', i)
             col_pusher = Pusher('col', i)
             pe_array[i][0].pe = row_pusher
             pe_array[0][i].pe = col_pusher
 
+            # First Row Pushers
             pe_array[i][1].bound = row_pusher.build('west', pe_array[i][1].bound)
             pe_array[1][i].bound = col_pusher.build('north', pe_array[1][i].bound)
 
-        for i in range(1, 5):
             # Last Column Sink
             pe_array[i][5].pe = Sink('west')
             pe_array[i][5].pe.build()
@@ -224,19 +204,15 @@ def systolic_array():
         for i in range(1, 5):
             for j in range(1, 5):
                 fwest, fnorth = pe_array[i][j].pe.build(
-                        pe_array[i][j + 1].bound, pe_array[i + 1][j].bound)
+                        pe_array[i][j + 1].bound,
+                        pe_array[i + 1][j].bound)
                 pe_array[i][j + 1].bound = fwest
                 pe_array[i + 1][j].bound = fnorth
 
         testbench = Testbench()
-        testbench.build(pe_array[0][1].pe, \
-                        pe_array[0][2].pe, \
-                        pe_array[0][3].pe, \
-                        pe_array[0][4].pe, \
-                        pe_array[1][0].pe, \
-                        pe_array[2][0].pe, \
-                        pe_array[3][0].pe, \
-                        pe_array[4][0].pe)
+        testbench.build(
+                [pe_array[0][i].pe for i in range(1, 5)], \
+                [pe_array[i][0].pe for i in range(1, 5)])
 
     simulator_path, verilator_path = elaborate(sys, verilog="verilator")
 
