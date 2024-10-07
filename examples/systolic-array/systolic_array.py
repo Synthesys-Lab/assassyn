@@ -165,50 +165,56 @@ def check_raw(raw):
                 actual = int(actual_line.split()[-1])
                 assert expected == actual
 
+def build_pe_array():
+    res = [[ProcElem() for _ in range(6)] for _ in range(6)]
+
+    # Init ComputePE
+    for i in range(1, 5):
+        for j in range(1, 5):
+            res[i][j].pe = ComputePE()
+
+    for i in range(1, 5):
+        for j in range(1, 5):
+            res[i][j].bound = res[i][j].pe
+
+    for i in range(1, 5):
+        # Build Column Pushers
+        row_pusher = Pusher('row', i)
+        col_pusher = Pusher('col', i)
+        res[i][0].pe = row_pusher
+        res[0][i].pe = col_pusher
+
+        # First Row Pushers
+        res[i][1].bound = row_pusher.build('west', res[i][1].bound)
+        res[1][i].bound = col_pusher.build('north', res[1][i].bound)
+
+        # Last Column Sink
+        res[i][5].pe = Sink('west')
+        res[i][5].pe.build()
+        res[i][5].bound = res[i][5].pe
+
+        # Last Row Sink
+        res[5][i].pe = Sink('north')
+        res[5][i].pe.build()
+        res[5][i].bound = res[5][i].pe
+
+    # Build ComputePEs
+    for i in range(1, 5):
+        for j in range(1, 5):
+            fwest, fnorth = res[i][j].pe.build(
+                    res[i][j + 1].bound,
+                    res[i + 1][j].bound)
+            res[i][j + 1].bound = fwest
+            res[i + 1][j].bound = fnorth
+
+    return res
+
+
 def systolic_array():
     sys = SysBuilder('systolic_array')
-    pe_array = [[ProcElem() for _ in range(6)] for _ in range(6)]
     
     with sys:
-        # Init ComputePE
-        for i in range(1, 5):
-            for j in range(1, 5):
-                pe_array[i][j].pe = ComputePE()
-
-        for i in range(1, 5):
-            for j in range(1, 5):
-                pe_array[i][j].bound = pe_array[i][j].pe
-
-        for i in range(1, 5):
-            # Build Column Pushers
-            row_pusher = Pusher('row', i)
-            col_pusher = Pusher('col', i)
-            pe_array[i][0].pe = row_pusher
-            pe_array[0][i].pe = col_pusher
-
-            # First Row Pushers
-            pe_array[i][1].bound = row_pusher.build('west', pe_array[i][1].bound)
-            pe_array[1][i].bound = col_pusher.build('north', pe_array[1][i].bound)
-
-            # Last Column Sink
-            pe_array[i][5].pe = Sink('west')
-            pe_array[i][5].pe.build()
-            pe_array[i][5].bound = pe_array[i][5].pe
-
-            # Last Row Sink
-            pe_array[5][i].pe = Sink('north')
-            pe_array[5][i].pe.build()
-            pe_array[5][i].bound = pe_array[5][i].pe
-
-        # Build ComputePEs
-        for i in range(1, 5):
-            for j in range(1, 5):
-                fwest, fnorth = pe_array[i][j].pe.build(
-                        pe_array[i][j + 1].bound,
-                        pe_array[i + 1][j].bound)
-                pe_array[i][j + 1].bound = fwest
-                pe_array[i + 1][j].bound = fnorth
-
+        pe_array = build_pe_array()
         testbench = Testbench()
         testbench.build(
                 [pe_array[0][i].pe for i in range(1, 5)], \

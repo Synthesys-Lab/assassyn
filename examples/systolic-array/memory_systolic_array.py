@@ -6,7 +6,7 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
 from assassyn.expr import Bind
-from systolic_array_rev import ProcElem, Sink, ColPusher, RowPusher, ComputePE, check_raw
+from systolic_array import ProcElem, Sink, Pusher, ComputePE, check_raw, build_pe_array
 
 #  # PE Array (4 + 1) x (4 + 1)
 #           [Pusher]      [Pusher]      [Pusher]      [Pusher]
@@ -21,13 +21,18 @@ class SRAM_R(SRAM):
     def __init__(self, init_file, width):
         super().__init__(width=width, depth=1024, init_file=init_file)
 
+class SRAM_C(SRAM):
+
+    def __init__(self, init_file, width):
+        super().__init__(width=width, depth=1024, init_file=init_file)
+
 class RDistributor(Module):
 
     def __init__(self):
         super().__init__(no_arbiter=True, ports={'rdata': Port(Bits(128))})
 
     @module.combinational
-    def build(self, row1: RowPusher, row2: RowPusher, row3: RowPusher, row4: RowPusher):
+    def build(self, row1, row2, row3, row4):
 
         width = 128
 
@@ -88,19 +93,13 @@ class RDistributor(Module):
             row4.async_called(data = buffer[3][0:31].bitcast(Int(32)))
 
 
-class SRAM_C(SRAM):
-
-    def __init__(self, init_file, width):
-        super().__init__(width=width, depth=1024, init_file=init_file)
-
-
 class CDistributor(Module):
 
     def __init__(self):
         super().__init__(no_arbiter=True, ports={'rdata': Port(Bits(128))})
 
     @module.combinational
-    def build(self, col1: ColPusher, col2: ColPusher, col3: ColPusher, col4: ColPusher):
+    def build(self, col1, col2, col3, col4):
 
         width = 128
         sm_ity = Int(8)
@@ -115,7 +114,6 @@ class CDistributor(Module):
         with Condition(sm_cnt < sm_ity(4)):
             rdata = self.rdata.pop()
             rdata = rdata.bitcast(Int(128))
-
 
             with Condition(sm_cnt == sm_ity(0)):
                 buffer[0] = rdata
@@ -202,58 +200,7 @@ def mem_systolic_array(sys_name, init_file_row, init_file_col, resource_base):
 
     with sys:
 
-        # Init ComputePE
-        for i in range(1, 5):
-            for j in range(1, 5):
-                pe_array[i][j].pe = ComputePE()
-                pe_array[i][j].pe.name = f"ComputePE_{i}_{j}"
-
-        for i in range(1, 5):
-            for j in range(1, 5):
-                pe_array[i][j].bound = pe_array[i][j].pe
-
-        # First Column Pushers
-        for i in range(1, 5):
-            pe_array[i][0].pe = ColPusher()
-            pe_array[i][0].pe.name = f"ColPusher_{i}"
-            if pe_array[i][1].bound is not None:  
-                bound = pe_array[i][0].pe.build(pe_array[i][1].bound)
-                pe_array[i][0].bound = bound
-            else:
-                print(f"Error: pe_array[{i}][1].bound is not initialized!")
-
-        # First Row Pushers
-        for i in range(1, 5):
-            pe_array[0][i].pe = RowPusher()
-            pe_array[0][i].pe.name = f"RowPusher_{i}"
-            if pe_array[1][i].bound is not None:
-                bound = pe_array[0][i].pe.build(pe_array[1][i].bound)
-                pe_array[0][i].bound = bound
-            else:
-                print(f"Error: pe_array[1][{i}].bound is not initialized!")
-
-        # Last Column Sink
-        for i in range(1, 5):
-            pe_array[i][5].pe = Sink('west')
-            pe_array[i][5].pe.build()
-            pe_array[i][5].bound = pe_array[i][5].pe
-
-        # Last Row Sink
-        for i in range(1, 5):
-            pe_array[5][i].pe = Sink('north')
-            pe_array[5][i].pe.build()
-            pe_array[5][i].bound = pe_array[5][i].pe
-
-        # Build ComputePEs
-        for i in range(1, 5):
-            for j in range(1, 5):
-                if pe_array[i][j+1].bound is None:
-                    print(f"Error: pe_array[{i}][{j+1}].bound is None")
-                if pe_array[i+1][j].bound is None:
-                    print(f"Error: pe_array[{i+1}][{j}].bound is None")
-                fwest, fnorth = pe_array[i][j].pe.build(pe_array[i][j+1].bound, pe_array[i+1][j].bound)
-                pe_array[i][j+1].bound = fwest
-                pe_array[i+1][j].bound = fnorth
+        pe_array = build_pe_array()
 
         # Build the SRAM module
         memory_R = SRAM_R(init_file_row, 128)
