@@ -281,7 +281,7 @@ class Execution(Module):
         is_memory = is_lw
         is_memory_read = is_lw
 
-        request_addr = is_memory.select(result[2:18].bitcast(Int(17)), Int(17)(0))
+        request_addr = is_memory.select(result[2:10].bitcast(Int(9)), Int(9)(0))
 
         mem_bypass_reg[0] = is_memory_read.select(rd_reg, Bits(5)(0))
 
@@ -405,7 +405,7 @@ class Fetcher(Module):
 
     @module.combinational
     def build(self, decoder: Decoder, pc: Array, on_branch: Array, icache: SRAM):
-        to_fetch = pc[0][2:11].bitcast(Int(10))
+        to_fetch = pc[0][2:10].bitcast(Int(9))
         icache.build(Bits(1)(0), ~on_branch[0], to_fetch, Bits(32)(0), decoder)
         with Condition(~on_branch[0]):
             log("fetching         | *inst[0x{:x}]", pc[0])
@@ -568,8 +568,8 @@ def main():
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
-    # raw = utils.run_verilator(verilog_path)
-    # check(raw)
+    raw = utils.run_verilator(verilog_path)
+    check(raw)
 
 if __name__ == '__main__':
     main()
