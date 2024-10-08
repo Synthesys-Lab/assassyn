@@ -27,11 +27,11 @@ cd $REPO_DIR/examples/systolic-array/
 test_case "python systolic_array.py"
 
 # A single-issue CPU
-cd $REPO_DIR/examples/cpu
+cd $REPO_DIR/examples/minor-cpu
 test_case "python src/main.py"
 
 # A Priority Queue
-cd $REPO_DIR/examples/priority_queue
+cd $REPO_DIR/examples/priority-queue
 test_case "python main.py"
 
 # TODO(@were): Test memory engine.
