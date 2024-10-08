@@ -79,7 +79,7 @@ jobs:
           RUSTC_WRAPPER: sccache
           VERILATOR_ROOT: ${{ github.workspace }}/verilator
         run: |
-          python3 examples/systolic-array/memory_systolic_array.py
           python3 examples/systolic-array/systolic_array.py
-          python3 examples/cpu/src/main.py
-          python3 examples/priority_queue/main.py
+          python3 examples/systolic-array/memory_systolic_array.py
+          python3 examples/minor-cpu/src/main.py
+          python3 examples/priority-queue/main.py
