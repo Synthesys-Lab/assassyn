@@ -995,7 +995,7 @@ module {} (
 
         let args = expr
           .operand_iter()
-          .map(|elem| elem.get_value().clone())
+          .map(|elem| *elem.get_value())
           .collect::<Vec<_>>();
 
         let format_str = utils::parse_format_string(args, expr.sys);

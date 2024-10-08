@@ -166,7 +166,7 @@ pub(super) fn parse_format_string(args: Vec<BaseNode>, sys: &SysBuilder) -> Stri
     .unwrap()
     .get_value()
     .to_string();
-  let mut fmt = raw.chars().into_iter().collect::<VecDeque<_>>();
+  let mut fmt = raw.chars().collect::<VecDeque<_>>();
   let mut res = String::new();
   let mut arg_idx = 1;
   while let Some(c) = fmt.pop_front() {
@@ -195,7 +195,7 @@ pub(super) fn parse_format_string(args: Vec<BaseNode>, sys: &SysBuilder) -> Stri
             assert!(closed, "Invalid format string, because of a single {{, {:?}", raw);
             let new_fmt = if substr.is_empty() {
               type_to_fmt(&dtype)
-            } else if matches!(substr.chars().nth(0), Some(':')) {
+            } else if matches!(substr.chars().next(), Some(':')) {
               let mut width_idx = 1;
               let pad = if matches!(substr.chars().nth(1), Some('0')) {
                 width_idx += 1;
@@ -206,7 +206,7 @@ pub(super) fn parse_format_string(args: Vec<BaseNode>, sys: &SysBuilder) -> Stri
               let width = if substr
                 .chars()
                 .nth(width_idx)
-                .map_or(false, |c| c.is_digit(10))
+                .map_or(false, |c| c.is_ascii_digit())
               {
                 width_idx += 1;
                 substr
