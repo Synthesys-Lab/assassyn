@@ -152,9 +152,7 @@ pub(super) fn connect_top<T: Field, U: Field>(display: &T, edge: &U, fields: &[&
 
 fn type_to_fmt(ty: &DataType) -> String {
   match ty {
-    DataType::Int(_) => "d",
-    DataType::UInt(_) => "u",
-    DataType::Bits(_) => "d",
+    DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "d",
     _ => panic!("Invalid type for type: {}", ty),
   }
   .to_string()
@@ -180,7 +178,7 @@ pub(super) fn parse_format_string(args: Vec<BaseNode>, sys: &SysBuilder) -> Stri
             let mut substr = c.to_string();
             // handle "{}"
             if substr.eq("}") {
-              res.push_str(&type_to_fmt(&dtype));
+              res.push_str(&format!("%{}", &type_to_fmt(&dtype)));
               arg_idx += 1;
               continue;
             }

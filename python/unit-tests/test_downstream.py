@@ -77,10 +77,12 @@ def test_downstream():
     simulator_path, verilator_path = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
+    print(raw)
     check_raw(raw)
     
     if verilator_path:
         raw = utils.run_verilator(verilator_path)
+        print(raw)
         check_raw(raw)
 
 if __name__ == '__main__':
