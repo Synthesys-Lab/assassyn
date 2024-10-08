@@ -164,11 +164,9 @@ pub(super) fn parse_format_string(args: Vec<BaseNode>, sys: &SysBuilder) -> Stri
   let raw = args[0]
     .as_ref::<StrImm>(sys)
     .unwrap()
-    .get_value().to_string();
-  let mut fmt = raw
-    .chars()
-    .into_iter()
-    .collect::<VecDeque<_>>();
+    .get_value()
+    .to_string();
+  let mut fmt = raw.chars().into_iter().collect::<VecDeque<_>>();
   let mut res = String::new();
   let mut arg_idx = 1;
   while let Some(c) = fmt.pop_front() {
