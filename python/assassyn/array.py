@@ -62,7 +62,8 @@ class Array:
     @ir_builder
     def __getitem__(self, index):
         if isinstance(index, int):
-            index = to_uint(index)
+            index_bits = self.size.bit_length()
+            index = to_uint(index, index_bits)
         assert isinstance(index, Value), f'Invalid index given: {index}'
         return ArrayRead(self, index)
 

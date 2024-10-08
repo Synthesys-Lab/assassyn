@@ -10,6 +10,7 @@ class MemUser(Module):
         super().__init__(
             ports={'rdata': Port(Bits(width))}, 
         )
+
     @module.combinational
     def build(self):
         width = self.rdata.dtype.bits
@@ -23,7 +24,7 @@ class MemUser(Module):
 class Driver(Module):
 
     def __init__(self):
-            super().__init__(ports={})
+        super().__init__(ports={})
 
     @module.combinational
     def build(self, width, init_file, user):
@@ -38,17 +39,8 @@ class Driver(Module):
         cnt[0] = plused
         sram = SRAM(width, 512, init_file)
         sram.build(we, re, addr, v.bitcast(Bits(width)), user)
-        return cnt, sram, plused
-
-class DriverDown(Downstream):
-
-    def __init__(self):
-            super().__init__()
-
-    @downstream.combinational
-    def build(self, sram):
-        bound = sram.bound
-        bound.async_called()
+        with Condition(re):
+            sram.bound.async_called()
 
 
 def check(raw):
@@ -69,10 +61,7 @@ def impl(sys_name, width, init_file, resource_base):
         user.build()
         # Build the driver
         driver = Driver()
-        cnt, sram, plused = driver.build(width, init_file, user)
-        # Build the downstream
-        downstream = DriverDown()
-        downstream.build(sram)
+        driver.build(width, init_file, user)
 
     config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
 
