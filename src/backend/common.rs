@@ -1,10 +1,14 @@
-use std::{collections::{HashMap, HashSet}, env, fs, path::PathBuf};
+use std::{
+  collections::{HashMap, HashSet},
+  env, fs,
+  path::PathBuf,
+};
 
 use crate::{
   builder::SysBuilder,
   ir::{
     node::{BaseNode, IsElement, ModuleRef},
-    Expr, Module,
+    Expr,
   },
 };
 
