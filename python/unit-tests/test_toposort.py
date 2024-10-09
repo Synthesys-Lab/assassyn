@@ -19,7 +19,6 @@ class Driver(Module):
 
 
 class ForwardData(Module):
-
     
     def __init__(self):
         super().__init__(
@@ -73,8 +72,11 @@ def test_toposort():
         d = hs4.build()
         
         adder1 = Adder()
+        adder1.name = 'adder1'
         adder2 = Adder()
+        adder2.name = 'adder2'
         adder3 = Adder()
+        adder3.name = 'adder3'
 
         driver.build(hs1, hs2)
         

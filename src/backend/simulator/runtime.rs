@@ -153,8 +153,9 @@ pub(super) fn dump_runtime(fd: &mut std::fs::File) {
       }
 
       pub fn push(&mut self, event: T) {
-        if let Some(event) = self.q.get(&event.cycle()) {
-          panic!("Cycle {}: Already occupied by {}", event.cycle(), event.pusher());
+        if let Some(a) = self.q.get(&event.cycle()) {
+          panic!("{}: Already occupied by {}, cannot accept {}!",
+            cyclize(a.cycle()), a.pusher(), event.pusher());
         } else {
           self.q.insert(event.cycle(), event);
         }

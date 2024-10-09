@@ -169,21 +169,21 @@ def decode_logic(inst):
             args.append(ri.view().rd)
             rd_valid = rd_valid | eq
         else:
-            fmt = fmt + '|               '
+            fmt = fmt + '|              '
 
         if ri.has_rs1:
             fmt = fmt + "| rs1: x{:02}      "
             args.append(ri.view().rs1)
             rs1_valid = rs1_valid | eq
         else:
-            fmt = fmt + '|               '
+            fmt = fmt + '|              '
 
         if ri.has_rs2:
             fmt = fmt + "| rs2: x{:02}      "
             args.append(ri.view().rs2)
             rs2_valid = rs2_valid | eq
         else:
-            fmt = fmt + '|               '
+            fmt = fmt + '|              '
 
         imm = ri.imm(False)
         if imm is not None:
@@ -242,7 +242,6 @@ class Execution(Module):
     @module.combinational
     def build(
         self, 
-        on_branch: Array, 
         pc: Array, 
         exec_bypass_reg: Array,
         exec_bypass_data: Array,
@@ -252,7 +251,7 @@ class Execution(Module):
         rf: Array, 
         memory: Module, 
         writeback: Module,
-        dcache: Module,):
+        data: str):
 
         a_reg = self.a_reg.peek()
         b_reg = self.b_reg.peek()
@@ -326,19 +325,17 @@ class Execution(Module):
         exec_bypass_reg[0] = produced_by_exec.select(rd_reg, Bits(5)(0))
         exec_bypass_data[0] = produced_by_exec.select(result, Bits(32)(0))
 
-        with Condition(is_branch):
-            on_branch[0] = Bits(1)(0)
-            log("clear-br({:b})| on_branch = 0", opcode)
-        
         with Condition(is_bne):
             delta = imm_value[0:12]
             delta = delta[12:12].select(Bits(19)(0x7ffff), Bits(19)(0)).concat(delta).bitcast(Int(32))
             log('delta: {:x}', delta)
-            dest_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) + delta).bitcast(Bits(32))
-            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(4)).bitcast(Bits(32))
+            dest_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) + delta)[0:10]
+            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(4))[0:10]
             br_dest = (a != b).select(dest_pc, new_pc)
             log("bne({:b})     | {} != {} | to {} | else {}", opcode, a, b, dest_pc, new_pc)
-            pc[0] = br_dest
+            br_sm = RegArray(Bits(1), 1)
+            br_sm[0] = Bits(1)(0)
+            pc[0] = (br_dest.bitcast(Int(11)) + Int(11)(4)).bitcast(Bits(11))
 
         is_memory = is_lw
         is_memory_read = is_lw
@@ -349,8 +346,10 @@ class Execution(Module):
 
         with Condition(is_memory):
             log("mem-read         | addr: {:x} | lineno: {:x}", result, request_addr)
+    
 
-
+        dcache = SRAM(width=32, depth=512, init_file=data)
+        dcache.name = 'dcache'
         dcache.build(we=Int(1)(0), re=is_memory_read, wdata=a, addr=request_addr, user=memory)
         dcache.bound.async_called()
         wb = writeback.bind(opcode = opcode, result = result, rd = rd_reg)
@@ -359,7 +358,7 @@ class Execution(Module):
             return_rd = rd_reg
             log("with-rd({:07b}) | own x{:02}", opcode, rd_reg)
 
-        return wb, return_rd
+        return br_sm, br_dest, wb, return_rd
 
 class WriteBack(Module):
     
@@ -413,23 +412,23 @@ class Decoder(Module):
         self.name = 'Decoder'
 
     @module.combinational
-    def build(self, pc: Array, on_branch: Array, executor: Module):
+    def build(self, executor: Module, br_sm: Array):
+
         inst = self.pop_all_ports(False)
-        with Condition(~on_branch[0]):
-            signals = decode_logic(inst)
 
-            with Condition(signals.is_branch):
-                on_branch[0] = Bits(1)(1)
+        signals = decode_logic(inst)
 
-            executor.async_called(
-                opcode = inst[0:6],
-                imm_value = signals.imm_value,
-                a_reg = signals.rs1_reg,
-                b_reg = signals.rs2_reg,
-                rd_reg = signals.rd_reg)
+        br_sm[0] = signals.is_branch
 
-        with Condition(on_branch[0]):
-            log("on a branch, stall decoding, pc freeze at 0x{:x}", pc[0])
+        executor.async_called(
+            opcode = inst[0:6],
+            imm_value = signals.imm_value,
+            a_reg = signals.rs1_reg,
+            b_reg = signals.rs2_reg,
+            rd_reg = signals.rd_reg)
+
+        return signals.is_branch
+
  
 
 class MemoryAccess(Module):
@@ -466,19 +465,33 @@ class Fetcher(Module):
         self.name = 'Fetcher'
 
     @module.combinational
-    def build(self, decoder: Decoder, pc: Array, on_branch: Array, icache: SRAM):
-        to_fetch = pc[0][2:10].bitcast(Int(9))
-        icache.build(Bits(1)(0), ~on_branch[0], to_fetch, Bits(32)(0), decoder)
-        with Condition(~on_branch[0]):
-            log("fetching         | *inst[0x{:x}]", pc[0])
-            pc[0] = (pc[0].bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
-            # Call the decoder
+    def build(self):
+        pc_reg = RegArray(Bits(11), 1)
+        addr = pc_reg[0]
+        return pc_reg, addr
+
+class FetcherImpl(Downstream):
+
+    def __init__(self):
+        super().__init__()
+        self.name = 'FetcherImpl'
+
+    @downstream.combinational
+    def build(self, on_branch: Value, br_sm: Array, ex_bypass: Value, pc_reg: Value, pc_addr: Value, decoder: Decoder, data: str):
+        on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
+        should_fetch = ~on_branch | ex_bypass.valid()
+        to_fetch = ex_bypass.optional(pc_addr)
+        icache = SRAM(width=32, depth=512, init_file=data)
+        icache.name = 'icache'
+        icache.build(Bits(1)(0), should_fetch, to_fetch[2:10].bitcast(Int(9)), Bits(32)(0), decoder)
+        log("fetcher          | on_br: {} | ex_by: {} | should_fetch: {} | fetch: 0x{:x}", on_branch, ex_bypass.valid(), should_fetch, to_fetch)
+        with Condition(should_fetch):
             icache.bound.async_called()
+            with Condition(~ex_bypass.valid()):
+                pc_reg[0] = (to_fetch.bitcast(Int(11)) + Int(11)(4)).bitcast(Bits(11))
 
-        with Condition(on_branch[0]):
-            log("fetching         | on branch, pc freeze at 0x{:x}", pc[0])
 
-class OnwriteDS(Downstream):
+class Onwrite(Downstream):
     
     def __init__(self):
         super().__init__()
@@ -557,14 +570,12 @@ def main():
         bits5   = Bits(5)
         bits32  = Bits(32)
 
-        icache = SRAM(width=32, depth=512, init_file='0to100.exe')
-        icache.name = 'icache'
-        dcache = SRAM(width=32, depth=512, init_file='0to100.data')
-        dcache.name = 'dcache'
+        fetcher = Fetcher()
+        pc_reg, pc_addr = fetcher.build()
+
+        fetcher_impl = FetcherImpl()
 
         # Data Structures
-        pc          = RegArray(bits32, 1)
-        on_branch   = RegArray(bits1, 1)
         reg_file    = RegArray(bits32, 32)
         reg_onwrite = RegArray(bits32, 1)
 
@@ -580,9 +591,8 @@ def main():
         memory_access = MemoryAccess()
 
         executor = Execution()
-        wb, exec_rd = executor.build(
-            pc = pc,
-            on_branch=on_branch,
+        br_sm, ex_bypass, wb, exec_rd = executor.build(
+            pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
             reg_onwrite = reg_onwrite,
             exec_bypass_data = exec_bypass_data,
@@ -591,7 +601,7 @@ def main():
             rf = reg_file,
             memory = memory_access,
             writeback = writeback,
-            dcache = dcache
+            data = '0to100.data'
         )
 
         memory_access.build(
@@ -601,13 +611,12 @@ def main():
         )
 
         decoder = Decoder()
-        decoder.build(pc = pc, on_branch = on_branch, executor = executor)
+        on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        onwrite_downstream = OnwriteDS()
+        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, '0to100.exe')
+
+        onwrite_downstream = Onwrite()
     
-        fetcher = Fetcher()
-        fetcher.build(decoder, pc, on_branch, icache)
-
         driver = Driver()
         driver.build(fetcher)
 

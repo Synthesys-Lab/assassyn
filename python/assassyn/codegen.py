@@ -205,8 +205,9 @@ class CodeGen(visitor.Visitor):
 
         self.finalize_bind()
 
+        self.code.append('  // Emit downstream modules')
         for elem in node.downstreams:
-            self.code.append('  // Emit downstream modules')
+            self.code.append(f'  // Module {elem.name}')
             var = self.generate_rval(elem)
             self.code.append(f'  sys.set_current_module({var});')
             self.visit_module(elem)
@@ -283,7 +284,7 @@ class CodeGen(visitor.Visitor):
 
     #pylint: disable=too-many-branches, too-many-locals, too-many-statements
     def visit_expr(self, node):
-        self.code.append(f'  // {node}')
+        self.code.append(f'  // {node}, {node.loc}')
         ib_method = opcode_to_ib(node)
         if node.is_binary():
             lhs = self.generate_rval(node.lhs)

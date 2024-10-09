@@ -38,13 +38,11 @@ impl Operand {
   }
 }
 
-struct Verifier {
-}
+struct Verifier {}
 
 impl Verifier {
   fn new() -> Self {
-    Self {
-    }
+    Self {}
   }
 }
 

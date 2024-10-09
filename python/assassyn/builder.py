@@ -16,10 +16,16 @@ def ir_builder(func, *args, **kwargs):
     res = func(*args, **kwargs)
     #pylint: disable=cyclic-import,import-outside-toplevel
     from .const import Const
+    from .utils import package_path
     if not isinstance(res, Const):
         Singleton.builder.insert_point.append(res)
-    stack_entry = inspect.stack()[2]
-    res.loc = (stack_entry.filename, stack_entry.lineno, stack_entry.function)
+    package = package_path()
+    for i in inspect.stack()[2:]:
+        fname, lineno = i.filename, i.lineno
+        if not fname.startswith(package):
+            res.loc = f'{fname}:{lineno}'
+            break
+    assert hasattr(res, 'loc')
     return res
 
 #pylint: disable=too-many-instance-attributes
