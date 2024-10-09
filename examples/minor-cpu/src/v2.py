@@ -563,7 +563,7 @@ def check(raw):
     print(f"Final difference: {accumulator - ideal_accumulator}")
 
 def main():
-    sys = SysBuilder('cpu')
+    sys = SysBuilder('cpu_v2')
 
     with sys:
         # Data Types

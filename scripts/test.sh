@@ -28,7 +28,8 @@ test_case "python systolic_array.py"
 
 # A single-issue CPU
 cd $REPO_DIR/examples/minor-cpu
-test_case "python src/main.py"
+test_case "python src/v1.py"
+test_case "python src/v2.py"
 
 # A Priority Queue
 cd $REPO_DIR/examples/priority-queue
