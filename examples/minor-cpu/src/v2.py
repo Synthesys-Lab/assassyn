@@ -296,7 +296,7 @@ class Execution(Module):
             finish()
 
         # Instruction attributes
-        uses_imm = is_addi | is_bne
+        uses_imm = is_addi | is_bne | is_lw
         is_branch = is_bne
 
         a = (exec_bypass_reg[0] == a_reg).select(
@@ -307,7 +307,10 @@ class Execution(Module):
             exec_bypass_data[0], 
             (mem_bypass_reg[0] == b_reg).select(mem_bypass_data[0], rf[b_reg])
         )
-        
+
+        # log('mem_bypass_reg: x{:02} | mem_bypass_data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
+        # log('exe_bypass_reg: x{:02} | exe_bypass_data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
+
         rhs = uses_imm.select(imm_value, b)
 
         invoke_adder = is_add | is_addi | is_lw
@@ -329,13 +332,12 @@ class Execution(Module):
             delta = imm_value[0:12]
             delta = delta[12:12].select(Bits(19)(0x7ffff), Bits(19)(0)).concat(delta).bitcast(Int(32))
             log('delta: {:x}', delta)
-            dest_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) + delta)[0:10]
-            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(4))[0:10]
-            br_dest = (a != b).select(dest_pc, new_pc)
-            log("bne({:b})     | {} != {} | to {} | else {}", opcode, a, b, dest_pc, new_pc)
+            br_pc = (pc[0].bitcast(Int(32)) - Int(32)(4) + delta).bitcast(Bits(32))
+            nxt_pc = pc[0]
+            br_dest = (a != b).select(br_pc, nxt_pc)
+            log("bne({:b})     | {} != {} | to {} | else {}", opcode, a, b, br_pc, nxt_pc)
             br_sm = RegArray(Bits(1), 1)
             br_sm[0] = Bits(1)(0)
-            pc[0] = (br_dest.bitcast(Int(11)) + Int(11)(4)).bitcast(Bits(11))
 
         is_memory = is_lw
         is_memory_read = is_lw
@@ -345,7 +347,7 @@ class Execution(Module):
         mem_bypass_reg[0] = is_memory_read.select(rd_reg, Bits(5)(0))
 
         with Condition(is_memory):
-            log("mem-read         | addr: {:x} | lineno: {:x}", result, request_addr)
+            log("mem-read         | addr: 0x{:x} | lineno: 0x{:x}", result, request_addr)
     
 
         dcache = SRAM(width=32, depth=512, init_file=data)
@@ -466,7 +468,7 @@ class Fetcher(Module):
 
     @module.combinational
     def build(self):
-        pc_reg = RegArray(Bits(11), 1)
+        pc_reg = RegArray(Bits(32), 1)
         addr = pc_reg[0]
         return pc_reg, addr
 
@@ -487,8 +489,7 @@ class FetcherImpl(Downstream):
         log("fetcher          | on_br: {} | ex_by: {} | should_fetch: {} | fetch: 0x{:x}", on_branch, ex_bypass.valid(), should_fetch, to_fetch)
         with Condition(should_fetch):
             icache.bound.async_called()
-            with Condition(~ex_bypass.valid()):
-                pc_reg[0] = (to_fetch.bitcast(Int(11)) + Int(11)(4)).bitcast(Bits(11))
+            pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
 
 
 class Onwrite(Downstream):

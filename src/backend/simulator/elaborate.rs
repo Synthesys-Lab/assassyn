@@ -586,6 +586,14 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   }
   fd.write_all("}".as_bytes())?;
 
+  // A topological order among these downstream modules is needed.
+  let downstreams = topo_sort(sys);
+  let topo_map = downstreams
+    .iter()
+    .enumerate()
+    .map(|(i, x)| (*x, i))
+    .collect::<std::collections::HashMap<_, _>>();
+
   let mut simulators = vec![];
   for module in sys.module_iter(ModuleKind::All) {
     let module_name = namify(module.get_name());
@@ -593,7 +601,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     if !module.is_downstream() {
       fd.write_all(format!("if self.event_valid(&self.{}_event) {{", module_name).as_bytes())?;
     } else {
-      let conds = upstreams(&module)
+      let conds = upstreams(&module, &topo_map)
         .into_iter()
         .map(|x| format!("self.{}_triggered", namify(x.as_ref::<Module>(sys).unwrap().get_name())))
         .collect::<Vec<_>>();
@@ -630,8 +638,6 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   }
   fd.write_all("];\n".as_bytes())?;
 
-  // A topological order among these downstream modules is needed.
-  let downstreams = topo_sort(sys);
   fd.write_all("let downstreams : Vec<fn(&mut Simulator)> = vec![".as_bytes())?;
   for downstream in downstreams {
     let module_ref = downstream.as_ref::<Module>(sys).unwrap();

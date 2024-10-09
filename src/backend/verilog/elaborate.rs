@@ -10,6 +10,7 @@ use instructions::FIFOPush;
 // use regex::Regex;
 
 use crate::{
+  analysis::topo_sort,
   backend::common::{create_and_clean_dir, namify, upstreams, Config},
   builder::system::{ModuleKind, SysBuilder},
   ir::{instructions::BlockIntrinsic, node::*, visitor::Visitor, *},
@@ -42,10 +43,16 @@ struct VerilogDumper<'a, 'b> {
   external_usage: ExternalUsage,
   current_module: String,
   before_wait_until: bool,
+  topo: HashMap<BaseNode, usize>,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
-  fn new(sys: &'a SysBuilder, config: &'b Config, external_usage: ExternalUsage) -> Self {
+  fn new(
+    sys: &'a SysBuilder,
+    config: &'b Config,
+    external_usage: ExternalUsage,
+    topo: HashMap<BaseNode, usize>,
+  ) -> Self {
     Self {
       sys,
       config,
@@ -56,6 +63,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       current_module: String::new(),
       external_usage,
       before_wait_until: false,
+      topo,
     }
   }
 
@@ -389,7 +397,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     if module.is_downstream() {
       res.push_str("    // Upstream executed signals\n");
-      upstreams(module).iter().for_each(|x| {
+      upstreams(module, &self.topo).iter().for_each(|x| {
         let name = namify(x.as_ref::<Module>(module.sys).unwrap().get_name());
         res.push_str(&format!("    .{}_executed({}_executed),\n", name, name));
       });
@@ -692,7 +700,7 @@ module {} (
 
     if module.is_downstream() {
       res.push_str("  // Declare upstream executed signals\n");
-      upstreams(&module).iter().for_each(|x| {
+      upstreams(&module, &self.topo).iter().for_each(|x| {
         let name = namify(x.as_ref::<Module>(module.sys).unwrap().get_name());
         res.push_str(&declare_in(bool_ty(), &format!("{}_executed", name)));
       });
@@ -814,7 +822,7 @@ module {} (
       res.push_str(&format!("  assign executed = counter_pop_valid{};\n", wait_until));
       res.push_str("  assign counter_pop_ready = executed;\n");
     } else {
-      let upstream_exec = upstreams(&module)
+      let upstream_exec = upstreams(&module, &self.topo)
         .iter()
         .map(|x| format!("{}_executed", namify(x.as_ref::<Module>(module.sys).unwrap().get_name())))
         .collect::<Vec<_>>();
@@ -1242,9 +1250,15 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
 
   generate_cpp_testbench(&verilog_name, sys, config)?;
 
+  let topo = topo_sort(sys);
+  let topo = topo
+    .into_iter()
+    .enumerate()
+    .map(|(i, x)| (x, i))
+    .collect::<HashMap<_, _>>();
   let external_usage = gather_exprs_externally_used(sys);
 
-  let mut vd = VerilogDumper::new(sys, config, external_usage);
+  let mut vd = VerilogDumper::new(sys, config, external_usage, topo);
 
   let mut fd = File::create(fname)?;
 
