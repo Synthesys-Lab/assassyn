@@ -190,10 +190,8 @@ def decode_logic(inst):
             fmt = fmt + "|imm: 0x{:x}"
             args.append(imm)
 
-
         with Condition(eq):
             log(fmt, *args)
-
 
     # Extract all the signals
     memory_read = eqs['lw']
