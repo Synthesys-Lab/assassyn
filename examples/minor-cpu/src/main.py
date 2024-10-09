@@ -6,59 +6,114 @@ from assassyn import utils
 
 from opcodes import *
 
-rv_r_type = Record({
-    (0, 6): ('opcode', Bits),
-    (7, 11): ('rd', Bits),
-    (12, 14): ('funct3', Bits),
-    (15, 19): ('rs1', Bits),
-    (20, 24): ('rs2', Bits),
-    (25, 31): ('funct7', Bits),
-})
+class InstType:
 
-rv_i_type = Record({
-    (0, 6): ('opcode', Bits),
-    (7, 11): ('rd', Bits),
-    (12, 14): ('funct3', Bits),
-    (15, 19): ('rs1', Bits),
-    (20, 31): ('imm', Bits),
-})
+    FIELDS = [
+        ((0, 6), 'opcode', Bits),
+        ((7, 11), 'rd', Bits),
+        ((15, 19), 'rs1', Bits),
+        ((20, 24), 'rs2', Bits),
+        ((12, 14), 'funct3', Bits),
+        ((25, 31), 'funct7', Bits),
+    ]
 
-rv_s_type = Record({
-    (0, 6): ('opcode', Bits),
-    (7, 11): ('imm4_0', Bits),
-    (12, 14): ('funct3', Bits),
-    (15, 19): ('rs1', Bits),
-    (20, 24): ('rs2', Bits),
-    (25, 31): ('imm11_5', Bits),
-})
+    def __init__(self, rd, rs1, rs2, funct3, funct7, fields):
+        self.fields = fields.copy()
+        for cond, entry in zip([True, rd, rs1, rs2, funct3, funct7], self.FIELDS):
+            key, field, ty = entry
+            setattr(self, f'has_{field}', cond)
+            if cond:
+                self.fields[key] = (field, ty)
+        self.dtype = Record(self.fields)
+        self.value = None
 
-rv_u_type = Record({
-    (0, 6): ('opcode', Bits),
-    (7, 11): ('rd', Bits),
-    (12, 31): ('imm', Bits),
-})
+    def view(self):
+        return self.dtype.view(self.value)
 
-rv_b_type = Record({
-    (0, 6): ('opcode', Bits),
-    (7, 7): ('imm11', Bits),
-    (8, 11): ('imm4_1', Bits),
-    (12, 14): ('funct3', Bits),
-    (15, 19): ('rs1', Bits),
-    (20, 24): ('rs2', Bits),
-    (25, 30): ('imm10_5', Bits),
-    (31, 31): ('imm12', Bits),
-})
+class RInst(InstType):
 
+    PREFIX = 'r'
+
+    def __init__(self, value):
+        super().__init__(True, True, True, True, True, {})
+        self.value = value
+
+    def imm(self, pad):
+        return None
+
+class IInst(InstType):
+
+    PREFIX = 'i'
+
+    def __init__(self, value):
+        super().__init__(True, True, False, True, False, { (20, 31): ('imm', Bits) })
+        self.value = value
+
+    def imm(self, pad):
+        raw = self.view().imm
+        if pad:
+            raw = concat(Bits(20)(0), raw)
+        return raw
+
+class SInst(InstType):
+
+    PREFIX = 's'
+
+    def __init__(self, value):
+        fields = { (25, 31): ('imm11_5', Bits), (7, 11): ('imm4_0', Bits) }
+        super().__init__(False, True, True, True, False, fields)
+        self.value = value
+
+    def imm(self, pad):
+        imm = self.view().imm11_5.concat(self.view().imm4_0)
+        if pad:
+            imm = concat(Bits(20)(0), imm)
+        return imm
+
+class UInst(InstType):
+
+    PREFIX = 'u'
+
+    def __init__(self, value):
+        super().__init__(True, False, False, False, False, { (12, 31): ('imm', Bits) })
+        self.value = value
+
+    def imm(self, pad):
+        raw = self.view().imm
+        if pad:
+            raw = concat(Bits(12)(0), raw)
+        return raw
+
+class BInst(InstType):
+
+    PREFIX = 'b'
+
+    def __init__(self, value):
+        fields = {
+            (7, 7): ('imm11', Bits),
+            (8, 11): ('imm4_1', Bits),
+            (25, 30): ('imm10_5', Bits),
+            (31, 31): ('imm12', Bits),
+        }
+        super().__init__(False, True, True, True, False, fields)
+        self.value = value
+
+    def imm(self, pad):
+        imm = concat(self.view().imm12, self.view().imm11, self.view().imm10_5, self.view().imm4_1)
+        imm = imm.concat(Bits(1)(0))
+        if pad:
+            imm = concat(Bits(19)(0), imm)
+        return imm
 
 supported_opcodes = [
   # mn,     opcode,    type
-  ('lui'   , 0b0110111, rv_u_type),
-  ('addi'  , 0b0010011, rv_i_type),
-  ('add'   , 0b0110011, rv_r_type),
-  ('lw'    , 0b0000011, rv_i_type),
-  ('bne'   , 0b1100011, rv_b_type),
-  ('ret'   , 0b1101111, rv_u_type),
-  ('ebreak', 0b1110011, rv_i_type),
+  ('lui'   , 0b0110111, UInst),
+  ('addi'  , 0b0010011, IInst),
+  ('add'   , 0b0110011, RInst),
+  ('lw'    , 0b0000011, IInst),
+  ('bne'   , 0b1100011, BInst),
+  ('ret'   , 0b1101111, UInst),
+  ('ebreak', 0b1110011, IInst),
 ]
 
 deocder_signals = Record(
@@ -75,81 +130,90 @@ deocder_signals = Record(
   imm_value=Bits(32),
 )
 
-def decode_logic(inst):
-    r_inst = rv_r_type.view(inst)
-    i_inst = rv_i_type.view(inst)
-    s_inst = rv_s_type.view(inst)
-    b_inst = rv_b_type.view(inst)
-    u_inst = rv_u_type.view(inst)
+supported_types = [RInst, IInst, SInst, BInst, UInst]
 
-    i_imm = Bits(20)(0).concat(i_inst.imm)
-    u_imm = Bits(12)(0).concat(u_inst.imm)
-    s_imm_raw = concat(s_inst.imm11_5, s_inst.imm4_0)
-    s_imm = Bits(20)(0).concat(s_imm_raw)
-    b_imm_raw = concat(b_inst.imm12, b_inst.imm11, b_inst.imm10_5, b_inst.imm4_1)
-    b_imm = concat(Bits(19)(0), b_imm_raw, Bits(1)(0))
+def decode_logic(inst):
+
+    views = {i: i(inst) for i in supported_types}
+    is_type = {i: Bits(1)(0) for i in supported_types}
 
     eqs = {}
 
-    inst_types = {
-       rv_r_type: Bits(1)(0),
-       rv_i_type: Bits(1)(0),
-       rv_s_type: Bits(1)(0),
-       rv_b_type: Bits(1)(0),
-       rv_u_type: Bits(1)(0)
-    }
+    rd_valid = Bits(1)(0)
+    rs1_valid = Bits(1)(0)
+    rs2_valid = Bits(1)(0)
+    imm_valid = Bits(1)(0)
 
     # Check if the given instruction's opcode equals one of the supported opcodes
     for mn, opcode, cur_type in supported_opcodes:
+
+        ri = views[cur_type]
         wrapped_opcode = Bits(7)(opcode)
-        eq = r_inst.opcode == wrapped_opcode
+        eq = ri.view().opcode == wrapped_opcode
+        is_type[cur_type] = is_type[cur_type] | eq
         eqs[mn] = eq
-        inst_types[cur_type] = inst_types[cur_type] | eq
 
         pad = 6 - len(mn)
         pad = ' ' * pad
 
-        if cur_type is rv_r_type:
-            with Condition(eq):
-                log(f"r.{mn}.{{:07b}}{pad} | rd: x{{:02}}      | rs1: x{{:02}}      | rs2: x{{:02}}      |", wrapped_opcode, r_inst.rd, r_inst.rs1, r_inst.rs2)
 
-        if cur_type is rv_i_type:
-            with Condition(eq):
-                log(f"i.{mn}.{{:07b}}{pad} | rd: x{{:02}}      | rs1: x{{:02}}      |                 | imm: 0x{{:x}}", wrapped_opcode, i_inst.rd, i_inst.rs1, i_imm)
+        fmt = None
+        str_opcode = bin(opcode)[2:]
+        str_opcode = (7 - len(str_opcode)) * '0' + str_opcode
+        fmt = f"{cur_type.PREFIX}.{mn}.{str_opcode}{pad} "
 
-        if cur_type is rv_s_type:
-            with Condition(eq):
-                log(f"s.{mn}.{{:07b}}{pad} |                | rs1: x{{:02}}      | rs2: x{{:02}}      | imm: 0x{{:x}}", wrapped_opcode, s_inst.rs1, s_inst.rs2, s_imm)
+        args = []
 
-        if cur_type is rv_u_type:
-            with Condition(eq):
-                log(f"u.{mn}.{{:07b}}{pad} | rd: x{{:02}}      |               |                 | imm: 0x{{:x}}", wrapped_opcode, u_inst.rd, u_imm)
+        if ri.has_rd:
+            fmt = fmt + "| rd: x{:02}      "
+            args.append(ri.view().rd)
+            rd_valid = rd_valid | eq
+        else:
+            fmt = fmt + '|               '
 
-        if cur_type is rv_b_type:
-            with Condition(eq):
-                log(f"b.{mn}.{{:07b}}{pad} |              | rs1: x{{:02}}      | rs2: x{{:02}}      | imm: 0x{{:x}}", wrapped_opcode, b_inst.rs1, b_inst.rs2, b_imm)
+        if ri.has_rs1:
+            fmt = fmt + "| rs1: x{:02}      "
+            args.append(ri.view().rs1)
+            rs1_valid = rs1_valid | eq
+        else:
+            fmt = fmt + '|               '
+
+        if ri.has_rs2:
+            fmt = fmt + "| rs2: x{:02}      "
+            args.append(ri.view().rs2)
+            rs2_valid = rs2_valid | eq
+        else:
+            fmt = fmt + '|               '
+
+        imm = ri.imm(False)
+        if imm is not None:
+            fmt = fmt + "|imm: 0x{:x}"
+            args.append(imm)
 
 
-    # Extract all the instruction types
-    is_r_type, is_i_type, is_s_type, is_b_type, is_u_type = inst_types[rv_r_type], inst_types[rv_i_type], inst_types[rv_s_type], inst_types[rv_b_type], inst_types[rv_u_type]
+        with Condition(eq):
+            log(fmt, *args)
+
+
     # Extract all the signals
     memory_read = eqs['lw']
     invoke_adder = eqs['addi'] | eqs['add'] | eqs['lw'] | eqs['bne']
     is_branch = eqs['bne'] | eqs['ret'] | eqs['ebreak']
     # Extract all the operands according to the instruction types
-    # rs1
-    rs1_valid = is_r_type | is_i_type | is_s_type | is_b_type
-    rs1_reg = rs1_valid.select(r_inst.rs1, Bits(5)(0))
-    # rs2
-    rs2_valid = is_r_type | is_s_type | is_b_type
-    rs2_reg = rs2_valid.select(r_inst.rs2, Bits(5)(0))
     # rd
-    rd_valid = is_r_type | is_i_type | is_u_type
-    rd_reg = rd_valid.select(r_inst.rd, Bits(5)(0))
+    rd_reg = rd_valid.select(views[RInst].view().rd, Bits(5)(0))
+    # rs1
+    rs1_reg = rs1_valid.select(views[RInst].view().rs1, Bits(5)(0))
+    # rs2
+    rs2_reg = rs2_valid.select(views[RInst].view().rs2, Bits(5)(0))
     # imm
-    imm_valid = is_i_type | is_u_type | is_s_type | is_b_type
-    imm_value = is_i_type.select(i_imm, is_u_type.select(u_imm, is_s_type.select(s_imm, b_imm)))
-    imm_value = eqs['lui'].select(u_inst.imm.concat(Bits(12)(0)), imm_value)
+    imm_valid = is_type[IInst] | is_type[UInst] | is_type[SInst] | is_type[BInst]
+    imm_value = Bits(32)(0)
+    for i in supported_types:
+        new_imm = views[i].imm(True)
+        if new_imm is not None:
+            imm_value = is_type[i].select(new_imm, imm_value)
+    imm_value = eqs['lui'].select(views[UInst].imm(False).concat(Bits(12)(0)), imm_value)
 
     return deocder_signals.bundle(
         memory_read=memory_read,

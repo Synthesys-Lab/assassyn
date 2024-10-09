@@ -77,6 +77,8 @@ class BinaryOp(Expr):
     }
 
     def __init__(self, opcode, lhs, rhs):
+        assert isinstance(lhs, Value), f'{type(lhs)} is not a Value!'
+        assert isinstance(rhs, Value), f'{type(rhs)} is not a Value!'
         super().__init__(opcode)
         self.lhs = lhs
         self.rhs = rhs
@@ -368,6 +370,9 @@ class Select(Expr):
     SELECT = 1000
 
     def __init__(self, opcode, cond, true_val, false_val):
+        assert isinstance(cond, Value), f'{type(cond)} is not a Value!'
+        assert isinstance(true_val, Value), f'{type(true_val)} is not a Value!'
+        assert isinstance(false_val, Value), f'{type(false_val)} is not a Value!'
         super().__init__(opcode)
         self.cond = cond
         self.true_value = true_val
