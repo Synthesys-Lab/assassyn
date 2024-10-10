@@ -4,73 +4,15 @@ use crate::builder::SysBuilder;
 
 use super::{node::BaseNode, DataType, Typed};
 
-use std::ops::RangeInclusive;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct MemoryParams {
-  pub width: usize,
-  pub depth: usize,
-  pub lat: RangeInclusive<usize>,
-  pub init_file: Option<String>,
-  pub module: BaseNode,
-}
-
-impl Default for MemoryParams {
-  fn default() -> Self {
-    Self {
-      width: 0,
-      depth: 0,
-      lat: 1..=1,
-      init_file: None,
-      module: BaseNode::unknown(),
-    }
-  }
-}
-
-impl MemoryParams {
-  pub fn new(
-    width: usize,
-    depth: usize,
-    lat: RangeInclusive<usize>,
-    init_file: Option<String>,
-    module: BaseNode,
-  ) -> Self {
-    Self {
-      width,
-      depth,
-      lat,
-      init_file,
-      module,
-    }
-  }
-
-  pub fn is_sram(&self) -> bool {
-    return self.lat.start().eq(&1) && self.lat.end().eq(&1);
-  }
-
-  pub fn to_string(&self, sys: &SysBuilder) -> String {
-    format!(
-      "width: {}, depth: {}, lat: [{:?}], file: {}, module: {}",
-      self.width,
-      self.depth,
-      self.lat,
-      self.init_file.clone().map_or("None".to_string(), |x| x),
-      self.module.to_string(sys)
-    )
-  }
-}
-
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ArrayAttr {
   FullyPartitioned,
-  MemoryParams(MemoryParams),
 }
 
 impl ArrayAttr {
-  pub fn to_string(&self, sys: &SysBuilder) -> String {
+  pub fn to_string(&self, _: &SysBuilder) -> String {
     match self {
       ArrayAttr::FullyPartitioned => "FullyPartitioned".into(),
-      ArrayAttr::MemoryParams(params) => format!("MemoryParams({})", params.to_string(sys)),
     }
   }
 }

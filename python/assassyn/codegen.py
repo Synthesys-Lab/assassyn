@@ -139,6 +139,29 @@ class CodeGen(visitor.Visitor):
         if m.no_arbiter:
             self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
 
+
+    def emit_memory_attrs(self, m: module.SRAM, var_id):
+        if isinstance(m, module.SRAM):
+            module_mut = f'{var_id}.as_mut::<assassyn::ir::Module>(&mut sys).unwrap()'
+            path = 'assassyn::ir::module::Attribute'
+            # (width, depth, init_file, we, re, addr, wdata)
+            params = ['assassyn::ir::module::attrs::MemoryParams::new(']
+            params.append(f'{m.width}, // width')
+            params.append(f'{m.depth}, // depth')
+            params.append(f'1..=1, // lat')
+            if m.init_file is not None:
+                params.append(f'Some("{m.init_file}".into()), // init-file')
+            else:
+                params.append('None, // init-file')
+            params.append(f'{self.generate_rval(m.payload)}, // array')
+            params.append(f'{self.generate_rval(m.re)}, // re')
+            params.append(f'{self.generate_rval(m.we)}, // we')
+            params.append(f'{self.generate_rval(m.addr)}, // addr')
+            params.append(f'{self.generate_rval(m.wdata)}, // wdata')
+            params.append(')')
+            params = '\n'.join(params)
+            self.code.append(f'{module_mut}.add_attr({path}::MemoryParams({params}));')
+
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''
         idle_threshold = f'idle_threshold: {self.idle_threshold}'
@@ -210,6 +233,8 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'  // Module {elem.name}')
             var = self.generate_rval(elem)
             self.code.append(f'  sys.set_current_module({var});')
+            # FIXME(@were): This is a hack to emit memory parameters, it should be generalized
+            self.emit_memory_attrs(elem, var)
             self.visit_module(elem)
 
         config = self.emit_config()
@@ -384,17 +409,8 @@ class CodeGen(visitor.Visitor):
             if attr == Array.FULLY_PARTITIONED:
                 attrs.append(f'{path}::FullyPartitioned')
             elif isinstance(attr, module.SRAM):
-                # (width, depth, init_file, we, re, addr, wdata)
-                params = ['assassyn::ir::array::MemoryParams {']
-                params.append(f'width: {attr.width},')
-                params.append(f'depth: {attr.depth},')
-                if attr.init_file is not None:
-                    params.append(f'init_file: Some("{attr.init_file}".into()),')
-                params.append(f'module: {self.generate_rval(attr)},')
-                params.append('..Default::default()')
-                params.append('}')
-                params = '\n'.join(params)
-                attrs.append(f'{path}::MemoryParams({params})')
+                # Skip this, this is handled in the module attributes
+                pass
             else:
                 assert False, f'Unsupported memory attribute {attr}'
         return ', '.join(attrs)

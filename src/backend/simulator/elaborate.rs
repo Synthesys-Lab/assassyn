@@ -646,12 +646,13 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   fd.write_all("];\n".as_bytes())?;
 
   // generate memory initializations
-  for array in sys.array_iter() {
-    for attr in array.get_attrs() {
-      if let ArrayAttr::MemoryParams(mp) = attr {
+  for m in sys.module_iter(ModuleKind::Downstream) {
+    for attr in m.get_attrs() {
+      if let module::Attribute::MemoryParams(mp) = attr {
         if let Some(init_file) = &mp.init_file {
           let init_file_path = config.resource_base.join(init_file);
           let init_file_path = init_file_path.to_str().unwrap();
+          let array = mp.array.as_ref::<Array>(sys).unwrap();
           let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
           fd.write_all(
             quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }

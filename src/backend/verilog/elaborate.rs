@@ -454,14 +454,14 @@ module top (
     // FIXME(@were): Fix the memory initialization.
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new();
     // array -> init_file_path
-    for array in self.sys.array_iter() {
-      for attr in array.get_attrs() {
-        if let ArrayAttr::MemoryParams(mp) = attr {
+    for m in self.sys.module_iter(ModuleKind::Downstream) {
+      for attr in m.get_attrs() {
+        if let module::Attribute::MemoryParams(mp) = attr {
           if let Some(init_file) = &mp.init_file {
             let mut init_file_path = self.config.resource_base.clone();
             init_file_path.push(init_file);
             let init_file_path = init_file_path.to_str().unwrap();
-            mem_init_map.insert(array.upcast(), init_file_path.to_string());
+            mem_init_map.insert(mp.array, init_file_path.to_string());
           }
         }
       }
