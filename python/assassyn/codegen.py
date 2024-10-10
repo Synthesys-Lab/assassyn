@@ -141,26 +141,28 @@ class CodeGen(visitor.Visitor):
 
 
     def emit_memory_attrs(self, m: module.SRAM, var_id):
+        '''Emit the memory attributes only for downstream modules'''
         if isinstance(m, module.SRAM):
             module_mut = f'{var_id}.as_mut::<assassyn::ir::Module>(&mut sys).unwrap()'
-            path = 'assassyn::ir::module::Attribute'
+            path = 'assassyn::ir::module'
             # (width, depth, init_file, we, re, addr, wdata)
-            params = ['assassyn::ir::module::attrs::MemoryParams::new(']
+            params = [f'{path}::attrs::MemoryParams::new(']
             params.append(f'{m.width}, // width')
             params.append(f'{m.depth}, // depth')
-            params.append(f'1..=1, // lat')
+            params.append('1..=1, // lat')
             if m.init_file is not None:
                 params.append(f'Some("{m.init_file}".into()), // init-file')
             else:
                 params.append('None, // init-file')
+            params.append(f'{path}::attrs::MemoryPins::new(')
             params.append(f'{self.generate_rval(m.payload)}, // array')
             params.append(f'{self.generate_rval(m.re)}, // re')
             params.append(f'{self.generate_rval(m.we)}, // we')
             params.append(f'{self.generate_rval(m.addr)}, // addr')
             params.append(f'{self.generate_rval(m.wdata)}, // wdata')
-            params.append(')')
+            params.append('))')
             params = '\n'.join(params)
-            self.code.append(f'{module_mut}.add_attr({path}::MemoryParams({params}));')
+            self.code.append(f'{module_mut}.add_attr({path}::Attribute::MemoryParams({params}));')
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''

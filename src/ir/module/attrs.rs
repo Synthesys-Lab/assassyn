@@ -10,12 +10,39 @@ pub struct MemoryParams {
   pub depth: usize,
   pub lat: RangeInclusive<usize>,
   pub init_file: Option<String>,
-  // Pins for memory module.
+  pub pins: MemoryPins,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MemoryPins {
   pub array: BaseNode,
   pub re: BaseNode,
   pub we: BaseNode,
   pub addr: BaseNode,
   pub wdata: BaseNode,
+}
+
+impl MemoryPins {
+  pub fn new(array: BaseNode, re: BaseNode, we: BaseNode, addr: BaseNode, wdata: BaseNode) -> Self {
+    Self {
+      array,
+      re,
+      we,
+      addr,
+      wdata,
+    }
+  }
+
+  pub fn to_string(&self, sys: &SysBuilder) -> String {
+    format!(
+      "(.array({}), .re({}), .we({}), .addr({}), .wdata({}))",
+      self.array.to_string(sys),
+      self.re.to_string(sys),
+      self.we.to_string(sys),
+      self.addr.to_string(sys),
+      self.wdata.to_string(sys),
+    )
+  }
 }
 
 impl MemoryParams {
@@ -24,22 +51,14 @@ impl MemoryParams {
     depth: usize,
     lat: RangeInclusive<usize>,
     init_file: Option<String>,
-    array: BaseNode,
-    re: BaseNode,
-    we: BaseNode,
-    addr: BaseNode,
-    wdata: BaseNode,
+    pins: MemoryPins,
   ) -> Self {
     Self {
       width,
       depth,
       lat,
       init_file,
-      array,
-      re,
-      we,
-      addr,
-      wdata,
+      pins,
     }
   }
 
@@ -49,16 +68,12 @@ impl MemoryParams {
 
   pub fn to_string(&self, sys: &SysBuilder) -> String {
     format!(
-      "width: {}, depth: {}, lat: [{:?}], file: {}, array: {} (.we({}), .re({}), .addr({}), .wdata({}))",
+      "width: {}, depth: {}, lat: [{:?}], file: {}, pins: {}",
       self.width,
       self.depth,
       self.lat,
       self.init_file.clone().map_or("None".to_string(), |x| x),
-      self.array.to_string(sys),
-      self.we.to_string(sys),
-      self.re.to_string(sys),
-      self.addr.to_string(sys),
-      self.wdata.to_string(sys),
+      self.pins.to_string(sys),
     )
   }
 }

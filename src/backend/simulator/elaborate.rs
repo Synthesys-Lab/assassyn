@@ -652,7 +652,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
         if let Some(init_file) = &mp.init_file {
           let init_file_path = config.resource_base.join(init_file);
           let init_file_path = init_file_path.to_str().unwrap();
-          let array = mp.array.as_ref::<Array>(sys).unwrap();
+          let array = mp.pins.array.as_ref::<Array>(sys).unwrap();
           let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
           fd.write_all(
             quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }

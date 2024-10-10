@@ -461,7 +461,7 @@ module top (
             let mut init_file_path = self.config.resource_base.clone();
             init_file_path.push(init_file);
             let init_file_path = init_file_path.to_str().unwrap();
-            mem_init_map.insert(mp.array, init_file_path.to_string());
+            mem_init_map.insert(mp.pins.array, init_file_path.to_string());
           }
         }
       }
