@@ -90,7 +90,26 @@ impl Visitor<String> for IRPrinter {
   }
 
   fn visit_array(&mut self, array: ArrayRef<'_>) -> Option<String> {
-    format!("Array: {}[{} x {}]", array.get_name(), array.get_size(), array.scalar_ty(),).into()
+    let mut res = String::new();
+    let attrs = array
+      .get_attrs()
+      .iter()
+      .map(|x| x.to_string(array.sys))
+      .collect::<Vec<_>>()
+      .join(", ");
+    if !attrs.is_empty() {
+      res.push_str(&format!("#[{}]\n", attrs));
+    }
+    if !res.is_empty() {
+      res.push_str("  ");
+    }
+    res.push_str(&format!(
+      "Array: {}[{} x {}]",
+      array.get_name(),
+      array.get_size(),
+      array.scalar_ty(),
+    ));
+    Some(res)
   }
 
   fn visit_int_imm(&mut self, int_imm: IntImmRef<'_>) -> Option<String> {

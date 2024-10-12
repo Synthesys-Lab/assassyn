@@ -38,15 +38,11 @@ impl Operand {
   }
 }
 
-struct Verifier {
-  in_wait_until_cond: bool,
-}
+struct Verifier {}
 
 impl Verifier {
   fn new() -> Self {
-    Self {
-      in_wait_until_cond: false,
-    }
+    Self {}
   }
 }
 
@@ -59,13 +55,6 @@ impl Visitor<()> for Verifier {
   }
 
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
-    if !matches!(expr.get_opcode(), Opcode::Log) && self.in_wait_until_cond {
-      assert!(
-        !expr.get_opcode().has_side_effect(),
-        "WaitUntil operations should have no side effects, but {:?} found!",
-        expr.get_opcode()
-      );
-    }
     for user in expr.users().iter() {
       let operand = user.as_ref::<Operand>(expr.sys).unwrap();
       assert!(operand.get_value().eq(&expr.upcast()));

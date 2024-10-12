@@ -7,42 +7,40 @@ from assassyn.expr import Bind
 
 class Sub(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.sub_a = Port(Int(32))
-        self.sub_b = Port(Int(32))
-
-    @module.wait_until
-    def wait_until(self):
-        a_valid = self.sub_a.valid()
-        b_valid = self.sub_b.valid()
-        both_valid = a_valid & b_valid
-        return both_valid
+        super().__init__(ports={
+            'a': Port(Int(32)),
+            'b': Port(Int(32)),
+        })
 
     @module.combinational
     def build(self):
-        c = self.sub_a - self.sub_b
-        log("sub: {} - {} = {}", self.sub_a, self.sub_b, c);
+        a_valid = self.a.valid()
+        b_valid = self.b.valid()
+        both_valid = a_valid & b_valid
+        wait_until(both_valid)
+        a, b = self.pop_all_ports(False)
+        c = a - b
+        log("sub: {} - {} = {}", a, b, c);
 
 
 class Lhs(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
-        self.v = Port(Int(32))
+        super().__init__({
+            'v': Port(Int(32)),
+        })
 
     @module.combinational
     def build(self, sub: Sub):
-        rhs = sub.bind(sub_a = self.v)
+        v = self.pop_all_ports(True)
+        rhs = sub.bind(a = v)
         return rhs
 
 class Driver(Module):
     
-        @module.constructor
         def __init__(self):
-            super().__init__()
+            super().__init__(ports={})
 
         @module.combinational
         def build(self, rhs: Bind, lhs: Lhs):
@@ -52,7 +50,7 @@ class Driver(Module):
             cnt[0] = v
             vv = v + v
             lhs.async_called(v = vv)
-            rhs.async_called(sub_b = v)
+            rhs.async_called(b = v)
  
 
 def check(raw):
@@ -72,7 +70,6 @@ def test_fifo_valid():
     sys = SysBuilder('fifo_valid')
     with sys:
         sub = Sub()
-        sub.wait_until()
         sub.build()
         
         lhs = Lhs()

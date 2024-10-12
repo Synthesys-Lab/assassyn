@@ -5,11 +5,11 @@ from assassyn.backend import elaborate
 from assassyn import utils
 
 class Peeker(Module):
-    
-    @module.constructor
+     
     def __init__(self):
-        super().__init__(explicit_fifo=True)
-        self.data = Port(Int(32))
+        super().__init__(
+            ports={'data': Port(Int(32))}, 
+        )
 
     @module.combinational
     def build(self):
@@ -20,10 +20,9 @@ class Peeker(Module):
         
 class Driver(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__()
-
+            super().__init__(ports={})
+            
     @module.combinational
     def build(self, peeker: Module):
         cnt = RegArray(Int(32), 1)

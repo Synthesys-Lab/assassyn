@@ -6,9 +6,9 @@ from assassyn import utils
 
 class Driver(Module):
     
-    @module.constructor
     def __init__(self):
-        super().__init__(disable_arbiter_rewrite=True)
+            super().__init__(ports={},no_arbiter=True,)
+        
         
     @module.combinational
     def build(self):

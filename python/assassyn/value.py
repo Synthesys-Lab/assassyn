@@ -3,94 +3,94 @@
 
 from .builder import ir_builder
 
-#pylint: disable=import-outside-toplevel
+#pylint: disable=import-outside-toplevel,cyclic-import
 
 class Value:
     '''Base class for overloading arithmetic operations in the frontend'''
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __add__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.ADD, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __sub__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.SUB, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __mul__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.MUL, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __or__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.BITWISE_OR, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __xor__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.BITWISE_XOR, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __and__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.BITWISE_AND, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __getitem__(self, x):
         from .expr import Slice
         if isinstance(x, slice):
             return Slice(self, int(x.start), int(x.stop))
         assert False, "Expecting a slice object"
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __lt__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.ILT, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __gt__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.IGT, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __le__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.ILE, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __ge__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.IGE, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __eq__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.EQ, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __ne__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.NEQ, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __mod__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.MOD, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __invert__(self):
         from .expr import UnaryOp
         return UnaryOp(UnaryOp.FLIP, self)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __lshift__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.SHL, self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __rshift__(self, other):
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.SHR, self, other)
@@ -106,43 +106,50 @@ class Value:
         assert isinstance(predicate, Value), "Expecting a Value object"
         return predicate.select(self, default)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def bitcast(self, dtype):
         '''The frontend API to create a bitcast operation'''
         from .expr import Cast
         return Cast(Cast.BITCAST, self, dtype)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def zext(self, dtype):
         '''The frontend API to create a zero-extend operation'''
         from .expr import Cast
         return Cast(Cast.ZEXT, self, dtype)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def sext(self, dtype):
         '''The frontend API to create a sign-extend operation'''
         from .expr import Cast
         return Cast(Cast.SEXT, self, dtype)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def concat(self, other):
+        #pylint: disable=no-member
         '''The frontend API to create a bitwise-concat operation'''
         from .expr import Concat
+        from .const import Const
+        from .dtype import Bits
+        if isinstance(self, Const) and isinstance(other, Const):
+            shift = other.dtype.bits
+            return Bits(shift + self.dtype.bits)((self.value << shift) | other.value)
+
         return Concat(self, other)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def select(self, true_value, false_value):
         '''The frontend API to create a select operation'''
         from .expr import Select
         return Select(Select.SELECT, self, true_value, false_value)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def select1hot(self, *args):
         '''The frontend API to create a select1hot operation'''
         from .expr import Select1Hot
         return Select1Hot(Select1Hot.SELECT_1HOT, self, args)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def valid(self):
         '''The frontend API to check if this value is valid.
         NOTE: This operation is only usable in downstream modules.'''

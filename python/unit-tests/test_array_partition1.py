@@ -6,11 +6,10 @@ from assassyn import utils
 
 
 class Driver(Module):
-    
-    @module.constructor
+     
     def __init__(self):
-        super().__init__(explicit_fifo=True)
-    
+        super().__init__(ports={})
+
     @module.combinational
     def build(self):
         a = RegArray(Int(32), 4, attr=[Array.FULLY_PARTITIONED], initializer=[1, 2, 3, 4])

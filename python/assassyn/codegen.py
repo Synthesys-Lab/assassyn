@@ -8,7 +8,7 @@ from . import block
 from . import const
 from .builder import SysBuilder
 from .array import Array
-from .module import Module, Port, Memory
+from .module import Module, Port
 from .block import Block
 from .expr import Expr
 from .utils import identifierize
@@ -74,10 +74,6 @@ CG_MIDFIX = {
     expr.PureInstrinsic.FIFO_VALID: 'fifo',
 }
 
-CG_ARRAY_ATTR = {
-    Array.FULLY_PARTITIONED: 'FullyPartitioned',
-}
-
 CG_SIMULATOR = {
     'verilator': 'Verilator',
     'vcs': 'VCS',
@@ -98,7 +94,9 @@ def generate_dtype(ty: dtype.DType):
         return f'{prefix}::int_ty({ty.bits})'
     if isinstance(ty, dtype.UInt):
         return f'{prefix}::uint_ty({ty.bits})'
-    assert isinstance(ty, dtype.Bits), f'{ty} is given'
+    if isinstance(ty, dtype.Bits):
+        return f'{prefix}::bits_ty({ty.bits})'
+    assert isinstance(ty, dtype.Record), 'Expecting a record type, but got {ty}'
     return f'{prefix}::bits_ty({ty.bits})'
 
 def generate_init_value(init_value, ty: dtype.DType):
@@ -138,20 +136,33 @@ class CodeGen(visitor.Visitor):
         path = 'assassyn::ir::module::Attribute'
         if m.is_systolic:
             self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
-        if m.disable_arbiter_rewrite:
+        if m.no_arbiter:
             self.code.append(f'{module_mut}.add_attr({path}::NoArbiter);')
-        if isinstance(m, Memory):
-            width = f'width: {m.width}'
-            depth = f'depth: {m.depth}'
-            lat = f'lat: {m.latency[0]}..={m.latency[1]}'
+
+
+    def emit_memory_attrs(self, m: module.SRAM, var_id):
+        '''Emit the memory attributes only for downstream modules'''
+        if isinstance(m, module.SRAM):
+            module_mut = f'{var_id}.as_mut::<assassyn::ir::Module>(&mut sys).unwrap()'
+            path = 'assassyn::ir::module'
+            # (width, depth, init_file, we, re, addr, wdata)
+            params = [f'{path}::attrs::MemoryParams::new(']
+            params.append(f'{m.width}, // width')
+            params.append(f'{m.depth}, // depth')
+            params.append('1..=1, // lat')
             if m.init_file is not None:
-                init_file = f'init_file: Some("{m.init_file}".into())'
+                params.append(f'Some("{m.init_file}".into()), // init-file')
             else:
-                init_file = 'init_file: None'
-            array = f'array: {m.payload.name}'
-            params = ', '.join([width, depth, lat, init_file, array])
-            params = f'assassyn::ir::module::memory::MemoryParams{{ {params} }}'
-            self.code.append(f'{module_mut}.add_attr({path}::Memory({params}));')
+                params.append('None, // init-file')
+            params.append(f'{path}::attrs::MemoryPins::new(')
+            params.append(f'{self.generate_rval(m.payload)}, // array')
+            params.append(f'{self.generate_rval(m.re)}, // re')
+            params.append(f'{self.generate_rval(m.we)}, // we')
+            params.append(f'{self.generate_rval(m.addr)}, // addr')
+            params.append(f'{self.generate_rval(m.wdata)}, // wdata')
+            params.append('))')
+            params = '\n'.join(params)
+            self.code.append(f'{module_mut}.add_attr({path}::Attribute::MemoryParams({params}));')
 
     def emit_config(self):
         '''Emit the configuration fed to the generated simulator'''
@@ -193,18 +204,22 @@ class CodeGen(visitor.Visitor):
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
         self.code.append(
                 '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
-        self.code.append('  // TODO: Support initial values')
-        self.code.append('  // TODO: Support array attributes')
-        for elem in node.arrays:
-            self.visit_array(elem)
+        self.code.append('  // Declare modules')
         for elem in node.modules:
             lval = elem.as_operand()
             name = elem.name.lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
             self.code.append(f'  let {lval} = sys.create_module("{name}", vec![{ports}]);')
             self.emit_module_attrs(elem, lval)
+        self.code.append('  // Declare downstream modules')
+        for elem in node.downstreams:
+            var = self.generate_rval(elem)
+            self.code.append(f'  let {var} = sys.create_downstream("{elem.name}");')
+        self.code.append('  // declare arrays')
+        for elem in node.arrays:
+            self.visit_array(elem)
         self.code.append('  // Gathered binds')
-        for elem in node.modules:
+        for elem in node.modules + node.downstreams:
             bind_emitter = EmitBinds(self)
             name = self.generate_rval(elem)
             self.code.append('  // Set the current module redundantly to emit related binds')
@@ -215,11 +230,13 @@ class CodeGen(visitor.Visitor):
 
         self.finalize_bind()
 
+        self.code.append('  // Emit downstream modules')
         for elem in node.downstreams:
-            self.code.append('  // Emit downstream modules')
+            self.code.append(f'  // Module {elem.name}')
             var = self.generate_rval(elem)
-            self.code.append(
-                    f'  let {var} = sys.create_downstream("{elem.name}");')
+            self.code.append(f'  sys.set_current_module({var});')
+            # FIXME(@were): This is a hack to emit memory parameters, it should be generalized
+            self.emit_memory_attrs(elem, var)
             self.visit_module(elem)
 
         config = self.emit_config()
@@ -294,7 +311,7 @@ class CodeGen(visitor.Visitor):
 
     #pylint: disable=too-many-branches, too-many-locals, too-many-statements
     def visit_expr(self, node):
-        self.code.append(f'  // {node}')
+        self.code.append(f'  // {node}, {node.loc}')
         ib_method = opcode_to_ib(node)
         if node.is_binary():
             lhs = self.generate_rval(node.lhs)
@@ -386,13 +403,28 @@ class CodeGen(visitor.Visitor):
         self.code.append(res)
 
 
+    def generate_array_attr(self, node: Array):
+        '''Generate the array attributes for the given array'''
+        attrs = []
+        path = 'assassyn::ir::array::ArrayAttr'
+        for attr in node.attr:
+            if attr == Array.FULLY_PARTITIONED:
+                attrs.append(f'{path}::FullyPartitioned')
+            elif isinstance(attr, module.SRAM):
+                # Skip this, this is handled in the module attributes
+                pass
+            else:
+                assert False, f'Unsupported memory attribute {attr}'
+        return ', '.join(attrs)
+
+
     def visit_array(self, node: Array):
         name = node.name if f'{id(node)}' in node.name else self.generate_rval(node)
         size = node.size
         ty = generate_dtype(node.scalar_ty)
         init = self.generate_init_value(node.initializer, ty)
         self.code.append(f'  // {node}')
-        attrs = ', '.join(f'assassyn::ir::data::ArrayAttr::{CG_ARRAY_ATTR[i]}' for i in node.attr)
+        attrs = self.generate_array_attr(node)
         attrs = f'vec![{attrs}]'
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         self.code.append(array_decl)

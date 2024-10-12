@@ -1,9 +1,13 @@
-use std::{collections::HashSet, env, fs, path::PathBuf};
+use std::{
+  collections::{HashMap, HashSet},
+  env, fs,
+  path::PathBuf,
+};
 
 use crate::{
   builder::SysBuilder,
   ir::{
-    node::{BaseNode, ModuleRef},
+    node::{BaseNode, IsElement, ModuleRef},
     Expr,
   },
 };
@@ -79,12 +83,20 @@ pub(super) fn namify(name: &str) -> String {
   name.replace('.', "_")
 }
 
-pub(super) fn upstreams(m: &ModuleRef<'_>) -> HashSet<BaseNode> {
+pub(super) fn upstreams(m: &ModuleRef<'_>, topo: &HashMap<BaseNode, usize>) -> HashSet<BaseNode> {
   assert!(m.is_downstream());
   let mut res = HashSet::new();
+  let idx = *topo.get(&m.upcast()).unwrap();
   for (interf, _) in m.ext_interf_iter() {
     if let Ok(expr) = interf.as_ref::<Expr>(m.sys) {
-      res.insert(expr.get_block().get_module());
+      let extm = expr.get_block().get_module();
+      if let Some(tidx) = topo.get(&extm) {
+        if *tidx < idx {
+          res.insert(extm);
+        }
+      } else {
+        res.insert(extm);
+      }
     }
   }
   res

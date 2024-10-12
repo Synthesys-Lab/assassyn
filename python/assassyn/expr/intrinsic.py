@@ -38,8 +38,8 @@ class Intrinsic(Expr):
     def __exit__(self, exc_type, exc_value, traceback):
         return False
 
-@ir_builder(node_type='expr')
-def _wait_until(cond):
+@ir_builder
+def wait_until(cond):
     '''Frontend API for creating a wait-until block.'''
     #pylint: disable=import-outside-toplevel
     from ..value import Value
@@ -51,7 +51,7 @@ def is_wait_until(expr):
     '''Check if the expression is a wait-until intrinsic.'''
     return isinstance(expr, Intrinsic) and expr.opcode == Intrinsic.WAIT_UNTIL
 
-@ir_builder(node_type='expr')
+@ir_builder
 def finish():
     '''Finish the simulation.'''
     return Intrinsic(Intrinsic.FINISH)

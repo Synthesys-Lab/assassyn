@@ -13,7 +13,6 @@ def config( # pylint: disable=too-many-arguments
         resource_base=None,
         pretty_printer=True,
         verbose=True,
-        finalized=False,
         simulator=True,
         verilog=False,
         sim_threshold=100,
@@ -25,7 +24,6 @@ def config( # pylint: disable=too-many-arguments
         'resource_base': resource_base,
         'pretty_printer': pretty_printer,
         'verbose': verbose,
-        'finalized': finalized,
         'simulator': simulator,
         'verilog': verilog,
         'sim_threshold': sim_threshold,
@@ -71,7 +69,6 @@ def elaborate( # pylint: disable=too-many-arguments
         resource_base=None,
         pretty_printer=True,
         verbose=True,
-        finalized=False,
         simulator=True,
         verilog=False,
         idle_threshold=100,
@@ -85,16 +82,12 @@ def elaborate( # pylint: disable=too-many-arguments
         path (Path): The directory where the Rust project will be dumped.
         pretty_printer (bool): Whether to run the Rust code formatter.
         verbose (bool): Whether dump the IR of the system to be elaborated.
-        finalized (bool): Whether the system is finalized before feeding to this API.
         simulator (bool): Whether to generate the Rust code for the simulator.
         verilog (bool): Whether to generate the SystemVerilog code.
         idle_threshold (int): The threshold for the idle state to terminate the simulation.
         sim_threshold (int): The threshold for the simulation to terminate.
         **kwargs: The optional arguments that will be passed to the code generator.
     '''
-
-    if not finalized:
-        sys.finalize()
 
     if verbose:
         print(sys)

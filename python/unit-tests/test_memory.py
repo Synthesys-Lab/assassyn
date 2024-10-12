@@ -4,47 +4,44 @@ from assassyn import backend
 from assassyn import utils
 
 
-class SRAM(Memory):
+class MemUser(Module):
 
-    @module.constructor
-    def __init__(self, init_file, width):
-        super().__init__(width=width, depth=1024, latency=(1, 1), init_file=init_file)
+    def __init__(self, width):
+        super().__init__(
+            ports={'rdata': Port(Bits(width))}, 
+        )
 
     @module.combinational
-    def build(self, width):
-        super().build()
-        read = ~self.we
-        with Condition(read):
-            rdata = self.rdata.bitcast(Int(width))
-            k = Int(width)(128)
-            delta = rdata + k
-            log('{} + {} = {}', rdata, k, delta)
-
-    @module.wait_until
-    def wait_until(self):
-        return self.validate_all_ports()
+    def build(self):
+        width = self.rdata.dtype.bits
+        rdata = self.pop_all_ports(False)
+        rdata = rdata.bitcast(Int(width))
+        k = Int(width)(128)
+        delta = rdata + k
+        log('{} + {} = {}', rdata, k, delta)
 
 
 class Driver(Module):
 
-    @module.constructor
     def __init__(self):
-        super().__init__()
+        super().__init__(ports={})
 
     @module.combinational
-    def build(self, memory: SRAM):
-        cnt = RegArray(Int(memory.width), 1)
+    def build(self, width, init_file, user):
+        cnt = RegArray(Int(width), 1)
         v = cnt[0]
         we = v[0:0]
-        plused = v + Int(memory.width)(1)
-        waddr = plused[0:9]
-        raddr = v[0:9]
-        addr = we.select(waddr, raddr).bitcast(Int(10))
-        memory.async_called(
-                we = we.bitcast(Int(1)),
-                addr = addr,
-                wdata = v.bitcast(Bits(memory.width)))
+        re = ~we
+        plused = v + Int(width)(1)
+        waddr = plused[0:8]
+        raddr = v[0:8]
+        addr = we.select(waddr, raddr).bitcast(Int(9))
         cnt[0] = plused
+        sram = SRAM(width, 512, init_file)
+        sram.build(we, re, addr, v.bitcast(Bits(width)), user)
+        with Condition(re):
+            sram.bound.async_called()
+
 
 def check(raw):
     for line in raw.splitlines():
@@ -60,13 +57,11 @@ def check(raw):
 def impl(sys_name, width, init_file, resource_base):
     sys = SysBuilder(sys_name)
     with sys:
-        # Build the SRAM module
-        memory = SRAM(init_file, width)
-        memory.wait_until()
-        memory.build(width)
+        user = MemUser(width)
+        user.build()
         # Build the driver
         driver = Driver()
-        driver.build(memory)
+        driver.build(width, init_file, user)
 
     config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
 
@@ -90,6 +85,6 @@ def test_memory_wide():
     impl('memory_wide', 256, None, None)
 
 if __name__ == "__main__":
-    #test_memory()
-    #test_memory_init()
+    test_memory()
+    test_memory_init()
     test_memory_wide()

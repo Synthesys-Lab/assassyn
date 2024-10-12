@@ -1,9 +1,12 @@
-use std::fmt::Display;
+use std::{collections::VecDeque, fmt::Display};
 
 use super::super::common::namify;
-use crate::ir::{
-  node::{ArrayRef, FIFORef, ModuleRef},
-  DataType,
+use crate::{
+  builder::SysBuilder,
+  ir::{
+    node::{ArrayRef, BaseNode, FIFORef, ModuleRef},
+    DataType, StrImm,
+  },
 };
 
 #[derive(Debug, Clone)]
@@ -143,6 +146,108 @@ pub(super) fn connect_top<T: Field, U: Field>(display: &T, edge: &U, fields: &[&
   let mut res = String::new();
   for field in fields {
     res.push_str(&format!("    .{}({}),\n", display.field(field), edge.field(field)));
+  }
+  res
+}
+
+fn type_to_fmt(ty: &DataType) -> String {
+  match ty {
+    DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "d",
+    _ => panic!("Invalid type for type: {}", ty),
+  }
+  .to_string()
+}
+
+pub(super) fn parse_format_string(args: Vec<BaseNode>, sys: &SysBuilder) -> String {
+  let raw = args[0]
+    .as_ref::<StrImm>(sys)
+    .unwrap()
+    .get_value()
+    .to_string();
+  let mut fmt = raw.chars().collect::<VecDeque<_>>();
+  let mut res = String::new();
+  let mut arg_idx = 1;
+  while let Some(c) = fmt.pop_front() {
+    match c {
+      '{' => {
+        if let Some(c) = fmt.pop_front() {
+          if c == '{' {
+            res.push('{');
+          } else {
+            let dtype = args[arg_idx].get_dtype(sys).unwrap();
+            let mut substr = c.to_string();
+            // handle "{}"
+            if substr.eq("}") {
+              res.push_str(&format!("%{}", &type_to_fmt(&dtype)));
+              arg_idx += 1;
+              continue;
+            }
+            let mut closed = false;
+            while let Some(c) = fmt.pop_front() {
+              if c == '}' {
+                closed = true;
+                break;
+              }
+              substr.push(c);
+            }
+            assert!(closed, "Invalid format string, because of a single {{, {:?}", raw);
+            let new_fmt = if substr.is_empty() {
+              type_to_fmt(&dtype)
+            } else if matches!(substr.chars().next(), Some(':')) {
+              let mut width_idx = 1;
+              let pad = if matches!(substr.chars().nth(1), Some('0')) {
+                width_idx += 1;
+                String::from("0")
+              } else {
+                String::new()
+              };
+              let width = if substr
+                .chars()
+                .nth(width_idx)
+                .map_or(false, |c| c.is_ascii_digit())
+              {
+                width_idx += 1;
+                substr
+                  .chars()
+                  .nth(width_idx - 1)
+                  .unwrap()
+                  .to_digit(10)
+                  .unwrap()
+                  .to_string()
+              } else {
+                String::new()
+              };
+              let vfmt = if substr
+                .chars()
+                .nth(width_idx)
+                .map_or(false, |c| c.is_alphabetic())
+              {
+                substr.chars().nth(width_idx).unwrap().to_string()
+              } else {
+                type_to_fmt(&dtype)
+              };
+              format!("%{}{}{}", pad, width, vfmt)
+            } else {
+              panic!("Invalid format string {:?}", raw);
+            };
+            res.push_str(&new_fmt);
+            arg_idx += 1;
+          }
+        } else {
+          panic!("Invalid format string, {:?}", raw);
+        }
+      }
+      '}' => {
+        if let Some(c) = fmt.pop_front() {
+          if c == '}' {
+            res.push('}');
+            continue;
+          }
+        }
+        panic!("Invalid format string, because of a single {{");
+      }
+      _ => res.push(c),
+    }
   }
   res
 }

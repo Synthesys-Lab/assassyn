@@ -1,12 +1,11 @@
 '''The module provides the Array class for representing register arrays in the IR.'''
 
-from .builder import ir_builder
+from .builder import ir_builder, Singleton
 from .dtype import DType, to_uint
 from .expr import ArrayRead, ArrayWrite
 from .value import Value
 from .utils import identifierize
 
-@ir_builder(node_type='array')
 def RegArray( #pylint: disable=invalid-name
         scalar_ty: DType,
         size: int,
@@ -27,6 +26,7 @@ def RegArray( #pylint: disable=invalid-name
     res = Array(scalar_ty, size, attr, initializer)
     if name is not None:
         res.name = name
+    Singleton.builder.arrays.append(res)
     return res
 
 class Array:
@@ -49,6 +49,7 @@ class Array:
         self._name = name
 
     def __init__(self, scalar_ty: DType, size: int, attr: list, initializer: list):
+        assert isinstance(scalar_ty, DType)
         self.scalar_ty = scalar_ty
         self.size = size
         self.attr = attr
@@ -58,14 +59,15 @@ class Array:
     def __repr__(self):
         return f'array {self.name}[{self.scalar_ty}; {self.size}] = {self.initializer}'
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __getitem__(self, index):
         if isinstance(index, int):
-            index = to_uint(index)
+            index_bits = self.size.bit_length()
+            index = to_uint(index, index_bits)
         assert isinstance(index, Value), f'Invalid index given: {index}'
         return ArrayRead(self, index)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def __setitem__(self, index, value):
         if isinstance(index, int):
             index = to_uint(index)

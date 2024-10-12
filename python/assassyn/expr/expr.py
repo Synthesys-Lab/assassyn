@@ -77,6 +77,8 @@ class BinaryOp(Expr):
     }
 
     def __init__(self, opcode, lhs, rhs):
+        assert isinstance(lhs, Value), f'{type(lhs)} is not a Value!'
+        assert isinstance(rhs, Value), f'{type(rhs)} is not a Value!'
         super().__init__(opcode)
         self.lhs = lhs
         self.rhs = rhs
@@ -110,9 +112,13 @@ class FIFOPop(Expr):
     def __init__(self, fifo):
         super().__init__(FIFOPop.FIFO_POP)
         self.fifo = fifo
+        self.dtype = fifo.dtype
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.fifo.as_operand()}.pop()'
+
+    def __getattr__(self, name):
+        return self.dtype.attributize(self, name)
 
 
 class ArrayWrite(Expr):
@@ -120,7 +126,7 @@ class ArrayWrite(Expr):
 
     ARRAY_WRITE = 401
 
-    def __init__(self, arr, idx, val):
+    def __init__(self, arr, idx: Value, val: Value):
         super().__init__(ArrayWrite.ARRAY_WRITE)
         self.arr = arr
         self.idx = idx
@@ -135,13 +141,17 @@ class ArrayRead(Expr):
 
     ARRAY_READ = 400
 
-    def __init__(self, arr, idx):
+    def __init__(self, arr, idx: Value):
         super().__init__(ArrayRead.ARRAY_READ)
         self.arr = arr
         self.idx = idx
+        self.dtype = arr.scalar_ty
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.arr.as_operand()}[{self.idx.as_operand()}]'
+
+    def __getattr__(self, name):
+        return self.dtype.attributize(self, name)
 
 class Log(Expr):
     '''The class for log operation. NOTE: This operation is just like verilog $display, which is
@@ -169,6 +179,9 @@ class Slice(Expr):
         from ..dtype import to_uint
         self.l = to_uint(l)
         self.r = to_uint(r)
+        # pylint: disable=import-outside-toplevel
+        from ..dtype import Bits
+        self.dtype = Bits(r - l + 1)
 
     def __repr__(self):
         return f'{self.as_operand()} = {self.x.as_operand()}[{self.l}:{self.r}]'
@@ -208,7 +221,7 @@ class Cast(Expr):
         method = Cast.SUBCODES[self.opcode]
         return f'{self.as_operand()} = {method} {self.x.as_operand()} to {self.dtype}'
 
-@ir_builder(node_type='expr')
+@ir_builder
 def log(*args):
     '''The exposed frontend function to instantiate a log operation'''
     assert isinstance(args[0], str)
@@ -260,6 +273,15 @@ class PureInstrinsic(Expr):
             return f'{self.as_operand()} = {fifo}.{self.OPERATORS[self.opcode]}()'
         raise NotImplementedError
 
+    def __getattr__(self, name):
+        if self.opcode == PureInstrinsic.FIFO_PEEK:
+            from ..module import Port
+            port = self.args[0]
+            assert isinstance(port, Port)
+            return port.dtype.attributize(self, name)
+
+        assert False, f"Cannot access attribute {name} on {self}"
+
 
 class Bind(Expr):
     '''The class for binding operations. Function bind is a functional programming concept like
@@ -285,7 +307,7 @@ class Bind(Expr):
         cnt = sum(i.name in fifo_names for i in ports)
         return cnt == len(ports)
 
-    @ir_builder(node_type='expr')
+    @ir_builder
     def async_called(self, **kwargs):
         '''The exposed frontend function to instantiate an async call operation'''
         self._push(**kwargs)
@@ -317,8 +339,9 @@ class Bind(Expr):
         for v in self.pushes:
             depth = self.fifo_depths.get(v.as_operand())
             depth_str = f", depth={depth}" if depth is not None else ""
-            args.append(f'{v.as_operand()}\
-                /* {v.fifo.as_operand()}={v.val.as_operand()}{depth_str} */')
+            operand = v.as_operand()
+            operand = f'{operand} /* {v.fifo.as_operand()}={v.val.as_operand()}{depth_str} */'
+            args.append(operand)
         args = ', '.join(args)
         callee = self.callee.as_operand()
         lval = self.as_operand()
@@ -347,6 +370,9 @@ class Select(Expr):
     SELECT = 1000
 
     def __init__(self, opcode, cond, true_val, false_val):
+        assert isinstance(cond, Value), f'{type(cond)} is not a Value!'
+        assert isinstance(true_val, Value), f'{type(true_val)} is not a Value!'
+        assert isinstance(false_val, Value), f'{type(false_val)} is not a Value!'
         super().__init__(opcode)
         self.cond = cond
         self.true_value = true_val

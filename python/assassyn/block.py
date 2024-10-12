@@ -9,11 +9,11 @@ class Block:
     MODULE_ROOT = 0
     CONDITIONAL = 1
     CYCLE       = 2
+    SRAM        = 3
 
     def __init__(self, kind: int):
         self.kind = kind
         self._body = []
-        self._restore = None
         self.parent = None
 
     def __repr__(self):
@@ -22,6 +22,11 @@ class Block:
         body = ident + ('\n' + ident).join(repr(elem) for elem in self.iter())
         Singleton.repr_ident -= 2
         return body
+
+    @property
+    def body(self):
+        '''Get the body of the block.'''
+        return self._body
 
     def as_operand(self):
         '''Dump the block as an operand.'''
@@ -37,19 +42,17 @@ class Block:
 
     def __enter__(self):
         '''Designate the scope of entering the block.'''
-        assert self._restore is None, "A block cannot be used twice!"
-        parent = Singleton.builder.get_current_block()
+        parent = Singleton.builder.current_block
         if parent is None:
-            parent = Singleton.builder.get_current_module()
+            parent = Singleton.builder.current_module
         assert parent is not None
         self.parent = parent
-        self._restore = Singleton.builder.insert_point['expr']
-        Singleton.builder.insert_point['expr'] = self._body
+        Singleton.builder.enter_context_of('block', self)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         '''Designate the scope of exiting the block.'''
-        Singleton.builder.insert_point['expr'] = self._restore
+        Singleton.builder.exit_context_of('block')
 
 class CondBlock(Block):
     '''The inherited class of the block for conditional block.'''

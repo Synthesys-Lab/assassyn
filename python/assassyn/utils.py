@@ -10,9 +10,19 @@ def identifierize(obj):
     from .builder import Singleton
     return hex(id(obj))[Singleton.id_slice]
 
+PATH_CACHE = None
+
 def repo_path():
     '''Get the path to assassyn repository'''
-    return os.environ['ASSASSYN_HOME']
+    # pylint: disable=global-statement
+    global PATH_CACHE
+    if PATH_CACHE is None:
+        PATH_CACHE = os.environ['ASSASSYN_HOME']
+    return PATH_CACHE
+
+def package_path():
+    '''Get the path to this python package'''
+    return repo_path() + '/python/assassyn'
 
 def run_simulator(path):
     '''The helper function to run the simulator'''

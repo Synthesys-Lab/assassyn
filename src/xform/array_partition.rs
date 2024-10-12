@@ -3,11 +3,11 @@ use std::collections::{HashMap, HashSet};
 use crate::{
   builder::SysBuilder,
   ir::{
-    data::ArrayAttr,
+    array::{Array, ArrayAttr},
     instructions,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
-    Array, DataType, Expr, IntImm, Opcode,
+    DataType, Expr, IntImm, Opcode,
   },
 };
 

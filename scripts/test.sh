@@ -18,7 +18,7 @@ REPO_DIR=`git rev-parse --show-toplevel`
 
 # Test unit tests
 cd $REPO_DIR/python/unit-tests
-test_case "pytest --workers 8"
+test_case "pytest --workers 8 -x"
 
 # Test examples
 
@@ -27,7 +27,14 @@ cd $REPO_DIR/examples/systolic-array/
 test_case "python systolic_array.py"
 
 # A single-issue CPU
-cd $REPO_DIR/examples/cpu
-test_case "python src/main.py"
+cd $REPO_DIR/examples/minor-cpu
+test_case "python src/v1.py"
+test_case "python src/v2.py"
+
+# A Priority Queue
+cd $REPO_DIR/examples/priority-queue
+test_case "python main.py"
+
+# TODO(@were): Test memory engine.
 
 cd $RESTORE_DIR
