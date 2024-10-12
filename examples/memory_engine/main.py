@@ -11,6 +11,7 @@ class MemUser(Module):
             ports={'rdata': Port(Bits(width))}, 
         )
         self.reg_accm = RegArray(Int(width), 1)
+        self.name = "sram"
         
     @module.combinational
     def build(self):
@@ -52,7 +53,7 @@ def check(raw):
             c = int(toks[-1])
             b = int(toks[-3])
             a = int(toks[-5])
-            assert c % 2 == 1 or a == 0, f'Expected odd number or zero, got {line}'
+            assert a % 2 == 1 or c == 0, f'Expected odd number or zero, got {line}'
             assert c == a + b, f'{a} + {b} = {c}'
 
 
@@ -70,7 +71,6 @@ def impl(sys_name, width, init_file, resource_base):
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
     check(raw)
 
     if utils.has_verilator():
