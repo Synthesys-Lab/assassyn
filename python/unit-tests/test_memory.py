@@ -45,7 +45,7 @@ class Driver(Module):
 
 def check(raw):
     for line in raw.splitlines():
-        if '[sram]' in line:
+        if '[memuser' in line:
             toks = line.split()
             c = int(toks[-1])
             b = int(toks[-3])
