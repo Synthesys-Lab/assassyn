@@ -10,6 +10,7 @@ from assassyn import utils
 from opcodes import *
 from decoder import *
 from writeback import *
+from memory_access import *
 from utils import *
 
 class Execution(Module):
