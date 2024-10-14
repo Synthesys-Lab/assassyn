@@ -172,7 +172,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     let scalar_bits = array.scalar_ty().get_bits();
 
-    res.push_str("//add try3   \n");
+    
 
     drivers.iter().for_each(|edge| {
       res.push_str(&declare_logic(array.scalar_ty(), &edge.field("d")));
@@ -180,7 +180,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(&declare_logic(array.get_idx_type(), &edge.field("widx")));
     });
 
-    res.push_str("//add try4   \n");
+    
     if has_memory_params
       {
 
@@ -236,8 +236,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // where w is the gathered write enable signal
     // widx/d are 1-hot selected from all the writers
     
-
-    res.push_str("//add try5   \n");
 
     
 
@@ -583,12 +581,12 @@ module top (
     for module in self.sys.module_iter(ModuleKind::Module) {
       res.push_str(&self.dump_module_instance(&module));
     }
-    res.push_str(" // try6\n");
+    
     // downstream instances
     for module in self.sys.module_iter(ModuleKind::Downstream) {
       res.push_str(&self.dump_module_instance(&module));
     }
-    res.push_str(" // try7\n");
+    
     res.push_str("endmodule // top\n\n");
 
     fd.write_all(res.as_bytes()).unwrap();
