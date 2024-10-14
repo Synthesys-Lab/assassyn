@@ -5,6 +5,8 @@ use std::{
   path::Path,
 };
 
+use std::cell::RefCell;
+
 use instructions::FIFOPush;
 // use instructions::FIFOPush;
 // use regex::Regex;
@@ -27,6 +29,9 @@ use super::{
   Simulator,
 };
 
+use crate::ir::module::attrs::MemoryParams;
+use crate::ir::module::attrs::MemoryPins;
+
 macro_rules! fifo_name {
   ($fifo:expr) => {{
     format!("{}", namify($fifo.get_name()))
@@ -44,6 +49,7 @@ struct VerilogDumper<'a, 'b> {
   current_module: String,
   before_wait_until: bool,
   topo: HashMap<BaseNode, usize>,
+  array_memory_params_map: RefCell<HashMap<BaseNode, MemoryParams>>,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
@@ -64,6 +70,73 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       external_usage,
       before_wait_until: false,
       topo,
+      array_memory_params_map: RefCell::new(HashMap::new()),
+    }
+  }
+
+  fn collect_array_memory_params(&self, module: &ModuleRef) {
+    for attr in module.get_attrs() {
+        if let module::Attribute::MemoryParams(mem) = attr {
+            if module.is_downstream() {
+                // 遍历模块的外部接口
+                for (interf, _) in module.ext_interf_iter() {
+                    if interf.get_kind() == NodeKind::Array {
+                        let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
+                        let mut map = self.array_memory_params_map.borrow_mut();
+                        map.insert(array_ref.upcast(), mem.clone());
+                    }
+                }
+            }
+        }
+    }
+}
+
+  fn process_node(&mut self, node: BaseNode, res: &mut String) {
+    match node.get_kind() {
+        NodeKind::Expr => {
+            let expr = node.as_ref::<Expr>(self.sys).unwrap();
+            if expr.get_opcode() == Opcode::Load {
+                // 特殊处理 Opcode::Load 表达式
+                let id = namify(&expr.upcast().to_string(self.sys));
+                let ty = expr.dtype();
+                //let load = expr.as_sub::<instructions::Load>().unwrap();
+                //let array_ref = load.array();
+                //let array_name = namify(&array_ref.get_name());
+                // 声明变量
+                res.push_str(&declare_logic(ty, &id));
+                // 生成不带索引的赋值语句
+                res.push_str(&format!("  assign {} = dataout;\n", id));
+            } else {
+                // 对于其他表达式，调用原有的 print_body 函数
+                res.push_str(&self.print_body(node));
+            }
+        }
+        NodeKind::Block => {
+            let block = node.as_ref::<Block>(self.sys).unwrap();
+            // 处理块的条件或循环
+            let skip = if let Some(cond) = block.get_condition() {
+                self.pred_stack.push_back(if cond.get_dtype(block.sys).unwrap().get_bits() == 1 {
+                    dump_ref(self.sys, &cond, true)
+                } else {
+                    format!("(|{})", dump_ref(self.sys, &cond, false))
+                });
+                1
+            } else if let Some(cycle) = block.get_cycle() {
+                self.pred_stack.push_back(format!("(cycle_cnt == {})", cycle));
+                1
+            } else {
+                0
+            };
+            // 递归地处理块内的元素
+            for elem in block.body_iter().skip(skip) {
+                self.process_node(elem, res);
+            }
+            // 弹出块的条件
+            self.pred_stack.pop_back();
+        }
+        _ => {
+            panic!("Unexpected node kind: {:?}", node.get_kind());
+        }
     }
   }
 
@@ -94,8 +167,16 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let d = display.field("d");
     // array buffer
     let q = display.field("q");
+
     res.push_str(&format!("  /* {} */\n", array));
-    res.push_str(&declare_array("", array, &q, ";"));
+    let map = self.array_memory_params_map.borrow();
+
+    if let Some(_) = map.get(&array.upcast()) {
+      res.push_str(&declare_logic(array.scalar_ty(), &q));
+        
+    } else {
+      res.push_str(&declare_array("", array, &q, ";"));
+    }
 
     let mut seen = HashSet::new();
     let drivers = array
@@ -121,6 +202,10 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(&declare_logic(array.get_idx_type(), &edge.field("widx")));
     });
 
+    if let Some(_) = map.get(&array.upcast()) {
+      
+        
+    } else {
     // if w: array[widx] = d;
     // where w is the gathered write enable signal
     // widx/d are 1-hot selected from all the writers
@@ -168,6 +253,9 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // Dump the array write
     res.push_str(&format!("    else if ({w}) {q}[{widx}] <= {d};\n\n",));
 
+    }
+
+    
     res
   }
 
@@ -345,7 +433,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
         res.push_str(&declare_logic(bool_ty(), &format!("logic_{}_valid", id)));
       }
     }
-
+    let mut is_memory_instance = false;
     res.push_str(&declare_logic(bool_ty(), &format!("{}_executed", module_name)));
 
     res.push_str(&format!(
@@ -374,12 +462,29 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
           let display = utils::DisplayInstance::from_array(&array_ref);
           let edge = Edge::new(display.clone(), module);
-          if self.sys.user_contains_opcode(ops, Opcode::Load) {
-            res.push_str(&format!("    .{q}({q}),\n", q = display.field("q"),));
+          
+          for attr in module.get_attrs() {
+            if let module::Attribute::MemoryParams(_) = attr {
+              if module.is_downstream()  
+                {
+                  is_memory_instance = true;
+                }
+                //let mut map = self.array_memory_params_map.borrow_mut();
+                //map.insert(array_ref.upcast(), mem.clone());
+
+            }
           }
-          if self.sys.user_contains_opcode(ops, Opcode::Store) {
-            res.push_str(&connect_top(&display, &edge, &["w", "widx", "d"]));
+          if is_memory_instance {
+            
+          } else {
+            if self.sys.user_contains_opcode(ops, Opcode::Load) {
+              res.push_str(&format!("    .{q}({q}),\n", q = display.field("q"),));
+            }
+            if self.sys.user_contains_opcode(ops, Opcode::Store) {
+              res.push_str(&connect_top(&display, &edge, &["w", "widx", "d"]));
+            }
           }
+
         }
         NodeKind::Module => {
           let interf = interf.as_ref::<Module>(self.sys).unwrap();
@@ -442,6 +547,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // runtime
     let mut res = String::new();
 
+    let mut has_memory_params = false;
+
     res.push_str(
       "
 module top (
@@ -455,8 +562,10 @@ module top (
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new();
     // array -> init_file_path
     for m in self.sys.module_iter(ModuleKind::Downstream) {
+      self.collect_array_memory_params(&m);
       for attr in m.get_attrs() {
         if let module::Attribute::MemoryParams(mp) = attr {
+          has_memory_params = true;
           if let Some(init_file) = &mp.init_file {
             let mut init_file_path = self.config.resource_base.clone();
             init_file_path.push(init_file);
@@ -466,8 +575,15 @@ module top (
         }
       }
     }
+    
+    res.push_str("//try1\n");
+    for (key, value) in &mem_init_map {
+      res.push_str(&format!("//Array: {}, Init File Path: {}\n", key.to_string(&self.sys), value));
+    }
+    res.push_str("//try2\n");
 
     // array storage element definitions
+    
     for array in self.sys.array_iter() {
       res.push_str(&self.dump_array(&array, mem_init_map.get(&array.upcast())));
     }
@@ -505,6 +621,44 @@ module top (
     res.push_str("endmodule // top\n\n");
 
     fd.write_all(res.as_bytes()).unwrap();
+
+    if has_memory_params {
+
+      fd.write_all(
+        format!(
+          "
+module srambank_128x4x32_6t122 (
+	  input clk
+	, input [8:0] address          // address
+	, input [31:0] wd                // data to write
+	, input banksel                    // access enable
+	, input read                       // read enable
+	, input write                      // write enable
+	, output reg [31:0] dataout      // latched data output (only updated on read)
+  , input logic rst_n       /////////// add rst here  
+	  );
+
+  reg [31:0] 				      mem [511:0];
+
+  always @ (posedge(clk)) begin
+    if (!rst_n) begin
+      mem[address] <= 32'd0;
+    end
+    else if (write & banksel) begin
+      mem[address] <= wd;
+    end
+  end
+
+  assign dataout = (read & banksel) ? mem[address] : 32'd0;
+
+
+
+endmodule 
+          "
+        )
+        .as_bytes(),
+      )?;
+      }
 
     let init = match self.config.verilog {
       Simulator::VCS => {
@@ -632,6 +786,10 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
 
     let mut res = String::new();
 
+    let mut array_memory_params_map: HashMap<BaseNode, MemoryParams> = HashMap::new();
+
+    
+
     res.push_str(&format!(
       "
 module {} (
@@ -653,6 +811,25 @@ module {} (
       res.push_str(&declare_out(bool_ty(), &display.field("pop_ready")));
     }
 
+    let mut has_memory_params = false;
+    let  empty_pins = MemoryPins::new(
+      BaseNode::unknown(), // array
+      BaseNode::unknown(), // re
+      BaseNode::unknown(), // we
+      BaseNode::unknown(), // addr
+      BaseNode::unknown(), // wdata
+  );
+  
+    let mut memory_params = MemoryParams::new(
+      0,            // width
+      0,            // depth
+      0..=0,        // lat
+      None,         // init_file
+      empty_pins, // 假设 `MemoryPins` 有一个 `new` 方法
+  );
+  
+    
+
     for (interf, ops) in module.ext_interf_iter() {
       match interf.get_kind() {
         NodeKind::FIFO => {
@@ -671,15 +848,34 @@ module {} (
           let array = interf.as_ref::<Array>(self.sys).unwrap();
           let display = utils::DisplayInstance::from_array(&array);
           res.push_str(&format!("  /* {} */\n", array));
-          if self.sys.user_contains_opcode(ops, Opcode::Load) {
-            res.push_str(&declare_array("input", &array, &display.field("q"), ","));
+
+          for attr in module.get_attrs() {
+            if let module::Attribute::MemoryParams(mem) = attr {
+              has_memory_params = true;
+              //memory_params.depth = mem.depth;
+              //memory_params.width = mem.width;
+              memory_params = mem.clone(); 
+            }}
+
+          if has_memory_params {
+            
+            
+              
+          
+          
+          }  else {
+            if self.sys.user_contains_opcode(ops, Opcode::Load) {
+              res.push_str(&declare_array("input", &array, &display.field("q"), ","));
+            }
+            // (w, widx, d): something like `array[widx] = d;`
+            if self.sys.user_contains_opcode(ops, Opcode::Store) {
+              res.push_str(&declare_out(bool_ty(), &display.field("w")));
+              res.push_str(&declare_out(array.get_idx_type(), &display.field("widx")));
+              res.push_str(&declare_out(array.scalar_ty(), &display.field("d")));
+            }
           }
-          // (w, widx, d): something like `array[widx] = d;`
-          if self.sys.user_contains_opcode(ops, Opcode::Store) {
-            res.push_str(&declare_out(bool_ty(), &display.field("w")));
-            res.push_str(&declare_out(array.get_idx_type(), &display.field("widx")));
-            res.push_str(&declare_out(array.scalar_ty(), &display.field("d")));
-          }
+
+          
         }
         NodeKind::Module => {
           let module = interf.as_ref::<Module>(self.sys).unwrap();
@@ -771,8 +967,14 @@ module {} (
     self.fifo_pushes.clear();
     self.array_stores.clear();
     self.triggers.clear();
-    for elem in module.get_body().body_iter().skip(skip) {
-      res.push_str(&self.print_body(elem));
+    if has_memory_params { 
+      res.push_str(&format!("  logic [{b}:0] dataout;\n",b=memory_params.width - 1));     
+      self.process_node(module.get_body().upcast(), &mut res);
+    
+    } else {
+      for elem in module.get_body().body_iter().skip(skip) {
+        res.push_str(&self.print_body(elem));
+      }
     }
 
     for (m, g) in self.triggers.drain() {
@@ -805,17 +1007,62 @@ module {} (
 
     res.push_str("  // Gather Array writes\n");
 
-    for (a, (idx, data)) in self.array_stores.drain() {
-      res.push_str(&format!(
-        "  assign array_{a}_w = {cond};
+    if has_memory_params {
+      res.push_str("  // this is Mem Array \n");
+
+      for (a, (idx, data)) in self.array_stores.drain() {
+
+        res.push_str(&format!("  logic array_{a}_w;\n",a=a));
+        res.push_str(&format!("  logic [{b}:0] array_{a}_d;\n",a=a,b=memory_params.width - 1));
+        res.push_str(&format!("  logic [{b}:0] array_{a}_widx;\n",a=a,b=(63 - (memory_params.depth - 1).leading_zeros())));
+
+        res.push_str(&format!(
+          "  assign array_{a}_w = {cond};
   assign array_{a}_d = {data};
-  assign array_{a}_widx = {idx};\n
-",
-        a = a,
-        cond = idx.and("executed", " || "),
-        idx = idx.select_1h(),
-        data = data.select_1h()
-      ));
+  assign array_{a}_widx = {idx};\n",
+          a = a,
+          cond = idx.and("executed", " || "),
+          idx = idx.value.first().unwrap().clone(),
+          data = data.select_1h()
+        ));
+        res.push_str(&format!("
+
+    genvar i;
+    generate
+        for (i = 0; i < {expand_num}; i++) begin : gen_my_module
+          srambank_128x4x32_6t122 srambank_128x4x32_6t122(
+            .clk     (clk), 
+            .address (array_{a}_widx), 
+            .wd      (array_{a}_d[(i*32+31) : i*32 ]), 
+            .banksel (1'd1),    
+            .read    (1'd1), 
+            .write   (array_{a}_w), 
+            .dataout (dataout[(i*32+31) : i*32 ]), 
+            .rst_n   (rst_n)
+            );
+          end
+      endgenerate    
+          \n",a = a ,expand_num = memory_params.width / 32)); 
+      }
+               
+
+
+
+
+    }  else {
+      
+      for (a, (idx, data)) in self.array_stores.drain() {
+        res.push_str(&format!(
+          "  assign array_{a}_w = {cond};
+    assign array_{a}_d = {data};
+    assign array_{a}_widx = {idx};\n
+  ",
+          a = a,
+          cond = idx.and("executed", " || "),
+          idx = idx.select_1h(),
+          data = data.select_1h()
+        ));
+      } 
     }
 
     if !module.is_downstream() {
