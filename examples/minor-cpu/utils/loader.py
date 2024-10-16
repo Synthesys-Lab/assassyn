@@ -2,11 +2,42 @@
 
 # This file aims at reading a objdump file and extracting the `.text` and `.data` sections for our CPU execution.
 
+import os
 import sys
+import argparse
+import subprocess
 
-fname = sys.argv[1]
+parser = argparse.ArgumentParser(description='Extract the `.text` and `.data` sections from the objdump file.')
+parser.add_argument('--fname', type=str, help='The file name a objdump output.', required=True)
+parser.add_argument('--odir', type=str, help='The output directory of the converted file.', default='.')
+args = vars(parser.parse_args())
+
+fname = args['fname']
 
 offset = 0x80000000
+
+readelf = subprocess.check_output(['riscv64-unknown-elf-readelf', '-S', args['fname'][:-5]]).decode('utf-8')
+readelf = readelf.split('\n')
+for i in readelf:
+    toks = i.strip().split()
+    if not toks:
+        continue
+    if toks[0] == '[':
+        toks[0] = toks[0] + toks[1]
+        toks = [toks[0]] + toks[2:]
+    n = len(toks)
+    if n > 1 and toks[1] == '.data':
+        data_offset = int(toks[3], 16)
+    if n > 0 and toks[0] == '[1]':
+        offset = int(toks[3], 16)
+
+data_offset = data_offset - offset
+assert data_offset % 4 == 0
+
+bin_name = os.path.split(fname)[-1]
+
+with open(args['odir'] + '/' + bin_name[:-10] + 'config', 'w') as f:
+    f.write(f'{{ offset: {hex(offset)}, data_offset: {hex(data_offset)} }}')
 
 text, data = [], []
 
@@ -82,7 +113,6 @@ with open(fname) as f:
                     assert False, f'TODO: len={len(value)} {line}'
 
         elif len(toks) > 1:
-            print(toks[0][:-1], toks[1:])
             pass
 
 text.sort()
@@ -97,7 +127,9 @@ for addr, inst, comment in text:
     inst = (10 - len(inst)) * '0' + inst[2:]
     buffer[addr // 4] = inst + ' // ' + comment
 
-with open(fname[:-10] + 'exe', 'w') as f:
+assert bin_name.endswith('.riscv.dump')
+ofile = args['odir'] + '/' + bin_name[:-10]
+with open(ofile + 'exe', 'w') as f:
     f.write('\n'.join(buffer))
 
 # This is tricky to coalesce the data section from 2-byte to 4-byte.
@@ -125,5 +157,5 @@ buffer = [zero_padding] * (coalesced[-1][0] // 4 + 1)
 for addr, value, comment in coalesced:
     buffer[addr // 4] = hex(value)[2:] + ' // ' + comment + hex(addr)
 
-with open(fname[:-10] + 'data', 'w') as f:
-    f.write('\n'.join(buffer))
+with open(ofile + 'data', 'w') as f:
+    f.write('\n'.join(buffer[data_offset // 4]))
