@@ -13,6 +13,9 @@ from writeback import *
 from memory_access import *
 from utils import *
 
+offset = None
+data_offset = None
+
 class Execution(Module):
     
     def __init__(self):
@@ -129,7 +132,9 @@ class Execution(Module):
         is_memory = is_lw
         is_memory_read = is_lw
 
-        request_addr = is_memory.select(result[2:10].bitcast(Int(9)), Int(9)(0))
+        addr = result - offset - data_offset
+
+        request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
 
         mem_bypass_reg[0] = is_memory_read.select(rd_reg, Bits(5)(0))
 
@@ -194,7 +199,14 @@ class FetcherImpl(Downstream):
         self.name = 'FetcherImpl'
 
     @downstream.combinational
-    def build(self, on_branch: Value, br_sm: Array, ex_bypass: Value, pc_reg: Value, pc_addr: Value, decoder: Decoder, data: str):
+    def build(self,
+              on_branch: Value,
+              br_sm: Array,
+              ex_bypass: Value,
+              pc_reg: Value,
+              pc_addr: Value,
+              decoder: Decoder,
+              data: str):
         on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
         should_fetch = ~on_branch | ex_bypass.valid()
         to_fetch = ex_bypass.optional(pc_addr)
@@ -232,10 +244,21 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
-def main():
-    sys = SysBuilder('cpu_v2')
+def run_cpu(workload):
+    sys = SysBuilder('minor_cpu')
+
+    resource_base = f'{utils.repo_path()}/examples/minor-cpu/resource'
 
     with sys:
+
+        with open(f'{resource_base}/{workload}.config') as f:
+            global offset, data_offset
+            offsets = eval(f.readline())
+            offset = offsets['offset']
+            data_offset = offsets['data_offset']
+            offset = Int(32)(offset)
+            data_offset = Int(32)(data_offset)
+
         # Data Types
         bits1   = Bits(1)
         bits5   = Bits(5)
@@ -272,7 +295,7 @@ def main():
             rf = reg_file,
             memory = memory_access,
             writeback = writeback,
-            data = '0to100.data'
+            data = '{workload}.data'
         )
 
         memory_access.build(
@@ -284,7 +307,7 @@ def main():
         decoder = Decoder()
         on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, '0to100.exe')
+        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, '{workload}.exe')
 
         onwrite_downstream = Onwrite()
     
@@ -302,7 +325,7 @@ def main():
         verilog=utils.has_verilator(),
         sim_threshold=1500,
         idle_threshold=1500,
-        resource_base=f'{utils.repo_path()}/examples/minor-cpu/resource'
+        resource_base=resource_base
     )
 
     simulator_path, verilog_path = elaborate(sys, **conf)
@@ -314,4 +337,4 @@ def main():
     check(raw)
 
 if __name__ == '__main__':
-    main()
+    run_cpu('0to100')

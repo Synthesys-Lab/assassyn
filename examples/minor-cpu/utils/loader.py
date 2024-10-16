@@ -162,4 +162,4 @@ if data:
         buffer[addr // 4] = hex(value)[2:] + ' // ' + comment + hex(addr)
     
     with open(ofile + 'data', 'w') as f:
-        f.write('\n'.join(buffer[data_offset // 4]))
+        f.write('\n'.join(buffer[data_offset // 4:]))
