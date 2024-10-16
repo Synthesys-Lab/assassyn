@@ -14,7 +14,10 @@ args = vars(parser.parse_args())
 
 fname = args['fname']
 
+print(f'Extracting {fname}...')
+
 offset = 0x80000000
+data_offset = 0
 
 readelf = subprocess.check_output(['riscv64-unknown-elf-readelf', '-S', args['fname'][:-5]]).decode('utf-8')
 readelf = readelf.split('\n')
@@ -132,30 +135,31 @@ ofile = args['odir'] + '/' + bin_name[:-10]
 with open(ofile + 'exe', 'w') as f:
     f.write('\n'.join(buffer))
 
-# This is tricky to coalesce the data section from 2-byte to 4-byte.
-# We do this 2-byte by 2-byte.
-coalesced = []
-i = 0
-n = len(data)
-while i < len(data):
-    residue = data[i][0] % 4
-    # If it is aligned by 4, it is a start of coalescing.
-    if residue == 0:
-        # If it has following data to coalesce, combine those two into one.
-        if i + 1 < n and data[i][0] + 2 == data[i + 1][0]:
-            coalesced.append((data[i][0], data[i + 1][1] << 16 | data[i][1], data[i][2]))
-        # If not, the high 16-bit is already implicitly zero, so just leave it.
+if data:
+    # This is tricky to coalesce the data section from 2-byte to 4-byte.
+    # We do this 2-byte by 2-byte.
+    coalesced = []
+    i = 0
+    n = len(data)
+    while i < len(data):
+        residue = data[i][0] % 4
+        # If it is aligned by 4, it is a start of coalescing.
+        if residue == 0:
+            # If it has following data to coalesce, combine those two into one.
+            if i + 1 < n and data[i][0] + 2 == data[i + 1][0]:
+                coalesced.append((data[i][0], data[i + 1][1] << 16 | data[i][1], data[i][2]))
+            # If not, the high 16-bit is already implicitly zero, so just leave it.
+            else:
+                coalesced.append(data[i])
+            i += 2
         else:
-            coalesced.append(data[i])
-        i += 2
-    else:
-        # If it is not aligned by 4, it is the high 16-bit of coalescing. We pad the low 16-bit with zero.
-        coalesced.append((data[i][0] - residue, data[i + 1][1] << 16, data[i][2]))
-        i += 1
-
-buffer = [zero_padding] * (coalesced[-1][0] // 4 + 1)
-for addr, value, comment in coalesced:
-    buffer[addr // 4] = hex(value)[2:] + ' // ' + comment + hex(addr)
-
-with open(ofile + 'data', 'w') as f:
-    f.write('\n'.join(buffer[data_offset // 4]))
+            # If it is not aligned by 4, it is the high 16-bit of coalescing. We pad the low 16-bit with zero.
+            coalesced.append((data[i][0] - residue, data[i + 1][1] << 16, data[i][2]))
+            i += 1
+    
+    buffer = [zero_padding] * (coalesced[-1][0] // 4 + 1)
+    for addr, value, comment in coalesced:
+        buffer[addr // 4] = hex(value)[2:] + ' // ' + comment + hex(addr)
+    
+    with open(ofile + 'data', 'w') as f:
+        f.write('\n'.join(buffer[data_offset // 4]))
