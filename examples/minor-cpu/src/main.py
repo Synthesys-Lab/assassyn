@@ -213,7 +213,8 @@ class FetcherImpl(Downstream):
         icache = SRAM(width=32, depth=512, init_file=data)
         icache.name = 'icache'
         icache.build(Bits(1)(0), should_fetch, to_fetch[2:10].bitcast(Int(9)), Bits(32)(0), decoder)
-        log("fetcher          | on_br: {} | ex_by: {} | should_fetch: {} | fetch: 0x{:x}", on_branch, ex_bypass.valid(), should_fetch, to_fetch)
+        log("fetcher          | on_br: {} | ex_by: {} | should_fetch: {} | fetch: 0x{:x}",
+            on_branch, ex_bypass.valid(), should_fetch, to_fetch)
         with Condition(should_fetch):
             icache.bound.async_called()
             pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
