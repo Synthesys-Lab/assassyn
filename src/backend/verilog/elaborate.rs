@@ -197,8 +197,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(&declare_logic(array.get_idx_type(), &edge.field("widx")));
     });
 
-    if map.get(&array.upcast()).is_some() {
-    } else {
+    if map.get(&array.upcast()).is_none() {
       // if w: array[widx] = d;
       // where w is the gathered write enable signal
       // widx/d are 1-hot selected from all the writers
@@ -563,14 +562,11 @@ module top (
       }
     }
 
-    res.push_str("//try1\n");
     for (key, value) in &mem_init_map {
-      res.push_str(&format!("//Array: {}, Init File Path: {}\n", key.to_string(self.sys), value));
+      res.push_str(&format!("// Array: {}, Init File Path: {}\n", key.to_string(self.sys), value));
     }
-    res.push_str("//try2\n");
 
     // array storage element definitions
-
     for array in self.sys.array_iter() {
       res.push_str(&self.dump_array(&array, mem_init_map.get(&array.upcast())));
     }
