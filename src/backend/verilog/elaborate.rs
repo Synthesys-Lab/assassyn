@@ -167,7 +167,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(&format!("  /* {} */\n", array));
     let map = self.array_memory_params_map.borrow();
 
-    if let Some(_) = map.get(&array.upcast()) {
+    if map.get(&array.upcast()).is_some() {
       res.push_str(&declare_logic(array.scalar_ty(), &q));
     } else {
       res.push_str(&declare_array("", array, &q, ";"));
@@ -197,7 +197,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(&declare_logic(array.get_idx_type(), &edge.field("widx")));
     });
 
-    if let Some(_) = map.get(&array.upcast()) {
+    if map.get(&array.upcast()).is_some() {
     } else {
       // if w: array[widx] = d;
       // where w is the gathered write enable signal
@@ -565,7 +565,7 @@ module top (
 
     res.push_str("//try1\n");
     for (key, value) in &mem_init_map {
-      res.push_str(&format!("//Array: {}, Init File Path: {}\n", key.to_string(&self.sys), value));
+      res.push_str(&format!("//Array: {}, Init File Path: {}\n", key.to_string(self.sys), value));
     }
     res.push_str("//try2\n");
 
@@ -611,8 +611,7 @@ module top (
 
     if has_memory_params {
       fd.write_all(
-        format!(
-          "
+        "
 module srambank_128x4x32_6t122 (
 	  input clk
 	, input [8:0] address          // address
@@ -641,7 +640,7 @@ module srambank_128x4x32_6t122 (
 
 endmodule 
           "
-        )
+        .to_string()
         .as_bytes(),
       )?;
     }
