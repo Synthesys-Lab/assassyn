@@ -39,7 +39,14 @@ assert data_offset % 4 == 0
 
 bin_name = os.path.split(fname)[-1]
 
-with open(args['odir'] + '/' + bin_name[:-10] + 'config', 'w') as f:
+if bin_name.endswith('.riscv.dump'):
+    strip_bin = bin_name[:-10]
+elif bin_name.endswith('.dump'):
+    strip_bin = bin_name[:-4]
+else:
+    strip_bin = bin_name
+
+with open(args['odir'] + '/' + strip_bin + 'config', 'w') as f:
     f.write(f'{{ "offset": {hex(offset)}, "data_offset": {hex(data_offset)} }}')
 
 text, data = [], []
@@ -172,13 +179,8 @@ for addr, inst, comment in coalesced:
     inst = (10 - len(inst)) * '0' + inst[2:]
     buffer[addr // 4] = inst + ' // ' + comment
 
-if bin_name.endswith('.riscv.dump'):
-    bin_name = bin_name[:-10]
-elif bin_name.endswith('.dump'):
-    bin_name = bin_name[:-4]
-else:
-    bin_name = bin_name
-ofile = args['odir'] + '/' + bin_name[:-10]
+
+ofile = args['odir'] + '/' + strip_bin
 with open(ofile + 'exe', 'w') as f:
     f.write('\n'.join(buffer))
 
