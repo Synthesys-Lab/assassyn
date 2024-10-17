@@ -547,7 +547,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // runtime
     let mut res = String::new();
 
-    let mut has_memory_params = false;
+    
 
     res.push_str(
       "
@@ -560,12 +560,13 @@ module top (
     // memory initializations mapS
     // FIXME(@were): Fix the memory initialization.
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new();
+    
     // array -> init_file_path
     for m in self.sys.module_iter(ModuleKind::Downstream) {
       self.collect_array_memory_params(&m);
       for attr in m.get_attrs() {
         if let module::Attribute::MemoryParams(mp) = attr {
-          has_memory_params = true;
+          
           if let Some(init_file) = &mp.init_file {
             let mut init_file_path = self.config.resource_base.clone();
             init_file_path.push(init_file);
@@ -622,43 +623,7 @@ module top (
 
     fd.write_all(res.as_bytes()).unwrap();
 
-    if has_memory_params {
 
-      fd.write_all(
-        format!(
-          "
-module srambank_128x4x32_6t122 (
-	  input clk
-	, input [8:0] address          // address
-	, input [31:0] wd                // data to write
-	, input banksel                    // access enable
-	, input read                       // read enable
-	, input write                      // write enable
-	, output reg [31:0] dataout      // latched data output (only updated on read)
-  , input logic rst_n       /////////// add rst here  
-	  );
-
-  reg [31:0] 				      mem [511:0];
-
-  always @ (posedge(clk)) begin
-    if (!rst_n) begin
-      mem[address] <= 32'd0;
-    end
-    else if (write & banksel) begin
-      mem[address] <= wd;
-    end
-  end
-
-  assign dataout = (read & banksel) ? mem[address] : 32'd0;
-
-
-
-endmodule 
-          "
-        )
-        .as_bytes(),
-      )?;
-      }
 
     let init = match self.config.verilog {
       Simulator::VCS => {
@@ -786,8 +751,6 @@ impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
 
     let mut res = String::new();
 
-    let mut array_memory_params_map: HashMap<BaseNode, MemoryParams> = HashMap::new();
-
     
 
     res.push_str(&format!(
@@ -812,6 +775,7 @@ module {} (
     }
 
     let mut has_memory_params = false;
+    let mut has_memory_init_path = false;
     let  empty_pins = MemoryPins::new(
       BaseNode::unknown(), // array
       BaseNode::unknown(), // re
@@ -827,7 +791,7 @@ module {} (
       None,         // init_file
       empty_pins, // 假设 `MemoryPins` 有一个 `new` 方法
   );
-  
+  let mut init_file_path = self.config.resource_base.clone();
     
 
     for (interf, ops) in module.ext_interf_iter() {
@@ -855,6 +819,14 @@ module {} (
               //memory_params.depth = mem.depth;
               //memory_params.width = mem.width;
               memory_params = mem.clone(); 
+              if let Some(init_file) = &mem.init_file {
+                
+                init_file_path.push(init_file);
+                let init_file_path = init_file_path.to_str().unwrap();
+                res.push_str(&format!("  /* {} */\n", init_file_path));
+                has_memory_init_path = true;
+
+              }
             }}
 
           if has_memory_params {
@@ -1006,11 +978,12 @@ module {} (
     }
 
     res.push_str("  // Gather Array writes\n");
-
+    
+    
     if has_memory_params {
       res.push_str("  // this is Mem Array \n");
 
-      for (a, (idx, data)) in self.array_stores.drain() {
+      for (a, (idx, data)) in &self.array_stores {
 
         res.push_str(&format!("  logic array_{a}_w;\n",a=a));
         res.push_str(&format!("  logic [{b}:0] array_{a}_d;\n",a=a,b=memory_params.width - 1));
@@ -1027,25 +1000,23 @@ module {} (
         ));
         res.push_str(&format!("
 
-    genvar i;
-    generate
-        for (i = 0; i < {expand_num}; i++) begin : gen_my_module
-          srambank_128x4x32_6t122 srambank_128x4x32_6t122(
-            .clk     (clk), 
-            .address (array_{a}_widx), 
-            .wd      (array_{a}_d[(i*32+31) : i*32 ]), 
-            .banksel (1'd1),    
-            .read    (1'd1), 
-            .write   (array_{a}_w), 
-            .dataout (dataout[(i*32+31) : i*32 ]), 
-            .rst_n   (rst_n)
-            );
-          end
-      endgenerate    
-          \n",a = a ,expand_num = memory_params.width / 32)); 
-      }
-               
+  memory_blackbox_{a} #(
+        .DATA_WIDTH({data_width}),   
+        .ADDR_WIDTH({addr_bits})     
+    ) memory_blackbox_{a}(
+    .clk     (clk), 
+    .address (array_{a}_widx), 
+    .wd      (array_{a}_d), 
+    .banksel (1'd1),    
+    .read    (1'd1), 
+    .write   (array_{a}_w), 
+    .dataout (dataout), 
+    .rst_n   (rst_n)
+    );  
+          \n",data_width = memory_params.width ,addr_bits = (63 - (memory_params.depth ).leading_zeros()) ,a = a )); 
+      
 
+    }
 
 
 
@@ -1079,6 +1050,66 @@ module {} (
     res.push_str("  assign expose_executed = executed;\n");
 
     res.push_str(&format!("endmodule // {}\n\n", self.current_module));
+
+
+    if has_memory_params {
+      
+      for (a, (_, _)) in self.array_stores.drain() {
+      res.push_str(
+        &format!(r#"
+module memory_blackbox_{a} #(
+    parameter DATA_WIDTH = {data_width},   
+    parameter ADDR_WIDTH = {addr_bits}     
+)(
+    input clk,
+    input [ADDR_WIDTH-1:0] address,        
+    input [DATA_WIDTH-1:0] wd,             
+    input banksel,                         
+    input read,                            
+    input write,                           
+    output reg [DATA_WIDTH-1:0] dataout,   
+    input rst_n                            
+);
+
+    localparam DEPTH = 1 << ADDR_WIDTH;
+    reg [DATA_WIDTH-1:0] mem [DEPTH-1:0];
+
+  "#  , a =a ,data_width = memory_params.width ,addr_bits = (63 - (memory_params.depth ).leading_zeros()))
+        );
+        if (has_memory_init_path) {
+
+      res.push_str(&format!(r#"  initial begin
+          $readmemh({:?}, mem);
+      end"# , init_file_path))
+
+        }
+
+
+        res.push_str(
+          r#"
+
+  
+      always @ (posedge clk) begin
+          if (!rst_n) begin
+              mem[address] <= {{DATA_WIDTH{{1'b0}}}};
+          end
+          else if (write & banksel) begin
+              mem[address] <= wd;
+          end
+      end
+  
+      assign dataout = (read & banksel) ? mem[address] : {{DATA_WIDTH{{1'b0}}}};
+  
+  endmodule
+            "#  
+          );
+      }
+    
+    
+    }
+
+
+
 
     Some(res)
   }
