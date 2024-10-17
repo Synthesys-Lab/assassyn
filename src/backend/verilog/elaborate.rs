@@ -175,7 +175,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(&format!("  /* {} */\n", array));
     let map = self.array_memory_params_map.borrow();
 
-    if let Some(_) = map.get(&array.upcast()) {
+    if map.get(&array.upcast()).is_some() {
       res.push_str(&declare_logic(array.scalar_ty(), &q));
     } else {
       res.push_str(&declare_array("", array, &q, ";"));
@@ -205,7 +205,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(&declare_logic(array.get_idx_type(), &edge.field("widx")));
     });
 
-    if let Some(_) = map.get(&array.upcast()) {
+    if map.get(&array.upcast()).is_some() {
     } else {
       // if w: array[widx] = d;
       // where w is the gathered write enable signal
@@ -569,11 +569,11 @@ module top (
       }
     }
 
-    res.push_str("//try1\n");
+    
     for (key, value) in &mem_init_map {
-      res.push_str(&format!("//Array: {}, Init File Path: {}\n", key.to_string(&self.sys), value));
+      res.push_str(&format!("//Array: {}, Init File Path: {}\n", key.to_string(self.sys), value));
     }
-    res.push_str("//try2\n");
+    
 
     // array storage element definitions
 
@@ -1060,7 +1060,7 @@ module memory_blackbox_{a} #(
           data_width = memory_params.width,
           addr_bits = (63 - (memory_params.depth).leading_zeros())
         ));
-        if (has_memory_init_path) {
+        if has_memory_init_path {
           res.push_str(&format!(
             r#"  initial begin
           $readmemh({:?}, mem);
