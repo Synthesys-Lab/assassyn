@@ -245,10 +245,8 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
-def run_cpu(workload):
+def run_cpu(resource_base, workload):
     sys = SysBuilder('minor_cpu')
-
-    resource_base = f'{utils.repo_path()}/examples/minor-cpu/resource'
 
     with sys:
 
@@ -344,4 +342,6 @@ def run_cpu(workload):
     check(raw)
 
 if __name__ == '__main__':
-    run_cpu('0to100')
+    workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+
+    run_cpu(workloads, '0to100')
