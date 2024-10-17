@@ -568,15 +568,10 @@ module top (
         }
       }
     }
-
-    
     for (key, value) in &mem_init_map {
       res.push_str(&format!("//Array: {}, Init File Path: {}\n", key.to_string(self.sys), value));
     }
-    
-
     // array storage element definitions
-
     for array in self.sys.array_iter() {
       res.push_str(&self.dump_array(&array, mem_init_map.get(&array.upcast())));
     }
