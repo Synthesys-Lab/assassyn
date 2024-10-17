@@ -24,6 +24,12 @@ logic [DEPTH_LOG2:0] new_count;
 logic [DEPTH_LOG2-1:0] new_front;
 logic temp_pop_valid;
 
+// The number of elements in the queue after this cycle.
+assign new_count = count + (push_valid ? 1 : 0) - (pop_ready ? 1 : 0);
+
+// The new front of the queue after this cycle.
+assign new_front = front + (pop_ready && count != 0 ? 1 : 0);
+
 always @(posedge clk or negedge rst_n) begin
   if (!rst_n) begin
     front <= 0;
@@ -34,18 +40,10 @@ always @(posedge clk or negedge rst_n) begin
     push_ready <= 1'b1;
   end else begin
 
-    // The number of elements in the queue after this cycle.
-    assign new_count = count + (push_valid ? 1 : 0) - (pop_ready ? 1 : 0);
-
-    // The new front of the queue after this cycle.
-    assign new_front = front + (pop_ready && count != 0 ? 1 : 0);
-
-
     if (push_valid && new_count <= (1 << DEPTH_LOG2)) begin
       q[back] <= push_data;
       back <= (back + 1);
     end
-
 
     front <= new_front;
     count <= new_count;
@@ -94,14 +92,15 @@ logic [WIDTH-1:0] count;
 logic [WIDTH-1:0] temp;
 logic [WIDTH-1:0] new_count;
 
+// If pop_ready is high, counter -= 1
+assign temp = count + delta;
+// To avoid overflow minus
+assign new_count = temp >= (pop_ready ? 1 : 0) ? temp - (pop_ready ? 1 : 0) : 0;
+
 always @(posedge clk or negedge rst_n) begin
   if (!rst_n) begin
     count <= '0;
   end else begin
-    // If pop_ready is high, counter -= 1
-    assign temp = count + delta;
-    // To avoid overflow minus
-    assign new_count = temp >= (pop_ready ? 1 : 0) ? temp - (pop_ready ? 1 : 0) : 0;
     // If the counter is gonna overflow, this counter cannot accept any new
     // deltas.
     delta_ready <= new_count != {WIDTH{1'b1}};

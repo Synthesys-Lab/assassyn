@@ -13,8 +13,11 @@ from writeback import *
 from memory_access import *
 from utils import *
 
-class Execution(Module):
+offset = None
+data_offset = None
 
+class Execution(Module):
+    
     def __init__(self):
         super().__init__(
             ports={
@@ -29,7 +32,6 @@ class Execution(Module):
     @module.combinational
     def build(
         self, 
-        on_branch: Array, 
         pc: Array, 
         exec_bypass_reg: Array,
         exec_bypass_data: Array,
@@ -39,7 +41,7 @@ class Execution(Module):
         rf: Array, 
         memory: Module, 
         writeback: Module,
-        dcache: Module,):
+        data: str):
 
         a_reg = self.a_reg.peek()
         b_reg = self.b_reg.peek()
@@ -84,7 +86,7 @@ class Execution(Module):
             finish()
 
         # Instruction attributes
-        uses_imm = is_addi | is_bne
+        uses_imm = is_addi | is_bne | is_lw
         is_branch = is_bne
 
         a = (exec_bypass_reg[0] == a_reg).select(
@@ -95,7 +97,10 @@ class Execution(Module):
             exec_bypass_data[0], 
             (mem_bypass_reg[0] == b_reg).select(mem_bypass_data[0], rf[b_reg])
         )
-        
+
+        # log('mem_bypass_reg: x{:02} | mem_bypass_data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
+        # log('exe_bypass_reg: x{:02} | exe_bypass_data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
+
         rhs = uses_imm.select(imm_value, b)
 
         invoke_adder = is_add | is_addi | is_lw
@@ -113,31 +118,32 @@ class Execution(Module):
         exec_bypass_reg[0] = produced_by_exec.select(rd_reg, Bits(5)(0))
         exec_bypass_data[0] = produced_by_exec.select(result, Bits(32)(0))
 
-        with Condition(is_branch):
-            on_branch[0] = Bits(1)(0)
-            log("clear-br({:b})| on_branch = 0", opcode)
-        
         with Condition(is_bne):
             delta = imm_value[0:12]
             delta = delta[12:12].select(Bits(19)(0x7ffff), Bits(19)(0)).concat(delta).bitcast(Int(32))
             log('delta: {:x}', delta)
-            dest_pc = (pc[0].bitcast(Int(32)) - Int(32)(8) + delta).bitcast(Bits(32))
-            new_pc = (pc[0].bitcast(Int(32)) - Int(32)(4)).bitcast(Bits(32))
-            br_dest = (a != b).select(dest_pc, new_pc)
-            log("bne({:b})     | {} != {} | to {} | else {}", opcode, a, b, dest_pc, new_pc)
-            pc[0] = br_dest
+            br_pc = (pc[0].bitcast(Int(32)) - Int(32)(4) + delta).bitcast(Bits(32))
+            nxt_pc = pc[0]
+            br_dest = (a != b).select(br_pc, nxt_pc)
+            log("bne({:b})     | {} != {} | to {} | else {}", opcode, a, b, br_pc, nxt_pc)
+            br_sm = RegArray(Bits(1), 1)
+            br_sm[0] = Bits(1)(0)
 
         is_memory = is_lw
         is_memory_read = is_lw
 
-        request_addr = is_memory.select(result[2:10].bitcast(Int(9)), Int(9)(0))
+        addr = (result.bitcast(Int(32)) - offset - data_offset).bitcast(Bits(32))
+
+        request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
 
         mem_bypass_reg[0] = is_memory_read.select(rd_reg, Bits(5)(0))
 
         with Condition(is_memory):
-            log("mem-read         | addr: {:x} | lineno: {:x}", result, request_addr)
+            log("mem-read         | addr: 0x{:x} | lineno: 0x{:x}", result, request_addr)
+    
 
-
+        dcache = SRAM(width=32, depth=512, init_file=data)
+        dcache.name = 'dcache'
         dcache.build(we=Int(1)(0), re=is_memory_read, wdata=a, addr=request_addr, user=memory)
         dcache.bound.async_called()
         wb = writeback.bind(opcode = opcode, result = result, rd = rd_reg)
@@ -146,7 +152,7 @@ class Execution(Module):
             return_rd = rd_reg
             log("with-rd({:07b}) | own x{:02}", opcode, rd_reg)
 
-        return wb, return_rd
+        return br_sm, br_dest, wb, return_rd
 
 class Decoder(Module):
     
@@ -157,23 +163,22 @@ class Decoder(Module):
         self.name = 'Decoder'
 
     @module.combinational
-    def build(self, pc: Array, on_branch: Array, executor: Module):
+    def build(self, executor: Module, br_sm: Array):
+
         inst = self.pop_all_ports(False)
-        with Condition(~on_branch[0]):
-            signals = decode_logic(inst)
 
-            with Condition(signals.is_branch):
-                on_branch[0] = Bits(1)(1)
+        signals = decode_logic(inst)
 
-            executor.async_called(
-                opcode = inst[0:6],
-                imm_value = signals.imm_value,
-                a_reg = signals.rs1_reg,
-                b_reg = signals.rs2_reg,
-                rd_reg = signals.rd_reg)
+        br_sm[0] = signals.is_branch
 
-        with Condition(on_branch[0]):
-            log("on a branch, stall decoding, pc freeze at 0x{:x}", pc[0])
+        executor.async_called(
+            opcode = inst[0:6],
+            imm_value = signals.imm_value,
+            a_reg = signals.rs1_reg,
+            b_reg = signals.rs2_reg,
+            rd_reg = signals.rd_reg)
+
+        return signals.is_branch
 
 class Fetcher(Module):
     
@@ -182,19 +187,39 @@ class Fetcher(Module):
         self.name = 'Fetcher'
 
     @module.combinational
-    def build(self, decoder: Decoder, pc: Array, on_branch: Array, icache: SRAM):
-        to_fetch = pc[0][2:10].bitcast(Int(9))
-        icache.build(Bits(1)(0), ~on_branch[0], to_fetch, Bits(32)(0), decoder)
-        with Condition(~on_branch[0]):
-            log("fetching         | *inst[0x{:x}]", pc[0])
-            pc[0] = (pc[0].bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
-            # Call the decoder
+    def build(self):
+        pc_reg = RegArray(Bits(32), 1)
+        addr = pc_reg[0]
+        return pc_reg, addr
+
+class FetcherImpl(Downstream):
+
+    def __init__(self):
+        super().__init__()
+        self.name = 'FetcherImpl'
+
+    @downstream.combinational
+    def build(self,
+              on_branch: Value,
+              br_sm: Array,
+              ex_bypass: Value,
+              pc_reg: Value,
+              pc_addr: Value,
+              decoder: Decoder,
+              data: str):
+        on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
+        should_fetch = ~on_branch | ex_bypass.valid()
+        to_fetch = ex_bypass.optional(pc_addr)
+        icache = SRAM(width=32, depth=512, init_file=data)
+        icache.name = 'icache'
+        icache.build(Bits(1)(0), should_fetch, to_fetch[2:10].bitcast(Int(9)), Bits(32)(0), decoder)
+        log("fetcher          | on_br: {} | ex_by: {} | should_fetch: {} | fetch: 0x{:x}",
+            on_branch, ex_bypass.valid(), should_fetch, to_fetch)
+        with Condition(should_fetch):
             icache.bound.async_called()
+            pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
 
-        with Condition(on_branch[0]):
-            log("fetching         | on branch, pc freeze at 0x{:x}", pc[0])
-
-class OnwriteDS(Downstream):
+class Onwrite(Downstream):
     
     def __init__(self):
         super().__init__()
@@ -220,23 +245,33 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
-def main():
-    sys = SysBuilder('cpu_v1')
+def run_cpu(resource_base, workload):
+    sys = SysBuilder('minor_cpu')
 
     with sys:
+
+        with open(f'{resource_base}/{workload}.config') as f:
+            global offset, data_offset
+            raw = f.readline()
+            raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
+            offsets = eval(raw)
+            print(offsets)
+            offset = offsets['offset']
+            data_offset = offsets['data_offset']
+            offset = Int(32)(offset)
+            data_offset = Int(32)(data_offset)
+
         # Data Types
         bits1   = Bits(1)
         bits5   = Bits(5)
         bits32  = Bits(32)
 
-        icache = SRAM(width=32, depth=512, init_file='0to100.exe')
-        icache.name = 'icache'
-        dcache = SRAM(width=32, depth=512, init_file='0to100.data')
-        dcache.name = 'dcache'
+        fetcher = Fetcher()
+        pc_reg, pc_addr = fetcher.build()
+
+        fetcher_impl = FetcherImpl()
 
         # Data Structures
-        pc          = RegArray(bits32, 1)
-        on_branch   = RegArray(bits1, 1)
         reg_file    = RegArray(bits32, 32)
         reg_onwrite = RegArray(bits32, 1)
 
@@ -252,9 +287,11 @@ def main():
         memory_access = MemoryAccess()
 
         executor = Execution()
-        wb, exec_rd = executor.build(
-            pc = pc,
-            on_branch=on_branch,
+
+        data_init = f'{workload}.data' if os.path.exists(f'{resource_base}/{workload}.data') else None
+
+        br_sm, ex_bypass, wb, exec_rd = executor.build(
+            pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
             reg_onwrite = reg_onwrite,
             exec_bypass_data = exec_bypass_data,
@@ -263,7 +300,7 @@ def main():
             rf = reg_file,
             memory = memory_access,
             writeback = writeback,
-            dcache = dcache
+            data = data_init
         )
 
         memory_access.build(
@@ -273,13 +310,12 @@ def main():
         )
 
         decoder = Decoder()
-        decoder.build(pc = pc, on_branch = on_branch, executor = executor)
+        on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        onwrite_downstream = OnwriteDS()
+        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe')
+
+        onwrite_downstream = Onwrite()
     
-        fetcher = Fetcher()
-        fetcher.build(decoder, pc, on_branch, icache)
-
         driver = Driver()
         driver.build(fetcher)
 
@@ -294,7 +330,7 @@ def main():
         verilog=utils.has_verilator(),
         sim_threshold=1500,
         idle_threshold=1500,
-        resource_base=f'{utils.repo_path()}/examples/minor-cpu/resource'
+        resource_base=resource_base
     )
 
     simulator_path, verilog_path = elaborate(sys, **conf)
@@ -306,4 +342,6 @@ def main():
     check(raw)
 
 if __name__ == '__main__':
-    main()
+    workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+
+    run_cpu(workloads, '0to100')

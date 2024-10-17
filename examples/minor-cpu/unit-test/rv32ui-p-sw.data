@@ -1,0 +1,12 @@
+deadbeef //  | jal     t4,7ffdd5ea <_start-0x22a16> <begin_signature>:0x2000
+deadbeef //  | jal     t4,7ffdd5ee <_start-0x22a12> <tdat2>:0x2004
+deadbeef //  | jal     t4,7ffdd5f2 <_start-0x22a0e> <tdat3>:0x2008
+deadbeef //  | jal     t4,7ffdd5f6 <_start-0x22a0a> <tdat4>:0x200c
+deadbeef //  | jal     t4,7ffdd5fa <_start-0x22a06> <tdat5>:0x2010
+deadbeef //  | jal     t4,7ffdd5fe <_start-0x22a02> <tdat6>:0x2014
+deadbeef //  | jal     t4,7ffdd602 <_start-0x229fe> <tdat7>:0x2018
+deadbeef //  | jal     t4,7ffdd606 <_start-0x229fa> <tdat8>:0x201c
+deadbeef //  | jal     t4,7ffdd60a <_start-0x229f6> <tdat9>:0x2020
+deadbeef //  | jal     t4,7ffdd60e <_start-0x229f2> <tdat10>:0x2024
+0 // .insn   2, 0x | .insn   2, 0x0x2028
+0 // .insn   2, 0x | .insn   2, 0x0x202c
