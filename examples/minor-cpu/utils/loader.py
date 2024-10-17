@@ -40,7 +40,7 @@ assert data_offset % 4 == 0
 bin_name = os.path.split(fname)[-1]
 
 with open(args['odir'] + '/' + bin_name[:-10] + 'config', 'w') as f:
-    f.write(f'{{ offset: {hex(offset)}, data_offset: {hex(data_offset)} }}')
+    f.write(f'{{ "offset": {hex(offset)}, "data_offset": {hex(data_offset)} }}')
 
 text, data = [], []
 

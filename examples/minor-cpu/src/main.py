@@ -132,7 +132,7 @@ class Execution(Module):
         is_memory = is_lw
         is_memory_read = is_lw
 
-        addr = result - offset - data_offset
+        addr = (result.bitcast(Int(32)) - offset - data_offset).bitcast(Bits(32))
 
         request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
 
@@ -254,7 +254,10 @@ def run_cpu(workload):
 
         with open(f'{resource_base}/{workload}.config') as f:
             global offset, data_offset
-            offsets = eval(f.readline())
+            raw = f.readline()
+            raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
+            offsets = eval(raw)
+            print(offsets)
             offset = offsets['offset']
             data_offset = offsets['data_offset']
             offset = Int(32)(offset)
@@ -286,6 +289,9 @@ def run_cpu(workload):
         memory_access = MemoryAccess()
 
         executor = Execution()
+
+        data_init = f'{workload}.data' if os.path.exists(f'{resource_base}/{workload}.data') else None
+
         br_sm, ex_bypass, wb, exec_rd = executor.build(
             pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
@@ -296,7 +302,7 @@ def run_cpu(workload):
             rf = reg_file,
             memory = memory_access,
             writeback = writeback,
-            data = '{workload}.data'
+            data = data_init
         )
 
         memory_access.build(
@@ -308,7 +314,7 @@ def run_cpu(workload):
         decoder = Decoder()
         on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, '{workload}.exe')
+        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe')
 
         onwrite_downstream = Onwrite()
     
