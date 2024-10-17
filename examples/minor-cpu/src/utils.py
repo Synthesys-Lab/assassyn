@@ -2,7 +2,7 @@
 from assassyn import utils
 
 def check(raw):
-    data_path = f'{utils.repo_path()}/examples/minor-cpu/resource/0to100.data'
+    data_path = f'{utils.repo_path()}/examples/minor-cpu/workloads/0to100.data'
     with open(data_path, 'r') as f:
         data = []
         for line in f:
