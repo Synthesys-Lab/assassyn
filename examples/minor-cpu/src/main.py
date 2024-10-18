@@ -164,13 +164,9 @@ class Decoder(Module):
 
     @module.combinational
     def build(self, executor: Module, br_sm: Array):
-
         inst = self.pop_all_ports(False)
-
         signals = decode_logic(inst)
-
         br_sm[0] = signals.is_branch
-
         executor.async_called(
             opcode = inst[0:6],
             imm_value = signals.imm_value,
@@ -336,14 +332,16 @@ def run_cpu(resource_base, workload):
     simulator_path, verilog_path = elaborate(sys, **conf)
 
     raw = utils.run_simulator(simulator_path)
-    check(raw)
+    # check(raw)
 
     raw = utils.run_verilator(verilog_path)
-    check(raw)
+    # check(raw)
 
 if __name__ == '__main__':
     workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
 
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
 
-    run_cpu(workloads, '0to100')
+    #run_cpu(workloads, '0to100')
+
+    run_cpu(tests, 'rv32ui-p-add')

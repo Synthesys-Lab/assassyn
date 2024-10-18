@@ -99,12 +99,21 @@ def generate_dtype(ty: dtype.DType):
     assert isinstance(ty, dtype.Record), 'Expecting a record type, but got {ty}'
     return f'{prefix}::bits_ty({ty.bits})'
 
-def generate_init_value(init_value, ty: dtype.DType):
+def const_int_wrapper(value: int, ty: str):
+    '''Generate the constant integer wrapper for the given value'''
+    value = hex(value)
+    if value[0] == '-':
+        value = value[1:]
+    if value.endswith('L'):
+        value = value[:-1]
+        assert value[2:].isnumeric() and len(value) <= 18, f'Int too large: {value}'
+    return f'sys.get_const_int({ty}, {value} as u64)'
+
+def generate_init_value(init_value, ty: str):
     '''Generate the initial value for the given array'''
     if init_value is None:
         return ("\n", "None")
-
-    str1 = f'let init_val = sys.get_const_int({ty}, {init_value});'
+    str1 = f'let init_val = {const_int_wrapper(init_value, ty)};'
     str2 = 'Some(vec![init_val])'
 
     return (str1, str2)
@@ -186,7 +195,7 @@ class CodeGen(visitor.Visitor):
 
         vec = []
         for i, j in enumerate(init_value):
-            self.code.append(f'let init_{i} = sys.get_const_int({ty}, {j});')
+            self.code.append(f'let init_{i} = {const_int_wrapper(j, ty)};')
             vec.append(f'init_{i}')
 
         self.code.append(f'let init = vec![{", ".join(vec)}];')
@@ -295,7 +304,7 @@ class CodeGen(visitor.Visitor):
         if isinstance(node, const.Const):
             ty = generate_dtype(node.dtype)
             imm_var = f'imm_{identifierize(node)}'
-            imm_decl = f'  let {imm_var} = sys.get_const_int({ty}, {node.value}); // {node}'
+            imm_decl = f'  let {imm_var} = {const_int_wrapper(node.value, ty)}; // {node}'
             self.code.append(imm_decl)
             return imm_var
         if isinstance(node, module.Port):
