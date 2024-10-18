@@ -63,12 +63,12 @@ class SysBuilder:
         self._ctx_stack = {'module': [], 'block': []}
         self._exposes = {}
 
-    def expose(self, node, kind=None):
+    def expose_on_top(self, node, kind=None):
         '''Expose the given node in the top function with the given kind.'''
         self._exposes[node] = kind
 
     @property
-    def exposes(self):
+    def exposed_nodes(self):
         return self._exposes
 
     def __enter__(self):
