@@ -132,7 +132,7 @@ class Execution(Module):
         is_memory = is_lw
         is_memory_read = is_lw
 
-        addr = (result.bitcast(Int(32)) - offset - data_offset).bitcast(Bits(32))
+        addr = (result.bitcast(Int(32)) - data_offset).bitcast(Bits(32))
 
         request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
 
