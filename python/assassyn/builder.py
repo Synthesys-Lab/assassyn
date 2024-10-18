@@ -61,6 +61,14 @@ class SysBuilder:
         self.downstreams = []
         self.arrays = []
         self._ctx_stack = {'module': [], 'block': []}
+        self._exposes = set()
+
+    def expose(self, node):
+        self._exposes.add(node)
+
+    @property
+    def exposes(self):
+        return self._exposes
 
     def __enter__(self):
         '''Designate the scope of this system builder.'''

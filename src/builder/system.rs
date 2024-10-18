@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, hash::Hash};
+use std::{collections::{HashMap, HashSet}, fmt::Display, hash::Hash};
 
 use instructions::call::LazyBind;
 
@@ -74,6 +74,8 @@ pub struct SysBuilder {
   /// The set of finalized binds. A lazy bind will not be instantiated as a bind expression until
   /// it is called. Key: LazyBind, Value: Expr::Bind.
   finalized_binds: HashMap<BaseNode, BaseNode>,
+  /// Exposed nodes on the top function.
+  exposed_nodes: HashSet<BaseNode>,
 }
 
 /// The information of an input of a module.
@@ -144,6 +146,7 @@ impl SysBuilder {
       },
       symbol_table: SymbolTable::new(),
       finalized_binds: HashMap::new(),
+      exposed_nodes: HashSet::new(),
     }
   }
 
@@ -163,6 +166,16 @@ impl SysBuilder {
     self
       .module_iter(ModuleKind::Module)
       .any(|x| x.get_name().eq("testbench"))
+  }
+
+  /// Expose the given node on the top function.
+  pub fn expose_to_top(&mut self, node: BaseNode) {
+    self.exposed_nodes.insert(node);
+  }
+
+  /// Get the iterator of the exposed nodes.
+  pub fn exposed_iter(&self) -> impl Iterator<Item = &BaseNode> {
+    self.exposed_nodes.iter()
   }
 
   /// The helper function to get an element of the system and downcast it to its actual

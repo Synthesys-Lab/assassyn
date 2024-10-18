@@ -1,7 +1,7 @@
 '''The module for intrinsic expressions'''
 #pylint: disable=cyclic-import
 
-from ..builder import ir_builder
+from ..builder import ir_builder, Singleton
 from .expr import Expr
 
 INTRIN_INFO = {

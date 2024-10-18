@@ -542,9 +542,19 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // runtime
     let mut res = String::new();
 
+    res.push_str("module top(\n");
+
+    for elem in self.sys.exposed_iter() {
+      match elem.get_kind() {
+        NodeKind::Array => {
+
+        }
+        _ => panic!("Unexpected exposed type: {:?}", elem),
+      }
+    }
+
     res.push_str(
       "
-module top (
   input logic clk,
   input logic rst_n
 );\n\n",
