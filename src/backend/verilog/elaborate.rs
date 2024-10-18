@@ -1059,29 +1059,41 @@ module memory_blackbox_{a} #(
           res.push_str(&format!(
             r#"  initial begin
           $readmemh({:?}, mem);
-      end"#,
+      end
+        always @ (posedge clk) begin
+            if (write & banksel) begin
+                mem[address] <= wd;
+            end
+        end
+    
+        assign dataout = (read & banksel) ? mem[address] : {{DATA_WIDTH{{1'b0}}}};
+    
+    endmodule
+              "#,
             init_file_path
           ))
+        } else  {
+          res.push_str(
+            r#"
+  
+    
+        always @ (posedge clk) begin
+            if (!rst_n) begin
+                mem[address] <= {{DATA_WIDTH{{1'b0}}}};
+            end
+            else if (write & banksel) begin
+                mem[address] <= wd;
+            end
+        end
+    
+        assign dataout = (read & banksel) ? mem[address] : {{DATA_WIDTH{{1'b0}}}};
+    
+    endmodule
+              "#,
+          );
         }
 
-        res.push_str(
-          r#"
 
-  
-      always @ (posedge clk) begin
-          if (!rst_n) begin
-              mem[address] <= {{DATA_WIDTH{{1'b0}}}};
-          end
-          else if (write & banksel) begin
-              mem[address] <= wd;
-          end
-      end
-  
-      assign dataout = (read & banksel) ? mem[address] : {{DATA_WIDTH{{1'b0}}}};
-  
-  endmodule
-            "#,
-        );
       }
     }
 
