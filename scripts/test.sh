@@ -18,7 +18,7 @@ REPO_DIR=`git rev-parse --show-toplevel`
 
 # Test unit tests
 cd $REPO_DIR/python/unit-tests
-test_case "pytest --workers 8 -x"
+test_case "pytest -n 8 -x"
 
 # Test examples
 
