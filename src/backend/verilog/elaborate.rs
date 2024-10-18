@@ -546,9 +546,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     for elem in self.sys.exposed_iter() {
       match elem.get_kind() {
-        NodeKind::Array => {
-
-        }
+        NodeKind::Array => {}
         _ => panic!("Unexpected exposed type: {:?}", elem),
       }
     }
