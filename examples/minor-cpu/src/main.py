@@ -344,4 +344,6 @@ def run_cpu(resource_base, workload):
 if __name__ == '__main__':
     workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
 
+    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+
     run_cpu(workloads, '0to100')
