@@ -1072,7 +1072,7 @@ module memory_blackbox_{a} #(
               "#,
             init_file_path
           ))
-        } else  {
+        } else {
           res.push_str(
             r#"
   
@@ -1092,8 +1092,6 @@ module memory_blackbox_{a} #(
               "#,
           );
         }
-
-
       }
     }
 
