@@ -61,10 +61,11 @@ class SysBuilder:
         self.downstreams = []
         self.arrays = []
         self._ctx_stack = {'module': [], 'block': []}
-        self._exposes = set()
+        self._exposes = {}
 
-    def expose(self, node):
-        self._exposes.add(node)
+    def expose(self, node, kind=None):
+        '''Expose the given node in the top function with the given kind.'''
+        self._exposes[node] = kind
 
     @property
     def exposes(self):

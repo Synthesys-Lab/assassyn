@@ -1,5 +1,5 @@
 use std::{
-  collections::{HashMap, HashSet},
+  collections::HashMap,
   fmt::Display,
   hash::Hash,
 };
@@ -61,6 +61,12 @@ impl InsertPoint {
   }
 }
 
+pub enum ExposeKind {
+  Input,
+  Output,
+  Both,
+}
+
 /// A `SysBuilder` struct not only serves as the data structure of the whole system,
 /// but also works as the syntax-sugared IR builder.
 pub struct SysBuilder {
@@ -79,7 +85,7 @@ pub struct SysBuilder {
   /// it is called. Key: LazyBind, Value: Expr::Bind.
   finalized_binds: HashMap<BaseNode, BaseNode>,
   /// Exposed nodes on the top function.
-  exposed_nodes: HashSet<BaseNode>,
+  exposed_nodes: HashMap<BaseNode, ExposeKind>,
 }
 
 /// The information of an input of a module.
@@ -150,7 +156,7 @@ impl SysBuilder {
       },
       symbol_table: SymbolTable::new(),
       finalized_binds: HashMap::new(),
-      exposed_nodes: HashSet::new(),
+      exposed_nodes: HashMap::new(),
     }
   }
 
@@ -173,12 +179,12 @@ impl SysBuilder {
   }
 
   /// Expose the given node on the top function.
-  pub fn expose_to_top(&mut self, node: BaseNode) {
-    self.exposed_nodes.insert(node);
+  pub fn expose_to_top(&mut self, node: BaseNode, kind: ExposeKind) {
+    self.exposed_nodes.insert(node, kind);
   }
 
   /// Get the iterator of the exposed nodes.
-  pub fn exposed_iter(&self) -> impl Iterator<Item = &BaseNode> {
+  pub fn exposed_nodes(&self) -> impl Iterator<Item = (&BaseNode, &ExposeKind)> {
     self.exposed_nodes.iter()
   }
 
