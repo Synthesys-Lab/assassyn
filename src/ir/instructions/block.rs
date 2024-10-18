@@ -30,6 +30,7 @@ impl Display for BlockIntrinsic<'_> {
         subcode::BlockIntrinsic::WaitUntil => "wait_until",
         subcode::BlockIntrinsic::Cycled => "cycled",
         subcode::BlockIntrinsic::Finish => "halt",
+        subcode::BlockIntrinsic::Assert => "assert",
       },
       self
         .value()
@@ -37,7 +38,8 @@ impl Display for BlockIntrinsic<'_> {
       match self.get_subcode() {
         subcode::BlockIntrinsic::Value
         | subcode::BlockIntrinsic::WaitUntil
-        | subcode::BlockIntrinsic::Finish => "",
+        | subcode::BlockIntrinsic::Finish
+        | subcode::BlockIntrinsic::Assert => "",
         subcode::BlockIntrinsic::Condition | subcode::BlockIntrinsic::Cycled => "{",
       },
     )

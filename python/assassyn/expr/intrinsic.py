@@ -7,7 +7,8 @@ from .expr import Expr
 INTRIN_INFO = {
     # Intrinsic operations opcode: (mnemonic, num of args, valued, side effect)
     900: ('wait_until', 1, False, True),
-    901: ('finish', 0, False, True)
+    901: ('finish', 0, False, True),
+    902: ('assert', 1, False, True)
 }
 
 class Intrinsic(Expr):
@@ -15,6 +16,7 @@ class Intrinsic(Expr):
 
     WAIT_UNTIL = 900
     FINISH = 901
+    ASSERT = 902
 
     def __init__(self, opcode, *args):
         super().__init__(opcode)
@@ -45,6 +47,15 @@ def wait_until(cond):
     from ..value import Value
     assert isinstance(cond, Value)
     return Intrinsic(Intrinsic.WAIT_UNTIL, cond)
+
+@ir_builder
+def assume(cond):
+    '''Frontend API for creating an assertion.
+    This name is to avoid conflict with the Python keyword.'''
+    #pylint: disable=import-outside-toplevel
+    from ..value import Value
+    assert isinstance(cond, Value)
+    return Intrinsic(Intrinsic.ASSERT, cond)
 
 
 def is_wait_until(expr):

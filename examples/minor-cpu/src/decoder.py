@@ -1,7 +1,7 @@
 
 from assassyn.frontend import *
 from opcodes import *
-from instruction_types import *
+from instructions import *
 
 def decode_logic(inst):
 
@@ -14,6 +14,9 @@ def decode_logic(inst):
     rs1_valid = Bits(1)(0)
     rs2_valid = Bits(1)(0)
     imm_valid = Bits(1)(0)
+    supported = Bits(1)(0)
+
+    log("0x{:08x}", inst)
 
     # Check if the given instruction's opcode equals one of the supported opcodes
     for mn, opcode, cur_type in supported_opcodes:
@@ -23,6 +26,7 @@ def decode_logic(inst):
         eq = ri.view().opcode == wrapped_opcode
         is_type[cur_type] = is_type[cur_type] | eq
         eqs[mn] = eq
+        supported = supported | eq
 
         pad = 6 - len(mn)
         pad = ' ' * pad
@@ -64,10 +68,14 @@ def decode_logic(inst):
         with Condition(eq):
             log(fmt, *args)
 
+    with Condition(~supported):
+        log("Unsupported instruction: opcode = 0x{:x}", views[RInst].view().opcode)
+        assume(Bits(1)(0))
+
     # Extract all the signals
     memory_read = eqs['lw']
     invoke_adder = eqs['addi'] | eqs['add'] | eqs['lw'] | eqs['bne']
-    is_branch = eqs['bne'] | eqs['ret'] | eqs['ebreak']
+    is_branch = eqs['bne'] | eqs['jal'] | eqs['ebreak']
     # Extract all the operands according to the instruction types
     # rd
     rd_reg = rd_valid.select(views[RInst].view().rd, Bits(5)(0))

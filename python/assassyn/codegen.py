@@ -65,6 +65,7 @@ CG_OPCODE = {
 
     expr.intrinsic.Intrinsic.WAIT_UNTIL: 'wait_until',
     expr.intrinsic.Intrinsic.FINISH: 'finish',
+    expr.intrinsic.Intrinsic.ASSERT: 'assert',
 }
 
 CG_MIDFIX = {
@@ -378,7 +379,7 @@ class CodeGen(visitor.Visitor):
             ty = generate_dtype(node.dtype)
             res = f'sys.{ib_method}({x}, {ty});'
         elif isinstance(node, expr.Intrinsic):
-            if node.opcode == expr.Intrinsic.WAIT_UNTIL:
+            if node.opcode in [expr.Intrinsic.WAIT_UNTIL, expr.Intrinsic.ASSERT]:
                 cond = self.generate_rval(node.args[0])
                 res = f'sys.{ib_method}({cond});'
             elif node.opcode == expr.Intrinsic.FINISH:

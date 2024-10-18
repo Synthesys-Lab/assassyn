@@ -78,5 +78,6 @@ register_subcode!(
     Cycled(cycled "cycled"),
     WaitUntil(wait_until "wait_until"),
     Finish(finish "finish"),
+    Assert(assert "assert"),
   }
 );

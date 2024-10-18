@@ -173,13 +173,17 @@ impl BlockMut<'_> {
 }
 
 impl SysBuilder {
-  fn create_block_intrinsic(
+  pub fn create_block_intrinsic(
     &mut self,
     dtype: DataType,
     subcode: subcode::BlockIntrinsic,
     value: BaseNode,
   ) -> BaseNode {
     self.create_expr(dtype, subcode.into(), vec![value], true)
+  }
+  /// Create an assertion.
+  pub fn create_assert(&mut self, cond: BaseNode) -> BaseNode {
+    self.create_block_intrinsic(DataType::void(), subcode::BlockIntrinsic::Assert, cond)
   }
 
   pub fn create_wait_until(&mut self, cond: BaseNode) -> BaseNode {

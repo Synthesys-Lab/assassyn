@@ -49,14 +49,14 @@ class Execution(Module):
 
         on_write = reg_onwrite[0]
 
-        a_valid = (((~(on_write >> self.a_reg.peek())) & Bits(32)(1)))[0:0] | \
-            (exec_bypass_reg[0] == self.a_reg.peek()) | \
+        a_valid = (~(on_write >> a_reg))[0:0] | \
+            (exec_bypass_reg[0] == a_reg) | \
             (mem_bypass_reg[0] == self.a_reg.peek())
-        b_valid = (((~(on_write >> self.b_reg.peek())) & Bits(32)(1)))[0:0] | \
-            (exec_bypass_reg[0] == self.b_reg.peek()) | \
-            (mem_bypass_reg[0] == self.b_reg.peek())
+        b_valid = (~(on_write >> b_reg))[0:0] | \
+            (exec_bypass_reg[0] == b_reg) | \
+            (mem_bypass_reg[0] == b_reg)
 
-        rd_valid = (((~(on_write >> self.rd_reg.peek())) & Bits(32)(1)))[0:0]
+        rd_valid = (~(on_write >> rd_reg) & Bits(32)(1))[0:0]
 
         valid = a_valid & b_valid & rd_valid
 
@@ -69,7 +69,6 @@ class Execution(Module):
         wait_until(valid)
 
         opcode, imm_value, a_reg, b_reg, rd_reg = self.pop_all_ports(False)
-
 
         op_check = OpcodeChecker(opcode)
         op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret', 'ebreak')
@@ -132,7 +131,7 @@ class Execution(Module):
         is_memory = is_lw
         is_memory_read = is_lw
 
-        addr = (result.bitcast(Int(32)) - data_offset).bitcast(Bits(32))
+        addr = (result.bitcast(UInt(32)) - data_offset).bitcast(Bits(32))
 
         request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
 
@@ -254,8 +253,8 @@ def run_cpu(resource_base, workload):
             print(offsets)
             offset = offsets['offset']
             data_offset = offsets['data_offset']
-            offset = Int(32)(offset)
-            data_offset = Int(32)(data_offset)
+            offset = UInt(32)(offset)
+            data_offset = UInt(32)(data_offset)
 
         # Data Types
         bits1   = Bits(1)
@@ -332,16 +331,14 @@ def run_cpu(resource_base, workload):
     simulator_path, verilog_path = elaborate(sys, **conf)
 
     raw = utils.run_simulator(simulator_path)
-    # check(raw)
+    check(raw)
 
     raw = utils.run_verilator(verilog_path)
-    # check(raw)
+    check(raw)
 
 if __name__ == '__main__':
     workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    run_cpu(workloads, '0to100')
 
-    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-
-    #run_cpu(workloads, '0to100')
-
-    run_cpu(tests, 'rv32ui-p-add')
+    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    # run_cpu(tests, 'rv32ui-p-add')

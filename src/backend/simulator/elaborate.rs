@@ -419,6 +419,9 @@ impl Visitor<String> for ElaborateModule<'_> {
             format!("if {} {{", value)
           }
           subcode::BlockIntrinsic::Finish => "std::process::exit(0);".to_string(),
+          subcode::BlockIntrinsic::Assert => {
+            format!("assert!({});", value)
+          }
         }
       }
     };
