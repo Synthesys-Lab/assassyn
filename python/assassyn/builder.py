@@ -69,6 +69,7 @@ class SysBuilder:
 
     @property
     def exposed_nodes(self):
+        '''Get the exposed nodes.'''
         return self._exposes
 
     def __enter__(self):
