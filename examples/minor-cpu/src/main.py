@@ -72,7 +72,6 @@ class Execution(Module):
         # TODO(@were): This is a hack to avoid post wait_until checks.
         rd = signals.rd
 
-        # TODO(@were): Bring this back later.
         is_ebreak = signals.rs1_valid & signals.imm_valid & (signals.imm == Bits(32)(1)) & (signals.alu == Bits(16)(0))
         with Condition(is_ebreak):
             log('ebreak | halt')

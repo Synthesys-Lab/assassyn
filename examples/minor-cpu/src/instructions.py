@@ -53,7 +53,7 @@ class RInst(InstType):
         opcode = view.opcode == Bits(7)(opcode)
         funct3 = view.funct3 == Bits(3)(funct3)
         funct7 = view.funct7 == Bits(7)(funct7)
-        eq =  opcode & funct3 & funct7
+        eq = opcode & funct3 & funct7
         return InstSignal(eq, alu)
 
 
