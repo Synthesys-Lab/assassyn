@@ -384,9 +384,13 @@ impl SysBuilder {
     let cond_ty = cond.get_dtype(self).unwrap();
     assert_eq!(cond_ty.get_bits(), values.len(), "Select1Hot value count mismatch!",);
     let v0type = values[0].get_dtype(self).unwrap();
-    for elem in values.iter().skip(1) {
+    for (i, elem) in values.iter().skip(1).enumerate() {
       let vitype = elem.get_dtype(self).unwrap();
-      assert_eq!(v0type, vitype, "Select1Hot value type mismatch {:?} != {:?}", v0type, vitype,);
+      assert_eq!(
+        v0type, vitype,
+        "Select1Hot: {}-th value type mismatch {:?} != {:?}",
+        i, v0type, vitype,
+      );
     }
     let mut args = vec![cond];
     args.extend(values);
