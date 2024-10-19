@@ -14,7 +14,7 @@ use instructions::FIFOPush;
 use crate::{
   analysis::topo_sort,
   backend::common::{create_and_clean_dir, namify, upstreams, Config},
-  builder::system::{ModuleKind, SysBuilder,ExposeKind},
+  builder::system::{ExposeKind, ModuleKind, SysBuilder},
   ir::{instructions::BlockIntrinsic, node::*, visitor::Visitor, *},
 };
 
@@ -544,8 +544,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     res.push_str("module top(\n");
 
-    
-
     for (exposed_node, kind) in self.sys.exposed_nodes() {
       let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
       let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
@@ -622,7 +620,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
       let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
       let q = display.field("q");
-      
       if *kind == ExposeKind::Output {
         let o = display.field("exposed");
         res.push_str(&format!("  assign {o} = {q}[0];\n"));
@@ -651,14 +648,13 @@ end"
 
     let threashold = (sim_threshold + 1) * 100;
     fd.write_all(
-      format!(
-        "
+      "
 module tb;
 
 logic clk;
 logic rst_n;
 "
-      )
+      .to_string()
       .as_bytes(),
     )?;
 
@@ -668,11 +664,9 @@ logic rst_n;
       let msb = exposed_nodes_ref.scalar_ty().get_bits() - 1;
       if *kind == ExposeKind::Output {
         let o = display.field("exposed");
-        fd.write_all(
-          format!("logic [{msb}:0]{o};\n",).as_bytes(),)?;
+        fd.write_all(format!("logic [{msb}:0]{o};\n",).as_bytes())?;
       }
     }
-
 
     fd.write_all(
       format!(
@@ -693,28 +687,26 @@ always #50 clk <= !clk;
 top top_i (
   .clk(clk),
   .rst_n(rst_n)"
-    )
-.as_bytes(),
-)?;
+      )
+      .as_bytes(),
+    )?;
 
     for (exposed_node, kind) in self.sys.exposed_nodes() {
       let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
       let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
       if *kind == ExposeKind::Output {
         let o = display.field("exposed");
-        fd.write_all(&format!(",\n  .{o}({o})").as_bytes(),)?;
+        fd.write_all(format!(",\n  .{o}({o})").as_bytes())?;
       }
     }
 
-
     fd.write_all(
-      format!(
-    "
+      "
 );
 
 endmodule
 "
-      )
+      .to_string()
       .as_bytes(),
     )?;
 

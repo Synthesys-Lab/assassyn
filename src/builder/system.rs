@@ -1,8 +1,4 @@
-use std::{
-  collections::HashMap,
-  fmt::Display,
-  hash::Hash,
-};
+use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 use instructions::call::LazyBind;
 
@@ -61,7 +57,7 @@ impl InsertPoint {
   }
 }
 
-#[derive(Debug , PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum ExposeKind {
   Input,
   Output,
@@ -849,17 +845,14 @@ impl SysBuilder {
 
   pub fn create_custom_basenode(
     &mut self,
-    ty: DataType,          
-    name: &str,            
-    size: usize,           
-    attrs: Vec<ArrayAttr>,  
-) -> BaseNode {
-
+    ty: DataType,
+    name: &str,
+    size: usize,
+    attrs: Vec<ArrayAttr>,
+  ) -> BaseNode {
     let instance = Array::new(ty.clone(), name.to_string(), size, None, attrs);
-    let custom_basenode = self.insert_element(instance); 
-    custom_basenode  
-}
-
+    self.insert_element(instance)
+  }
 }
 
 impl Display for SysBuilder {

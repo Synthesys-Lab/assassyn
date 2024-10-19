@@ -7,14 +7,12 @@ use super::{node::BaseNode, DataType, Typed};
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ArrayAttr {
   FullyPartitioned,
-  
 }
 
 impl ArrayAttr {
   pub fn to_string(&self, _: &SysBuilder) -> String {
     match self {
       ArrayAttr::FullyPartitioned => "FullyPartitioned".into(),
-      
     }
   }
 }
