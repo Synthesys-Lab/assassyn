@@ -3,7 +3,6 @@
 import inspect
 from decorator import decorator
 import os
-import sys
 import site
 
 all_dirs_to_exclude = []
