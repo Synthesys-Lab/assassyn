@@ -30,8 +30,9 @@ class InstSignal:
     def __init__(self, eq, alu, cond=None):
         self.eq = eq
 
-        self.alu = 0
-        self.alu = Bits(RV32I_ALU.CNT)(1 << alu)
+        self.alu = Bits(RV32I_ALU.CNT)(0)
+        if alu is not None:
+            self.alu = Bits(RV32I_ALU.CNT)(1 << alu)
 
         self.cond = Bits(RV32I_ALU.CNT)(1)
         self.flip = Bits(1)(0)
@@ -204,7 +205,7 @@ supported_opcodes = [
   ('xori'  , (0b0010011, 0b100, RV32I_ALU.ALU_XOR, None), IInst),
 
   ('lw'    , (0b0000011, 0b010, RV32I_ALU.ALU_ADD, None), IInst),
-  ('ebreak', (0b1110011, 0b010, RV32I_ALU.ALU_ADD, None), IInst),
+  ('ebreak', (0b1110011, 0b000, None, None), IInst),
 
   # mn,       opcode,    funct3,cmp,                  flip
   ('bne'   , (0b1100011, 0b001, RV32I_ALU.ALU_CMP_EQ, True), BInst),

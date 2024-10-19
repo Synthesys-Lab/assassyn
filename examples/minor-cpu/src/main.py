@@ -11,7 +11,6 @@ from opcodes import *
 from decoder import *
 from writeback import *
 from memory_access import *
-from utils import *
 
 offset = None
 data_offset = None
@@ -74,9 +73,10 @@ class Execution(Module):
         rd = signals.rd
 
         # TODO(@were): Bring this back later.
-        # with Condition(is_ebreak):
-        #     log('ebreak({:07b}) | halt', opcode)
-        #     finish()
+        is_ebreak = signals.rs1_valid & signals.imm_valid & (signals.imm == Bits(32)(1)) & (signals.alu == Bits(16)(0))
+        with Condition(is_ebreak):
+            log('ebreak | halt')
+            finish()
 
         # Instruction attributes
 
@@ -330,10 +330,16 @@ def run_cpu(resource_base, workload):
     simulator_path, verilog_path = elaborate(sys, **conf)
 
     raw = utils.run_simulator(simulator_path)
-    check(raw)
+    open('raw.log', 'w').write(raw)
+    test = f'{resource_base}/{workload}.sh'
+    subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
 
     raw = utils.run_verilator(verilog_path)
-    check(raw)
+    open('raw.log', 'w').write(raw)
+    test = f'{resource_base}/{workload}.sh'
+    subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
+
+    os.remove('raw.log')
 
 if __name__ == '__main__':
     workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
