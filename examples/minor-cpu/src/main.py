@@ -24,7 +24,7 @@ class Execution(Module):
                 'signals': Port(deocder_signals),
                 'fetch_addr': Port(Bits(32)),
             })
-        self.name = "Executor"
+        self.name = "E"
 
     @module.combinational
     def build(
@@ -63,12 +63,15 @@ class Execution(Module):
         valid = a_valid & b_valid & rd_valid
 
         with Condition(~valid):
-            log("scoreboard       | rs1-x{:02}:{:05}| rs2-x{:02}:{:05}| rd-x{:02}: {}", \
+            log("rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {}", \
                 rs1, a_valid, rs2, b_valid, rd, rd_valid)
 
         wait_until(valid)
 
         signals, fetch_addr = self.pop_all_ports(False)
+
+        # TODO(@were): This is a hack to avoid post wait_until checks.
+        rd = signals.rd
 
         # TODO(@were): Bring this back later.
         # with Condition(is_ebreak):
@@ -110,7 +113,11 @@ class Execution(Module):
         results[RV32I_ALU.ALU_TRUE] = Bits(32)(1)
 
         # TODO: Fix this bullshit.
-        result = signals.alu.select1hot(*results)
+        alu = signals.alu
+        result = alu.select1hot(*results)
+
+        log("0x{:08x}       | a: {:08x}  | b: {:08x}   | imm: {:08x} | result: {:08x}", alu, a, b, signals.imm, result)
+
         condition = signals.cond.select1hot(*results)
         condition = signals.flip.select(~condition, condition)
 
@@ -124,18 +131,19 @@ class Execution(Module):
 
         with Condition(signals.is_branch):
             br_dest = condition[0:0].select(result, pc[0])
-            log("condition: {}, br_dest: {}", condition, br_dest)
+            log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc[0])
             br_sm = RegArray(Bits(1), 1)
             br_sm[0] = Bits(1)(0)
 
-        addr = (result.bitcast(UInt(32)) - data_offset).bitcast(Bits(32))
-
         is_memory = memory_read | memory_write
+
+        # This `is_memory` hack is to evade rust's overflow check.
+        addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
         request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
 
-        with Condition(memory_read):
+        with Condition(is_memory):
             mem_bypass_reg[0] = memory_read.select(rd, Bits(5)(0))
-            log("mem-read         | addr: 0x{:x} | lineno: 0x{:x}", result, request_addr)
+            log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
 
         dcache = SRAM(width=32, depth=512, init_file=data)
         dcache.name = 'dcache'
@@ -144,7 +152,7 @@ class Execution(Module):
         wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd)
 
         with Condition(rd != Bits(5)(0)):
-            log("own x{:02}", rd)
+            log("own x{:02}          |", rd)
 
         return br_sm, br_dest, wb, rd 
 
@@ -155,7 +163,7 @@ class Decoder(Module):
             'rdata': Port(Bits(32)),
             'fetch_addr': Port(Bits(32)),
         })
-        self.name = 'Decoder'
+        self.name = 'D'
 
     @module.combinational
     def build(self, executor: Module, br_sm: Array):
@@ -172,7 +180,7 @@ class Fetcher(Module):
     
     def __init__(self):
         super().__init__(ports={})
-        self.name = 'Fetcher'
+        self.name = 'F'
 
     @module.combinational
     def build(self):
@@ -184,7 +192,7 @@ class FetcherImpl(Downstream):
 
     def __init__(self):
         super().__init__()
-        self.name = 'FetcherImpl'
+        self.name = 'F1'
 
     @downstream.combinational
     def build(self,
@@ -201,7 +209,7 @@ class FetcherImpl(Downstream):
         icache = SRAM(width=32, depth=512, init_file=data)
         icache.name = 'icache'
         icache.build(Bits(1)(0), should_fetch, to_fetch[2:10].bitcast(Int(9)), Bits(32)(0), decoder)
-        log("fetcher          | on_br: {} | ex_by: {} | should_fetch: {} | fetch: 0x{:x}",
+        log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} |",
             on_branch, ex_bypass.valid(), should_fetch, to_fetch)
         with Condition(should_fetch):
             icache.bound.async_called(fetch_addr=to_fetch)
@@ -211,16 +219,16 @@ class Onwrite(Downstream):
     
     def __init__(self):
         super().__init__()
-        self.name = 'Onwrite'
+        self.name = 'W1'
 
     @downstream.combinational
     def build(self, reg_onwrite: Array, exec_rd: Value, writeback_rd: Value):
         ex_rd = exec_rd.optional(Bits(5)(0))
         wb_rd = writeback_rd.optional(Bits(5)(0))
-        ex_rd = (ex_rd != Bits(5)(0)).select(Bits(32)(1) << ex_rd, Bits(32)(0))
-        wb_rd = (wb_rd != Bits(5)(0)).select(Bits(32)(1) << wb_rd, Bits(32)(0))
-        log("scoreboard       | ownning: {:08x} | releasing: {:08x}", ex_rd, wb_rd)
-        reg_onwrite[0] = reg_onwrite[0] ^ ex_rd ^ wb_rd
+        ex_bit = (ex_rd != Bits(5)(0)).select(Bits(32)(1) << ex_rd, Bits(32)(0))
+        wb_bit = (wb_rd != Bits(5)(0)).select(Bits(32)(1) << wb_rd, Bits(32)(0))
+        log("ownning: {:02}      | releasing: {:02}|", ex_rd, wb_rd)
+        reg_onwrite[0] = reg_onwrite[0] ^ ex_bit ^ wb_bit
 
 class Driver(Module):
     

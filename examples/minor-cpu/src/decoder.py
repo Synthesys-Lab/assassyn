@@ -20,7 +20,7 @@ def decode_logic(inst):
     cond = Bits(RV32I_ALU.CNT)(0)
     flip = Bits(1)(0)
 
-    log("0x{:08x}", inst)
+    log("raw: 0x{:08x}  |", inst)
 
     # Check if the given instruction's opcode equals one of the supported opcodes
     for mn, args, cur_type in supported_opcodes:
@@ -53,7 +53,7 @@ def decode_logic(inst):
             args.append(ri.view().rd)
             rd_valid = rd_valid | eq
         else:
-            fmt = fmt + '|               '
+            fmt = fmt + '|              '
 
         if ri.has_rs1:
             fmt = fmt + "| rs1: x{:02}      "
@@ -78,7 +78,8 @@ def decode_logic(inst):
             log(fmt, *args)
 
     with Condition(~supported):
-        log("Unsupported instruction: opcode = 0x{:x}", views[RInst].view().opcode)
+        view = views[RInst].view()
+        log("Unsupported instruction: opcode = 0x{:x} funct3: 0x{:x} funct7: 0x{:x}", view.opcode, view.funct3, view.funct7)
         assume(Bits(1)(0))
 
     # Extract all the signals

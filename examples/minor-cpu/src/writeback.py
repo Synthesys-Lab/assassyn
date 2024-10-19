@@ -12,7 +12,7 @@ class WriteBack(Module):
                 'mdata': Port(Bits(32)),
             }, no_arbiter=True)
 
-        self.name = 'WriteBack'
+        self.name = 'W'
 
     @module.combinational
     def build(self, reg_file: Array):
@@ -22,7 +22,7 @@ class WriteBack(Module):
         data = is_memory_read.select(mdata, result)
 
         with Condition((rd != Bits(5)(0))):
-            log("writeback        | x{:02} = 0x{:x}", rd, data)
+            log("writeback        | x{:02}          | 0x{:08x}", rd, data)
             reg_file[rd] = data
 
         return rd

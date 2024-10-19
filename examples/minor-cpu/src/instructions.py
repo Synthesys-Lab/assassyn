@@ -70,7 +70,7 @@ class IInst(InstType):
         raw = self.view().imm
         if pad:
             signal = raw[11:11]
-            signal = signal.select(Bits(20)(1), Bits(20)(0))
+            signal = signal.select(Bits(20)(0xfffff), Bits(20)(0))
             raw = concat(signal, raw)
         return raw
 
@@ -140,7 +140,7 @@ class JInst(InstType):
         imm = concat(view.imm20, view.imm19_12, view.imm11, view.imm10_1, Bits(1)(0))
         if pad:
             signal = imm[20:20]
-            signal = signal.select(Bits(11)(1), Bits(11)(0))
+            signal = signal.select(Bits(11)(0x7ff), Bits(11)(0))
             imm = concat(signal, imm)
         return imm
 
@@ -169,7 +169,7 @@ class BInst(InstType):
         imm = imm.concat(Bits(1)(0))
         if pad:
             signal = imm[12:12]
-            signal = signal.select(Bits(19)(1), Bits(19)(0))
+            signal = signal.select(Bits(19)(0x7ffff), Bits(19)(0))
             imm = concat(signal, imm)
         return imm
 

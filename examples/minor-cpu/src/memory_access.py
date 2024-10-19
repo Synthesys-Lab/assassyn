@@ -7,7 +7,7 @@ class MemoryAccess(Module):
         super().__init__(
             ports={'rdata': Port(Bits(32))},
             no_arbiter=True)
-        self.name = 'memaccess'
+        self.name = 'm'
 
     @module.combinational
     def build(
