@@ -316,7 +316,11 @@ impl Visitor<String> for ElaborateModule<'_> {
         res.push_str("println!(");
         for elem in expr.operand_iter() {
           let dump = dump_rval_ref(self.module_ctx, self.sys, elem.get_value());
-          let dump = if elem.get_value().get_dtype(self.sys).map_or(false, |x| x.get_bits() == 1) {
+          let dump = if elem
+            .get_value()
+            .get_dtype(self.sys)
+            .map_or(false, |x| x.get_bits() == 1)
+          {
             format!("if {} {{ 1 }} else {{ 0 }}", dump)
           } else {
             dump
