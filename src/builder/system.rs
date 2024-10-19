@@ -61,10 +61,11 @@ impl InsertPoint {
   }
 }
 
+#[derive(Debug , PartialEq)]
 pub enum ExposeKind {
   Input,
   Output,
-  Both,
+  Inout,
 }
 
 /// A `SysBuilder` struct not only serves as the data structure of the whole system,
@@ -845,6 +846,20 @@ impl SysBuilder {
       _ => panic!("Unsupported node kind!"),
     }
   }
+
+  pub fn create_custom_basenode(
+    &mut self,
+    ty: DataType,          
+    name: &str,            
+    size: usize,           
+    attrs: Vec<ArrayAttr>,  
+) -> BaseNode {
+
+    let instance = Array::new(ty.clone(), name.to_string(), size, None, attrs);
+    let custom_basenode = self.insert_element(instance); 
+    custom_basenode  
+}
+
 }
 
 impl Display for SysBuilder {

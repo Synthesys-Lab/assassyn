@@ -14,7 +14,7 @@ use instructions::FIFOPush;
 use crate::{
   analysis::topo_sort,
   backend::common::{create_and_clean_dir, namify, upstreams, Config},
-  builder::system::{ModuleKind, SysBuilder},
+  builder::system::{ModuleKind, SysBuilder,ExposeKind},
   ir::{instructions::BlockIntrinsic, node::*, visitor::Visitor, *},
 };
 
@@ -544,10 +544,13 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     res.push_str("module top(\n");
 
-    for elem in self.sys.exposed_iter() {
-      match elem.get_kind() {
-        NodeKind::Array => {}
-        _ => panic!("Unexpected exposed type: {:?}", elem),
+    
+
+    for (exposed_node, kind) in self.sys.exposed_nodes() {
+      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
+      if *kind == ExposeKind::Output {
+        res.push_str(&declare_out(exposed_nodes_ref.scalar_ty(), &display.field("exposed")));
       }
     }
 
@@ -614,6 +617,18 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       res.push_str(&self.dump_module_instance(&module));
     }
 
+    // expose signals to tb
+    for (exposed_node, kind) in self.sys.exposed_nodes() {
+      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
+      let q = display.field("q");
+      
+      if *kind == ExposeKind::Output {
+        let o = display.field("exposed");
+        res.push_str(&format!("  assign {o} = {q}[0];\n"));
+      }
+    }
+
     res.push_str("endmodule // top\n\n");
 
     fd.write_all(res.as_bytes()).unwrap();
@@ -642,7 +657,26 @@ module tb;
 
 logic clk;
 logic rst_n;
+"
+      )
+      .as_bytes(),
+    )?;
 
+    for (exposed_node, kind) in self.sys.exposed_nodes() {
+      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
+      let msb = exposed_nodes_ref.scalar_ty().get_bits() - 1;
+      if *kind == ExposeKind::Output {
+        let o = display.field("exposed");
+        fd.write_all(
+          format!("logic [{msb}:0]{o};\n",).as_bytes(),)?;
+      }
+    }
+
+
+    fd.write_all(
+      format!(
+        "
 initial begin
   clk = 1'b1;
   rst_n = 1'b0;
@@ -658,7 +692,24 @@ always #50 clk <= !clk;
 
 top top_i (
   .clk(clk),
-  .rst_n(rst_n)
+  .rst_n(rst_n)"
+    )
+.as_bytes(),
+)?;
+
+    for (exposed_node, kind) in self.sys.exposed_nodes() {
+      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
+      if *kind == ExposeKind::Output {
+        let o = display.field("exposed");
+        fd.write_all(&format!(",\n  .{o}({o})").as_bytes(),)?;
+      }
+    }
+
+
+    fd.write_all(
+      format!(
+    "
 );
 
 endmodule
