@@ -1,17 +1,18 @@
 '''The module provides the implementation of a class that is both IR builder and the system.'''
-
-import inspect
-from decorator import decorator
 import os
 import site
+import inspect
+from decorator import decorator
 
 all_dirs_to_exclude = []
+
 class Singleton(type):
     '''The class maintains the global singleton instance of the system builder.'''
     builder = None
     repr_ident = None
     id_slice = slice(-6, -1)
     with_py_loc = False
+    
 
 @decorator
 def ir_builder(func, *args, **kwargs):
@@ -20,7 +21,7 @@ def ir_builder(func, *args, **kwargs):
     #pylint: disable=cyclic-import,import-outside-toplevel
     from .const import Const
     from .utils import package_path
-     
+
     if not isinstance(res, Const):
         Singleton.builder.insert_point.append(res)
     
@@ -29,17 +30,16 @@ def ir_builder(func, *args, **kwargs):
     global all_dirs_to_exclude
     if not all_dirs_to_exclude:
         site_package_dirs = site.getsitepackages()
-    
         user_site_package_dir = site.getusersitepackages()
-    
         all_dirs_to_exclude =  site_package_dirs + [user_site_package_dir]
      
     for i in inspect.stack()[2:]:
         fname, lineno = i.filename, i.lineno
         fname_abs = os.path.abspath(fname)
  
-        if not fname_abs.startswith(package_dir) and not any(fname_abs.startswith(exclude_dir) for exclude_dir in all_dirs_to_exclude):
-            res.loc = f'{fname}:{lineno}' 
+        if not fname_abs.startswith(package_dir) \
+            and not any(fname_abs.startswith(exclude_dir) for exclude_dir in all_dirs_to_exclude):
+            res.loc = f'{fname}:{lineno}'
             break
     assert hasattr(res, 'loc')
     return res
