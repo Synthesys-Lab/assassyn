@@ -23,7 +23,7 @@ class MemUser(Module):
         rdata = rdata.bitcast(Int(width))
 
         bitmask = Bits(cachesize)(0b10101010)
-        data_joint = Bits(0)(0)
+        data_joint = Bits(1)(0)
 
         for i in range(cachesize):
             offest = cachesize - i - 1
@@ -87,7 +87,6 @@ def impl(sys_name, width, init_file, resource_base):
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
     check(raw)
 
     if utils.has_verilator():
