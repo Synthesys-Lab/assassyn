@@ -12,7 +12,6 @@ class Singleton(type):
     repr_ident = None
     id_slice = slice(-6, -1)
     with_py_loc = False
-    
 
 @decorator
 def ir_builder(func, *args, **kwargs):
@@ -24,19 +23,19 @@ def ir_builder(func, *args, **kwargs):
 
     if not isinstance(res, Const):
         Singleton.builder.insert_point.append(res)
-    
+
     package_dir = os.path.abspath(package_path())
-    
+
     global all_dirs_to_exclude
     if not all_dirs_to_exclude:
         site_package_dirs = site.getsitepackages()
         user_site_package_dir = site.getusersitepackages()
         all_dirs_to_exclude =  site_package_dirs + [user_site_package_dir]
-     
+
     for i in inspect.stack()[2:]:
         fname, lineno = i.filename, i.lineno
         fname_abs = os.path.abspath(fname)
- 
+
         if not fname_abs.startswith(package_dir) \
             and not any(fname_abs.startswith(exclude_dir) for exclude_dir in all_dirs_to_exclude):
             res.loc = f'{fname}:{lineno}'
