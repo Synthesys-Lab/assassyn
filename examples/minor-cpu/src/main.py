@@ -116,6 +116,7 @@ class Execution(Module):
         result = alu.select1hot(*results)
 
         log("0x{:08x}       | a: {:08x}  | b: {:08x}   | imm: {:08x} | result: {:08x}", alu, a, b, signals.imm, result)
+        log("0x{:08x}       |a.a:{:08x}  |a.b:{:08x}   | res: {:08x} |", alu, alu_a, alu_b, result)
 
         condition = signals.cond.select1hot(*results)
         condition = signals.flip.select(~condition, condition)
@@ -341,8 +342,8 @@ def run_cpu(resource_base, workload):
     os.remove('raw.log')
 
 if __name__ == '__main__':
-    workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    run_cpu(workloads, '0to100')
+    # workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    # run_cpu(workloads, '0to100')
 
-    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    # run_cpu(tests, 'rv32ui-p-add')
+    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    run_cpu(tests, 'rv32ui-p-add')
