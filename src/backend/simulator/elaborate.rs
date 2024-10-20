@@ -559,7 +559,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     }
   }
   for expr in expr_validities
-    .into_iter()
+    .iter()
     .map(|x| x.as_ref::<Expr>(sys).unwrap())
   {
     let name = namify(&expr.get_name());
@@ -625,6 +625,20 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     fd.write_all(format!("let succ = super::modules::{}(self);", module_name).as_bytes())?;
     if !module.is_downstream() {
       fd.write_all(format!("if succ {{ self.{}_event.pop_front(); }}", module_name).as_bytes())?;
+      fd.write_all(" else {".as_bytes())?;
+      // This is the tricky part: If a module is failed at the `wait_until` phase, but some
+      // value used externally is already footprinted. Then that external usage should be
+      // invalidated to align with the semantics of verilog.
+      for expr in expr_validities
+        .iter()
+        .map(|x| x.as_ref::<Expr>(sys).unwrap())
+      {
+        if expr.get_block().get_module() == module.upcast() {
+          let name = namify(&expr.get_name());
+          fd.write_all(format!("self.{}_value = None;", name).as_bytes())?;
+        }
+      }
+      fd.write_all("}".as_bytes())?;
       simulators.push(module_name.clone());
     }
     fd.write_all(format!("self.{}_triggered = succ;\n", module_name).as_bytes())?;
