@@ -101,7 +101,7 @@ def mem_systolic_array(sys_name, init_file_row, init_file_col, resource_base):
 
     with sys:
 
-        pe_array = build_pe_array()
+        pe_array = build_pe_array(sys)
 
         # Build the SRAM module
         memory_R = SRAM(width=128, depth=1024, init_file=init_file_row) 

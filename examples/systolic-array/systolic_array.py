@@ -32,11 +32,12 @@ class ComputePE(Module):
 
     def __init__(self):
         super().__init__(no_arbiter=True, ports={'west': Port(Int(32)), 'north': Port(Int(32))})
+        self.acc = RegArray(Int(32), 1)
 
     @module.combinational
     def build(self, east: Bind, south: Bind):
         west, north = self.pop_all_ports(False)
-        acc = RegArray(Int(32), 1)
+        acc = self.acc
         val = acc[0]
         mul = (west * north)
         c = mul[0:31].bitcast(Int(32))
@@ -165,7 +166,7 @@ def check_raw(raw):
                 actual = int(actual_line.split()[-1])
                 assert expected == actual
 
-def build_pe_array():
+def build_pe_array(sys):
     res = [[ProcElem() for _ in range(6)] for _ in range(6)]
 
     # Init ComputePE
@@ -205,6 +206,7 @@ def build_pe_array():
             fwest, fnorth = res[i][j].pe.build(
                     res[i][j + 1].bound,
                     res[i + 1][j].bound)
+            sys.expose_on_top(res[i][j].pe.acc,kind='Output')
             res[i][j + 1].bound = fwest
             res[i + 1][j].bound = fnorth
 
@@ -215,7 +217,7 @@ def systolic_array():
     sys = SysBuilder('systolic_array')
     
     with sys:
-        pe_array = build_pe_array()
+        pe_array = build_pe_array(sys)
         testbench = Testbench()
         testbench.build(
                 [pe_array[0][i].pe for i in range(1, 5)], \

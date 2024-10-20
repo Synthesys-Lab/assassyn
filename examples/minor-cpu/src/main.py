@@ -11,7 +11,6 @@ from opcodes import *
 from decoder import *
 from writeback import *
 from memory_access import *
-from utils import *
 
 offset = None
 data_offset = None
@@ -21,13 +20,10 @@ class Execution(Module):
     def __init__(self):
         super().__init__(
             ports={
-                'opcode': Port(Bits(7)),
-                'imm_value': Port(Bits(32)),
-                'a_reg': Port(Bits(5)),
-                'b_reg': Port(Bits(5)),
-                'rd_reg': Port(Bits(5)),
+                'signals': Port(deocder_signals),
+                'fetch_addr': Port(Bits(32)),
             })
-        self.name = "Executor"
+        self.name = "E"
 
     @module.combinational
     def build(
@@ -43,140 +39,139 @@ class Execution(Module):
         writeback: Module,
         data: str):
 
-        a_reg = self.a_reg.peek()
-        b_reg = self.b_reg.peek()
-        rd_reg = self.rd_reg.peek()
+        signals = self.signals.peek()
+
+        rs1 = signals.rs1
+        rs2 = signals.rs2
+        rd = signals.rd
 
         on_write = reg_onwrite[0]
 
-        a_valid = (((~(on_write >> self.a_reg.peek())) & Bits(32)(1)))[0:0] | \
-            (exec_bypass_reg[0] == self.a_reg.peek()) | \
-            (mem_bypass_reg[0] == self.a_reg.peek())
-        b_valid = (((~(on_write >> self.b_reg.peek())) & Bits(32)(1)))[0:0] | \
-            (exec_bypass_reg[0] == self.b_reg.peek()) | \
-            (mem_bypass_reg[0] == self.b_reg.peek())
+        a_valid = (~(on_write >> rs1))[0:0] | \
+                  (exec_bypass_reg[0] == rs1) | \
+                  (mem_bypass_reg[0] == rs1) | \
+                  ~signals.rs1_valid
 
-        rd_valid = (((~(on_write >> self.rd_reg.peek())) & Bits(32)(1)))[0:0]
+        b_valid = (~(on_write >> rs2))[0:0] | \
+                  (exec_bypass_reg[0] == rs2) | \
+                  (mem_bypass_reg[0] == rs2) | \
+                  ~signals.rs2_valid
+
+        rd_valid = (~(on_write >> rd))[0:0]
 
         valid = a_valid & b_valid & rd_valid
 
         with Condition(~valid):
-            log("scoreboard       | rs1-x{:02}:{:05}| rs2-x{:02}:{:05}| rd-x{:02}: {}", \
-                a_reg, a_valid, \
-                b_reg, b_valid, \
-                rd_reg, rd_valid)
+            log("rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {}", \
+                rs1, a_valid, rs2, b_valid, rd, rd_valid)
 
         wait_until(valid)
 
-        opcode, imm_value, a_reg, b_reg, rd_reg = self.pop_all_ports(False)
+        signals, fetch_addr = self.pop_all_ports(False)
 
+        # TODO(@were): This is a hack to avoid post wait_until checks.
+        rd = signals.rd
 
-        op_check = OpcodeChecker(opcode)
-        op_check.check('lui', 'addi', 'add', 'lw', 'bne', 'ret', 'ebreak')
-
-        is_lui    = op_check.lui
-        is_addi   = op_check.addi
-        is_add    = op_check.add
-        is_lw     = op_check.lw
-        is_bne    = op_check.bne
-        is_ebreak = op_check.ebreak
-
+        is_ebreak = signals.rs1_valid & signals.imm_valid & (signals.imm == Bits(32)(1)) & (signals.alu == Bits(16)(0))
         with Condition(is_ebreak):
-            log('ebreak({:07b}) | halt', opcode)
+            log('ebreak | halt')
             finish()
 
         # Instruction attributes
-        uses_imm = is_addi | is_bne | is_lw
-        is_branch = is_bne
 
-        a = (exec_bypass_reg[0] == a_reg).select(
-            exec_bypass_data[0], 
-            (mem_bypass_reg[0] == a_reg).select(mem_bypass_data[0], rf[a_reg])
-        )
-        b = (exec_bypass_reg[0] == b_reg).select(
-            exec_bypass_data[0], 
-            (mem_bypass_reg[0] == b_reg).select(mem_bypass_data[0], rf[b_reg])
-        )
+        def bypass(bypass_reg, bypass_data, idx, value):
+            return (bypass_reg[0] == idx).select(bypass_data[0], value)
 
-        # log('mem_bypass_reg: x{:02} | mem_bypass_data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
-        # log('exe_bypass_reg: x{:02} | exe_bypass_data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
+        a = bypass(exec_bypass_reg, exec_bypass_data, rs1, rf[rs1])
+        a = bypass(mem_bypass_reg, mem_bypass_data, rs1, a)
+        a = (rs1 == Bits(5)(0)).select(Bits(32)(0), a)
 
-        rhs = uses_imm.select(imm_value, b)
+        b = bypass(exec_bypass_reg, exec_bypass_data, rs2, rf[rs2])
+        b = bypass(mem_bypass_reg, mem_bypass_data, rs2, b)
+        b = (rs2 == Bits(5)(0)).select(Bits(32)(0), b)
 
-        invoke_adder = is_add | is_addi | is_lw
+        # log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
+        # log('exe_bypass.reg: x{:02} | .data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
 
-        result = (a.bitcast(Int(32)) + rhs.bitcast(Int(32))).bitcast(Bits(32))
-        result = (concat(invoke_adder, is_lui, is_branch)).select1hot(
-            Bits(32)(0), imm_value, result
-        )
-        with Condition(invoke_adder):
-            log("add              | a: {:08x}  | b:{:08x}    | res: {:08x}", a, rhs, result)
+        # TODO: To support `auipc`, is_branch will be separated into `is_branch` and `is_pc_calc`.
+        alu_a = signals.is_branch.select(fetch_addr, a)
+        alu_b = signals.imm_valid.select(signals.imm, b)
 
-        produced_by_exec = is_lui | is_addi | is_add
+        results = [Bits(32)(0)] * RV32I_ALU.CNT
 
+        adder_result = (alu_a.bitcast(Int(32)) + alu_b.bitcast(Int(32))).bitcast(Bits(32))
+        le_result = (a.bitcast(Int(32)) < b.bitcast(Int(32))).select(Bits(32)(1), Bits(32)(0))
+        eq_result = (a == b).select(Bits(32)(1), Bits(32)(0))
 
-        exec_bypass_reg[0] = produced_by_exec.select(rd_reg, Bits(5)(0))
+        results[RV32I_ALU.ALU_ADD] = adder_result
+        results[RV32I_ALU.ALU_CMP_LT] = le_result
+        results[RV32I_ALU.ALU_CMP_EQ] = eq_result
+        results[RV32I_ALU.ALU_XOR] = a ^ b
+        results[RV32I_ALU.ALU_OR] = a | b
+        results[RV32I_ALU.ALU_AND] = a & b
+        results[RV32I_ALU.ALU_TRUE] = Bits(32)(1)
+
+        # TODO: Fix this bullshit.
+        alu = signals.alu
+        result = alu.select1hot(*results)
+
+        log("0x{:08x}       | a: {:08x}  | b: {:08x}   | imm: {:08x} | result: {:08x}", alu, a, b, signals.imm, result)
+
+        condition = signals.cond.select1hot(*results)
+        condition = signals.flip.select(~condition, condition)
+
+        memory_read = signals.memory[0:0]
+        memory_write = signals.memory[1:1]
+
+        # TODO: Make this stricter later.
+        produced_by_exec = ~memory_read & (rd != Bits(5)(0))
+        exec_bypass_reg[0] = produced_by_exec.select(rd, Bits(5)(0))
         exec_bypass_data[0] = produced_by_exec.select(result, Bits(32)(0))
 
-        with Condition(is_bne):
-            delta = imm_value[0:12]
-            delta = delta[12:12].select(Bits(19)(0x7ffff), Bits(19)(0)).concat(delta).bitcast(Int(32))
-            log('delta: {:x}', delta)
-            br_pc = (pc[0].bitcast(Int(32)) - Int(32)(4) + delta).bitcast(Bits(32))
-            nxt_pc = pc[0]
-            br_dest = (a != b).select(br_pc, nxt_pc)
-            log("bne({:b})     | {} != {} | to {} | else {}", opcode, a, b, br_pc, nxt_pc)
+        with Condition(signals.is_branch):
+            br_dest = condition[0:0].select(result, pc[0])
+            log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc[0])
             br_sm = RegArray(Bits(1), 1)
             br_sm[0] = Bits(1)(0)
 
-        is_memory = is_lw
-        is_memory_read = is_lw
+        is_memory = memory_read | memory_write
 
-        addr = (result.bitcast(Int(32)) - offset - data_offset).bitcast(Bits(32))
-
+        # This `is_memory` hack is to evade rust's overflow check.
+        addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
         request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
 
-        mem_bypass_reg[0] = is_memory_read.select(rd_reg, Bits(5)(0))
-
         with Condition(is_memory):
-            log("mem-read         | addr: 0x{:x} | lineno: 0x{:x}", result, request_addr)
-    
+            mem_bypass_reg[0] = memory_read.select(rd, Bits(5)(0))
+            log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
 
         dcache = SRAM(width=32, depth=512, init_file=data)
         dcache.name = 'dcache'
-        dcache.build(we=Int(1)(0), re=is_memory_read, wdata=a, addr=request_addr, user=memory)
+        dcache.build(we=memory_write, re=memory_read, wdata=a, addr=request_addr, user=memory)
         dcache.bound.async_called()
-        wb = writeback.bind(opcode = opcode, result = result, rd = rd_reg)
+        wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd)
 
-        with Condition(rd_reg != Bits(5)(0)):
-            return_rd = rd_reg
-            log("with-rd({:07b}) | own x{:02}", opcode, rd_reg)
+        with Condition(rd != Bits(5)(0)):
+            log("own x{:02}          |", rd)
 
-        return br_sm, br_dest, wb, return_rd
+        return br_sm, br_dest, wb, rd 
 
 class Decoder(Module):
     
     def __init__(self):
         super().__init__(ports={
-            'rdata': Port(Bits(32))
+            'rdata': Port(Bits(32)),
+            'fetch_addr': Port(Bits(32)),
         })
-        self.name = 'Decoder'
+        self.name = 'D'
 
     @module.combinational
     def build(self, executor: Module, br_sm: Array):
-
-        inst = self.pop_all_ports(False)
+        inst, fetch_addr = self.pop_all_ports(False)
 
         signals = decode_logic(inst)
-
         br_sm[0] = signals.is_branch
 
-        executor.async_called(
-            opcode = inst[0:6],
-            imm_value = signals.imm_value,
-            a_reg = signals.rs1_reg,
-            b_reg = signals.rs2_reg,
-            rd_reg = signals.rd_reg)
+        executor.async_called(signals=signals, fetch_addr=fetch_addr)
 
         return signals.is_branch
 
@@ -184,7 +179,7 @@ class Fetcher(Module):
     
     def __init__(self):
         super().__init__(ports={})
-        self.name = 'Fetcher'
+        self.name = 'F'
 
     @module.combinational
     def build(self):
@@ -196,7 +191,7 @@ class FetcherImpl(Downstream):
 
     def __init__(self):
         super().__init__()
-        self.name = 'FetcherImpl'
+        self.name = 'F1'
 
     @downstream.combinational
     def build(self,
@@ -213,28 +208,26 @@ class FetcherImpl(Downstream):
         icache = SRAM(width=32, depth=512, init_file=data)
         icache.name = 'icache'
         icache.build(Bits(1)(0), should_fetch, to_fetch[2:10].bitcast(Int(9)), Bits(32)(0), decoder)
-        log("fetcher          | on_br: {} | ex_by: {} | should_fetch: {} | fetch: 0x{:x}",
+        log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} |",
             on_branch, ex_bypass.valid(), should_fetch, to_fetch)
         with Condition(should_fetch):
-            icache.bound.async_called()
+            icache.bound.async_called(fetch_addr=to_fetch)
             pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
 
 class Onwrite(Downstream):
     
     def __init__(self):
         super().__init__()
-        self.name = 'Onwrite'
+        self.name = 'W1'
 
     @downstream.combinational
     def build(self, reg_onwrite: Array, exec_rd: Value, writeback_rd: Value):
         ex_rd = exec_rd.optional(Bits(5)(0))
         wb_rd = writeback_rd.optional(Bits(5)(0))
-
-        log("scoreboard       | ownning: x{:02} | releasing: x{:02}", ex_rd, wb_rd)
-
-        reg_onwrite[0] = reg_onwrite[0] ^ \
-                        (Bits(32)(1) << wb_rd) ^ \
-                        (Bits(32)(1) << ex_rd)
+        ex_bit = (ex_rd != Bits(5)(0)).select(Bits(32)(1) << ex_rd, Bits(32)(0))
+        wb_bit = (wb_rd != Bits(5)(0)).select(Bits(32)(1) << wb_rd, Bits(32)(0))
+        log("ownning: {:02}      | releasing: {:02}|", ex_rd, wb_rd)
+        reg_onwrite[0] = reg_onwrite[0] ^ ex_bit ^ wb_bit
 
 class Driver(Module):
     
@@ -258,8 +251,8 @@ def run_cpu(resource_base, workload):
             print(offsets)
             offset = offsets['offset']
             data_offset = offsets['data_offset']
-            offset = Int(32)(offset)
-            data_offset = Int(32)(data_offset)
+            offset = UInt(32)(offset)
+            data_offset = UInt(32)(data_offset)
 
         # Data Types
         bits1   = Bits(1)
@@ -293,8 +286,8 @@ def run_cpu(resource_base, workload):
         br_sm, ex_bypass, wb, exec_rd = executor.build(
             pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
-            reg_onwrite = reg_onwrite,
             exec_bypass_data = exec_bypass_data,
+            reg_onwrite = reg_onwrite,
             mem_bypass_reg = mem_bypass_reg,
             mem_bypass_data = mem_bypass_data,
             rf = reg_file,
@@ -336,12 +329,20 @@ def run_cpu(resource_base, workload):
     simulator_path, verilog_path = elaborate(sys, **conf)
 
     raw = utils.run_simulator(simulator_path)
-    check(raw)
+    open('raw.log', 'w').write(raw)
+    test = f'{resource_base}/{workload}.sh'
+    subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
 
     raw = utils.run_verilator(verilog_path)
-    check(raw)
+    open('raw.log', 'w').write(raw)
+    test = f'{resource_base}/{workload}.sh'
+    subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
+
+    os.remove('raw.log')
 
 if __name__ == '__main__':
     workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-
     run_cpu(workloads, '0to100')
+
+    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    # run_cpu(tests, 'rv32ui-p-add')

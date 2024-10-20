@@ -310,13 +310,23 @@ impl Visitor<String> for ElaborateModule<'_> {
       Opcode::Log => {
         let mut res = String::new();
         res.push_str(&format!(
-          "print!(\"@line:{{:<5}}\t{{}}:\t[{}]\t\", line!(), cyclize(sim.stamp));",
+          "print!(\"@line:{{:<5}} {{:<10}}: [{}]\t\", line!(), cyclize(sim.stamp));",
           self.module_name
         ));
         res.push_str("println!(");
         for elem in expr.operand_iter() {
-          res
-            .push_str(&format!("{}, ", dump_rval_ref(self.module_ctx, self.sys, elem.get_value())));
+          let dump = dump_rval_ref(self.module_ctx, self.sys, elem.get_value());
+          let dump = if elem
+            .get_value()
+            .get_dtype(self.sys)
+            .map_or(false, |x| x.get_bits() == 1)
+          {
+            format!("if {} {{ 1 }} else {{ 0 }}", dump)
+          } else {
+            dump
+          };
+          res.push_str(&dump);
+          res.push_str(", ");
         }
         res.push(')');
         res
@@ -419,6 +429,9 @@ impl Visitor<String> for ElaborateModule<'_> {
             format!("if {} {{", value)
           }
           subcode::BlockIntrinsic::Finish => "std::process::exit(0);".to_string(),
+          subcode::BlockIntrinsic::Assert => {
+            format!("assert!({});", value)
+          }
         }
       }
     };

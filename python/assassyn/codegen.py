@@ -65,6 +65,7 @@ CG_OPCODE = {
 
     expr.intrinsic.Intrinsic.WAIT_UNTIL: 'wait_until',
     expr.intrinsic.Intrinsic.FINISH: 'finish',
+    expr.intrinsic.Intrinsic.ASSERT: 'assert',
 }
 
 CG_MIDFIX = {
@@ -99,12 +100,21 @@ def generate_dtype(ty: dtype.DType):
     assert isinstance(ty, dtype.Record), 'Expecting a record type, but got {ty}'
     return f'{prefix}::bits_ty({ty.bits})'
 
-def generate_init_value(init_value, ty: dtype.DType):
+def const_int_wrapper(value: int, ty: str):
+    '''Generate the constant integer wrapper for the given value'''
+    value = hex(value)
+    if value[0] == '-':
+        value = value[1:]
+    if value.endswith('L'):
+        value = value[:-1]
+        assert value[2:].isnumeric() and len(value) <= 18, f'Int too large: {value}'
+    return f'sys.get_const_int({ty}, {value} as u64)'
+
+def generate_init_value(init_value, ty: str):
     '''Generate the initial value for the given array'''
     if init_value is None:
         return ("\n", "None")
-
-    str1 = f'let init_val = sys.get_const_int({ty}, {init_value});'
+    str1 = f'let init_val = {const_int_wrapper(init_value, ty)};'
     str2 = 'Some(vec![init_val])'
 
     return (str1, str2)
@@ -186,7 +196,7 @@ class CodeGen(visitor.Visitor):
 
         vec = []
         for i, j in enumerate(init_value):
-            self.code.append(f'let init_{i} = sys.get_const_int({ty}, {j});')
+            self.code.append(f'let init_{i} = {const_int_wrapper(j, ty)};')
             vec.append(f'init_{i}')
 
         self.code.append(f'let init = vec![{", ".join(vec)}];')
@@ -238,6 +248,20 @@ class CodeGen(visitor.Visitor):
             # FIXME(@were): This is a hack to emit memory parameters, it should be generalized
             self.emit_memory_attrs(elem, var)
             self.visit_module(elem)
+
+        for elem , kind in node.exposed_nodes.items():
+            name = elem.name if f'{id(elem)}' in elem.name else self.generate_rval(elem)
+            size = elem.size
+            ty = generate_dtype(elem.scalar_ty)
+            if kind is None:
+                kind = 'Inout'
+            self.code.append(f'  // try0 {elem} {kind}')
+            self.code.append(f'  // try1 {name} {size} {ty}')
+            self.visit_exposed_nodes(elem)
+            self.code.append(
+                f'  sys.expose_to_top({elem.name}, '
+                f'assassyn::builder::system::ExposeKind::{kind});'
+            )
 
         config = self.emit_config()
         self.code.append(f'''
@@ -295,7 +319,7 @@ class CodeGen(visitor.Visitor):
         if isinstance(node, const.Const):
             ty = generate_dtype(node.dtype)
             imm_var = f'imm_{identifierize(node)}'
-            imm_decl = f'  let {imm_var} = sys.get_const_int({ty}, {node.value}); // {node}'
+            imm_decl = f'  let {imm_var} = {const_int_wrapper(node.value, ty)}; // {node}'
             self.code.append(imm_decl)
             return imm_var
         if isinstance(node, module.Port):
@@ -369,7 +393,7 @@ class CodeGen(visitor.Visitor):
             ty = generate_dtype(node.dtype)
             res = f'sys.{ib_method}({x}, {ty});'
         elif isinstance(node, expr.Intrinsic):
-            if node.opcode == expr.Intrinsic.WAIT_UNTIL:
+            if node.opcode in [expr.Intrinsic.WAIT_UNTIL, expr.Intrinsic.ASSERT]:
                 cond = self.generate_rval(node.args[0])
                 res = f'sys.{ib_method}({cond});'
             elif node.opcode == expr.Intrinsic.FINISH:
@@ -427,6 +451,20 @@ class CodeGen(visitor.Visitor):
         attrs = self.generate_array_attr(node)
         attrs = f'vec![{attrs}]'
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
+        self.code.append(array_decl)
+
+    def visit_exposed_nodes(self, node: Array):
+        """Generate the exposed nodes for the given array"""
+        name = node.name if f'{id(node)}' in node.name else self.generate_rval(node)
+        size = node.size
+        ty = generate_dtype(node.scalar_ty)
+        self.code.append(f'  // {node}')
+        attrs = self.generate_array_attr(node)
+        attrs = f'vec![{attrs}]'
+        array_decl = (
+            f'  let Exposed_{name} = sys.create_custom_basenode('
+            f'{ty}, "Exposed_{name}", {size}, {attrs});'
+        )
         self.code.append(array_decl)
 
     def __init__(self, simulator, verilog, idle_threshold, sim_threshold, random, resource_base): #pylint: disable=too-many-arguments

@@ -61,6 +61,16 @@ class SysBuilder:
         self.downstreams = []
         self.arrays = []
         self._ctx_stack = {'module': [], 'block': []}
+        self._exposes = {}
+
+    def expose_on_top(self, node, kind=None):
+        '''Expose the given node in the top function with the given kind.'''
+        self._exposes[node] = kind
+
+    @property
+    def exposed_nodes(self):
+        '''Get the exposed nodes.'''
+        return self._exposes
 
     def __enter__(self):
         '''Designate the scope of this system builder.'''

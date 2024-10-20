@@ -57,6 +57,13 @@ impl InsertPoint {
   }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ExposeKind {
+  Input,
+  Output,
+  Inout,
+}
+
 /// A `SysBuilder` struct not only serves as the data structure of the whole system,
 /// but also works as the syntax-sugared IR builder.
 pub struct SysBuilder {
@@ -74,6 +81,8 @@ pub struct SysBuilder {
   /// The set of finalized binds. A lazy bind will not be instantiated as a bind expression until
   /// it is called. Key: LazyBind, Value: Expr::Bind.
   finalized_binds: HashMap<BaseNode, BaseNode>,
+  /// Exposed nodes on the top function.
+  exposed_nodes: HashMap<BaseNode, ExposeKind>,
 }
 
 /// The information of an input of a module.
@@ -144,6 +153,7 @@ impl SysBuilder {
       },
       symbol_table: SymbolTable::new(),
       finalized_binds: HashMap::new(),
+      exposed_nodes: HashMap::new(),
     }
   }
 
@@ -163,6 +173,16 @@ impl SysBuilder {
     self
       .module_iter(ModuleKind::Module)
       .any(|x| x.get_name().eq("testbench"))
+  }
+
+  /// Expose the given node on the top function.
+  pub fn expose_to_top(&mut self, node: BaseNode, kind: ExposeKind) {
+    self.exposed_nodes.insert(node, kind);
+  }
+
+  /// Get the iterator of the exposed nodes.
+  pub fn exposed_nodes(&self) -> impl Iterator<Item = (&BaseNode, &ExposeKind)> {
+    self.exposed_nodes.iter()
   }
 
   /// The helper function to get an element of the system and downcast it to its actual
@@ -384,9 +404,13 @@ impl SysBuilder {
     let cond_ty = cond.get_dtype(self).unwrap();
     assert_eq!(cond_ty.get_bits(), values.len(), "Select1Hot value count mismatch!",);
     let v0type = values[0].get_dtype(self).unwrap();
-    for elem in values.iter().skip(1) {
+    for (i, elem) in values.iter().skip(1).enumerate() {
       let vitype = elem.get_dtype(self).unwrap();
-      assert_eq!(v0type, vitype, "Select1Hot value type mismatch {:?} != {:?}", v0type, vitype,);
+      assert_eq!(
+        v0type, vitype,
+        "Select1Hot: {}-th value type mismatch {:?} != {:?}",
+        i, v0type, vitype,
+      );
     }
     let mut args = vec![cond];
     args.extend(values);
@@ -821,6 +845,17 @@ impl SysBuilder {
       }
       _ => panic!("Unsupported node kind!"),
     }
+  }
+
+  pub fn create_custom_basenode(
+    &mut self,
+    ty: DataType,
+    name: &str,
+    size: usize,
+    attrs: Vec<ArrayAttr>,
+  ) -> BaseNode {
+    let instance = Array::new(ty.clone(), name.to_string(), size, None, attrs);
+    self.insert_element(instance)
   }
 }
 
