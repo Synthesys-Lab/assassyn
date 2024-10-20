@@ -4,14 +4,22 @@ import site
 import inspect
 from decorator import decorator
 
-all_dirs_to_exclude = []
-
 class Singleton(type):
     '''The class maintains the global singleton instance of the system builder.'''
     builder = None
     repr_ident = None
     id_slice = slice(-6, -1)
     with_py_loc = False
+    all_dirs_to_exclude = []
+
+    @classmethod
+    def initialize_dirs_to_exclude(mcs):
+        '''Initialize the directories to exclude if not already initialized.'''
+        if not mcs.all_dirs_to_exclude:
+            site_package_dirs = site.getsitepackages()
+            user_site_package_dir = site.getusersitepackages()
+            mcs.all_dirs_to_exclude = site_package_dirs + [user_site_package_dir]
+
 
 @decorator
 def ir_builder(func, *args, **kwargs):
@@ -26,18 +34,14 @@ def ir_builder(func, *args, **kwargs):
 
     package_dir = os.path.abspath(package_path())
 
-    global all_dirs_to_exclude
-    if not all_dirs_to_exclude:
-        site_package_dirs = site.getsitepackages()
-        user_site_package_dir = site.getusersitepackages()
-        all_dirs_to_exclude =  site_package_dirs + [user_site_package_dir]
-
+    Singleton.initialize_dirs_to_exclude()
     for i in inspect.stack()[2:]:
         fname, lineno = i.filename, i.lineno
         fname_abs = os.path.abspath(fname)
 
         if not fname_abs.startswith(package_dir) \
-            and not any(fname_abs.startswith(exclude_dir) for exclude_dir in all_dirs_to_exclude):
+            and not any(fname_abs.startswith(exclude_dir) \
+                         for exclude_dir in Singleton.all_dirs_to_exclude):
             res.loc = f'{fname}:{lineno}'
             break
     assert hasattr(res, 'loc')
