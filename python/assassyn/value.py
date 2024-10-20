@@ -129,12 +129,6 @@ class Value:
         #pylint: disable=no-member
         '''The frontend API to create a bitwise-concat operation'''
         from .expr import Concat
-        from .const import Const
-        from .dtype import Bits
-        if isinstance(self, Const) and isinstance(other, Const):
-            shift = other.dtype.bits
-            return Bits(shift + self.dtype.bits)((self.value << shift) | other.value)
-
         return Concat(self, other)
 
     @ir_builder

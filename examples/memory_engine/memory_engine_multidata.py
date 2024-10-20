@@ -29,7 +29,15 @@ class MemUser(Module):
             offest = cachesize - i - 1
             data_joint = data_joint.concat(bitmask[offest:offest].select(rdata[offest*32:offest*32+31], Bits(32)(0)))
 
-        log("Cacheline:\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", data_joint[224:255], data_joint[192:223], data_joint[160:191], data_joint[128:159], data_joint[96:127], data_joint[64:95], data_joint[32:63], data_joint[0:31])
+        log("Cacheline:\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            data_joint[224:255],
+            data_joint[192:223],
+            data_joint[160:191],
+            data_joint[128:159],
+            data_joint[96:127],
+            data_joint[64:95],
+            data_joint[32:63],
+            data_joint[0:31])
 
 class Driver(Module):
 
