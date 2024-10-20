@@ -32,16 +32,16 @@ git commit -m 'your commit message' --no-verify
 
 **Adding New Features:**
 
-1. Fork the repository to your account `<img src="./imag/fork.png" width=100>`
+1. Fork the repository to your account <img src="./imag/fork.png" width=100>.
 2. Clone your fork: `git clone <url-to-your-fork>`.
 3. Create a new branch for your changes: `git checkout -b <your-dev-branch>`.
 4. After development, submit a pull request to the master branch from your branch.
-   - Go to the Pull Request tab in our repo `<img src="./imag/pr-tab.png" width=75%>`
-   - Find the `New Pull Request` button `<img src="./imag/new-pr.png" width=75>`
+   - Go to the Pull Request tab in our repo <img src="./imag/pr-tab.png" width=75%>.
+   - Find the `New Pull Request` button <img src="./imag/new-pr.png" width=75>
    - Select the base branch as `master` and compare branch as your development branch
-     `<img src="./imag/pr-base-dev.png" width="50%">`
-   - After filling out the PR title and description, click `Create Pull Request` `<img src="./imag/create-pr.png" width=100>`
-   - Wait for all the checks done by the CI/CD pipeline, and the code review from the maintainers. `<img src="./imag/pr-checks.png">`
+     <img src="./imag/pr-base-dev.png" width="50%">
+   - After filling out the PR title and description, click `Create Pull Request` <img src="./imag/create-pr.png" width=100>
+   - Wait for all the checks done by the CI/CD pipeline, and the code review from the maintainers. <img src="./imag/pr-checks.png">
    - If everything is good, the maintainers will merge your PR.
 
 **Resolve the conflicts:**
