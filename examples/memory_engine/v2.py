@@ -2,7 +2,9 @@ import assassyn
 from assassyn.frontend import *
 from assassyn import backend
 from assassyn import utils
+import math
 
+cachesize = 8
 
 class MemUser(Module):
 
@@ -19,11 +21,26 @@ class MemUser(Module):
         width = self.rdata.dtype.bits
         rdata = self.pop_all_ports(False)
         rdata = rdata.bitcast(Int(width))
-        k = self.reg_accm[0]
-        delta = rdata + k
-        self.reg_accm[0] = delta
-        log('{} + {} = {}', rdata, k, delta)
 
+        bitmask = Bits(cachesize)(0b10101010)
+        data_joint = None
+
+        for i in range(cachesize):
+            offest = cachesize - i - 1
+            if data_joint is None:
+                data_joint = bitmask[offest:offest].select(rdata[offest*32:offest*32+31], Bits(32)(0))
+            else:
+                data_joint = data_joint.concat(bitmask[offest:offest].select(rdata[offest*32:offest*32+31], Bits(32)(0)))
+
+        log("Cacheline:\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            data_joint[224:255],
+            data_joint[192:223],
+            data_joint[160:191],
+            data_joint[128:159],
+            data_joint[96:127],
+            data_joint[64:95],
+            data_joint[32:63],
+            data_joint[0:31])
 
 class Driver(Module):
 
@@ -34,15 +51,17 @@ class Driver(Module):
     def build(self, width, init_file, user):
         cnt = RegArray(Int(width), 1)
         v = cnt[0]
-        we = v[0:0]
-        re = ~we
+        we = Int(1)(0)
+        re = ~v[0:0]
         plused = v + Int(width)(1)
-        waddr = plused[0:8]
-        raddr = v[0:8]
-        addr = we.select(waddr, raddr).bitcast(Int(9))
+        raddr = v[0:8].bitcast(Int(9))
+        
+        shift = Int(9)(int(math.log2(cachesize)))
+        addr_access = raddr >> shift
+        
         cnt[0] = plused
         sram = SRAM(width, 512, init_file)
-        sram.build(we, re, addr, v.bitcast(Bits(width)), user)
+        sram.build(we, re, addr_access, v.bitcast(Bits(width)), user)
         with Condition(re):
             sram.bound.async_called()
 
@@ -78,7 +97,7 @@ def impl(sys_name, width, init_file, resource_base):
         check(raw)
 
 def test_memory():
-    impl('memory_init', 32, 'init.hex', f'{utils.repo_path()}/python/unit-tests/resources')
+    impl('memory_init', 32*cachesize, 'init_2.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 if __name__ == "__main__":
         test_memory()
