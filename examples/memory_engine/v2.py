@@ -27,10 +27,8 @@ class MemUser(Module):
 
         for i in range(cachesize):
             offest = cachesize - i - 1
-            if data_joint is None:
-                data_joint = bitmask[offest:offest].select(rdata[offest*32:offest*32+31], Bits(32)(0))
-            else:
-                data_joint = data_joint.concat(bitmask[offest:offest].select(rdata[offest*32:offest*32+31], Bits(32)(0)))
+            data_masked = bitmask[offest:offest].select(rdata[offest*32:offest*32+31], Bits(32)(0))
+            data_joint = data_masked if data_joint is None else data_joint.concat(data_masked)
 
         log("Cacheline:\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             data_joint[224:255],
@@ -57,6 +55,8 @@ class Driver(Module):
         raddr = v[0:8].bitcast(Int(9))
         
         shift = Int(9)(int(math.log2(cachesize)))
+        
+        shift
         addr_access = raddr >> shift
         
         cnt[0] = plused
@@ -90,6 +90,7 @@ def impl(sys_name, width, init_file, resource_base):
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
+    print(raw)
     check(raw)
 
     if utils.has_verilator():
