@@ -2,7 +2,6 @@ import assassyn
 from assassyn.frontend import *
 from assassyn import backend
 from assassyn import utils
-import math
 
 cachesize = 8
 
@@ -54,7 +53,7 @@ class Driver(Module):
         plused = v + Int(width)(1)
         raddr = v[0:8].bitcast(Int(9))
         
-        shift = Int(9)(int(math.log2(cachesize)))
+        shift = Int(9)(cachesize.bit_length())
         
         shift
         addr_access = raddr >> shift
@@ -90,7 +89,6 @@ def impl(sys_name, width, init_file, resource_base):
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
     check(raw)
 
     if utils.has_verilator():

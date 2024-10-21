@@ -79,7 +79,7 @@ def test_memory():
     impl('memory', 32, None, None)
 
 def test_memory_init():
-    impl('memory_init', 32, 'init.hex', f'{utils.repo_path()}/python/unit-tests/resources')
+    impl('memory_init', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 def test_memory_wide():
     impl('memory_wide', 256, None, None)
