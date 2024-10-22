@@ -35,10 +35,17 @@ class Execution(Module):
         mem_bypass_data: Array,
         reg_onwrite: Array,
         rf: Array, 
+        csr_f: Array,
         memory: Module, 
         writeback: Module,
-        data: str):
+        data: str
+        
+        ):
 
+        
+        csr_id = Bits(4)(0)
+        
+ 
         signals = self.signals.peek()
 
         rs1 = signals.rs1
@@ -67,14 +74,30 @@ class Execution(Module):
 
         wait_until(valid)
 
+
+
+        raw_id = [(3860, 9), (773, 1) ,(1860, 15) , (384,10) , (944 , 11) , (928 , 12) , (772 , 4 ) , (770 ,13),(771,14),(768,8) ,(833,2)]
+        #mtvec 1 mepc 2 mcause 3 mie 4 mip 5 mtval 6 mscratc 7 mstatus 8 mhartid 9 satp 10 pmpaddr0 11  pmpcfg0 12 medeleg 13 mideleg 14 unkonwn 15
+
+        csr_id = Bits(4)(0)
+        for i, j in raw_id:
+            csr_id = (signals.imm[0:11] == Bits(12)(i)).select(Bits(4)(j), csr_id)
+            csr_id = signals.is_mepc.select(Bits(4)(2), csr_id)
+
+        is_csr = Bits(1)(0)
+        is_csr = signals.csr_read | signals.csr_write
+        csr_new = Bits(32)(0)
+        csr_new = signals.csr_write.select( rf[rs1] , csr_new)
+        csr_new = signals.is_zimm.select(concat(Bits(27)(0),rs1), csr_new)
+
         signals, fetch_addr = self.pop_all_ports(False)
 
         # TODO(@were): This is a hack to avoid post wait_until checks.
         rd = signals.rd
 
-        is_ebreak = signals.rs1_valid & signals.imm_valid & (signals.imm == Bits(32)(1)) & (signals.alu == Bits(16)(0))
+        is_ebreak = signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0))) & (signals.alu == Bits(16)(0))
         with Condition(is_ebreak):
-            log('ebreak | halt')
+            log('ebreak | halt | ecall')
             finish()
 
         # Instruction attributes
@@ -85,10 +108,13 @@ class Execution(Module):
         a = bypass(exec_bypass_reg, exec_bypass_data, rs1, rf[rs1])
         a = bypass(mem_bypass_reg, mem_bypass_data, rs1, a)
         a = (rs1 == Bits(5)(0)).select(Bits(32)(0), a)
+        a = signals.csr_write.select(Bits(32)(0), a)
 
         b = bypass(exec_bypass_reg, exec_bypass_data, rs2, rf[rs2])
         b = bypass(mem_bypass_reg, mem_bypass_data, rs2, b)
         b = (rs2 == Bits(5)(0)).select(Bits(32)(0), b)
+        b = is_csr.select(csr_f[csr_id], b)
+        
 
         # log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
         # log('exe_bypass.reg: x{:02} | .data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
@@ -108,8 +134,9 @@ class Execution(Module):
         results[RV32I_ALU.ALU_CMP_EQ] = eq_result
         results[RV32I_ALU.ALU_XOR] = a ^ b
         results[RV32I_ALU.ALU_OR] = a | b
-        results[RV32I_ALU.ALU_AND] = a & b
+        results[RV32I_ALU.ALU_AND] = a & alu_b
         results[RV32I_ALU.ALU_TRUE] = Bits(32)(1)
+        results[RV32I_ALU.ALU_SLL] = a << alu_b[0:4]
 
         # TODO: Fix this bullshit.
         alu = signals.alu
@@ -149,7 +176,7 @@ class Execution(Module):
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=a, addr=request_addr, user=memory)
         dcache.bound.async_called()
-        wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd)
+        wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd , is_csr = signals.csr_write, csr_id = csr_id , csr_new = csr_new)
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
@@ -269,6 +296,8 @@ def run_cpu(resource_base, workload):
         reg_file    = RegArray(bits32, 32)
         reg_onwrite = RegArray(bits32, 1)
 
+        csr_file = RegArray(Bits(32), 16, initializer=[0]*16)
+
         exec_bypass_reg = RegArray(bits5, 1)
         exec_bypass_data = RegArray(bits32, 1)
 
@@ -276,7 +305,7 @@ def run_cpu(resource_base, workload):
         mem_bypass_data = RegArray(bits32, 1)
 
         writeback = WriteBack()
-        wb_rd = writeback.build(reg_file = reg_file)
+        wb_rd = writeback.build(reg_file = reg_file , csr_file = csr_file)
 
         memory_access = MemoryAccess()
 
@@ -292,6 +321,7 @@ def run_cpu(resource_base, workload):
             mem_bypass_reg = mem_bypass_reg,
             mem_bypass_data = mem_bypass_data,
             rf = reg_file,
+            csr_f = csr_file,
             memory = memory_access,
             writeback = writeback,
             data = data_init
@@ -333,6 +363,7 @@ def run_cpu(resource_base, workload):
     open('raw.log', 'w').write(raw)
     test = f'{resource_base}/{workload}.sh'
     subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
+    #quit()
 
     raw = utils.run_verilator(verilog_path)
     open('raw.log', 'w').write(raw)
@@ -342,8 +373,20 @@ def run_cpu(resource_base, workload):
     os.remove('raw.log')
 
 if __name__ == '__main__':
-    # workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    # run_cpu(workloads, '0to100')
+    #workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    #run_cpu(workloads, '0to100')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-add')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-addi')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-and')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-andi')
 
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    run_cpu(tests, 'rv32ui-p-add')
+    run_cpu(tests, 'rv32ui-p-auipc')
