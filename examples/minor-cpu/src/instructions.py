@@ -79,7 +79,7 @@ class IInst(InstType):
             raw = concat(signal, raw)
         return raw
 
-    def decode(self, opcode, funct3, alu, cond , ex_code=None):
+    def decode(self, opcode, funct3, alu, cond , ex_code ,ex_code2):
         view = self.view()
         opcode = view.opcode == Bits(7)(opcode)
         funct3 = view.funct3 == Bits(3)(funct3)
@@ -87,7 +87,14 @@ class IInst(InstType):
             ex = view.imm == Bits(12)(ex_code)
         else:
             ex = Bits(1)(1)
-        eq = opcode & funct3 & ex
+        
+        if ex_code2 is not None:
+            ex2 = (view.imm)[6:11] == Bits(6)(ex_code2)
+            #log("ex2_code: 0x{:x} | imm[6:11]: 0x{:x}", Bits(6)(ex_code2) , (view.imm)[6:11])
+        else:
+            ex2 = Bits(1)(1)
+        
+        eq = opcode & funct3 & ex & ex2
         return InstSignal(eq, alu, cond=cond)
 
 class SInst(InstType):
@@ -193,6 +200,7 @@ class RV32I_ALU:
     ALU_SLL = 5
     ALU_SRL = 6
     ALU_SRA = 7
+    ALU_SRA_U = 12
     ALU_CMP_EQ = 8
     ALU_CMP_LT = 9
     ALU_CMP_LTU = 10
@@ -208,31 +216,41 @@ supported_opcodes = [
   ('add'   , (0b0110011, 0b000, 0b0000000, RV32I_ALU.ALU_ADD), RInst),
   ('sub'   , (0b0110011, 0b000, 0b0100000, RV32I_ALU.ALU_SUB), RInst),
 
-  ('jalr'  , (0b1100111, 0b000, RV32I_ALU.ALU_ADD, (RV32I_ALU.ALU_TRUE, False)), IInst),
-  ('addi'  , (0b0010011, 0b000, RV32I_ALU.ALU_ADD, None), IInst),
-  ('xori'  , (0b0010011, 0b100, RV32I_ALU.ALU_XOR, None), IInst),
+  ('jalr'  , (0b1100111, 0b000, RV32I_ALU.ALU_ADD, (RV32I_ALU.ALU_TRUE, False), None, None), IInst),
+  ('addi'  , (0b0010011, 0b000, RV32I_ALU.ALU_ADD, None, None, None), IInst),
+  ('xori'  , (0b0010011, 0b100, RV32I_ALU.ALU_XOR, None, None, None), IInst),
 
-  ('lw'    , (0b0000011, 0b010, RV32I_ALU.ALU_ADD, None), IInst),
-  ('ebreak', (0b1110011, 0b000, None, None,0b000000000001), IInst),
+  ('lw'    , (0b0000011, 0b010, RV32I_ALU.ALU_ADD, None, None, None), IInst),
+  ('lbu'   , (0b0000011, 0b100, RV32I_ALU.ALU_ADD, None, None, None), IInst),
+
+  ('ebreak', (0b1110011, 0b000, None, None,0b000000000001,None), IInst),
 
   # mn,       opcode,    funct3,cmp,                  flip
   ('beq'   , (0b1100011, 0b000, RV32I_ALU.ALU_CMP_EQ,  False), BInst),
   ('bne'   , (0b1100011, 0b001, RV32I_ALU.ALU_CMP_EQ,  True), BInst),
   ('blt'   , (0b1100011, 0b100, RV32I_ALU.ALU_CMP_LT,  False), BInst),
+  ('bge'   , (0b1100011, 0b101, RV32I_ALU.ALU_CMP_LT,  True), BInst),
+  ('bgeu' , (0b1100011, 0b111, RV32I_ALU.ALU_CMP_LTU, True), BInst),
+  ('bltu' , (0b1100011, 0b110, RV32I_ALU.ALU_CMP_LTU, False), BInst),
 
-  ('csrrs'   , (0b1110011, 0b010, RV32I_ALU.ALU_OR, None), IInst),
+  ('csrrs'   , (0b1110011, 0b010, RV32I_ALU.ALU_OR, None ,None ,None), IInst),
   ('auipc' , (0b0010111, RV32I_ALU.ALU_ADD), UInst),
-  ('csrrw' , (0b1110011, 0b001, RV32I_ALU.ALU_ADD, None), IInst),
-  ('csrrwi' , (0b1110011, 0b101, RV32I_ALU.ALU_ADD, None), IInst),
-  ('slli' , (0b0010011, 0b001, RV32I_ALU.ALU_SLL, None), IInst),
+  ('csrrw' , (0b1110011, 0b001, RV32I_ALU.ALU_ADD, None,None,None), IInst),
+  ('csrrwi' , (0b1110011, 0b101, RV32I_ALU.ALU_ADD, None,None,None), IInst),
+
+  ('slli' , (0b0010011, 0b001, RV32I_ALU.ALU_SLL, None, None , 0b000000), IInst),
+  ('srai' , (0b0010011, 0b101, RV32I_ALU.ALU_SRA,  None,None , 0b010000), IInst),#signed
+  ('srli' , (0b0010011, 0b101, RV32I_ALU.ALU_SRA_U,  None, None , 0b000000), IInst),#0
+
   #todo: mret is not supported for setting the MPIE in CSR(mstatus)
   ('mret' , (0b1110011, 0b000, 0b0011000,RV32I_ALU.ALU_ADD,0b00010), RInst ),
   #we have only a sigle thread, so we don't need to deal with 'fence' instruction
-  ('fence' , (0b0001111, 0b000, RV32I_ALU.ALU_ADD, None), IInst),
-  ('ecall' , (0b1110011, 0b000, None, None,0b000000000000), IInst),
+  ('fence' , (0b0001111, 0b000, RV32I_ALU.ALU_ADD, None,None,None), IInst),
+  ('ecall' , (0b1110011, 0b000, None, None,0b000000000000,None), IInst),
+  
   ('and' , (0b0110011, 0b111, 0b0000000, RV32I_ALU.ALU_AND), RInst),
-  ('andi' , (0b0010011, 0b111, RV32I_ALU.ALU_AND, None), IInst),
-  ('ori' , (0b0010011, 0b110, RV32I_ALU.ALU_OR, None), IInst),
+  ('andi' , (0b0010011, 0b111, RV32I_ALU.ALU_AND, None,None,None), IInst),
+  ('ori' , (0b0010011, 0b110, RV32I_ALU.ALU_OR, None,None,None), IInst),
 ]
 
 deocder_signals = Record(
@@ -248,6 +266,7 @@ deocder_signals = Record(
   csr_calculate = Bits(1),
   is_zimm = Bits(1),
   is_mepc = Bits(1), 
+  is_pc_calc = Bits(1),
   #csr_id = Bits(4),
   imm=Bits(32),
   imm_valid=Bits(1),
@@ -261,6 +280,8 @@ deocder_signals = Record(
   flip=Bits(1),
   # if the decoded instruction is a branch instruction.
   is_branch=Bits(1),
+  mem_ext=Bits(2),
+
 )
 
 #TODO(@were): Add `SInst` to the supported types later.

@@ -84,9 +84,14 @@ def decode_logic(inst):
 
     # Extract all the signals
     # For now, write is always disabled.
-    memory = concat(Bits(1)(0), eqs['lw'])
+    memory = concat(Bits(1)(0), eqs['lw'] | eqs['lbu'])
+    # [ unsigned (signed), byte(word) ]
+    mem_ext = concat(eqs['lbu'], eqs['lbu']) 
+
     # BInst and JInst are designed for branches.
-    is_branch = is_type[BInst] | is_type[JInst] | eqs['ebreak'] | eqs['jalr'] | eqs['auipc'] | eqs['mret']
+    is_branch = is_type[BInst] | is_type[JInst] | eqs['ebreak'] | eqs['jalr'] |  eqs['mret']
+
+    is_pc_calc = eqs['auipc']
     # Extract all the operands according to the instruction types
     # rd
     rd = rd_valid.select(views[RInst].view().rd, Bits(5)(0))
@@ -97,7 +102,6 @@ def decode_logic(inst):
     imm_valid = is_type[IInst] | is_type[UInst] | is_type[BInst] | is_type[JInst]
 
     imm = Bits(32)(0)
-    #csr_id = Bits(4)(0)
     csr_read = Bits(1)(0)
     csr_write = Bits(1)(0)
     csr_calculate = Bits(1)(0)
@@ -135,9 +139,10 @@ def decode_logic(inst):
         rd_valid=rd_valid,
         imm=imm,
         imm_valid=imm_valid,
-        #csr_id = csr_id,
+        is_pc_calc = is_pc_calc,
         csr_read=csr_read,
         csr_write=csr_write,
         csr_calculate=csr_calculate,
         is_zimm = is_zimm,
-        is_mepc = is_mepc)
+        is_mepc = is_mepc,
+        mem_ext = mem_ext)

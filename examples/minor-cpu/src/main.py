@@ -121,6 +121,7 @@ class Execution(Module):
 
         # TODO: To support `auipc`, is_branch will be separated into `is_branch` and `is_pc_calc`.
         alu_a = signals.is_branch.select(fetch_addr, a)
+        alu_a = signals.is_pc_calc.select(fetch_addr, alu_a)
         alu_b = signals.imm_valid.select(signals.imm, b)
 
         results = [Bits(32)(0)] * RV32I_ALU.CNT
@@ -128,15 +129,21 @@ class Execution(Module):
         adder_result = (alu_a.bitcast(Int(32)) + alu_b.bitcast(Int(32))).bitcast(Bits(32))
         le_result = (a.bitcast(Int(32)) < b.bitcast(Int(32))).select(Bits(32)(1), Bits(32)(0))
         eq_result = (a == b).select(Bits(32)(1), Bits(32)(0))
+        # TODO: find the problem with this:uint can't be comaared correctly while positive and negative
+        leu_result = (Bits(1)(0).concat(a) < Bits(1)(0).concat(b ) ).select(Bits(32)(1), Bits(32)(0))
+        #sra_signed_result = a[31:31].select( (a >> alu_b[0:4]) | ~((Bits(1)(1) << (Bits(6)(32) - concat(Bits(1)(0),(alu_b[0:4])) )   ) - Bits(1)(1)) , (a >> alu_b[0:4]))
 
         results[RV32I_ALU.ALU_ADD] = adder_result
         results[RV32I_ALU.ALU_CMP_LT] = le_result
         results[RV32I_ALU.ALU_CMP_EQ] = eq_result
+        results[RV32I_ALU.ALU_CMP_LTU] = leu_result
         results[RV32I_ALU.ALU_XOR] = a ^ b
         results[RV32I_ALU.ALU_OR] = a | b
         results[RV32I_ALU.ALU_AND] = a & alu_b
         results[RV32I_ALU.ALU_TRUE] = Bits(32)(1)
         results[RV32I_ALU.ALU_SLL] = a << alu_b[0:4]
+        results[RV32I_ALU.ALU_SRA] = a >> alu_b[0:4] #to be fixed
+        results[RV32I_ALU.ALU_SRA_U] = a >> alu_b[0:4]
 
         # TODO: Fix this bullshit.
         alu = signals.alu
@@ -176,7 +183,7 @@ class Execution(Module):
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=a, addr=request_addr, user=memory)
         dcache.bound.async_called()
-        wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd , is_csr = signals.csr_write, csr_id = csr_id , csr_new = csr_new)
+        wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd , is_csr = signals.csr_write, csr_id = csr_id , csr_new = csr_new , mem_ext = signals.mem_ext)
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
@@ -388,5 +395,39 @@ if __name__ == '__main__':
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #run_cpu(tests, 'rv32ui-p-andi')
 
-    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'    #TODEBUG fail 
     run_cpu(tests, 'rv32ui-p-auipc')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-beq')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-bge')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-bgeu')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-blt')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-bltu')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-bne')
+
+    #TODEBUG fail tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #   run_cpu(tests, 'rv32ui-p-jal')
+
+    #TODEBUG time out tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-jalr')
+
+    #TODEBUG  tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #  run_cpu(tests, 'rv32ui-p-lbu')
+
+    #TODEBUG fix 'srai' first tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #  run_cpu(tests, 'rv32ui-p-lui')
+
+    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #  run_cpu(tests, 'rv32ui-p-lw')
+
