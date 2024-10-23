@@ -1,0 +1,772 @@
+@line:1300  Cycle @2.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00000 |
+@line:1345  Cycle @3.00: [d]	raw: 0x0500006f  |
+@line:1454  Cycle @3.00: [d]	j.jal.1101111    | rd: x00      |               |               |imm: 0x50
+@line:1300  Cycle @3.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00004 |
+@line:708   Cycle @4.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000050 | result: 00000050
+@line:713   Cycle @4.00: [e]	0x00000001       |a.a:00000000  |a.b:00000050   | res: 00000050 |
+@line:854   Cycle @4.00: [e]	condition: 1.a.b | a: 00000050  | b: 00000004   |
+@line:1300  Cycle @4.00: [F1]	on_br: 1         | ex_by: 1     | fetch: 1      | addr: 0x00050 |
+@line:3279  Cycle @4.00: [W1]	ownning: 00      | releasing: 00|
+@line:1345  Cycle @5.00: [d]	raw: 0x00000093  |
+@line:1678  Cycle @5.00: [d]	i.addi.0010011   | rd: x01      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @5.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00054 |
+@line:708   Cycle @6.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @6.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @6.00: [e]	own x01          |
+@line:1345  Cycle @6.00: [d]	raw: 0x00000113  |
+@line:1678  Cycle @6.00: [d]	i.addi.0010011   | rd: x02      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @6.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00058 |
+@line:3279  Cycle @6.00: [W1]	ownning: 01      | releasing: 00|
+@line:708   Cycle @7.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @7.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @7.00: [e]	own x02          |
+@line:1345  Cycle @7.00: [d]	raw: 0x00000193  |
+@line:1678  Cycle @7.00: [d]	i.addi.0010011   | rd: x03      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @7.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0005c |
+@line:3279  Cycle @7.00: [W1]	ownning: 02      | releasing: 00|
+@line:708   Cycle @8.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @8.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @8.00: [e]	own x03          |
+@line:1171  Cycle @8.00: [w]	writeback        | x01          | 0x00000000
+@line:1345  Cycle @8.00: [d]	raw: 0x00000213  |
+@line:1678  Cycle @8.00: [d]	i.addi.0010011   | rd: x04      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @8.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00060 |
+@line:3279  Cycle @8.00: [W1]	ownning: 03      | releasing: 01|
+@line:708   Cycle @9.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @9.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @9.00: [e]	own x04          |
+@line:1171  Cycle @9.00: [w]	writeback        | x02          | 0x00000000
+@line:1345  Cycle @9.00: [d]	raw: 0x00000293  |
+@line:1678  Cycle @9.00: [d]	i.addi.0010011   | rd: x05      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @9.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00064 |
+@line:3279  Cycle @9.00: [W1]	ownning: 04      | releasing: 02|
+@line:708   Cycle @10.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @10.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @10.00: [e]	own x05          |
+@line:1171  Cycle @10.00: [w]	writeback        | x03          | 0x00000000
+@line:1345  Cycle @10.00: [d]	raw: 0x00000313  |
+@line:1678  Cycle @10.00: [d]	i.addi.0010011   | rd: x06      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @10.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00068 |
+@line:3279  Cycle @10.00: [W1]	ownning: 05      | releasing: 03|
+@line:708   Cycle @11.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @11.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @11.00: [e]	own x06          |
+@line:1171  Cycle @11.00: [w]	writeback        | x04          | 0x00000000
+@line:1345  Cycle @11.00: [d]	raw: 0x00000393  |
+@line:1678  Cycle @11.00: [d]	i.addi.0010011   | rd: x07      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @11.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0006c |
+@line:3279  Cycle @11.00: [W1]	ownning: 06      | releasing: 04|
+@line:708   Cycle @12.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @12.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @12.00: [e]	own x07          |
+@line:1171  Cycle @12.00: [w]	writeback        | x05          | 0x00000000
+@line:1345  Cycle @12.00: [d]	raw: 0x00000413  |
+@line:1678  Cycle @12.00: [d]	i.addi.0010011   | rd: x08      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @12.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00070 |
+@line:3279  Cycle @12.00: [W1]	ownning: 07      | releasing: 05|
+@line:708   Cycle @13.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @13.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @13.00: [e]	own x08          |
+@line:1171  Cycle @13.00: [w]	writeback        | x06          | 0x00000000
+@line:1345  Cycle @13.00: [d]	raw: 0x00000493  |
+@line:1678  Cycle @13.00: [d]	i.addi.0010011   | rd: x09      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @13.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00074 |
+@line:3279  Cycle @13.00: [W1]	ownning: 08      | releasing: 06|
+@line:708   Cycle @14.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @14.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @14.00: [e]	own x09          |
+@line:1171  Cycle @14.00: [w]	writeback        | x07          | 0x00000000
+@line:1345  Cycle @14.00: [d]	raw: 0x00000513  |
+@line:1678  Cycle @14.00: [d]	i.addi.0010011   | rd: x10      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @14.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00078 |
+@line:3279  Cycle @14.00: [W1]	ownning: 09      | releasing: 07|
+@line:708   Cycle @15.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @15.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @15.00: [e]	own x10          |
+@line:1171  Cycle @15.00: [w]	writeback        | x08          | 0x00000000
+@line:1345  Cycle @15.00: [d]	raw: 0x00000593  |
+@line:1678  Cycle @15.00: [d]	i.addi.0010011   | rd: x11      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @15.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0007c |
+@line:3279  Cycle @15.00: [W1]	ownning: 10      | releasing: 08|
+@line:708   Cycle @16.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @16.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @16.00: [e]	own x11          |
+@line:1171  Cycle @16.00: [w]	writeback        | x09          | 0x00000000
+@line:1345  Cycle @16.00: [d]	raw: 0x00000613  |
+@line:1678  Cycle @16.00: [d]	i.addi.0010011   | rd: x12      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @16.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00080 |
+@line:3279  Cycle @16.00: [W1]	ownning: 11      | releasing: 09|
+@line:708   Cycle @17.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @17.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @17.00: [e]	own x12          |
+@line:1171  Cycle @17.00: [w]	writeback        | x10          | 0x00000000
+@line:1345  Cycle @17.00: [d]	raw: 0x00000693  |
+@line:1678  Cycle @17.00: [d]	i.addi.0010011   | rd: x13      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @17.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00084 |
+@line:3279  Cycle @17.00: [W1]	ownning: 12      | releasing: 10|
+@line:708   Cycle @18.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @18.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @18.00: [e]	own x13          |
+@line:1171  Cycle @18.00: [w]	writeback        | x11          | 0x00000000
+@line:1345  Cycle @18.00: [d]	raw: 0x00000713  |
+@line:1678  Cycle @18.00: [d]	i.addi.0010011   | rd: x14      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @18.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00088 |
+@line:3279  Cycle @18.00: [W1]	ownning: 13      | releasing: 11|
+@line:708   Cycle @19.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @19.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @19.00: [e]	own x14          |
+@line:1171  Cycle @19.00: [w]	writeback        | x12          | 0x00000000
+@line:1345  Cycle @19.00: [d]	raw: 0x00000793  |
+@line:1678  Cycle @19.00: [d]	i.addi.0010011   | rd: x15      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @19.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0008c |
+@line:3279  Cycle @19.00: [W1]	ownning: 14      | releasing: 12|
+@line:708   Cycle @20.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @20.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @20.00: [e]	own x15          |
+@line:1171  Cycle @20.00: [w]	writeback        | x13          | 0x00000000
+@line:1345  Cycle @20.00: [d]	raw: 0x00000813  |
+@line:1678  Cycle @20.00: [d]	i.addi.0010011   | rd: x16      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @20.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00090 |
+@line:3279  Cycle @20.00: [W1]	ownning: 15      | releasing: 13|
+@line:708   Cycle @21.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @21.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @21.00: [e]	own x16          |
+@line:1171  Cycle @21.00: [w]	writeback        | x14          | 0x00000000
+@line:1345  Cycle @21.00: [d]	raw: 0x00000893  |
+@line:1678  Cycle @21.00: [d]	i.addi.0010011   | rd: x17      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @21.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00094 |
+@line:3279  Cycle @21.00: [W1]	ownning: 16      | releasing: 14|
+@line:708   Cycle @22.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @22.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @22.00: [e]	own x17          |
+@line:1171  Cycle @22.00: [w]	writeback        | x15          | 0x00000000
+@line:1345  Cycle @22.00: [d]	raw: 0x00000913  |
+@line:1678  Cycle @22.00: [d]	i.addi.0010011   | rd: x18      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @22.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00098 |
+@line:3279  Cycle @22.00: [W1]	ownning: 17      | releasing: 15|
+@line:708   Cycle @23.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @23.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @23.00: [e]	own x18          |
+@line:1171  Cycle @23.00: [w]	writeback        | x16          | 0x00000000
+@line:1345  Cycle @23.00: [d]	raw: 0x00000993  |
+@line:1678  Cycle @23.00: [d]	i.addi.0010011   | rd: x19      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @23.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0009c |
+@line:3279  Cycle @23.00: [W1]	ownning: 18      | releasing: 16|
+@line:708   Cycle @24.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @24.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @24.00: [e]	own x19          |
+@line:1171  Cycle @24.00: [w]	writeback        | x17          | 0x00000000
+@line:1345  Cycle @24.00: [d]	raw: 0x00000a13  |
+@line:1678  Cycle @24.00: [d]	i.addi.0010011   | rd: x20      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @24.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000a0 |
+@line:3279  Cycle @24.00: [W1]	ownning: 19      | releasing: 17|
+@line:708   Cycle @25.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @25.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @25.00: [e]	own x20          |
+@line:1171  Cycle @25.00: [w]	writeback        | x18          | 0x00000000
+@line:1345  Cycle @25.00: [d]	raw: 0x00000a93  |
+@line:1678  Cycle @25.00: [d]	i.addi.0010011   | rd: x21      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @25.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000a4 |
+@line:3279  Cycle @25.00: [W1]	ownning: 20      | releasing: 18|
+@line:708   Cycle @26.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @26.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @26.00: [e]	own x21          |
+@line:1171  Cycle @26.00: [w]	writeback        | x19          | 0x00000000
+@line:1345  Cycle @26.00: [d]	raw: 0x00000b13  |
+@line:1678  Cycle @26.00: [d]	i.addi.0010011   | rd: x22      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @26.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000a8 |
+@line:3279  Cycle @26.00: [W1]	ownning: 21      | releasing: 19|
+@line:708   Cycle @27.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @27.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @27.00: [e]	own x22          |
+@line:1171  Cycle @27.00: [w]	writeback        | x20          | 0x00000000
+@line:1345  Cycle @27.00: [d]	raw: 0x00000b93  |
+@line:1678  Cycle @27.00: [d]	i.addi.0010011   | rd: x23      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @27.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000ac |
+@line:3279  Cycle @27.00: [W1]	ownning: 22      | releasing: 20|
+@line:708   Cycle @28.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @28.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @28.00: [e]	own x23          |
+@line:1171  Cycle @28.00: [w]	writeback        | x21          | 0x00000000
+@line:1345  Cycle @28.00: [d]	raw: 0x00000c13  |
+@line:1678  Cycle @28.00: [d]	i.addi.0010011   | rd: x24      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @28.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000b0 |
+@line:3279  Cycle @28.00: [W1]	ownning: 23      | releasing: 21|
+@line:708   Cycle @29.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @29.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @29.00: [e]	own x24          |
+@line:1171  Cycle @29.00: [w]	writeback        | x22          | 0x00000000
+@line:1345  Cycle @29.00: [d]	raw: 0x00000c93  |
+@line:1678  Cycle @29.00: [d]	i.addi.0010011   | rd: x25      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @29.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000b4 |
+@line:3279  Cycle @29.00: [W1]	ownning: 24      | releasing: 22|
+@line:708   Cycle @30.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @30.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @30.00: [e]	own x25          |
+@line:1171  Cycle @30.00: [w]	writeback        | x23          | 0x00000000
+@line:1345  Cycle @30.00: [d]	raw: 0x00000d13  |
+@line:1678  Cycle @30.00: [d]	i.addi.0010011   | rd: x26      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @30.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000b8 |
+@line:3279  Cycle @30.00: [W1]	ownning: 25      | releasing: 23|
+@line:708   Cycle @31.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @31.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @31.00: [e]	own x26          |
+@line:1171  Cycle @31.00: [w]	writeback        | x24          | 0x00000000
+@line:1345  Cycle @31.00: [d]	raw: 0x00000d93  |
+@line:1678  Cycle @31.00: [d]	i.addi.0010011   | rd: x27      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @31.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000bc |
+@line:3279  Cycle @31.00: [W1]	ownning: 26      | releasing: 24|
+@line:708   Cycle @32.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @32.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @32.00: [e]	own x27          |
+@line:1171  Cycle @32.00: [w]	writeback        | x25          | 0x00000000
+@line:1345  Cycle @32.00: [d]	raw: 0x00000e13  |
+@line:1678  Cycle @32.00: [d]	i.addi.0010011   | rd: x28      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @32.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000c0 |
+@line:3279  Cycle @32.00: [W1]	ownning: 27      | releasing: 25|
+@line:708   Cycle @33.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @33.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @33.00: [e]	own x28          |
+@line:1171  Cycle @33.00: [w]	writeback        | x26          | 0x00000000
+@line:1345  Cycle @33.00: [d]	raw: 0x00000e93  |
+@line:1678  Cycle @33.00: [d]	i.addi.0010011   | rd: x29      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @33.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000c4 |
+@line:3279  Cycle @33.00: [W1]	ownning: 28      | releasing: 26|
+@line:708   Cycle @34.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @34.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @34.00: [e]	own x29          |
+@line:1171  Cycle @34.00: [w]	writeback        | x27          | 0x00000000
+@line:1345  Cycle @34.00: [d]	raw: 0x00000f13  |
+@line:1678  Cycle @34.00: [d]	i.addi.0010011   | rd: x30      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @34.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000c8 |
+@line:3279  Cycle @34.00: [W1]	ownning: 29      | releasing: 27|
+@line:708   Cycle @35.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @35.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @35.00: [e]	own x30          |
+@line:1171  Cycle @35.00: [w]	writeback        | x28          | 0x00000000
+@line:1345  Cycle @35.00: [d]	raw: 0x00000f93  |
+@line:1678  Cycle @35.00: [d]	i.addi.0010011   | rd: x31      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @35.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000cc |
+@line:3279  Cycle @35.00: [W1]	ownning: 30      | releasing: 28|
+@line:708   Cycle @36.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @36.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @36.00: [e]	own x31          |
+@line:1171  Cycle @36.00: [w]	writeback        | x29          | 0x00000000
+@line:1345  Cycle @36.00: [d]	raw: 0xf1402573  |
+@line:2309  Cycle @36.00: [d]	i.csrrs.1110011  | rd: x10      | rs1: x00      |               |imm: 0xf14
+@line:3045  Cycle @36.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x2 csr_addr: 0xf14
+@line:1300  Cycle @36.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000d0 |
+@line:3279  Cycle @36.00: [W1]	ownning: 31      | releasing: 29|
+@line:708   Cycle @37.00: [e]	0x00000008       | a: 00000000  | b: 00000000   | imm: ffffff14 | result: 00000000
+@line:713   Cycle @37.00: [e]	0x00000008       |a.a:00000000  |a.b:ffffff14   | res: 00000000 |
+@line:958   Cycle @37.00: [e]	own x10          |
+@line:1171  Cycle @37.00: [w]	writeback        | x30          | 0x00000000
+@line:1345  Cycle @37.00: [d]	raw: 0x00051063  |
+@line:1989  Cycle @37.00: [d]	b.bne.1100011    |              | rs1: x10      | rs2: x00      |imm: 0x0
+@line:1300  Cycle @37.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x000d4 |
+@line:3279  Cycle @37.00: [W1]	ownning: 10      | releasing: 30|
+@line:708   Cycle @38.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 000000d0
+@line:713   Cycle @38.00: [e]	0x00000001       |a.a:000000d0  |a.b:00000000   | res: 000000d0 |
+@line:854   Cycle @38.00: [e]	condition: 0.a.b | a: 000000d0  | b: 000000d4   |
+@line:1171  Cycle @38.00: [w]	writeback        | x31          | 0x00000000
+@line:1300  Cycle @38.00: [F1]	on_br: 1         | ex_by: 1     | fetch: 1      | addr: 0x000d4 |
+@line:3279  Cycle @38.00: [W1]	ownning: 00      | releasing: 31|
+@line:1171  Cycle @39.00: [w]	writeback        | x10          | 0x00000000
+@line:1345  Cycle @39.00: [d]	raw: 0x00000297  |
+@line:2337  Cycle @39.00: [d]	u.auipc.0010111  | rd: x05      |               |               |imm: 0x0
+@line:1300  Cycle @39.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000d8 |
+@line:3279  Cycle @39.00: [W1]	ownning: 00      | releasing: 10|
+@line:708   Cycle @40.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 000000d4
+@line:713   Cycle @40.00: [e]	0x00000001       |a.a:000000d4  |a.b:00000000   | res: 000000d4 |
+@line:958   Cycle @40.00: [e]	own x05          |
+@line:1345  Cycle @40.00: [d]	raw: 0x01028293  |
+@line:1678  Cycle @40.00: [d]	i.addi.0010011   | rd: x05      | rs1: x05      |               |imm: 0x10
+@line:1300  Cycle @40.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000dc |
+@line:3279  Cycle @40.00: [W1]	ownning: 05      | releasing: 00|
+@line:97    Cycle @41.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1345  Cycle @41.00: [d]	raw: 0x30529073  |
+@line:2370  Cycle @41.00: [d]	i.csrrw.1110011  | rd: x00      | rs1: x05      |               |imm: 0x305
+@line:3045  Cycle @41.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x1 csr_addr: 0x305
+@line:1300  Cycle @41.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000e0 |
+@line:97    Cycle @42.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @42.00: [w]	writeback        | x05          | 0x000000d4
+@line:1345  Cycle @42.00: [d]	raw: 0x74445073  |
+@line:2403  Cycle @42.00: [d]	i.csrrwi.1110011 | rd: x00      | rs1: x08      |               |imm: 0x744
+@line:3045  Cycle @42.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x5 csr_addr: 0x744
+@line:1300  Cycle @42.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000e4 |
+@line:3279  Cycle @42.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @43.00: [e]	0x00000001       | a: 000000d4  | b: 00000000   | imm: 00000010 | result: 000000e4
+@line:713   Cycle @43.00: [e]	0x00000001       |a.a:000000d4  |a.b:00000010   | res: 000000e4 |
+@line:958   Cycle @43.00: [e]	own x05          |
+@line:1345  Cycle @43.00: [d]	raw: 0x00000297  |
+@line:2337  Cycle @43.00: [d]	u.auipc.0010111  | rd: x05      |               |               |imm: 0x0
+@line:1300  Cycle @43.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000e8 |
+@line:3279  Cycle @43.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @44.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000305 | result: 00000305
+@line:713   Cycle @44.00: [e]	0x00000001       |a.a:00000000  |a.b:00000305   | res: 00000305 |
+@line:1345  Cycle @44.00: [d]	raw: 0x01028293  |
+@line:1678  Cycle @44.00: [d]	i.addi.0010011   | rd: x05      | rs1: x05      |               |imm: 0x10
+@line:1300  Cycle @44.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000ec |
+@line:3279  Cycle @44.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @45.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000744 | result: 00000744
+@line:713   Cycle @45.00: [e]	0x00000001       |a.a:00000000  |a.b:00000744   | res: 00000744 |
+@line:1171  Cycle @45.00: [w]	writeback        | x05          | 0x000000e4
+@line:1345  Cycle @45.00: [d]	raw: 0x30529073  |
+@line:2370  Cycle @45.00: [d]	i.csrrw.1110011  | rd: x00      | rs1: x05      |               |imm: 0x305
+@line:3045  Cycle @45.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x1 csr_addr: 0x305
+@line:1300  Cycle @45.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000f0 |
+@line:3279  Cycle @45.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @46.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 000000e4
+@line:713   Cycle @46.00: [e]	0x00000001       |a.a:000000e4  |a.b:00000000   | res: 000000e4 |
+@line:958   Cycle @46.00: [e]	own x05          |
+@line:1180  Cycle @46.00: [w]	writeback        | csr[01]       | 0x00000305
+@line:1345  Cycle @46.00: [d]	raw: 0x18005073  |
+@line:2403  Cycle @46.00: [d]	i.csrrwi.1110011 | rd: x00      | rs1: x00      |               |imm: 0x180
+@line:3045  Cycle @46.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x5 csr_addr: 0x180
+@line:1300  Cycle @46.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000f4 |
+@line:3279  Cycle @46.00: [W1]	ownning: 05      | releasing: 00|
+@line:97    Cycle @47.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1180  Cycle @47.00: [w]	writeback        | csr[15]       | 0x00000744
+@line:1345  Cycle @47.00: [d]	raw: 0x00000297  |
+@line:2337  Cycle @47.00: [d]	u.auipc.0010111  | rd: x05      |               |               |imm: 0x0
+@line:1300  Cycle @47.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000f8 |
+@line:3279  Cycle @47.00: [W1]	ownning: 00      | releasing: 00|
+@line:97    Cycle @48.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @48.00: [w]	writeback        | x05          | 0x000000e4
+@line:1345  Cycle @48.00: [d]	raw: 0x02028293  |
+@line:1678  Cycle @48.00: [d]	i.addi.0010011   | rd: x05      | rs1: x05      |               |imm: 0x20
+@line:1300  Cycle @48.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x000fc |
+@line:3279  Cycle @48.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @49.00: [e]	0x00000001       | a: 000000e4  | b: 00000000   | imm: 00000010 | result: 000000f4
+@line:713   Cycle @49.00: [e]	0x00000001       |a.a:000000e4  |a.b:00000010   | res: 000000f4 |
+@line:958   Cycle @49.00: [e]	own x05          |
+@line:1345  Cycle @49.00: [d]	raw: 0x30529073  |
+@line:2370  Cycle @49.00: [d]	i.csrrw.1110011  | rd: x00      | rs1: x05      |               |imm: 0x305
+@line:3045  Cycle @49.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x1 csr_addr: 0x305
+@line:1300  Cycle @49.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00100 |
+@line:3279  Cycle @49.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @50.00: [e]	0x00000001       | a: 00000000  | b: 000000d4   | imm: 00000305 | result: 00000305
+@line:713   Cycle @50.00: [e]	0x00000001       |a.a:00000000  |a.b:00000305   | res: 00000305 |
+@line:1345  Cycle @50.00: [d]	raw: 0x800002b7  |
+@line:1490  Cycle @50.00: [d]	u.lui.0110111    | rd: x05      |               |               |imm: 0x80000
+@line:1300  Cycle @50.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00104 |
+@line:3279  Cycle @50.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @51.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000180 | result: 00000180
+@line:713   Cycle @51.00: [e]	0x00000001       |a.a:00000000  |a.b:00000180   | res: 00000180 |
+@line:1171  Cycle @51.00: [w]	writeback        | x05          | 0x000000f4
+@line:1345  Cycle @51.00: [d]	raw: 0xfff28293  |
+@line:1678  Cycle @51.00: [d]	i.addi.0010011   | rd: x05      | rs1: x05      |               |imm: 0xfff
+@line:1300  Cycle @51.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00108 |
+@line:3279  Cycle @51.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @52.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 000000f4
+@line:713   Cycle @52.00: [e]	0x00000001       |a.a:000000f4  |a.b:00000000   | res: 000000f4 |
+@line:958   Cycle @52.00: [e]	own x05          |
+@line:1180  Cycle @52.00: [w]	writeback        | csr[01]       | 0x00000305
+@line:1345  Cycle @52.00: [d]	raw: 0x3b029073  |
+@line:2370  Cycle @52.00: [d]	i.csrrw.1110011  | rd: x00      | rs1: x05      |               |imm: 0x3b0
+@line:3045  Cycle @52.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x1 csr_addr: 0x3b0
+@line:1300  Cycle @52.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0010c |
+@line:3279  Cycle @52.00: [W1]	ownning: 05      | releasing: 00|
+@line:97    Cycle @53.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1180  Cycle @53.00: [w]	writeback        | csr[10]       | 0x00000180
+@line:1345  Cycle @53.00: [d]	raw: 0x01f00293  |
+@line:1678  Cycle @53.00: [d]	i.addi.0010011   | rd: x05      | rs1: x00      |               |imm: 0x1f
+@line:1300  Cycle @53.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00110 |
+@line:3279  Cycle @53.00: [W1]	ownning: 00      | releasing: 00|
+@line:97    Cycle @54.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @54.00: [w]	writeback        | x05          | 0x000000f4
+@line:1345  Cycle @54.00: [d]	raw: 0x3a029073  |
+@line:2370  Cycle @54.00: [d]	i.csrrw.1110011  | rd: x00      | rs1: x05      |               |imm: 0x3a0
+@line:3045  Cycle @54.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x1 csr_addr: 0x3a0
+@line:1300  Cycle @54.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00114 |
+@line:3279  Cycle @54.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @55.00: [e]	0x00000001       | a: 000000f4  | b: 00000000   | imm: 00000020 | result: 00000114
+@line:713   Cycle @55.00: [e]	0x00000001       |a.a:000000f4  |a.b:00000020   | res: 00000114 |
+@line:958   Cycle @55.00: [e]	own x05          |
+@line:1345  Cycle @55.00: [d]	raw: 0x30405073  |
+@line:2403  Cycle @55.00: [d]	i.csrrwi.1110011 | rd: x00      | rs1: x00      |               |imm: 0x304
+@line:3045  Cycle @55.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x5 csr_addr: 0x304
+@line:1300  Cycle @55.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00118 |
+@line:3279  Cycle @55.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @56.00: [e]	0x00000001       | a: 00000000  | b: 000000e4   | imm: 00000305 | result: 00000305
+@line:713   Cycle @56.00: [e]	0x00000001       |a.a:00000000  |a.b:00000305   | res: 00000305 |
+@line:1345  Cycle @56.00: [d]	raw: 0x00000297  |
+@line:2337  Cycle @56.00: [d]	u.auipc.0010111  | rd: x05      |               |               |imm: 0x0
+@line:1300  Cycle @56.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0011c |
+@line:3279  Cycle @56.00: [W1]	ownning: 00      | releasing: 00|
+@line:97    Cycle @57.00: [e]	rs1-x00: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @57.00: [w]	writeback        | x05          | 0x00000114
+@line:1345  Cycle @57.00: [d]	raw: 0x01428293  |
+@line:1678  Cycle @57.00: [d]	i.addi.0010011   | rd: x05      | rs1: x05      |               |imm: 0x14
+@line:1300  Cycle @57.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00120 |
+@line:3279  Cycle @57.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @58.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 80000000 | result: 80000000
+@line:713   Cycle @58.00: [e]	0x00000001       |a.a:00000000  |a.b:80000000   | res: 80000000 |
+@line:958   Cycle @58.00: [e]	own x05          |
+@line:1180  Cycle @58.00: [w]	writeback        | csr[01]       | 0x00000305
+@line:1345  Cycle @58.00: [d]	raw: 0x30529073  |
+@line:2370  Cycle @58.00: [d]	i.csrrw.1110011  | rd: x00      | rs1: x05      |               |imm: 0x305
+@line:3045  Cycle @58.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x1 csr_addr: 0x305
+@line:1300  Cycle @58.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00124 |
+@line:3279  Cycle @58.00: [W1]	ownning: 05      | releasing: 00|
+@line:97    Cycle @59.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1345  Cycle @59.00: [d]	raw: 0x30205073  |
+@line:2403  Cycle @59.00: [d]	i.csrrwi.1110011 | rd: x00      | rs1: x00      |               |imm: 0x302
+@line:3045  Cycle @59.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x5 csr_addr: 0x302
+@line:1300  Cycle @59.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00128 |
+@line:97    Cycle @60.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @60.00: [w]	writeback        | x05          | 0x80000000
+@line:1345  Cycle @60.00: [d]	raw: 0x30305073  |
+@line:2403  Cycle @60.00: [d]	i.csrrwi.1110011 | rd: x00      | rs1: x00      |               |imm: 0x303
+@line:3045  Cycle @60.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x5 csr_addr: 0x303
+@line:1300  Cycle @60.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0012c |
+@line:3279  Cycle @60.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @61.00: [e]	0x00000001       | a: 80000000  | b: 00000000   | imm: ffffffff | result: 7fffffff
+@line:713   Cycle @61.00: [e]	0x00000001       |a.a:80000000  |a.b:ffffffff   | res: 7fffffff |
+@line:958   Cycle @61.00: [e]	own x05          |
+@line:1345  Cycle @61.00: [d]	raw: 0x00000193  |
+@line:1678  Cycle @61.00: [d]	i.addi.0010011   | rd: x03      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @61.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00130 |
+@line:3279  Cycle @61.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @62.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 000003b0 | result: 000003b0
+@line:713   Cycle @62.00: [e]	0x00000001       |a.a:00000000  |a.b:000003b0   | res: 000003b0 |
+@line:1345  Cycle @62.00: [d]	raw: 0x00000297  |
+@line:2337  Cycle @62.00: [d]	u.auipc.0010111  | rd: x05      |               |               |imm: 0x0
+@line:1300  Cycle @62.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00134 |
+@line:3279  Cycle @62.00: [W1]	ownning: 00      | releasing: 00|
+@line:97    Cycle @63.00: [e]	rs1-x00: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @63.00: [w]	writeback        | x05          | 0x7fffffff
+@line:1345  Cycle @63.00: [d]	raw: 0xed428293  |
+@line:1678  Cycle @63.00: [d]	i.addi.0010011   | rd: x05      | rs1: x05      |               |imm: 0xed4
+@line:1300  Cycle @63.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00138 |
+@line:3279  Cycle @63.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @64.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 0000001f | result: 0000001f
+@line:713   Cycle @64.00: [e]	0x00000001       |a.a:00000000  |a.b:0000001f   | res: 0000001f |
+@line:958   Cycle @64.00: [e]	own x05          |
+@line:1180  Cycle @64.00: [w]	writeback        | csr[11]       | 0x000003b0
+@line:1345  Cycle @64.00: [d]	raw: 0x30529073  |
+@line:2370  Cycle @64.00: [d]	i.csrrw.1110011  | rd: x00      | rs1: x05      |               |imm: 0x305
+@line:3045  Cycle @64.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x1 csr_addr: 0x305
+@line:1300  Cycle @64.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0013c |
+@line:3279  Cycle @64.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @65.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 000003a0 | result: 000003a0
+@line:713   Cycle @65.00: [e]	0x00000001       |a.a:00000000  |a.b:000003a0   | res: 000003a0 |
+@line:1345  Cycle @65.00: [d]	raw: 0x00100513  |
+@line:1678  Cycle @65.00: [d]	i.addi.0010011   | rd: x10      | rs1: x00      |               |imm: 0x1
+@line:1300  Cycle @65.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00140 |
+@line:3279  Cycle @65.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @66.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000304 | result: 00000304
+@line:713   Cycle @66.00: [e]	0x00000001       |a.a:00000000  |a.b:00000304   | res: 00000304 |
+@line:1171  Cycle @66.00: [w]	writeback        | x05          | 0x0000001f
+@line:1345  Cycle @66.00: [d]	raw: 0x01f51513  |
+@line:2452  Cycle @66.00: [d]	i.slli.0010011   | rd: x10      | rs1: x10      |               |imm: 0x1f
+@line:1300  Cycle @66.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00144 |
+@line:3279  Cycle @66.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @67.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000118
+@line:713   Cycle @67.00: [e]	0x00000001       |a.a:00000118  |a.b:00000000   | res: 00000118 |
+@line:958   Cycle @67.00: [e]	own x05          |
+@line:1180  Cycle @67.00: [w]	writeback        | csr[12]       | 0x000003a0
+@line:1345  Cycle @67.00: [d]	raw: 0x00054c63  |
+@line:2059  Cycle @67.00: [d]	b.blt.1100011    |              | rs1: x10      | rs2: x00      |imm: 0x18
+@line:1300  Cycle @67.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @67.00: [W1]	ownning: 05      | releasing: 00|
+@line:97    Cycle @68.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1180  Cycle @68.00: [w]	writeback        | csr[04]       | 0x00000304
+@line:1300  Cycle @68.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @68.00: [W1]	ownning: 00      | releasing: 00|
+@line:97    Cycle @69.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @69.00: [w]	writeback        | x05          | 0x00000118
+@line:1300  Cycle @69.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @69.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @70.00: [e]	0x00000001       | a: 00000118  | b: 00000000   | imm: 00000014 | result: 0000012c
+@line:713   Cycle @70.00: [e]	0x00000001       |a.a:00000118  |a.b:00000014   | res: 0000012c |
+@line:958   Cycle @70.00: [e]	own x05          |
+@line:1300  Cycle @70.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @70.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @71.00: [e]	0x00000001       | a: 00000000  | b: 000000f4   | imm: 00000305 | result: 00000305
+@line:713   Cycle @71.00: [e]	0x00000001       |a.a:00000000  |a.b:00000305   | res: 00000305 |
+@line:1300  Cycle @71.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @71.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @72.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000302 | result: 00000302
+@line:713   Cycle @72.00: [e]	0x00000001       |a.a:00000000  |a.b:00000302   | res: 00000302 |
+@line:1171  Cycle @72.00: [w]	writeback        | x05          | 0x0000012c
+@line:1300  Cycle @72.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @72.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @73.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000303 | result: 00000303
+@line:713   Cycle @73.00: [e]	0x00000001       |a.a:00000000  |a.b:00000303   | res: 00000303 |
+@line:1180  Cycle @73.00: [w]	writeback        | csr[01]       | 0x00000305
+@line:1300  Cycle @73.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @73.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @74.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @74.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @74.00: [e]	own x03          |
+@line:1180  Cycle @74.00: [w]	writeback        | csr[13]       | 0x00000302
+@line:1300  Cycle @74.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @74.00: [W1]	ownning: 03      | releasing: 00|
+@line:708   Cycle @75.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000130
+@line:713   Cycle @75.00: [e]	0x00000001       |a.a:00000130  |a.b:00000000   | res: 00000130 |
+@line:958   Cycle @75.00: [e]	own x05          |
+@line:1180  Cycle @75.00: [w]	writeback        | csr[14]       | 0x00000303
+@line:1300  Cycle @75.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @75.00: [W1]	ownning: 05      | releasing: 00|
+@line:97    Cycle @76.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @76.00: [w]	writeback        | x03          | 0x00000000
+@line:1300  Cycle @76.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @76.00: [W1]	ownning: 00      | releasing: 03|
+@line:97    Cycle @77.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @77.00: [w]	writeback        | x05          | 0x00000130
+@line:1300  Cycle @77.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @77.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @78.00: [e]	0x00000001       | a: 00000130  | b: 00000000   | imm: fffffed4 | result: 00000004
+@line:713   Cycle @78.00: [e]	0x00000001       |a.a:00000130  |a.b:fffffed4   | res: 00000004 |
+@line:958   Cycle @78.00: [e]	own x05          |
+@line:1300  Cycle @78.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @78.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @79.00: [e]	0x00000001       | a: 00000000  | b: 00000118   | imm: 00000305 | result: 00000305
+@line:713   Cycle @79.00: [e]	0x00000001       |a.a:00000000  |a.b:00000305   | res: 00000305 |
+@line:1300  Cycle @79.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @79.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @80.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000001 | result: 00000001
+@line:713   Cycle @80.00: [e]	0x00000001       |a.a:00000000  |a.b:00000001   | res: 00000001 |
+@line:958   Cycle @80.00: [e]	own x10          |
+@line:1171  Cycle @80.00: [w]	writeback        | x05          | 0x00000004
+@line:1300  Cycle @80.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @80.00: [W1]	ownning: 10      | releasing: 05|
+@line:97    Cycle @81.00: [e]	rs1-x10: 1       | rs2-x00: 1   | rd-x10: 0
+@line:1180  Cycle @81.00: [w]	writeback        | csr[01]       | 0x00000305
+@line:1300  Cycle @81.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @81.00: [W1]	ownning: 00      | releasing: 00|
+@line:97    Cycle @82.00: [e]	rs1-x10: 1       | rs2-x00: 1   | rd-x10: 0
+@line:1171  Cycle @82.00: [w]	writeback        | x10          | 0x00000001
+@line:1300  Cycle @82.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @82.00: [W1]	ownning: 00      | releasing: 10|
+@line:708   Cycle @83.00: [e]	0x00000020       | a: 00000001  | b: 00000000   | imm: 0000001f | result: 80000000
+@line:713   Cycle @83.00: [e]	0x00000020       |a.a:00000001  |a.b:0000001f   | res: 80000000 |
+@line:958   Cycle @83.00: [e]	own x10          |
+@line:1300  Cycle @83.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00148 |
+@line:3279  Cycle @83.00: [W1]	ownning: 10      | releasing: 00|
+@line:708   Cycle @84.00: [e]	0x00000001       | a: 80000000  | b: 00000000   | imm: 00000018 | result: 0000015c
+@line:713   Cycle @84.00: [e]	0x00000001       |a.a:00000144  |a.b:00000018   | res: 0000015c |
+@line:854   Cycle @84.00: [e]	condition: 1.a.b | a: 0000015c  | b: 00000148   |
+@line:1300  Cycle @84.00: [F1]	on_br: 1         | ex_by: 1     | fetch: 1      | addr: 0x0015c |
+@line:3279  Cycle @84.00: [W1]	ownning: 00      | releasing: 00|
+@line:1171  Cycle @85.00: [w]	writeback        | x10          | 0x80000000
+@line:1345  Cycle @85.00: [d]	raw: 0x00000293  |
+@line:1678  Cycle @85.00: [d]	i.addi.0010011   | rd: x05      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @85.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00160 |
+@line:3279  Cycle @85.00: [W1]	ownning: 00      | releasing: 10|
+@line:708   Cycle @86.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000000
+@line:713   Cycle @86.00: [e]	0x00000001       |a.a:00000000  |a.b:00000000   | res: 00000000 |
+@line:958   Cycle @86.00: [e]	own x05          |
+@line:1345  Cycle @86.00: [d]	raw: 0x00028a63  |
+@line:1919  Cycle @86.00: [d]	b.beq.1100011    |              | rs1: x05      | rs2: x00      |imm: 0x14
+@line:1300  Cycle @86.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x00164 |
+@line:3279  Cycle @86.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @87.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000014 | result: 00000174
+@line:713   Cycle @87.00: [e]	0x00000001       |a.a:00000160  |a.b:00000014   | res: 00000174 |
+@line:854   Cycle @87.00: [e]	condition: 1.a.b | a: 00000174  | b: 00000164   |
+@line:1300  Cycle @87.00: [F1]	on_br: 1         | ex_by: 1     | fetch: 1      | addr: 0x00174 |
+@line:3279  Cycle @87.00: [W1]	ownning: 00      | releasing: 00|
+@line:1171  Cycle @88.00: [w]	writeback        | x05          | 0x00000000
+@line:1345  Cycle @88.00: [d]	raw: 0x30005073  |
+@line:2403  Cycle @88.00: [d]	i.csrrwi.1110011 | rd: x00      | rs1: x00      |               |imm: 0x300
+@line:3045  Cycle @88.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x5 csr_addr: 0x300
+@line:1300  Cycle @88.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00178 |
+@line:3279  Cycle @88.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @89.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000300 | result: 00000300
+@line:713   Cycle @89.00: [e]	0x00000001       |a.a:00000000  |a.b:00000300   | res: 00000300 |
+@line:1345  Cycle @89.00: [d]	raw: 0x00000297  |
+@line:2337  Cycle @89.00: [d]	u.auipc.0010111  | rd: x05      |               |               |imm: 0x0
+@line:1300  Cycle @89.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x0017c |
+@line:3279  Cycle @89.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @90.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000178
+@line:713   Cycle @90.00: [e]	0x00000001       |a.a:00000178  |a.b:00000000   | res: 00000178 |
+@line:958   Cycle @90.00: [e]	own x05          |
+@line:1345  Cycle @90.00: [d]	raw: 0x01428293  |
+@line:1678  Cycle @90.00: [d]	i.addi.0010011   | rd: x05      | rs1: x05      |               |imm: 0x14
+@line:1300  Cycle @90.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00180 |
+@line:3279  Cycle @90.00: [W1]	ownning: 05      | releasing: 00|
+@line:97    Cycle @91.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1180  Cycle @91.00: [w]	writeback        | csr[08]       | 0x00000300
+@line:1345  Cycle @91.00: [d]	raw: 0x34129073  |
+@line:2370  Cycle @91.00: [d]	i.csrrw.1110011  | rd: x00      | rs1: x05      |               |imm: 0x341
+@line:3045  Cycle @91.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x1 csr_addr: 0x341
+@line:1300  Cycle @91.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00184 |
+@line:3279  Cycle @91.00: [W1]	ownning: 00      | releasing: 00|
+@line:97    Cycle @92.00: [e]	rs1-x05: 1       | rs2-x00: 1   | rd-x05: 0
+@line:1171  Cycle @92.00: [w]	writeback        | x05          | 0x00000178
+@line:1345  Cycle @92.00: [d]	raw: 0xf1402573  |
+@line:2309  Cycle @92.00: [d]	i.csrrs.1110011  | rd: x10      | rs1: x00      |               |imm: 0xf14
+@line:3045  Cycle @92.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x2 csr_addr: 0xf14
+@line:1300  Cycle @92.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00188 |
+@line:3279  Cycle @92.00: [W1]	ownning: 00      | releasing: 05|
+@line:708   Cycle @93.00: [e]	0x00000001       | a: 00000178  | b: 00000000   | imm: 00000014 | result: 0000018c
+@line:713   Cycle @93.00: [e]	0x00000001       |a.a:00000178  |a.b:00000014   | res: 0000018c |
+@line:958   Cycle @93.00: [e]	own x05          |
+@line:1345  Cycle @93.00: [d]	raw: 0x30200073  |
+@line:2586  Cycle @93.00: [d]	r.mret.1110011   | rd: x00      | rs1: x00      | rs2: x02      
+@line:3045  Cycle @93.00: [d]	CSR instruction: opcode = 0x73 funct3: 0x0 csr_addr: 0x302
+@line:1300  Cycle @93.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x0018c |
+@line:3279  Cycle @93.00: [W1]	ownning: 05      | releasing: 00|
+@line:708   Cycle @94.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000341 | result: 00000341
+@line:713   Cycle @94.00: [e]	0x00000001       |a.a:00000000  |a.b:00000341   | res: 00000341 |
+@line:1300  Cycle @94.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x0018c |
+@line:3279  Cycle @94.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @95.00: [e]	0x00000008       | a: 00000000  | b: 00000000   | imm: ffffff14 | result: 00000000
+@line:713   Cycle @95.00: [e]	0x00000008       |a.a:00000000  |a.b:ffffff14   | res: 00000000 |
+@line:958   Cycle @95.00: [e]	own x10          |
+@line:1171  Cycle @95.00: [w]	writeback        | x05          | 0x0000018c
+@line:1300  Cycle @95.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x0018c |
+@line:3279  Cycle @95.00: [W1]	ownning: 10      | releasing: 05|
+@line:708   Cycle @96.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000000 | result: 00000188
+@line:713   Cycle @96.00: [e]	0x00000001       |a.a:00000188  |a.b:00000000   | res: 00000188 |
+@line:854   Cycle @96.00: [e]	condition: 0.a.b | a: 00000188  | b: 0000018c   |
+@line:1180  Cycle @96.00: [w]	writeback        | csr[02]       | 0x00000341
+@line:1300  Cycle @96.00: [F1]	on_br: 1         | ex_by: 1     | fetch: 1      | addr: 0x0018c |
+@line:3279  Cycle @96.00: [W1]	ownning: 00      | releasing: 00|
+@line:1171  Cycle @97.00: [w]	writeback        | x10          | 0x00000000
+@line:1345  Cycle @97.00: [d]	raw: 0x00200193  |
+@line:1678  Cycle @97.00: [d]	i.addi.0010011   | rd: x03      | rs1: x00      |               |imm: 0x2
+@line:1300  Cycle @97.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00190 |
+@line:3279  Cycle @97.00: [W1]	ownning: 00      | releasing: 10|
+@line:708   Cycle @98.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000002 | result: 00000002
+@line:713   Cycle @98.00: [e]	0x00000001       |a.a:00000000  |a.b:00000002   | res: 00000002 |
+@line:958   Cycle @98.00: [e]	own x03          |
+@line:1345  Cycle @98.00: [d]	raw: 0x00002517  |
+@line:2337  Cycle @98.00: [d]	u.auipc.0010111  | rd: x10      |               |               |imm: 0x2
+@line:1300  Cycle @98.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00194 |
+@line:3279  Cycle @98.00: [W1]	ownning: 03      | releasing: 00|
+@line:708   Cycle @99.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00002000 | result: 00002190
+@line:713   Cycle @99.00: [e]	0x00000001       |a.a:00000190  |a.b:00002000   | res: 00002190 |
+@line:958   Cycle @99.00: [e]	own x10          |
+@line:1345  Cycle @99.00: [d]	raw: 0x71c50513  |
+@line:1678  Cycle @99.00: [d]	i.addi.0010011   | rd: x10      | rs1: x10      |               |imm: 0x71c
+@line:1300  Cycle @99.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00198 |
+@line:3279  Cycle @99.00: [W1]	ownning: 10      | releasing: 00|
+@line:97    Cycle @100.00: [e]	rs1-x10: 1       | rs2-x00: 1   | rd-x10: 0
+@line:1171  Cycle @100.00: [w]	writeback        | x03          | 0x00000002
+@line:1345  Cycle @100.00: [d]	raw: 0x004005ef  |
+@line:1454  Cycle @100.00: [d]	j.jal.1101111    | rd: x11      |               |               |imm: 0x4
+@line:1300  Cycle @100.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x0019c |
+@line:3279  Cycle @100.00: [W1]	ownning: 00      | releasing: 03|
+@line:97    Cycle @101.00: [e]	rs1-x10: 1       | rs2-x00: 1   | rd-x10: 0
+@line:1171  Cycle @101.00: [w]	writeback        | x10          | 0x00002190
+@line:1300  Cycle @101.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x0019c |
+@line:3279  Cycle @101.00: [W1]	ownning: 00      | releasing: 10|
+@line:708   Cycle @102.00: [e]	0x00000001       | a: 00002190  | b: 00000000   | imm: 0000071c | result: 000028ac
+@line:713   Cycle @102.00: [e]	0x00000001       |a.a:00002190  |a.b:0000071c   | res: 000028ac |
+@line:958   Cycle @102.00: [e]	own x10          |
+@line:1300  Cycle @102.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x0019c |
+@line:3279  Cycle @102.00: [W1]	ownning: 10      | releasing: 00|
+@line:708   Cycle @103.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00000004 | result: 0000019c
+@line:713   Cycle @103.00: [e]	0x00000001       |a.a:00000198  |a.b:00000004   | res: 0000019c |
+@line:854   Cycle @103.00: [e]	condition: 1.a.b | a: 0000019c  | b: 0000019c   |
+@line:958   Cycle @103.00: [e]	own x11          |
+@line:1300  Cycle @103.00: [F1]	on_br: 1         | ex_by: 1     | fetch: 1      | addr: 0x0019c |
+@line:3279  Cycle @103.00: [W1]	ownning: 11      | releasing: 00|
+@line:1171  Cycle @104.00: [w]	writeback        | x10          | 0x000028ac
+@line:1345  Cycle @104.00: [d]	raw: 0x40b50533  |
+@line:1597  Cycle @104.00: [d]	r.sub.0110011    | rd: x10      | rs1: x10      | rs2: x11      
+@line:1300  Cycle @104.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001a0 |
+@line:3279  Cycle @104.00: [W1]	ownning: 00      | releasing: 10|
+@line:708   Cycle @105.00: [e]	0x00000002       | a: 000028ac  | b: 0000019c   | imm: 00000000 | result: 00000000
+@line:713   Cycle @105.00: [e]	0x00000002       |a.a:000028ac  |a.b:0000019c   | res: 00000000 |
+@line:958   Cycle @105.00: [e]	own x10          |
+@line:1171  Cycle @105.00: [w]	writeback        | x11          | 0x0000019c
+@line:1345  Cycle @105.00: [d]	raw: 0x000023b7  |
+@line:1490  Cycle @105.00: [d]	u.lui.0110111    | rd: x07      |               |               |imm: 0x2
+@line:1300  Cycle @105.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001a4 |
+@line:3279  Cycle @105.00: [W1]	ownning: 10      | releasing: 11|
+@line:708   Cycle @106.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 00002000 | result: 00002000
+@line:713   Cycle @106.00: [e]	0x00000001       |a.a:00000000  |a.b:00002000   | res: 00002000 |
+@line:958   Cycle @106.00: [e]	own x07          |
+@line:1345  Cycle @106.00: [d]	raw: 0x71038393  |
+@line:1678  Cycle @106.00: [d]	i.addi.0010011   | rd: x07      | rs1: x07      |               |imm: 0x710
+@line:1300  Cycle @106.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001a8 |
+@line:3279  Cycle @106.00: [W1]	ownning: 07      | releasing: 00|
+@line:97    Cycle @107.00: [e]	rs1-x07: 1       | rs2-x00: 1   | rd-x07: 0
+@line:1171  Cycle @107.00: [w]	writeback        | x10          | 0x00000000
+@line:1345  Cycle @107.00: [d]	raw: 0x02751463  |
+@line:1989  Cycle @107.00: [d]	b.bne.1100011    |              | rs1: x10      | rs2: x07      |imm: 0x28
+@line:1300  Cycle @107.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x001ac |
+@line:3279  Cycle @107.00: [W1]	ownning: 00      | releasing: 10|
+@line:97    Cycle @108.00: [e]	rs1-x07: 1       | rs2-x00: 1   | rd-x07: 0
+@line:1171  Cycle @108.00: [w]	writeback        | x07          | 0x00002000
+@line:1300  Cycle @108.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x001ac |
+@line:3279  Cycle @108.00: [W1]	ownning: 00      | releasing: 07|
+@line:708   Cycle @109.00: [e]	0x00000001       | a: 00002000  | b: 00000000   | imm: 00000710 | result: 00002710
+@line:713   Cycle @109.00: [e]	0x00000001       |a.a:00002000  |a.b:00000710   | res: 00002710 |
+@line:958   Cycle @109.00: [e]	own x07          |
+@line:1300  Cycle @109.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x001ac |
+@line:3279  Cycle @109.00: [W1]	ownning: 07      | releasing: 00|
+@line:708   Cycle @110.00: [e]	0x00000001       | a: 00000000  | b: 00002710   | imm: 00000028 | result: 000001d0
+@line:713   Cycle @110.00: [e]	0x00000001       |a.a:000001a8  |a.b:00000028   | res: 000001d0 |
+@line:854   Cycle @110.00: [e]	condition: 1.a.b | a: 000001d0  | b: 000001ac   |
+@line:1300  Cycle @110.00: [F1]	on_br: 1         | ex_by: 1     | fetch: 1      | addr: 0x001d0 |
+@line:3279  Cycle @110.00: [W1]	ownning: 00      | releasing: 00|
+@line:1171  Cycle @111.00: [w]	writeback        | x07          | 0x00002710
+@line:1345  Cycle @111.00: [d]	raw: 0x0ff0000f  |
+@line:2619  Cycle @111.00: [d]	i.fence.0001111  | rd: x00      | rs1: x00      |               |imm: 0xff
+@line:1300  Cycle @111.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001d4 |
+@line:3279  Cycle @111.00: [W1]	ownning: 00      | releasing: 07|
+@line:708   Cycle @112.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 000000ff | result: 000000ff
+@line:713   Cycle @112.00: [e]	0x00000001       |a.a:00000000  |a.b:000000ff   | res: 000000ff |
+@line:1345  Cycle @112.00: [d]	raw: 0x00018063  |
+@line:1919  Cycle @112.00: [d]	b.beq.1100011    |              | rs1: x03      | rs2: x00      |imm: 0x0
+@line:1300  Cycle @112.00: [F1]	on_br: 1         | ex_by: 0     | fetch: 0      | addr: 0x001d8 |
+@line:3279  Cycle @112.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @113.00: [e]	0x00000001       | a: 00000002  | b: 00000000   | imm: 00000000 | result: 000001d4
+@line:713   Cycle @113.00: [e]	0x00000001       |a.a:000001d4  |a.b:00000000   | res: 000001d4 |
+@line:854   Cycle @113.00: [e]	condition: 0.a.b | a: 000001d4  | b: 000001d8   |
+@line:1300  Cycle @113.00: [F1]	on_br: 1         | ex_by: 1     | fetch: 1      | addr: 0x001d8 |
+@line:3279  Cycle @113.00: [W1]	ownning: 00      | releasing: 00|
+@line:1345  Cycle @114.00: [d]	raw: 0x00119193  |
+@line:2452  Cycle @114.00: [d]	i.slli.0010011   | rd: x03      | rs1: x03      |               |imm: 0x1
+@line:1300  Cycle @114.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001dc |
+@line:3279  Cycle @114.00: [W1]	ownning: 00      | releasing: 00|
+@line:708   Cycle @115.00: [e]	0x00000020       | a: 00000002  | b: 00000000   | imm: 00000001 | result: 00000004
+@line:713   Cycle @115.00: [e]	0x00000020       |a.a:00000002  |a.b:00000001   | res: 00000004 |
+@line:958   Cycle @115.00: [e]	own x03          |
+@line:1345  Cycle @115.00: [d]	raw: 0x0011e193  |
+@line:2782  Cycle @115.00: [d]	i.ori.0010011    | rd: x03      | rs1: x03      |               |imm: 0x1
+@line:1300  Cycle @115.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001e0 |
+@line:3279  Cycle @115.00: [W1]	ownning: 03      | releasing: 00|
+@line:97    Cycle @116.00: [e]	rs1-x03: 1       | rs2-x00: 1   | rd-x03: 0
+@line:1345  Cycle @116.00: [d]	raw: 0x05d00893  |
+@line:1678  Cycle @116.00: [d]	i.addi.0010011   | rd: x17      | rs1: x00      |               |imm: 0x5d
+@line:1300  Cycle @116.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001e4 |
+@line:97    Cycle @117.00: [e]	rs1-x03: 1       | rs2-x00: 1   | rd-x03: 0
+@line:1171  Cycle @117.00: [w]	writeback        | x03          | 0x00000004
+@line:1345  Cycle @117.00: [d]	raw: 0x00018513  |
+@line:1678  Cycle @117.00: [d]	i.addi.0010011   | rd: x10      | rs1: x03      |               |imm: 0x0
+@line:1300  Cycle @117.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001e8 |
+@line:3279  Cycle @117.00: [W1]	ownning: 00      | releasing: 03|
+@line:708   Cycle @118.00: [e]	0x00000008       | a: 00000004  | b: 00000000   | imm: 00000001 | result: 00000004
+@line:713   Cycle @118.00: [e]	0x00000008       |a.a:00000004  |a.b:00000001   | res: 00000004 |
+@line:958   Cycle @118.00: [e]	own x03          |
+@line:1345  Cycle @118.00: [d]	raw: 0x00000073  |
+@line:2660  Cycle @118.00: [d]	i.ecall.1110011  | rd: x00      | rs1: x00      |               |imm: 0x0
+@line:1300  Cycle @118.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001ec |
+@line:3279  Cycle @118.00: [W1]	ownning: 03      | releasing: 00|
+@line:708   Cycle @119.00: [e]	0x00000001       | a: 00000000  | b: 00000000   | imm: 0000005d | result: 0000005d
+@line:713   Cycle @119.00: [e]	0x00000001       |a.a:00000000  |a.b:0000005d   | res: 0000005d |
+@line:958   Cycle @119.00: [e]	own x17          |
+@line:1345  Cycle @119.00: [d]	raw: 0x0ff0000f  |
+@line:2619  Cycle @119.00: [d]	i.fence.0001111  | rd: x00      | rs1: x00      |               |imm: 0xff
+@line:1300  Cycle @119.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001f0 |
+@line:3279  Cycle @119.00: [W1]	ownning: 17      | releasing: 00|
+@line:97    Cycle @120.00: [e]	rs1-x03: 0       | rs2-x00: 1   | rd-x10: 1
+@line:1171  Cycle @120.00: [w]	writeback        | x03          | 0x00000004
+@line:1345  Cycle @120.00: [d]	raw: 0x00100193  |
+@line:1678  Cycle @120.00: [d]	i.addi.0010011   | rd: x03      | rs1: x00      |               |imm: 0x1
+@line:1300  Cycle @120.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001f4 |
+@line:3279  Cycle @120.00: [W1]	ownning: 00      | releasing: 03|
+@line:708   Cycle @121.00: [e]	0x00000001       | a: 00000004  | b: 00000000   | imm: 00000000 | result: 00000004
+@line:713   Cycle @121.00: [e]	0x00000001       |a.a:00000004  |a.b:00000000   | res: 00000004 |
+@line:958   Cycle @121.00: [e]	own x10          |
+@line:1171  Cycle @121.00: [w]	writeback        | x17          | 0x0000005d
+@line:1345  Cycle @121.00: [d]	raw: 0x05d00893  |
+@line:1678  Cycle @121.00: [d]	i.addi.0010011   | rd: x17      | rs1: x00      |               |imm: 0x5d
+@line:1300  Cycle @121.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x001f8 |
+@line:3279  Cycle @121.00: [W1]	ownning: 10      | releasing: 17|
+@line:491   Cycle @122.00: [e]	ebreak | halt | ecall
