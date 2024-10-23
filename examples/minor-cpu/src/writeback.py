@@ -35,7 +35,7 @@ class WriteBack(Module):
             reg_file[rd] = data
 
         with Condition(is_csr):
-            log("writeback        | csr[{:02}]       | 0x{:08x}", csr_id, data)
+            log("writeback        | csr[{:02}]       | 0x{:08x}", csr_id, csr_new)
             csr_file[csr_id] = csr_new
 
         return rd

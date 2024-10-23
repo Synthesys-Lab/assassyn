@@ -90,6 +90,10 @@ class Execution(Module):
         csr_new = signals.csr_write.select( rf[rs1] , csr_new)
         csr_new = signals.is_zimm.select(concat(Bits(27)(0),rs1), csr_new)
 
+        with Condition(is_csr):
+            log("csr_id: {} | new: {:08x} |", csr_id, csr_new)
+
+
         signals, fetch_addr = self.pop_all_ports(False)
 
         # TODO(@were): This is a hack to avoid post wait_until checks.
@@ -395,8 +399,8 @@ if __name__ == '__main__':
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #run_cpu(tests, 'rv32ui-p-andi')
 
-    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'    #TODEBUG fail 
-    run_cpu(tests, 'rv32ui-p-auipc')
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'    #TODEBUG fail 
+    #run_cpu(tests, 'rv32ui-p-auipc')
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #run_cpu(tests, 'rv32ui-p-beq')
@@ -431,3 +435,5 @@ if __name__ == '__main__':
     #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #  run_cpu(tests, 'rv32ui-p-lw')
 
+    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    run_cpu(tests, 'rv32ui-p-sub')
