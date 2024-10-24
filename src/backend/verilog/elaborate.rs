@@ -749,7 +749,7 @@ fn node_dump_ref(
         _ => raw,
       };
       Some(res)
-    },
+    }
     _ => panic!("Unknown node of kind {:?}", node.get_kind()),
   }
 }
