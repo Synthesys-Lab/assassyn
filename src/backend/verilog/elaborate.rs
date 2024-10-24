@@ -741,7 +741,15 @@ fn node_dump_ref(
       let value = str_imm.get_value();
       quote::quote!(#value).to_string().into()
     }
-    NodeKind::Expr => Some(namify(&node.to_string(sys))),
+    NodeKind::Expr => {
+      let dtype = node.get_dtype(sys).unwrap();
+      let raw = namify(&node.to_string(sys));
+      let res = match dtype {
+        DataType::Int(_) => format!("$signed({})", raw),
+        _ => raw,
+      };
+      Some(res)
+    },
     _ => panic!("Unknown node of kind {:?}", node.get_kind()),
   }
 }

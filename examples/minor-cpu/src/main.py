@@ -393,8 +393,8 @@ if __name__ == '__main__':
     #workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     #run_cpu(workloads, '0to100')
 
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-add')
+    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    run_cpu(tests, 'rv32ui-p-add')
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #run_cpu(tests, 'rv32ui-p-addi')
