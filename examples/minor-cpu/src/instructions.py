@@ -215,6 +215,7 @@ supported_opcodes = [
 
   ('add'   , (0b0110011, 0b000, 0b0000000, RV32I_ALU.ALU_ADD), RInst),
   ('sub'   , (0b0110011, 0b000, 0b0100000, RV32I_ALU.ALU_SUB), RInst),
+  ('or'    , (0b0110011, 0b110, 0b0000000, RV32I_ALU.ALU_OR) , RInst),
 
   ('jalr'  , (0b1100111, 0b000, RV32I_ALU.ALU_ADD, (RV32I_ALU.ALU_TRUE, False), None, None), IInst),
   ('addi'  , (0b0010011, 0b000, RV32I_ALU.ALU_ADD, None, None, None), IInst),

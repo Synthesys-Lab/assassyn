@@ -133,11 +133,13 @@ class Execution(Module):
         adder_result = (alu_a.bitcast(Int(32)) + alu_b.bitcast(Int(32))).bitcast(Bits(32))
         le_result = (a.bitcast(Int(32)) < b.bitcast(Int(32))).select(Bits(32)(1), Bits(32)(0))
         eq_result = (a == b).select(Bits(32)(1), Bits(32)(0))
-        # TODO: find the problem with this:uint can't be comaared correctly while positive and negative
         leu_result = (Bits(1)(0).concat(a) < Bits(1)(0).concat(b ) ).select(Bits(32)(1), Bits(32)(0))
-        #sra_signed_result = a[31:31].select( (a >> alu_b[0:4]) | ~((Bits(1)(1) << (Bits(6)(32) - concat(Bits(1)(0),(alu_b[0:4])) )   ) - Bits(1)(1)) , (a >> alu_b[0:4]))
+        alu_b_shift_bits = alu_b[4:4].select( concat(Int(27)(-1) , alu_b[0:4]).bitcast(Int(32)), concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32)) )
+        sra_signed_result = a[31:31].select( (a >> alu_b[0:4]) | ~((Int(32)(1) << (Int(32)(32) - alu_b_shift_bits )   ) - Int(32)(1)) , (a >> alu_b[0:4]))
+        sub_result = (a.bitcast(Int(32)) - b.bitcast(Int(32))).bitcast(Bits(32))
 
         results[RV32I_ALU.ALU_ADD] = adder_result
+        results[RV32I_ALU.ALU_SUB] = sub_result
         results[RV32I_ALU.ALU_CMP_LT] = le_result
         results[RV32I_ALU.ALU_CMP_EQ] = eq_result
         results[RV32I_ALU.ALU_CMP_LTU] = leu_result
@@ -146,7 +148,7 @@ class Execution(Module):
         results[RV32I_ALU.ALU_AND] = a & alu_b
         results[RV32I_ALU.ALU_TRUE] = Bits(32)(1)
         results[RV32I_ALU.ALU_SLL] = a << alu_b[0:4]
-        results[RV32I_ALU.ALU_SRA] = a >> alu_b[0:4] #to be fixed
+        results[RV32I_ALU.ALU_SRA] = a >> sra_signed_result 
         results[RV32I_ALU.ALU_SRA_U] = a >> alu_b[0:4]
 
         # TODO: Fix this bullshit.
@@ -372,16 +374,22 @@ def run_cpu(resource_base, workload):
 
     raw = utils.run_simulator(simulator_path)
     open('raw.log', 'w').write(raw)
-    test = f'{resource_base}/{workload}.sh'
-    subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
+    test = f'{resource_base}/find_pass.sh'
+    res = subprocess.run([test, 'raw.log'])
+
+    if res.returncode != 0:
+        print('Test failed!!!')
+    else:
+        print('Test passed!!!')
+        raw = utils.run_verilator(verilog_path)
+        open('raw.log', 'w').write(raw)
+    #test = f'{resource_base}/{workload}.sh'
+    #subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
+
+        os.remove('raw.log')
     #quit()
 
-    raw = utils.run_verilator(verilog_path)
-    open('raw.log', 'w').write(raw)
-    test = f'{resource_base}/{workload}.sh'
-    subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
-
-    os.remove('raw.log')
+    
 
 if __name__ == '__main__':
     #workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
@@ -399,7 +407,7 @@ if __name__ == '__main__':
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #run_cpu(tests, 'rv32ui-p-andi')
 
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'    #TODEBUG fail 
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'     
     #run_cpu(tests, 'rv32ui-p-auipc')
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
@@ -420,20 +428,26 @@ if __name__ == '__main__':
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #run_cpu(tests, 'rv32ui-p-bne')
 
-    #TODEBUG fail tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #   run_cpu(tests, 'rv32ui-p-jal')
+    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-jal')
 
     #TODEBUG time out tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #run_cpu(tests, 'rv32ui-p-jalr')
 
-    #TODEBUG  tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #  run_cpu(tests, 'rv32ui-p-lbu')
+    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #TODEBUG run_cpu(tests, 'rv32ui-p-lbu')
 
-    #TODEBUG fix 'srai' first tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #  run_cpu(tests, 'rv32ui-p-lui')
+    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'   #'srai' is right
+    #TODEBUG run_cpu(tests, 'rv32ui-p-lui')
 
     #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #  run_cpu(tests, 'rv32ui-p-lw')
 
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-sub')
+
+    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    #run_cpu(tests, 'rv32ui-p-or')
+
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    run_cpu(tests, 'rv32ui-p-sub')
+    run_cpu(tests, 'rv32ui-p-ori')
