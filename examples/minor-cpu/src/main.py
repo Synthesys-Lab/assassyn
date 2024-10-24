@@ -38,9 +38,7 @@ class Execution(Module):
         csr_f: Array,
         memory: Module, 
         writeback: Module,
-        data: str
-        
-        ):
+        data: str):
 
         
         csr_id = Bits(4)(0)
@@ -449,5 +447,7 @@ if __name__ == '__main__':
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     #run_cpu(tests, 'rv32ui-p-or')
 
-    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    run_cpu(tests, 'rv32ui-p-ori')
+    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    # run_cpu(tests, 'rv32ui-p-ori')
+
+    pass

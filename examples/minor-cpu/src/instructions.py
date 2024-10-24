@@ -48,7 +48,7 @@ class RInst(InstType):
     def __init__(self, value):
         super().__init__(True, True, True, True, True, {}, value)
 
-    def decode(self, opcode, funct3, funct7, alu ,ex_code=None):
+    def decode(self, opcode, funct3, funct7, alu, ex_code=None):
         view = self.view()
         opcode = view.opcode == Bits(7)(opcode)
         funct3 = view.funct3 == Bits(3)(funct3)
