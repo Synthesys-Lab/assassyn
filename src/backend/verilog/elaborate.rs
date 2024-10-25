@@ -741,7 +741,15 @@ fn node_dump_ref(
       let value = str_imm.get_value();
       quote::quote!(#value).to_string().into()
     }
-    NodeKind::Expr => Some(namify(&node.to_string(sys))),
+    NodeKind::Expr => {
+      let dtype = node.get_dtype(sys).unwrap();
+      let raw = namify(&node.to_string(sys));
+      let res = match dtype {
+        DataType::Int(_) => format!("$signed({})", raw),
+        _ => raw,
+      };
+      Some(res)
+    }
     _ => panic!("Unknown node of kind {:?}", node.get_kind()),
   }
 }
@@ -1253,52 +1261,6 @@ module memory_blackbox_{a} #(
       }
 
       Opcode::Log => {
-        // let mut format_str = dump_ref!(self.sys, expr.operand_iter().next().unwrap().get_value());
-
-        // let re = Regex::new(r"\{(:.[bxXo]?)?\}").unwrap();
-
-        // let dtypes = expr
-        //   .operand_iter()
-        //   .skip(1)
-        //   .map(|elem| elem.get_value().get_dtype(self.sys).unwrap())
-        //   .collect::<Vec<_>>();
-
-        // let mut dtype_index = 0;
-        // format_str = re
-        //   .replace_all(&format_str, |caps: &regex::Captures| {
-        //     let result = if let Some(format_spec) = caps.get(1) {
-        //       match format_spec.as_str() {
-        //         ":b" => "%b",
-        //         ":x" => "%x",
-        //         ":X" => "%X",
-        //         ":o" => "%o",
-        //         ":" | _ => {
-        //           if let Some(dtype) = dtypes.get(dtype_index) {
-        //             match dtype {
-        //               DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "%d",
-        //               DataType::Str => "%s",
-        //               _ => "?",
-        //             }
-        //           } else {
-        //             "?"
-        //           }
-        //         }
-        //       }
-        //     } else if let Some(dtype) = dtypes.get(dtype_index) {
-        //       match dtype {
-        //         DataType::Int(_) | DataType::UInt(_) | DataType::Bits(_) => "%d",
-        //         DataType::Str => "%s",
-        //         _ => "?",
-        //       }
-        //     } else {
-        //       "?"
-        //     };
-        //     dtype_index += 1;
-        //     result
-        //   })
-        //   .into_owned();
-        // format_str = format_str.replace('"', "");
-
         let mut res = String::new();
 
         res.push_str(&format!(
