@@ -398,33 +398,33 @@ def check(resource_base, test):
     
 
 if __name__ == '__main__':
-    workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    run_cpu(workloads, '0to100', 9)
+    # workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    # run_cpu(workloads, '0to100', 9)
 
-    # test_cases = [
-    #     'rv32ui-p-add',
-    #     'rv32ui-p-addi',
-    #     'rv32ui-p-and',
-    #     'rv32ui-p-andi',
-    #     'rv32ui-p-auipc',
-    #     'rv32ui-p-beq',
-    #     'rv32ui-p-bge',
-    #     'rv32ui-p-bgeu',
-    #     'rv32ui-p-blt',
-    #     'rv32ui-p-bltu',
-    #     'rv32ui-p-bne',
-    #     'rv32ui-p-jal',
-    #     'rv32ui-p-jalr',
-    #     'rv32ui-p-lbu',
-    #     'rv32ui-p-lui',
-    #     'rv32ui-p-lw',
-    #     'rv32ui-p-sub',
-    #     'rv32ui-p-or',
-    #     'rv32ui-p-ori',
-    # ]
+    test_cases = [
+        'rv32ui-p-add',
+        # 'rv32ui-p-addi',
+        # 'rv32ui-p-and',
+        # 'rv32ui-p-andi',
+        # 'rv32ui-p-auipc',
+        # 'rv32ui-p-beq',
+        # 'rv32ui-p-bge',
+        # 'rv32ui-p-bgeu',
+        # 'rv32ui-p-blt',
+        # 'rv32ui-p-bltu',
+        # 'rv32ui-p-bne',
+        # 'rv32ui-p-jal',
+        # 'rv32ui-p-jalr',
+        # 'rv32ui-p-lbu',
+        # 'rv32ui-p-lui',
+        # 'rv32ui-p-lw',
+        # 'rv32ui-p-sub',
+        # 'rv32ui-p-or',
+        # 'rv32ui-p-ori',
+    ]
 
-    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
 
-    # for case in test_cases:
-    #     run_cpu(tests, case, 9)
+    for case in test_cases:
+        run_cpu(tests, case, 9)
 
