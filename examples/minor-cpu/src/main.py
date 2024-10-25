@@ -37,7 +37,8 @@ class Execution(Module):
         rf: Array, 
         memory: Module, 
         writeback: Module,
-        data: str):
+        data: str,
+        depth_log: int):
 
         signals = self.signals.peek()
 
@@ -144,7 +145,7 @@ class Execution(Module):
             mem_bypass_reg[0] = memory_read.select(rd, Bits(5)(0))
             log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
 
-        dcache = SRAM(width=32, depth=512, init_file=data)
+        dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=a, addr=request_addr, user=memory)
         dcache.bound.async_called()
@@ -201,13 +202,14 @@ class FetcherImpl(Downstream):
               pc_reg: Value,
               pc_addr: Value,
               decoder: Decoder,
-              data: str):
+              data: str,
+              depth_log: int):
         on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
         should_fetch = ~on_branch | ex_bypass.valid()
         to_fetch = ex_bypass.optional(pc_addr)
-        icache = SRAM(width=32, depth=512, init_file=data)
+        icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
-        icache.build(Bits(1)(0), should_fetch, to_fetch[2:10].bitcast(Int(9)), Bits(32)(0), decoder)
+        icache.build(Bits(1)(0), should_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} |",
             on_branch, ex_bypass.valid(), should_fetch, to_fetch)
         with Condition(should_fetch):
@@ -238,7 +240,7 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
-def run_cpu(resource_base, workload):
+def run_cpu(resource_base, workload, depth_log):
     sys = SysBuilder('minor_cpu')
 
     with sys:
@@ -293,7 +295,8 @@ def run_cpu(resource_base, workload):
             rf = reg_file,
             memory = memory_access,
             writeback = writeback,
-            data = data_init
+            data = data_init,
+            depth_log = depth_log
         )
 
         memory_access.build(
@@ -305,7 +308,7 @@ def run_cpu(resource_base, workload):
         decoder = Decoder()
         on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe')
+        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe', depth_log)
 
         onwrite_downstream = Onwrite()
     
@@ -342,7 +345,10 @@ def run_cpu(resource_base, workload):
 
 if __name__ == '__main__':
     workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    run_cpu(workloads, '0to100')
+    run_cpu(workloads, '0to100', 12)
 
     # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     # run_cpu(tests, 'rv32ui-p-add')
+    
+    # workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    # run_cpu(workloads, 'multiply', 12)
