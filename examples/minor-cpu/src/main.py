@@ -139,7 +139,7 @@ class Execution(Module):
 
         # This `is_memory` hack is to evade rust's overflow check.
         addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
-        request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
+        request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(Int(depth_log)), Int(depth_log)(0))
 
         with Condition(is_memory):
             mem_bypass_reg[0] = memory_read.select(rd, Bits(5)(0))
@@ -345,7 +345,7 @@ def run_cpu(resource_base, workload, depth_log):
 
 if __name__ == '__main__':
     workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    run_cpu(workloads, '0to100', 12)
+    run_cpu(workloads, '0to100', 9)
 
     # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     # run_cpu(tests, 'rv32ui-p-add')
