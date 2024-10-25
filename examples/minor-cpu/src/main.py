@@ -217,6 +217,8 @@ class Decoder(Module):
     def build(self, executor: Module, br_sm: Array):
         inst, fetch_addr = self.pop_all_ports(False)
 
+        log("raw: 0x{:08x}  | addr: 0x{:05x} |", inst, fetch_addr)
+
         signals = decode_logic(inst)
         br_sm[0] = signals.is_branch
 

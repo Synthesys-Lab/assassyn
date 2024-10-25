@@ -20,8 +20,6 @@ def decode_logic(inst):
     cond = Bits(RV32I_ALU.CNT)(0)
     flip = Bits(1)(0)
 
-    log("raw: 0x{:08x}  |", inst)
-
     # Check if the given instruction's opcode equals one of the supported opcodes
     for mn, args, cur_type in supported_opcodes:
 
