@@ -84,7 +84,7 @@ def decode_logic(inst):
 
     # Extract all the signals
     # For now, write is always disabled.
-    memory = concat(Bits(1)(0), eqs['lw'] | eqs['lbu'])
+    memory = concat(eqs['sw'], eqs['lw'] | eqs['lbu'])
     # [ unsigned (signed), byte(word) ]
     mem_ext = concat(eqs['lbu'], eqs['lbu']) 
 
@@ -99,7 +99,7 @@ def decode_logic(inst):
     rs2 = rs2_valid.select(views[RInst].view().rs2, Bits(5)(0))
     # imm
     # TODO(@were): Add `SInst` back to this list later.
-    imm_valid = is_type[IInst] | is_type[UInst] | is_type[BInst] | is_type[JInst]
+    imm_valid = is_type[IInst] | is_type[UInst] | is_type[BInst] | is_type[JInst] | is_type[SInst]
 
     imm = Bits(32)(0)
     csr_read = Bits(1)(0)

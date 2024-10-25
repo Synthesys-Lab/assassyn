@@ -105,14 +105,19 @@ class SInst(InstType):
         fields = { (25, 31): ('imm11_5', Bits), (7, 11): ('imm4_0', Bits) }
         super().__init__(False, True, True, True, False, fields, value)
 
-    def decode(self, *args):
-        raise NotImplementedError
+    def decode(self, opcode, funct3, alu):
+        view = self.view()
+        opcode = view.opcode == Bits(7)(opcode)
+        funct3 = view.funct3 == Bits(3)(funct3)
+        eq = opcode & funct3
+        return InstSignal(eq, alu)
 
     def imm(self, pad):
-        raise NotImplementedError
         imm = self.view().imm11_5.concat(self.view().imm4_0)
         if pad:
-            imm = concat(Bits(20)(0), imm)
+            msb = imm[11:11]
+            msb = msb.select(Bits(20)(0xfffff), Bits(20)(0))
+            imm = concat(msb, imm)
         return imm
 
 class UInst(InstType):
@@ -226,6 +231,8 @@ supported_opcodes = [
 
   ('ebreak', (0b1110011, 0b000, None, None,0b000000000001,None), IInst),
 
+  ('sw'    , (0b0100011, 0b010, RV32I_ALU.ALU_ADD), SInst),
+
   # mn,       opcode,    funct3,cmp,                  flip
   ('beq'   , (0b1100011, 0b000, RV32I_ALU.ALU_CMP_EQ,  False), BInst),
   ('bne'   , (0b1100011, 0b001, RV32I_ALU.ALU_CMP_EQ,  True), BInst),
@@ -286,4 +293,4 @@ deocder_signals = Record(
 )
 
 #TODO(@were): Add `SInst` to the supported types later.
-supported_types = [RInst, IInst, BInst, UInst, JInst]
+supported_types = [RInst, IInst, BInst, UInst, JInst, SInst]

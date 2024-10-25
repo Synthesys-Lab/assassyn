@@ -180,13 +180,16 @@ class Execution(Module):
         addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
         request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(Int(depth_log)), Int(depth_log)(0))
 
-        with Condition(is_memory):
+        with Condition(memory_read):
             mem_bypass_reg[0] = memory_read.select(rd, Bits(5)(0))
             log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
 
+        with Condition(memory_write):
+            log("mem-write        | addr: 0x{:05x}| line: 0x{:05x} | value: 0x{:08x}", result, request_addr, a)
+
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
-        dcache.build(we=memory_write, re=memory_read, wdata=a, addr=request_addr, user=memory)
+        dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
         dcache.bound.async_called()
         wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd , is_csr = signals.csr_write, csr_id = csr_id , csr_new = csr_new , mem_ext = signals.mem_ext)
 
@@ -398,29 +401,35 @@ def check(resource_base, test):
     
 
 if __name__ == '__main__':
-    # workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    # run_cpu(workloads, '0to100', 9)
+    # wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    # workloads = [
+    #     # '0to100',
+    #     'multiply',
+    # ]
+    # for wl in workloads:
+    #     run_cpu(wl_path, wl, 12)
 
     test_cases = [
-        'rv32ui-p-add',
-        # 'rv32ui-p-addi',
-        # 'rv32ui-p-and',
-        # 'rv32ui-p-andi',
-        # 'rv32ui-p-auipc',
-        # 'rv32ui-p-beq',
-        # 'rv32ui-p-bge',
-        # 'rv32ui-p-bgeu',
-        # 'rv32ui-p-blt',
-        # 'rv32ui-p-bltu',
-        # 'rv32ui-p-bne',
-        # 'rv32ui-p-jal',
-        # 'rv32ui-p-jalr',
-        # 'rv32ui-p-lbu',
-        # 'rv32ui-p-lui',
-        # 'rv32ui-p-lw',
-        # 'rv32ui-p-sub',
-        # 'rv32ui-p-or',
-        # 'rv32ui-p-ori',
+        #'rv32ui-p-add',
+        #'rv32ui-p-addi',
+        #'rv32ui-p-and',
+        #'rv32ui-p-andi',
+        #'rv32ui-p-auipc',
+        #'rv32ui-p-beq',
+        #'rv32ui-p-bge',
+        #'rv32ui-p-bgeu',
+        #'rv32ui-p-blt',
+        #'rv32ui-p-bltu',
+        #'rv32ui-p-bne',
+        #'rv32ui-p-jal',
+        #'rv32ui-p-jalr',
+        #'rv32ui-p-lbu',
+        #'rv32ui-p-lui',
+        #'rv32ui-p-lw',
+        #'rv32ui-p-sub',
+        'rv32ui-p-sw',
+        #'rv32ui-p-or',
+        #'rv32ui-p-ori',
     ]
 
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
