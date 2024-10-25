@@ -1,9 +1,9 @@
 #!/bin/bash
 
 if [ `uname` == "Darwin" ]; then
-    alias S2N=""
+    S2N=""
 else
-    alias S2N="strtonum"
+    S2N="strtonum"
 fi
 
 sum=$(cat $1 | grep "writeback.*x14" | awk "{ sum += $S2N(\$NF) } END { print $S2N(sum) }")

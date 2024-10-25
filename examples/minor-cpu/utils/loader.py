@@ -10,6 +10,7 @@ import subprocess
 parser = argparse.ArgumentParser(description='Extract the `.text` and `.data` sections from the objdump file.')
 parser.add_argument('--fname', type=str, help='The file name a objdump output.', required=True)
 parser.add_argument('--odir', type=str, help='The output directory of the converted file.', default='.')
+parser.add_argument('--exit-tohost', action='store_true', help='Exit to host')
 args = vars(parser.parse_args())
 
 fname = args['fname']
