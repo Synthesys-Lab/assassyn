@@ -89,7 +89,9 @@ def decode_logic(inst):
     mem_ext = concat(eqs['lbu'], eqs['lbu']) 
 
     # BInst and JInst are designed for branches.
-    is_branch = is_type[BInst] | is_type[JInst] | eqs['ebreak'] | eqs['jalr'] |  eqs['mret']
+    is_branch = is_type[BInst] | is_type[JInst] | eqs['ebreak'] | eqs['jalr'] | eqs['mret']
+    is_offset_br = is_type[BInst] | eqs['jal'] 
+    link_pc = eqs['jalr'] | eqs['jal']
 
     is_pc_calc = eqs['auipc']
     # Extract all the operands according to the instruction types
@@ -131,6 +133,8 @@ def decode_logic(inst):
         cond=cond,
         flip=flip,
         is_branch=is_branch,
+        is_offset_br=is_offset_br,
+        link_pc=link_pc,
         rs1=rs1,
         rs1_valid=rs1_valid,
         rs2=rs2,

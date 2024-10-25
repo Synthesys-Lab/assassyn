@@ -288,8 +288,12 @@ deocder_signals = Record(
   flip=Bits(1),
   # if the decoded instruction is a branch instruction.
   is_branch=Bits(1),
+  # b-inst and jal are both using the instruction's pc as the base of branching,
+  # while jalr is using the rs1 as the base of branching.
+  is_offset_br=Bits(1),
+  # should we link the pc to rd
+  link_pc=Bits(1),
   mem_ext=Bits(2),
-
 )
 
 #TODO(@were): Add `SInst` to the supported types later.

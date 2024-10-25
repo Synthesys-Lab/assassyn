@@ -123,8 +123,7 @@ class Execution(Module):
         # log('exe_bypass.reg: x{:02} | .data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
 
         # TODO: To support `auipc`, is_branch will be separated into `is_branch` and `is_pc_calc`.
-        alu_a = signals.is_branch.select(fetch_addr, a)
-        alu_a = signals.is_pc_calc.select(fetch_addr, alu_a)
+        alu_a = (signals.is_offset_br | signals.is_pc_calc).select(fetch_addr, a)
         alu_b = signals.imm_valid.select(signals.imm, b)
 
         results = [Bits(32)(0)] * RV32I_ALU.CNT
@@ -154,6 +153,7 @@ class Execution(Module):
         alu = signals.alu
         result = alu.select1hot(*results)
 
+        log('is_offset_br: {}  | is_pc_calc: {} |', signals.is_offset_br, signals.is_pc_calc)
         log("0x{:08x}       | a: {:08x}  | b: {:08x}   | imm: {:08x} | result: {:08x}", alu, a, b, signals.imm, result)
         log("0x{:08x}       |a.a:{:08x}  |a.b:{:08x}   | res: {:08x} |", alu, alu_a, alu_b, result)
 
@@ -191,7 +191,13 @@ class Execution(Module):
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
         dcache.bound.async_called()
-        wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd , is_csr = signals.csr_write, csr_id = csr_id , csr_new = csr_new , mem_ext = signals.mem_ext)
+        wb = writeback.bind(is_memory_read = memory_read,
+                            result = signals.link_pc.select(pc[0], result),
+                            rd = rd,
+                            is_csr = signals.csr_write,
+                            csr_id = csr_id,
+                            csr_new = csr_new,
+                            mem_ext = signals.mem_ext)
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
@@ -369,8 +375,8 @@ def run_cpu(resource_base, workload, depth_log):
     print(sys)
     conf = config(
         verilog=utils.has_verilator(),
-        sim_threshold=1500,
-        idle_threshold=1500,
+        sim_threshold=100000,
+        idle_threshold=100000,
         resource_base=resource_base
     )
 
@@ -396,18 +402,18 @@ def check(resource_base, test):
     else:
         script = f'{resource_base}/../utils/find_pass.sh'
         res = subprocess.run([script, 'raw.log'])
-    assert res.returncode == 0
+    assert res.returncode == 0, f'Failed test {test}'
     print('Test passed!!!')
     
 
 if __name__ == '__main__':
-    # wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    # workloads = [
-    #     # '0to100',
-    #     'multiply',
-    # ]
-    # for wl in workloads:
-    #     run_cpu(wl_path, wl, 12)
+    #wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    #workloads = [
+    #    # '0to100',
+    #    'multiply',
+    #]
+    #for wl in workloads:
+    #    run_cpu(wl_path, wl, 12)
 
     test_cases = [
         #'rv32ui-p-add',
