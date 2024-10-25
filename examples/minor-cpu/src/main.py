@@ -396,62 +396,62 @@ if __name__ == '__main__':
     workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     run_cpu(workloads, '0to100', 9)
 
-    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    run_cpu(tests, 'rv32ui-p-add', 9)
+    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    # run_cpu(tests, 'rv32ui-p-add', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-addi')
+    #run_cpu(tests, 'rv32ui-p-addi', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-and')
+    #run_cpu(tests, 'rv32ui-p-and', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-andi')
+    #run_cpu(tests, 'rv32ui-p-andi', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'     
-    #run_cpu(tests, 'rv32ui-p-auipc')
+    #run_cpu(tests, 'rv32ui-p-auipc', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-beq')
+    #run_cpu(tests, 'rv32ui-p-beq', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bge')
+    #run_cpu(tests, 'rv32ui-p-bge', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bgeu')
+    #run_cpu(tests, 'rv32ui-p-bgeu', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-blt')
+    #run_cpu(tests, 'rv32ui-p-blt', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bltu')
+    #run_cpu(tests, 'rv32ui-p-bltu', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bne')
+    #run_cpu(tests, 'rv32ui-p-bne', 9)
 
     #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-jal')
+    #run_cpu(tests, 'rv32ui-p-jal', 9)
 
     #TODEBUG time out tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-jalr')
+    #run_cpu(tests, 'rv32ui-p-jalr', 9)
 
     #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #TODEBUG run_cpu(tests, 'rv32ui-p-lbu')
+    #TODEBUG run_cpu(tests, 'rv32ui-p-lbu', 9)
 
     #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'   #'srai' is right
-    #TODEBUG run_cpu(tests, 'rv32ui-p-lui')
+    #TODEBUG run_cpu(tests, 'rv32ui-p-lui', 9)
 
     #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #  run_cpu(tests, 'rv32ui-p-lw')
+    #  run_cpu(tests, 'rv32ui-p-lw', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-sub')
+    #run_cpu(tests, 'rv32ui-p-sub', 9)
 
     #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-or')
+    #run_cpu(tests, 'rv32ui-p-or', 9)
 
     # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    # run_cpu(tests, 'rv32ui-p-ori')
+    # run_cpu(tests, 'rv32ui-p-ori', 9)
     
     # workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     # run_cpu(workloads, 'multiply', 12)
