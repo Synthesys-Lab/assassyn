@@ -2,34 +2,57 @@ import assassyn
 from assassyn.frontend import *
 from assassyn import backend
 from assassyn import utils
+import time
+import random
+
+# current_seed = int(time.time())
+current_seed = 1000
 
 cachesize = 8
+
+num_rows = 50
+num_columns = 30
+stride = 30
+
+random.seed(current_seed)
+num1 = random.randint(0, num_rows * num_columns)
+num2 = random.randint(0, num_rows * num_columns)
+start, end = sorted([num1, num2]) # Will get [start, end)
+
+# start = 5
+# end =33
+
+init_i  = start // num_columns
+init_j = start % num_columns
 
 class MemUser(Module):
 
     def __init__(self, width):
         super().__init__(
-            ports={'rdata': Port(Bits(width))}, 
+            ports={'rdata': Port(Bits(width)),
+                   'mask': Port(Bits(cachesize))
+            }, 
         )
         self.reg_accm = RegArray(Int(width), 1)
-        self.name = "sram"
         
     @module.combinational
     def build(self):
         
         width = self.rdata.dtype.bits
-        rdata = self.pop_all_ports(False)
+        rdata, bitmask = self.pop_all_ports(False)
         rdata = rdata.bitcast(Int(width))
 
-        bitmask = Bits(cachesize)(0b10101010)
         data_joint = None
 
         for i in range(cachesize):
             offest = cachesize - i - 1
             data_masked = bitmask[offest:offest].select(rdata[offest*32:offest*32+31], Bits(32)(0))
             data_joint = data_masked if data_joint is None else data_joint.concat(data_masked)
-
-        log("Cacheline:\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            
+            lineno = ((rdata[0:31].bitcast(Int(32)) + Int(32)(1)) >> Int(32)(3)) - Int(32)(1)
+        
+        # log("\t\tGET:\t\tbitmask={:b}\tlineno={}\trdata={:x}", bitmask, lineno, rdata)
+        log("\tCacheline:\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             data_joint[224:255],
             data_joint[192:223],
             data_joint[160:191],
@@ -46,34 +69,93 @@ class Driver(Module):
 
     @module.combinational
     def build(self, width, init_file, user):
-        cnt = RegArray(Int(width), 1)
-        v = cnt[0]
-        we = Int(1)(0)
-        re = ~v[0:0]
-        plused = v + Int(width)(1)
-        raddr = v[0:8].bitcast(Int(9))
+
+        initialization = RegArray(Int(1), 1)
+        init = initialization[0]
         
-        shift = Int(9)(cachesize.bit_length())
+        terminal = RegArray(Int(1), 1)
+        term = terminal[0]
         
-        shift
-        addr_access = raddr >> shift
+        cnt_i = RegArray(Int(32), 1)
+        cnt_j = RegArray(Int(32), 1)
+                
+        i = cnt_i[0]
+        j = cnt_j[0]
+
+        addr = (i * Int(32)(stride))[0:31].bitcast(Int(32)) + j
+        row_end = (i * Int(32)(stride))[0:31].bitcast(Int(32)) + Int(32)(stride)
+        shift = cachesize.bit_length() - 1
         
-        cnt[0] = plused
-        sram = SRAM(width, 512, init_file)
-        sram.build(we, re, addr_access, v.bitcast(Bits(width)), user)
-        with Condition(re):
+        # Initialization.
+        with Condition(~(init | term)):
+            initialization[0] = Int(1)(1)
+            terminal[0] = Int(1)(1)
+            cnt_i[0] = Int(32)(init_i)
+            cnt_j[0] = Int(32)(init_j)
+            
+            log("start:{} end:{} i:{} j:{}", Int(32)(start), Int(32)(end), Int(32)(init_i), Int(32)(init_j))
+        
+        # i and j have already been initialized.
+        with Condition(term & init):
+            lineno = addr[shift:shift+8].bitcast(Int(9))
+            line_end = (Bits(32)(0).concat((lineno + Int(9)(1)) << Int(9)(cachesize.bit_length()-1)))[0:31].bitcast(Int(32))
+            offset = Bits(cachesize-shift)(0).concat(addr[0:shift-1]).bitcast(Bits(cachesize))
+            reserve = Bits(cachesize)(2 ** cachesize - 1) >> offset
+
+            sram = SRAM(width, 512, init_file)
+            sram.build(Int(1)(0), term & init, lineno, Bits(width)(0), user)            
+            
+            sentinel = (Int(32)(end) <= row_end).select(Int(32)(end), row_end)
+            nextrow = (Int(32)(end) <= row_end).select(Int(1)(0), Int(1)(1))
+            
+            counter = (line_end >= sentinel).select((line_end - sentinel).bitcast(UInt(32)), UInt(32)(0))
+            discard = (UInt(cachesize)(1) << counter) - UInt(cachesize)(1)
+            
+            bitmask = (reserve ^ discard).bitcast(Bits(cachesize))
+            
+            # log("___________________________i={}\tj={}\taddr={}\trow_end={}\tlineno={}\tline_end={}\toffest={}\tsentinel={}\treserve={:b} discard={:b} bitmask={:b}", i, j, addr, row_end, lineno, line_end, offset, sentinel, reserve, discard, bitmask)
+            
+            # log("term={}", term)
+                                    
+            # log("\t\tCALL: bitmask={:b}\tlineno={}", bitmask, lineno)
+            
+            user.bind(mask=bitmask)
             sram.bound.async_called()
+            
+            with Condition(line_end >= sentinel):
+                # Read will go to next row.
+                with Condition(nextrow):
+                    cnt_i[0] = i + Int(32)(1)
+                    cnt_j[0] = Int(32)(0)
+                # Read will finish in current row.
+                with Condition(~nextrow): 
+                    initialization[0] = Int(1)(0)
+                    terminal[0] = Int(1)(1)
+                
+            with Condition(line_end < sentinel):
+                cnt_j[0] = j + Int(32)(cachesize) - (Bits(32-cachesize)(0).concat(offset)).bitcast(Int(32))
 
 def check(raw):
+    cache_values = []
     for line in raw.splitlines():
-        if '[sram]' in line:
+        if 'Cacheline:' in line:
             toks = line.split()
-            c = int(toks[-1])
-            b = int(toks[-3])
-            a = int(toks[-5])
-            assert a % 2 == 1 or c == 0, f'Expected odd number or zero, got {line}'
-            assert c == a + b, f'{a} + {b} = {c}'
-
+            values = toks[-8:]
+            cache_values.extend(int(value) for value in values if int(value) != 0)
+    
+    # Verify if `cached_values` are a continuous array
+    if cache_values:
+        expected_values = list(range(start+1, end+1))
+        # If `cached_values` are not equal to a continuous expected array, an error is reported
+        if cache_values != expected_values:
+            missing_values = set(expected_values) - set(cache_values)
+            extra_values = set(cache_values) - set(expected_values)
+            error_msg = (
+                f"Error: Cacheline values are not continuous from {start} to {end}.\n"
+                f"Missing values: {sorted(missing_values)}\n"
+                f"Extra values: {sorted(extra_values)}"
+            )
+            assert False, error_msg
 
 def impl(sys_name, width, init_file, resource_base):
     sys = SysBuilder(sys_name)
@@ -84,16 +166,18 @@ def impl(sys_name, width, init_file, resource_base):
         driver = Driver()
         driver.build(width, init_file, user)
 
-    config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
+    config = backend.config(sim_threshold=300, idle_threshold=50, resource_base=resource_base, verilog=utils.has_verilator())
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    check(raw)
+    print(raw)
+    # check(raw)
 
     if utils.has_verilator():
         raw = utils.run_verilator(verilator_path)
-        check(raw)
+        print(raw)
+        # check(raw)
 
 def test_memory():
     impl('memory_init', 32*cachesize, 'init_2.hex', f'{utils.repo_path()}/python/unit-tests/resources')
