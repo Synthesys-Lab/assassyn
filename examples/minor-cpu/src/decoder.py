@@ -84,9 +84,14 @@ def decode_logic(inst):
 
     # Extract all the signals
     # For now, write is always disabled.
-    memory = concat(Bits(1)(0), eqs['lw'])
+    memory = concat(Bits(1)(0), eqs['lw'] | eqs['lbu'])
+    # [ unsigned (signed), byte(word) ]
+    mem_ext = concat(eqs['lbu'], eqs['lbu']) 
+
     # BInst and JInst are designed for branches.
-    is_branch = is_type[BInst] | is_type[JInst] | eqs['ebreak'] | eqs['jalr']
+    is_branch = is_type[BInst] | is_type[JInst] | eqs['ebreak'] | eqs['jalr'] |  eqs['mret']
+
+    is_pc_calc = eqs['auipc']
     # Extract all the operands according to the instruction types
     # rd
     rd = rd_valid.select(views[RInst].view().rd, Bits(5)(0))
@@ -94,14 +99,31 @@ def decode_logic(inst):
     rs2 = rs2_valid.select(views[RInst].view().rs2, Bits(5)(0))
     # imm
     # TODO(@were): Add `SInst` back to this list later.
-    imm_valid = is_type[IInst] | is_type[UInst] | is_type[BInst]
+    imm_valid = is_type[IInst] | is_type[UInst] | is_type[BInst] | is_type[JInst]
 
     imm = Bits(32)(0)
+    csr_read = Bits(1)(0)
+    csr_write = Bits(1)(0)
+    csr_calculate = Bits(1)(0)
+    is_zimm = Bits(1)(0)
+    is_mepc = Bits(1)(0)
+
     for i in supported_types:
         new_imm = views[i].imm(True)
         if new_imm is not None:
             imm = is_type[i].select(new_imm, imm)
     imm = eqs['lui'].select(views[UInst].imm(False).concat(Bits(12)(0)), imm)
+    imm = eqs['auipc'].select(views[UInst].imm(False).concat(Bits(12)(0)), imm)
+
+    csr_read = eqs['csrrs'] | eqs['mret']
+    csr_calculate = eqs['csrrs'] 
+    csr_write = eqs['csrrw'] | eqs['csrrwi']
+    is_zimm = eqs['csrrwi']
+    is_mepc = eqs['mret']
+
+    with Condition(csr_read | csr_write):
+        view = views[IInst].view()
+        log("CSR instruction: opcode = 0x{:x} funct3: 0x{:x} csr_addr: 0x{:x}", view.opcode, view.funct3, view.imm)
 
     return deocder_signals.bundle(
         memory=memory,
@@ -116,4 +138,11 @@ def decode_logic(inst):
         rd=rd,
         rd_valid=rd_valid,
         imm=imm,
-        imm_valid=imm_valid)
+        imm_valid=imm_valid,
+        is_pc_calc = is_pc_calc,
+        csr_read=csr_read,
+        csr_write=csr_write,
+        csr_calculate=csr_calculate,
+        is_zimm = is_zimm,
+        is_mepc = is_mepc,
+        mem_ext = mem_ext)
