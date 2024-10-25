@@ -38,7 +38,8 @@ class Execution(Module):
         csr_f: Array,
         memory: Module, 
         writeback: Module,
-        data: str):
+        data: str,
+        depth_log: int):
 
         
         csr_id = Bits(4)(0)
@@ -177,13 +178,13 @@ class Execution(Module):
 
         # This `is_memory` hack is to evade rust's overflow check.
         addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
-        request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
+        request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(Int(depth_log)), Int(depth_log)(0))
 
         with Condition(is_memory):
             mem_bypass_reg[0] = memory_read.select(rd, Bits(5)(0))
             log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
 
-        dcache = SRAM(width=32, depth=512, init_file=data)
+        dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=a, addr=request_addr, user=memory)
         dcache.bound.async_called()
@@ -240,13 +241,14 @@ class FetcherImpl(Downstream):
               pc_reg: Value,
               pc_addr: Value,
               decoder: Decoder,
-              data: str):
+              data: str,
+              depth_log: int):
         on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
         should_fetch = ~on_branch | ex_bypass.valid()
         to_fetch = ex_bypass.optional(pc_addr)
-        icache = SRAM(width=32, depth=512, init_file=data)
+        icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
-        icache.build(Bits(1)(0), should_fetch, to_fetch[2:10].bitcast(Int(9)), Bits(32)(0), decoder)
+        icache.build(Bits(1)(0), should_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} |",
             on_branch, ex_bypass.valid(), should_fetch, to_fetch)
         with Condition(should_fetch):
@@ -277,7 +279,7 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
-def run_cpu(resource_base, workload):
+def run_cpu(resource_base, workload, depth_log):
     sys = SysBuilder('minor_cpu')
 
     with sys:
@@ -335,7 +337,8 @@ def run_cpu(resource_base, workload):
             csr_f = csr_file,
             memory = memory_access,
             writeback = writeback,
-            data = data_init
+            data = data_init,
+            depth_log = depth_log
         )
 
         memory_access.build(
@@ -347,7 +350,7 @@ def run_cpu(resource_base, workload):
         decoder = Decoder()
         on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe')
+        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe', depth_log)
 
         onwrite_downstream = Onwrite()
     
@@ -373,81 +376,55 @@ def run_cpu(resource_base, workload):
     raw = utils.run_simulator(simulator_path)
     open('raw.log', 'w').write(raw)
     test = f'{resource_base}/find_pass.sh'
-    res = subprocess.run([test, 'raw.log'])
+    check(resource_base, workload)
 
-    if res.returncode != 0:
-        print('Test failed!!!')
+    raw = utils.run_verilator(verilog_path)
+    open('raw.log', 'w').write(raw)
+    check(resource_base, workload)
+
+    os.remove('raw.log')
+
+
+def check(resource_base, test):
+
+    script = f'{resource_base}/{test}.sh'
+    if os.path.exists(script):
+        res = subprocess.run([script, 'raw.log', f'{resource_base}/{test}.data'])
     else:
-        print('Test passed!!!')
-        raw = utils.run_verilator(verilog_path)
-        open('raw.log', 'w').write(raw)
-    #test = f'{resource_base}/{workload}.sh'
-    #subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
-
-        os.remove('raw.log')
-    #quit()
-
+        script = f'{resource_base}/../utils/find_pass.sh'
+        res = subprocess.run([script, 'raw.log'])
+    assert res.returncode == 0
+    print('Test passed!!!')
     
 
 if __name__ == '__main__':
-    #workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    #run_cpu(workloads, '0to100')
+    workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    run_cpu(workloads, '0to100', 9)
 
-    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    run_cpu(tests, 'rv32ui-p-add')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-addi')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-and')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-andi')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'     
-    #run_cpu(tests, 'rv32ui-p-auipc')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-beq')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bge')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bgeu')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-blt')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bltu')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bne')
-
-    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-jal')
-
-    #TODEBUG time out tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-jalr')
-
-    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #TODEBUG run_cpu(tests, 'rv32ui-p-lbu')
-
-    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'   #'srai' is right
-    #TODEBUG run_cpu(tests, 'rv32ui-p-lui')
-
-    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #  run_cpu(tests, 'rv32ui-p-lw')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-sub')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-or')
+    # test_cases = [
+    #     'rv32ui-p-add',
+    #     'rv32ui-p-addi',
+    #     'rv32ui-p-and',
+    #     'rv32ui-p-andi',
+    #     'rv32ui-p-auipc',
+    #     'rv32ui-p-beq',
+    #     'rv32ui-p-bge',
+    #     'rv32ui-p-bgeu',
+    #     'rv32ui-p-blt',
+    #     'rv32ui-p-bltu',
+    #     'rv32ui-p-bne',
+    #     'rv32ui-p-jal',
+    #     'rv32ui-p-jalr',
+    #     'rv32ui-p-lbu',
+    #     'rv32ui-p-lui',
+    #     'rv32ui-p-lw',
+    #     'rv32ui-p-sub',
+    #     'rv32ui-p-or',
+    #     'rv32ui-p-ori',
+    # ]
 
     # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    # run_cpu(tests, 'rv32ui-p-ori')
 
-    pass
+    # for case in test_cases:
+    #     run_cpu(tests, case, 9)
+
