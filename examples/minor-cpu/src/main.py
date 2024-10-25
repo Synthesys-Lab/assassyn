@@ -407,16 +407,16 @@ def check(resource_base, test):
     
 
 if __name__ == '__main__':
-    #wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    #workloads = [
-    #    # '0to100',
-    #    'multiply',
-    #]
-    #for wl in workloads:
-    #    run_cpu(wl_path, wl, 12)
+    wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    workloads = [
+        '0to100',
+        # 'multiply',
+    ]
+    for wl in workloads:
+        run_cpu(wl_path, wl, 12)
 
     test_cases = [
-        #'rv32ui-p-add',
+        'rv32ui-p-add',
         #'rv32ui-p-addi',
         #'rv32ui-p-and',
         #'rv32ui-p-andi',
@@ -433,7 +433,7 @@ if __name__ == '__main__':
         #'rv32ui-p-lui',
         #'rv32ui-p-lw',
         #'rv32ui-p-sub',
-        'rv32ui-p-sw',
+        #'rv32ui-p-sw',
         #'rv32ui-p-or',
         #'rv32ui-p-ori',
     ]
