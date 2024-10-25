@@ -103,6 +103,16 @@ class Execution(Module):
             log('ebreak | halt | ecall')
             finish()
 
+        is_trap = signals.is_branch & \
+                  signals.is_offset_br & \
+                  signals.imm_valid & \
+                  (signals.imm == Bits(32)(0)) & \
+                  (signals.cond == Bits(RV32I_ALU.CNT)(1 << RV32I_ALU.ALU_TRUE)) & \
+                  (signals.alu == Bits(RV32I_ALU.CNT)(1 << RV32I_ALU.ALU_ADD))
+        with Condition(is_trap):
+            log('trap')
+            finish()
+
         # Instruction attributes
 
         def bypass(bypass_reg, bypass_data, idx, value):
@@ -146,7 +156,7 @@ class Execution(Module):
         results[RV32I_ALU.ALU_AND] = a & alu_b
         results[RV32I_ALU.ALU_TRUE] = Bits(32)(1)
         results[RV32I_ALU.ALU_SLL] = a << alu_b[0:4]
-        results[RV32I_ALU.ALU_SRA] = a >> sra_signed_result 
+        results[RV32I_ALU.ALU_SRA] = sra_signed_result 
         results[RV32I_ALU.ALU_SRA_U] = a >> alu_b[0:4]
 
         # TODO: Fix this bullshit.
