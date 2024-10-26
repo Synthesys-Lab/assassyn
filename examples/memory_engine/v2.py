@@ -5,8 +5,8 @@ from assassyn import utils
 import time
 import random
 
-# current_seed = int(time.time())
-current_seed = 1000
+current_seed = int(time.time())
+# current_seed = 1000
 
 cachesize = 8
 
@@ -14,13 +14,16 @@ num_rows = 50
 num_columns = 30
 stride = 30
 
-random.seed(current_seed)
-num1 = random.randint(0, num_rows * num_columns)
-num2 = random.randint(0, num_rows * num_columns)
-start, end = sorted([num1, num2]) # Will get [start, end)
+lineno_bitlength = 11
+sram_depth = 1 << lineno_bitlength
 
-# start = 5
-# end =33
+# random.seed(current_seed)
+# num1 = random.randint(0, num_rows * num_columns)
+# num2 = random.randint(0, num_rows * num_columns)
+# start, end = sorted([num1, num2]) # Will get [start, end)
+
+start = 0
+end = 1500
 
 init_i  = start // num_columns
 init_j = start % num_columns
@@ -78,7 +81,7 @@ class Driver(Module):
         
         cnt_i = RegArray(Int(32), 1)
         cnt_j = RegArray(Int(32), 1)
-                
+        
         i = cnt_i[0]
         j = cnt_j[0]
 
@@ -93,16 +96,17 @@ class Driver(Module):
             cnt_i[0] = Int(32)(init_i)
             cnt_j[0] = Int(32)(init_j)
             
-            log("start:{} end:{} i:{} j:{}", Int(32)(start), Int(32)(end), Int(32)(init_i), Int(32)(init_j))
+            log("start:{} end:{} i:{} j:{} seed:{}", Int(32)(start), Int(32)(end), Int(32)(init_i), Int(32)(init_j), Int(32)(current_seed))
         
         # i and j have already been initialized.
         with Condition(term & init):
-            lineno = addr[shift:shift+8].bitcast(Int(9))
-            line_end = (Bits(32)(0).concat((lineno + Int(9)(1)) << Int(9)(cachesize.bit_length()-1)))[0:31].bitcast(Int(32))
+            lineno = addr[shift:shift+lineno_bitlength-1].bitcast(UInt(lineno_bitlength))
+            line_end = (Bits(32)(0).concat((lineno + UInt(lineno_bitlength)(1)) << UInt(lineno_bitlength)(cachesize.bit_length()-1)))[0:31].bitcast(Int(32))
             offset = Bits(cachesize-shift)(0).concat(addr[0:shift-1]).bitcast(Bits(cachesize))
             reserve = Bits(cachesize)(2 ** cachesize - 1) >> offset
 
-            sram = SRAM(width, 512, init_file)
+            # lineno = lineno.bitcast(UInt(lineno_bitlength))
+            sram = SRAM(width, sram_depth, init_file)
             sram.build(Int(1)(0), term & init, lineno, Bits(width)(0), user)            
             
             sentinel = (Int(32)(end) <= row_end).select(Int(32)(end), row_end)
@@ -116,8 +120,8 @@ class Driver(Module):
             # log("___________________________i={}\tj={}\taddr={}\trow_end={}\tlineno={}\tline_end={}\toffest={}\tsentinel={}\treserve={:b} discard={:b} bitmask={:b}", i, j, addr, row_end, lineno, line_end, offset, sentinel, reserve, discard, bitmask)
             
             # log("term={}", term)
-                                    
-            # log("\t\tCALL: bitmask={:b}\tlineno={}", bitmask, lineno)
+            
+            log("\t\tCALL: bitmask={:b}\tlineno={}", bitmask, lineno)
             
             user.bind(mask=bitmask)
             sram.bound.async_called()
