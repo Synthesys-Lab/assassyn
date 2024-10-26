@@ -134,7 +134,7 @@ class Driver(Module):
                 with Condition(~nextrow): 
                     initialization[0] = Int(1)(0)
                     terminal[0] = Int(1)(1)
-                    finish()
+                    # finish()  # Enabling `finish` will result in one line missing from the read result.
                 
             with Condition(line_end < sentinel):
                 cnt_j[0] = j + Int(32)(cachesize) - (Bits(32-cachesize)(0).concat(offset)).bitcast(Int(32))
@@ -176,12 +176,12 @@ def impl(sys_name, width, init_file, resource_base):
 
     raw = utils.run_simulator(simulator_path)
     print(raw)
-    # check(raw)
+    check(raw)
 
     if utils.has_verilator():
         raw = utils.run_verilator(verilator_path)
         print(raw)
-        # check(raw)
+        check(raw)
 
 def test_memory():
     impl('memory_init', 32*cachesize, 'init_2.hex', f'{utils.repo_path()}/python/unit-tests/resources')
