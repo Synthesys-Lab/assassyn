@@ -45,8 +45,8 @@ class ComputePE(Module):
         log("Mac value: {} * {} + {} = {}", west, north, val, mac)
         acc[0] = mac
 
-        res_east = east.bind(west = west)
-        res_south = south.bind(north = north)
+        res_east = east.bind(west = west.bitcast(Int(16)))
+        res_south = south.bind(north = north.bitcast(Int(16)))
         if res_east.is_fully_bound():
             res_east = res_east.async_called()
         if res_south.is_fully_bound():
