@@ -57,14 +57,14 @@ class ComputePE(Module):
 class Pusher(Module):
 
     def __init__(self, prefix, idx):
-        super().__init__(no_arbiter=True, ports={'data': Port(Int(16))})
+        super().__init__(no_arbiter=True, ports={'data': Port(Int(8))})
         self.name = f'{prefix}_Pusher_{idx}'
 
     @module.combinational
     def build(self, direction: str, dest: Bind):
         data = self.pop_all_ports(False)
         log(f"{self.name} pushes {{}}", data)
-        kwargs = {direction: data}
+        kwargs = {direction: data.bitcast(Int(16))}
         new_bind = dest.bind(**kwargs)
         if new_bind.is_fully_bound():
             res = new_bind.async_called()
@@ -81,8 +81,8 @@ class Testbench(Module):
 
         def build_call(x, data):
             for row, col, data in zip(rows[x], cols[x], data):
-                row.async_called(data = Int(16)(data))
-                col.async_called(data = Int(16)(data))
+                row.async_called(data = Int(8)(data))
+                col.async_called(data = Int(8)(data))
 
         with Cycle(1):
             # 1 0
