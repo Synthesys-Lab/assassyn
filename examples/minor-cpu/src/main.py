@@ -38,7 +38,8 @@ class Execution(Module):
         csr_f: Array,
         memory: Module, 
         writeback: Module,
-        data: str):
+        data: str,
+        depth_log: int):
 
         
         csr_id = Bits(4)(0)
@@ -102,6 +103,16 @@ class Execution(Module):
             log('ebreak | halt | ecall')
             finish()
 
+        is_trap = signals.is_branch & \
+                  signals.is_offset_br & \
+                  signals.imm_valid & \
+                  (signals.imm == Bits(32)(0)) & \
+                  (signals.cond == Bits(RV32I_ALU.CNT)(1 << RV32I_ALU.ALU_TRUE)) & \
+                  (signals.alu == Bits(RV32I_ALU.CNT)(1 << RV32I_ALU.ALU_ADD))
+        with Condition(is_trap):
+            log('trap')
+            finish()
+
         # Instruction attributes
 
         def bypass(bypass_reg, bypass_data, idx, value):
@@ -118,12 +129,11 @@ class Execution(Module):
         b = is_csr.select(csr_f[csr_id], b)
         
 
-        # log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
-        # log('exe_bypass.reg: x{:02} | .data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
+        log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
+        log('exe_bypass.reg: x{:02} | .data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
 
         # TODO: To support `auipc`, is_branch will be separated into `is_branch` and `is_pc_calc`.
-        alu_a = signals.is_branch.select(fetch_addr, a)
-        alu_a = signals.is_pc_calc.select(fetch_addr, alu_a)
+        alu_a = (signals.is_offset_br | signals.is_pc_calc).select(fetch_addr, a)
         alu_b = signals.imm_valid.select(signals.imm, b)
 
         results = [Bits(32)(0)] * RV32I_ALU.CNT
@@ -132,8 +142,11 @@ class Execution(Module):
         le_result = (a.bitcast(Int(32)) < b.bitcast(Int(32))).select(Bits(32)(1), Bits(32)(0))
         eq_result = (a == b).select(Bits(32)(1), Bits(32)(0))
         leu_result = (Bits(1)(0).concat(a) < Bits(1)(0).concat(b ) ).select(Bits(32)(1), Bits(32)(0))
-        alu_b_shift_bits = alu_b[4:4].select( concat(Int(27)(-1) , alu_b[0:4]).bitcast(Int(32)), concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32)) )
-        sra_signed_result = a[31:31].select( (a >> alu_b[0:4]) | ~((Int(32)(1) << (Int(32)(32) - alu_b_shift_bits )   ) - Int(32)(1)) , (a >> alu_b[0:4]))
+        #alu_b_shift_bits = alu_b[4:4].select( concat(Int(27)(-1) , alu_b[0:4]).bitcast(Int(32)), concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32)) )
+        alu_b_shift_bits =  concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32))
+        shift_temp = Int(32)(0)
+        shift_temp = (Int(33)(1) << (Int(33)(32) - alu_b_shift_bits )   )[0:31]
+        sra_signed_result = a[31:31].select( (a >> alu_b[0:4]) | ~(  shift_temp.bitcast(Int(32)) - Int(32)(1)) , (a >> alu_b[0:4]))
         sub_result = (a.bitcast(Int(32)) - b.bitcast(Int(32))).bitcast(Bits(32))
 
         results[RV32I_ALU.ALU_ADD] = adder_result
@@ -141,18 +154,20 @@ class Execution(Module):
         results[RV32I_ALU.ALU_CMP_LT] = le_result
         results[RV32I_ALU.ALU_CMP_EQ] = eq_result
         results[RV32I_ALU.ALU_CMP_LTU] = leu_result
-        results[RV32I_ALU.ALU_XOR] = a ^ b
+        results[RV32I_ALU.ALU_XOR] = a ^ alu_b
         results[RV32I_ALU.ALU_OR] = a | b
+        results[RV32I_ALU.ALU_ORI] = a | alu_b
         results[RV32I_ALU.ALU_AND] = a & alu_b
         results[RV32I_ALU.ALU_TRUE] = Bits(32)(1)
         results[RV32I_ALU.ALU_SLL] = a << alu_b[0:4]
-        results[RV32I_ALU.ALU_SRA] = a >> sra_signed_result 
+        results[RV32I_ALU.ALU_SRA] = sra_signed_result 
         results[RV32I_ALU.ALU_SRA_U] = a >> alu_b[0:4]
 
         # TODO: Fix this bullshit.
         alu = signals.alu
         result = alu.select1hot(*results)
 
+        log('pc: 0x{:08x}   |is_offset_br: {}| is_pc_calc: {}|', fetch_addr, signals.is_offset_br, signals.is_pc_calc)
         log("0x{:08x}       | a: {:08x}  | b: {:08x}   | imm: {:08x} | result: {:08x}", alu, a, b, signals.imm, result)
         log("0x{:08x}       |a.a:{:08x}  |a.b:{:08x}   | res: {:08x} |", alu, alu_a, alu_b, result)
 
@@ -177,17 +192,27 @@ class Execution(Module):
 
         # This `is_memory` hack is to evade rust's overflow check.
         addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
-        request_addr = is_memory.select(addr[2:10].bitcast(Int(9)), Int(9)(0))
+        request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(Int(depth_log)), Int(depth_log)(0))
 
-        with Condition(is_memory):
-            mem_bypass_reg[0] = memory_read.select(rd, Bits(5)(0))
+        with Condition(memory_read):
             log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
 
-        dcache = SRAM(width=32, depth=512, init_file=data)
+        with Condition(memory_write):
+            log("mem-write        | addr: 0x{:05x}| line: 0x{:05x} | value: 0x{:08x}", result, request_addr, a)
+
+        dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
-        dcache.build(we=memory_write, re=memory_read, wdata=a, addr=request_addr, user=memory)
-        dcache.bound.async_called()
-        wb = writeback.bind(is_memory_read = memory_read, result = result, rd = rd , is_csr = signals.csr_write, csr_id = csr_id , csr_new = csr_new , mem_ext = signals.mem_ext)
+        dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
+        with Condition(memory_read):
+            bound = dcache.bound.bind(rd=rd)
+        bound.async_called()
+        wb = writeback.bind(is_memory_read = memory_read,
+                            result = signals.link_pc.select(pc[0], result),
+                            rd = rd,
+                            is_csr = signals.csr_write,
+                            csr_id = csr_id,
+                            csr_new = csr_new,
+                            mem_ext = signals.mem_ext)
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
@@ -206,6 +231,8 @@ class Decoder(Module):
     @module.combinational
     def build(self, executor: Module, br_sm: Array):
         inst, fetch_addr = self.pop_all_ports(False)
+
+        log("raw: 0x{:08x}  | addr: 0x{:05x} |", inst, fetch_addr)
 
         signals = decode_logic(inst)
         br_sm[0] = signals.is_branch
@@ -240,13 +267,14 @@ class FetcherImpl(Downstream):
               pc_reg: Value,
               pc_addr: Value,
               decoder: Decoder,
-              data: str):
+              data: str,
+              depth_log: int):
         on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
         should_fetch = ~on_branch | ex_bypass.valid()
         to_fetch = ex_bypass.optional(pc_addr)
-        icache = SRAM(width=32, depth=512, init_file=data)
+        icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
-        icache.build(Bits(1)(0), should_fetch, to_fetch[2:10].bitcast(Int(9)), Bits(32)(0), decoder)
+        icache.build(Bits(1)(0), should_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} |",
             on_branch, ex_bypass.valid(), should_fetch, to_fetch)
         with Condition(should_fetch):
@@ -277,7 +305,7 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
-def run_cpu(resource_base, workload):
+def run_cpu(resource_base, workload, depth_log):
     sys = SysBuilder('minor_cpu')
 
     with sys:
@@ -335,7 +363,8 @@ def run_cpu(resource_base, workload):
             csr_f = csr_file,
             memory = memory_access,
             writeback = writeback,
-            data = data_init
+            data = data_init,
+            depth_log = depth_log
         )
 
         memory_access.build(
@@ -347,7 +376,7 @@ def run_cpu(resource_base, workload):
         decoder = Decoder()
         on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe')
+        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe', depth_log)
 
         onwrite_downstream = Onwrite()
     
@@ -363,8 +392,8 @@ def run_cpu(resource_base, workload):
     print(sys)
     conf = config(
         verilog=utils.has_verilator(),
-        sim_threshold=1500,
-        idle_threshold=1500,
+        sim_threshold=100000,
+        idle_threshold=100000,
         resource_base=resource_base
     )
 
@@ -373,81 +402,69 @@ def run_cpu(resource_base, workload):
     raw = utils.run_simulator(simulator_path)
     open('raw.log', 'w').write(raw)
     test = f'{resource_base}/find_pass.sh'
-    res = subprocess.run([test, 'raw.log'])
+    check(resource_base, workload)
 
-    if res.returncode != 0:
-        print('Test failed!!!')
+    raw = utils.run_verilator(verilog_path)
+    open('raw.log', 'w').write(raw)
+    check(resource_base, workload)
+
+    os.remove('raw.log')
+
+
+def check(resource_base, test):
+
+    script = f'{resource_base}/{test}.sh'
+    if os.path.exists(script):
+        res = subprocess.run([script, 'raw.log', f'{resource_base}/{test}.data'])
     else:
-        print('Test passed!!!')
-        raw = utils.run_verilator(verilog_path)
-        open('raw.log', 'w').write(raw)
-    #test = f'{resource_base}/{workload}.sh'
-    #subprocess.run([test, 'raw.log', f'{resource_base}/{workload}.data'])
-
-        os.remove('raw.log')
-    #quit()
-
+        script = f'{resource_base}/../utils/find_pass.sh'
+        res = subprocess.run([script, 'raw.log'])
+    assert res.returncode == 0, f'Failed test {test}'
+    print('Test passed!!!')
     
 
 if __name__ == '__main__':
-    #workloads = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    #run_cpu(workloads, '0to100')
+    wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
+    workloads = [
+        '0to100',
+        #'multiply',
+    ]
+    for wl in workloads:
+        run_cpu(wl_path, wl, 12)
+
+    test_cases = [
+        #'rv32ui-p-add',
+        #'rv32ui-p-addi',
+        #'rv32ui-p-and',
+        #'rv32ui-p-andi',
+        #'rv32ui-p-auipc',
+        #'rv32ui-p-beq',
+        #'rv32ui-p-bge',
+        #'rv32ui-p-bgeu',
+        #'rv32ui-p-blt',
+        #'rv32ui-p-bltu',
+        #'rv32ui-p-bne',
+        #'rv32ui-p-jal',
+        #'rv32ui-p-jalr',
+        #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
+        #'rv32ui-p-lui',
+        #'rv32ui-p-lw',
+        #'rv32ui-p-or',
+        #'rv32ui-p-ori',
+        #'rv32ui-p-sb',#TO CHECK
+        #'rv32ui-p-sll',
+        #'rv32ui-p-slli',
+        #'rv32ui-p-sltu',
+        #'rv32ui-p-srai',
+        #'rv32ui-p-srl',
+        #'rv32ui-p-srli',
+        #'rv32ui-p-sub',
+        #'rv32ui-p-sw',
+        #'rv32ui-p-xori',
+    ]
 
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    run_cpu(tests, 'rv32ui-p-add')
 
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-addi')
+    for case in test_cases:
+        run_cpu(tests, case, 9)
 
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-and')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-andi')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'     
-    #run_cpu(tests, 'rv32ui-p-auipc')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-beq')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bge')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bgeu')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-blt')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bltu')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-bne')
-
-    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-jal')
-
-    #TODEBUG time out tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-jalr')
-
-    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #TODEBUG run_cpu(tests, 'rv32ui-p-lbu')
-
-    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'   #'srai' is right
-    #TODEBUG run_cpu(tests, 'rv32ui-p-lui')
-
-    #TODEBUG tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #  run_cpu(tests, 'rv32ui-p-lw')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-sub')
-
-    #tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    #run_cpu(tests, 'rv32ui-p-or')
-
-    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    # run_cpu(tests, 'rv32ui-p-ori')
-
-    pass

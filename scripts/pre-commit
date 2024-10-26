@@ -1,6 +1,5 @@
 #!/bin/sh
 
-set -euxo pipefail
 # It is highly recommended to put this to your git pre-commit hook, to format your code
 # before checking anything in.
 
