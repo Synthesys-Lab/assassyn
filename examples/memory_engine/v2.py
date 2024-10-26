@@ -5,17 +5,12 @@ from assassyn import utils
 import time
 import random
 
-current_seed = int(time.time())
-# current_seed = 1000
-
-cachesize = 8
+# current_seed = int(time.time())
+current_seed = 1000
 
 num_rows = 50
 num_columns = 30
 stride = 30
-
-lineno_bitlength = 11
-sram_depth = 1 << lineno_bitlength
 
 # random.seed(current_seed)
 # num1 = random.randint(0, num_rows * num_columns)
@@ -27,6 +22,10 @@ end = 1500
 
 init_i  = start // num_columns
 init_j = start % num_columns
+
+cachesize = 8
+lineno_bitlength = 11 # The maximum value of lineno is 50*30//8=187, but when the bitlength is set to 10, it will overflow
+sram_depth = 1 << lineno_bitlength
 
 class MemUser(Module):
 
@@ -135,6 +134,7 @@ class Driver(Module):
                 with Condition(~nextrow): 
                     initialization[0] = Int(1)(0)
                     terminal[0] = Int(1)(1)
+                    finish()
                 
             with Condition(line_end < sentinel):
                 cnt_j[0] = j + Int(32)(cachesize) - (Bits(32-cachesize)(0).concat(offset)).bitcast(Int(32))
