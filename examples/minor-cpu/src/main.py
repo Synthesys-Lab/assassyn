@@ -426,7 +426,7 @@ def check(resource_base, test):
 if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        #'0to100',
+        '0to100',
         #'multiply',
     ]
     for wl in workloads:
@@ -461,8 +461,6 @@ if __name__ == '__main__':
         #'rv32ui-p-sub',
         #'rv32ui-p-sw',
         #'rv32ui-p-xori',
-        
-        
     ]
 
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
