@@ -201,6 +201,7 @@ class RV32I_ALU:
     ALU_SUB = 1
     ALU_XOR = 2
     ALU_OR = 3
+    ALU_ORI = 13
     ALU_AND = 4
     ALU_SLL = 5
     ALU_SRL = 6
@@ -247,8 +248,12 @@ supported_opcodes = [
   ('csrrwi' , (0b1110011, 0b101, RV32I_ALU.ALU_ADD, None,None,None), IInst),
 
   ('slli' , (0b0010011, 0b001, RV32I_ALU.ALU_SLL, None, None , 0b000000), IInst),
+  ('sll'  , (0b0110011, 0b001, 0b0000000, RV32I_ALU.ALU_SLL), RInst),
   ('srai' , (0b0010011, 0b101, RV32I_ALU.ALU_SRA,  None,None , 0b010000), IInst),#signed
   ('srli' , (0b0010011, 0b101, RV32I_ALU.ALU_SRA_U,  None, None , 0b000000), IInst),#0
+  ('sltu' , (0b0110011, 0b011, 0b0000000, RV32I_ALU.ALU_CMP_LTU), RInst),
+  ('srl'  , (0b0110011, 0b101, 0b0000000, RV32I_ALU.ALU_SRA_U), RInst),
+  ('sra'  , (0b0110011, 0b101, 0b0100000, RV32I_ALU.ALU_SRA), RInst),
 
   #todo: mret is not supported for setting the MPIE in CSR(mstatus)
   ('mret' , (0b1110011, 0b000, 0b0011000,RV32I_ALU.ALU_ADD,0b00010), RInst ),
@@ -258,7 +263,8 @@ supported_opcodes = [
   
   ('and' , (0b0110011, 0b111, 0b0000000, RV32I_ALU.ALU_AND), RInst),
   ('andi' , (0b0010011, 0b111, RV32I_ALU.ALU_AND, None,None,None), IInst),
-  ('ori' , (0b0010011, 0b110, RV32I_ALU.ALU_OR, None,None,None), IInst),
+  ('ori' , (0b0010011, 0b110, RV32I_ALU.ALU_ORI, None,None,None), IInst),
+  ('xori' , (0b0010011, 0b100, RV32I_ALU.ALU_XOR, None,None,None), IInst),
 ]
 
 deocder_signals = Record(

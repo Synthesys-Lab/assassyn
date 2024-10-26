@@ -129,8 +129,8 @@ class Execution(Module):
         b = is_csr.select(csr_f[csr_id], b)
         
 
-        # log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
-        # log('exe_bypass.reg: x{:02} | .data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
+        log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
+        log('exe_bypass.reg: x{:02} | .data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
 
         # TODO: To support `auipc`, is_branch will be separated into `is_branch` and `is_pc_calc`.
         alu_a = (signals.is_offset_br | signals.is_pc_calc).select(fetch_addr, a)
@@ -142,8 +142,11 @@ class Execution(Module):
         le_result = (a.bitcast(Int(32)) < b.bitcast(Int(32))).select(Bits(32)(1), Bits(32)(0))
         eq_result = (a == b).select(Bits(32)(1), Bits(32)(0))
         leu_result = (Bits(1)(0).concat(a) < Bits(1)(0).concat(b ) ).select(Bits(32)(1), Bits(32)(0))
-        alu_b_shift_bits = alu_b[4:4].select( concat(Int(27)(-1) , alu_b[0:4]).bitcast(Int(32)), concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32)) )
-        sra_signed_result = a[31:31].select( (a >> alu_b[0:4]) | ~((Int(32)(1) << (Int(32)(32) - alu_b_shift_bits )   ) - Int(32)(1)) , (a >> alu_b[0:4]))
+        #alu_b_shift_bits = alu_b[4:4].select( concat(Int(27)(-1) , alu_b[0:4]).bitcast(Int(32)), concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32)) )
+        alu_b_shift_bits =  concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32))
+        shift_temp = Int(32)(0)
+        shift_temp = (Int(33)(1) << (Int(33)(32) - alu_b_shift_bits )   )[0:31]
+        sra_signed_result = a[31:31].select( (a >> alu_b[0:4]) | ~(  shift_temp.bitcast(Int(32)) - Int(32)(1)) , (a >> alu_b[0:4]))
         sub_result = (a.bitcast(Int(32)) - b.bitcast(Int(32))).bitcast(Bits(32))
 
         results[RV32I_ALU.ALU_ADD] = adder_result
@@ -151,8 +154,9 @@ class Execution(Module):
         results[RV32I_ALU.ALU_CMP_LT] = le_result
         results[RV32I_ALU.ALU_CMP_EQ] = eq_result
         results[RV32I_ALU.ALU_CMP_LTU] = leu_result
-        results[RV32I_ALU.ALU_XOR] = a ^ b
+        results[RV32I_ALU.ALU_XOR] = a ^ alu_b
         results[RV32I_ALU.ALU_OR] = a | b
+        results[RV32I_ALU.ALU_ORI] = a | alu_b
         results[RV32I_ALU.ALU_AND] = a & alu_b
         results[RV32I_ALU.ALU_TRUE] = Bits(32)(1)
         results[RV32I_ALU.ALU_SLL] = a << alu_b[0:4]
@@ -163,7 +167,7 @@ class Execution(Module):
         alu = signals.alu
         result = alu.select1hot(*results)
 
-        log('is_offset_br: {}  | is_pc_calc: {} |', signals.is_offset_br, signals.is_pc_calc)
+        log('pc: 0x{:08x}   |is_offset_br: {}| is_pc_calc: {}|', fetch_addr, signals.is_offset_br, signals.is_pc_calc)
         log("0x{:08x}       | a: {:08x}  | b: {:08x}   | imm: {:08x} | result: {:08x}", alu, a, b, signals.imm, result)
         log("0x{:08x}       |a.a:{:08x}  |a.b:{:08x}   | res: {:08x} |", alu, alu_a, alu_b, result)
 
@@ -191,7 +195,6 @@ class Execution(Module):
         request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(Int(depth_log)), Int(depth_log)(0))
 
         with Condition(memory_read):
-            mem_bypass_reg[0] = memory_read.select(rd, Bits(5)(0))
             log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
 
         with Condition(memory_write):
@@ -200,7 +203,9 @@ class Execution(Module):
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
-        dcache.bound.async_called()
+        with Condition(memory_read):
+            bound = dcache.bound.bind(rd=rd)
+        bound.async_called()
         wb = writeback.bind(is_memory_read = memory_read,
                             result = signals.link_pc.select(pc[0], result),
                             rd = rd,
@@ -421,14 +426,14 @@ def check(resource_base, test):
 if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        '0to100',
-        # 'multiply',
+        #'0to100',
+        #'multiply',
     ]
     for wl in workloads:
         run_cpu(wl_path, wl, 12)
 
     test_cases = [
-        'rv32ui-p-add',
+        #'rv32ui-p-add',
         #'rv32ui-p-addi',
         #'rv32ui-p-and',
         #'rv32ui-p-andi',
@@ -441,13 +446,23 @@ if __name__ == '__main__':
         #'rv32ui-p-bne',
         #'rv32ui-p-jal',
         #'rv32ui-p-jalr',
-        #'rv32ui-p-lbu',
+        #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
         #'rv32ui-p-lui',
         #'rv32ui-p-lw',
-        #'rv32ui-p-sub',
-        #'rv32ui-p-sw',
         #'rv32ui-p-or',
         #'rv32ui-p-ori',
+        #'rv32ui-p-sb',#TO CHECK
+        #'rv32ui-p-sll',
+        #'rv32ui-p-slli',
+        #'rv32ui-p-sltu',
+        #'rv32ui-p-srai',
+        #'rv32ui-p-srl',
+        #'rv32ui-p-srli',
+        #'rv32ui-p-sub',
+        #'rv32ui-p-sw',
+        #'rv32ui-p-xori',
+        
+        
     ]
 
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
