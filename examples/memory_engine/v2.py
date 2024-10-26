@@ -5,20 +5,20 @@ from assassyn import utils
 import time
 import random
 
-# current_seed = int(time.time())
-current_seed = 1000
+current_seed = int(time.time())
+# current_seed = 1000
 
 num_rows = 50
 num_columns = 30
 stride = 30
 
-# random.seed(current_seed)
-# num1 = random.randint(0, num_rows * num_columns)
-# num2 = random.randint(0, num_rows * num_columns)
-# start, end = sorted([num1, num2]) # Will get [start, end)
+random.seed(current_seed)
+num1 = random.randint(0, num_rows * num_columns)
+num2 = random.randint(0, num_rows * num_columns)
+start, end = sorted([num1, num2]) # Will get [start, end)
 
-start = 0
-end = 1500
+# start = 0
+# end = 1500
 
 init_i  = start // num_columns
 init_j = start % num_columns
@@ -32,7 +32,8 @@ class MemUser(Module):
     def __init__(self, width):
         super().__init__(
             ports={'rdata': Port(Bits(width)),
-                   'mask': Port(Bits(cachesize))
+                   'mask': Port(Bits(cachesize)),
+                   'term': Port(Bits(1))
             }, 
         )
         self.reg_accm = RegArray(Int(width), 1)
@@ -41,7 +42,7 @@ class MemUser(Module):
     def build(self):
         
         width = self.rdata.dtype.bits
-        rdata, bitmask = self.pop_all_ports(False)
+        rdata, bitmask, term = self.pop_all_ports(False)
         rdata = rdata.bitcast(Int(width))
 
         data_joint = None
@@ -63,6 +64,9 @@ class MemUser(Module):
             data_joint[64:95],
             data_joint[32:63],
             data_joint[0:31])
+        
+        with Condition(term):
+            finish()
 
 class Driver(Module):
 
@@ -75,9 +79,6 @@ class Driver(Module):
         initialization = RegArray(Int(1), 1)
         init = initialization[0]
         
-        terminal = RegArray(Int(1), 1)
-        term = terminal[0]
-        
         cnt_i = RegArray(Int(32), 1)
         cnt_j = RegArray(Int(32), 1)
         
@@ -89,16 +90,15 @@ class Driver(Module):
         shift = cachesize.bit_length() - 1
         
         # Initialization.
-        with Condition(~(init | term)):
+        with Condition(~(init)):
             initialization[0] = Int(1)(1)
-            terminal[0] = Int(1)(1)
             cnt_i[0] = Int(32)(init_i)
             cnt_j[0] = Int(32)(init_j)
             
             log("start:{} end:{} i:{} j:{} seed:{}", Int(32)(start), Int(32)(end), Int(32)(init_i), Int(32)(init_j), Int(32)(current_seed))
         
         # i and j have already been initialized.
-        with Condition(term & init):
+        with Condition(init):
             lineno = addr[shift:shift+lineno_bitlength-1].bitcast(UInt(lineno_bitlength))
             line_end = (Bits(32)(0).concat((lineno + UInt(lineno_bitlength)(1)) << UInt(lineno_bitlength)(cachesize.bit_length()-1)))[0:31].bitcast(Int(32))
             offset = Bits(cachesize-shift)(0).concat(addr[0:shift-1]).bitcast(Bits(cachesize))
@@ -106,7 +106,7 @@ class Driver(Module):
 
             # lineno = lineno.bitcast(UInt(lineno_bitlength))
             sram = SRAM(width, sram_depth, init_file)
-            sram.build(Int(1)(0), term & init, lineno, Bits(width)(0), user)            
+            sram.build(Int(1)(0), init, lineno, Bits(width)(0), user)            
             
             sentinel = (Int(32)(end) <= row_end).select(Int(32)(end), row_end)
             nextrow = (Int(32)(end) <= row_end).select(Int(1)(0), Int(1)(1))
@@ -116,13 +116,16 @@ class Driver(Module):
             
             bitmask = (reserve ^ discard).bitcast(Bits(cachesize))
             
+            simu_term = (line_end >= sentinel).select(Int(1)(1), Int(1)(0))
+            simu_term = simu_term & ~nextrow
+            
             # log("___________________________i={}\tj={}\taddr={}\trow_end={}\tlineno={}\tline_end={}\toffest={}\tsentinel={}\treserve={:b} discard={:b} bitmask={:b}", i, j, addr, row_end, lineno, line_end, offset, sentinel, reserve, discard, bitmask)
             
             # log("term={}", term)
             
             log("\t\tCALL: bitmask={:b}\tlineno={}", bitmask, lineno)
             
-            user.bind(mask=bitmask)
+            user.bind(mask=bitmask, term=simu_term)
             sram.bound.async_called()
             
             with Condition(line_end >= sentinel):
@@ -130,11 +133,6 @@ class Driver(Module):
                 with Condition(nextrow):
                     cnt_i[0] = i + Int(32)(1)
                     cnt_j[0] = Int(32)(0)
-                # Read will finish in current row.
-                with Condition(~nextrow): 
-                    initialization[0] = Int(1)(0)
-                    terminal[0] = Int(1)(1)
-                    # finish()  # Enabling `finish` will result in one line missing from the read result.
                 
             with Condition(line_end < sentinel):
                 cnt_j[0] = j + Int(32)(cachesize) - (Bits(32-cachesize)(0).concat(offset)).bitcast(Int(32))
