@@ -6,7 +6,6 @@ import time
 import random
 
 current_seed = int(time.time())
-# current_seed = 1000
 
 num_rows = 50
 num_columns = 30
@@ -16,9 +15,6 @@ random.seed(current_seed)
 num1 = random.randint(0, num_rows * num_columns)
 num2 = random.randint(0, num_rows * num_columns)
 start, end = sorted([num1, num2]) # Will get [start, end)
-
-# start = 0
-# end = 1500
 
 init_i  = start // num_columns
 init_j = start % num_columns
@@ -54,7 +50,6 @@ class MemUser(Module):
             
             lineno = ((rdata[0:31].bitcast(Int(32)) + Int(32)(1)) >> Int(32)(3)) - Int(32)(1)
         
-        # log("\t\tGET:\t\tbitmask={:b}\tlineno={}\trdata={:x}", bitmask, lineno, rdata)
         log("\tCacheline:\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             data_joint[224:255],
             data_joint[192:223],
@@ -104,7 +99,6 @@ class Driver(Module):
             offset = Bits(cachesize-shift)(0).concat(addr[0:shift-1]).bitcast(Bits(cachesize))
             reserve = Bits(cachesize)(2 ** cachesize - 1) >> offset
 
-            # lineno = lineno.bitcast(UInt(lineno_bitlength))
             sram = SRAM(width, sram_depth, init_file)
             sram.build(Int(1)(0), init, lineno, Bits(width)(0), user)            
             
@@ -118,10 +112,6 @@ class Driver(Module):
             
             simu_term = (line_end >= sentinel).select(Int(1)(1), Int(1)(0))
             simu_term = simu_term & ~nextrow
-            
-            # log("___________________________i={}\tj={}\taddr={}\trow_end={}\tlineno={}\tline_end={}\toffest={}\tsentinel={}\treserve={:b} discard={:b} bitmask={:b}", i, j, addr, row_end, lineno, line_end, offset, sentinel, reserve, discard, bitmask)
-            
-            # log("term={}", term)
             
             log("\t\tCALL: bitmask={:b}\tlineno={}", bitmask, lineno)
             
@@ -173,12 +163,10 @@ def impl(sys_name, width, init_file, resource_base):
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
     check(raw)
 
     if utils.has_verilator():
         raw = utils.run_verilator(verilator_path)
-        print(raw)
         check(raw)
 
 def test_memory():
