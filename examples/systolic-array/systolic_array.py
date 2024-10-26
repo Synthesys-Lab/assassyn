@@ -21,7 +21,7 @@ class ProcElem():
 class Sink(Module):
     
     def __init__(self, port_name='_v'):
-        super().__init__(no_arbiter=True, ports={port_name: Port(Int(32))})
+        super().__init__(no_arbiter=True, ports={port_name: Port(Int(16))})
 
     @module.combinational
     def build(self):
@@ -31,8 +31,8 @@ class Sink(Module):
 class ComputePE(Module):
 
     def __init__(self):
-        super().__init__(no_arbiter=True, ports={'west': Port(Int(32)), 'north': Port(Int(32))})
-        self.acc = RegArray(Int(32), 1)
+        super().__init__(no_arbiter=True, ports={'west': Port(Int(16)), 'north': Port(Int(16))})
+        self.acc = RegArray(Int(16), 1)
 
     @module.combinational
     def build(self, east: Bind, south: Bind):
@@ -40,7 +40,7 @@ class ComputePE(Module):
         acc = self.acc
         val = acc[0]
         mul = (west * north)
-        c = mul[0:31].bitcast(Int(32))
+        c = mul[0:15].bitcast(Int(16))
         mac = val + c
         log("Mac value: {} * {} + {} = {}", west, north, val, mac)
         acc[0] = mac
@@ -57,7 +57,7 @@ class ComputePE(Module):
 class Pusher(Module):
 
     def __init__(self, prefix, idx):
-        super().__init__(no_arbiter=True, ports={'data': Port(Int(32))})
+        super().__init__(no_arbiter=True, ports={'data': Port(Int(16))})
         self.name = f'{prefix}_Pusher_{idx}'
 
     @module.combinational
@@ -81,8 +81,8 @@ class Testbench(Module):
 
         def build_call(x, data):
             for row, col, data in zip(rows[x], cols[x], data):
-                row.async_called(data = Int(32)(data))
-                col.async_called(data = Int(32)(data))
+                row.async_called(data = Int(16)(data))
+                col.async_called(data = Int(16)(data))
 
         with Cycle(1):
             # 1 0
