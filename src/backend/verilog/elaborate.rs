@@ -75,22 +75,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     }
   }
 
-  fn collect_array_memory_params(&self, module: &ModuleRef) {
-    for attr in module.get_attrs() {
-      if let module::Attribute::MemoryParams(mem) = attr {
-        if module.is_downstream() {
-          for (interf, _) in module.ext_interf_iter() {
-            if interf.get_kind() == NodeKind::Array {
-              let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-              let mut map = self.array_memory_params_map.borrow_mut();
-              map.insert(array_ref.upcast(), mem.clone());
-            }
-          }
-        }
-      }
-    }
-  }
-
   fn process_node(&mut self, node: BaseNode, res: &mut String) {
     match node.get_kind() {
       NodeKind::Expr => {
@@ -565,18 +549,12 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let mut mem_init_map: HashMap<BaseNode, String> = HashMap::new();
 
     // array -> init_file_path
-    for m in self.sys.module_iter(ModuleKind::Downstream) {
-      self.collect_array_memory_params(&m);
-      for attr in m.get_attrs() {
-        if let module::Attribute::MemoryParams(mp) = attr {
-          let array = mp.pins.array.as_ref::<Array>(self.sys).unwrap();
+    for array in self.sys.array_iter() {
           if let Initializer::File(init_file) = &array.get_initializer() {
             let mut init_file_path = self.config.resource_base.clone();
             init_file_path.push(init_file);
             let init_file_path = init_file_path.to_str().unwrap();
-            mem_init_map.insert(mp.pins.array, init_file_path.to_string());
-          }
-        }
+            mem_init_map.insert(array.upcast(), init_file_path.to_string());
       }
     }
     for (key, value) in &mem_init_map {
