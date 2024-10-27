@@ -306,7 +306,7 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
-def build_cpu(resource_base, depth_log):
+def build_cpu(depth_log):
     sys = SysBuilder('minor_cpu')
 
     with sys:
@@ -382,7 +382,7 @@ def build_cpu(resource_base, depth_log):
         verilog=utils.has_verilator(),
         sim_threshold=100000,
         idle_threshold=100000,
-        resource_base=resource_base
+        resource_base=f'{utils.repo_path()}/examples/minor-cpu/workloads'
     )
 
     simulator_path, verilog_path = elaborate(sys, **conf)
@@ -425,38 +425,33 @@ def check():
     
 
 if __name__ == '__main__':
+    # Build the CPU Module only once
+    sys, simulator_path, verilog_path = build_cpu(depth_log=12)
+    print("minor-CPU built successfully!")
+    # Create tmp directory and clean it
+    if os.path.exists(f'{current_path}/tmp'):
+        shutil.rmtree(f'{current_path}/tmp')
+    os.mkdir(f'{current_path}/tmp')
+    # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         '0to100',
         # 'multiply',
     ]
-    depth_log = 12  # Adjust as needed
-    # create tmp directoryl; If it exist the empty it;
-    try:
-        if os.path.exists(f'{current_path}/tmp'):
-            shutil.rmtree(f'{current_path}/tmp')
-        os.mkdir(f'{current_path}/tmp')
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
-    # Copy workloads to tmp directory and rename to workload.*
+    # Iterate workloads
     for wl in workloads:
+        # Copy workloads to tmp directory and rename to workload.
         shutil.copy(f'{wl_path}/{wl}.exe', f'{current_path}/tmp/workload.exe')
         shutil.copy(f'{wl_path}/{wl}.data', f'{current_path}/tmp/workload.data')
         shutil.copy(f'{wl_path}/{wl}.config', f'{current_path}/tmp/workload.config')
         shutil.copy(f'{wl_path}/{wl}.sh', f'{current_path}/tmp/workload.sh')
-    # Build the CPU model once
-    sys, simulator_path, verilog_path = build_cpu(wl_path, depth_log)
-    print("CPU model built successfully!")
-    run_cpu(sys, simulator_path, verilog_path)
-    print("CPU model ran successfully!")
-
-    # # Run each workload
-    # for wl in workloads:
-    #     run_cpu(sys, fetcher_impl, executor, memory_access, fetcher, decoder, wl_path, wl, depth_log)
-
+        run_cpu(sys, simulator_path, verilog_path)
+    print("minor-CPU workloads ran successfully!")
+    #================================================================================================
+    # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
+    # # Define test cases
     # test_cases = [
-    #     #'rv32ui-p-add',
+    #     'rv32ui-p-add',
     #     #'rv32ui-p-addi',
     #     #'rv32ui-p-and',
     #     #'rv32ui-p-andi',
@@ -485,11 +480,16 @@ if __name__ == '__main__':
     #     #'rv32ui-p-sw',
     #     #'rv32ui-p-xori',
     # ]
-
     # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-
+    # # Iterate test cases
     # for case in test_cases:
-    #     run_cpu(tests, case, 9)
+    #     # Copy test cases to tmp directory and rename to workload.
+    #     shutil.copy(f'{tests}/{case}.exe', f'{current_path}/tmp/workload.exe')
+    #     shutil.copy(f'{tests}/{case}.data', f'{current_path}/tmp/workload.data')
+    #     shutil.copy(f'{tests}/{case}.config', f'{current_path}/tmp/workload.config')
+    #     shutil.copy(f'{tests}/{case}.sh', f'{current_path}/tmp/workload.sh')
+    #     run_cpu(sys, simulator_path, verilog_path)
+    # print("minor-CPU tests ran successfully!")
 
 
 
