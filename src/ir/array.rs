@@ -9,6 +9,17 @@ pub enum ArrayAttr {
   FullyPartitioned,
 }
 
+/// The initializer of an array.
+#[derive(Clone)]
+pub enum Initializer {
+  /// Intialize from a file
+  File(String),
+  /// Initialize from a list of values
+  Values(Vec<BaseNode>),
+  /// No initializer
+  None,
+}
+
 impl ArrayAttr {
   pub fn to_string(&self, _: &SysBuilder) -> String {
     match self {
@@ -22,7 +33,7 @@ pub struct Array {
   name: String,
   scalar_ty: DataType,
   size: usize,
-  init: Option<Vec<BaseNode>>,
+  init: Initializer,
   attrs: Vec<ArrayAttr>,
   pub(crate) user_set: HashSet<BaseNode>,
 }
@@ -38,7 +49,7 @@ impl Array {
     scalar_ty: DataType,
     name: String,
     size: usize,
-    init: Option<Vec<BaseNode>>,
+    init: Initializer,
     attrs: Vec<ArrayAttr>,
   ) -> Array {
     Self {
@@ -82,8 +93,8 @@ impl Array {
     self.scalar_ty.clone()
   }
 
-  pub fn get_initializer(&self) -> Option<&Vec<BaseNode>> {
-    self.init.as_ref()
+  pub fn get_initializer(&self) -> &Initializer {
+    &self.init
   }
 
   pub fn user(&self) -> &HashSet<BaseNode> {
@@ -106,10 +117,10 @@ impl SysBuilder {
     ty: DataType,
     name: &str,
     size: usize,
-    init: Option<Vec<BaseNode>>,
+    init: Initializer,
     attrs: Vec<ArrayAttr>,
   ) -> BaseNode {
-    if let Some(init) = &init {
+    if let Initializer::Values(init) = &init {
       assert_eq!(init.len(), size);
       init.iter().for_each(|x| {
         assert_eq!(x.get_dtype(self).unwrap(), ty);

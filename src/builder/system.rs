@@ -854,7 +854,7 @@ impl SysBuilder {
     size: usize,
     attrs: Vec<ArrayAttr>,
   ) -> BaseNode {
-    let instance = Array::new(ty.clone(), name.to_string(), size, None, attrs);
+    let instance = Array::new(ty.clone(), name.to_string(), size, array::Initializer::None, attrs);
     self.insert_element(instance)
   }
 }

@@ -13,8 +13,7 @@ class SRAM(Downstream): # pylint: disable=too-many-instance-attributes
         super().__init__()
         self.width = width
         self.depth = depth
-        self.init_file = init_file
-        self.payload = RegArray(Bits(width), depth, attr=[self])
+        self.payload = RegArray(Bits(width), depth, attr=[self], initializer=init_file)
         self.we = None
         self.re = None
         self.addr = None

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
   builder::SysBuilder,
   ir::{
-    array::{Array, ArrayAttr},
+    array::{Array, ArrayAttr, Initializer},
     instructions,
     node::{BaseNode, ExprRef, IsElement},
     visitor::Visitor,
@@ -61,9 +61,15 @@ pub fn rewrite_array_partitions(sys: &mut SysBuilder) {
     let (dtype, name, size, init) = {
       let array = array.as_ref::<Array>(sys).unwrap();
       let size = array.get_size();
-      let init = array
-        .get_initializer()
-        .map_or_else(|| vec![None; size], |x| x.iter().map(|x| Some(vec![*x])).collect::<Vec<_>>());
+      let init = match array.get_initializer() {
+        Initializer::Values(x) => {
+          x.iter().map(|x| Initializer::Values(vec![*x])).collect::<Vec<_>>()
+        }
+        Initializer::None => {
+          vec![Initializer::None; size]
+        }
+        Initializer::File(_) => unimplemented!(),
+      };
       (array.scalar_ty().clone(), array.get_name().to_string(), array.get_size(), init)
     };
     let partition = init

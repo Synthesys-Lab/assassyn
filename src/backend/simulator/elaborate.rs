@@ -6,6 +6,7 @@ use std::{
   process::Command,
 };
 
+use array::Initializer;
 use proc_macro2::Span;
 use quote::quote;
 
@@ -516,18 +517,21 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     let name = namify(array.get_name());
     let dtype = dtype_to_rust_type(&array.scalar_ty());
     fd.write_all(format!("pub {} : Array<{}>,", name, dtype,).as_bytes())?;
-    if let Some(init) = array.get_initializer() {
-      let init = init
-        .iter()
-        .map(|x| {
-          let int_imm = x.as_ref::<IntImm>(sys).unwrap();
-          int_imm_dumper_impl(&int_imm.dtype(), int_imm.get_value())
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-      simulator_init.push(format!("{} : Array::new_with_init(vec![{}]),", name, init));
-    } else {
-      simulator_init.push(format!("{} : Array::new({}),", name, array.get_size()));
+    match array.get_initializer() {
+      Initializer::None | Initializer::File(_) => {
+        simulator_init.push(format!("{} : Array::new({}),", name, array.get_size()));
+      }
+      Initializer::Values(init) => {
+        let init = init
+          .iter()
+          .map(|x| {
+            let int_imm = x.as_ref::<IntImm>(sys).unwrap();
+            int_imm_dumper_impl(&int_imm.dtype(), int_imm.get_value())
+          })
+          .collect::<Vec<_>>()
+          .join(", ");
+        simulator_init.push(format!("{} : Array::new_with_init(vec![{}]),", name, init));
+      }
     }
     registers.push(name);
   }
@@ -676,10 +680,10 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   for m in sys.module_iter(ModuleKind::Downstream) {
     for attr in m.get_attrs() {
       if let module::Attribute::MemoryParams(mp) = attr {
-        if let Some(init_file) = &mp.init_file {
+        let array = mp.pins.array.as_ref::<Array>(sys).unwrap();
+        if let Initializer::File(init_file) = array.get_initializer() {
           let init_file_path = config.resource_base.join(init_file);
           let init_file_path = init_file_path.to_str().unwrap();
-          let array = mp.pins.array.as_ref::<Array>(sys).unwrap();
           let array_name = syn::Ident::new(&namify(array.get_name()), Span::call_site());
           fd.write_all(
             quote::quote! { load_hex_file(&mut sim.#array_name.payload, #init_file_path); }

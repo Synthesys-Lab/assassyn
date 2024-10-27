@@ -48,7 +48,7 @@ class Array:
     def name(self, name):
         self._name = name
 
-    def __init__(self, scalar_ty: DType, size: int, attr: list, initializer: list):
+    def __init__(self, scalar_ty: DType, size: int, attr: list, initializer: [list, str]):
         assert isinstance(scalar_ty, DType)
         self.scalar_ty = scalar_ty
         self.size = size

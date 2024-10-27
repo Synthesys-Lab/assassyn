@@ -9,7 +9,6 @@ pub struct MemoryParams {
   pub width: usize,
   pub depth: usize,
   pub lat: RangeInclusive<usize>,
-  pub init_file: Option<String>,
   pub pins: MemoryPins,
 }
 
@@ -50,14 +49,12 @@ impl MemoryParams {
     width: usize,
     depth: usize,
     lat: RangeInclusive<usize>,
-    init_file: Option<String>,
     pins: MemoryPins,
   ) -> Self {
     Self {
       width,
       depth,
       lat,
-      init_file,
       pins,
     }
   }
@@ -68,11 +65,10 @@ impl MemoryParams {
 
   pub fn to_string(&self, sys: &SysBuilder) -> String {
     format!(
-      "width: {}, depth: {}, lat: [{:?}], file: {}, pins: {}",
+      "width: {}, depth: {}, lat: [{:?}], pins: {}",
       self.width,
       self.depth,
       self.lat,
-      self.init_file.clone().map_or("None".to_string(), |x| x),
       self.pins.to_string(sys),
     )
   }

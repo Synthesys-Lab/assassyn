@@ -110,15 +110,6 @@ def const_int_wrapper(value: int, ty: str):
         assert value[2:].isnumeric() and len(value) <= 18, f'Int too large: {value}'
     return f'sys.get_const_int({ty}, {value} as u64)'
 
-def generate_init_value(init_value, ty: str):
-    '''Generate the initial value for the given array'''
-    if init_value is None:
-        return ("\n", "None")
-    str1 = f'let init_val = {const_int_wrapper(init_value, ty)};'
-    str2 = 'Some(vec![init_val])'
-
-    return (str1, str2)
-
 def generate_port(port: Port):
     '''Generate the port information for the given port for module construction'''
     ty = f'{generate_dtype(port.dtype)}'
@@ -155,15 +146,11 @@ class CodeGen(visitor.Visitor):
         if isinstance(m, module.SRAM):
             module_mut = f'{var_id}.as_mut::<assassyn::ir::Module>(&mut sys).unwrap()'
             path = 'assassyn::ir::module'
-            # (width, depth, init_file, we, re, addr, wdata)
+            # (width, depth, we, re, addr, wdata)
             params = [f'{path}::attrs::MemoryParams::new(']
             params.append(f'{m.width}, // width')
             params.append(f'{m.depth}, // depth')
             params.append('1..=1, // lat')
-            if m.init_file is not None:
-                params.append(f'Some("{m.init_file}".into()), // init-file')
-            else:
-                params.append('None, // init-file')
             params.append(f'{path}::attrs::MemoryPins::new(')
             params.append(f'{self.generate_rval(m.payload)}, // array')
             params.append(f'{self.generate_rval(m.re)}, // re')
@@ -192,16 +179,22 @@ class CodeGen(visitor.Visitor):
     def generate_init_value(self, init_value, ty: str):
         '''Generate the initializer vector. NOTE: ty is already generated in an str!'''
         if init_value is None:
-            return 'None'
+            return 'assassyn::ir::Initializer::None'
 
-        vec = []
-        for i, j in enumerate(init_value):
-            self.code.append(f'let init_{i} = {const_int_wrapper(j, ty)};')
-            vec.append(f'init_{i}')
+        if isinstance(init_value, list):
 
-        self.code.append(f'let init = vec![{", ".join(vec)}];')
+            vec = []
+            for i, j in enumerate(init_value):
+                self.code.append(f'let init_{i} = {const_int_wrapper(j, ty)};')
+                vec.append(f'init_{i}')
+            self.code.append(f'let init = vec![{", ".join(vec)}];')
 
-        return 'Some(init)'
+            return 'assassyn::ir::Initializer::Values(init)'
+
+        elif isinstance(init_value, str):
+            return f'assassyn::ir::Initializer::File("{init_value}".into())'
+
+        assert False, f'Unsupported initializer {init_value}'
 
 
     # pylint: disable=too-many-locals, too-many-statements

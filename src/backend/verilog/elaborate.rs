@@ -7,6 +7,7 @@ use std::{
 
 use std::cell::RefCell;
 
+use array::Initializer;
 use instructions::FIFOPush;
 // use instructions::FIFOPush;
 // use regex::Regex;
@@ -229,7 +230,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       if mem_init_path.is_some() {
         // Read from memory initialization file
         res.push_str(&format!("      $readmemh(\"{}\", {q});\n", mem_init_path.unwrap()));
-      } else if let Some(initializer) = array.get_initializer() {
+      } else if let Initializer::Values(initializer) = array.get_initializer() {
         // Read from the hardcoded initializer
         res.push_str("    begin\n");
         for (idx, value) in initializer.iter().enumerate() {
@@ -568,7 +569,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       self.collect_array_memory_params(&m);
       for attr in m.get_attrs() {
         if let module::Attribute::MemoryParams(mp) = attr {
-          if let Some(init_file) = &mp.init_file {
+          let array = mp.pins.array.as_ref::<Array>(self.sys).unwrap();
+          if let Initializer::File(init_file) = &array.get_initializer() {
             let mut init_file_path = self.config.resource_base.clone();
             init_file_path.push(init_file);
             let init_file_path = init_file_path.to_str().unwrap();
@@ -834,8 +836,7 @@ module {} (
       0,          // width
       0,          // depth
       0..=0,      // lat
-      None,       // init_file
-      empty_pins, // 假设 `MemoryPins` 有一个 `new` 方法
+      empty_pins,      // empty pins
     );
     let mut init_file_path = self.config.resource_base.clone();
 
@@ -864,7 +865,8 @@ module {} (
               //memory_params.depth = mem.depth;
               //memory_params.width = mem.width;
               memory_params = mem.clone();
-              if let Some(init_file) = &mem.init_file {
+              let array = mem.pins.array.as_ref::<Array>(self.sys).unwrap();
+              if let Initializer::File(init_file) = array.get_initializer() {
                 init_file_path.push(init_file);
                 let init_file_path = init_file_path.to_str().unwrap();
                 res.push_str(&format!("  /* {} */\n", init_file_path));

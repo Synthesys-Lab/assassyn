@@ -10,7 +10,7 @@ pub mod port;
 pub mod user;
 pub mod visitor;
 
-pub use array::{Array, ArrayAttr};
+pub use array::{Array, ArrayAttr, Initializer};
 pub use block::Block;
 pub use data::{DataType, IntImm, StrImm, Typed};
 pub use expr::{Expr, Opcode};
