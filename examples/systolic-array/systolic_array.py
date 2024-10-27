@@ -21,7 +21,7 @@ class ProcElem():
 class Sink(Module):
     
     def __init__(self, port_name='_v'):
-        super().__init__(no_arbiter=True, ports={port_name: Port(Int(16))})
+        super().__init__(no_arbiter=True, ports={port_name: Port(Int(8))})
 
     @module.combinational
     def build(self):
@@ -31,7 +31,7 @@ class Sink(Module):
 class ComputePE(Module):
 
     def __init__(self):
-        super().__init__(no_arbiter=True, ports={'west': Port(Int(16)), 'north': Port(Int(16))})
+        super().__init__(no_arbiter=True, ports={'west': Port(Int(8)), 'north': Port(Int(8))})
         self.acc = RegArray(Int(16), 1)
 
     @module.combinational
@@ -45,8 +45,8 @@ class ComputePE(Module):
         log("Mac value: {} * {} + {} = {}", west, north, val, mac)
         acc[0] = mac
 
-        res_east = east.bind(west = west.bitcast(Int(16)))
-        res_south = south.bind(north = north.bitcast(Int(16)))
+        res_east = east.bind(west = west)
+        res_south = south.bind(north = north)
         if res_east.is_fully_bound():
             res_east = res_east.async_called()
         if res_south.is_fully_bound():
@@ -64,7 +64,7 @@ class Pusher(Module):
     def build(self, direction: str, dest: Bind):
         data = self.pop_all_ports(False)
         log(f"{self.name} pushes {{}}", data)
-        kwargs = {direction: data.bitcast(Int(16))}
+        kwargs = {direction: data}
         new_bind = dest.bind(**kwargs)
         if new_bind.is_fully_bound():
             res = new_bind.async_called()
@@ -206,7 +206,7 @@ def build_pe_array(sys):
             fwest, fnorth = res[i][j].pe.build(
                     res[i][j + 1].bound,
                     res[i + 1][j].bound)
-            sys.expose_on_top(res[i][j].pe.acc,kind='Output')
+            sys.expose_on_top(res[i][j].pe.acc, kind='Output')
             res[i][j + 1].bound = fwest
             res[i + 1][j].bound = fnorth
 
