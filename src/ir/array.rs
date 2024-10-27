@@ -60,6 +60,10 @@ impl Array {
     self.size
   }
 
+  pub fn get_flattened_size(&self) -> usize {
+    self.get_size() * self.scalar_ty().get_bits()
+  }
+
   pub fn get_idx_type(&self) -> DataType {
     let bits = self.size.ilog2().max(1);
     let bits = if 1 << bits < self.size {

@@ -20,8 +20,8 @@ class Driver(Module):
         v0 = v0 * UInt(32)(12345)
         v1 = v1 * UInt(32)(54321)
         
-        rand0 = v0 + UInt(32)(67890)
-        rand1 = v1 + UInt(32)(9876)
+        rand0 = v0 + UInt(64)(67890)
+        rand1 = v1 + UInt(64)(9876)
 
         rand0 = rand0[0: 31].bitcast(UInt(32))
         rand1 = rand1[0: 31].bitcast(UInt(32))
