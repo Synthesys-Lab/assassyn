@@ -1290,13 +1290,15 @@ module memory_blackbox_{a} #(
 
         res.push_str(&format!("$display(\"%t\\t[{}]\\t\\t", self.current_module));
         res.push_str(&format_str);
-        res.push_str("\",
+        res.push_str(
+          "\",
 `ifndef SYNTHESIS
   $time - 200
 `else
   $time
 `endif
-, ");
+, ",
+        );
         for elem in expr.operand_iter().skip(1) {
           res.push_str(&format!("{}, ", dump_ref(self.sys, elem.get_value(), false)));
         }
@@ -1331,7 +1333,8 @@ module memory_blackbox_{a} #(
           _ => {
             panic!("Unexpected reference type: {:?}", load.idx());
           }
-        }.into()
+        }
+        .into()
       }
 
       Opcode::Store => {
@@ -1504,10 +1507,13 @@ module memory_blackbox_{a} #(
       Opcode::BlockIntrinsic { intrinsic } => match intrinsic {
         subcode::BlockIntrinsic::Finish => {
           let pred = self.get_pred().unwrap_or("1".to_string());
-          format!("
+          format!(
+            "
 `ifndef SYNTHESIS
   always_ff @(posedge clk) if (executed && {}) $finish();
-`endif\n", pred)
+`endif\n",
+            pred
+          )
         }
         subcode::BlockIntrinsic::Assert => {
           let assert = expr.as_sub::<instructions::BlockIntrinsic>().unwrap();
