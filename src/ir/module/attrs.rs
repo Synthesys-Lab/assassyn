@@ -45,12 +45,7 @@ impl MemoryPins {
 }
 
 impl MemoryParams {
-  pub fn new(
-    width: usize,
-    depth: usize,
-    lat: RangeInclusive<usize>,
-    pins: MemoryPins,
-  ) -> Self {
+  pub fn new(width: usize, depth: usize, lat: RangeInclusive<usize>, pins: MemoryPins) -> Self {
     Self {
       width,
       depth,

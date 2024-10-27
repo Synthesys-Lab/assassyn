@@ -62,9 +62,10 @@ pub fn rewrite_array_partitions(sys: &mut SysBuilder) {
       let array = array.as_ref::<Array>(sys).unwrap();
       let size = array.get_size();
       let init = match array.get_initializer() {
-        Initializer::Values(x) => {
-          x.iter().map(|x| Initializer::Values(vec![*x])).collect::<Vec<_>>()
-        }
+        Initializer::Values(x) => x
+          .iter()
+          .map(|x| Initializer::Values(vec![*x]))
+          .collect::<Vec<_>>(),
         Initializer::None => {
           vec![Initializer::None; size]
         }

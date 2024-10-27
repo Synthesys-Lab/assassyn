@@ -836,7 +836,7 @@ module {} (
       0,          // width
       0,          // depth
       0..=0,      // lat
-      empty_pins,      // empty pins
+      empty_pins, // empty pins
     );
     let mut init_file_path = self.config.resource_base.clone();
 
