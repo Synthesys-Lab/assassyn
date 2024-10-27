@@ -550,11 +550,11 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     // array -> init_file_path
     for array in self.sys.array_iter() {
-          if let Initializer::File(init_file) = &array.get_initializer() {
-            let mut init_file_path = self.config.resource_base.clone();
-            init_file_path.push(init_file);
-            let init_file_path = init_file_path.to_str().unwrap();
-            mem_init_map.insert(array.upcast(), init_file_path.to_string());
+      if let Initializer::File(init_file) = &array.get_initializer() {
+        let mut init_file_path = self.config.resource_base.clone();
+        init_file_path.push(init_file);
+        let init_file_path = init_file_path.to_str().unwrap();
+        mem_init_map.insert(array.upcast(), init_file_path.to_string());
       }
     }
     for (key, value) in &mem_init_map {
