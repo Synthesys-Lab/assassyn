@@ -182,7 +182,6 @@ class CodeGen(visitor.Visitor):
             return 'assassyn::ir::Initializer::None'
 
         if isinstance(init_value, list):
-
             vec = []
             for i, j in enumerate(init_value):
                 self.code.append(f'let init_{i} = {const_int_wrapper(j, ty)};')
@@ -190,11 +189,8 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'let init = vec![{", ".join(vec)}];')
 
             return 'assassyn::ir::Initializer::Values(init)'
-
-        elif isinstance(init_value, str):
-            return f'assassyn::ir::Initializer::File("{init_value}".into())'
-
-        assert False, f'Unsupported initializer {init_value}'
+        assert isinstance(init_value, str)
+        return f'assassyn::ir::Initializer::File("{init_value}".into())'
 
 
     # pylint: disable=too-many-locals, too-many-statements
