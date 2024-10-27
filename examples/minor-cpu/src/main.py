@@ -1,7 +1,7 @@
 ''' A simplest single issue RISCV CPU, which has no operand buffer.
 '''
-
-import pytest
+import os
+import shutil
 
 from assassyn.frontend import *
 from assassyn.backend import *
@@ -12,8 +12,9 @@ from decoder import *
 from writeback import *
 from memory_access import *
 
-offset = None
-data_offset = None
+offset = UInt(32)(0)
+data_offset = UInt(32)(0xb8)
+current_path = os.path.dirname(os.path.abspath(__file__))
 
 class Execution(Module):
     
@@ -301,22 +302,10 @@ class Driver(Module):
     def build(self, fetcher: Module):
         fetcher.async_called()
 
-def run_cpu(resource_base, workload, depth_log):
+def build_cpu(resource_base, depth_log):
     sys = SysBuilder('minor_cpu')
 
     with sys:
-
-        with open(f'{resource_base}/{workload}.config') as f:
-            global offset, data_offset
-            raw = f.readline()
-            raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
-            offsets = eval(raw)
-            print(offsets)
-            offset = offsets['offset']
-            data_offset = offsets['data_offset']
-            offset = UInt(32)(offset)
-            data_offset = UInt(32)(data_offset)
-
         # Data Types
         bits1   = Bits(1)
         bits5   = Bits(5)
@@ -346,7 +335,6 @@ def run_cpu(resource_base, workload, depth_log):
 
         executor = Execution()
 
-        data_init = f'{workload}.data' if os.path.exists(f'{resource_base}/{workload}.data') else None
 
         br_sm, ex_bypass, wb, exec_rd = executor.build(
             pc = pc_reg,
@@ -359,7 +347,7 @@ def run_cpu(resource_base, workload, depth_log):
             csr_f = csr_file,
             memory = memory_access,
             writeback = writeback,
-            data = data_init,
+            data = f'{current_path}/tmp/workload.data',
             depth_log = depth_log
         )
 
@@ -372,7 +360,7 @@ def run_cpu(resource_base, workload, depth_log):
         decoder = Decoder()
         on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{workload}.exe', depth_log)
+        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{current_path}/tmp/workload.exe', depth_log)
 
         onwrite_downstream = Onwrite()
     
@@ -395,27 +383,40 @@ def run_cpu(resource_base, workload, depth_log):
 
     simulator_path, verilog_path = elaborate(sys, **conf)
 
+    # Return the built system and relevant components
+    return sys, simulator_path, verilog_path
+
+
+def run_cpu(sys, simulator_path, verilog_path):
+    with sys:
+        with open(f'{current_path}/tmp/workload.config') as f:
+            global offset, data_offset
+            raw = f.readline()
+            raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
+            offsets = eval(raw)
+            offset = offsets['offset']
+            data_offset = offsets['data_offset']
+            offset = UInt(32)(offset)
+            data_offset = UInt(32)(data_offset)
     raw = utils.run_simulator(simulator_path)
     open('raw.log', 'w').write(raw)
-    test = f'{resource_base}/find_pass.sh'
-    check(resource_base, workload)
+    check()
 
     raw = utils.run_verilator(verilog_path)
     open('raw.log', 'w').write(raw)
-    check(resource_base, workload)
-
+    check()
     os.remove('raw.log')
 
 
-def check(resource_base, test):
+def check():
 
-    script = f'{resource_base}/{test}.sh'
+    script = f'{current_path}/tmp/workload.sh'
     if os.path.exists(script):
-        res = subprocess.run([script, 'raw.log', f'{resource_base}/{test}.data'])
+        res = subprocess.run([script, 'raw.log', f'{current_path}/tmp/workload.data'])
     else:
-        script = f'{resource_base}/../utils/find_pass.sh'
+        script = f'{current_path}/../utils/find_pass.sh'
         res = subprocess.run([script, 'raw.log'])
-    assert res.returncode == 0, f'Failed test {test}'
+    assert res.returncode == 0, f'Failed test: {res.returncode}'
     print('Test passed!!!')
     
 
@@ -423,44 +424,68 @@ if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         '0to100',
-        #'multiply',
+        # 'multiply',
     ]
+    depth_log = 12  # Adjust as needed
+    # create tmp directoryl; If it exist the empty it;
+    try:
+        if os.path.exists(f'{current_path}/tmp'):
+            shutil.rmtree(f'{current_path}/tmp')
+        os.mkdir(f'{current_path}/tmp')
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    # Copy workloads to tmp directory and rename to workload.*
     for wl in workloads:
-        run_cpu(wl_path, wl, 16)
+        shutil.copy(f'{wl_path}/{wl}.exe', f'{current_path}/tmp/workload.exe')
+        shutil.copy(f'{wl_path}/{wl}.data', f'{current_path}/tmp/workload.data')
+        shutil.copy(f'{wl_path}/{wl}.config', f'{current_path}/tmp/workload.config')
+        shutil.copy(f'{wl_path}/{wl}.sh', f'{current_path}/tmp/workload.sh')
+    # Build the CPU model once
+    sys, simulator_path, verilog_path = build_cpu(wl_path, depth_log)
+    print("CPU model built successfully!")
+    run_cpu(sys, simulator_path, verilog_path)
+    print("CPU model ran successfully!")
 
-    test_cases = [
-        #'rv32ui-p-add',
-        #'rv32ui-p-addi',
-        #'rv32ui-p-and',
-        #'rv32ui-p-andi',
-        #'rv32ui-p-auipc',
-        #'rv32ui-p-beq',
-        #'rv32ui-p-bge',
-        #'rv32ui-p-bgeu',
-        #'rv32ui-p-blt',
-        #'rv32ui-p-bltu',
-        #'rv32ui-p-bne',
-        #'rv32ui-p-jal',
-        #'rv32ui-p-jalr',
-        #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
-        #'rv32ui-p-lui',
-        #'rv32ui-p-lw',
-        #'rv32ui-p-or',
-        #'rv32ui-p-ori',
-        #'rv32ui-p-sb',#TO CHECK
-        #'rv32ui-p-sll',
-        #'rv32ui-p-slli',
-        #'rv32ui-p-sltu',
-        #'rv32ui-p-srai',
-        #'rv32ui-p-srl',
-        #'rv32ui-p-srli',
-        #'rv32ui-p-sub',
-        #'rv32ui-p-sw',
-        #'rv32ui-p-xori',
-    ]
+    # # Run each workload
+    # for wl in workloads:
+    #     run_cpu(sys, fetcher_impl, executor, memory_access, fetcher, decoder, wl_path, wl, depth_log)
 
-    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    # test_cases = [
+    #     #'rv32ui-p-add',
+    #     #'rv32ui-p-addi',
+    #     #'rv32ui-p-and',
+    #     #'rv32ui-p-andi',
+    #     #'rv32ui-p-auipc',
+    #     #'rv32ui-p-beq',
+    #     #'rv32ui-p-bge',
+    #     #'rv32ui-p-bgeu',
+    #     #'rv32ui-p-blt',
+    #     #'rv32ui-p-bltu',
+    #     #'rv32ui-p-bne',
+    #     #'rv32ui-p-jal',
+    #     #'rv32ui-p-jalr',
+    #     #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
+    #     #'rv32ui-p-lui',
+    #     #'rv32ui-p-lw',
+    #     #'rv32ui-p-or',
+    #     #'rv32ui-p-ori',
+    #     #'rv32ui-p-sb',#TO CHECK
+    #     #'rv32ui-p-sll',
+    #     #'rv32ui-p-slli',
+    #     #'rv32ui-p-sltu',
+    #     #'rv32ui-p-srai',
+    #     #'rv32ui-p-srl',
+    #     #'rv32ui-p-srli',
+    #     #'rv32ui-p-sub',
+    #     #'rv32ui-p-sw',
+    #     #'rv32ui-p-xori',
+    # ]
 
-    for case in test_cases:
-        run_cpu(tests, case, 9)
+    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+
+    # for case in test_cases:
+    #     run_cpu(tests, case, 9)
+
+
 
