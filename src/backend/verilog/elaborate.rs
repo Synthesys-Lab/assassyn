@@ -621,7 +621,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       let q = display.field("q");
       if *kind == ExposeKind::Output {
         let o = display.field("exposed");
-        res.push_str(&format!("  assign {o} = {q}[0];\n"));
+        res.push_str(&format!("  assign {o} = {q};\n"));
       }
     }
 
@@ -658,12 +658,12 @@ logic rst_n;
     )?;
 
     for (exposed_node, kind) in self.sys.exposed_nodes() {
-      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
-      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
-      let msb = exposed_nodes_ref.scalar_ty().get_bits() - 1;
+      let array_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+      let display = utils::DisplayInstance::from_array(&array_ref);
+      let bits = array_ref.scalar_ty().get_bits() * array_ref.get_size() - 1;
       if *kind == ExposeKind::Output {
         let o = display.field("exposed");
-        fd.write_all(format!("logic [{msb}:0]{o};\n",).as_bytes())?;
+        fd.write_all(format!("logic [{bits}:0]{o};\n",).as_bytes())?;
       }
     }
 
