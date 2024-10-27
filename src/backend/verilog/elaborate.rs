@@ -1334,7 +1334,6 @@ module memory_blackbox_{a} #(
             panic!("Unexpected reference type: {:?}", load.idx());
           }
         }
-        .into()
       }
 
       Opcode::Store => {
