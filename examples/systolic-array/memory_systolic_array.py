@@ -19,12 +19,12 @@ from systolic_array import ProcElem, Sink, Pusher, ComputePE, check_raw, build_p
 class Distributor(Module):
 
     def __init__(self):
-        super().__init__(no_arbiter=True, ports={'rdata': Port(Bits(128))})
+        super().__init__(no_arbiter=True, ports={'rdata': Port(Bits(32))})
 
     @module.combinational
     def build(self, pushers):
 
-        width = 128
+        width = 32
 
         sm_ity = Int(8)
         cnt = RegArray(sm_ity, 1, initializer=[0])
@@ -38,26 +38,26 @@ class Distributor(Module):
 
         self.timing = 'systolic'
 
-        buffer_idx = [slice(i * 32, i * 32 + 31) for i in range(3, -1, -1)]
+        buffer_idx = [slice(i * 8, i * 8 + 7) for i in range(3, -1, -1)]
         print(buffer_idx)
 
         buffer_related = []
 
         with Condition(cond):
             rdata = self.rdata.pop()
-            rdata = rdata.bitcast(Int(128))
+            rdata = rdata.bitcast(Int(32))
 
             for i in range(4):
                 with Condition(sm_cnt == sm_ity(i)):
                     buffer[i] = rdata
                     for p_idx, b_idx in zip(buffer_related, reversed(buffer_related)):
-                        pushers[p_idx].async_called(data = buffer[p_idx][buffer_idx[b_idx]].bitcast(Int(32)))
+                        pushers[p_idx].async_called(data = buffer[p_idx][buffer_idx[b_idx]].bitcast(Int(8)))
                 buffer_related.append(i)
 
         for i in range(4, 8):
             with Condition(sm_cnt == sm_ity(i)):
                 for p_idx, b_idx in zip(buffer_related, reversed(buffer_related)):
-                    pushers[p_idx].async_called(data = buffer[p_idx][buffer_idx[b_idx]].bitcast(Int(32)))
+                    pushers[p_idx].async_called(data = buffer[p_idx][buffer_idx[b_idx]].bitcast(Int(8)))
             buffer_related = buffer_related[1:]
 
 class Driver(Module):
@@ -104,8 +104,8 @@ def mem_systolic_array(sys_name, init_file_row, init_file_col, resource_base):
         pe_array = build_pe_array(sys)
 
         # Build the SRAM module
-        memory_R = SRAM(width=128, depth=1024, init_file=init_file_row) 
-        memory_C = SRAM(width=128, depth=1024, init_file=init_file_col)
+        memory_R = SRAM(width=32, depth=1024, init_file=init_file_row) 
+        memory_C = SRAM(width=32, depth=1024, init_file=init_file_col)
 
         # Build the Distributor
         rd = Distributor()
