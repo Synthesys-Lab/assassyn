@@ -422,8 +422,8 @@ def check(resource_base, test):
 if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        #'0to100',
-        'multiply',
+        '0to100',
+        #'multiply',
     ]
     for wl in workloads:
         run_cpu(wl_path, wl, 16)
