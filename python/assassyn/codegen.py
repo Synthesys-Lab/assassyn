@@ -249,6 +249,14 @@ class CodeGen(visitor.Visitor):
             self.emit_memory_attrs(elem, var)
             self.visit_module(elem)
 
+        for elem , kind in node.exposed_nodes.items():
+            name = elem.name if f'{id(elem)}' in elem.name else self.generate_rval(elem)
+            if kind is None:
+                kind = 'Inout'
+            self.code.append(
+                f'  sys.expose_to_top({elem.name}, '
+                f'assassyn::builder::system::ExposeKind::{kind});'
+            )
 
         config = self.emit_config()
         self.code.append(f'''
