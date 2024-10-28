@@ -847,16 +847,6 @@ impl SysBuilder {
     }
   }
 
-  pub fn create_custom_basenode(
-    &mut self,
-    ty: DataType,
-    name: &str,
-    size: usize,
-    attrs: Vec<ArrayAttr>,
-  ) -> BaseNode {
-    let instance = Array::new(ty.clone(), name.to_string(), size, None, attrs);
-    self.insert_element(instance)
-  }
 }
 
 impl Display for SysBuilder {
