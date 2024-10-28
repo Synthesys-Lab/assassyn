@@ -225,7 +225,6 @@ impl Visitor<String> for ElaborateModule<'_> {
         let store = expr.as_sub::<instructions::Store>().unwrap();
         let (array, idx) = (store.array(), store.idx());
         let idx = dump_rval_ref(self.module_ctx, store.get().sys, &idx);
-        println!("Parsed idx (before TokenStream parsing): {}", idx);
         let idx = idx.parse::<proc_macro2::TokenStream>().unwrap();
         let value = dump_rval_ref(self.module_ctx, self.sys, &store.value());
         let value = value.parse::<proc_macro2::TokenStream>().unwrap();

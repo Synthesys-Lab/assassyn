@@ -1225,7 +1225,7 @@ module memory_blackbox_{a} #(
         let bin = expr.as_sub::<instructions::Binary>().unwrap();
         format!(
           "{} {} {}",
-          dump_ref!(self.sys, &bin.a()),
+          dump_arith_ref(self.sys, &bin.a()),
           if matches!(binop, subcode::Binary::Shr) {
             if dtype.is_signed() {
               ">>>".into()
@@ -1235,7 +1235,7 @@ module memory_blackbox_{a} #(
           } else {
             binop.to_string()
           },
-          dump_ref!(self.sys, &bin.b())
+          dump_arith_ref(self.sys, &bin.b())
         )
       }
 
