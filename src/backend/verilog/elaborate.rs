@@ -1220,26 +1220,25 @@ module memory_blackbox_{a} #(
     let mut is_pop = None;
 
     let body = match expr.get_opcode() {
-
-        Opcode::Binary { binop } => {
-          let dtype = expr.dtype();
-          let bin = expr.as_sub::<instructions::Binary>().unwrap();
-          format!(
-            "{} {} {}",
-            dump_ref!(self.sys, &bin.a()),
-            if matches!(binop, subcode::Binary::Shr) {
-              if dtype.is_signed() {
-                ">>>".into()
-              } else {
-                ">>".into()
-              }
+      Opcode::Binary { binop } => {
+        let dtype = expr.dtype();
+        let bin = expr.as_sub::<instructions::Binary>().unwrap();
+        format!(
+          "{} {} {}",
+          dump_ref!(self.sys, &bin.a()),
+          if matches!(binop, subcode::Binary::Shr) {
+            if dtype.is_signed() {
+              ">>>".into()
             } else {
-              binop.to_string()
-            },
-            dump_ref!(self.sys, &bin.b())
-          )
-        }
-  
+              ">>".into()
+            }
+          } else {
+            binop.to_string()
+          },
+          dump_ref!(self.sys, &bin.b())
+        )
+      }
+
       Opcode::Unary { ref uop } => {
         let dump = match uop {
           subcode::Unary::Flip => "~",
