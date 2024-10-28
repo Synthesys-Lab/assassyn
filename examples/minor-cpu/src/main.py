@@ -443,49 +443,50 @@ if __name__ == '__main__':
         shutil.copy(f'{wl_path}/{wl}.sh', f'{current_path}/tmp/workload.sh')
         run_cpu(sys, simulator_path, verilog_path)
     print("minor-CPU workloads ran successfully!")
+
     #================================================================================================
     # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
-    # # Define test cases
-    # test_cases = [
-    #     'rv32ui-p-add',
-    #     #'rv32ui-p-addi',
-    #     #'rv32ui-p-and',
-    #     #'rv32ui-p-andi',
-    #     #'rv32ui-p-auipc',
-    #     #'rv32ui-p-beq',
-    #     #'rv32ui-p-bge',
-    #     #'rv32ui-p-bgeu',
-    #     #'rv32ui-p-blt',
-    #     #'rv32ui-p-bltu',
-    #     #'rv32ui-p-bne',
-    #     #'rv32ui-p-jal',
-    #     #'rv32ui-p-jalr',
-    #     #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
-    #     #'rv32ui-p-lui',
-    #     #'rv32ui-p-lw',
-    #     #'rv32ui-p-or',
-    #     #'rv32ui-p-ori',
-    #     #'rv32ui-p-sb',#TO CHECK
-    #     #'rv32ui-p-sll',
-    #     #'rv32ui-p-slli',
-    #     #'rv32ui-p-sltu',
-    #     #'rv32ui-p-srai',
-    #     #'rv32ui-p-srl',
-    #     #'rv32ui-p-srli',
-    #     #'rv32ui-p-sub',
-    #     #'rv32ui-p-sw',
-    #     #'rv32ui-p-xori',
-    # ]
-    # tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    # # Iterate test cases
-    # for case in test_cases:
-    #     # Copy test cases to tmp directory and rename to workload.
-    #     shutil.copy(f'{tests}/{case}.exe', f'{current_path}/tmp/workload.exe')
-    #     shutil.copy(f'{tests}/{case}.data', f'{current_path}/tmp/workload.data')
-    #     shutil.copy(f'{tests}/{case}.config', f'{current_path}/tmp/workload.config')
-    #     shutil.copy(f'{tests}/{case}.sh', f'{current_path}/tmp/workload.sh')
-    #     run_cpu(sys, simulator_path, verilog_path)
-    # print("minor-CPU tests ran successfully!")
+    # Define test cases
+    test_cases = [
+        'rv32ui-p-add',
+        #'rv32ui-p-addi',
+        #'rv32ui-p-and',
+        #'rv32ui-p-andi',
+        #'rv32ui-p-auipc',
+        #'rv32ui-p-beq',
+        #'rv32ui-p-bge',
+        #'rv32ui-p-bgeu',
+        #'rv32ui-p-blt',
+        #'rv32ui-p-bltu',
+        #'rv32ui-p-bne',
+        #'rv32ui-p-jal',
+        #'rv32ui-p-jalr',
+        #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
+        #'rv32ui-p-lui',
+        #'rv32ui-p-lw',
+        #'rv32ui-p-or',
+        #'rv32ui-p-ori',
+        #'rv32ui-p-sb',#TO CHECK
+        #'rv32ui-p-sll',
+        #'rv32ui-p-slli',
+        #'rv32ui-p-sltu',
+        #'rv32ui-p-srai',
+        #'rv32ui-p-srl',
+        #'rv32ui-p-srli',
+        #'rv32ui-p-sub',
+        #'rv32ui-p-sw',
+        #'rv32ui-p-xori',
+    ]
+    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+    # Iterate test cases
+    for case in test_cases:
+        # Copy test cases to tmp directory and rename to workload.
+        shutil.copy(f'{tests}/{case}.exe', f'{current_path}/tmp/workload.exe')
+        shutil.copy(f'{tests}/{case}.data', f'{current_path}/tmp/workload.data')
+        shutil.copy(f'{tests}/{case}.config', f'{current_path}/tmp/workload.config')
+        shutil.copy(f'{tests}/{case}.sh', f'{current_path}/tmp/workload.sh')
+        run_cpu(sys, simulator_path, verilog_path)
+    print("minor-CPU tests ran successfully!")
 
 
 
