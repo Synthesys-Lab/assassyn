@@ -144,16 +144,19 @@ class Testbench(Module):
         # 15 P P P  P
         # build_call(slice(3, 4), [15])
 
-        for i in range(1, 2 * array_size):
-            if i <= array_size:
-                slice_range = slice(0, i)
-                values = [j * array_size + (i - j - 1) for j in range(i)
-                            if j * array_size + (i - j - 1) < array_size * array_size]
-            else:
-                slice_range = slice(i - array_size, array_size)
-                values = [(i - array_size + j) * array_size + (array_size - j - 1)
-                            for j in range(2 * array_size - i)
-                            if (i - array_size + j) * array_size + (array_size - j - 1) < array_size * array_size]
+        for i in range(1, array_size + 1):
+            slice_range = slice(0, i)
+            values = [j * array_size + (i - j - 1) for j in range(i)
+                        if j * array_size + (i - j - 1) < array_size * array_size]
+
+            with Cycle(i):
+                build_call(slice_range, values)
+
+        for i in range(array_size + 1, 2 * array_size):
+            slice_range = slice(i - array_size, array_size)
+            values = [(i - array_size + j) * array_size + (array_size - j - 1)
+                        for j in range(2 * array_size - i)
+                        if (i - array_size + j) * array_size + (array_size - j - 1) < array_size * array_size]
 
             with Cycle(i):
                 build_call(slice_range, values)
