@@ -77,68 +77,86 @@ class Testbench(Module):
         super().__init__(ports={}, no_arbiter=True)
 
     @module.combinational
-    def build(self, rows, cols):
+    def build(self, rows, cols, array_size):
 
         def build_call(x, data):
             for row, col, data in zip(rows[x], cols[x], data):
                 row.async_called(data = Int(8)(data))
                 col.async_called(data = Int(8)(data))
 
-        with Cycle(1):
+
+        # Example:
+        # array_size = 4
+        
+        # Cycle 1:
             # 1 0
             # 0 P P P  P
             #   P P P  P
             #   P P P  P
             #   P P P  P        
-            build_call(slice(0, 1), [0])
+            # build_call(slice(0, 1), [0])
 
-        with Cycle(2):
+        # Cycle 2:
             # 2 1 4
             # 1 P P P  P
             # 4 P P P  P
             #   P P P  P
             #   P P P  P            
-            build_call(slice(0, 2), [1, 4])
+            # build_call(slice(0, 2), [1, 4])
 
-        with Cycle(3):
+        # Cycle 3:
             # 3 2 5 8
             # 2 P P P  P
             # 5 P P P  P
             # 8 P P P  P
             #   P P P  P
-            build_call(slice(0, 3), [2, 5, 8])
+            # build_call(slice(0, 3), [2, 5, 8])
 
-        with Cycle(4):
+        # Cycle 4:
             # 4  3 6 9  12
             # 3  P P P  P
             # 6  P P P  P
             # 9  P P P  P
             # 12 P P P  P
-            build_call(slice(0, 4), [3, 6, 9, 12])
+            # build_call(slice(0, 4), [3, 6, 9, 12])
         
-        with Cycle(5):
+        # Cycle 5:
             # 5    7 10 13
             #    P P P  P
             # 7  P P P  P
             # 10 P P P  P
             # 13 P P P  P            
-            build_call(slice(1, 4), [7, 10, 13])
+            # build_call(slice(1, 4), [7, 10, 13])
 
-        with Cycle(6):
+        # Cycle 6:
             #  6    11 14
             #    P P P  P
             #    P P P  P
             # 11 P P P  P
             # 14 P P P  P
-            build_call(slice(2, 4), [11, 14])
+            # build_call(slice(2, 4), [11, 14])
             
-        with Cycle(7):
+        # Cycle 7:
             #   7      15
             #    P P P  P
             #    P P P  P
             #    P P P  P
             # 15 P P P  P
-            build_call(slice(3, 4), [15])
+            # build_call(slice(3, 4), [15])
+
+        for i in range(1, 2 * array_size):
+            if i <= array_size:
+                slice_range = slice(0, i)
+                values = [j * array_size + (i - j - 1) for j in range(i)
+                            if j * array_size + (i - j - 1) < array_size * array_size]
+            else:
+                slice_range = slice(i - array_size, array_size)
+                values = [(i - array_size + j) * array_size + (array_size - j - 1)
+                            for j in range(2 * array_size - i)
+                            if (i - array_size + j) * array_size + (array_size - j - 1) < array_size * array_size]
+
+            with Cycle(i):
+                build_call(slice_range, values)
 
 def check_raw(raw):
     a = [[0 for _ in range(4)] for _ in range(4)]
@@ -221,7 +239,8 @@ def systolic_array():
         testbench = Testbench()
         testbench.build(
                 [pe_array[0][i].pe for i in range(1, 5)], \
-                [pe_array[i][0].pe for i in range(1, 5)])
+                [pe_array[i][0].pe for i in range(1, 5)],
+                4)
 
     simulator_path, verilator_path = elaborate(sys, verilog="verilator")
 
