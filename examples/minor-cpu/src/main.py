@@ -142,11 +142,7 @@ class Execution(Module):
         le_result = (a.bitcast(Int(32)) < b.bitcast(Int(32))).select(Bits(32)(1), Bits(32)(0))
         eq_result = (a == b).select(Bits(32)(1), Bits(32)(0))
         leu_result = (Bits(1)(0).concat(a) < Bits(1)(0).concat(b ) ).select(Bits(32)(1), Bits(32)(0))
-        #alu_b_shift_bits = alu_b[4:4].select( concat(Int(27)(-1) , alu_b[0:4]).bitcast(Int(32)), concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32)) )
-        alu_b_shift_bits =  concat(Bits(27)(0),  alu_b[0:4]).bitcast(Int(32))
-        shift_temp = Int(32)(0)
-        shift_temp = (Int(33)(1) << (Int(33)(32) - alu_b_shift_bits )   )[0:31]
-        sra_signed_result = a[31:31].select( (a >> alu_b[0:4]) | ~(  shift_temp.bitcast(Int(32)) - Int(32)(1)) , (a >> alu_b[0:4]))
+        sra_signed_result = (a.bitcast(Int(32)) >> alu_b[0:4].bitcast(Int(5))).bitcast(Bits(32))
         sub_result = (a.bitcast(Int(32)) - b.bitcast(Int(32))).bitcast(Bits(32))
 
         results[RV32I_ALU.ALU_ADD] = adder_result
@@ -192,13 +188,13 @@ class Execution(Module):
 
         # This `is_memory` hack is to evade rust's overflow check.
         addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
-        request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(Int(depth_log)), Int(depth_log)(0))
+        request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(UInt(depth_log)), UInt(depth_log)(0))
 
         with Condition(memory_read):
             log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
 
         with Condition(memory_write):
-            log("mem-write        | addr: 0x{:05x}| line: 0x{:05x} | value: 0x{:08x}", result, request_addr, a)
+            log("mem-write        | addr: 0x{:05x}| line: 0x{:05x} | value: 0x{:08x} | wdada: 0x{:08x}", result, request_addr, a, b)
 
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
@@ -426,11 +422,11 @@ def check(resource_base, test):
 if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        '0to100',
-        #'multiply',
+        #'0to100',
+        'multiply',
     ]
     for wl in workloads:
-        run_cpu(wl_path, wl, 12)
+        run_cpu(wl_path, wl, 16)
 
     test_cases = [
         #'rv32ui-p-add',
