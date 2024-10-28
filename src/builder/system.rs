@@ -846,7 +846,6 @@ impl SysBuilder {
       _ => panic!("Unsupported node kind!"),
     }
   }
-
 }
 
 impl Display for SysBuilder {

@@ -5,7 +5,6 @@ use std::{
   path::Path,
 };
 
-
 use instructions::FIFOPush;
 // use instructions::FIFOPush;
 // use regex::Regex;
@@ -78,22 +77,22 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let mut map = HashMap::new();
 
     for module in sys.module_iter(ModuleKind::Downstream) {
-        for attr in module.get_attrs() {
-            if let module::Attribute::MemoryParams(mem) = attr {
-                if module.is_downstream() {
-                    for (interf, _) in module.ext_interf_iter() {
-                        if interf.get_kind() == NodeKind::Array {
-                            let array_ref = interf.as_ref::<Array>(sys).unwrap();
-                            map.insert(array_ref.upcast(), mem.clone());
-                        }
-                    }
-                }
+      for attr in module.get_attrs() {
+        if let module::Attribute::MemoryParams(mem) = attr {
+          if module.is_downstream() {
+            for (interf, _) in module.ext_interf_iter() {
+              if interf.get_kind() == NodeKind::Array {
+                let array_ref = interf.as_ref::<Array>(sys).unwrap();
+                map.insert(array_ref.upcast(), mem.clone());
+              }
             }
+          }
         }
+      }
     }
 
     map
-}
+  }
 
   fn dump_memory_nodes(&mut self, node: BaseNode, res: &mut String) {
     match node.get_kind() {
@@ -472,7 +471,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
               if module.is_downstream() {
                 is_memory_instance = true;
               }
-              
             }
           }
           if is_memory_instance {
@@ -569,7 +567,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     // array -> init_file_path
     for m in self.sys.module_iter(ModuleKind::Downstream) {
-      
       for attr in m.get_attrs() {
         if let module::Attribute::MemoryParams(mp) = attr {
           if let Some(init_file) = &mp.init_file {
@@ -1591,7 +1588,7 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
   let external_usage = gather_exprs_externally_used(sys);
   let array_memory_params_map = VerilogDumper::collect_array_memory_params_map(sys);
 
-  let mut vd = VerilogDumper::new(sys, config, external_usage, topo , array_memory_params_map);
+  let mut vd = VerilogDumper::new(sys, config, external_usage, topo, array_memory_params_map);
 
   let mut fd = File::create(fname)?;
 
