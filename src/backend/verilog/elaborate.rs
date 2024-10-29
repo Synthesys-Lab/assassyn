@@ -5,8 +5,6 @@ use std::{
   path::Path,
 };
 
-use std::cell::RefCell;
-
 use instructions::FIFOPush;
 // use instructions::FIFOPush;
 // use regex::Regex;
@@ -49,7 +47,7 @@ struct VerilogDumper<'a, 'b> {
   current_module: String,
   before_wait_until: bool,
   topo: HashMap<BaseNode, usize>,
-  array_memory_params_map: RefCell<HashMap<BaseNode, MemoryParams>>,
+  array_memory_params_map: HashMap<BaseNode, MemoryParams>,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
@@ -58,6 +56,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     config: &'b Config,
     external_usage: ExternalUsage,
     topo: HashMap<BaseNode, usize>,
+    array_memory_params_map: HashMap<BaseNode, MemoryParams>,
   ) -> Self {
     Self {
       sys,
@@ -70,27 +69,32 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       external_usage,
       before_wait_until: false,
       topo,
-      array_memory_params_map: RefCell::new(HashMap::new()),
+      array_memory_params_map,
     }
   }
 
-  fn collect_array_memory_params(&self, module: &ModuleRef) {
-    for attr in module.get_attrs() {
-      if let module::Attribute::MemoryParams(mem) = attr {
-        if module.is_downstream() {
-          for (interf, _) in module.ext_interf_iter() {
-            if interf.get_kind() == NodeKind::Array {
-              let array_ref = interf.as_ref::<Array>(self.sys).unwrap();
-              let mut map = self.array_memory_params_map.borrow_mut();
-              map.insert(array_ref.upcast(), mem.clone());
+  fn collect_array_memory_params_map(sys: &SysBuilder) -> HashMap<BaseNode, MemoryParams> {
+    let mut map = HashMap::new();
+
+    for module in sys.module_iter(ModuleKind::Downstream) {
+      for attr in module.get_attrs() {
+        if let module::Attribute::MemoryParams(mem) = attr {
+          if module.is_downstream() {
+            for (interf, _) in module.ext_interf_iter() {
+              if interf.get_kind() == NodeKind::Array {
+                let array_ref = interf.as_ref::<Array>(sys).unwrap();
+                map.insert(array_ref.upcast(), mem.clone());
+              }
             }
           }
         }
       }
     }
+
+    map
   }
 
-  fn process_node(&mut self, node: BaseNode, res: &mut String) {
+  fn dump_memory_nodes(&mut self, node: BaseNode, res: &mut String) {
     match node.get_kind() {
       NodeKind::Expr => {
         let expr = node.as_ref::<Expr>(self.sys).unwrap();
@@ -123,7 +127,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           0
         };
         for elem in block.body_iter().skip(skip) {
-          self.process_node(elem, res);
+          self.dump_memory_nodes(elem, res);
         }
         self.pred_stack.pop_back();
       }
@@ -162,7 +166,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     let q = display.field("q");
 
     res.push_str(&format!("  /* {} */\n", array));
-    let map = self.array_memory_params_map.borrow();
+    let map = &self.array_memory_params_map;
 
     if map.get(&array.upcast()).is_some() {
       res.push_str(&declare_logic(array.scalar_ty(), &q));
@@ -467,8 +471,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
               if module.is_downstream() {
                 is_memory_instance = true;
               }
-              //let mut map = self.array_memory_params_map.borrow_mut();
-              //map.insert(array_ref.upcast(), mem.clone());
             }
           }
           if is_memory_instance {
@@ -565,7 +567,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
 
     // array -> init_file_path
     for m in self.sys.module_iter(ModuleKind::Downstream) {
-      self.collect_array_memory_params(&m);
       for attr in m.get_attrs() {
         if let module::Attribute::MemoryParams(mp) = attr {
           if let Some(init_file) = &mp.init_file {
@@ -978,7 +979,7 @@ module {} (
     self.triggers.clear();
     if has_memory_params {
       res.push_str(&format!("  logic [{b}:0] dataout;\n", b = memory_params.width - 1));
-      self.process_node(module.get_body().upcast(), &mut res);
+      self.dump_memory_nodes(module.get_body().upcast(), &mut res);
     } else {
       for elem in module.get_body().body_iter().skip(skip) {
         res.push_str(&self.print_body(elem));
@@ -1585,8 +1586,9 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
     .map(|(i, x)| (x, i))
     .collect::<HashMap<_, _>>();
   let external_usage = gather_exprs_externally_used(sys);
+  let array_memory_params_map = VerilogDumper::collect_array_memory_params_map(sys);
 
-  let mut vd = VerilogDumper::new(sys, config, external_usage, topo);
+  let mut vd = VerilogDumper::new(sys, config, external_usage, topo, array_memory_params_map);
 
   let mut fd = File::create(fname)?;
 

@@ -32,14 +32,12 @@ class MemUser(Module):
                    'term': Port(Bits(1))
             }, 
         )
-        self.reg_accm = RegArray(Int(width), 1)
         
     @module.combinational
     def build(self):
         
         width = self.rdata.dtype.bits
         rdata, bitmask, term = self.pop_all_ports(False)
-        rdata = rdata.bitcast(Int(width))
 
         data_joint = None
 
@@ -47,8 +45,6 @@ class MemUser(Module):
             offest = cachesize - i - 1
             data_masked = bitmask[offest:offest].select(rdata[offest*32:offest*32+31], Bits(32)(0))
             data_joint = data_masked if data_joint is None else data_joint.concat(data_masked)
-            
-            lineno = ((rdata[0:31].bitcast(Int(32)) + Int(32)(1)) >> Int(32)(3)) - Int(32)(1)
         
         log("\tCacheline:\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             data_joint[224:255],
@@ -97,10 +93,10 @@ class Driver(Module):
             lineno = addr[shift:shift+lineno_bitlength-1].bitcast(UInt(lineno_bitlength))
             line_end = (Bits(32)(0).concat((lineno + UInt(lineno_bitlength)(1)) << UInt(lineno_bitlength)(cachesize.bit_length()-1)))[0:31].bitcast(Int(32))
             offset = Bits(cachesize-shift)(0).concat(addr[0:shift-1]).bitcast(Bits(cachesize))
-            reserve = Bits(cachesize)(2 ** cachesize - 1) >> offset
+            reserve = Bits(cachesize)((1<<cachesize) - 1) >> offset
 
             sram = SRAM(width, sram_depth, init_file)
-            sram.build(Int(1)(0), init, lineno, Bits(width)(0), user)            
+            sram.build(Int(1)(0), init, lineno, Bits(width)(0), user)
             
             sentinel = (Int(32)(end) <= row_end).select(Int(32)(end), row_end)
             nextrow = (Int(32)(end) <= row_end).select(Int(1)(0), Int(1)(1))

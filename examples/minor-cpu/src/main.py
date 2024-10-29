@@ -55,25 +55,21 @@ class Execution(Module):
 
         on_write = reg_onwrite[0]
 
-        a_valid = (~(on_write >> rs1))[0:0] | \
-                  (exec_bypass_reg[0] == rs1) | \
-                  (mem_bypass_reg[0] == rs1) | \
-                  ~signals.rs1_valid
+        a_valid = (~(on_write >> rs1))[0:0] | (exec_bypass_reg[0] == rs1) | (mem_bypass_reg[0] == rs1) | ~signals.rs1_valid
 
-        b_valid = (~(on_write >> rs2))[0:0] | \
-                  (exec_bypass_reg[0] == rs2) | \
-                  (mem_bypass_reg[0] == rs2) | \
-                  ~signals.rs2_valid
+        b_valid = (~(on_write >> rs2))[0:0] | (exec_bypass_reg[0] == rs2) | (mem_bypass_reg[0] == rs2) | ~signals.rs2_valid
 
-        rd_valid = (~(on_write >> rd))[0:0]
+        rd_valid = (~(on_write >> rd))[0:0] | (exec_bypass_reg[0] == rd) | (mem_bypass_reg[0] == rd) | ~signals.rd_valid
 
         valid = a_valid & b_valid & rd_valid
 
         with Condition(~valid):
-            log("rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {}", \
-                rs1, a_valid, rs2, b_valid, rd, rd_valid)
+            log("pc: 0x{:08x}   | rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {} | backlogged", \
+                self.fetch_addr.peek(), rs1, a_valid, rs2, b_valid, rd, rd_valid)
 
         wait_until(valid)
+
+        ex_valid = valid
 
 
 
@@ -120,13 +116,13 @@ class Execution(Module):
         def bypass(bypass_reg, bypass_data, idx, value):
             return (bypass_reg[0] == idx).select(bypass_data[0], value)
 
-        a = bypass(exec_bypass_reg, exec_bypass_data, rs1, rf[rs1])
-        a = bypass(mem_bypass_reg, mem_bypass_data, rs1, a)
+        a = bypass(mem_bypass_reg, mem_bypass_data, rs1, rf[rs1])
+        a = bypass(exec_bypass_reg, exec_bypass_data, rs1, a)
         a = (rs1 == Bits(5)(0)).select(Bits(32)(0), a)
         a = signals.csr_write.select(Bits(32)(0), a)
 
-        b = bypass(exec_bypass_reg, exec_bypass_data, rs2, rf[rs2])
-        b = bypass(mem_bypass_reg, mem_bypass_data, rs2, b)
+        b = bypass(mem_bypass_reg, mem_bypass_data, rs2, rf[rs2])
+        b = bypass(exec_bypass_reg, exec_bypass_data, rs2, b)
         b = (rs2 == Bits(5)(0)).select(Bits(32)(0), b)
         b = is_csr.select(csr_f[csr_id], b)
         
@@ -143,7 +139,7 @@ class Execution(Module):
         adder_result = (alu_a.bitcast(Int(32)) + alu_b.bitcast(Int(32))).bitcast(Bits(32))
         le_result = (a.bitcast(Int(32)) < b.bitcast(Int(32))).select(Bits(32)(1), Bits(32)(0))
         eq_result = (a == b).select(Bits(32)(1), Bits(32)(0))
-        leu_result = (Bits(1)(0).concat(a) < Bits(1)(0).concat(b ) ).select(Bits(32)(1), Bits(32)(0))
+        leu_result = (a < b).select(Bits(32)(1), Bits(32)(0))
         sra_signed_result = (a.bitcast(Int(32)) >> alu_b[0:4].bitcast(Int(5))).bitcast(Bits(32))
         sub_result = (a.bitcast(Int(32)) - b.bitcast(Int(32))).bitcast(Bits(32))
 
@@ -180,9 +176,10 @@ class Execution(Module):
         exec_bypass_reg[0] = produced_by_exec.select(rd, Bits(5)(0))
         exec_bypass_data[0] = produced_by_exec.select(result, Bits(32)(0))
 
+        pc0 = (fetch_addr.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
         with Condition(signals.is_branch):
-            br_dest = condition[0:0].select(result, pc[0])
-            log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc[0])
+            br_dest = condition[0:0].select(result, pc0)
+            log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc0)
             br_sm = RegArray(Bits(1), 1)
             br_sm[0] = Bits(1)(0)
 
@@ -205,7 +202,7 @@ class Execution(Module):
             bound = dcache.bound.bind(rd=rd)
         bound.async_called()
         wb = writeback.bind(is_memory_read = memory_read,
-                            result = signals.link_pc.select(pc[0], result),
+                            result = signals.link_pc.select(pc0, result),
                             rd = rd,
                             is_csr = signals.csr_write,
                             csr_id = csr_id,
@@ -215,7 +212,7 @@ class Execution(Module):
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
 
-        return br_sm, br_dest, wb, rd 
+        return br_sm, br_dest, wb, rd, ex_valid
 
 class Decoder(Module):
     
@@ -235,7 +232,9 @@ class Decoder(Module):
         signals = decode_logic(inst)
         br_sm[0] = signals.is_branch
 
-        executor.async_called(signals=signals, fetch_addr=fetch_addr)
+        call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
+
+        call.bind.set_fifo_depth()
 
         return signals.is_branch
 
@@ -262,22 +261,36 @@ class FetcherImpl(Downstream):
               on_branch: Value,
               br_sm: Array,
               ex_bypass: Value,
+              ex_valid: Value,
               pc_reg: Value,
               pc_addr: Value,
               decoder: Decoder,
               data: str,
               depth_log: int):
+
+        ongoing = RegArray(Int(8), 1, initializer=[0])
+
         on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
         should_fetch = ~on_branch | ex_bypass.valid()
         to_fetch = ex_bypass.optional(pc_addr)
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
-        icache.build(Bits(1)(0), should_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
-        log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} |",
-            on_branch, ex_bypass.valid(), should_fetch, to_fetch)
-        with Condition(should_fetch):
+
+        new_cnt = ongoing[0] - (ex_valid.optional(Bits(1)(0))).select(Int(8)(1), Int(8)(0))
+        real_fetch = should_fetch & (new_cnt < Int(8)(5))
+
+        icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
+        log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} | ongoing: {}",
+            on_branch, ex_bypass.valid(), real_fetch, to_fetch, new_cnt)
+
+        with Condition(real_fetch):
             icache.bound.async_called(fetch_addr=to_fetch)
             pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
+            ongoing[0] = new_cnt + Int(8)(1)
+        
+        with Condition(~real_fetch):
+            pc_reg[0] = to_fetch
+            ongoing[0] = new_cnt
 
 class Onwrite(Downstream):
     
@@ -363,7 +376,7 @@ def build_cpu(depth_log):
         executor = Execution()
 
 
-        br_sm, ex_bypass, wb, exec_rd = executor.build(
+        br_sm, ex_bypass, wb, exec_rd, ex_valid = executor.build(
             pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
             exec_bypass_data = exec_bypass_data,
@@ -422,14 +435,22 @@ def run_cpu(sys, simulator_path, verilog_path):
             raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
             offsets = eval(raw)
             open(f'{current_path}/tmp/workload.init', 'w').write(hex(offsets['data_offset'])[2:])
-    raw = utils.run_simulator(simulator_path)
-    open('raw.log', 'w').write(raw)
-    check()
+    report = False
 
-    raw = utils.run_verilator(verilog_path)
-    open('raw.log', 'w').write(raw)
-    check()
-    os.remove('raw.log')
+    if report:
+        raw, tt = utils.run_simulator(simulator_path, True)
+        open(f'{workload}.log', 'w').write(raw)
+        open(f'{workload}.sim.time', 'w').write(str(tt))
+        raw, tt = utils.run_verilator(verilog_path, True)
+        open(f'{workload}.verilog.log', 'w').write(raw)
+    else:
+        raw = utils.run_simulator(simulator_path)
+        open('raw.log', 'w').write(raw)
+        check()
+        raw = utils.run_verilator(verilog_path)
+        open('raw.log', 'w').write(raw)
+        check()
+        os.remove('raw.log')
 
 
 def check():
@@ -456,7 +477,15 @@ if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         '0to100',
+        dev-241028
         # 'multiply',
+        #'dhrystone',
+        #'median',
+        #'multiply',
+        #'qsort',
+        #'rsort',
+        #'towers',
+        #'vvadd',
     ]
     # Iterate workloads
     for wl in workloads:
@@ -485,12 +514,10 @@ if __name__ == '__main__':
         #'rv32ui-p-bne',
         #'rv32ui-p-jal',
         #'rv32ui-p-jalr',
-        #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
         #'rv32ui-p-lui',
         #'rv32ui-p-lw',
         #'rv32ui-p-or',
         #'rv32ui-p-ori',
-        #'rv32ui-p-sb',#TO CHECK
         #'rv32ui-p-sll',
         #'rv32ui-p-slli',
         #'rv32ui-p-sltu',
@@ -500,6 +527,9 @@ if __name__ == '__main__':
         #'rv32ui-p-sub',
         #'rv32ui-p-sw',
         #'rv32ui-p-xori',
+
+        #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
+        #'rv32ui-p-sb',#TO CHECK
     ]
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     # Iterate test cases

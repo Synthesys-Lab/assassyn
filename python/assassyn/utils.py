@@ -1,5 +1,6 @@
 '''The untilities for the project'''
 
+import timeit
 import os
 import subprocess
 
@@ -24,12 +25,22 @@ def package_path():
     '''Get the path to this python package'''
     return repo_path() + '/python/assassyn'
 
-def run_simulator(path):
-    '''The helper function to run the simulator'''
-    cmd = ['cargo', 'run', '--manifest-path', path + '/Cargo.toml', '--release', '--offline']
+def _cmd_wrapper(cmd):
     return subprocess.check_output(cmd).decode('utf-8')
 
-def run_verilator(path):
+
+def run_simulator(path, count_time=False):
+    '''The helper function to run the simulator'''
+    cmd = ['cargo', 'build', '--manifest-path', path + '/Cargo.toml', '--release', '--offline']
+    _cmd_wrapper(cmd)
+    cmd = ['cargo', 'run', '--manifest-path', path + '/Cargo.toml', '--release', '--offline']
+    res = _cmd_wrapper(cmd)
+    if count_time:
+        a = timeit.timeit(lambda: _cmd_wrapper(cmd), number=5)
+        return (res, a)
+    return res
+
+def run_verilator(path, count_time=False):
     '''The helper function to run the verilator'''
     restore = os.getcwd()
     os.chdir(path)
@@ -37,7 +48,11 @@ def run_verilator(path):
     subprocess.check_output(cmd).decode('utf-8')
     # TODO(@were): Fix this hardcoded Vtb later.
     cmd = ['./obj_dir/Vtb']
-    res = subprocess.check_output(cmd).decode('utf-8')
+    res = _cmd_wrapper(cmd)
+    if count_time:
+        a = timeit.timeit(lambda: _cmd_wrapper(cmd), number=5)
+        os.chdir(restore)
+        return (res, a)
     os.chdir(restore)
     return res
 

@@ -251,13 +251,8 @@ class CodeGen(visitor.Visitor):
 
         for elem , kind in node.exposed_nodes.items():
             name = elem.name if f'{id(elem)}' in elem.name else self.generate_rval(elem)
-            size = elem.size
-            ty = generate_dtype(elem.scalar_ty)
             if kind is None:
                 kind = 'Inout'
-            self.code.append(f'  // try0 {elem} {kind}')
-            self.code.append(f'  // try1 {name} {size} {ty}')
-            self.visit_exposed_nodes(elem)
             self.code.append(
                 f'  sys.expose_to_top({elem.name}, '
                 f'assassyn::builder::system::ExposeKind::{kind});'
@@ -453,19 +448,6 @@ class CodeGen(visitor.Visitor):
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         self.code.append(array_decl)
 
-    def visit_exposed_nodes(self, node: Array):
-        """Generate the exposed nodes for the given array"""
-        name = node.name if f'{id(node)}' in node.name else self.generate_rval(node)
-        size = node.size
-        ty = generate_dtype(node.scalar_ty)
-        self.code.append(f'  // {node}')
-        attrs = self.generate_array_attr(node)
-        attrs = f'vec![{attrs}]'
-        array_decl = (
-            f'  let Exposed_{name} = sys.create_custom_basenode('
-            f'{ty}, "Exposed_{name}", {size}, {attrs});'
-        )
-        self.code.append(array_decl)
 
     def __init__(self, simulator, verilog, idle_threshold, sim_threshold, random, resource_base): #pylint: disable=too-many-arguments
         self.code = []

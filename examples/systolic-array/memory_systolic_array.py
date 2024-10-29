@@ -101,7 +101,7 @@ def mem_systolic_array(sys_name, init_file_row, init_file_col, resource_base):
 
     with sys:
 
-        pe_array = build_pe_array(sys)
+        pe_array = build_pe_array(sys, 4)
 
         # Build the SRAM module
         memory_R = SRAM(width=32, depth=1024, init_file=init_file_row) 
@@ -127,7 +127,7 @@ def mem_systolic_array(sys_name, init_file_row, init_file_col, resource_base):
 
     raw = utils.run_simulator(simulator_path)
     print(raw)
-    check_raw(raw)
+    check_raw(raw, 4)
     # utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
