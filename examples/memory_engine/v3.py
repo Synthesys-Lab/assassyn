@@ -246,7 +246,7 @@ def impl(sys_name, width, init_file, resource_base):
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
+    # print(raw)
     check(raw)
 
     if utils.has_verilator():
