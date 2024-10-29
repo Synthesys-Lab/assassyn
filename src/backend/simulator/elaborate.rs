@@ -183,7 +183,7 @@ impl Visitor<String> for ElaborateModule<'_> {
     };
     let mut open_scope = false;
     let res = match expr.get_opcode() {
-      Opcode::Binary { .. } => {
+      Opcode::Binary { binop } => {
         let bin = expr.as_sub::<instructions::Binary>().unwrap();
         let ty = bin.get().dtype();
         let ty = dtype_to_rust_type(&ty);
@@ -192,11 +192,19 @@ impl Visitor<String> for ElaborateModule<'_> {
           ty,
           dump_rval_ref(self.module_ctx, self.sys, &bin.a())
         );
-        let rhs = format!(
-          "ValueCastTo::<{}>::cast(&{})",
-          ty,
-          dump_rval_ref(self.module_ctx, self.sys, &bin.b())
-        );
+        // TODO(@were): A more systematic way to handle shift operations.
+        let rhs = if matches!(binop, subcode::Binary::Shl | subcode::Binary::Shr) {
+          format!(
+            "ValueCastTo::<u64>::cast(&{})",
+            dump_rval_ref(self.module_ctx, self.sys, &bin.b())
+          )
+        } else {
+          format!(
+            "ValueCastTo::<{}>::cast(&{})",
+            ty,
+            dump_rval_ref(self.module_ctx, self.sys, &bin.b())
+          )
+        };
         format!("{} {} {}", lhs, bin.get_opcode(), rhs)
       }
       Opcode::Unary { .. } => {
