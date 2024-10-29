@@ -38,7 +38,7 @@ def run_simulator(path, count_time=False):
     if count_time:
         a = timeit.timeit(lambda: _cmd_wrapper(cmd), number=5)
         return (res, a)
-    return res 
+    return res
 
 def run_verilator(path, count_time=False):
     '''The helper function to run the verilator'''
