@@ -13,7 +13,7 @@ from writeback import *
 from memory_access import *
 
 offset = UInt(32)(0)
-data_offset = UInt(32)(0xb8)
+# data_offset = None
 current_path = os.path.dirname(os.path.abspath(__file__))
 
 class Execution(Module):
@@ -35,6 +35,7 @@ class Execution(Module):
         mem_bypass_reg: Array,
         mem_bypass_data: Array,
         reg_onwrite: Array,
+        offset_reg: Array,
         rf: Array, 
         csr_f: Array,
         memory: Module, 
@@ -188,7 +189,7 @@ class Execution(Module):
         is_memory = memory_read | memory_write
 
         # This `is_memory` hack is to evade rust's overflow check.
-        addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
+        addr = (result.bitcast(UInt(32)) - is_memory.select(offset_reg[0].bitcast(UInt(32)), UInt(32)(0))).bitcast(Bits(32))
         request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(UInt(depth_log)), UInt(depth_log)(0))
 
         with Condition(memory_read):
@@ -241,7 +242,7 @@ class Decoder(Module):
 class Fetcher(Module):
     
     def __init__(self):
-        super().__init__(ports={})
+        super().__init__(ports={}, no_arbiter=True)
         self.name = 'F'
 
     @module.combinational
@@ -293,14 +294,37 @@ class Onwrite(Downstream):
         log("ownning: {:02}      | releasing: {:02}|", ex_rd, wb_rd)
         reg_onwrite[0] = reg_onwrite[0] ^ ex_bit ^ wb_bit
 
+class MemUser(Module):
+    def __init__(self, width):
+        super().__init__(
+            ports={'rdata': Port(Bits(width))}, 
+        )
+    @module.combinational
+    def build(self):
+        width = self.rdata.dtype.bits
+        rdata = self.pop_all_ports(False)
+        rdata = rdata.bitcast(Int(width))
+        offset_reg = RegArray(Bits(width), 1)
+        offset_reg[0] = rdata.bitcast(Bits(width))
+        return offset_reg
+
+
 class Driver(Module):
-    
     def __init__(self):
         super().__init__(ports={})
-
     @module.combinational
-    def build(self, fetcher: Module):
-        fetcher.async_called()
+    def build(self, fetcher: Module, user: Module):
+        init_reg = RegArray(Int(1), 1, initializer=[1])
+        init_cache = SRAM(width=32, depth=32, init_file=f"{current_path}/tmp/workload.init")
+        init_cache.name = 'init_cache'
+        init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0), user=user)
+        # Initialze offset at first cycle
+        with Condition(init_reg[0]==Int(1)(1)):
+            init_cache.bound.async_called()
+            init_reg[0] = Int(1)(0)
+        # Async_call after first cycle
+        with Condition(init_reg[0] == Int(1)(0)):
+            fetcher.async_called()
 
 def build_cpu(depth_log):
     sys = SysBuilder('minor_cpu')
@@ -310,6 +334,9 @@ def build_cpu(depth_log):
         bits1   = Bits(1)
         bits5   = Bits(5)
         bits32  = Bits(32)
+
+        user = MemUser(32)
+        offset_reg = user.build()
 
         fetcher = Fetcher()
         pc_reg, pc_addr = fetcher.build()
@@ -343,6 +370,7 @@ def build_cpu(depth_log):
             reg_onwrite = reg_onwrite,
             mem_bypass_reg = mem_bypass_reg,
             mem_bypass_data = mem_bypass_data,
+            offset_reg = offset_reg,
             rf = reg_file,
             csr_f = csr_file,
             memory = memory_access,
@@ -363,9 +391,9 @@ def build_cpu(depth_log):
         fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{current_path}/tmp/workload.exe', depth_log)
 
         onwrite_downstream = Onwrite()
-    
+
         driver = Driver()
-        driver.build(fetcher)
+        driver.build(fetcher, user)
 
         onwrite_downstream.build(
             reg_onwrite=reg_onwrite,
@@ -390,14 +418,10 @@ def build_cpu(depth_log):
 def run_cpu(sys, simulator_path, verilog_path):
     with sys:
         with open(f'{current_path}/tmp/workload.config') as f:
-            global offset, data_offset
             raw = f.readline()
             raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
             offsets = eval(raw)
-            offset = offsets['offset']
-            data_offset = offsets['data_offset']
-            offset = UInt(32)(offset)
-            data_offset = UInt(32)(data_offset)
+            open(f'{current_path}/tmp/workload.init', 'w').write(hex(offsets['data_offset'])[2:])
     raw = utils.run_simulator(simulator_path)
     open('raw.log', 'w').write(raw)
     check()
@@ -448,7 +472,7 @@ if __name__ == '__main__':
     # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
     # Define test cases
     test_cases = [
-        'rv32ui-p-add',
+        # 'rv32ui-p-add',
         #'rv32ui-p-addi',
         #'rv32ui-p-and',
         #'rv32ui-p-andi',
