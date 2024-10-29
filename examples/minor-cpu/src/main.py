@@ -13,8 +13,8 @@ from writeback import *
 from memory_access import *
 
 offset = UInt(32)(0)
-# data_offset = None
 current_path = os.path.dirname(os.path.abspath(__file__))
+workspace = f'{current_path}/.workspace/'
 
 class Execution(Module):
     
@@ -328,7 +328,7 @@ class Driver(Module):
     @module.combinational
     def build(self, fetcher: Module, user: Module):
         init_reg = RegArray(Int(1), 1, initializer=[1])
-        init_cache = SRAM(width=32, depth=32, init_file=f"{current_path}/tmp/workload.init")
+        init_cache = SRAM(width=32, depth=32, init_file=f"{workspace}/workload.init")
         init_cache.name = 'init_cache'
         init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0), user=user)
         # Initialze offset at first cycle
@@ -388,7 +388,7 @@ def build_cpu(depth_log):
             csr_f = csr_file,
             memory = memory_access,
             writeback = writeback,
-            data = f'{current_path}/tmp/workload.data',
+            data = f'{workspace}/workload.data',
             depth_log = depth_log
         )
 
@@ -401,7 +401,7 @@ def build_cpu(depth_log):
         decoder = Decoder()
         on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, ex_valid, pc_reg, pc_addr, decoder, f'{current_path}/tmp/workload.exe', depth_log)
+        fetcher_impl.build(on_br, br_sm, ex_bypass, ex_valid, pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log)
 
         onwrite_downstream = Onwrite()
 
@@ -430,11 +430,15 @@ def build_cpu(depth_log):
 
 def run_cpu(sys, simulator_path, verilog_path):
     with sys:
-        with open(f'{current_path}/tmp/workload.config') as f:
+        with open(f'{workspace}/workload.config') as f:
             raw = f.readline()
             raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
             offsets = eval(raw)
-            open(f'{current_path}/tmp/workload.init', 'w').write(hex(offsets['data_offset'])[2:])
+            value = hex(offsets['data_offset'])
+            value = value[1:] if value[0] == '-' else value
+            value = value[2:]
+            open(f'{workspace}/workload.init', 'w').write(value)
+
     report = False
 
     if report:
@@ -455,29 +459,40 @@ def run_cpu(sys, simulator_path, verilog_path):
 
 def check():
 
-    script = f'{current_path}/tmp/workload.sh'
+    script = f'{workspace}/workload.sh'
     if os.path.exists(script):
-        res = subprocess.run([script, 'raw.log', f'{current_path}/tmp/workload.data'])
+        res = subprocess.run([script, 'raw.log', f'{workspace}/workload.data'])
     else:
         script = f'{current_path}/../utils/find_pass.sh'
         res = subprocess.run([script, 'raw.log'])
     assert res.returncode == 0, f'Failed test: {res.returncode}'
     print('Test passed!!!')
-    
+
+ 
+def cp_if_exists(src, dst, placeholder):
+    if os.path.exists(src):
+        shutil.copy(src, dst)
+    elif placeholder:
+        open(dst, 'w').write('')
+
+def init_workspace(base_path, case):
+    if os.path.exists(f'{workspace}'):
+        shutil.rmtree(f'{workspace}')
+    os.mkdir(f'{workspace}')
+    cp_if_exists(f'{base_path}/{case}.exe', f'{workspace}/workload.exe', False)
+    cp_if_exists(f'{base_path}/{case}.data', f'{workspace}/workload.data', True)
+    cp_if_exists(f'{base_path}/{case}.config', f'{workspace}/workload.config', False)
+    cp_if_exists(f'{base_path}/{case}.sh', f'{workspace}/workload.sh', False)
 
 if __name__ == '__main__':
     # Build the CPU Module only once
     sys, simulator_path, verilog_path = build_cpu(depth_log=12)
     print("minor-CPU built successfully!")
-    # Create tmp directory and clean it
-    if os.path.exists(f'{current_path}/tmp'):
-        shutil.rmtree(f'{current_path}/tmp')
-    os.mkdir(f'{current_path}/tmp')
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         '0to100',
-        # 'multiply',
+        #'multiply',
         #'dhrystone',
         #'median',
         #'multiply',
@@ -489,10 +504,7 @@ if __name__ == '__main__':
     # Iterate workloads
     for wl in workloads:
         # Copy workloads to tmp directory and rename to workload.
-        shutil.copy(f'{wl_path}/{wl}.exe', f'{current_path}/tmp/workload.exe')
-        shutil.copy(f'{wl_path}/{wl}.data', f'{current_path}/tmp/workload.data')
-        shutil.copy(f'{wl_path}/{wl}.config', f'{current_path}/tmp/workload.config')
-        shutil.copy(f'{wl_path}/{wl}.sh', f'{current_path}/tmp/workload.sh')
+        init_workspace(wl_path, wl)
         run_cpu(sys, simulator_path, verilog_path)
     print("minor-CPU workloads ran successfully!")
 
@@ -500,33 +512,32 @@ if __name__ == '__main__':
     # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
     # Define test cases
     test_cases = [
-        # 'rv32ui-p-add',
-        #'rv32ui-p-addi',
-        #'rv32ui-p-and',
-        #'rv32ui-p-andi',
-        #'rv32ui-p-auipc',
-        #'rv32ui-p-beq',
-        #'rv32ui-p-bge',
-        #'rv32ui-p-bgeu',
-        #'rv32ui-p-blt',
-        #'rv32ui-p-bltu',
-        #'rv32ui-p-bne',
-        #'rv32ui-p-jal',
-        #'rv32ui-p-jalr',
-        #'rv32ui-p-lui',
-        #'rv32ui-p-lw',
-        #'rv32ui-p-or',
-        #'rv32ui-p-ori',
-        #'rv32ui-p-sll',
-        #'rv32ui-p-slli',
-        #'rv32ui-p-sltu',
-        #'rv32ui-p-srai',
-        #'rv32ui-p-srl',
-        #'rv32ui-p-srli',
-        #'rv32ui-p-sub',
-        #'rv32ui-p-sw',
-        #'rv32ui-p-xori',
-
+        'rv32ui-p-add',
+        'rv32ui-p-addi',
+        'rv32ui-p-and',
+        'rv32ui-p-andi',
+        'rv32ui-p-auipc',
+        'rv32ui-p-beq',
+        'rv32ui-p-bge',
+        'rv32ui-p-bgeu',
+        'rv32ui-p-blt',
+        'rv32ui-p-bltu',
+        'rv32ui-p-bne',
+        'rv32ui-p-jal',
+        'rv32ui-p-jalr',
+        'rv32ui-p-lui',
+        'rv32ui-p-lw',
+        'rv32ui-p-or',
+        'rv32ui-p-ori',
+        'rv32ui-p-sll',
+        'rv32ui-p-slli',
+        'rv32ui-p-sltu',
+        'rv32ui-p-srai',
+        'rv32ui-p-srl',
+        'rv32ui-p-srli',
+        'rv32ui-p-sub',
+        'rv32ui-p-sw',
+        'rv32ui-p-xori',
         #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
         #'rv32ui-p-sb',#TO CHECK
     ]
@@ -534,12 +545,6 @@ if __name__ == '__main__':
     # Iterate test cases
     for case in test_cases:
         # Copy test cases to tmp directory and rename to workload.
-        shutil.copy(f'{tests}/{case}.exe', f'{current_path}/tmp/workload.exe')
-        shutil.copy(f'{tests}/{case}.data', f'{current_path}/tmp/workload.data')
-        shutil.copy(f'{tests}/{case}.config', f'{current_path}/tmp/workload.config')
-        shutil.copy(f'{tests}/{case}.sh', f'{current_path}/tmp/workload.sh')
+        init_workspace(tests, case)
         run_cpu(sys, simulator_path, verilog_path)
     print("minor-CPU tests ran successfully!")
-
-
-
