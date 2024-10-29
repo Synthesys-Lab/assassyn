@@ -78,7 +78,7 @@ def impl(sys_name, width, init_file, resource_base):
         check(raw)
 
 def test_memory():
-    impl('memory_init', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
+    impl('memory_v1', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 if __name__ == "__main__":
         test_memory()
