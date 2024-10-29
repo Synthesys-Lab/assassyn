@@ -105,16 +105,12 @@ class MemUser(Module):
         data78 = (((UInt(64)(0) | data7).bitcast(UInt(64))) << mask8) | data8
         data78 = (UInt(64)(0)).concat(data78).bitcast(UInt(128))        
         
-        # log("data12 {:x}\tdata34 {:x}\tdata56 {:x}\tdata78 {:x}",data12, data34, data56, data78)
-        
         mask34 = mask3 + mask4
         mask56 = mask5 + mask6
         mask78 = mask7 + mask8
         
         data1234 = (((UInt(128)(0) | data12).bitcast(UInt(128))) << mask34) | data34
         data5678 = (((UInt(128)(0) | data56).bitcast(UInt(128))) << mask78) | data78
-        
-        # log("data1234 {:x}\tdata5678 {:x}", data1234, data5678)
         
         mask5678 = mask56 + mask78
         
@@ -151,8 +147,6 @@ class Driver(Module):
         adjust1 = (start_addr - line0_addr) % Int(32)(step)
         adjust2 = Int(32)(step) - ((line_start - line0_addr) % Int(32)(step))
         perturbation = ((adjust1 + adjust2) % Int(32)(step))[0:cachesize-1].bitcast(Bits(cachesize))
-        
-        # log("adjust1:{}\tadjust2:{}\tperturbation:{}", adjust1, adjust2, perturbation)
                 
         # Initialization.
         with Condition(~(init)):
