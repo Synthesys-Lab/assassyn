@@ -32,7 +32,7 @@ class ComputePE(Module):
 
     def __init__(self):
         super().__init__(no_arbiter=True, ports={'west': Port(Int(8)), 'north': Port(Int(8))})
-        self.acc = RegArray(Int(16), 1)
+        self.acc = RegArray(Int(19), 1)
 
     @module.combinational
     def build(self, east: Bind, south: Bind):
@@ -40,7 +40,8 @@ class ComputePE(Module):
         acc = self.acc
         val = acc[0]
         mul = (west * north)
-        c = mul[0:15].bitcast(Int(16))
+        mul = concat(Bits(3)(0), mul)
+        c = mul.bitcast(Int(19))
         mac = val + c
         log("Mac value: {} * {} + {} = {}", west, north, val, mac)
         acc[0] = mac
