@@ -401,7 +401,7 @@ def build_cpu(depth_log):
         decoder = Decoder()
         on_br = decoder.build(executor=executor, br_sm=br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, pc_reg, pc_addr, decoder, f'{current_path}/tmp/workload.exe', depth_log)
+        fetcher_impl.build(on_br, br_sm, ex_bypass, ex_valid, pc_reg, pc_addr, decoder, f'{current_path}/tmp/workload.exe', depth_log)
 
         onwrite_downstream = Onwrite()
 
@@ -477,7 +477,6 @@ if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         '0to100',
-        dev-241028
         # 'multiply',
         #'dhrystone',
         #'median',
