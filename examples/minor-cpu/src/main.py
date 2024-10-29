@@ -408,11 +408,12 @@ def run_cpu(resource_base, workload, depth_log):
 
     simulator_path, verilog_path = elaborate(sys, **conf)
 
-    if True:
+    report = False
+
+    if report:
         raw, tt = utils.run_simulator(simulator_path, True)
         open(f'{workload}.log', 'w').write(raw)
         open(f'{workload}.sim.time', 'w').write(str(tt))
-
         raw, tt = utils.run_verilator(verilog_path, True)
         open(f'{workload}.verilog.log', 'w').write(raw)
     else:
@@ -441,12 +442,12 @@ def check(resource_base, test):
 if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        #'0to100',
+        '0to100',
         #'dhrystone',
         #'median',
         #'multiply',
         #'qsort',
-        'rsort',
+        #'rsort',
         #'towers',
         #'vvadd',
     ]
