@@ -396,7 +396,6 @@ def build_cpu(depth_log):
         )
 
         memory_access.build(
-            sys = sys,
             writeback = wb, 
             mem_bypass_reg = mem_bypass_reg, 
             mem_bypass_data=mem_bypass_data
@@ -418,13 +417,14 @@ def build_cpu(depth_log):
             writeback_rd=wb_rd,
         )
         '''RegArray exposing'''
-        sys.expose_on_top(reg_file, kind='Output')
+        sys.expose_on_top(reg_file, kind='Inout')
         sys.expose_on_top(reg_onwrite, kind='Output')
         sys.expose_on_top(csr_file, kind='Output')
         sys.expose_on_top(pc_reg, kind='Output')
 
-        sys.expose_on_top(mem_bypass_reg, kind='Input')
-        sys.expose_on_top(mem_bypass_data, kind='Input')
+        '''Exprs exposing'''
+        sys.expose_on_top(ex_valid, kind='Inout')
+        
 
 
     print(sys)

@@ -2,10 +2,10 @@ use std::{
   collections::{HashMap, HashSet, VecDeque},
   fs::File,
   io::{self, Error, Write},
-  path::Path,
+  path::Path, sync::Arc,
 };
 
-use instructions::FIFOPush;
+use instructions::{bits, FIFOPush};
 // use instructions::FIFOPush;
 // use regex::Regex;
 
@@ -48,6 +48,7 @@ struct VerilogDumper<'a, 'b> {
   before_wait_until: bool,
   topo: HashMap<BaseNode, usize>,
   array_memory_params_map: HashMap<BaseNode, MemoryParams>,
+  module_expr_map: HashMap<BaseNode, HashMap<BaseNode, ExposeKind>>,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
@@ -57,6 +58,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     external_usage: ExternalUsage,
     topo: HashMap<BaseNode, usize>,
     array_memory_params_map: HashMap<BaseNode, MemoryParams>,
+    module_expr_map: HashMap<BaseNode, HashMap<BaseNode, ExposeKind>>,
   ) -> Self {
     Self {
       sys,
@@ -70,6 +72,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       before_wait_until: false,
       topo,
       array_memory_params_map,
+      module_expr_map,
+
     }
   }
 
@@ -377,7 +381,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       // Dump the array write
       res.push_str(&format!("    else if ({w}) begin\n\n",));
       res.push_str(&format!("      case ({widx})\n"));
-      if *exposed_kind == ExposeKind::Input {
+      if (*exposed_kind == ExposeKind::Input)||(*exposed_kind == ExposeKind::Inout) {
         for i in 0..array_size {
           let slice = format!("{}:{}", (i + 1) * scalar_bits - 1, i * scalar_bits);
           res.push_str(&format!("        {i} : {q}[{slice}] <= {temp};\n"));
@@ -658,6 +662,24 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       }
     }
 
+    if let Some(exposed_map) = self.module_expr_map.get(&module.upcast()) 
+    {
+      for (exposed_node, kind) in exposed_map {
+        if exposed_node.get_kind() == NodeKind::Expr
+        {
+          let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+          let id = namify(&expr.upcast().to_string(self.sys));
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!("    .{a}_exposed_o({a}_exposed_o),\n", a = id));
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!("    .{a}_exposed_i({a}_exposed_i),\n", a = id));
+            res.push_str(&format!("    .{a}_exposed_i_valid({a}_exposed_i_valid),\n", a = id));
+          }
+        }
+      }
+    }
+
     if !module.is_downstream() {
       let display = utils::DisplayInstance::from_module(module);
       res.push_str(&format!(
@@ -682,15 +704,34 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str("module top(\n");
 
     for (exposed_node, kind) in self.sys.exposed_nodes() {
-      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
-      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
-      if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
-        res.push_str(&declare_out(exposed_nodes_ref.scalar_ty(), &display.field("exposed_o")));
-      }
-      if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
-        res.push_str(&declare_in(exposed_nodes_ref.scalar_ty(), &display.field("exposed_i")));
-        res.push_str(&declare_in(bool_ty(), &display.field("exposed_i_valid")));
-      }
+      
+      if exposed_node.get_kind() == NodeKind::Array
+        {
+          let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+          let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            let o = display.field("exposed_o");
+            res.push_str(&declare_array("output", &exposed_nodes_ref, &o, ","));
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            res.push_str(&declare_in(exposed_nodes_ref.scalar_ty(), &display.field("exposed_i")));
+            res.push_str(&declare_in(bool_ty(), &display.field("exposed_i_valid")));
+          }
+        }
+      if exposed_node.get_kind() == NodeKind::Expr
+        {
+          let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+          let id = namify(&expr.upcast().to_string(self.sys));
+          let dtype = exposed_node.get_dtype(self.sys).unwrap();
+          let bits = dtype.get_bits() - 1;
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!("  output logic [{bits}:0] {a}_exposed_o,\n", bits = bits, a = id));
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!("  input logic [{bits}:0] {a}_exposed_i,\n", bits = bits, a = id));
+            res.push_str(&format!("  input logic {a}_exposed_i_valid,\n", a = id));
+          }
+        }
     }
 
     res.push_str(
@@ -795,22 +836,44 @@ logic rst_n;
     )?;
 
     for (exposed_node, kind) in self.sys.exposed_nodes() {
-      let array_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
-      let display = utils::DisplayInstance::from_array(&array_ref);
-      let bits = array_ref.scalar_ty().get_bits() * array_ref.get_size();
-      let bits_1 = bits - 1;
-      if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
-        let o = display.field("exposed_o");
-        fd.write_all(format!("logic [{bits_1}:0]{o};\n",).as_bytes())?;
-      }
-      if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
-        let i = display.field("exposed_i");
-        let i_valid = display.field("exposed_i_valid");
-        fd.write_all(format!("logic [{bits_1}:0]{i};\n",).as_bytes())?;
-        fd.write_all(format!("logic {i_valid};\n",).as_bytes())?;
-        fd.write_all(format!("assign {i_valid} = 1'd0;\n",).as_bytes())?;
-        fd.write_all(format!("assign {i} = {bits}'d0;\n",).as_bytes())?;
-      }
+      if exposed_node.get_kind() == NodeKind::Array
+        {
+          let array_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+          let display = utils::DisplayInstance::from_array(&array_ref);
+          let bits = array_ref.scalar_ty().get_bits();
+          let bits_1 = bits - 1;
+          let flatten_bits_1 = array_ref.get_flattened_size()-1;
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            let o = display.field("exposed_o");
+            fd.write_all(format!("logic [{flatten_bits_1}:0]{o};\n",).as_bytes())?;
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            let i = display.field("exposed_i");
+            let i_valid = display.field("exposed_i_valid");
+            fd.write_all(format!("logic [{bits_1}:0]{i};\n",).as_bytes())?;
+            fd.write_all(format!("logic {i_valid};\n",).as_bytes())?;
+            fd.write_all(format!("\nassign {i_valid} = 1'd0;\n",).as_bytes())?;
+            fd.write_all(format!("assign {i} = {bits}'d0;\n",).as_bytes())?;
+          }
+        }
+      if exposed_node.get_kind() == NodeKind::Expr
+        {
+          let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+          let id = namify(&expr.upcast().to_string(self.sys));
+          let dtype = exposed_node.get_dtype(self.sys).unwrap();
+          let bits = dtype.get_bits();
+          let bits_1 = bits - 1;
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            fd.write_all(format!("logic [{bits_1}:0] {id}_exposed_o;\n",).as_bytes())?;
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            fd.write_all(format!("logic [{bits_1}:0] {id}_exposed_i;\n",).as_bytes())?;
+            fd.write_all(format!("logic {id}_exposed_i_valid;\n",).as_bytes())?;
+            fd.write_all(format!("\nassign {id}_exposed_i_valid = 1'd0;\n",).as_bytes())?;
+            fd.write_all(format!("assign {id}_exposed_i = {bits}'d0;\n",).as_bytes())?;
+
+          }
+        }
     }
 
     fd.write_all(
@@ -839,16 +902,31 @@ top top_i (
     )?;
 
     for (exposed_node, kind) in self.sys.exposed_nodes() {
-      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
-      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
-      if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
-        let o = display.field("exposed_o");
-        fd.write_all(format!(",\n  .{o}({o})").as_bytes())?;
-      }
-      if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
-        let i = display.field("exposed_i");
-        let i_valid = display.field("exposed_i_valid");
-        fd.write_all(format!(",\n  .{i}({i}),\n  .{i_valid}({i_valid})",).as_bytes())?;
+      if exposed_node.get_kind() == NodeKind::Array
+        {
+          let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+          let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            let o = display.field("exposed_o");
+            fd.write_all(format!(",\n  .{o}({o})").as_bytes())?;
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            let i = display.field("exposed_i");
+            let i_valid = display.field("exposed_i_valid");
+            fd.write_all(format!(",\n  .{i}({i}),\n  .{i_valid}({i_valid})",).as_bytes())?;
+          }
+        }
+      if exposed_node.get_kind() == NodeKind::Expr
+      {
+        let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+        let id = namify(&expr.upcast().to_string(self.sys));
+        if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+          fd.write_all(format!(",\n  .{id}_exposed_o({id}_exposed_o)",).as_bytes())?;
+        }
+        if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+          fd.write_all(format!(",\n  .{id}_exposed_i({id}_exposed_i)",).as_bytes())?;
+          fd.write_all(format!(",\n  .{id}_exposed_i_valid({id}_exposed_i_valid)",).as_bytes())?;
+        }
       }
     }
 
@@ -1076,6 +1154,26 @@ module {} (
         let dtype = elem.get_dtype(module.sys).unwrap();
         res.push_str(&declare_in(dtype, &id));
         res.push_str(&declare_in(bool_ty(), &format!("{}_valid", id)));
+      }
+    }
+
+    if let Some(exposed_map) = self.module_expr_map.get(&module.upcast()) 
+    {
+      for (exposed_node, kind) in exposed_map {
+        if exposed_node.get_kind() == NodeKind::Expr
+        {
+          let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+          let id = namify(&expr.upcast().to_string(self.sys));
+          let dtype = exposed_node.get_dtype(self.sys).unwrap();
+          let bits = dtype.get_bits() - 1;
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!("  output logic [{bits}:0] {a}_exposed_o,\n", bits = bits, a = id));
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!("  input logic [{bits}:0] {a}_exposed_i,\n", bits = bits, a = id));
+            res.push_str(&format!("  input logic {a}_exposed_i_valid,\n", a = id));
+          }
+        }
       }
     }
 
@@ -1366,6 +1464,20 @@ module memory_blackbox_{a} #(
       } else {
         (None, "".into())
       };
+
+    let exposed_map: HashMap<_, _> = self.sys.exposed_nodes().collect();
+    let expr_clone = expr.clone();  
+    let expose_out_str = if let Some(exposed_kind) = exposed_map.get(&expr.upcast()) {
+      let id = namify(&expr.upcast().to_string(self.sys));
+        if (**exposed_kind == ExposeKind::Output) || (**exposed_kind == ExposeKind::Inout) {
+          format!("  assign {id}_exposed_o = {id};\n")
+        } else {
+          "".into()
+        }
+        } else {
+          "".into()
+        };
+
 
     let mut is_pop = None;
 
@@ -1683,11 +1795,24 @@ module memory_blackbox_{a} #(
       },
     };
 
-    let mut res = if let Some((id, ty)) = decl {
-      format!("{}  assign {} = {};\n{}\n", declare_logic(ty, &id), id, body, expose)
+    let temp:String =body;
+    
+    let body: String = if let Some((id, _)) = decl.clone() { if let Some(kind) = exposed_map.get(&expr_clone.upcast()) {
+      if (**kind ==ExposeKind::Inout)||(**kind ==ExposeKind::Input) {
+        format!("{}_exposed_i_valid ? {}_exposed_i :({}) ", id, id ,temp )
+      }
+      else 
+      {temp}
+    } else {temp}}else {temp};
+
+
+    let mut res: String =   
+    if let Some((id, ty)) = decl {
+      format!("{}  assign {} = {};\n{}\n{}\n", declare_logic(ty, &id), id, body, expose ,expose_out_str)
     } else {
-      body
+      body.clone()
     };
+    
 
     if let Some(pop) = is_pop {
       res.push_str(&pop);
@@ -1710,12 +1835,80 @@ pub fn generate_cpp_testbench(dir: &Path, sys: &SysBuilder, config: &Config) -> 
   Ok(())
 }
 
+struct ExposeGather<'a>{
+  exposed_map: HashMap<BaseNode, ExposeKind>,
+  sys:&'a SysBuilder,
+}
+impl<'a> ExposeGather<'a> {
+  pub fn new(sys: &'a SysBuilder) -> Self {
+      ExposeGather {
+          exposed_map: HashMap::new(),
+          sys,
+      }
+  }
+}
+impl<'a> Visitor<()> for ExposeGather<'a> {
+
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
+    if let Some((_, v)) = self.sys.exposed_nodes().find(|(node, _)| *node == &expr.upcast()) {
+      let k = expr.upcast();
+      self.exposed_map.insert(k, v.clone());
+    }
+    None  
+  }
+  /*fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
+    let body = module.get_body();
+    let body_iter = body.body_iter();
+      for (_, elem) in body_iter.enumerate() {
+        match elem.get_kind() {
+          NodeKind::Expr =>  {
+              let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+              self.visit_expr(expr)?;
+          }
+          NodeKind::Block => {
+            let block = elem.as_ref::<Block>(self.sys).unwrap();
+            self.visit_block(block)?;
+          }
+          _ => {
+            panic!("Unexpected reference type: {:?}", elem);
+          }
+      }
+    }None
+  }
+
+  fn visit_block(&mut self, block: BlockRef<'_>) -> Option<()> {
+
+    for node in block.body_iter()
+    {match node.get_kind() {
+      NodeKind::Expr => {
+        let expr = node.as_ref::<Expr>(self.sys).unwrap();
+        self.visit_expr(expr)?;
+      }
+      NodeKind::Block => {
+        let block = node.as_ref::<Block>(self.sys).unwrap();
+        self.visit_block(block)?;
+      }
+      _ => {
+        panic!("Unexpected reference type: {:?}", node);
+      }
+    }}
+    None
+  }*/
+}
+
 pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
   if matches!(config.verilog, Simulator::None) {
     return Err(Error::new(
       io::ErrorKind::Other,
       "No simulator specified for verilog generation",
     ));
+  }
+
+  let mut module_expr_map = HashMap::new();
+  for m in sys.module_iter(ModuleKind::All) {
+    let mut eg = ExposeGather::new(sys);
+    eg.visit_module(m.clone());
+    module_expr_map.insert(m.upcast(), eg.exposed_map);
   }
 
   create_and_clean_dir(config.dirname(sys, "verilog"), config.override_dump);
@@ -1737,7 +1930,7 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
   let external_usage = gather_exprs_externally_used(sys);
   let array_memory_params_map = VerilogDumper::collect_array_memory_params_map(sys);
 
-  let mut vd = VerilogDumper::new(sys, config, external_usage, topo, array_memory_params_map);
+  let mut vd = VerilogDumper::new(sys, config, external_usage, topo, array_memory_params_map,module_expr_map);
 
   let mut fd = File::create(fname)?;
 

@@ -55,7 +55,7 @@ def check_raw(raw):
 
 
 def test_async_call():
-    sys = SysBuilder('async_call')
+    sys = SysBuilder('Comb_expose')
     with sys:
         adder = Adder()
         c = adder.build()
@@ -63,7 +63,7 @@ def test_async_call():
         driver = Driver()
         driver.build(adder)
 
-        sys.expose_on_top(c, kind='Input')
+        sys.expose_on_top(c, kind='Inout')
 
     print(sys)
 
