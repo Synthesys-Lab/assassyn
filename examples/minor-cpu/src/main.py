@@ -25,6 +25,7 @@ class Execution(Module):
                 'fetch_addr': Port(Bits(32)),
             })
         self.name = "E"
+        #self.exe_valid = Bits(1)
 
     @module.combinational
     def build(
@@ -70,7 +71,7 @@ class Execution(Module):
         wait_until(valid)
 
         ex_valid = valid
-
+        self.exe_valid = ex_valid
 
 
         raw_id = [(3860, 9), (773, 1) ,(1860, 15) , (384,10) , (944 , 11) , (928 , 12) , (772 , 4 ) , (770 ,13),(771,14),(768,8) ,(833,2)]
@@ -211,6 +212,8 @@ class Execution(Module):
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
+
+        
 
         return br_sm, br_dest, wb, rd, ex_valid
 
@@ -393,6 +396,7 @@ def build_cpu(depth_log):
         )
 
         memory_access.build(
+            sys = sys,
             writeback = wb, 
             mem_bypass_reg = mem_bypass_reg, 
             mem_bypass_data=mem_bypass_data
@@ -413,6 +417,15 @@ def build_cpu(depth_log):
             exec_rd=exec_rd,
             writeback_rd=wb_rd,
         )
+        '''RegArray exposing'''
+        sys.expose_on_top(reg_file, kind='Output')
+        sys.expose_on_top(reg_onwrite, kind='Output')
+        sys.expose_on_top(csr_file, kind='Output')
+        sys.expose_on_top(pc_reg, kind='Output')
+
+        sys.expose_on_top(mem_bypass_reg, kind='Input')
+        sys.expose_on_top(mem_bypass_data, kind='Input')
+
 
     print(sys)
     conf = config(

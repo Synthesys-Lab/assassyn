@@ -95,6 +95,9 @@ class Value:
         from .expr import BinaryOp
         return BinaryOp(BinaryOp.SHR, self, other)
 
+    def __hash__(self):
+        return id(self)
+
     # This is a pitfall of developing the frontend. This optional method is served as a "ir_builder"
     # API, but it should not be annotated with this decorator. It calls the "select" method, and
     # the called "select" method will insert the generated Select node into the AST. It we annotate
