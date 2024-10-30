@@ -57,7 +57,7 @@ impl InsertPoint {
   }
 }
 
-#[derive(Debug, PartialEq,Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExposeKind {
   Input,
   Output,
