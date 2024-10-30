@@ -234,8 +234,6 @@ class Decoder(Module):
 
         call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
 
-        call.bind.set_fifo_depth()
-
         return signals.is_branch
 
 class Fetcher(Module):

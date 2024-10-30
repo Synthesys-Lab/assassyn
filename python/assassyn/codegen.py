@@ -366,11 +366,12 @@ class CodeGen(visitor.Visitor):
             bind_var = self.generate_rval(node.bind)
             fifo_name = node.fifo.name
             val = self.generate_rval(node.val)
-            res = f'let push{bind_var} = sys.bind_arg({bind_var}, "{fifo_name}".into(), {val});'
+            rval = self.generate_rval(node)
+            res = f'let {rval} = sys.bind_arg({bind_var}, "{fifo_name}".into(), {val});'
+            if node.fifo_depth is not None:
+                self.fifo_depths[rval] = node.fifo_depth
         elif isinstance(node, expr.Bind):
-            fifo_depths = node.fifo_depths
-            self.fifo_depths.update(fifo_depths)
-            res = f'// Already handled by `EmitBinds` {fifo_depths}'
+            res = '// Already handled by `EmitBinds`'
         elif isinstance(node, expr.AsyncCall):
             bind_var = self.generate_rval(node.bind)
             res = f'sys.create_async_call({bind_var});'
@@ -471,10 +472,10 @@ class CodeGen(visitor.Visitor):
     def finalize_bind(self):
         '''Finalize the bind by setting the FIFO depths'''
         self.code.append('  // Set FIFO depths')
-        for push, depth in self.fifo_depths.items():
+        for v, depth in self.fifo_depths.items():
             depth = depth if depth & (depth - 1) == 0 \
                 else 1 << (depth - 1).bit_length()
-            res = f'''  push{push}.as_mut::<assassyn::ir::Expr>(&mut sys).unwrap()
+            res = f'''  {v}.as_mut::<assassyn::ir::Expr>(&mut sys).unwrap()
                             .add_metadata(assassyn::ir::expr::Metadata::FIFODepth({depth}));
             '''
             self.code.append(res)
