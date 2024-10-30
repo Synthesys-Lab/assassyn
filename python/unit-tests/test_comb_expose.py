@@ -75,7 +75,6 @@ def test_async_call():
 
     simulator_path, verilator_path = elaborate(sys, **config)
 
-    quit()
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
