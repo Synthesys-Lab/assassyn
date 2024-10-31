@@ -99,6 +99,7 @@ class FIFOPush(Expr):
         self.fifo = fifo
         self.val = val
         self.bind = None
+        self.fifo_depth = None
 
     def __repr__(self):
         handle = self.as_operand()
@@ -327,7 +328,6 @@ class Bind(Expr):
                 raise ValueError(f"Depth for {name} must be an integer")
             for push in self.pushes:
                 if push.fifo.name == name:
-                    self.fifo_depths[self.as_operand()] = depth
                     push.fifo_depth = depth
                     break
             else:

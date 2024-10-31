@@ -25,6 +25,7 @@ class Execution(Module):
                 'fetch_addr': Port(Bits(32)),
             })
         self.name = "E"
+        #self.exe_valid = Bits(1)
 
     @module.combinational
     def build(
@@ -70,7 +71,7 @@ class Execution(Module):
         wait_until(valid)
 
         ex_valid = valid
-
+        self.exe_valid = ex_valid
 
 
         raw_id = [(3860, 9), (773, 1) ,(1860, 15) , (384,10) , (944 , 11) , (928 , 12) , (772 , 4 ) , (770 ,13),(771,14),(768,8) ,(833,2)]
@@ -212,6 +213,8 @@ class Execution(Module):
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
 
+        
+
         return br_sm, br_dest, wb, rd, ex_valid
 
 class Decoder(Module):
@@ -233,8 +236,6 @@ class Decoder(Module):
         br_sm[0] = signals.is_branch
 
         call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
-
-        call.bind.set_fifo_depth()
 
         return signals.is_branch
 
@@ -413,6 +414,16 @@ def build_cpu(depth_log):
             exec_rd=exec_rd,
             writeback_rd=wb_rd,
         )
+        '''RegArray exposing'''
+        sys.expose_on_top(reg_file, kind='Inout')
+        sys.expose_on_top(reg_onwrite, kind='Output')
+        sys.expose_on_top(csr_file, kind='Output')
+        sys.expose_on_top(pc_reg, kind='Output')
+
+        '''Exprs exposing'''
+        sys.expose_on_top(ex_valid, kind='Inout')
+        
+
 
     print(sys)
     conf = config(

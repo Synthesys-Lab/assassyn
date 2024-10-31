@@ -228,7 +228,7 @@ def build_pe_array(sys, array_size):
             fwest, fnorth = res[i][j].pe.build(
                     res[i][j + 1].bound,
                     res[i + 1][j].bound)
-            sys.expose_on_top(res[i][j].pe.acc, kind='Output')
+            sys.expose_on_top(res[i][j].pe.acc, kind='Inout')
             res[i][j + 1].bound = fwest
             res[i + 1][j].bound = fnorth
 

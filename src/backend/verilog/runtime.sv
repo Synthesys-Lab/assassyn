@@ -1,6 +1,6 @@
 module fifo #(
     parameter WIDTH = 8,
-    parameter DEPTH_LOG2 = 4
+    parameter DEPTH_LOG2 = 2
     // parameter NAME = "fifo" // TODO(@were): Open this later
 ) (
   input logic clk,
@@ -15,13 +15,17 @@ module fifo #(
   input  logic               pop_ready
 );
 
-logic [DEPTH_LOG2-1:0] front;
-logic [DEPTH_LOG2-1:0] back;
-logic [DEPTH_LOG2:0] count;
-logic [WIDTH - 1:0] q[0:(1<<DEPTH_LOG2)-1];
+`define IDX_DECL (DEPTH_LOG2 != 0 ? DEPTH_LOG2 - 1 : 0)
+`define CNT_DECL (DEPTH_LOG2 + 1)
+`define FIFO_SIZE (1 << DEPTH_LOG2)
 
-logic [DEPTH_LOG2:0] new_count;
-logic [DEPTH_LOG2-1:0] new_front;
+logic [`IDX_DECL:0] front;
+logic [`IDX_DECL:0] back;
+logic [`CNT_DECL:0] count;
+logic [WIDTH - 1:0] q[0:`FIFO_SIZE-1];
+
+logic [`CNT_DECL:0] new_count;
+logic [`IDX_DECL:0] new_front;
 logic temp_pop_valid;
 
 // The number of elements in the queue after this cycle.
@@ -40,7 +44,7 @@ always @(posedge clk or negedge rst_n) begin
     push_ready <= 1'b1;
   end else begin
 
-    if (push_valid && new_count <= (1 << DEPTH_LOG2)) begin
+    if (push_valid && new_count <= `FIFO_SIZE) begin
       q[back] <= push_data;
       back <= (back + 1);
     end
@@ -48,7 +52,7 @@ always @(posedge clk or negedge rst_n) begin
     front <= new_front;
     count <= new_count;
 
-    push_ready <= new_count < (1 << DEPTH_LOG2);
+    push_ready <= new_count < `FIFO_SIZE;
 
     temp_pop_valid = new_count != 0 || push_valid;
     pop_valid <= temp_pop_valid;
@@ -65,7 +69,12 @@ always @(posedge clk or negedge rst_n) begin
   end
 end
 
+`undef FIFO_SIZE
+`undef IDX_DECL
+`undef COUNTER_WIDTH
+
 endmodule
+
 
 // The purpose of a FIFO is different from the purpose of a counter.
 // A FIFO can only be pushed or popped once per cycle, while a counter

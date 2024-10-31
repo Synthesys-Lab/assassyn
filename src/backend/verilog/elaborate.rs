@@ -48,6 +48,7 @@ struct VerilogDumper<'a, 'b> {
   before_wait_until: bool,
   topo: HashMap<BaseNode, usize>,
   array_memory_params_map: HashMap<BaseNode, MemoryParams>,
+  module_expr_map: HashMap<BaseNode, HashMap<BaseNode, ExposeKind>>,
 }
 
 impl<'a, 'b> VerilogDumper<'a, 'b> {
@@ -57,6 +58,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     external_usage: ExternalUsage,
     topo: HashMap<BaseNode, usize>,
     array_memory_params_map: HashMap<BaseNode, MemoryParams>,
+    module_expr_map: HashMap<BaseNode, HashMap<BaseNode, ExposeKind>>,
   ) -> Self {
     Self {
       sys,
@@ -70,6 +72,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       before_wait_until: false,
       topo,
       array_memory_params_map,
+      module_expr_map,
     }
   }
 
@@ -262,6 +265,141 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res
   }
 
+  fn dump_exposed_array(
+    &self,
+    array: &ArrayRef,
+    exposed_kind: &ExposeKind,
+    mem_init_path: Option<&String>,
+  ) -> String {
+    let mut res = String::new();
+    let display = utils::DisplayInstance::from_array(array);
+    // write enable
+    let w = display.field("w");
+    // write index
+    let widx = display.field("widx");
+    // write data
+    let d = display.field("d");
+    // array buffer
+    let q = display.field("q");
+
+    let temp = display.field("temp");
+    let i = display.field("exposed_i");
+    let i_valid = display.field("exposed_i_valid");
+
+    res.push_str(&format!("  /* {} */\n", array));
+    let map = &self.array_memory_params_map;
+
+    if map.get(&array.upcast()).is_some() {
+      res.push_str(&declare_logic(array.scalar_ty(), &q));
+    } else {
+      res.push_str(&declare_array("", array, &q, ";"));
+    }
+
+    let mut seen = HashSet::new();
+    let drivers = array
+      .users()
+      .iter()
+      .filter_map(move |x| {
+        let expr = x.as_ref::<Operand>(array.sys).unwrap().get_expr();
+        if matches!(expr.get_opcode(), Opcode::Store) {
+          Some(expr.get_block().get_module())
+        } else {
+          None
+        }
+      })
+      .filter(|x| seen.insert(x.get_key()))
+      .map(|x| Edge::new(display.clone(), &x.as_ref::<Module>(array.sys).unwrap()))
+      .collect::<Vec<_>>();
+
+    let scalar_bits = array.scalar_ty().get_bits();
+    let array_size = array.get_size();
+
+    drivers.iter().for_each(|edge| {
+      res.push_str(&declare_logic(array.scalar_ty(), &edge.field("d")));
+      res.push_str(&declare_logic(DataType::int_ty(1), &edge.field("w")));
+      res.push_str(&declare_logic(array.get_idx_type(), &edge.field("widx")));
+    });
+
+    if (*exposed_kind == ExposeKind::Output) || (*exposed_kind == ExposeKind::Inout) {
+      let o = display.field("exposed_o");
+      res.push_str(&format!("  assign {o} = {q};\n"));
+    }
+    if (*exposed_kind == ExposeKind::Input) || (*exposed_kind == ExposeKind::Inout) {
+      res.push_str(&declare_logic(array.scalar_ty(), &temp));
+      res.push_str(&format!("  assign {temp} = {i_valid}?{i}:{d};\n"));
+    }
+
+    if map.get(&array.upcast()).is_some() {
+    } else {
+      // if w: array[widx] = d;
+      // where w is the gathered write enable signal
+      // widx/d are 1-hot selected from all the writers
+      res.push_str(&declare_logic(array.scalar_ty(), &d));
+      res.push_str(&declare_logic(array.get_idx_type(), &widx));
+      res.push_str(&declare_logic(DataType::int_ty(1), &w));
+
+      let write_data = select_1h(
+        drivers
+          .iter()
+          .map(|edge| (edge.field("w"), edge.field("d"))),
+        scalar_bits,
+      );
+      res.push_str(&format!("  assign {d} = {};\n", write_data));
+
+      let write_idx = select_1h(
+        drivers
+          .iter()
+          .map(|edge| (edge.field("w"), edge.field("widx"))),
+        array.get_idx_type().get_bits(),
+      );
+      res.push_str(&format!("  assign {widx} = {};\n", write_idx));
+
+      let write_enable = reduce(drivers.iter().map(|edge| edge.field("w")), " | ");
+      res.push_str(&format!("  assign {w} = {};\n", write_enable));
+
+      res.push_str("  always_ff @(posedge clk or negedge rst_n)\n");
+      // Dump the initializer
+      res.push_str("    if (!rst_n)\n");
+      if mem_init_path.is_some() {
+        // Read from memory initialization file
+        res.push_str(&format!("      $readmemh(\"{}\", {q});\n", mem_init_path.unwrap()));
+      } else if let Some(initializer) = array.get_initializer() {
+        // Read from the hardcoded initializer
+        res.push_str("    begin\n");
+        for (idx, value) in initializer.iter().enumerate() {
+          let elem_init = value.as_ref::<IntImm>(self.sys).unwrap().get_value();
+          let slice = format!("{}:{}", (idx + 1) * scalar_bits - 1, idx * scalar_bits);
+          res.push_str(&format!("      {q}[{slice}] <= {scalar_bits}'d{elem_init};\n",));
+        }
+        res.push_str("    end\n");
+      } else {
+        let init_bits = array.get_flattened_size();
+        // Initialize to 0
+        res.push_str(&format!("      {q} <= {init_bits}'d0;\n",));
+      }
+      // Dump the array write
+      res.push_str(&format!("    else if ({w}) begin\n\n",));
+      res.push_str(&format!("      case ({widx})\n"));
+      if (*exposed_kind == ExposeKind::Input) || (*exposed_kind == ExposeKind::Inout) {
+        for i in 0..array_size {
+          let slice = format!("{}:{}", (i + 1) * scalar_bits - 1, i * scalar_bits);
+          res.push_str(&format!("        {i} : {q}[{slice}] <= {temp};\n"));
+        }
+      } else {
+        for i in 0..array_size {
+          let slice = format!("{}:{}", (i + 1) * scalar_bits - 1, i * scalar_bits);
+          res.push_str(&format!("        {i} : {q}[{slice}] <= {d};\n"));
+        }
+      }
+
+      res.push_str("        default: ;\n");
+      res.push_str("      endcase\n");
+      res.push_str("    end\n");
+    }
+
+    res
+  }
+
   fn dump_fifo(&self, fifo: &FIFORef) -> String {
     let mut res = String::new();
     let display = utils::DisplayInstance::from_fifo(fifo, true);
@@ -290,7 +428,7 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       fifo_depth.next_power_of_two()
     };
 
-    res.push_str(&format!("  // {}\n", fifo));
+    res.push_str(&format!("  // fifo: {}, depth: {}\n", fifo, fifo_depth));
 
     let push_valid = display.field("push_valid"); // If external pushers have data to push
     let push_data = display.field("push_data"); // Data to be pushed
@@ -347,10 +485,11 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(&declare_logic(fifo.scalar_ty(), &push_data));
     res.push_str(&format!("  assign {push_data} = {data};\n"));
 
+    let log2_depth = fifo_depth.trailing_zeros();
     // Instantiate the FIFO
     res.push_str(&format!(
       "
-  fifo #({fifo_width}, {fifo_depth}) fifo_{fifo_name}_i (
+  fifo #({fifo_width}, {log2_depth}) fifo_{fifo_name}_i (
     .clk(clk),
     .rst_n(rst_n),
     .push_valid({push_valid}),
@@ -523,6 +662,22 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
       }
     }
 
+    if let Some(exposed_map) = self.module_expr_map.get(&module.upcast()) {
+      for (exposed_node, kind) in exposed_map {
+        if exposed_node.get_kind() == NodeKind::Expr {
+          let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+          let id = namify(&expr.upcast().to_string(self.sys));
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!("    .{a}_exposed_o({a}_exposed_o),\n", a = id));
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!("    .{a}_exposed_i({a}_exposed_i),\n", a = id));
+            res.push_str(&format!("    .{a}_exposed_i_valid({a}_exposed_i_valid),\n", a = id));
+          }
+        }
+      }
+    }
+
     if !module.is_downstream() {
       let display = utils::DisplayInstance::from_module(module);
       res.push_str(&format!(
@@ -547,10 +702,30 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str("module top(\n");
 
     for (exposed_node, kind) in self.sys.exposed_nodes() {
-      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
-      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
-      if *kind == ExposeKind::Output {
-        res.push_str(&declare_out(exposed_nodes_ref.scalar_ty(), &display.field("exposed")));
+      if exposed_node.get_kind() == NodeKind::Array {
+        let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+        let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
+        if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+          let o = display.field("exposed_o");
+          res.push_str(&declare_array("output", &exposed_nodes_ref, &o, ","));
+        }
+        if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+          res.push_str(&declare_in(exposed_nodes_ref.scalar_ty(), &display.field("exposed_i")));
+          res.push_str(&declare_in(bool_ty(), &display.field("exposed_i_valid")));
+        }
+      }
+      if exposed_node.get_kind() == NodeKind::Expr {
+        let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+        let id = namify(&expr.upcast().to_string(self.sys));
+        let dtype = exposed_node.get_dtype(self.sys).unwrap();
+        let bits = dtype.get_bits() - 1;
+        if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+          res.push_str(&format!("  output logic [{bits}:0] {a}_exposed_o,\n", bits = bits, a = id));
+        }
+        if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+          res.push_str(&format!("  input logic [{bits}:0] {a}_exposed_i,\n", bits = bits, a = id));
+          res.push_str(&format!("  input logic {a}_exposed_i_valid,\n", a = id));
+        }
       }
     }
 
@@ -581,9 +756,16 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     for (key, value) in &mem_init_map {
       res.push_str(&format!("//Array: {}, Init File Path: {}\n", key.to_string(self.sys), value));
     }
+
+    let exposed_map: HashMap<_, _> = self.sys.exposed_nodes().collect();
+
     // array storage element definitions
     for array in self.sys.array_iter() {
-      res.push_str(&self.dump_array(&array, mem_init_map.get(&array.upcast())));
+      if let Some(kind) = exposed_map.get(&array.upcast()) {
+        res.push_str(&self.dump_exposed_array(&array, kind, mem_init_map.get(&array.upcast())));
+      } else {
+        res.push_str(&self.dump_array(&array, mem_init_map.get(&array.upcast())));
+      }
     }
 
     // fifo storage element definitions
@@ -614,17 +796,6 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     // downstream instances
     for module in self.sys.module_iter(ModuleKind::Downstream) {
       res.push_str(&self.dump_module_instance(&module));
-    }
-
-    // expose signals to tb
-    for (exposed_node, kind) in self.sys.exposed_nodes() {
-      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
-      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
-      let q = display.field("q");
-      if *kind == ExposeKind::Output {
-        let o = display.field("exposed");
-        res.push_str(&format!("  assign {o} = {q};\n"));
-      }
     }
 
     res.push_str("endmodule // top\n\n");
@@ -660,12 +831,40 @@ logic rst_n;
     )?;
 
     for (exposed_node, kind) in self.sys.exposed_nodes() {
-      let array_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
-      let display = utils::DisplayInstance::from_array(&array_ref);
-      let bits = array_ref.scalar_ty().get_bits() * array_ref.get_size() - 1;
-      if *kind == ExposeKind::Output {
-        let o = display.field("exposed");
-        fd.write_all(format!("logic [{bits}:0]{o};\n",).as_bytes())?;
+      if exposed_node.get_kind() == NodeKind::Array {
+        let array_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+        let display = utils::DisplayInstance::from_array(&array_ref);
+        let bits = array_ref.scalar_ty().get_bits();
+        let bits_1 = bits - 1;
+        let flatten_bits_1 = array_ref.get_flattened_size() - 1;
+        if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+          let o = display.field("exposed_o");
+          fd.write_all(format!("logic [{flatten_bits_1}:0]{o};\n",).as_bytes())?;
+        }
+        if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+          let i = display.field("exposed_i");
+          let i_valid = display.field("exposed_i_valid");
+          fd.write_all(format!("logic [{bits_1}:0]{i};\n",).as_bytes())?;
+          fd.write_all(format!("logic {i_valid};\n",).as_bytes())?;
+          fd.write_all(format!("\nassign {i_valid} = 1'd0;\n",).as_bytes())?;
+          fd.write_all(format!("assign {i} = {bits}'d0;\n",).as_bytes())?;
+        }
+      }
+      if exposed_node.get_kind() == NodeKind::Expr {
+        let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+        let id = namify(&expr.upcast().to_string(self.sys));
+        let dtype = exposed_node.get_dtype(self.sys).unwrap();
+        let bits = dtype.get_bits();
+        let bits_1 = bits - 1;
+        if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+          fd.write_all(format!("logic [{bits_1}:0] {id}_exposed_o;\n",).as_bytes())?;
+        }
+        if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+          fd.write_all(format!("logic [{bits_1}:0] {id}_exposed_i;\n",).as_bytes())?;
+          fd.write_all(format!("logic {id}_exposed_i_valid;\n",).as_bytes())?;
+          fd.write_all(format!("\nassign {id}_exposed_i_valid = 1'd0;\n",).as_bytes())?;
+          fd.write_all(format!("assign {id}_exposed_i = {bits}'d0;\n",).as_bytes())?;
+        }
       }
     }
 
@@ -695,11 +894,29 @@ top top_i (
     )?;
 
     for (exposed_node, kind) in self.sys.exposed_nodes() {
-      let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
-      let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
-      if *kind == ExposeKind::Output {
-        let o = display.field("exposed");
-        fd.write_all(format!(",\n  .{o}({o})").as_bytes())?;
+      if exposed_node.get_kind() == NodeKind::Array {
+        let exposed_nodes_ref = exposed_node.as_ref::<Array>(self.sys).unwrap();
+        let display = utils::DisplayInstance::from_array(&exposed_nodes_ref);
+        if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+          let o = display.field("exposed_o");
+          fd.write_all(format!(",\n  .{o}({o})").as_bytes())?;
+        }
+        if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+          let i = display.field("exposed_i");
+          let i_valid = display.field("exposed_i_valid");
+          fd.write_all(format!(",\n  .{i}({i}),\n  .{i_valid}({i_valid})",).as_bytes())?;
+        }
+      }
+      if exposed_node.get_kind() == NodeKind::Expr {
+        let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+        let id = namify(&expr.upcast().to_string(self.sys));
+        if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+          fd.write_all(format!(",\n  .{id}_exposed_o({id}_exposed_o)",).as_bytes())?;
+        }
+        if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+          fd.write_all(format!(",\n  .{id}_exposed_i({id}_exposed_i)",).as_bytes())?;
+          fd.write_all(format!(",\n  .{id}_exposed_i_valid({id}_exposed_i_valid)",).as_bytes())?;
+        }
       }
     }
 
@@ -927,6 +1144,32 @@ module {} (
         let dtype = elem.get_dtype(module.sys).unwrap();
         res.push_str(&declare_in(dtype, &id));
         res.push_str(&declare_in(bool_ty(), &format!("{}_valid", id)));
+      }
+    }
+
+    if let Some(exposed_map) = self.module_expr_map.get(&module.upcast()) {
+      for (exposed_node, kind) in exposed_map {
+        if exposed_node.get_kind() == NodeKind::Expr {
+          let expr = exposed_node.as_ref::<Expr>(self.sys).unwrap();
+          let id = namify(&expr.upcast().to_string(self.sys));
+          let dtype = exposed_node.get_dtype(self.sys).unwrap();
+          let bits = dtype.get_bits() - 1;
+          if (*kind == ExposeKind::Output) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!(
+              "  output logic [{bits}:0] {a}_exposed_o,\n",
+              bits = bits,
+              a = id
+            ));
+          }
+          if (*kind == ExposeKind::Input) || (*kind == ExposeKind::Inout) {
+            res.push_str(&format!(
+              "  input logic [{bits}:0] {a}_exposed_i,\n",
+              bits = bits,
+              a = id
+            ));
+            res.push_str(&format!("  input logic {a}_exposed_i_valid,\n", a = id));
+          }
+        }
       }
     }
 
@@ -1217,6 +1460,19 @@ module memory_blackbox_{a} #(
       } else {
         (None, "".into())
       };
+
+    let exposed_map: HashMap<_, _> = self.sys.exposed_nodes().collect();
+    let expr_clone = expr.clone();
+    let expose_out_str = if let Some(exposed_kind) = exposed_map.get(&expr.upcast()) {
+      let id = namify(&expr.upcast().to_string(self.sys));
+      if (**exposed_kind == ExposeKind::Output) || (**exposed_kind == ExposeKind::Inout) {
+        format!("  assign {id}_exposed_o = {id};\n")
+      } else {
+        "".into()
+      }
+    } else {
+      "".into()
+    };
 
     let mut is_pop = None;
 
@@ -1534,10 +1790,33 @@ module memory_blackbox_{a} #(
       },
     };
 
-    let mut res = if let Some((id, ty)) = decl {
-      format!("{}  assign {} = {};\n{}\n", declare_logic(ty, &id), id, body, expose)
+    let temp: String = body;
+
+    let body: String = if let Some((id, _)) = decl.clone() {
+      if let Some(kind) = exposed_map.get(&expr_clone.upcast()) {
+        if (**kind == ExposeKind::Inout) || (**kind == ExposeKind::Input) {
+          format!("{}_exposed_i_valid ? {}_exposed_i :({}) ", id, id, temp)
+        } else {
+          temp
+        }
+      } else {
+        temp
+      }
     } else {
-      body
+      temp
+    };
+
+    let mut res: String = if let Some((id, ty)) = decl {
+      format!(
+        "{}  assign {} = {};\n{}\n{}\n",
+        declare_logic(ty, &id),
+        id,
+        body,
+        expose,
+        expose_out_str
+      )
+    } else {
+      body.clone()
     };
 
     if let Some(pop) = is_pop {
@@ -1561,12 +1840,83 @@ pub fn generate_cpp_testbench(dir: &Path, sys: &SysBuilder, config: &Config) -> 
   Ok(())
 }
 
+struct ExposeGather<'a> {
+  exposed_map: HashMap<BaseNode, ExposeKind>,
+  sys: &'a SysBuilder,
+}
+impl<'a> ExposeGather<'a> {
+  pub fn new(sys: &'a SysBuilder) -> Self {
+    ExposeGather {
+      exposed_map: HashMap::new(),
+      sys,
+    }
+  }
+}
+impl<'a> Visitor<()> for ExposeGather<'a> {
+  fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
+    if let Some((_, v)) = self
+      .sys
+      .exposed_nodes()
+      .find(|(node, _)| *node == &expr.upcast())
+    {
+      let k = expr.upcast();
+      self.exposed_map.insert(k, v.clone());
+    }
+    None
+  }
+  /*fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<()> {
+    let body = module.get_body();
+    let body_iter = body.body_iter();
+      for (_, elem) in body_iter.enumerate() {
+        match elem.get_kind() {
+          NodeKind::Expr =>  {
+              let expr = elem.as_ref::<Expr>(self.sys).unwrap();
+              self.visit_expr(expr)?;
+          }
+          NodeKind::Block => {
+            let block = elem.as_ref::<Block>(self.sys).unwrap();
+            self.visit_block(block)?;
+          }
+          _ => {
+            panic!("Unexpected reference type: {:?}", elem);
+          }
+      }
+    }None
+  }
+
+  fn visit_block(&mut self, block: BlockRef<'_>) -> Option<()> {
+
+    for node in block.body_iter()
+    {match node.get_kind() {
+      NodeKind::Expr => {
+        let expr = node.as_ref::<Expr>(self.sys).unwrap();
+        self.visit_expr(expr)?;
+      }
+      NodeKind::Block => {
+        let block = node.as_ref::<Block>(self.sys).unwrap();
+        self.visit_block(block)?;
+      }
+      _ => {
+        panic!("Unexpected reference type: {:?}", node);
+      }
+    }}
+    None
+  }*/
+}
+
 pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
   if matches!(config.verilog, Simulator::None) {
     return Err(Error::new(
       io::ErrorKind::Other,
       "No simulator specified for verilog generation",
     ));
+  }
+
+  let mut module_expr_map = HashMap::new();
+  for m in sys.module_iter(ModuleKind::All) {
+    let mut eg = ExposeGather::new(sys);
+    eg.visit_module(m.clone());
+    module_expr_map.insert(m.upcast(), eg.exposed_map);
   }
 
   create_and_clean_dir(config.dirname(sys, "verilog"), config.override_dump);
@@ -1588,7 +1938,8 @@ pub fn elaborate(sys: &SysBuilder, config: &Config) -> Result<(), Error> {
   let external_usage = gather_exprs_externally_used(sys);
   let array_memory_params_map = VerilogDumper::collect_array_memory_params_map(sys);
 
-  let mut vd = VerilogDumper::new(sys, config, external_usage, topo, array_memory_params_map);
+  let mut vd =
+    VerilogDumper::new(sys, config, external_usage, topo, array_memory_params_map, module_expr_map);
 
   let mut fd = File::create(fname)?;
 
