@@ -1,28 +1,10 @@
-import assassyn
 from assassyn.frontend import *
 from assassyn import backend
 from assassyn import utils
-import time
-import random
-
-current_seed = int(time.time())
-current_seed = 1000
-
-num_rows = 50
-num_columns = 30
-stride = 30
-
-random.seed(current_seed)
-num1 = random.randint(0, num_rows * num_columns)
-num2 = random.randint(0, num_rows * num_columns)
-start, end = sorted([num1, num2]) # Will get [start, end)
 
 start_1 = 0
 start_2 = 1
 start_3 = 2
-
-init_i  = start // num_columns
-init_j = start % num_columns
 
 lineno_bitlength = 10
 sram_depth = 1 << lineno_bitlength
@@ -50,23 +32,15 @@ class ConvFilter(Downstream):
         is_ready = self.ready[0]
         self.ready[0] = is_ready + UInt(32)(1)
         
-        with Condition(is_ready > UInt(32)(1)):
-            # log("INPUT: {} , {} , {} ", self.input[0][0][0], self.input[0][1][0], self.input[0][2][0])
-            # log("INPUT: {} , {} , {} ", self.input[1][0][0], self.input[1][1][0], self.input[1][2][0])
-            # log("INPUT: {} , {} , {} ", self.input[2][0][0], self.input[2][1][0], self.input[2][2][0])
-            
-            # log("INPUT: {} , {} , {} ", filter_to_use[0], filter_to_use[1], filter_to_use[2])
-            # log("INPUT: {} , {} , {} ", filter_to_use[3], filter_to_use[4], filter_to_use[5])
-            # log("INPUT: {} , {} , {} ", filter_to_use[6], filter_to_use[7], filter_to_use[8])
-            
-            
+        # The input is already full.
+        with Condition(is_ready > UInt(32)(1)):                        
             # Convolution of two 3x3 matrices:
             # self.input    filter_to_use
             # [a b c]   *   [1 4 7]
             # [d e f]       [2 5 8]
             # [g h i]       [3 6 9]
-            # Element-wise multiplication and summation for convolution result            
-            conv_value = Int(32)(0)            
+            # Element-wise multiplication and summation for convolution result.
+            conv_value = Int(32)(0)
             for i in range(3):
                 for j in range(1,3):
                     unit_product = self.input[i][j][0] * filter_to_use[(j-1)*3+i]
@@ -75,7 +49,7 @@ class ConvFilter(Downstream):
                 unit_product = newly_loaded[i] * filter_to_use[6+i]
                 conv_value = conv_value + unit_product[0:31].bitcast(Int(32))
                 
-            log("Conv value: {}", conv_value)
+            log("Step: {}\tConv_sum: {}", is_ready - UInt(32)(1) ,conv_value)
 
 class ForwardData(Module):
     def __init__(self):
@@ -87,7 +61,6 @@ class ForwardData(Module):
     def build(self):
         data = self.pop_all_ports(True)
         data = data.bitcast(Int(32))
-        log("Forward: {}", data)
         return data
 
 class Driver(Module):
@@ -119,15 +92,20 @@ class Driver(Module):
         
         cnt[0] = v + UInt(32)(1)
 
-# def check(raw):
-#     for line in raw.splitlines():
-#         if '[sram]' in line:
-#             toks = line.split()
-#             c = int(toks[-1])
-#             b = int(toks[-3])
-#             a = int(toks[-5])
-#             assert a % 2 == 1 or c == 0, f'Expected odd number or zero, got {line}'
-#             assert c == a + b, f'{a} + {b} = {c}'
+def check(raw):
+    for line in raw.splitlines():
+        if 'Conv_sum:' in line:
+            toks = line.split()
+            step = int(toks[-3])
+            conv_sum = int(toks[-1])
+            
+            input = [start_1+step, start_1+step+1 , start_1+step+2,
+                     start_2+step, start_2+step+1 , start_2+step+2,
+                     start_3+step, start_3+step+1 , start_3+step+2]
+            
+            result = sum(x * y for x, y in zip(input, filter_given))
+            
+            assert conv_sum == result, f"Mismatch at step {step}: conv_sum != result ({conv_sum} != {result})"
 
 
 def impl(sys_name, width, init_file, resource_base):
@@ -156,20 +134,18 @@ def impl(sys_name, width, init_file, resource_base):
         
         conv = ConvFilter()
         conv.build(data_load, filter_to_use)
-
         
 
-    config = backend.config(sim_threshold=10, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
+    config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    print(raw)
-    # check(raw)
+    check(raw)
 
     if utils.has_verilator():
         raw = utils.run_verilator(verilator_path)
-        # check(raw)
+        check(raw)
 
 def test_filter():
     impl('conv_filter', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
