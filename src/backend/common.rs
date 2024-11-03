@@ -29,6 +29,10 @@ pub struct Config {
   pub resource_base: PathBuf,
   /// The simulator to use for verilog simulation
   pub verilog: verilog::Simulator,
+  /// The default depth of the FIFOs in the generated verilog
+  pub fifo_depth: usize,
+  /// The default width of the trigger state machine in the generated verilog
+  pub delta_width: usize,
 }
 
 impl Default for Config {
@@ -41,6 +45,8 @@ impl Default for Config {
       random: false,
       resource_base: PathBuf::new(),
       verilog: verilog::Simulator::default(),
+      fifo_depth: 4,
+      delta_width: 8,
     }
   }
 }

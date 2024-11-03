@@ -93,6 +93,7 @@ class Execution(Module):
 
 
         signals, fetch_addr = self.pop_all_ports(False)
+        
 
         # TODO(@were): This is a hack to avoid post wait_until checks.
         rd = signals.rd
@@ -202,6 +203,7 @@ class Execution(Module):
         with Condition(memory_read):
             bound = dcache.bound.bind(rd=rd)
         bound.async_called()
+        bound.set_fifo_depth(rd=1 , rdata=1)
         wb = writeback.bind(is_memory_read = memory_read,
                             result = signals.link_pc.select(pc0, result),
                             rd = rd,
@@ -209,6 +211,8 @@ class Execution(Module):
                             csr_id = csr_id,
                             csr_new = csr_new,
                             mem_ext = signals.mem_ext)
+        
+        wb.set_fifo_depth(is_memory_read=1, result=1, rd=1, is_csr=1, csr_id=1, csr_new=1, mem_ext=1)
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
@@ -233,7 +237,8 @@ class Decoder(Module):
         signals = decode_logic(inst)
         br_sm[0] = signals.is_branch
 
-        call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
+        e_call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
+        e_call.bind.set_fifo_depth(signals=3, fetch_addr=3)
 
         return signals.is_branch
 
@@ -336,7 +341,9 @@ class Driver(Module):
             init_reg[0] = Int(1)(0)
         # Async_call after first cycle
         with Condition(init_reg[0] == Int(1)(0)):
-            fetcher.async_called()
+            
+            d_call = fetcher.async_called()
+            #d_call.set_fifo_depth(rdata=1, fetch_addr=1)
 
 def build_cpu(depth_log):
     sys = SysBuilder('minor_cpu')
@@ -413,13 +420,17 @@ def build_cpu(depth_log):
             writeback_rd=wb_rd,
         )
         '''RegArray exposing'''
-        sys.expose_on_top(reg_file, kind='Inout')
+        sys.expose_on_top(reg_file, kind='Output')
         sys.expose_on_top(reg_onwrite, kind='Output')
-        sys.expose_on_top(csr_file, kind='Output')
+        sys.expose_on_top(csr_file, kind='Inout')
         sys.expose_on_top(pc_reg, kind='Output')
 
+
         '''Exprs exposing'''
-        sys.expose_on_top(ex_valid, kind='Inout')
+        sys.expose_on_top(offset_reg, kind='Inout')
+        sys.expose_on_top(ex_valid, kind='Output')
+        sys.expose_on_top(on_br, kind='Output')
+        sys.expose_on_top(br_sm, kind='Output')
         
 
 
@@ -428,7 +439,8 @@ def build_cpu(depth_log):
         verilog=utils.has_verilator(),
         sim_threshold=600000,
         idle_threshold=600000,
-        resource_base=''
+        resource_base='',
+        fifo_depth=1,
     )
 
     simulator_path, verilog_path = elaborate(sys, **conf)

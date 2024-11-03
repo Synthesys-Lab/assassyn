@@ -187,6 +187,7 @@ class CodeGen(visitor.Visitor):
             verilog_target = self.targets['verilog']
             simulator = f'assassyn::backend::verilog::Simulator::{CG_SIMULATOR[verilog_target]}'
             config.append(f'verilog: {simulator}')
+            config.append(f'fifo_depth: {self.default_fifo_depth}')
         return ', '.join(config)
 
     def generate_init_value(self, init_value, ty: str):
@@ -448,7 +449,8 @@ class CodeGen(visitor.Visitor):
         self.code.append(array_decl)
 
 
-    def __init__(self, simulator, verilog, idle_threshold, sim_threshold, random, resource_base): #pylint: disable=too-many-arguments
+    def __init__(self, simulator, verilog, idle_threshold, sim_threshold, #pylint: disable=too-many-arguments
+                 random, resource_base,default_fifo_depth):
         self.code = []
         self.header = []
         self.emitted_bind = set()
@@ -461,6 +463,7 @@ class CodeGen(visitor.Visitor):
         self.idle_threshold = idle_threshold
         self.sim_threshold = sim_threshold
         self.random = random
+        self.default_fifo_depth = default_fifo_depth
         self.fifo_depths = {}
 
     def get_source(self):
@@ -471,8 +474,8 @@ class CodeGen(visitor.Visitor):
         '''Finalize the bind by setting the FIFO depths'''
         self.code.append('  // Set FIFO depths')
         for v, depth in self.fifo_depths.items():
-            depth = depth if depth & (depth - 1) == 0 \
-                else 1 << (depth - 1).bit_length()
+            #depth = depth if depth & (depth - 1) == 0 \
+            #    else 1 << (depth - 1).bit_length()
             res = f'''  {v}.as_mut::<assassyn::ir::Expr>(&mut sys).unwrap()
                             .add_metadata(assassyn::ir::expr::Metadata::FIFODepth({depth}));
             '''
@@ -485,7 +488,8 @@ def codegen( #pylint: disable=too-many-arguments
         idle_threshold,
         sim_threshold,
         random,
-        resource_base):
+        resource_base,
+        fifo_depth):
     '''
     The help function to generate the assassyn IR builder for the given system
 
@@ -493,6 +497,7 @@ def codegen( #pylint: disable=too-many-arguments
         sys (SysBuilder): The system to generate the builder for
         kwargs: Additional arguments to pass to the code
     '''
-    cg = CodeGen(simulator, verilog, idle_threshold, sim_threshold, random, resource_base)
+    cg = CodeGen(simulator, verilog, idle_threshold, sim_threshold,
+                 random, resource_base , fifo_depth)
     cg.visit_system(sys)
     return cg.get_source()

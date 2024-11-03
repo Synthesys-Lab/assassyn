@@ -56,8 +56,10 @@ class Driver(Module):
         cnt[0] = cnt[0] + Int(32)(1)
         v = cnt[0] * cnt[0]
 
-        lhs.async_called(lhs_a = v[0: 31].bitcast(Int(32)))
-        rhs.async_called(rhs_b = cnt[0])
+        call_lhs = lhs.async_called(lhs_a = v[0: 31].bitcast(Int(32)))
+        call_lhs.bind.set_fifo_depth(lhs_a = 2)
+        call_rhs = rhs.async_called(rhs_b = cnt[0])
+        call_rhs.bind.set_fifo_depth(rhs_b = 2)
 
 def check_raw(raw):
     cnt = 0

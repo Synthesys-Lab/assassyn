@@ -50,8 +50,10 @@ class ComputePE(Module):
         res_south = south.bind(north = north)
         if res_east.is_fully_bound():
             res_east = res_east.async_called()
+            res_east.bind.set_fifo_depth(west = 1)
         if res_south.is_fully_bound():
             res_south = res_south.async_called()
+            res_south.bind.set_fifo_depth(north = 1)
 
         return res_east, res_south
 
@@ -82,8 +84,8 @@ class Testbench(Module):
 
         def build_call(x, data):
             for row, col, data in zip(rows[x], cols[x], data):
-                row.async_called(data = Int(8)(data))
-                col.async_called(data = Int(8)(data))
+                call_row = row.async_called(data = Int(8)(data))
+                call_col = col.async_called(data = Int(8)(data))
 
 
         # Example:

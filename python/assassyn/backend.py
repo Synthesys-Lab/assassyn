@@ -17,6 +17,7 @@ def config( # pylint: disable=too-many-arguments
         verilog=False,
         sim_threshold=100,
         idle_threshold=100,
+        fifo_depth=4,
         random=False):
     '''The helper function to dump the default configuration of elaboration.'''
     res = {
@@ -28,6 +29,7 @@ def config( # pylint: disable=too-many-arguments
         'verilog': verilog,
         'sim_threshold': sim_threshold,
         'idle_threshold': idle_threshold,
+        'fifo_depth': fifo_depth,
         'random': random
     }
     return res.copy()
@@ -73,6 +75,7 @@ def elaborate( # pylint: disable=too-many-arguments
         verilog=False,
         idle_threshold=100,
         sim_threshold=100,
+        fifo_depth=4,
         random=False):
     '''
     Invoke the elaboration process of the given system.
@@ -108,7 +111,7 @@ def elaborate( # pylint: disable=too-many-arguments
         raw = codegen.codegen(
             sys, simulator, verilog,
             idle_threshold, sim_threshold, random_sims,
-            resource_base
+            resource_base,fifo_depth
         )
         fd.write(raw)
     if pretty_printer:
