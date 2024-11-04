@@ -420,7 +420,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           *depth
         })
       })
-      .unwrap_or(self.config.fifo_depth);
+      .unwrap_or(self.config.fifo_depth)
+      .next_power_of_two();
 
     res.push_str(&format!("  // fifo: {}, depth: {}\n", fifo, fifo_depth));
 
@@ -479,11 +480,11 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(&declare_logic(fifo.scalar_ty(), &push_data));
     res.push_str(&format!("  assign {push_data} = {data};\n"));
 
-    //let log2_depth = fifo_depth.trailing_zeros();
+    let log2_depth = fifo_depth.trailing_zeros();
     // Instantiate the FIFO
     res.push_str(&format!(
       "
-  fifo #({fifo_width}, {fifo_depth}) fifo_{fifo_name}_i (
+  fifo #({fifo_width}, {log2_depth}) fifo_{fifo_name}_i (
     .clk(clk),
     .rst_n(rst_n),
     .push_valid({push_valid}),

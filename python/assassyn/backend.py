@@ -111,7 +111,7 @@ def elaborate( # pylint: disable=too-many-arguments
         raw = codegen.codegen(
             sys, simulator, verilog,
             idle_threshold, sim_threshold, random_sims,
-            resource_base,fifo_depth
+            resource_base, fifo_depth
         )
         fd.write(raw)
     if pretty_printer:
