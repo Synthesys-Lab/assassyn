@@ -203,7 +203,6 @@ class Execution(Module):
         with Condition(memory_read):
             bound = dcache.bound.bind(rd=rd)
         bound.async_called()
-        bound.set_fifo_depth(rd=1 , rdata=1)
         wb = writeback.bind(is_memory_read = memory_read,
                             result = signals.link_pc.select(pc0, result),
                             rd = rd,
