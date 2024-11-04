@@ -203,7 +203,6 @@ class Execution(Module):
         with Condition(memory_read):
             bound = dcache.bound.bind(rd=rd)
         bound.async_called()
-        bound.set_fifo_depth(rd=1 , rdata=1)
         wb = writeback.bind(is_memory_read = memory_read,
                             result = signals.link_pc.select(pc0, result),
                             rd = rd,
@@ -212,7 +211,6 @@ class Execution(Module):
                             csr_new = csr_new,
                             mem_ext = signals.mem_ext)
         
-        wb.set_fifo_depth(is_memory_read=1, result=1, rd=1, is_csr=1, csr_id=1, csr_new=1, mem_ext=1)
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
@@ -343,7 +341,6 @@ class Driver(Module):
         with Condition(init_reg[0] == Int(1)(0)):
             
             d_call = fetcher.async_called()
-            #d_call.set_fifo_depth(rdata=1, fetch_addr=1)
 
 def build_cpu(depth_log):
     sys = SysBuilder('minor_cpu')
