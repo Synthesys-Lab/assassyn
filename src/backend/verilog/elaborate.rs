@@ -1335,6 +1335,10 @@ module {} (
       for (a, (_, _)) in self.array_stores.drain() {
         res.push_str(&format!(
           r#"
+
+`ifdef SYNTHESIS
+(* blackbox *)
+`endif
 module memory_blackbox_{a} #(
     parameter DATA_WIDTH = {data_width},   
     parameter ADDR_WIDTH = {addr_bits}     
