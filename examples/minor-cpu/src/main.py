@@ -249,7 +249,7 @@ class Decoder(Module):
         br_sm[0] = signals.is_branch
 
         e_call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
-        e_call.bind.set_fifo_depth(signals=4, fetch_addr=4)
+        e_call.bind.set_fifo_depth(signals=8, fetch_addr=8)
 
         return signals.is_branch
 
