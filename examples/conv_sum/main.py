@@ -81,11 +81,11 @@ class Driver(Module):
         sram_1 = SRAM(width, sram_depth, init_file)
         sram_1.build(Int(1)(0), Int(1)(1), addr_1, Bits(width)(0), user_1)
         sram_1.bound.async_called()
-        
+
         sram_2 = SRAM(width, sram_depth, init_file)
         sram_2.build(Int(1)(0), Int(1)(1), addr_2, Bits(width)(0), user_2)
         sram_2.bound.async_called()
-        
+
         sram_3 = SRAM(width, sram_depth, init_file)
         sram_3.build(Int(1)(0), Int(1)(1), addr_3, Bits(width)(0), user_3)
         sram_3.bound.async_called()
