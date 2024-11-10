@@ -219,12 +219,11 @@ class Execution(Module):
         wb = writeback.bind(is_memory_read = memory_read,
                             result = signals.link_pc.select(pc0, result),
                             rd = rd,
-                            is_csr = signals.csr_write,
-                            csr_id = csr_id,
-                            csr_new = csr_new,
                             mem_ext = signals.mem_ext)
+        with Condition(signals.csr_write):
+            csr_f[csr_id] = csr_new
         
-        wb.set_fifo_depth(is_memory_read = 2, result = 2, rd = 2, is_csr = 2, csr_id = 2, csr_new = 2, mem_ext = 2)
+        wb.set_fifo_depth(is_memory_read = 2, result = 2, rd = 2,  mem_ext = 2)
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
