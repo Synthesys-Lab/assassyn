@@ -224,6 +224,7 @@ class Execution(Module):
                             csr_new = csr_new,
                             mem_ext = signals.mem_ext)
         
+        wb.set_fifo_depth(is_memory_read = 2, result = 2, rd = 2, is_csr = 2, csr_id = 2, csr_new = 2, mem_ext = 2)
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
@@ -249,7 +250,7 @@ class Decoder(Module):
         br_sm[0] = signals.is_branch
 
         e_call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
-        e_call.bind.set_fifo_depth(signals=8, fetch_addr=8)
+        e_call.bind.set_fifo_depth(signals=2, fetch_addr=2)
 
         return signals.is_branch
 
@@ -292,7 +293,7 @@ class FetcherImpl(Downstream):
         icache.name = 'icache'
 
         new_cnt = ongoing[0] - (ex_valid.optional(Bits(1)(0))).select(Int(8)(1), Int(8)(0))
-        real_fetch = should_fetch & (new_cnt < Int(8)(4))
+        real_fetch = should_fetch & (new_cnt < Int(8)(2))
 
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} | ongoing: {}",
@@ -450,7 +451,7 @@ def build_cpu(depth_log):
         sim_threshold=600000,
         idle_threshold=600000,
         resource_base='',
-        fifo_depth=2,
+        fifo_depth=1,
     )
 
     simulator_path, verilog_path = elaborate(sys, **conf)

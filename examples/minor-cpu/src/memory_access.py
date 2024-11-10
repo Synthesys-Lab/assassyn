@@ -31,4 +31,7 @@ class MemoryAccess(Module):
             mem_bypass_reg[0] = Bits(5)(0)
 
         arg = self.rdata.valid().select(self.rdata.peek(), Bits(32)(0))
-        writeback.async_called(mdata = arg)
+
+        wb_bound = writeback.bind(mdata = arg)
+        wb_bound.async_called() 
+        wb_bound.set_fifo_depth(mdata = 2)
