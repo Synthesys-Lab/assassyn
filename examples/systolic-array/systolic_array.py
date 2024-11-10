@@ -47,13 +47,13 @@ class ComputePE(Module):
         acc[0] = mac
 
         res_east = east.bind(west = west)
+        res_east.set_fifo_depth(west = 1)
         res_south = south.bind(north = north)
+        res_south.set_fifo_depth(north = 1)
         if res_east.is_fully_bound():
             res_east = res_east.async_called()
-            res_east.bind.set_fifo_depth(west = 1)
         if res_south.is_fully_bound():
             res_south = res_south.async_called()
-            res_south.bind.set_fifo_depth(north = 1)
 
         return res_east, res_south
 
@@ -69,6 +69,8 @@ class Pusher(Module):
         log(f"{self.name} pushes {{}}", data)
         kwargs = {direction: data}
         new_bind = dest.bind(**kwargs)
+        kwdep = {direction: 1}
+        new_bind.set_fifo_depth(**kwdep)
         if new_bind.is_fully_bound():
             res = new_bind.async_called()
             return res
