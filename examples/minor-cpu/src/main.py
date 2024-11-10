@@ -40,7 +40,6 @@ class Execution(Module):
         rf: Array, 
         csr_f: Array,
         memory: Module, 
-        writeback: Module,
         data: str,
         depth_log: int):
 
@@ -213,22 +212,16 @@ class Execution(Module):
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
-        with Condition(memory_read):
-            bound = dcache.bound.bind(rd=rd)
+        bound = dcache.bound.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext)
         bound.async_called()
-        wb = writeback.bind(is_memory_read = memory_read,
-                            result = signals.link_pc.select(pc0, result),
-                            rd = rd,
-                            mem_ext = signals.mem_ext)
         with Condition(signals.csr_write):
             csr_f[csr_id] = csr_new
-        
-        wb.set_fifo_depth(is_memory_read = 2, result = 2, rd = 2,  mem_ext = 2)
+
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
 
-        return br_sm, br_dest, wb, rd, ex_valid
+        return br_sm, br_dest,  rd, ex_valid
 
 class Decoder(Module):
     
@@ -385,14 +378,13 @@ def build_cpu(depth_log):
         mem_bypass_data = RegArray(bits32, 1)
 
         writeback = WriteBack()
-        wb_rd = writeback.build(reg_file = reg_file , csr_file = csr_file)
+        wb_rd = writeback.build(reg_file = reg_file )
 
         memory_access = MemoryAccess()
 
         executor = Execution()
 
-
-        br_sm, ex_bypass, wb, exec_rd, ex_valid = executor.build(
+        br_sm, ex_bypass, exec_rd, ex_valid = executor.build(
             pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
             exec_bypass_data = exec_bypass_data,
@@ -403,13 +395,13 @@ def build_cpu(depth_log):
             rf = reg_file,
             csr_f = csr_file,
             memory = memory_access,
-            writeback = writeback,
+            #writeback = writeback,
             data = f'{workspace}/workload.data',
             depth_log = depth_log
         )
 
         memory_access.build(
-            writeback = wb, 
+            writeback = writeback, 
             mem_bypass_reg = mem_bypass_reg, 
             mem_bypass_data=mem_bypass_data
         )
@@ -522,7 +514,7 @@ if __name__ == '__main__':
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        '0to100',
+        #'0to100',
         #'multiply',
         #'dhrystone',
         #'median',
