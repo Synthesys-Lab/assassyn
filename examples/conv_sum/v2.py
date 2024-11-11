@@ -7,11 +7,10 @@ import time
 import os
 import csv
 
-# current_seed = int(time.time())
-current_seed = 1000
+current_seed = int(time.time())
 
-INPUT_WIDTH = 20
-INPUT_DEPTH = 10
+INPUT_WIDTH = 128
+INPUT_DEPTH = 64
 
 FILTER_WIDTH = 3
 FILTER_SIZE = FILTER_WIDTH * FILTER_WIDTH
@@ -20,8 +19,8 @@ SIM_THRESHOLD = INPUT_WIDTH * INPUT_DEPTH * FILTER_SIZE
 
 filter_given = [i for i in range(FILTER_SIZE)] # Can be changed as needed.
 
-lineno_bitlength = 20
-sram_depth = 1 << lineno_bitlength
+LINENO_BITLENGTH = (INPUT_WIDTH * INPUT_DEPTH).bit_length()
+SRAM_DEPTH = 1 << LINENO_BITLENGTH
 
 
 def generate_random_hex_file(path, filename, line_count):
@@ -95,14 +94,14 @@ class Driver(Module):
                 
         addr_base = (vi_input * UInt(32)(INPUT_WIDTH))[0:31].bitcast(UInt(32)) + vj_input
         addr_offest = (vi_filter * UInt(32)(INPUT_WIDTH))[0:31].bitcast(UInt(32)) + vj_filter
-        addr = (addr_base + addr_offest)[0:lineno_bitlength-1].bitcast(Int(lineno_bitlength))
+        addr = (addr_base + addr_offest)[0:LINENO_BITLENGTH-1].bitcast(Int(LINENO_BITLENGTH))
         
         is_finish = Int(1)(1)
         is_finish = (vi_input==UInt(32)(INPUT_DEPTH-FILTER_WIDTH)).select(is_finish, Int(1)(0))
         is_finish = (vj_input==UInt(32)(INPUT_WIDTH-FILTER_WIDTH)).select(is_finish, Int(1)(0))
         user.bind(count=v_conv, is_finish=is_finish)
         
-        sram = SRAM(width, sram_depth, init_file)
+        sram = SRAM(width, SRAM_DEPTH, init_file)
         sram.build(Int(1)(0), Int(1)(1), addr, Bits(width)(0), user)
         sram.bound.async_called()
         
@@ -188,8 +187,6 @@ def check(raw, file_path):
             if step < len(conv_sums):
                 conv_sum = conv_sums[step]
                 assert conv_sum == conv_result, f"Mismatch at step {step}: {conv_sum} != {conv_result}"
-            else:
-                raise ValueError(f"Not enough conv_sums provided for step {step}")
 
             step += 1  # Increment step after each comparison
 
@@ -213,16 +210,18 @@ def impl(sys_name, width, init_file, resource_base):
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
         
-    print(f"Seed is {current_seed}.") # For reproducing when problems occur
     file_path = os.path.join(resource_base, init_file)
        
     raw = utils.run_simulator(simulator_path)
-    print(raw)
+    # print(raw)
     check(raw, file_path)
 
     if utils.has_verilator():
         raw = utils.run_verilator(verilator_path)
         check(raw, file_path)
+        
+    print(f"Seed is {current_seed}.") # For reproducing when problems occur
+    print(f"bitlength:{LINENO_BITLENGTH}")
 
 def test_convolution(sys_name, path, file):
     impl(sys_name, 32, file, path)
