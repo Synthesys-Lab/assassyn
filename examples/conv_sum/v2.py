@@ -3,14 +3,16 @@ from assassyn.frontend import *
 from assassyn import backend
 from assassyn import utils
 
-starts = [0, 1, 2]
+INPUT_WIDTH = 128
+INPUT_DEPTH = 64
+
+FILTER_WIDTH = 3
+FILTER_SIZE = FILTER_WIDTH * FILTER_WIDTH
+
+filter_given = [i for i in range(FILTER_SIZE)] # Can be changed as needed.
 
 lineno_bitlength = 10
 sram_depth = 1 << lineno_bitlength
-
-filter_given = [1, 2, 3,
-                4, 5, 6,
-                7, 8, 9]
 
 class MemUser(Module):
 
@@ -35,10 +37,10 @@ class MemUser(Module):
         
         conv_sum = self.result[0] + unit_product
         
-        with Condition(cnt<UInt(32)(8)):
+        with Condition(cnt<UInt(32)(FILTER_SIZE-1)):
             self.result[0] = conv_sum
             
-        with Condition(cnt==UInt(32)(8)):
+        with Condition(cnt==UInt(32)(FILTER_SIZE-1)):
             step = self.steps[0] + UInt(32)(1)
             log("Step: {}\tConv_sum: {}", step ,conv_sum)
             self.steps[0] = step
@@ -52,7 +54,14 @@ class Driver(Module):
     @module.combinational
     def build(self, width, init_file, user):
         
-        addr_start = RegArray(Int(lineno_bitlength), 3, initializer=starts)
+        input_i = RegArray(UInt(32), 1, initializer=[0])
+        input_j = RegArray(UInt(32), 1, initializer=[0])
+        
+        vi_input = input_i[0]
+        vj_input = input_j[0]
+        
+        sram_starts = [i for i in range(FILTER_WIDTH)]
+        addr_start = RegArray(Int(lineno_bitlength), FILTER_WIDTH, initializer=sram_starts)
 
         cnt_sram = RegArray(UInt(32), 1, initializer=[0])   # For sram traversal
         cnt_conv = RegArray(UInt(32), 1, initializer=[0])   # For conv resetting
@@ -71,11 +80,11 @@ class Driver(Module):
         sram.build(Int(1)(0), Int(1)(1), addr, Bits(width)(0), user)
         sram.bound.async_called()
         
-        v_addr = (v_sram==UInt(32)(2)).select(v_addr+UInt(32)(1), v_addr)
-        v_sram = (v_sram==UInt(32)(2)).select(UInt(32)(0), v_sram+UInt(32)(1))        
-        
-        v_addr = (v_conv==UInt(32)(8)).select(v_addr-UInt(32)(2), v_addr)
-        v_conv = (v_conv==UInt(32)(8)).select(UInt(32)(0), v_conv+UInt(32)(1))
+        v_addr = (v_sram==UInt(32)(FILTER_WIDTH-1)).select(v_addr+UInt(32)(1), v_addr)
+        v_sram = (v_sram==UInt(32)(FILTER_WIDTH-1)).select(UInt(32)(0), v_sram+UInt(32)(1))        
+
+        v_addr = (v_conv==UInt(32)(FILTER_SIZE-1)).select(v_addr-UInt(32)(FILTER_WIDTH-1), v_addr)
+        v_conv = (v_conv==UInt(32)(FILTER_SIZE-1)).select(UInt(32)(0), v_conv+UInt(32)(1))
         
         cnt_sram[0] = v_sram
         cnt_conv[0] = v_conv
@@ -88,7 +97,7 @@ def check(raw):
             step = int(toks[-3])
             conv_sum = int(toks[-1])
             
-            input = [start + step + i for start in starts for i in range(3)]
+            input = [start + step + i for start in sram_starts for i in range(FILTER_WIDTH)]
             
             result = sum(x * y for x, y in zip(input, filter_given))
             
@@ -100,7 +109,7 @@ def impl(sys_name, width, init_file, resource_base):
         
         filter_to_use = RegArray(
             scalar_ty=Int(32),
-            size=9,
+            size=FILTER_SIZE,
             initializer=filter_given
         )
         
@@ -115,6 +124,7 @@ def impl(sys_name, width, init_file, resource_base):
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
+    print(raw)
     check(raw)
 
     if utils.has_verilator():
@@ -122,7 +132,7 @@ def impl(sys_name, width, init_file, resource_base):
         check(raw)
 
 def test_convolution():
-    impl('conv_filter', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
+    impl('conv_sum', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 if __name__ == "__main__":
         test_convolution()
