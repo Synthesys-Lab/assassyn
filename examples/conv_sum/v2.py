@@ -5,22 +5,19 @@ from assassyn import utils
 import random
 import time
 import os
-import csv
 
 current_seed = int(time.time())
 
 INPUT_WIDTH = 128
 INPUT_DEPTH = 64
-
 FILTER_WIDTH = 3
+
 FILTER_SIZE = FILTER_WIDTH * FILTER_WIDTH
-
-SIM_THRESHOLD = INPUT_WIDTH * INPUT_DEPTH * FILTER_SIZE
-
-filter_given = [i for i in range(FILTER_SIZE)] # Can be changed as needed.
-
+SIM_THRESHOLD = INPUT_WIDTH * INPUT_DEPTH * FILTER_SIZE # Complete matrix convolution.
 LINENO_BITLENGTH = (INPUT_WIDTH * INPUT_DEPTH).bit_length()
 SRAM_DEPTH = 1 << LINENO_BITLENGTH
+
+filter_given = [i for i in range(FILTER_SIZE)] # Can be changed as needed.
 
 
 def generate_random_hex_file(path, filename, line_count):
@@ -38,7 +35,6 @@ def generate_random_hex_file(path, filename, line_count):
     print(f"File generated at: {file_path}")
 
 class MemUser(Module):
-
     def __init__(self, width):
         super().__init__(
             ports={'rdata': Port(Bits(width)),
@@ -56,9 +52,7 @@ class MemUser(Module):
         rdata = rdata.bitcast(Int(width))
         
         filter_select = filter_to_use[cnt]
-
-        unit_product = (rdata * filter_select)[0:31].bitcast(Int(32))
-        
+        unit_product = (rdata * filter_select)[0:31].bitcast(Int(32))        
         conv_sum = self.result[0] + unit_product
         
         with Condition(cnt<UInt(32)(FILTER_SIZE-1)):
@@ -73,7 +67,6 @@ class MemUser(Module):
                 finish()
 
 class Driver(Module):
-
     def __init__(self):
         super().__init__(ports={})
 
@@ -121,40 +114,14 @@ class Driver(Module):
         j_filter[0] = vj_filter
         cnt_conv[0] = v_conv
 
-
-# def check(raw, file_path):
-            
-#     input_file = []
-#     with open(file_path, 'r') as file:
-#         for line in file:
-#             input_file.append(int(line.strip(), 16))            
-#     # print(input_file[0:9])
-    
-#     for line in raw.splitlines():
-#         if 'Conv_sum:' in line:
-#             toks = line.split()
-#             step = int(toks[-3])
-#             conv_sum = int(toks[-1])
-            
-#             input = [input_file[start+step+i-1] for start in [j for j in range(FILTER_WIDTH)] for i in range(FILTER_WIDTH)]
-            
-#             result = sum(x * y for x, y in zip(input, filter_given))
-            
-#             assert conv_sum == result, f"Mismatch at step {step}: conv_sum != result ({conv_sum} != {result})"
-
-
 def check(raw, file_path):
-    # Parse conv_sums from raw
     conv_sums = []
     for line in raw.splitlines():
         if 'Conv_sum:' in line:
             toks = line.split()
             conv_sums.append(int(toks[-1]))
     
-    # Initialize a 2D matrix of zeros with shape [INPUT_DEPTH][INPUT_WIDTH]
     input_file = [[0] * INPUT_WIDTH for _ in range(INPUT_DEPTH)]
-
-    # Fill input_file with data from file
     with open(file_path, 'r') as file:
         row, col = 0, 0
         for line in file:
@@ -164,31 +131,23 @@ def check(raw, file_path):
                 col = 0
                 row += 1
             if row == INPUT_DEPTH:
-                break  # Stop reading if we reach the matrix limit
-            
-    # # Save input_file as CSV in the same directory as file_path
-    # csv_path = os.path.join(os.path.dirname(file_path), 'input_file.csv')
-    # with open(csv_path, 'w', newline='') as csv_file:
-    #     writer = csv.writer(csv_file)
-    #     writer.writerows(input_file)
+                break
 
     # Apply convolution without padding and compare with conv_sums
     filter_matrix = [[filter_given[i * FILTER_WIDTH + j] for j in range(FILTER_WIDTH)] for i in range(FILTER_WIDTH)]
-    step = 0  # Keep track of the step for error reporting
+    step = 0
     for i in range(INPUT_DEPTH - FILTER_WIDTH + 1):
         for j in range(INPUT_WIDTH - FILTER_WIDTH + 1):
-            # Compute convolution for the current position
             conv_result = 0
             for k in range(FILTER_WIDTH):
                 for l in range(FILTER_WIDTH):
                     conv_result += input_file[i + k][j + l] * filter_matrix[k][l]
             
-            # Check if the convolution result matches the corresponding conv_sum
             if step < len(conv_sums):
                 conv_sum = conv_sums[step]
                 assert conv_sum == conv_result, f"Mismatch at step {step}: {conv_sum} != {conv_result}"
 
-            step += 1  # Increment step after each comparison
+            step += 1
 
 def impl(sys_name, width, init_file, resource_base):
     sys = SysBuilder(sys_name)
@@ -213,7 +172,6 @@ def impl(sys_name, width, init_file, resource_base):
     file_path = os.path.join(resource_base, init_file)
        
     raw = utils.run_simulator(simulator_path)
-    # print(raw)
     check(raw, file_path)
 
     if utils.has_verilator():
@@ -221,7 +179,6 @@ def impl(sys_name, width, init_file, resource_base):
         check(raw, file_path)
         
     print(f"Seed is {current_seed}.") # For reproducing when problems occur
-    print(f"bitlength:{LINENO_BITLENGTH}")
 
 def test_convolution(sys_name, path, file):
     impl(sys_name, 32, file, path)
