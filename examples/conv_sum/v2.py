@@ -5,15 +5,18 @@ from assassyn import utils
 import random
 import time
 import os
+import csv
 
 # current_seed = int(time.time())
 current_seed = 1000
 
-INPUT_WIDTH = 128
-INPUT_DEPTH = 64
+INPUT_WIDTH = 20
+INPUT_DEPTH = 10
 
 FILTER_WIDTH = 3
 FILTER_SIZE = FILTER_WIDTH * FILTER_WIDTH
+
+SIM_THRESHOLD = INPUT_WIDTH * INPUT_DEPTH * FILTER_SIZE
 
 filter_given = [i for i in range(FILTER_SIZE)] # Can be changed as needed.
 
@@ -22,15 +25,6 @@ sram_depth = 1 << lineno_bitlength
 
 
 def generate_random_hex_file(path, filename, line_count):
-    """
-    Generates a file with each line containing a random hexadecimal number between 0 and 255.
-    
-    Parameters:
-    - path (str): The directory path where the file will be saved. If it doesn't exist, it will be created.
-    - filename (str): The name of the file to be created.
-    - line_count (int): The number of lines in the file.
-    """
-    # Check if the path exists; if not, create it
     if not os.path.exists(path):
         os.makedirs(path)
 
@@ -44,13 +38,13 @@ def generate_random_hex_file(path, filename, line_count):
     
     print(f"File generated at: {file_path}")
 
-
 class MemUser(Module):
 
     def __init__(self, width):
         super().__init__(
             ports={'rdata': Port(Bits(width)),
-                   'count': Port(UInt(32))}, 
+                   'count': Port(UInt(32)),
+                   'is_finish': Port(Int(1))}, 
         )
         self.steps = RegArray(UInt(32), 1)
         self.result = RegArray(Int(32), 1)
@@ -59,7 +53,7 @@ class MemUser(Module):
     def build(self, filter_to_use: RegArray):
         
         width = self.rdata.dtype.bits
-        rdata, cnt = self.pop_all_ports(False)
+        rdata, cnt, is_finish = self.pop_all_ports(False)
         rdata = rdata.bitcast(Int(width))
         
         filter_select = filter_to_use[cnt]
@@ -76,6 +70,8 @@ class MemUser(Module):
             log("Step: {}\tConv_sum: {}", step ,conv_sum)
             self.steps[0] = step
             self.result[0] = Int(32)(0)
+            with Condition(is_finish):
+                finish()
 
 class Driver(Module):
 
@@ -85,63 +81,117 @@ class Driver(Module):
     @module.combinational
     def build(self, width, init_file, user):
         
-        input_i = RegArray(UInt(32), 1, initializer=[0])
-        input_j = RegArray(UInt(32), 1, initializer=[0])
+        i_input = RegArray(UInt(32), 1)    # i of the input
+        j_input = RegArray(UInt(32), 1)    # j of the input
+        i_filter = RegArray(UInt(32), 1)   # i of the filter
+        j_filter = RegArray(UInt(32), 1)   # j of the filter
+        cnt_conv = RegArray(UInt(32), 1)   # For conv count
         
-        vi_input = input_i[0]
-        vj_input = input_j[0]
-        
-        addr_ij = (vi_input * UInt(32)(INPUT_WIDTH))[0:31].bitcast(UInt(32)) + vj_input
-        
-        sram_starts = [i for i in range(FILTER_WIDTH)]
-        addr_start = RegArray(Int(lineno_bitlength), FILTER_WIDTH, initializer=sram_starts)
-
-        cnt_sram = RegArray(UInt(32), 1, initializer=[0])   # For sram traversal
-        cnt_conv = RegArray(UInt(32), 1, initializer=[0])   # For conv resetting
-        cnt_addr = RegArray(UInt(32), 1, initializer=[0])   # For addr increment
-        
-        v_sram = cnt_sram[0]
+        vi_input = i_input[0]
+        vj_input = j_input[0]
+        vi_filter = i_filter[0]
+        vj_filter = j_filter[0]
         v_conv = cnt_conv[0]
-        v_addr = cnt_addr[0]
-
-        addr_base = v_addr[0:lineno_bitlength-1].bitcast(Int(lineno_bitlength))
-        addr = addr_base + addr_start[v_sram]
+                
+        addr_base = (vi_input * UInt(32)(INPUT_WIDTH))[0:31].bitcast(UInt(32)) + vj_input
+        addr_offest = (vi_filter * UInt(32)(INPUT_WIDTH))[0:31].bitcast(UInt(32)) + vj_filter
+        addr = (addr_base + addr_offest)[0:lineno_bitlength-1].bitcast(Int(lineno_bitlength))
         
-        user.bind(count=v_conv)
+        is_finish = Int(1)(1)
+        is_finish = (vi_input==UInt(32)(INPUT_DEPTH-FILTER_WIDTH)).select(is_finish, Int(1)(0))
+        is_finish = (vj_input==UInt(32)(INPUT_WIDTH-FILTER_WIDTH)).select(is_finish, Int(1)(0))
+        user.bind(count=v_conv, is_finish=is_finish)
         
         sram = SRAM(width, sram_depth, init_file)
         sram.build(Int(1)(0), Int(1)(1), addr, Bits(width)(0), user)
         sram.bound.async_called()
         
-        v_addr = (v_sram==UInt(32)(FILTER_WIDTH-1)).select(v_addr+UInt(32)(1), v_addr)
-        v_sram = (v_sram==UInt(32)(FILTER_WIDTH-1)).select(UInt(32)(0), v_sram+UInt(32)(1))        
-
-        v_addr = (v_conv==UInt(32)(FILTER_SIZE-1)).select(v_addr-UInt(32)(FILTER_WIDTH-1), v_addr)
-        v_conv = (v_conv==UInt(32)(FILTER_SIZE-1)).select(UInt(32)(0), v_conv+UInt(32)(1))
+        vi_filter = (vj_filter==UInt(32)(FILTER_WIDTH-1)).select(vi_filter+UInt(32)(1), vi_filter)
+        vi_filter = (vi_filter==UInt(32)(FILTER_WIDTH)).select(UInt(32)(0), vi_filter)
+        vj_filter = (vj_filter==UInt(32)(FILTER_WIDTH-1)).select(UInt(32)(0), vj_filter+UInt(32)(1))
         
-        cnt_sram[0] = v_sram
+        with Condition(v_conv==UInt(32)(FILTER_SIZE-1)):
+            vi_input = (vj_input==UInt(32)(INPUT_WIDTH-FILTER_WIDTH)).select(vi_input+UInt(32)(1), vi_input)
+            vj_input = (vj_input==UInt(32)(INPUT_WIDTH-FILTER_WIDTH)).select(UInt(32)(0), vj_input+UInt(32)(1))
+            i_input[0] = vi_input
+            j_input[0] = vj_input
+
+        v_conv = (v_conv==UInt(32)(FILTER_SIZE-1)).select(UInt(32)(0), v_conv+UInt(32)(1))        
+        
+        i_filter[0] = vi_filter
+        j_filter[0] = vj_filter
         cnt_conv[0] = v_conv
-        cnt_addr[0] = v_addr
+
+
+# def check(raw, file_path):
+            
+#     input_file = []
+#     with open(file_path, 'r') as file:
+#         for line in file:
+#             input_file.append(int(line.strip(), 16))            
+#     # print(input_file[0:9])
+    
+#     for line in raw.splitlines():
+#         if 'Conv_sum:' in line:
+#             toks = line.split()
+#             step = int(toks[-3])
+#             conv_sum = int(toks[-1])
+            
+#             input = [input_file[start+step+i-1] for start in [j for j in range(FILTER_WIDTH)] for i in range(FILTER_WIDTH)]
+            
+#             result = sum(x * y for x, y in zip(input, filter_given))
+            
+#             assert conv_sum == result, f"Mismatch at step {step}: conv_sum != result ({conv_sum} != {result})"
+
 
 def check(raw, file_path):
-            
-    input_file = []
-    with open(file_path, 'r') as file:
-        for line in file:
-            input_file.append(int(line.strip(), 16))            
-    # print(input_file[0:9])
-    
+    # Parse conv_sums from raw
+    conv_sums = []
     for line in raw.splitlines():
         if 'Conv_sum:' in line:
             toks = line.split()
-            step = int(toks[-3])
-            conv_sum = int(toks[-1])
+            conv_sums.append(int(toks[-1]))
+    
+    # Initialize a 2D matrix of zeros with shape [INPUT_DEPTH][INPUT_WIDTH]
+    input_file = [[0] * INPUT_WIDTH for _ in range(INPUT_DEPTH)]
+
+    # Fill input_file with data from file
+    with open(file_path, 'r') as file:
+        row, col = 0, 0
+        for line in file:
+            input_file[row][col] = int(line.strip(), 16)
+            col += 1
+            if col == INPUT_WIDTH:
+                col = 0
+                row += 1
+            if row == INPUT_DEPTH:
+                break  # Stop reading if we reach the matrix limit
             
-            input = [input_file[start+step+i-1] for start in [j for j in range(FILTER_WIDTH)] for i in range(FILTER_WIDTH)]
+    # # Save input_file as CSV in the same directory as file_path
+    # csv_path = os.path.join(os.path.dirname(file_path), 'input_file.csv')
+    # with open(csv_path, 'w', newline='') as csv_file:
+    #     writer = csv.writer(csv_file)
+    #     writer.writerows(input_file)
+
+    # Apply convolution without padding and compare with conv_sums
+    filter_matrix = [[filter_given[i * FILTER_WIDTH + j] for j in range(FILTER_WIDTH)] for i in range(FILTER_WIDTH)]
+    step = 0  # Keep track of the step for error reporting
+    for i in range(INPUT_DEPTH - FILTER_WIDTH + 1):
+        for j in range(INPUT_WIDTH - FILTER_WIDTH + 1):
+            # Compute convolution for the current position
+            conv_result = 0
+            for k in range(FILTER_WIDTH):
+                for l in range(FILTER_WIDTH):
+                    conv_result += input_file[i + k][j + l] * filter_matrix[k][l]
             
-            result = sum(x * y for x, y in zip(input, filter_given))
-            
-            assert conv_sum == result, f"Mismatch at step {step}: conv_sum != result ({conv_sum} != {result})"
+            # Check if the convolution result matches the corresponding conv_sum
+            if step < len(conv_sums):
+                conv_sum = conv_sums[step]
+                assert conv_sum == conv_result, f"Mismatch at step {step}: {conv_sum} != {conv_result}"
+            else:
+                raise ValueError(f"Not enough conv_sums provided for step {step}")
+
+            step += 1  # Increment step after each comparison
 
 def impl(sys_name, width, init_file, resource_base):
     sys = SysBuilder(sys_name)
@@ -159,7 +209,7 @@ def impl(sys_name, width, init_file, resource_base):
         driver = Driver()
         driver.build(width, init_file, user)
 
-    config = backend.config(sim_threshold=500, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
+    config = backend.config(sim_threshold=SIM_THRESHOLD, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
         
@@ -176,7 +226,6 @@ def impl(sys_name, width, init_file, resource_base):
 
 def test_convolution(sys_name, path, file):
     impl(sys_name, 32, file, path)
-    # impl('conv_sum', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 if __name__ == "__main__":
     sys_name = 'conv_sum'
