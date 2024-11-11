@@ -2,6 +2,12 @@ import assassyn
 from assassyn.frontend import *
 from assassyn import backend
 from assassyn import utils
+import random
+import time
+import os
+
+# current_seed = int(time.time())
+current_seed = 1000
 
 INPUT_WIDTH = 128
 INPUT_DEPTH = 64
@@ -11,8 +17,33 @@ FILTER_SIZE = FILTER_WIDTH * FILTER_WIDTH
 
 filter_given = [i for i in range(FILTER_SIZE)] # Can be changed as needed.
 
-lineno_bitlength = 10
+lineno_bitlength = 20
 sram_depth = 1 << lineno_bitlength
+
+
+def generate_random_hex_file(path, filename, line_count):
+    """
+    Generates a file with each line containing a random hexadecimal number between 0 and 255.
+    
+    Parameters:
+    - path (str): The directory path where the file will be saved. If it doesn't exist, it will be created.
+    - filename (str): The name of the file to be created.
+    - line_count (int): The number of lines in the file.
+    """
+    # Check if the path exists; if not, create it
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    random.seed(current_seed)
+    # Generate random hex numbers and write to the file
+    file_path = os.path.join(path, filename)
+    with open(file_path, 'w') as file:
+        for _ in range(line_count):
+            random_number = random.randint(0, 255)
+            file.write(f"{random_number:08X}\n")
+    
+    print(f"File generated at: {file_path}")
+
 
 class MemUser(Module):
 
@@ -60,6 +91,8 @@ class Driver(Module):
         vi_input = input_i[0]
         vj_input = input_j[0]
         
+        addr_ij = (vi_input * UInt(32)(INPUT_WIDTH))[0:31].bitcast(UInt(32)) + vj_input
+        
         sram_starts = [i for i in range(FILTER_WIDTH)]
         addr_start = RegArray(Int(lineno_bitlength), FILTER_WIDTH, initializer=sram_starts)
 
@@ -90,14 +123,21 @@ class Driver(Module):
         cnt_conv[0] = v_conv
         cnt_addr[0] = v_addr
 
-def check(raw):
+def check(raw, file_path):
+            
+    input_file = []
+    with open(file_path, 'r') as file:
+        for line in file:
+            input_file.append(int(line.strip(), 16))            
+    # print(input_file[0:9])
+    
     for line in raw.splitlines():
         if 'Conv_sum:' in line:
             toks = line.split()
             step = int(toks[-3])
             conv_sum = int(toks[-1])
             
-            input = [start + step + i for start in sram_starts for i in range(FILTER_WIDTH)]
+            input = [input_file[start+step+i-1] for start in [j for j in range(FILTER_WIDTH)] for i in range(FILTER_WIDTH)]
             
             result = sum(x * y for x, y in zip(input, filter_given))
             
@@ -122,17 +162,26 @@ def impl(sys_name, width, init_file, resource_base):
     config = backend.config(sim_threshold=500, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
-
+        
+    print(f"Seed is {current_seed}.") # For reproducing when problems occur
+    file_path = os.path.join(resource_base, init_file)
+       
     raw = utils.run_simulator(simulator_path)
     print(raw)
-    check(raw)
+    check(raw, file_path)
 
     if utils.has_verilator():
         raw = utils.run_verilator(verilator_path)
-        check(raw)
+        check(raw, file_path)
 
-def test_convolution():
-    impl('conv_sum', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
+def test_convolution(sys_name, path, file):
+    impl(sys_name, 32, file, path)
+    # impl('conv_sum', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 if __name__ == "__main__":
-        test_convolution()
+    sys_name = 'conv_sum'
+    path = f'/tmp/{sys_name}'
+    file = 'inputfile.hex'
+    generate_random_hex_file(path, file, INPUT_WIDTH*INPUT_DEPTH)
+    test_convolution(sys_name, path, file)
+
