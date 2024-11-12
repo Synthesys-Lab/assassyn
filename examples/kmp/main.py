@@ -3,7 +3,6 @@ from assassyn.frontend import *
 from assassyn import backend
 from assassyn import utils
 
-
 class Driver(Module):
 
     def __init__(self):

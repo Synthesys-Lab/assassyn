@@ -72,4 +72,5 @@ class Array:
         if isinstance(index, int):
             index = to_uint(index)
         assert isinstance(index, Value)
+        assert isinstance(value, Value)
         return ArrayWrite(self, index, value)
