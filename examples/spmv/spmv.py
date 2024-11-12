@@ -39,15 +39,20 @@ class SRAM_Master(Module):
         with Condition((user_state[0] == SRAM_USER.M1)|(user_state[0] == SRAM_USER.M2)|(user_state[0] == SRAM_USER.M3)):
             with Condition(user_state[0] == SRAM_USER.M1):
                 user_state[0] = SRAM_USER.M2
+
             with Condition(user_state[0] == SRAM_USER.M2):
                 user_state[0] = SRAM_USER.M3
+
             with Condition(user_state[0] == SRAM_USER.M3):
                 user_state[0] = SRAM_USER.JUMP
+
         with Condition(user_state[0] == SRAM_USER.IDLE):
             with Condition(Start == Bits(1)(1)):
                 user_state[0] = SRAM_USER.M1
+
         with Condition(user_state[0] == SRAM_USER.JUMP):
             user_state[0] = SRAM_USER.IDLE
+
         return SRAM_Master_flag
 
 class Loop_user(Module):
@@ -77,6 +82,8 @@ class External_loop(Module):
         In_full_flag = self.pop_all_ports(True)
         i = RegArray(Int(32), 1)
         full_flag = RegArray(Bits(1), 1)
+
+        
         with Condition((In_full_flag == Bits(1)(1))&(full_flag[0] == Bits(1)(0))):
             con = Bits(1)(0)
             con = i[0] < Int(32)(I_MAX)
@@ -99,18 +106,15 @@ class Internal_loop(Module):
         j = RegArray(Int(32), 1)
         con = Bits(1)(0)
         full_flag = Bits(1)(0)
-        con = j[0] < Int(32)(J_MAX)
-        full_flag = j[0] == Int(32)(J_MAX)
+        full_flag = (j[0] == Int(32)(J_MAX)) & sram_master_flag[0]
+
         with Condition(sram_master_flag[0] == Bits(1)(1)):
+            con = j[0] < Int(32)(J_MAX)
             j[0] = con.select((j[0].bitcast(Int(32)) + Int(32)(1)) , Int(32)(0))
-        outter_loop.async_called( In_full_flag = full_flag.bitcast(Bits(1)))
+        
+        outter_loop.async_called( In_full_flag = full_flag)
         return j
 
-
-        
-
-        
-        
 
 
 

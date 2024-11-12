@@ -11,7 +11,8 @@ from assassyn.frontend import *
 from assassyn.backend import *
 from assassyn import utils
 
-
+I_MAX = 5
+J_MAX = 8
 
 
 class Loop_user(Module):
@@ -27,7 +28,7 @@ class Loop_user(Module):
     @module.combinational
     def build(self, i: Array, j: Array):
         p = RegArray(Int(32), 1)
-        p[0] = (i[0][0:15].bitcast(Int(16)) * Int(16)(50)).bitcast(Int(32)) + j[0]
+        p[0] = (i[0][0:15].bitcast(Int(16)) * Int(16)(J_MAX+1)).bitcast(Int(32)) + j[0]
         log("p: {} = i_{}, j_{}", p[0], i[0], j[0])
 
 class External_loop(Module):
@@ -42,8 +43,8 @@ class External_loop(Module):
         i = RegArray(Int(32), 1)
         with Condition(In_full_flag == Bits(1)(1)):
             con = Bits(1)(0)
-            con = i[0] < Int(32)(100)
-            full_flag = i[0] == Int(32)(100)
+            con = i[0] < Int(32)(I_MAX)
+            full_flag = i[0] == Int(32)(I_MAX)
             i[0] = con.select((i[0].bitcast(Int(32)) + Int(32)(1)) , Int(32)(0))
         
         return i
@@ -60,8 +61,8 @@ class Internal_loop(Module):
         j = RegArray(Int(32), 1)
         con = Bits(1)(0)
         full_flag = Bits(1)(0)
-        con = j[0] < Int(32)(50)
-        full_flag = j[0] == Int(32)(50)
+        con = j[0] < Int(32)(J_MAX)
+        full_flag = j[0] == (Int(32)(J_MAX)-Int(32)(1))
         j[0] = con.select((j[0].bitcast(Int(32)) + Int(32)(1)) , Int(32)(0))
         outter_loop.async_called( In_full_flag = full_flag.bitcast(Bits(1)))
         return j
@@ -95,8 +96,8 @@ def test_double_loop():
         driver.build(internal_loop, loop_user)
     conf = config(
         verilog=utils.has_verilator(),
-        sim_threshold=5000,
-        idle_threshold=5000,
+        sim_threshold=200,
+        idle_threshold=200,
         
     )
     simulator_path, verilator_path = elaborate(sys, **conf)
