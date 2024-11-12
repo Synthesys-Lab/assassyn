@@ -23,10 +23,20 @@ class RegisterWriter(Module):
         self.name = 'reg_writer'
 
     @module.combinational
-    def build(self):
-        with Condition(self.rdata.valid()):
-            self.rdata.pop()
+    def build(self, reg_idx):
+        rdata = self.pop_all_ports(False)
+        reg = RegArray(Bits(32), 2, initializer=[0, 0])
+        reg[reg_idx[0]] = rdata
+        return reg
 
+class SortImpl(Downstream):
+
+    def __init__(self):
+        super().__init__()
+
+    @downstream.combinational
+    def build(self, current_state):
+        pass
 
 
 class Sorter(Module):
@@ -36,10 +46,12 @@ class Sorter(Module):
         self.name = 'sort'
 
     @module.combinational
-    def build(self, block_size, block_start, from_ptr, to_ptr, writer):
+    def build(self, block_size, block_start, from_ptr, to_ptr, writer, reg_idx, reg):
         state = RegArray(UInt(state_bits), 1, initializer=[1])
+        return state[0]
+
+
         k = RegArray(addr_type, 1, initializer=[0])
-        pred = RegArray(UInt(1), 1, initializer=[0])
         idx = RegArray(addr_type, 2, initializer=[0, 0])
 
         with Condition(state[0] == state_init_a):
@@ -48,24 +60,30 @@ class Sorter(Module):
             k[0] = addr_type(0)
             idx[0] = addr_type(0)
             # TODO(@were): write to reg[0], by memory re=1, lineno=(block.start + 0 + from[0]).
+            reg_idx[0] = UInt(1)(0)
 
         with Condition(state[0] == state_init_b):
             state[0] = state_idle
             log("[sort.init] 2nd element")
             idx[1] = addr_type(0)
             # TODO(@were): write to reg[1], by memory re=1, lineno=(block.start + (block.size / 2) + from[0]).
+            reg_idx[0] = UInt(1)(1)
 
         # Idle for a cycle to wait the memory write data to reg[b].
         with Condition(state[0] == state_idle):
             state[0] = state_sort
 
+        cmp = reg[0] > reg[1]
         with Condition(state[0] == state_sort):
             # TODO(@were): Replace "0" with comparison later.
-            pred[0] = UInt(1)(0)
+            # TODO(@were): memory we=1, lineno=(block.start + k[0] + to[0]).
+            reg_idx[0] = cmp
             state[0] = state_read
             k[0] = k[0] + addr_type(1)
             log("[loop.k++ ] {}", k[0])
-            # TODO(@were): memory we=1, lineno=(block.start + k[0] + to[0]).
+
+        half_block = block_size[0] >> addr_type(1)
+        inrange = idx[reg_idx[0]] < half_block
 
         with Condition(state[0] == state_read):
             # TODO(@were): memory re=(index[pred[0]] < (block.size / 2)), lineno=(block.start + index[pred[0]] + (block.size / 2) * pred[0] + from[0]).
@@ -77,8 +95,8 @@ class Sorter(Module):
                 block_start[0] = new_start
                 state[0] = state_init_a
                 log("[loop.next] block.start: {}", new_start)
-
-        half_block = block_size[0] >> addr_type(1)
+            with Condition(~inrange):
+                reg[reg_idx[0]] = Bits(32)(0x7FFFFFFF)
 
         we = state[0] == state_sort
 
@@ -86,7 +104,7 @@ class Sorter(Module):
             state_init_a: UInt(1)(1),
             state_init_b: UInt(1)(1),
             state_sort: UInt(1)(0),
-            state_read: idx[pred[0]] < half_block,
+            state_read: inrange,
             None: UInt(1)(0)
         })
 
@@ -94,13 +112,13 @@ class Sorter(Module):
             state_init_a: block_start[0] + from_ptr[0],
             state_init_b: block_start[0] + half_block + from_ptr[0],
             state_sort: block_start[0] + k[0] + to_ptr[0],
-            state_read: block_start[0] + idx[pred[0]] + pred[0].select(half_block, addr_type(0)) + from_ptr[0],
+            state_read: block_start[0] + idx[reg_idx[0]] + reg_idx[0].select(half_block, addr_type(0)) + from_ptr[0],
             None: addr_type(0)
         })
 
         log('[loop.sram] addr: {}', addr)
 
-        wdata = Bits(32)(0)
+        wdata = we.select(reg[cmp], Bits(32)(0))
 
         sram = SRAM(32, n * 2, 'init.hex')
         sram.build(we, re, addr, wdata, writer)
@@ -136,12 +154,13 @@ def test_sort():
         block_start = RegArray(addr_type, 1, initializer=[0])
         from_ptr = RegArray(addr_type, 1, initializer=[0])
         to_ptr = RegArray(addr_type, 1, initializer=[n // 2])
+        reg_idx = RegArray(UInt(1), 1, initializer=[0])
 
         writer = RegisterWriter()
-        writer.build()
+        reg = writer.build(reg_idx)
 
         sorter = Sorter()
-        sorter.build(block_size, block_start, from_ptr, to_ptr, writer)
+        sorter.build(block_size, block_start, from_ptr, to_ptr, writer, reg_idx, reg)
 
         driver = Driver()
         driver.build(sorter, block_size, block_start, from_ptr, to_ptr)
