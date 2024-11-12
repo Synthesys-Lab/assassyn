@@ -35,7 +35,7 @@ class SRAM_Master(Module):
         Start = self.pop_all_ports(False)
         SRAM_Master_flag = RegArray(Bits(1), 1)
         log("user_state: {} ", user_state[0])
-        SRAM_Master_flag[0] = (user_state[0] == SRAM_USER.JUMP).bitcast(Bits(1))
+        SRAM_Master_flag[0] = (user_state[0] == SRAM_USER.M3).bitcast(Bits(1))
         with Condition((user_state[0] == SRAM_USER.M1)|(user_state[0] == SRAM_USER.M2)|(user_state[0] == SRAM_USER.M3)):
             with Condition(user_state[0] == SRAM_USER.M1):
                 user_state[0] = SRAM_USER.M2
@@ -68,7 +68,7 @@ class Loop_user(Module):
     @module.combinational
     def build(self, i: Array, j: Array):
         p = RegArray(Int(32), 1)
-        p[0] = (i[0][0:15].bitcast(Int(16)) * Int(16)(J_MAX)).bitcast(Int(32)) + j[0]
+        p[0] = (i[0][0:15].bitcast(Int(16)) * Int(16)(J_MAX+1)).bitcast(Int(32)) + j[0]
         log("p: {} = i_{}, j_{}", p[0], i[0], j[0])
 
 class External_loop(Module):
@@ -79,11 +79,11 @@ class External_loop(Module):
 
     @module.combinational
     def build(self,sram_master: SRAM_Master):
-        In_full_flag = self.pop_all_ports(True)
+        In_full_flag = self.pop_all_ports(False)
         i = RegArray(Int(32), 1)
         full_flag = RegArray(Bits(1), 1)
 
-        
+
         with Condition((In_full_flag == Bits(1)(1))&(full_flag[0] == Bits(1)(0))):
             con = Bits(1)(0)
             con = i[0] < Int(32)(I_MAX)
@@ -106,7 +106,7 @@ class Internal_loop(Module):
         j = RegArray(Int(32), 1)
         con = Bits(1)(0)
         full_flag = Bits(1)(0)
-        full_flag = (j[0] == Int(32)(J_MAX)) & sram_master_flag[0]
+        full_flag = (j[0] == (Int(32)(J_MAX))) & sram_master_flag[0]
 
         with Condition(sram_master_flag[0] == Bits(1)(1)):
             con = j[0] < Int(32)(J_MAX)
@@ -148,8 +148,8 @@ def test_spmv():
         driver.build(internal_loop, loop_user)
     conf = config(
         verilog=utils.has_verilator(),
-        sim_threshold=200,
-        idle_threshold=200,
+        sim_threshold=100,
+        idle_threshold=100,
         
     )
     simulator_path, verilator_path = elaborate(sys, **conf)
