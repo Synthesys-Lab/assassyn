@@ -247,4 +247,3 @@ class RecordValue:
     # object and the wrapped object.
     def __getattr__(self, name):
         return self._dtype.attributize(self._payload, name)
-
