@@ -238,6 +238,11 @@ def test_spmv():
         driver = Driver()
         driver.build(internal_loop)
 
+        sys.expose_on_top(i, kind='Output')
+        sys.expose_on_top(j, kind='Output')
+        sys.expose_on_top(user_state, kind='Output')
+        sys.expose_on_top(out, kind='Output')
+
     
     
     conf = config(
