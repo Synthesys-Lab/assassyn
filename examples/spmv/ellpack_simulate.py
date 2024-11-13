@@ -1,8 +1,8 @@
 import numpy as np
 
 # Parameters
-N = 10  # Number of rows in the sparse matrix
-L = 5   # Maximum number of non-zero elements per row
+N = 494  # Number of rows in the sparse matrix
+L = 10   # Maximum number of non-zero elements per row
 
 def read_from_file(filename):
     with open(filename, 'r') as f:

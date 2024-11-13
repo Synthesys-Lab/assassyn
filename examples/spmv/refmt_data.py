@@ -15,17 +15,17 @@ def read_and_reformat_file(input_filename, output_filename):
         # Write nzval data with //nzval as a comment
         outfile.write("//nzval\n")
         for val in nzval:
-            outfile.write(f"{val},\n")
+            outfile.write(f"{format(val & 0xFFFFFFFF, '08x')}\n")
         
         # Write colind data with //colind as a comment
         outfile.write("//colind\n")
         for val in colind:
-            outfile.write(f"{val},\n")
+            outfile.write(f"{format(val & 0xFFFFFFFF, '08x')}\n")
         
         # Write x data with //x as a comment
         outfile.write("//x\n")
         for val in x:
-            outfile.write(f"{val},\n")
+            outfile.write(f"{format(val & 0xFFFFFFFF, '08x')}\n")
 
 if __name__ == "__main__":
     input_filename = "./data/ellpack_data.txt"

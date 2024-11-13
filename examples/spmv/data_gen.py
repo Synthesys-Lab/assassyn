@@ -2,9 +2,9 @@ import numpy as np
 import random
 
 # Parameters
-N = 10  # Number of rows in the sparse matrix
-L = 5   # Maximum number of non-zero elements per row
-MIN = -1024  # Minimum value for random generation (int16 range)
+N = 494  # Number of rows in the sparse matrix
+L = 10   # Maximum number of non-zero elements per row
+MIN = 0  # Minimum value for random generation (int16 range)
 MAX = 1023   # Maximum value for random generation (int16 range)
 
 # Function to generate random values in the range [MIN, MAX]
