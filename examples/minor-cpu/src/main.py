@@ -43,9 +43,7 @@ class Execution(Module):
         data: str,
         depth_log: int):
 
-        
         csr_id = Bits(4)(0)
-        
  
         signals = self.signals.peek()
 

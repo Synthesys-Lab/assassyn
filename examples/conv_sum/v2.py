@@ -165,6 +165,8 @@ def impl(sys_name, width, init_file, resource_base):
         driver = Driver()
         driver.build(width, init_file, user)
 
+        sys.expose_on_top(user.result)
+
     config = backend.config(sim_threshold=SIM_THRESHOLD, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
 
     simulator_path, verilator_path = backend.elaborate(sys, **config)
