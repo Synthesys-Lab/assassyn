@@ -44,7 +44,7 @@ class Layer(Module):
         occupied0 = self.elements[index0].is_occupied
         vacancy0 = self.elements[index0].vacancy       
                         
-        # log
+        # Only log the first layer.
         with Condition(self.level_I == Int(32)(0)):
             with Condition(action):
                 log("Push: {}", value)
@@ -233,7 +233,6 @@ def priority_queue(heap_height=3):
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
   
     raw = utils.run_simulator(simulator_path)
-    print(raw)
     check(raw, heap_height=heap_height)
 
     if verilator_path:
