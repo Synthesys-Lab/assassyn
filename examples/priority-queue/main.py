@@ -6,6 +6,7 @@ import random
 import heapq
 
 current_seed = int(time.time())
+# current_seed = 1731606257
 
 class Layer(Module):
     """
@@ -46,24 +47,64 @@ class Layer(Module):
         value0 = self.elements[index0].value
         occupied0 = self.elements[index0].is_occupied
         vacancy0 = self.elements[index0].vacancy
-
+        
+        # Two child nodes derived from the same parent node.
+        index1 = (index0 * Int(32)(2))[0:31].bitcast(Int(32))
+        index2 = index1 + Int(32)(1)
+        value1 = Int(32)(0)
+        value2 = Int(32)(0)
+        occupied1 = Int(1)(0)
+        occupied2 = Int(1)(0)
+        vacancy1 = Int(self.height)(0)
+        vacancy2 = Int(self.height)(0)
+        call_n = Int(1)(0)
+    
         if next_elements:
-            # Two child nodes derived from the same parent node.
-            index1 = (index0 * Int(32)(2))[0:31].bitcast(Int(32))
-            index2 = index1 + Int(32)(1)
-            # Extract datas from Records
+            # Extract data from Records
             value1 = next_elements[index1].value
             value2 = next_elements[index2].value
             occupied1 = next_elements[index1].is_occupied
             occupied2 = next_elements[index2].is_occupied
             vacancy1 = next_elements[index1].vacancy
             vacancy2 = next_elements[index2].vacancy
+            call_n = Int(1)(1)
+        
+        # Each cycle only needs to do 2 things: 1. Determine the data for current layer. 2. Determine the data go to the next layer.
+        # Current value
+        vacancy_c = action.select(vacancy0-Int(self.height)(1), vacancy0+Int(self.height)(1))   # Basic changes for push and pop
+        # log("vacancy_c:{}", vacancy_c)
+        vacancy_c = (action|occupied1|occupied2).select(vacancy_c, vacancy0)    # It's pop, and the two child elements are empty
+        # log("vacancy_c:{}", vacancy_c)
+        vacancy_c = occupied0.select(vacancy_c, vacancy0)   # The current element is empty
+        
+        occupied_c = action.select(Int(1)(1), Int(1)(0))    # Basic changes for push and pop
+        # log("occupied_c:{}", occupied_c)
+        occupied_c = (~action&(occupied1|occupied2)).select(Int(1)(1), occupied_c)  # It's pop, and at least one child element is non empty
+
+        
+        value_mask = Bits(1)(1).concat(Bits(32)(0))
+        value_c1 = action.select(action.concat(value), occupied1.concat(value1)) ^ value_mask
+        value_c2 = action.select(occupied0.concat(value0), occupied2.concat(value2)) ^ value_mask
+        value_c = ((value_c1<value_c2).select(value_c1, value_c2))[0:31].bitcast(Int(32))
+        
+        log("NEW CURRENT VALUE:\t value: {}\toccupied: {}\tvacancy: {}", value_c, occupied_c, vacancy_c)
+        
+        # Next value
+        index_n = Int(32)(1234)
+        value_n = ((value_c1<value_c2).select(value_c2, value_c1))[0:31].bitcast(Int(32))
+        value_n = action.select(value_n, Int(32)(0))
+        call_n = Int(32)(1234)
+        
+        log("------------------------------------------------------OLD NEXT VALUE:\t value: {}\tindex: {}\t call:{}", value_n, index_n, call_n)
 
         # PUSH
-        with Condition(~action):
+        with Condition(action):
             # The current element is valid.
             with Condition(~occupied0):
                 self.elements[index0] = type0.bundle(value=value, is_occupied=ONE, vacancy=vacancy0)
+                
+                log("OLD CURRENT VALUE:\t value: {}\toccupied: {}\tvacancy: {}", value, ONE, vacancy0)
+                
                 log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                     value, self.level_I, index0, value0, occupied0, vacancy0, value, ONE, vacancy0)
 
@@ -81,6 +122,9 @@ class Layer(Module):
                     # value write to next level
                     value_next = (value > value0).select(value, value0)
                     self.elements[index0] = type0.bundle(value=value_current, is_occupied=ONE, vacancy=vacancy)
+                    
+                    log("OLD CURRENT VALUE:\t value: {}\toccupied: {}\tvacancy: {}", value_current, ONE, vacancy)
+                    
                     log("Push {}  \tin\tLevel_{}[{}]\tFrom  {} + {} + {}\tto  {} + {} + {}",
                         value, self.level_I, index0, value0, occupied0, vacancy0, value_current, ONE, vacancy)
                     
@@ -91,17 +135,19 @@ class Layer(Module):
                             valid_ab = (~occupied2).concat(~occupied1).bitcast(Int(2))
                             pred = ((~valid_ab) + Int(2)(1)) & valid_ab
                             index_next = pred.select1hot(index1, index2)
-                            call = next_layer.async_called(action=ZERO, index=index_next, value=value_next)
+                            call = next_layer.async_called(action=ONE, index=index_next, value=value_next)
+                            log("------------------------------------------------------OLD NEXT VALUE:\t value: {}\tindex: {}\t call:{}", value_next, index_next, Int(1)(1))
                             call.bind.set_fifo_depth(action=1, index=1, value=1)
 
                         # Two child nodes are both occupied.
                         with Condition(occupied1 & occupied2):
                             index_next = (vacancy1 < vacancy2).select(index2, index1)
-                            call = next_layer.async_called(action=ZERO, index=index_next, value=value_next)
+                            call = next_layer.async_called(action=ONE, index=index_next, value=value_next)
+                            log("------------------------------------------------------OLD NEXT VALUE:\t value: {}\tindex: {}\t call:{}", value_next, index_next, Int(1)(1))
                             call.bind.set_fifo_depth(action=1, index=1, value=1)
 
         # POP
-        with Condition(action):
+        with Condition(~action):
             # The current element is valid.
             with Condition(~occupied0):
                 log("Pop\t\tPop failed! The heap is empty.")
@@ -117,7 +163,9 @@ class Layer(Module):
                 if next_elements is None:
                     self.elements[index0] = type0.bundle(value=Int(32)(0), is_occupied=ZERO, vacancy=vacancy0)
                     
-                if next_elements:                    
+                    log("OLD CURRENT VALUE:\t value: {}\toccupied: {}\tvacancy: {}", Int(32)(0), ZERO, vacancy0)
+                    
+                if next_elements:
                     # Two child nodes are both occupied.
                     with Condition(occupied1 & occupied2):
                         # value write to current level
@@ -125,8 +173,11 @@ class Layer(Module):
                         index_next = (value1 < value2).select(index1, index2)                        
                         vacancy = vacancy0 + Int(self.height)(1)
                         self.elements[index0] = type0.bundle(value=value_update, is_occupied=ONE, vacancy=vacancy)
+                        
+                        log("OLD CURRENT VALUE:\t value: {}\toccupied: {}\tvacancy: {}", value_update, ONE, vacancy)
 
-                        call = next_layer.async_called(action=ONE, index=index_next, value=Int(32)(0))
+                        call = next_layer.async_called(action=ZERO, index=index_next, value=Int(32)(0))
+                        log("------------------------------------------------------OLD NEXT VALUE:\t value: {}\tindex: {}\t call:{}", value_update, index_next, Int(1)(1))
                         call.bind.set_fifo_depth(action=1, index=1, value=1)
                         
                     # One child is valid, another is occupied.
@@ -137,13 +188,18 @@ class Layer(Module):
                         value_update = pred.select1hot(value1, value2)
                         vacancy = vacancy0 + Int(self.height)(1)
                         self.elements[index0] = type0.bundle(value=value_update, is_occupied=ONE, vacancy=vacancy)
+                        
+                        log("OLD CURRENT VALUE:\t value: {}\toccupied: {}\tvacancy: {}", value_update, ONE, vacancy)
 
-                        call = next_layer.async_called(action=ONE, index=index_next, value=Int(32)(0))
+                        call = next_layer.async_called(action=ZERO, index=index_next, value=Int(32)(0))
+                        log("------------------------------------------------------OLD NEXT VALUE:\t value: {}\tindex: {}\t call:{}", value_update, index_next, Int(1)(1))
                         call.bind.set_fifo_depth(action=1, index=1, value=1)
 
                     # Two child nodes are both valid.
                     with Condition(~occupied1 & ~occupied2):
                         self.elements[index0] = type0.bundle(value=Int(32)(0), is_occupied=ZERO, vacancy=vacancy0)
+                        
+                        log("OLD CURRENT VALUE:\t value: {}\toccupied: {}\tvacancy: {}", Int(32)(0), ZERO, vacancy0)
 
 class HeapPush(Module):
     
@@ -155,7 +211,7 @@ class HeapPush(Module):
     @module.combinational
     def build(self, layer: Layer):
         push_value = self.pop_all_ports(True)
-        bound = layer.bind(action=Int(1)(0), index=Int(32)(0))
+        bound = layer.bind(action=Int(1)(1), index=Int(32)(0))
         call = bound.async_called(value=push_value)
         call.bind.set_fifo_depth(action=1, index=1, value=1)
 
@@ -167,7 +223,7 @@ class HeapPop(Module):
 
     @module.combinational
     def build(self, layer: Layer):
-        bound = layer.bind(action=Int(1)(1), index=Int(32)(0), value=Int(32)(1))
+        bound = layer.bind(action=Int(1)(0), index=Int(32)(0), value=Int(32)(1))
         call = bound.async_called()        
         call.bind.set_fifo_depth(action=1, index=1, value=1)
         
@@ -225,17 +281,45 @@ def check(raw,heap_height):
     for i in range(len(pops)):
         assert pops[i] == outputs[i] 
     assert len(outputs) == len(pops), f'heap pops: {len(outputs)} != {len(pops)}'
+    
+def check_c(raw):
+    new_array = []
+    old_array = []
+    
+    for line in raw.splitlines():
+        if 'NEW CURRENT VALUE:' in line:
+            toks = line.split()
+            a = toks[-1]
+            b = toks[-3]
+            c = toks[-5]
+            new_array.append([a, b, c])
+        
+        if 'OLD CURRENT VALUE:' in line:
+            toks = line.split()
+            a = toks[-1]
+            b = toks[-3]
+            c = toks[-5]
+            old_array.append([a, b, c])
+    
+    # 检查数组是否长度相等
+    assert len(new_array) == len(old_array), "Arrays have different lengths."
+    
+    # 逐项比较两个数组
+    for i in range(len(new_array)):
+        for j in range(len(new_array[i])):
+            assert new_array[i][j] == old_array[i][j], f"Mismatch at row {i}, column {j}: {new_array[i][j]} != {old_array[i][j]}"
+
 
 def priority_queue(heap_height=3):    
     # Build a layer with the given heap height and layer level.
     def build_layer(heap_height: int, level: int):
         element_type = Record({  # TODO: Vacancy can be reduced by 1 in the future.
-            (0, heap_height-level): ('vacancy', Int),
-            (heap_height-level+1, heap_height-level+1): ('is_occupied', Bits),
-            (heap_height-level+2, heap_height-level+33):('value', Int),
+            (0, 31):('value', Int),
+            (32, 32): ('is_occupied', Bits),
+            (33, 33+heap_height-level): ('vacancy', Int),
         })
         size = 2 ** level
-        vacancy = 2 ** (heap_height - level) - 2
+        vacancy = (2 ** (heap_height - level) - 2) << 33
         initializer = [vacancy] * size
         reg_array = RegArray(
             scalar_ty=element_type,
@@ -268,14 +352,17 @@ def priority_queue(heap_height=3):
         testbench.build(heap_push, heap_pop)
     
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-    
-    print(f"Seed is {current_seed}.") # For reproducing when problems occur    
+  
     raw = utils.run_simulator(simulator_path)
+    print(raw)
     check(raw, heap_height=heap_height)
+    check_c(raw)
 
     if verilator_path:
         raw = utils.run_verilator(verilator_path)
-        check(raw, heap_height=heap_height)    
+        check(raw, heap_height=heap_height)        
+        
+    print(f"Seed is {current_seed}.") # For reproducing when problems occur
     
 if __name__ == '__main__':
     priority_queue(heap_height=3)
