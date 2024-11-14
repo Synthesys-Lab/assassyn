@@ -35,6 +35,8 @@ class Execution(Module):
         exec_bypass_data: Array,
         mem_bypass_reg: Array,
         mem_bypass_data: Array,
+        wb_bypass_reg: Array,
+        wb_bypass_data: Array,
         reg_onwrite: Array,
         offset_reg: Array,
         rf: Array, 
@@ -55,13 +57,24 @@ class Execution(Module):
 
         on_write = reg_onwrite[0]
 
-        a_valid = (~(on_write >> rs1))[0:0] | (exec_bypass_reg[0] == rs1) | (mem_bypass_reg[0] == rs1) | ~signals.rs1_valid
+        
 
-        b_valid = (~(on_write >> rs2))[0:0] | (exec_bypass_reg[0] == rs2) | (mem_bypass_reg[0] == rs2) | ~signals.rs2_valid
+        a_valid =(exec_bypass_reg[0] == rs1) | (mem_bypass_reg[0] == rs1) | ~signals.rs1_valid | (~(on_write >> rs1))[0:0] #| (wb_bypass_reg[0] == rs1)
+        a_valid_true = a_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rs1).bitcast(Bits(1))) 
+        with Condition(~a_valid):
+            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rs1_valid: {} | (~(on_write >> rs1))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rs1_valid, (~(on_write >> rs1))[0:0])
 
-        rd_valid = (~(on_write >> rd))[0:0] | (exec_bypass_reg[0] == rd) | (mem_bypass_reg[0] == rd) | ~signals.rd_valid
+        b_valid =(exec_bypass_reg[0] == rs2) | (mem_bypass_reg[0] == rs2) | ~signals.rs2_valid | (~(on_write >> rs2))[0:0] #| (wb_bypass_reg[0] == rs2)
+        b_valid_true = b_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rs2).bitcast(Bits(1) ))
+        with Condition(~b_valid):
+            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rs2_valid: {} | (~(on_write >> rs2))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rs2_valid, (~(on_write >> rs2))[0:0])
 
-        valid = a_valid & b_valid & rd_valid
+        rd_valid =  (exec_bypass_reg[0] == rd) | (mem_bypass_reg[0] == rd) | ~signals.rd_valid | (~(on_write >> rd))[0:0] 
+        rd_valid_true = rd_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rd).bitcast(Bits(1) ))
+        with Condition(~rd_valid):
+            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rd_valid: {} | (~(on_write >> rd))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rd_valid, (~(on_write >> rd))[0:0])
+
+        valid = a_valid_true & b_valid_true & rd_valid_true
 
         with Condition(~valid):
             log("pc: 0x{:08x}   | rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {} | backlogged", \
@@ -134,11 +147,13 @@ class Execution(Module):
         a = bypass(exec_bypass_reg, exec_bypass_data, rs1, a)
         a = (rs1 == Bits(5)(0)).select(Bits(32)(0), a)
         a = signals.csr_write.select(Bits(32)(0), a)
+        a = (~a_valid).select( wb_bypass_data[0], a)
 
         b = bypass(mem_bypass_reg, mem_bypass_data, rs2, rf[rs2])
         b = bypass(exec_bypass_reg, exec_bypass_data, rs2, b)
         b = (rs2 == Bits(5)(0)).select(Bits(32)(0), b)
         b = is_csr.select(csr_f[csr_id], b)
+        b = (~b_valid).select( wb_bypass_data[0], b)
         
 
         log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
@@ -312,8 +327,9 @@ class Onwrite(Downstream):
         wb_rd = writeback_rd.optional(Bits(5)(0))
         ex_bit = (ex_rd != Bits(5)(0)).select(Bits(32)(1) << ex_rd, Bits(32)(0))
         wb_bit = (wb_rd != Bits(5)(0)).select(Bits(32)(1) << wb_rd, Bits(32)(0))
-        log("ownning: {:02}      | releasing: {:02}|", ex_rd, wb_rd)
+        
         reg_onwrite[0] = reg_onwrite[0] ^ ex_bit ^ wb_bit
+        log("ownning: {:02}      | releasing: {:02}| reg_onwrite[0]: {:08x}", ex_rd, wb_rd, reg_onwrite[0])
 
 class MemUser(Module):
     def __init__(self, width):
@@ -377,8 +393,11 @@ def build_cpu(depth_log):
         mem_bypass_reg = RegArray(bits5, 1)
         mem_bypass_data = RegArray(bits32, 1)
 
+        wb_bypass_reg = RegArray(bits5, 1)
+        wb_bypass_data = RegArray(bits32, 1)
+
         writeback = WriteBack()
-        wb_rd = writeback.build(reg_file = reg_file )
+        wb_rd = writeback.build(reg_file = reg_file)
 
         memory_access = MemoryAccess()
 
@@ -391,6 +410,8 @@ def build_cpu(depth_log):
             reg_onwrite = reg_onwrite,
             mem_bypass_reg = mem_bypass_reg,
             mem_bypass_data = mem_bypass_data,
+            wb_bypass_reg = wb_bypass_reg,
+            wb_bypass_data = wb_bypass_data,
             offset_reg = offset_reg,
             rf = reg_file,
             csr_f = csr_file,
@@ -403,7 +424,9 @@ def build_cpu(depth_log):
         memory_access.build(
             writeback = writeback, 
             mem_bypass_reg = mem_bypass_reg, 
-            mem_bypass_data=mem_bypass_data
+            mem_bypass_data=mem_bypass_data,
+            wb_bypass_reg=wb_bypass_reg,
+            wb_bypass_data=wb_bypass_data
         )
 
         decoder = Decoder()
@@ -514,13 +537,13 @@ if __name__ == '__main__':
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        #'0to100',
+        '0to100',
         #'multiply',
         #'dhrystone',
         #'median',
         #'multiply',
         #'qsort',
-        'rsort',
+        #'rsort',
         #'towers',
         #'vvadd',
     ]

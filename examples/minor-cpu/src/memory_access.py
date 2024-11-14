@@ -14,7 +14,9 @@ class MemoryAccess(Module):
         self, 
         writeback: Module, 
         mem_bypass_reg: Array, 
-        mem_bypass_data: Array
+        mem_bypass_data: Array,
+        wb_bypass_data: Array,
+        wb_bypass_reg: Array
     ):
         self.timing = 'systolic'
 
@@ -40,6 +42,9 @@ class MemoryAccess(Module):
         
         arg = self.rdata.valid().select(arg, result)
         arg = mem_ext[0:0].select( data_cut ,arg)
+
+        wb_bypass_data[0] = arg
+        wb_bypass_reg[0] = rd
 
         wb_bound = writeback.bind(mdata = arg , rd = rd)
         wb_bound.async_called() 

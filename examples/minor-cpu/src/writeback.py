@@ -19,5 +19,4 @@ class WriteBack(Module):
         with Condition((rd != Bits(5)(0))):
             log("writeback        | x{:02}          | 0x{:08x}", rd, mdata)
             reg_file[rd] = mdata
-
         return rd
