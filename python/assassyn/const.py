@@ -7,6 +7,7 @@ class Const(Value):
     '''The AST node data structure for constant values.'''
 
     def __init__(self, dtype, value):
+        assert dtype.inrange(value), f"Value {value} is out of range for {dtype}"
         self.dtype = dtype
         self.value = value
 

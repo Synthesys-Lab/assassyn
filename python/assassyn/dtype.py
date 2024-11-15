@@ -12,11 +12,17 @@ class DType:
     def attributize(self, value, name):
         '''The syntax sugar for creating a port'''
 
+    def inrange(self, value):
+        return True
+
 class Void(DType):
     '''Void data type'''
 
     def __init__(self):
         super().__init__(1)
+
+    def inrange(self, value):
+        return False
 
 _VOID = Void()
 
@@ -38,6 +44,11 @@ class Int(DType):
         #pylint: disable=import-outside-toplevel
         from .const import _const_impl
         return _const_impl(self, value)
+    
+    def inrange(self, value):
+        left = -(1 << (self.bits - 1))
+        right = (1 << (self.bits - 1)) - 1
+        return left <= value <= right
 
 class UInt(DType):
     '''Un-signed integer data type'''
@@ -53,6 +64,9 @@ class UInt(DType):
         #pylint: disable=import-outside-toplevel
         from .const import _const_impl
         return _const_impl(self, value)
+    
+    def inrange(self, value):
+        return 0 <= value < (1 << self.bits)
 
 class Float(DType):
     '''Floating point data type'''
@@ -76,6 +90,10 @@ class Bits(DType):
         #pylint: disable=import-outside-toplevel
         from .const import _const_impl
         return _const_impl(self, value)
+    
+    def inrange(self, value):
+        right = (1 << self.bits) - 1
+        return 0 <= value <= right
 
 class Record(DType):
     '''Record data type'''
