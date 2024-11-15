@@ -28,18 +28,23 @@ def radix_sort_binary(numbers):
 
         # 将排序后的数组更新到原始数组中，准备进行下一轮排序
         numbers = sorted_numbers
-        print(f"第 {i} 轮排序结果: ")
-        print([f"{num:032b}" for num in sorted_numbers])
+        if i == 0:
+            print(f"第 {i} 轮排序结果: ")
+            # print([f"{num:032b}" for num in sorted_numbers])
+            print(sorted_numbers)
 
     return numbers
 
 # 示例用法
 numbers = [
-    0b11010101010101010101010101010101,
-    0b11010101010101011111010101010101,
-    0b11010101010101010101010111111111,
-    0b00000000000000000000000000000001,
-    0b11010101010101111111010101010101,
+    0x255c,
+    0x41b,
+    0x2107,
+    0x2380,
+    0xc1c,
+    0x1440,
+    0x28aa,
+    0x2dc1,
 ]
 
 # 执行排序
@@ -47,4 +52,4 @@ sorted_numbers = radix_sort_binary(numbers)
 
 # 输出排序结果
 sorted_numbers_binary = [f"{num:032b}" for num in sorted_numbers]
-print(sorted_numbers_binary)
+# print(sorted_numbers_binary)
