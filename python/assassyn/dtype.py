@@ -13,6 +13,7 @@ class DType:
         '''The syntax sugar for creating a port'''
 
     def inrange(self, value):
+        '''Check if the value is in the range of the data type'''
         return True
 
 class Void(DType):
