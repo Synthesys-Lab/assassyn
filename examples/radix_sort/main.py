@@ -16,7 +16,7 @@ print(f'resource_base: {resource_base}')
 # Data width, length
 data_width = 32
 data_depth = sum(1 for _ in open(f'{resource_base}/numbers.data'))
-addr_width = data_depth.bit_length()
+addr_width = (data_depth * 2 + 1).bit_length()
 print(f'data_width: {data_width}, data_depth: {data_depth}, addr_width: {addr_width}')
 
 # MemUser module
@@ -27,19 +27,16 @@ class MemUser(Module):
             no_arbiter=True
         )
     @module.combinational
-    def build(self, cycle_reg: RegArray, SM_reg: RegArray, radix_reg: RegArray):
+    def build(self, SM_reg: RegArray, radix_reg: RegArray):
         width = self.rdata.dtype.bits
         offset_reg = RegArray(UInt(width), 1, initializer=[0])
         rdata = self.pop_all_ports(True)
         rdata = rdata.bitcast(UInt(width))
         idx = (rdata >> offset_reg[0])[0:3]
-        # Stage 1: Read Data into radix
+        # Only read to radix_reg in stage 1
         with Condition(SM_reg[0] == UInt(2)(1)):
             log("Stage 1: Read rdata from memory: {:08x}", rdata)
             radix_reg[idx] = radix_reg[idx] + UInt(width)(1)
-        # Stage 3: Write Data to Memory's new address
-        # with Condition(SM_reg[0] != UInt(2)(1)):
-        #     log("Stage 3!")
         return rdata
 
 # RadixReducer module
@@ -50,9 +47,10 @@ class RadixReducer(Module):
     def build(self, radix_reg: RegArray, cycle_reg: RegArray):
         # Prefix sum
         with Condition(cycle_reg[0] < UInt(data_width)(16)):
-            radix_reg[cycle_reg[0]] = radix_reg[cycle_reg[0]] + radix_reg[cycle_reg[0]-UInt(data_width)(1)]
-            log("Stage 2: radix_reg[{}]: {:08x}", cycle_reg[0]-UInt(data_width)(1), radix_reg[cycle_reg[0]-UInt(data_width)(1)])
-            cycle_reg[0] = cycle_reg[0] + UInt(data_width)(1)
+            cycle_index = cycle_reg[0][0:3].bitcast(UInt(4))
+            radix_reg[cycle_index] = radix_reg[cycle_index] + radix_reg[cycle_index-UInt(4)(1)]
+            log("Stage 2: radix_reg[{}]: {:08x}; cycle_index: {:04x};cycle_reg[0]: {:08x}", cycle_reg[0]-UInt(data_width)(1), radix_reg[cycle_reg[0]-UInt(data_width)(1)], cycle_index, cycle_reg[0])
+            cycle_reg[0] = cycle_reg[0]+ UInt(data_width)(1)
         return
 
 class MemImpl(Downstream):
@@ -86,7 +84,7 @@ class MemImpl(Downstream):
                 re[0] = Bits(1)(1)
                 we[0] = Bits(1)(0)
                 wdata[0] = rdata.bitcast(Bits(data_width))
-                write_addr_reg[0] = radix_reg[rdata[0:3]].bitcast(UInt(addr_width)) + UInt(addr_width)(data_depth) - UInt(addr_width)(1)
+                write_addr_reg[0] = radix_reg[rdata[0:3]][0:(addr_width-1)].bitcast(UInt(addr_width)) + UInt(addr_width)(data_depth) - UInt(addr_width)(1)
                 radix_reg[rdata[0:3]] = radix_reg[rdata[0:3]] - UInt(data_width)(1)
                 with Condition(read_addr_reg[0] == UInt(addr_width)(0)):
                     stop_reg[0] = UInt(1)(1)
@@ -95,7 +93,7 @@ class MemImpl(Downstream):
                     addr_reg[0] = read_addr_reg[0]
                 with Condition(stop_reg[0] == UInt(1)(1)): # Stop
                     SM_MemImpl[0] = UInt(2)(3)
-                    addr_reg[0] = radix_reg[rdata[0:3]].bitcast(UInt(addr_width)) + UInt(addr_width)(data_depth) - UInt(addr_width)(1)
+                    addr_reg[0] = radix_reg[rdata[0:3]][0:(addr_width-1)].bitcast(UInt(addr_width)) + UInt(addr_width)(data_depth) - UInt(addr_width)(1)
             # Stage 3: Stop
             with Condition(SM_MemImpl[0] == UInt(2)(3)):
                 log("Stage 3-3: Finilization Cycle:Writing wdata ({}) to mem_addr ({});).",wdata[0], addr_reg[0]) # Place holder to use read_cond for upstreams
@@ -110,9 +108,9 @@ class Driver(Module):
 
     @module.combinational
     def build(self, memory_user: Module, radix_reducer: Module, cycle_reg: RegArray, radix_reg: RegArray, SM_reg: RegArray, addr_reg: RegArray, we: RegArray, re: RegArray, wdata: RegArray):
-        read_cond = (addr_reg[0] < UInt(addr_width)(data_depth)) & (addr_reg[0] >= UInt(addr_width)(0))
+        read_cond = (addr_reg[0] < UInt(addr_width)(data_depth))
         # Build Memory
-        numbers_mem = SRAM(width=data_width, depth=data_depth * 2 + 1, init_file=f'{resource_base}/numbers.data')
+        numbers_mem = SRAM(width=data_width, depth=2**addr_width, init_file=f'{resource_base}/numbers.data')
         numbers_mem.name = 'numbers_mem'
         numbers_mem.build(we=we[0], re=re[0], wdata=wdata[0], addr=addr_reg[0], user=memory_user)
         # StageMachine: 0 for stop; 1 for read; 2 for sort
@@ -152,7 +150,7 @@ def build_system():
         radix_reg = RegArray(UInt(data_width), 16, initializer=[0]*16)
         # Create Memory User
         memory_user = MemUser(width=data_width)
-        rdata = memory_user.build(cycle_reg=cycle_reg, SM_reg=SM_reg, radix_reg=radix_reg)
+        rdata = memory_user.build(SM_reg=SM_reg, radix_reg=radix_reg)
         # Create Radix Reducer
         radix_reducer = RadixReducer(width=data_width)
         radix_reducer.build(radix_reg, cycle_reg=cycle_reg)
