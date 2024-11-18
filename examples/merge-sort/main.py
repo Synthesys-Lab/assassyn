@@ -73,7 +73,7 @@ class SortImpl(Downstream):
             
 
         half_block = block_size[0] >> addr_type(1)
-        inrange = (idx[reg_idx[0]] + addr_type(1)) < half_block #  + addr_type(1)  ;reg_idx[0].select( half_block , block_size[0])
+        inrange = (idx[reg_idx[0]] + addr_type(1)) < half_block 
 
         with Condition(current_state == state_read):
             # TODO(@were): memory re=(index[pred[0]] < (block.size / 2)), lineno=(block.start + index[pred[0]] + (block.size / 2) * pred[0] + from[0]).
@@ -85,7 +85,6 @@ class SortImpl(Downstream):
                 new_start = block_start[0] + block_size[0]
                 block_start[0] = new_start
                 state[0] = state_init_a
-                #k[0] = addr_type(0)
                 log("[loop.next] block.start: {}", new_start)
             with Condition(~inrange):
                 reg[reg_idx[0]] = Bits(32)(0x7FFFFFFF)
@@ -196,12 +195,7 @@ def test_sort():
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    # print(raw)
-    # check(raw)
 
-    # if utils.has_verilator():
-    #     raw = utils.run_verilator(verilator_path)
-    #     check(raw)
 
 if __name__ == "__main__":
     test_sort()
