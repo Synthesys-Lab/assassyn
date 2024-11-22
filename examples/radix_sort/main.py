@@ -14,7 +14,7 @@ current_path = os.path.dirname(os.path.abspath(__file__))
 resource_base = f"{current_path}/workload/"
 print(f"resource_base: {resource_base}")
 # Data width, length
-data_width = 16
+data_width = 32
 data_depth = sum(1 for _ in open(f"{resource_base}/numbers.data"))
 addr_width = (data_depth * 2 + 1).bit_length()
 print(f"data_width: {data_width}, data_depth: {data_depth}, addr_width: {addr_width}")
@@ -230,7 +230,7 @@ class Driver(Module):
         mem_end = mem_start + UInt(addr_width)(data_depth)
 
         # Outer for loop
-        with Condition(offset_reg[0] < UInt(data_width)(16)):
+        with Condition(offset_reg[0] < UInt(data_width)(data_width)):
             # Stage Machine: 0 for reset; 1 for read; 2 for sort
             with Condition(SM_reg[0] == UInt(2)(0)):  # Stage 0: Reset
                 log(
