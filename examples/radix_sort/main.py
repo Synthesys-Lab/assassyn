@@ -70,7 +70,7 @@ class MemImpl(Downstream):
                 log("Stage 3-0: Initialization Cycle: Copy addr_reg[0]={:08x} to read_addr_reg[0]; mem_start={:08x}; mem_end={:08x}.",addr_reg[0], mem_start, mem_end)
                 SM_MemImpl[0] = UInt(2)(1)
                 read_addr_reg[0] = addr_reg[0]
-                write_addr_reg[0] = UInt(addr_width)(data_depth) - mem_start.bitcast(UInt(addr_width))
+                write_addr_reg[0] = UInt(addr_width)(data_depth) - mem_start
             # Stage 1: Read Cycle: reading from memory, where rdata will be seen at next cycle
             with Condition(SM_MemImpl[0] == UInt(2)(1)):
                 log("Stage 3-1: Reading from mem_addr ({}).",addr_reg[0])
@@ -129,8 +129,9 @@ class Driver(Module):
         numbers_mem = SRAM(width=data_width, depth=2**addr_width, init_file=f'{resource_base}/numbers.data')
         numbers_mem.name = 'numbers_mem'
         numbers_mem.build(we=we[0], re=re[0], wdata=wdata[0], addr=addr_reg[0], user=memory_user)
-        mem_start = UInt(addr_width)(0) + mem_pingpong_reg[0].bitcast(UInt(addr_width)) * UInt(addr_width)(data_depth)
-        mem_end = mem_start.bitcast(UInt(addr_width)) + UInt(addr_width)(data_depth)
+        mem_start = UInt(addr_width)(0) + (mem_pingpong_reg[0] * UInt(addr_width)(data_depth))[0:(addr_width-1)].bitcast(UInt(addr_width))
+        mem_end = mem_start + UInt(addr_width)(data_depth)
+
         # Outer for loop
         with Condition(offset_reg[0] < UInt(data_width)(16)):
             # Stage Machine: 0 for reset; 1 for read; 2 for sort
@@ -139,7 +140,7 @@ class Driver(Module):
                 log("========================================================================")
                 offset_reg[0] = offset_reg[0] + UInt(data_width)(4)
                 SM_reg[0] = UInt(2)(1)
-                addr_reg[0] = UInt(addr_width)(0) + ((~mem_pingpong_reg[0]).bitcast(UInt(addr_width)) * UInt(addr_width)(data_depth)).bitcast(UInt(addr_width))
+                addr_reg[0] = UInt(addr_width)(0) + (~mem_pingpong_reg[0] * UInt(addr_width)(data_depth))[0:(addr_width-1)].bitcast(UInt(addr_width))
                 re[0] = Bits(1)(1)
                 we[0] = Bits(1)(0)
                 mem_pingpong_reg[0] = ~mem_pingpong_reg[0] 
