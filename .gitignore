@@ -4,4 +4,3 @@ target
 verilator
 examples/*/__pycache__/
 /.vscode
-examples/radix_sort/workload/numbers.data
