@@ -1,41 +1,42 @@
-# 这是一个多关键字基数排序的完整 Python 代码示例，用于对 32 位二进制数按每 4 位一组进行排序
+# This is a complete Python code example of multi-key radix sort, used to sort 32-bit binary numbers in groups of 4 bits
 
 def radix_sort_binary(numbers):
-    # 每 4 位进行排序，一共需要 8 轮（32位 / 4位 = 8轮）
-    num_bits = 32
+    # Sort every 4 bits, 8 rounds in total (32 bits / 4 bits = 8 rounds)
+    num_bits = 16
     group_size = 4
     num_groups = num_bits // group_size
-    # 从最低位的4位开始，每组4位依次排序
+    # Start from the lowest 4 bits, sort each group of 4 bits in sequence
     for i in range(num_groups):
-        # 计数数组，用于存储每组4位的值出现的次数
-        count = [0] * 16  # 4位二进制有16种组合（0000到1111）
-        # 计算当前4位组的值并计数
+        # Count array, used to store the frequency of each 4-bit value
+        count = [0] * 16  # 4 binary bits have 16 combinations (0000 to 1111)
+        # Calculate the value of current 4-bit group and count
         for num in numbers:
-            # 提取当前 4 位组的值（使用位移和掩码）
+            # Extract the value of current 4-bit group (using bit shift and mask)
             group_value = (num >> (i * group_size)) & 0xF
             count[group_value] += 1
 
-        # 计算前缀和，用于确定每个值在排序后的位置
+        # Calculate prefix sum to determine the position of each value after sorting
         for j in range(1, 16):
             count[j] += count[j - 1]
 
-        # 根据当前4位组的排序结果，将元素放入新的数组
+        # Place elements into new array based on current 4-bit group sorting result
         sorted_numbers = [0] * len(numbers)
-        for num in reversed(numbers):  # 倒序遍历，保证排序稳定性
+        for num in reversed(numbers):  # Reverse traversal to maintain sorting stability
             group_value = (num >> (i * group_size)) & 0xF
             count[group_value] -= 1
             sorted_numbers[count[group_value]] = num
 
-        # 将排序后的数组更新到原始数组中，准备进行下一轮排序
+        # Update the original array with sorted array, prepare for next round of sorting
         numbers = sorted_numbers
-        if i == 0:
-            print(f"第 {i} 轮排序结果: ")
-            # print([f"{num:032b}" for num in sorted_numbers])
-            print(sorted_numbers)
+        print(f"Round {i} sorting result: ")
+        print([f"{num:08x}" for num in sorted_numbers])
+        print(f"Round {i} radix result:")
+        print([f"{num}" for num in count][1:])
+            # print(sorted_numbers)
 
     return numbers
 
-# 示例用法
+# Example usage
 numbers = [
     0x255c,
     0x41b,
@@ -47,9 +48,9 @@ numbers = [
     0x2dc1,
 ]
 
-# 执行排序
+# Execute sorting
 sorted_numbers = radix_sort_binary(numbers)
 
-# 输出排序结果
+# Output sorting result
 sorted_numbers_binary = [f"{num:032b}" for num in sorted_numbers]
-# print(sorted_numbers_binary)
+print(sorted_numbers_binary)
