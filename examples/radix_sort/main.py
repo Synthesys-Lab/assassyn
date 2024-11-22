@@ -27,15 +27,14 @@ class MemUser(Module):
             no_arbiter=True
         )
     @module.combinational
-    def build(self, SM_reg: RegArray, radix_reg: RegArray):
+    def build(self, SM_reg: RegArray, radix_reg: RegArray, offset_reg: RegArray, addr_reg: RegArray):
         width = self.rdata.dtype.bits
-        offset_reg = RegArray(UInt(width), 1, initializer=[0])
         rdata = self.pop_all_ports(True)
         rdata = rdata.bitcast(UInt(width))
         idx = (rdata >> offset_reg[0])[0:3]
         # Only read to radix_reg in stage 1
         with Condition(SM_reg[0] == UInt(2)(1)):
-            log("Stage 1: Read rdata from memory: {:08x}", rdata)
+            log("Stage 1: Read rdata from memory: {:08x}; addr_reg[0]: {:08x}", rdata, addr_reg[0])
             radix_reg[idx] = radix_reg[idx] + UInt(width)(1)
         return rdata
 
@@ -58,11 +57,13 @@ class MemImpl(Downstream):
         super().__init__()
         self.name = 'MemImpl'
     @downstream.combinational
-    def build(self, rdata: Value, wdata: RegArray, SM_reg: RegArray, addr_reg: RegArray, we: RegArray, re: RegArray, radix_reg: RegArray, read_cond: Value):
+    def build(self, rdata: Value, wdata: RegArray, SM_reg: RegArray, addr_reg: RegArray, we: RegArray, re: RegArray, radix_reg: RegArray, read_cond: Value, offset_reg: RegArray):
         SM_MemImpl = RegArray(UInt(2), 1, initializer=[0])
         read_addr_reg = RegArray(UInt(addr_width), 1, initializer=[0])
         write_addr_reg = RegArray(UInt(addr_width), 1, initializer=[data_depth])
         stop_reg = RegArray(UInt(1), 1, initializer=[0])
+        reset_cycle_reg = RegArray(UInt(4), 1, initializer=[0])
+        
         with Condition(SM_reg[0] == UInt(2)(3)): # Stage 3: Write Data to Memory
             # Stage 0: Start
             with Condition(SM_MemImpl[0] == UInt(2)(0)):
@@ -71,7 +72,7 @@ class MemImpl(Downstream):
                 read_addr_reg[0] = addr_reg[0]
             # Stage 1: Read Cycle: reading from memory, where rdata will be seen at next cycle
             with Condition(SM_MemImpl[0] == UInt(2)(1)):
-                log("Stage 3-1: Reading from mem_addr ({:08x}).",addr_reg[0])
+                log("Stage 3-1: Reading from mem_addr ({}).",addr_reg[0])
                 re[0] = Bits(1)(0)
                 we[0] = Bits(1)(1)
                 addr_reg[0] = write_addr_reg[0]
@@ -80,25 +81,43 @@ class MemImpl(Downstream):
                 SM_MemImpl[0] = UInt(2)(2)
             # Stage 2: Write Cycle: writing to memory, while put rdata into wdata
             with Condition(SM_MemImpl[0] == UInt(2)(2)):
-                log("Stage 3-2: Writing wdata ({}) to mem_addr ({}); wdata <= rdata ({}).",wdata[0], addr_reg[0], rdata)
-                re[0] = Bits(1)(1)
-                we[0] = Bits(1)(0)
+                log("Stage 3-2: Writing wdata ({:08x}) to mem_addr ({}); wdata <= rdata ({:08x}).",wdata[0], addr_reg[0], rdata)
+                idx = (rdata >> offset_reg[0])[0:3]
                 wdata[0] = rdata.bitcast(Bits(data_width))
-                write_addr_reg[0] = radix_reg[rdata[0:3]][0:(addr_width-1)].bitcast(UInt(addr_width)) + UInt(addr_width)(data_depth) - UInt(addr_width)(1)
-                radix_reg[rdata[0:3]] = radix_reg[rdata[0:3]] - UInt(data_width)(1)
+                write_addr_reg[0] = radix_reg[idx][0:(addr_width-1)].bitcast(UInt(addr_width))  - UInt(addr_width)(1) + UInt(addr_width)(data_depth)
+                radix_reg[idx] = radix_reg[idx] - UInt(data_width)(1)
                 with Condition(read_addr_reg[0] == UInt(addr_width)(0)):
                     stop_reg[0] = UInt(1)(1)
                 with Condition(stop_reg[0] == UInt(1)(0)): # Repeat
                     SM_MemImpl[0] = UInt(2)(1)
                     addr_reg[0] = read_addr_reg[0]
+                    re[0] = Bits(1)(1)
+                    we[0] = Bits(1)(0)
                 with Condition(stop_reg[0] == UInt(1)(1)): # Stop
                     SM_MemImpl[0] = UInt(2)(3)
-                    addr_reg[0] = radix_reg[rdata[0:3]][0:(addr_width-1)].bitcast(UInt(addr_width)) + UInt(addr_width)(data_depth) - UInt(addr_width)(1)
-            # Stage 3: Stop
+                    addr_reg[0] = radix_reg[idx][0:(addr_width-1)].bitcast(UInt(addr_width)) + UInt(addr_width)(data_depth) - UInt(addr_width)(1)
+                    re[0] = Bits(1)(0)
+                    we[0] = Bits(1)(0)
+
+            # Stage 3: Reset
             with Condition(SM_MemImpl[0] == UInt(2)(3)):
-                log("Stage 3-3: Finilization Cycle:Writing wdata ({}) to mem_addr ({});).",wdata[0], addr_reg[0]) # Place holder to use read_cond for upstreams
-                log("read_cond: {:08x}", read_cond)
-                finish()
+                with Condition(reset_cycle_reg[0] == UInt(4)(0)):
+                    log("Stage 3-3: Writing wdata ({:08x}) to mem_addr ({});read_cond={:08x}.",wdata[0], addr_reg[0], read_cond) # Place holder to use read_cond for upstreams
+                with Condition(reset_cycle_reg[0] <= UInt(4)(14)):
+                    log("Stage 3-3: Reset radix_reg[{}] to {:08x}.",reset_cycle_reg[0], UInt(data_width)(0))
+                    radix_reg[reset_cycle_reg[0]] = UInt(data_width)(0)
+                    reset_cycle_reg[0] = reset_cycle_reg[0] + UInt(4)(1)
+                with Condition(reset_cycle_reg[0] == UInt(4)(15)):
+                    log("Stage 3-3: Reset radix_reg[{}] to {:08x}.",reset_cycle_reg[0], UInt(data_width)(0))
+                    log(f"Stage 3-3: Reset other registers:\n reset_cycle_reg[0]=0; SM_MemImpl[0]=0; SM_reg[0]=0; addr_reg[0]=0; read_addr_reg[0]=0; write_addr_reg[0]={data_depth}; stop_reg[0]=0;")
+                    radix_reg[reset_cycle_reg[0]] = UInt(data_width)(0)
+                    reset_cycle_reg[0] = UInt(4)(0)
+                    SM_MemImpl[0] = UInt(2)(0)
+                    SM_reg[0] = UInt(2)(0)
+                    addr_reg[0] = UInt(addr_width)(0)
+                    read_addr_reg[0] = UInt(addr_width)(0)
+                    write_addr_reg[0] = UInt(addr_width)(data_depth)
+                    stop_reg[0] = UInt(1)(0)
         return
 
 # Driver module
@@ -107,35 +126,44 @@ class Driver(Module):
         super().__init__(ports={},no_arbiter=True)
 
     @module.combinational
-    def build(self, memory_user: Module, radix_reducer: Module, cycle_reg: RegArray, radix_reg: RegArray, SM_reg: RegArray, addr_reg: RegArray, we: RegArray, re: RegArray, wdata: RegArray):
+    def build(self, memory_user: Module, radix_reducer: Module, cycle_reg: RegArray, radix_reg: RegArray, SM_reg: RegArray, addr_reg: RegArray, we: RegArray, re: RegArray, wdata: RegArray, offset_reg: RegArray):
         read_cond = (addr_reg[0] < UInt(addr_width)(data_depth))
         # Build Memory
         numbers_mem = SRAM(width=data_width, depth=2**addr_width, init_file=f'{resource_base}/numbers.data')
         numbers_mem.name = 'numbers_mem'
         numbers_mem.build(we=we[0], re=re[0], wdata=wdata[0], addr=addr_reg[0], user=memory_user)
-        # StageMachine: 0 for stop; 1 for read; 2 for sort
-        with Condition(SM_reg[0] == UInt(2)(0)): # Stage 0: Stop
-            log("Radix Sort One Iteration Completed!")
-            finish()
-        with Condition(SM_reg[0] == UInt(2)(1)): # Stage 1: Read Data into radix
-            with Condition(addr_reg[0] < UInt(addr_width)(data_depth)):
-                numbers_mem.bound.async_called()    
-                addr_reg[0] = addr_reg[0] + UInt(addr_width)(1)
-                with Condition(addr_reg[0] == UInt(addr_width)(data_depth-1)):
-                    re[0] = Bits(1)(0)
-            with Condition(~ read_cond):
-                SM_reg[0] = UInt(2)(2)
-                cycle_reg[0] = UInt(data_width)(1)
-                addr_reg[0] = addr_reg[0] - UInt(addr_width)(1)
-        with Condition(SM_reg[0] == UInt(2)(2)): # Stage 2: Prefix sum the radix
-            radix_reducer.async_called()
-            with Condition(cycle_reg[0] == UInt(data_width)(15)):
-                SM_reg[0] = UInt(2)(3)
+        # outter for loop
+        with Condition(offset_reg[0] < UInt(data_width)(16)):
+            # StageMachine: 0 for reset; 1 for read; 2 for sort
+            with Condition(SM_reg[0] == UInt(2)(0)): # Stage 0: Reset
+                log("Radix Sort: Bits {} - {} Completed!", offset_reg[0], offset_reg[0] + UInt(data_width)(4))
+                log("========================================================================")
+                offset_reg[0] = offset_reg[0] + UInt(data_width)(4)
+                SM_reg[0] = UInt(2)(1)
+                addr_reg[0] = UInt(addr_width)(0)
                 re[0] = Bits(1)(1)
                 we[0] = Bits(1)(0)
-        with Condition((SM_reg[0] == UInt(2)(3))): # Stage 3: Write Data to Memory
-            # log("Memory async called: re={:08x}; we={:08x}; addr_reg[0]={:08x}", re[0], we[0],addr_reg[0])
-            numbers_mem.bound.async_called()
+            with Condition(SM_reg[0] == UInt(2)(1)): # Stage 1: Read Data into radix
+                with Condition(addr_reg[0] < UInt(addr_width)(data_depth)):
+                    numbers_mem.bound.async_called()    
+                    addr_reg[0] = addr_reg[0] + UInt(addr_width)(1)
+                    with Condition(addr_reg[0] == UInt(addr_width)(data_depth-1)):
+                        re[0] = Bits(1)(0)
+                with Condition(~ read_cond):
+                    SM_reg[0] = UInt(2)(2)
+                    cycle_reg[0] = UInt(data_width)(1)
+                    addr_reg[0] = addr_reg[0] - UInt(addr_width)(1)
+            with Condition(SM_reg[0] == UInt(2)(2)): # Stage 2: Prefix sum the radix
+                radix_reducer.async_called()
+                with Condition(cycle_reg[0] == UInt(data_width)(15)):
+                    SM_reg[0] = UInt(2)(3)
+                    re[0] = Bits(1)(1)
+                    we[0] = Bits(1)(0)
+            with Condition((SM_reg[0] == UInt(2)(3))): # Stage 3: Write Data to Memory
+                # log("Memory async called: re={:08x}; we={:08x}; addr_reg[0]={:08x};", re[0], we[0],addr_reg[0])
+                numbers_mem.bound.async_called()
+        with Condition(offset_reg[0] == UInt(data_width)(16)):
+            finish()
         return read_cond
 
 def build_system():
@@ -148,18 +176,19 @@ def build_system():
         we = RegArray(Bits(1), 1, initializer=[0])
         re = RegArray(Bits(1), 1, initializer=[1])
         radix_reg = RegArray(UInt(data_width), 16, initializer=[0]*16)
+        offset_reg = RegArray(UInt(data_width), 1, initializer=[0])
         # Create Memory User
         memory_user = MemUser(width=data_width)
-        rdata = memory_user.build(SM_reg=SM_reg, radix_reg=radix_reg)
+        rdata = memory_user.build(SM_reg=SM_reg, radix_reg=radix_reg, offset_reg=offset_reg, addr_reg=addr_reg)
         # Create Radix Reducer
         radix_reducer = RadixReducer(width=data_width)
         radix_reducer.build(radix_reg, cycle_reg=cycle_reg)
         # Create driver
         driver = Driver()
-        read_cond = driver.build(memory_user, radix_reducer, cycle_reg=cycle_reg, radix_reg=radix_reg, SM_reg=SM_reg, addr_reg=addr_reg, we=we, re=re, wdata=wdata)
+        read_cond = driver.build(memory_user, radix_reducer, cycle_reg=cycle_reg, radix_reg=radix_reg, SM_reg=SM_reg, addr_reg=addr_reg, we=we, re=re, wdata=wdata, offset_reg=offset_reg)
         # Create Memory Implementation
         mem_impl = MemImpl()
-        mem_impl.build(rdata=rdata, wdata=wdata, SM_reg=SM_reg, addr_reg=addr_reg, we=we, re=re, radix_reg=radix_reg, read_cond=read_cond)
+        mem_impl.build(rdata=rdata, wdata=wdata, SM_reg=SM_reg, addr_reg=addr_reg, we=we, re=re, radix_reg=radix_reg, read_cond=read_cond, offset_reg=offset_reg)
         sys.expose_on_top(radix_reg, kind='Output')
     conf = config(
         verilog=utils.has_verilator(),
