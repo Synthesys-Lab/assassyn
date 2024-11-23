@@ -1610,7 +1610,6 @@ module memory_blackbox_{a} #(
         let idx_bits = store.idx().get_dtype(self.sys).unwrap().get_bits();
         let value = dump_ref(store.get().sys, &store.value(), true);
         let value_bits = store.value().get_dtype(self.sys).unwrap().get_bits();
-        eprintln!("{}", array_ref);
         match self.array_stores.get_mut(&array_name) {
           Some((g_idx, g_value)) => {
             g_idx.push(pred.clone(), idx, idx_bits);
