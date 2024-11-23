@@ -12,7 +12,7 @@ state_sort   = UInt(state_bits)(3)
 state_read   = UInt(state_bits)(4)
 state_idle   = UInt(state_bits)(5)
 
-n = 2048
+n = 2048*2
 addr_bits = n.bit_length()
 addr_type = UInt(addr_bits)
 
@@ -35,9 +35,9 @@ class SortImpl(Downstream):
         super().__init__()
 
     @downstream.combinational
-    def build(self, current_state, new_value, state, sorter, block_size, block_start, from_ptr, to_ptr, writer, reg_idx, reg):
+    def build(self, current_state, new_value, state, sorter, block_size, block_start, from_ptr, to_ptr, writer, reg_idx, reg , k):
 
-        k = RegArray(addr_type, 1, initializer=[0])
+        
         idx = RegArray(addr_type, 2, initializer=[0, 0])
 
         with Condition(current_state == state_init_a):
@@ -68,16 +68,20 @@ class SortImpl(Downstream):
             state[0] = state_read
             k[0] = k[0] + addr_type(1)
             log("[loop.k++ ] {}", k[0])
+            log("new_value: {} | a: {} | b: {} | cmp: {}", new_value, a, b, cmp)
+            
+            
 
         half_block = block_size[0] >> addr_type(1)
-        inrange = idx[reg_idx[0]] < half_block
+        inrange = (idx[reg_idx[0]] + addr_type(1)) < half_block 
 
         with Condition(current_state == state_read):
             # TODO(@were): memory re=(index[pred[0]] < (block.size / 2)), lineno=(block.start + index[pred[0]] + (block.size / 2) * pred[0] + from[0]).
             log("[sort.fill] refill the popped element")
-            with Condition(k[0] < block_size[0]):
+            log("k: {} | block.size: {} | block.start: {} | from: {} | to: {}", k[0], block_size[0], block_start[0], from_ptr[0], to_ptr[0])
+            with Condition(k[0] < (block_size[0] )):
                 state[0] = state_sort
-            with Condition(k[0] == block_size[0]):
+            with Condition(k[0] == (block_size[0] )):
                 new_start = block_start[0] + block_size[0]
                 block_start[0] = new_start
                 state[0] = state_init_a
@@ -85,6 +89,7 @@ class SortImpl(Downstream):
             with Condition(~inrange):
                 reg[reg_idx[0]] = Bits(32)(0x7FFFFFFF)
             idx[reg_idx[0]] = idx[reg_idx[0]] + addr_type(1)
+            log("[loop.idx] idx[{}]: {}", reg_idx[0], idx[reg_idx[0]])
 
         we = current_state == state_sort
 
@@ -96,19 +101,27 @@ class SortImpl(Downstream):
             None: UInt(1)(0)
         })
 
+        is_edge = (block_start[0] ) == addr_type(n//2)
+
         addr = current_state.case({
-            state_init_a: block_start[0] + from_ptr[0],
+            state_init_a: is_edge.select(   to_ptr[0],(block_start[0] + from_ptr[0])),
             state_init_b: block_start[0] + half_block + from_ptr[0],
             state_sort: block_start[0] + k[0] + to_ptr[0],
-            state_read: block_start[0] + idx[reg_idx[0]] + reg_idx[0].select(half_block, addr_type(0)) + from_ptr[0],
+            state_read: block_start[0] + idx[reg_idx[0]]+ addr_type(1) + reg_idx[0].select((half_block), addr_type(0)) + from_ptr[0],#reg_idx[0].select +k[0]
             None: addr_type(0)
         })
 
+        log("block.start: {} | idx: {} | reg_idx: {} | k: {} | from: {} ", block_start[0], idx[reg_idx[0]], reg_idx[0], k[0], from_ptr[0])
+
         log('[loop.sram] addr: {}', addr)
+        
 
-        wdata = we.select(cmp.select(a, b), Bits(32)(0))
+        wdata = we.select(cmp.select(b, a), Bits(32)(0))
 
-        sram = SRAM(32, n * 2, 'init.hex')
+        with Condition(we):
+            log('[loop.sram] wdata: {} | a: {} | b: {} ', wdata, a, b)
+
+        sram = SRAM(32, n  , 'init.hex')
         sram.build(we, re, addr, wdata, writer)
         with Condition(re):
             sram.bound.async_called()
@@ -132,10 +145,10 @@ class Driver(Module):
         super().__init__(ports={})
 
     @module.combinational
-    def build(self, sorter, block_size, block_start, from_ptr, to_ptr):
+    def build(self, sorter, block_size, block_start, from_ptr, to_ptr, k):
 
-        with Condition(block_start[0] == addr_type(n)):
-            with Condition(block_size[0] == addr_type(n)):
+        with Condition((block_start[0] ) == addr_type(n//2)):
+            with Condition(block_size[0] == addr_type(n//2)):
                 finish()
             block_size[0] = block_size[0] << addr_type(1)
             block_start[0] = addr_type(0)
@@ -155,6 +168,7 @@ def test_sort():
         from_ptr = RegArray(addr_type, 1, initializer=[0])
         to_ptr = RegArray(addr_type, 1, initializer=[n // 2])
         reg_idx = RegArray(UInt(1), 1, initializer=[0])
+        k = RegArray(addr_type, 1, initializer=[0])
 
         writer = RegisterWriter()
         reg, new_value = writer.build(reg_idx)
@@ -163,10 +177,10 @@ def test_sort():
         cur_state, state_sm = sorter.build()
 
         sorter_impl = SortImpl()
-        sorter_impl.build(cur_state, new_value, state_sm, sorter, block_size, block_start, from_ptr, to_ptr, writer, reg_idx, reg)
+        sorter_impl.build(cur_state, new_value, state_sm, sorter, block_size, block_start, from_ptr, to_ptr, writer, reg_idx, reg, k)
 
         driver = Driver()
-        driver.build(sorter, block_size, block_start, from_ptr, to_ptr)
+        driver.build(sorter, block_size, block_start, from_ptr, to_ptr, k)
 
         for i in [block_size, block_start, from_ptr, to_ptr, reg_idx, reg]:
             sys.expose_on_top(i)
@@ -181,12 +195,7 @@ def test_sort():
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-    # print(raw)
-    # check(raw)
 
-    # if utils.has_verilator():
-    #     raw = utils.run_verilator(verilator_path)
-    #     check(raw)
 
 if __name__ == "__main__":
     test_sort()
