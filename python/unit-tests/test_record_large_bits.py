@@ -27,10 +27,11 @@ class Driver(Module):
             index = valid_temp.select(Int(5)(i), index)
         
         with Condition(valid_global):
+            update_b = index.bitcast(Bits(32))
             record[index] = entry.bundle(
                 symbol= ~record[index].symbol, 
                 a=record[index].a,
-                b= index.bitcast(Bits(32)), 
+                b= update_b
             )
             log("index {:05} ",index)
 
