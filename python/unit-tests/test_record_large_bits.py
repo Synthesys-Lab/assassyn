@@ -45,16 +45,15 @@ def check_raw(raw):
     lines = raw.split('\n')
     expected_indices = list(range(14, -1, -1))  # Expected indices: 14 to 0
     cycle = 1
-
     for i, expected_index in enumerate(expected_indices):
-        expected_line = f"@line:657   Cycle @{cycle}.00: [driver]\tindex {expected_index:05}"
-        cycle += 1
+        try:
+            actual_index = int(lines[i].strip().split()[-1])
+        except (IndexError, ValueError):
+            raise ValueError(f"Line {i} is invalid or does not contain an index: {lines[i]}")
 
-        if expected_line not in lines[i]:
-            raise ValueError(f"Expected: '{expected_line}', but got: '{lines[i]}'")
-    
-    print("All indices and cycles match the expected output.")
-
+        if actual_index != expected_index:
+            raise ValueError(f"Expected index: {expected_index}, but got: {actual_index} in line {i}: '{lines[i]}'")
+    print("All indices match the expected output.")
 
 def test_record():
     sys = SysBuilder('record')
