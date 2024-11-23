@@ -30,7 +30,7 @@ class Driver(Module):
         bundle = RegArray(record_ty, 1)
         value = bundle[0].payload.bitcast(Int(32))
         is_odd = value[0:0]
-        new_value = (value + Int(32)(1)).bitcast(Bits(70))
+        new_value = (value + Int(32)(1)).bitcast(Bits(32))
         new_record = record_ty.bundle(is_odd=is_odd, payload=new_value).value()
         bundle[0] = new_record
         adder.async_called(a = new_record, b = new_record)
@@ -53,7 +53,7 @@ def test_record():
     with sys:
         record_ty = Record({
             (0, 0): ('is_odd', Bits),
-            (1, 70): ('payload', Bits),
+            (1, 32): ('payload', Bits),
         })
         adder = Adder(record_ty)
         adder.build()
