@@ -17,20 +17,20 @@ class Driver(Module):
 
     @module.combinational
     def build(self,record:Array):
-        index = Bits(5)(1)
+        index = Int(5)(1)
         valid_temp = Bits(1)(0)
         valid_global = Bits(1)(0)
 
         for i in range(15):
             valid_temp = ~record[i].symbol
             valid_global = valid_global | valid_temp
-            index = valid_temp.select(Bits(5)(i), index)
+            index = valid_temp.select(Int(5)(i), index)
         
         with Condition(valid_global):
             record[index] = entry.bundle(
                 symbol= ~record[index].symbol, 
                 a=record[index].a,
-                b=index.bitcast(Bits(32)), 
+                b= index.bitcast(Bits(32)), 
             )
             log("index {:05} ",index)
 
