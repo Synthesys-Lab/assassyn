@@ -111,11 +111,11 @@ impl Visitor<String> for NodeRefDumper {
               }.clone()
             }
             .to_string()
-          }else if expr.dtype().get_bits() <= 64 {
+          } else if expr.dtype().get_bits() <= 64 {
             raw
-        } else {
+          } else {
             format!("{}.clone()", raw)
-        }
+          }
         };
         // Lazy evaluation for FIFO peek.
         if let Ok(pure) = expr.as_sub::<PureIntrinsic>() {
