@@ -1,19 +1,19 @@
 from assassyn.frontend import *
 from assassyn.backend import elaborate
-from assassyn import utils 
+from assassyn import utils
 import assassyn
 
 
 entry = Record(
     symbol = Bits(1),
-    a=Bits(32),
-    b=Bits(32)   
+    a = Bits(32),
+    b = Bits(32)   
 )
 
 class Driver(Module):
 
     def __init__(self):
-            super().__init__(ports={})
+        super().__init__(ports={})
 
     @module.combinational
     def build(self,record:Array):
