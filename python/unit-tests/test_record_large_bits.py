@@ -17,22 +17,22 @@ class Driver(Module):
 
     @module.combinational
     def build(self,record:Array):
-        index = Int(5)(1)
+        index = Bits(32)(0)
         valid_temp = Bits(1)(0)
         valid_global = Bits(1)(0)
 
         for i in range(15):
             valid_temp = ~record[i].symbol
             valid_global = valid_global | valid_temp
-            index = valid_temp.select(Int(5)(i), index)
+            index = valid_temp.select(Bits(32)(i), index)
         
         with Condition(valid_global):
-            update_b = index.bitcast(Bits(32))
+             
             record[index] = entry.bundle(
                 symbol= ~record[index].symbol, 
                 a=record[index].a,
-                b= update_b
-            )
+                b= index
+            ).value()
             log("index {:05} ",index)
 
 def check_raw(raw):
@@ -47,7 +47,7 @@ def check_raw(raw):
     cycle = 1
 
     for i, expected_index in enumerate(expected_indices):
-        expected_line = f"@line:658   Cycle @{cycle}.00: [driver]\tindex {expected_index:05}"
+        expected_line = f"@line:657   Cycle @{cycle}.00: [driver]\tindex {expected_index:05}"
         cycle += 1
 
         if expected_line not in lines[i]:
