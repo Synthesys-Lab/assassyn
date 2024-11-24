@@ -1,0 +1,800 @@
+29 // c.nop   10 <input_data>: | unimp0x3150
+1c6 // slli    gp,gp,0x11 | unimp0x3154
+341 // addi    t1,t1,16 | unimp0x3158
+14f //  | fnmadd.sft2,ft0,ft0,ft0,rne0x315c
+234 // addi    a3,sp,264 | unimp0x3160
+1 // nop | unimp0x3164
+bb //  | 0xbb0x3168
+3dd // addi    t2,t2,23 | unimp0x316c
+2ed // addi    t0,t0,27 | unimp0x3170
+16d // addi    sp,sp,27 | unimp0x3174
+15e // slli    sp,sp,0x17 | unimp0x3178
+23c // addi    a5,sp,264 | unimp0x317c
+84 // addi    s1,sp,64 | unimp0x3180
+40 // addi    s0,sp,4 | unimp0x3184
+3b5 // addi    t2,t2,13 | unimp0x3188
+99 // addi    ra,ra,6 | unimp0x318c
+248 // addi    a0,sp,260 | unimp0x3190
+d8 // addi    a4,sp,68 | unimp0x3194
+325 // addi    t1,t1,9 | unimp0x3198
+8c // addi    a1,sp,64 | unimp0x319c
+26d // addi    tp,tp,27 | unimp0x31a0
+d2 // slli    ra,ra,0x14 | unimp0x31a4
+6 // c.slli  zero,0x1 | unimp0x31a8
+23c // addi    a5,sp,264 | unimp0x31ac
+3a3 //  | sb      zero,7(zero) # 7 <buf.2940+0x7>0x31b0
+153 //  | fadd.s  ft2,ft0,ft0,rne0x31b4
+37a // slli    t1,t1,0x1e | unimp0x31b8
+251 // addi    tp,tp,20 | unimp0x31bc
+188 // addi    a0,sp,192 | unimp0x31c0
+382 // c.slli64t2 | unimp0x31c4
+2b6 // slli    t0,t0,0xd | unimp0x31c8
+e4 // addi    s1,sp,76 | unimp0x31cc
+3c1 // addi    t2,t2,16 | unimp0x31d0
+c // 0xc | unimp0x31d4
+6e // c.slli  zero,0x1b | unimp0x31d8
+373 //  | 0x3730x31dc
+74 // addi    a3,sp,12 | unimp0x31e0
+2ee // slli    t0,t0,0x1b | unimp0x31e4
+128 // addi    a0,sp,136 | unimp0x31e8
+286 // slli    t0,t0,0x1 | unimp0x31ec
+1aa // slli    gp,gp,0xa | unimp0x31f0
+1f4 // addi    a3,sp,204 | unimp0x31f4
+13a // slli    sp,sp,0xe | unimp0x31f8
+1b4 // addi    a3,sp,200 | unimp0x31fc
+293 //  | li      t0,00x3200
+2bd // addi    t0,t0,15 | unimp0x3204
+306 // slli    t1,t1,0x1 | unimp0x3208
+32c // addi    a1,sp,392 | unimp0x320c
+13f //  | 0x3210
+3d5 //  | 0x3d50000013f0x3214
+2a6 // slli    t0,t0,0x9 | unimp0x3218
+96 // slli    ra,ra,0x5 | unimp0x321c
+36b //  | 0x36b0x3220
+2b8 // addi    a4,sp,328 | unimp0x3224
+178 // addi    a4,sp,140 | unimp0x3228
+234 // addi    a3,sp,264 | unimp0x322c
+1da // slli    gp,gp,0x16 | unimp0x3230
+110 // addi    a2,sp,128 | unimp0x3234
+3aa // slli    t2,t2,0xa | unimp0x3238
+102 // c.slli64sp | unimp0x323c
+21b //  | 0x21b0x3240
+287 //  | 0x2870x3244
+239 // addi    tp,tp,14 | unimp0x3248
+1fd // addi    gp,gp,31 | unimp0x324c
+cb //  | fnmsub.sft1,ft0,ft0,ft0,rne0x3250
+58 // addi    a4,sp,4 | unimp0x3254
+118 // addi    a4,sp,128 | unimp0x3258
+2bf //  | 0x325c
+2f7 //  | 0x2f7000002bf0x3260
+29d // addi    t0,t0,7 | unimp0x3264
+25e // slli    tp,tp,0x17 | unimp0x3268
+177 //  | 0x1770x326c
+1ff // 0x1ff | unimp0x3270
+227 //  | 0x2270x3274
+291 // addi    t0,t0,4 | unimp0x3278
+3a8 // addi    a0,sp,456 | unimp0x327c
+c3 //  | fmadd.s ft1,ft0,ft0,ft0,rne0x3280
+250 // addi    a2,sp,260 | unimp0x3284
+51 // c.nop   20 | unimp0x3288
+239 // addi    tp,tp,14 | unimp0x328c
+10b //  | 0x10b0x3290
+3b8 // addi    a4,sp,456 | unimp0x3294
+e5 // addi    ra,ra,25 | unimp0x3298
+320 // addi    s0,sp,392 | unimp0x329c
+151 // addi    sp,sp,20 | unimp0x32a0
+248 // addi    a0,sp,260 | unimp0x32a4
+3b0 // addi    a2,sp,456 | unimp0x32a8
+283 //  | lb      t0,0(zero) # 0 <buf.2940>0x32ac
+386 // slli    t2,t2,0x1 | unimp0x32b0
+170 // addi    a2,sp,140 | unimp0x32b4
+f1 // addi    ra,ra,28 | unimp0x32b8
+1e9 // addi    gp,gp,26 | unimp0x32bc
+391 // addi    t2,t2,4 | unimp0x32c0
+148 // addi    a0,sp,132 | unimp0x32c4
+33a // slli    t1,t1,0xe | unimp0x32c8
+139 // addi    sp,sp,14 | unimp0x32cc
+3a5 // addi    t2,t2,9 | unimp0x32d0
+250 // addi    a2,sp,260 | unimp0x32d4
+3d9 // addi    t2,t2,22 | unimp0x32d8
+184 // addi    s1,sp,192 | unimp0x32dc
+c3 //  | fmadd.s ft1,ft0,ft0,ft0,rne0x32e0
+21f //  | 0x32e4
+3c0 // 0x3c00000021f | unimp0x32e8
+289 // addi    t0,t0,2 | unimp0x32ec
+236 // slli    tp,tp,0xd | unimp0x32f0
+3d3 //  | fadd.s  ft7,ft0,ft0,rne0x32f4
+15e // slli    sp,sp,0x17 | unimp0x32f8
+3e5 // addi    t2,t2,25 | unimp0x32fc
+289 // addi    t0,t0,2 | unimp0x3300
+32e // slli    t1,t1,0xb | unimp0x3304
+291 // addi    t0,t0,4 | unimp0x3308
+4f //  | fnmadd.sft0,ft0,ft0,ft0,rne0x330c
+b5 // addi    ra,ra,13 | unimp0x3310
+d0 // addi    a2,sp,68 | unimp0x3314
+6f //  | j       80003318 <input_data+0x1c8>0x3318
+3e6 // slli    t2,t2,0x19 | unimp0x331c
+35b //  | 0x35b0x3320
+275 // addi    tp,tp,29 | unimp0x3324
+41 // c.nop   16 | unimp0x3328
+34f //  | fnmadd.sft6,ft0,ft0,ft0,rne0x332c
+120 // addi    s0,sp,136 | unimp0x3330
+2c0 // addi    s0,sp,324 | unimp0x3334
+15d // addi    sp,sp,23 | unimp0x3338
+3e5 // addi    t2,t2,25 | unimp0x333c
+8d // addi    ra,ra,3 | unimp0x3340
+fd // addi    ra,ra,31 | unimp0x3344
+389 // addi    t2,t2,2 | unimp0x3348
+2cb //  | fnmsub.sft5,ft0,ft0,ft0,rne0x334c
+376 // slli    t1,t1,0x1d | unimp0x3350
+1ae // slli    gp,gp,0xb | unimp0x3354
+108 // addi    a0,sp,128 | unimp0x3358
+19f //  | 0x335c
+240 // 0x2400000019f | unimp0x3360
+21a // slli    tp,tp,0x6 | unimp0x3364
+3d3 //  | fadd.s  ft7,ft0,ft0,rne0x3368
+2bc // addi    a5,sp,328 | unimp0x336c
+2f9 // addi    t0,t0,30 | unimp0x3370
+4 // 0x4 | unimp0x3374
+f1 // addi    ra,ra,28 | unimp0x3378
+1ee // slli    gp,gp,0x1b | unimp0x337c
+1de // slli    gp,gp,0x17 | unimp0x3380
+64 // addi    s1,sp,12 | unimp0x3384
+1f3 //  | 0x1f30x3388
+360 // addi    s0,sp,396 | unimp0x338c
+193 //  | li      gp,00x3390
+2b5 // addi    t0,t0,13 | unimp0x3394
+de // slli    ra,ra,0x17 | unimp0x3398
+1a0 // addi    s0,sp,200 | unimp0x339c
+1bc // addi    a5,sp,200 | unimp0x33a0
+128 // addi    a0,sp,136 | unimp0x33a4
+2d1 // addi    t0,t0,20 | unimp0x33a8
+11d // addi    sp,sp,7 | unimp0x33ac
+2a4 // addi    s1,sp,328 | unimp0x33b0
+26c // addi    a1,sp,268 | unimp0x33b4
+13d // addi    sp,sp,15 | unimp0x33b8
+4e // c.slli  zero,0x13 | unimp0x33bc
+e0 // addi    s0,sp,76 | unimp0x33c0
+15f //  | 0x33c4
+3a9 // 0x3a90000015f | unimp0x33c8
+21c // addi    a5,sp,256 | unimp0x33cc
+120 // addi    s0,sp,136 | unimp0x33d0
+286 // slli    t0,t0,0x1 | unimp0x33d4
+77 //  | 0x770x33d8
+a9 // addi    ra,ra,10 | unimp0x33dc
+267 //  | jalr    tp,zero # 0 <buf.2940>0x33e0
+20f //  | 0x20f0x33e4
+25e // slli    tp,tp,0x17 | unimp0x33e8
+121 // addi    sp,sp,8 | unimp0x33ec
+185 // addi    gp,gp,1 | unimp0x33f0
+31c // addi    a5,sp,384 | unimp0x33f4
+15f //  | 0x33f8
+321 // 0x3210000015f | unimp0x33fc
+1c7 //  | fmsub.s ft3,ft0,ft0,ft0,rne0x3400
+2d0 // addi    a2,sp,324 | unimp0x3404
+116 // slli    sp,sp,0x5 | unimp0x3408
+2f6 // slli    t0,t0,0x1d | unimp0x340c
+16f //  | jal     sp,80003410 <input_data+0x2c0>0x3410
+2e9 // addi    t0,t0,26 | unimp0x3414
+166 // slli    sp,sp,0x19 | unimp0x3418
+5c // addi    a5,sp,4 | unimp0x341c
+248 // addi    a0,sp,260 | unimp0x3420
+3dd // addi    t2,t2,23 | unimp0x3424
+3e // c.slli  zero,0xf | unimp0x3428
+10f //  | 0x10f0x342c
+3d9 // addi    t2,t2,22 | unimp0x3430
+355 // addi    t1,t1,21 | unimp0x3434
+193 //  | li      gp,00x3438
+314 // addi    a3,sp,384 | unimp0x343c
+15a // slli    sp,sp,0x16 | unimp0x3440
+213 //  | li      tp,00x3444
+205 // addi    tp,tp,1 | unimp0x3448
+de // slli    ra,ra,0x17 | unimp0x344c
+22f //  | 0x22f0x3450
+1cd // addi    gp,gp,19 | unimp0x3454
+38c // addi    a1,sp,448 | unimp0x3458
+f1 // addi    ra,ra,28 | unimp0x345c
+307 //  | 0x3070x3460
+166 // slli    sp,sp,0x19 | unimp0x3464
+ff // 0xff | unimp0x3468
+14c // addi    a1,sp,132 | unimp0x346c
+30a // slli    t1,t1,0x2 | unimp0x3470
+2ac // addi    a1,sp,328 | unimp0x3474
+256 // slli    tp,tp,0x15 | unimp0x3478
+2e4 // addi    s1,sp,332 | unimp0x347c
+8f //  | 0x8f0x3480
+1be // slli    gp,gp,0xf | unimp0x3484
+21 // c.nop   8 | unimp0x3488
+137 //  | lui     sp,0x00x348c
+7d // c.nop   31 | unimp0x3490
+2e7 //  | jalr    t0,zero # 0 <buf.2940>0x3494
+3ad // addi    t2,t2,11 | unimp0x3498
+22d // addi    tp,tp,11 | unimp0x349c
+3a5 // addi    t2,t2,9 | unimp0x34a0
+1df //  | 0x34a4
+31f // 0x31f000001df | unimp0x34a8
+22d // addi    tp,tp,11 | unimp0x34ac
+229 // addi    tp,tp,10 | unimp0x34b0
+39d // addi    t2,t2,7 | unimp0x34b4
+1af //  | 0x1af0x34b8
+31c // addi    a5,sp,384 | unimp0x34bc
+288 // addi    a0,sp,320 | unimp0x34c0
+165 // addi    sp,sp,25 | unimp0x34c4
+3b8 // addi    a4,sp,456 | unimp0x34c8
+37b //  | 0x37b0x34cc
+11f //  | 0x34d0
+29a // 0x29a0000011f | unimp0x34d4
+13 //  | nop0x34d8
+202 // c.slli64tp | unimp0x34dc
+31 // c.nop   12 | unimp0x34e0
+22d // addi    tp,tp,11 | unimp0x34e4
+56 // c.slli  zero,0x15 | unimp0x34e8
+366 // slli    t1,t1,0x19 | unimp0x34ec
+5f //  | 0x34f0
+355 // 0x3550000005f | unimp0x34f4
+1b9 // addi    gp,gp,14 | unimp0x34f8
+1b8 // addi    a4,sp,200 | unimp0x34fc
+24b //  | fnmsub.sft4,ft0,ft0,ft0,rne0x3500
+3d // c.nop   15 | unimp0x3504
+266 // slli    tp,tp,0x19 | unimp0x3508
+2a6 // slli    t0,t0,0x9 | unimp0x350c
+17e // slli    sp,sp,0x1f | unimp0x3510
+18c // addi    a1,sp,192 | unimp0x3514
+118 // addi    a4,sp,128 | unimp0x3518
+9 // c.nop   2 | unimp0x351c
+328 // addi    a0,sp,392 | unimp0x3520
+11 // c.nop   4 | unimp0x3524
+3cb //  | fnmsub.sft7,ft0,ft0,ft0,rne0x3528
+aa // slli    ra,ra,0xa | unimp0x352c
+333 //  | add     t1,zero,zero0x3530
+123 //  | sb      zero,2(zero) # 2 <buf.2940+0x2>0x3534
+158 // addi    a4,sp,132 | unimp0x3538
+17c // addi    a5,sp,140 | unimp0x353c
+1c2 // slli    gp,gp,0x10 | unimp0x3540
+218 // addi    a4,sp,256 | unimp0x3544
+200 // addi    s0,sp,256 | unimp0x3548
+b9 // addi    ra,ra,14 | unimp0x354c
+3c5 // addi    t2,t2,17 | unimp0x3550
+395 // addi    t2,t2,5 | unimp0x3554
+15b //  | 0x15b0x3558
+21b //  | 0x21b0x355c
+328 // addi    a0,sp,392 | unimp0x3560
+3d7 //  | 0x3d70x3564
+372 // slli    t1,t1,0x1c | unimp0x3568
+377 //  | 0x3770x356c
+219 // addi    tp,tp,6 | unimp0x3570
+36 // c.slli  zero,0xd | unimp0x3574
+3b2 // slli    t2,t2,0xc | unimp0x3578
+264 // addi    s1,sp,268 | unimp0x357c
+2bd // addi    t0,t0,15 | unimp0x3580
+3b7 //  | lui     t2,0x00x3584
+164 // addi    s1,sp,140 | unimp0x3588
+1df //  | 0x358c
+237 // 0x237000001df | unimp0x3590
+97 //  | auipc   ra,0x00x3594
+37b //  | 0x37b0x3598
+7 //  | 0x70x359c
+16 // c.slli  zero,0x5 | unimp0x35a0
+281 // addi    t0,t0,0 | unimp0x35a4
+238 // addi    a4,sp,264 | unimp0x35a8
+14f //  | fnmadd.sft2,ft0,ft0,ft0,rne0x35ac
+299 // addi    t0,t0,6 | unimp0x35b0
+2da // slli    t0,t0,0x16 | unimp0x35b4
+1a7 //  | 0x1a70x35b8
+5f //  | 0x35bc
+1b2 // 0x1b20000005f | unimp0x35c0
+2d8 // addi    a4,sp,324 | unimp0x35c4
+9e // slli    ra,ra,0x7 | unimp0x35c8
+118 // addi    a4,sp,128 | unimp0x35cc
+2 // c.slli64zero | unimp0x35d0
+18b //  | 0x18b0x35d4
+54 // addi    a3,sp,4 | unimp0x35d8
+2b0 // addi    a2,sp,328 | unimp0x35dc
+f7 //  | 0xf70x35e0
+38f //  | 0x38f0x35e4
+31 // c.nop   12 | unimp0x35e8
+1dc // addi    a5,sp,196 | unimp0x35ec
+1b3 //  | add     gp,zero,zero0x35f0
+32f //  | 0x32f0x35f4
+318 // addi    a4,sp,384 | unimp0x35f8
+2d9 // addi    t0,t0,22 | unimp0x35fc
+365 // addi    t1,t1,25 | unimp0x3600
+109 // addi    sp,sp,2 | unimp0x3604
+1e6 // slli    gp,gp,0x19 | unimp0x3608
+7f // 0x7f | unimp0x360c
+19e // slli    gp,gp,0x7 | unimp0x3610
+ec // addi    a1,sp,76 | unimp0x3614
+171 // addi    sp,sp,28 | unimp0x3618
+d6 // slli    ra,ra,0x15 | unimp0x361c
+224 // addi    s1,sp,264 | unimp0x3620
+b4 // addi    a3,sp,72 | unimp0x3624
+206 // slli    tp,tp,0x1 | unimp0x3628
+6 // c.slli  zero,0x1 | unimp0x362c
+378 // addi    a4,sp,396 | unimp0x3630
+1f7 //  | 0x1f70x3634
+2aa // slli    t0,t0,0xa | unimp0x3638
+254 // addi    a3,sp,260 | unimp0x363c
+11c // addi    a5,sp,128 | unimp0x3640
+ad // addi    ra,ra,11 | unimp0x3644
+108 // addi    a0,sp,128 | unimp0x3648
+283 //  | lb      t0,0(zero) # 0 <buf.2940>0x364c
+1f3 //  | 0x1f30x3650
+15a // slli    sp,sp,0x16 | unimp0x3654
+122 // slli    sp,sp,0x8 | unimp0x3658
+257 //  | 0x2570x365c
+381 // addi    t2,t2,0 | unimp0x3660
+44 // addi    s1,sp,4 | unimp0x3664
+d7 //  | 0xd70x3668
+351 // addi    t1,t1,20 | unimp0x366c
+2db //  | 0x2db0x3670
+292 // slli    t0,t0,0x4 | unimp0x3674
+2b0 // addi    a2,sp,328 | unimp0x3678
+26b //  | 0x26b0x367c
+fb //  | 0xfb0x3680
+79 // c.nop   30 | unimp0x3684
+312 // slli    t1,t1,0x4 | unimp0x3688
+83 //  | lb      ra,0(zero) # 0 <buf.2940>0x368c
+22b //  | 0x22b0x3690
+33c // addi    a5,sp,392 | unimp0x3694
+12e // slli    sp,sp,0xb | unimp0x3698
+29b //  | 0x29b0x369c
+210 // addi    a2,sp,256 | unimp0x36a0
+1b1 // addi    gp,gp,12 | unimp0x36a4
+220 // addi    s0,sp,264 | unimp0x36a8
+1e7 //  | jalr    gp,zero # 0 <buf.2940>0x36ac
+142 // slli    sp,sp,0x10 | unimp0x36b0
+2f1 // addi    t0,t0,28 | unimp0x36b4
+3b3 //  | add     t2,zero,zero0x36b8
+7d // c.nop   31 | unimp0x36bc
+11f //  | 0x36c0
+272 // 0x2720000011f | unimp0x36c4
+338 // addi    a4,sp,392 | unimp0x36c8
+e // c.slli  zero,0x3 | unimp0x36cc
+130 // addi    a2,sp,136 | unimp0x36d0
+a // c.slli  zero,0x2 | unimp0x36d4
+314 // addi    a3,sp,384 | unimp0x36d8
+193 //  | li      gp,00x36dc
+2dd // addi    t0,t0,23 | unimp0x36e0
+6a // c.slli  zero,0x1a | unimp0x36e4
+3bf //  | 0x36e8
+2bf //  | 0x2bf000003bf0x36ec
+16e // slli    sp,sp,0x1b | unimp0x36f0
+332 // slli    t1,t1,0xc | unimp0x36f4
+2d2 // slli    t0,t0,0x14 | unimp0x36f8
+3c4 // addi    s1,sp,452 | unimp0x36fc
+126 // slli    sp,sp,0x9 | unimp0x3700
+196 // slli    gp,gp,0x5 | unimp0x3704
+3cf //  | fnmadd.sft7,ft0,ft0,ft0,rne0x3708
+36a // slli    t1,t1,0x1a | unimp0x370c
+28d // addi    t0,t0,3 | unimp0x3710
+358 // addi    a4,sp,388 | unimp0x3714
+2ec // addi    a1,sp,332 | unimp0x3718
+56 // c.slli  zero,0x15 | unimp0x371c
+5b //  | 0x5b0x3720
+3c // addi    a5,sp,8 | unimp0x3724
+17a // slli    sp,sp,0x1e | unimp0x3728
+294 // addi    a3,sp,320 | unimp0x372c
+69 // c.nop   26 | unimp0x3730
+29b //  | 0x29b0x3734
+66 // c.slli  zero,0x19 | unimp0x3738
+99 // addi    ra,ra,6 | unimp0x373c
+17d // addi    sp,sp,31 | unimp0x3740
+79 // c.nop   30 | unimp0x3744
+28b //  | 0x28b0x3748
+62 // c.slli  zero,0x18 | unimp0x374c
+339 // addi    t1,t1,14 | unimp0x3750
+19c // addi    a5,sp,192 | unimp0x3754
+348 // addi    a0,sp,388 | unimp0x3758
+ec // addi    a1,sp,76 | unimp0x375c
+164 // addi    s1,sp,140 | unimp0x3760
+c // 0xc | unimp0x3764
+94 // addi    a3,sp,64 | unimp0x3768
+1a7 //  | 0x1a70x376c
+36 // c.slli  zero,0xd | unimp0x3770
+3c5 // addi    t2,t2,17 | unimp0x3774
+8c // addi    a1,sp,64 | unimp0x3778
+d8 // addi    a4,sp,68 | unimp0x377c
+3bb //  | 0x3bb0x3780
+26d // addi    tp,tp,27 | unimp0x3784
+157 //  | 0x1570x3788
+169 // addi    sp,sp,26 | unimp0x378c
+0 // unimp <verify_data>: | unimp0x3790
+1c6 // slli    gp,gp,0x11 | unimp0x3794
+1c6 // slli    gp,gp,0x11 | unimp0x3798
+234 // addi    a3,sp,264 | unimp0x379c
+14f //  | fnmadd.sft2,ft0,ft0,ft0,rne0x37a0
+bb //  | 0xbb0x37a4
+bb //  | 0xbb0x37a8
+2ed // addi    t0,t0,27 | unimp0x37ac
+2ed // addi    t0,t0,27 | unimp0x37b0
+16d // addi    sp,sp,27 | unimp0x37b4
+16d // addi    sp,sp,27 | unimp0x37b8
+15e // slli    sp,sp,0x17 | unimp0x37bc
+84 // addi    s1,sp,64 | unimp0x37c0
+84 // addi    s1,sp,64 | unimp0x37c4
+99 // addi    ra,ra,6 | unimp0x37c8
+248 // addi    a0,sp,260 | unimp0x37cc
+d8 // addi    a4,sp,68 | unimp0x37d0
+248 // addi    a0,sp,260 | unimp0x37d4
+d8 // addi    a4,sp,68 | unimp0x37d8
+26d // addi    tp,tp,27 | unimp0x37dc
+d2 // slli    ra,ra,0x14 | unimp0x37e0
+d2 // slli    ra,ra,0x14 | unimp0x37e4
+d2 // slli    ra,ra,0x14 | unimp0x37e8
+23c // addi    a5,sp,264 | unimp0x37ec
+23c // addi    a5,sp,264 | unimp0x37f0
+37a // slli    t1,t1,0x1e | unimp0x37f4
+251 // addi    tp,tp,20 | unimp0x37f8
+251 // addi    tp,tp,20 | unimp0x37fc
+251 // addi    tp,tp,20 | unimp0x3800
+2b6 // slli    t0,t0,0xd | unimp0x3804
+2b6 // slli    t0,t0,0xd | unimp0x3808
+2b6 // slli    t0,t0,0xd | unimp0x380c
+e4 // addi    s1,sp,76 | unimp0x3810
+6e // c.slli  zero,0x1b | unimp0x3814
+6e // c.slli  zero,0x1b | unimp0x3818
+74 // addi    a3,sp,12 | unimp0x381c
+2ee // slli    t0,t0,0x1b | unimp0x3820
+128 // addi    a0,sp,136 | unimp0x3824
+286 // slli    t0,t0,0x1 | unimp0x3828
+1aa // slli    gp,gp,0xa | unimp0x382c
+1f4 // addi    a3,sp,204 | unimp0x3830
+1aa // slli    gp,gp,0xa | unimp0x3834
+1b4 // addi    a3,sp,200 | unimp0x3838
+1b4 // addi    a3,sp,200 | unimp0x383c
+293 //  | li      t0,00x3840
+2bd // addi    t0,t0,15 | unimp0x3844
+306 // slli    t1,t1,0x1 | unimp0x3848
+306 // slli    t1,t1,0x1 | unimp0x384c
+32c // addi    a1,sp,392 | unimp0x3850
+2a6 // slli    t0,t0,0x9 | unimp0x3854
+2a6 // slli    t0,t0,0x9 | unimp0x3858
+2a6 // slli    t0,t0,0x9 | unimp0x385c
+2b8 // addi    a4,sp,328 | unimp0x3860
+2b8 // addi    a4,sp,328 | unimp0x3864
+234 // addi    a3,sp,264 | unimp0x3868
+1da // slli    gp,gp,0x16 | unimp0x386c
+1da // slli    gp,gp,0x16 | unimp0x3870
+1da // slli    gp,gp,0x16 | unimp0x3874
+110 // addi    a2,sp,128 | unimp0x3878
+21b //  | 0x21b0x387c
+21b //  | 0x21b0x3880
+239 // addi    tp,tp,14 | unimp0x3884
+239 // addi    tp,tp,14 | unimp0x3888
+1fd // addi    gp,gp,31 | unimp0x388c
+cb //  | fnmsub.sft1,ft0,ft0,ft0,rne0x3890
+cb //  | fnmsub.sft1,ft0,ft0,ft0,rne0x3894
+118 // addi    a4,sp,128 | unimp0x3898
+2bf //  | 0x389c
+2bf //  | 0x2bf000002bf0x38a0
+29d // addi    t0,t0,7 | unimp0x38a4
+25e // slli    tp,tp,0x17 | unimp0x38a8
+1ff // 0x1ff | unimp0x38ac
+1ff // 0x1ff | unimp0x38b0
+227 //  | 0x2270x38b4
+291 // addi    t0,t0,4 | unimp0x38b8
+291 // addi    t0,t0,4 | unimp0x38bc
+250 // addi    a2,sp,260 | unimp0x38c0
+c3 //  | fmadd.s ft1,ft0,ft0,ft0,rne0x38c4
+239 // addi    tp,tp,14 | unimp0x38c8
+10b //  | 0x10b0x38cc
+239 // addi    tp,tp,14 | unimp0x38d0
+10b //  | 0x10b0x38d4
+320 // addi    s0,sp,392 | unimp0x38d8
+151 // addi    sp,sp,20 | unimp0x38dc
+248 // addi    a0,sp,260 | unimp0x38e0
+248 // addi    a0,sp,260 | unimp0x38e4
+283 //  | lb      t0,0(zero) # 0 <buf.2940>0x38e8
+386 // slli    t2,t2,0x1 | unimp0x38ec
+283 //  | lb      t0,0(zero) # 0 <buf.2940>0x38f0
+170 // addi    a2,sp,140 | unimp0x38f4
+170 // addi    a2,sp,140 | unimp0x38f8
+1e9 // addi    gp,gp,26 | unimp0x38fc
+1e9 // addi    gp,gp,26 | unimp0x3900
+33a // slli    t1,t1,0xe | unimp0x3904
+148 // addi    a0,sp,132 | unimp0x3908
+33a // slli    t1,t1,0xe | unimp0x390c
+250 // addi    a2,sp,260 | unimp0x3910
+3a5 // addi    t2,t2,9 | unimp0x3914
+250 // addi    a2,sp,260 | unimp0x3918
+184 // addi    s1,sp,192 | unimp0x391c
+184 // addi    s1,sp,192 | unimp0x3920
+21f //  | 0x3924
+289 // 0x2890000021f | unimp0x3928
+289 // addi    t0,t0,2 | unimp0x392c
+289 // addi    t0,t0,2 | unimp0x3930
+236 // slli    tp,tp,0xd | unimp0x3934
+3d3 //  | fadd.s  ft7,ft0,ft0,rne0x3938
+289 // addi    t0,t0,2 | unimp0x393c
+32e // slli    t1,t1,0xb | unimp0x3940
+291 // addi    t0,t0,4 | unimp0x3944
+291 // addi    t0,t0,4 | unimp0x3948
+b5 // addi    ra,ra,13 | unimp0x394c
+b5 // addi    ra,ra,13 | unimp0x3950
+b5 // addi    ra,ra,13 | unimp0x3954
+d0 // addi    a2,sp,68 | unimp0x3958
+35b //  | 0x35b0x395c
+35b //  | 0x35b0x3960
+275 // addi    tp,tp,29 | unimp0x3964
+275 // addi    tp,tp,29 | unimp0x3968
+120 // addi    s0,sp,136 | unimp0x396c
+2c0 // addi    s0,sp,324 | unimp0x3970
+15d // addi    sp,sp,23 | unimp0x3974
+2c0 // addi    s0,sp,324 | unimp0x3978
+15d // addi    sp,sp,23 | unimp0x397c
+fd // addi    ra,ra,31 | unimp0x3980
+fd // addi    ra,ra,31 | unimp0x3984
+2cb //  | fnmsub.sft5,ft0,ft0,ft0,rne0x3988
+376 // slli    t1,t1,0x1d | unimp0x398c
+2cb //  | fnmsub.sft5,ft0,ft0,ft0,rne0x3990
+1ae // slli    gp,gp,0xb | unimp0x3994
+19f //  | 0x3998
+19f // 0x19f0000019f | unimp0x399c
+21a // slli    tp,tp,0x6 | unimp0x39a0
+240 // addi    s0,sp,260 | unimp0x39a4
+2bc // addi    a5,sp,328 | unimp0x39a8
+2f9 // addi    t0,t0,30 | unimp0x39ac
+2bc // addi    a5,sp,328 | unimp0x39b0
+f1 // addi    ra,ra,28 | unimp0x39b4
+f1 // addi    ra,ra,28 | unimp0x39b8
+1de // slli    gp,gp,0x17 | unimp0x39bc
+1de // slli    gp,gp,0x17 | unimp0x39c0
+1de // slli    gp,gp,0x17 | unimp0x39c4
+1f3 //  | 0x1f30x39c8
+1f3 //  | 0x1f30x39cc
+2b5 // addi    t0,t0,13 | unimp0x39d0
+193 //  | li      gp,00x39d4
+1a0 // addi    s0,sp,200 | unimp0x39d8
+1a0 // addi    s0,sp,200 | unimp0x39dc
+1a0 // addi    s0,sp,200 | unimp0x39e0
+1bc // addi    a5,sp,200 | unimp0x39e4
+128 // addi    a0,sp,136 | unimp0x39e8
+2a4 // addi    s1,sp,328 | unimp0x39ec
+26c // addi    a1,sp,268 | unimp0x39f0
+26c // addi    a1,sp,268 | unimp0x39f4
+13d // addi    sp,sp,15 | unimp0x39f8
+e0 // addi    s0,sp,76 | unimp0x39fc
+e0 // addi    s0,sp,76 | unimp0x3a00
+15f //  | 0x3a04
+21c // 0x21c0000015f | unimp0x3a08
+21c // addi    a5,sp,256 | unimp0x3a0c
+21c // addi    a5,sp,256 | unimp0x3a10
+120 // addi    s0,sp,136 | unimp0x3a14
+a9 // addi    ra,ra,10 | unimp0x3a18
+a9 // addi    ra,ra,10 | unimp0x3a1c
+20f //  | 0x20f0x3a20
+25e // slli    tp,tp,0x17 | unimp0x3a24
+20f //  | 0x20f0x3a28
+185 // addi    gp,gp,1 | unimp0x3a2c
+185 // addi    gp,gp,1 | unimp0x3a30
+185 // addi    gp,gp,1 | unimp0x3a34
+31c // addi    a5,sp,384 | unimp0x3a38
+1c7 //  | fmsub.s ft3,ft0,ft0,ft0,rne0x3a3c
+2d0 // addi    a2,sp,324 | unimp0x3a40
+1c7 //  | fmsub.s ft3,ft0,ft0,ft0,rne0x3a44
+2d0 // addi    a2,sp,324 | unimp0x3a48
+16f //  | jal     sp,80003a4c <verify_data+0x2bc>0x3a4c
+2e9 // addi    t0,t0,26 | unimp0x3a50
+16f //  | jal     sp,80003a54 <verify_data+0x2c4>0x3a54
+166 // slli    sp,sp,0x19 | unimp0x3a58
+166 // slli    sp,sp,0x19 | unimp0x3a5c
+248 // addi    a0,sp,260 | unimp0x3a60
+248 // addi    a0,sp,260 | unimp0x3a64
+10f //  | 0x10f0x3a68
+10f //  | 0x10f0x3a6c
+355 // addi    t1,t1,21 | unimp0x3a70
+355 // addi    t1,t1,21 | unimp0x3a74
+314 // addi    a3,sp,384 | unimp0x3a78
+193 //  | li      gp,00x3a7c
+213 //  | li      tp,00x3a80
+205 // addi    tp,tp,1 | unimp0x3a84
+205 // addi    tp,tp,1 | unimp0x3a88
+205 // addi    tp,tp,1 | unimp0x3a8c
+1cd // addi    gp,gp,19 | unimp0x3a90
+22f //  | 0x22f0x3a94
+1cd // addi    gp,gp,19 | unimp0x3a98
+307 //  | 0x3070x3a9c
+166 // slli    sp,sp,0x19 | unimp0x3aa0
+166 // slli    sp,sp,0x19 | unimp0x3aa4
+14c // addi    a1,sp,132 | unimp0x3aa8
+14c // addi    a1,sp,132 | unimp0x3aac
+2ac // addi    a1,sp,328 | unimp0x3ab0
+2ac // addi    a1,sp,328 | unimp0x3ab4
+2ac // addi    a1,sp,328 | unimp0x3ab8
+256 // slli    tp,tp,0x15 | unimp0x3abc
+1be // slli    gp,gp,0xf | unimp0x3ac0
+8f //  | 0x8f0x3ac4
+137 //  | lui     sp,0x00x3ac8
+7d // c.nop   31 | unimp0x3acc
+137 //  | lui     sp,0x00x3ad0
+2e7 //  | jalr    t0,zero # 0 <buf.2940>0x3ad4
+2e7 //  | jalr    t0,zero # 0 <buf.2940>0x3ad8
+3a5 // addi    t2,t2,9 | unimp0x3adc
+22d // addi    tp,tp,11 | unimp0x3ae0
+31f //  | 0x3ae4
+22d // 0x22d0000031f | unimp0x3ae8
+22d // addi    tp,tp,11 | unimp0x3aec
+22d // addi    tp,tp,11 | unimp0x3af0
+229 // addi    tp,tp,10 | unimp0x3af4
+31c // addi    a5,sp,384 | unimp0x3af8
+288 // addi    a0,sp,320 | unimp0x3afc
+288 // addi    a0,sp,320 | unimp0x3b00
+288 // addi    a0,sp,320 | unimp0x3b04
+37b //  | 0x37b0x3b08
+37b //  | 0x37b0x3b0c
+29a // slli    t0,t0,0x6 | unimp0x3b10
+11f //  | 0x3b14
+202 // 0x2020000011f | unimp0x3b18
+31 // c.nop   12 | unimp0x3b1c
+202 // c.slli64tp | unimp0x3b20
+56 // c.slli  zero,0x15 | unimp0x3b24
+22d // addi    tp,tp,11 | unimp0x3b28
+5f //  | 0x3b2c
+355 // 0x3550000005f | unimp0x3b30
+1b9 // addi    gp,gp,14 | unimp0x3b34
+1b9 // addi    gp,gp,14 | unimp0x3b38
+1b9 // addi    gp,gp,14 | unimp0x3b3c
+1b8 // addi    a4,sp,200 | unimp0x3b40
+24b //  | fnmsub.sft4,ft0,ft0,ft0,rne0x3b44
+266 // slli    tp,tp,0x19 | unimp0x3b48
+266 // slli    tp,tp,0x19 | unimp0x3b4c
+18c // addi    a1,sp,192 | unimp0x3b50
+17e // slli    sp,sp,0x1f | unimp0x3b54
+118 // addi    a4,sp,128 | unimp0x3b58
+118 // addi    a4,sp,128 | unimp0x3b5c
+11 // c.nop   4 | unimp0x3b60
+328 // addi    a0,sp,392 | unimp0x3b64
+aa // slli    ra,ra,0xa | unimp0x3b68
+333 //  | add     t1,zero,zero0x3b6c
+123 //  | sb      zero,2(zero) # 2 <buf.2940+0x2>0x3b70
+158 // addi    a4,sp,132 | unimp0x3b74
+158 // addi    a4,sp,132 | unimp0x3b78
+17c // addi    a5,sp,140 | unimp0x3b7c
+1c2 // slli    gp,gp,0x10 | unimp0x3b80
+200 // addi    s0,sp,256 | unimp0x3b84
+200 // addi    s0,sp,256 | unimp0x3b88
+200 // addi    s0,sp,256 | unimp0x3b8c
+395 // addi    t2,t2,5 | unimp0x3b90
+395 // addi    t2,t2,5 | unimp0x3b94
+21b //  | 0x21b0x3b98
+21b //  | 0x21b0x3b9c
+328 // addi    a0,sp,392 | unimp0x3ba0
+372 // slli    t1,t1,0x1c | unimp0x3ba4
+377 //  | 0x3770x3ba8
+372 // slli    t1,t1,0x1c | unimp0x3bac
+219 // addi    tp,tp,6 | unimp0x3bb0
+219 // addi    tp,tp,6 | unimp0x3bb4
+264 // addi    s1,sp,268 | unimp0x3bb8
+2bd // addi    t0,t0,15 | unimp0x3bbc
+2bd // addi    t0,t0,15 | unimp0x3bc0
+2bd // addi    t0,t0,15 | unimp0x3bc4
+1df //  | 0x3bc8
+1df // 0x1df000001df | unimp0x3bcc
+1df //  | 0x3bd0
+237 // 0x237000001df | unimp0x3bd4
+97 //  | auipc   ra,0x00x3bd8
+16 // c.slli  zero,0x5 | unimp0x3bdc
+16 // c.slli  zero,0x5 | unimp0x3be0
+238 // addi    a4,sp,264 | unimp0x3be4
+238 // addi    a4,sp,264 | unimp0x3be8
+238 // addi    a4,sp,264 | unimp0x3bec
+299 // addi    t0,t0,6 | unimp0x3bf0
+299 // addi    t0,t0,6 | unimp0x3bf4
+1a7 //  | 0x1a70x3bf8
+1a7 //  | 0x1a70x3bfc
+1b2 // slli    gp,gp,0xc | unimp0x3c00
+1b2 // slli    gp,gp,0xc | unimp0x3c04
+118 // addi    a4,sp,128 | unimp0x3c08
+9e // slli    ra,ra,0x7 | unimp0x3c0c
+118 // addi    a4,sp,128 | unimp0x3c10
+54 // addi    a3,sp,4 | unimp0x3c14
+18b //  | 0x18b0x3c18
+f7 //  | 0xf70x3c1c
+2b0 // addi    a2,sp,328 | unimp0x3c20
+f7 //  | 0xf70x3c24
+1dc // addi    a5,sp,196 | unimp0x3c28
+1b3 //  | add     gp,zero,zero0x3c2c
+1dc // addi    a5,sp,196 | unimp0x3c30
+318 // addi    a4,sp,384 | unimp0x3c34
+318 // addi    a4,sp,384 | unimp0x3c38
+318 // addi    a4,sp,384 | unimp0x3c3c
+2d9 // addi    t0,t0,22 | unimp0x3c40
+1e6 // slli    gp,gp,0x19 | unimp0x3c44
+109 // addi    sp,sp,2 | unimp0x3c48
+19e // slli    gp,gp,0x7 | unimp0x3c4c
+ec // addi    a1,sp,76 | unimp0x3c50
+171 // addi    sp,sp,28 | unimp0x3c54
+ec // addi    a1,sp,76 | unimp0x3c58
+171 // addi    sp,sp,28 | unimp0x3c5c
+d6 // slli    ra,ra,0x15 | unimp0x3c60
+206 // slli    tp,tp,0x1 | unimp0x3c64
+b4 // addi    a3,sp,72 | unimp0x3c68
+206 // slli    tp,tp,0x1 | unimp0x3c6c
+1f7 //  | 0x1f70x3c70
+2aa // slli    t0,t0,0xa | unimp0x3c74
+254 // addi    a3,sp,260 | unimp0x3c78
+254 // addi    a3,sp,260 | unimp0x3c7c
+11c // addi    a5,sp,128 | unimp0x3c80
+108 // addi    a0,sp,128 | unimp0x3c84
+108 // addi    a0,sp,128 | unimp0x3c88
+1f3 //  | 0x1f30x3c8c
+1f3 //  | 0x1f30x3c90
+15a // slli    sp,sp,0x16 | unimp0x3c94
+15a // slli    sp,sp,0x16 | unimp0x3c98
+257 //  | 0x2570x3c9c
+257 //  | 0x2570x3ca0
+d7 //  | 0xd70x3ca4
+d7 //  | 0xd70x3ca8
+2db //  | 0x2db0x3cac
+2db //  | 0x2db0x3cb0
+2b0 // addi    a2,sp,328 | unimp0x3cb4
+292 // slli    t0,t0,0x4 | unimp0x3cb8
+26b //  | 0x26b0x3cbc
+fb //  | 0xfb0x3cc0
+fb //  | 0xfb0x3cc4
+83 //  | lb      ra,0(zero) # 0 <buf.2940>0x3cc8
+22b //  | 0x22b0x3ccc
+22b //  | 0x22b0x3cd0
+22b //  | 0x22b0x3cd4
+29b //  | 0x29b0x3cd8
+210 // addi    a2,sp,256 | unimp0x3cdc
+210 // addi    a2,sp,256 | unimp0x3ce0
+210 // addi    a2,sp,256 | unimp0x3ce4
+1e7 //  | jalr    gp,zero # 0 <buf.2940>0x3ce8
+1e7 //  | jalr    gp,zero # 0 <buf.2940>0x3cec
+1e7 //  | jalr    gp,zero # 0 <buf.2940>0x3cf0
+2f1 // addi    t0,t0,28 | unimp0x3cf4
+2f1 // addi    t0,t0,28 | unimp0x3cf8
+11f //  | 0x3cfc
+11f // 0x11f0000011f | unimp0x3d00
+272 // slli    tp,tp,0x1c | unimp0x3d04
+272 // slli    tp,tp,0x1c | unimp0x3d08
+130 // addi    a2,sp,136 | unimp0x3d0c
+e // c.slli  zero,0x3 | unimp0x3d10
+130 // addi    a2,sp,136 | unimp0x3d14
+193 //  | li      gp,00x3d18
+2dd // addi    t0,t0,23 | unimp0x3d1c
+193 //  | li      gp,00x3d20
+2dd // addi    t0,t0,23 | unimp0x3d24
+2bf //  | 0x3d28
+2bf //  | 0x2bf000002bf0x3d2c
+2bf //  | 0x3d30
+2d2 //  | 0x2d2000002bf0x3d34
+332 // slli    t1,t1,0xc | unimp0x3d38
+2d2 // slli    t0,t0,0x14 | unimp0x3d3c
+196 // slli    gp,gp,0x5 | unimp0x3d40
+196 // slli    gp,gp,0x5 | unimp0x3d44
+36a // slli    t1,t1,0x1a | unimp0x3d48
+36a // slli    t1,t1,0x1a | unimp0x3d4c
+358 // addi    a4,sp,388 | unimp0x3d50
+2ec // addi    a1,sp,332 | unimp0x3d54
+2ec // addi    a1,sp,332 | unimp0x3d58
+5b //  | 0x5b0x3d5c
+56 // c.slli  zero,0x15 | unimp0x3d60
+5b //  | 0x5b0x3d64
+17a // slli    sp,sp,0x1e | unimp0x3d68
+17a // slli    sp,sp,0x1e | unimp0x3d6c
+294 // addi    a3,sp,320 | unimp0x3d70
+69 // c.nop   26 | unimp0x3d74
+99 // addi    ra,ra,6 | unimp0x3d78
+99 // addi    ra,ra,6 | unimp0x3d7c
+99 // addi    ra,ra,6 | unimp0x3d80
+17d // addi    sp,sp,31 | unimp0x3d84
+79 // c.nop   30 | unimp0x3d88
+28b //  | 0x28b0x3d8c
+19c // addi    a5,sp,192 | unimp0x3d90
+339 // addi    t1,t1,14 | unimp0x3d94
+19c // addi    a5,sp,192 | unimp0x3d98
+164 // addi    s1,sp,140 | unimp0x3d9c
+ec // addi    a1,sp,76 | unimp0x3da0
+94 // addi    a3,sp,64 | unimp0x3da4
+94 // addi    a3,sp,64 | unimp0x3da8
+94 // addi    a3,sp,64 | unimp0x3dac
+1a7 //  | 0x1a70x3db0
+8c // addi    a1,sp,64 | unimp0x3db4
+d8 // addi    a4,sp,68 | unimp0x3db8
+d8 // addi    a4,sp,68 | unimp0x3dbc
+26d // addi    tp,tp,27 | unimp0x3dc0
+26d // addi    tp,tp,27 | unimp0x3dc4
+169 // addi    sp,sp,26 | unimp0x3dc8
+0 // unimp | unimp0x3dcc

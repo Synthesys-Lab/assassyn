@@ -1,0 +1,4 @@
+ff00ff //  | 10, 0x0ff0ff00ff0000ff00ff <begin_signature>:0x2000
+ff00ff00 // .insn   2, 0xff00 <tdat2>: | .insn   2, 0xff000x2004
+ff00ff0 // .insn   2, 0x0ff0 <tdat3>: | .insn   2, 0x0ff00x2008
+f00ff00f //  | .insn   4, 0xf00ff00f <tdat4>:0x200c

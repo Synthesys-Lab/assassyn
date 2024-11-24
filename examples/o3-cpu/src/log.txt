@@ -1,0 +1,11 @@
+@line:44202 Cycle @2.00: [f]	In Fetch
+@line:6643  Cycle @2.00: [F1]	In fetchImpl
+@line:6715  Cycle @2.00: [F1]	on_br: 0         | ex_by: 0     | fetch: 1      | addr: 0x00000 | ongoing: 0
+@line:6761  Cycle @2.00: [F1]	out fetchImpl
+@line:21    Cycle @3.00: [d]	In decoder
+@line:23    Cycle @3.00: [d]	raw: 0x000007b7  | addr: 0x00000 |
+@line:168   Cycle @3.00: [d]	u.lui.0110111    | rd: x15      |               |               |imm: 0x0
+@line:2549  Cycle @3.00: [d]	not WAW 001
+@line:4152  Cycle @3.00: [d]	reg map table rd:15  dep: 16 ,  cur_Index:0
+@line:4155  Cycle @3.00: [d]	update current sb_status 0 for index 0
+@line:4157  Cycle @3.00: [d]	Bundle values: valid=1,  rd=15, rs1=0, rs2=0, rs1_ready=1, rs2_ready=1, rs1_value=0, rs2_value=0,             rs1_dep=16, rs2_dep=16, sb_status=0 
