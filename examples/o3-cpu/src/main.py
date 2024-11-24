@@ -278,14 +278,13 @@ class Decoder(Module):
         with Condition(signals.rd_valid):
             noWAW =  ( RMT[signals.rd] ==Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size) ).select(Bits(1)(1),Bits(1)(0))
             wait_until(noWAW)
-        RMT[signals.rd]= (signals.rd_valid).select(Index,Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size) )
+            RMT[signals.rd]= Index
 
         scoreboard[Index] = add_entry(signals,scoreboard,Index,RMT,reg_file,fetch_addr)
         sb_tail[0]= (((sb_tail[0].bitcast(UInt(32)) )+UInt(32)(1) )%SCOREBOARD.sizeI ).bitcast(Bits(SCOREBOARD.Bit_size))
         log("update sb_tail {:05}",sb_tail[0])
         Dispatch.async_called()
 
-        # log("out decoder")
         return signals.is_branch
 
 class Fetcher(Module):

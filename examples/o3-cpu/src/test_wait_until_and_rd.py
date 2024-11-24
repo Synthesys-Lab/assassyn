@@ -13,18 +13,19 @@ class Driver(Module):
 
     @module.combinational
     def build(self,  RMT:Array  ):
+        sb_tail = RegArray(Bits(5),1,initializer=[3])
+        signals = decode_logic(Bits(32)(1975))
         
-        signals = decode_logic(Bits(32)(2039))
-        Index = signals.rs1
-        noWAW = Bits(1)(1)
-        rmt_entry = (RMT[signals.rd] ==Bits(5)(16) )
-        noWAW =  ( rmt_entry ).select(Bits(1)(1),Bits(1)(0))
-        # # log("not WAW {:03}",noWAW) 
-        wait_until(noWAW)
-        RMT[signals.rd]= (signals.rd_valid).select(Index,Bits(5)(SCOREBOARD.size) )
-             
+        Index = sb_tail[0]
+        with Condition(signals.rd_valid):
+            noWAW =  ( RMT[signals.rd] ==Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size) ).select(Bits(1)(1),Bits(1)(0))
+            wait_until(noWAW)
+        RMT[signals.rd]= (signals.rd_valid).select(Index,Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size) )
+        sb_tail[0]= (((sb_tail[0].bitcast(UInt(32)) )+UInt(32)(1) )%SCOREBOARD.sizeI ).bitcast(Bits(SCOREBOARD.Bit_size))
+        
 
 def test_record():
+
     sys = SysBuilder('record')
     with sys:
         reg_map_table = RegArray(Bits(5),33,initializer=[16]*33,attr=[Array.FULLY_PARTITIONED])
