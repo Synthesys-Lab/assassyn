@@ -56,15 +56,15 @@ Refer `python/unit-tests/README.md` for more details on the feature-case corresp
 the following command.
 
 ````sh
-./scripts/build-verilator.sh
-source setup.sh # Re-run the script since it has a different environment variable for verilator
+$ ./scripts/build-verilator.sh
+$ source setup.sh # Re-run the script since it has a different environment variable for verilator
 ````
 
 **Developers**: All the test cases are located in `python/tests`, you can just run them like
 all other Python scripts.
 
 ````sh
-python python/unit-tests/test_driver.py 
+$ python python/unit-tests/test_driver.py 
 ````
 
 Refer our [developer doc](./docs/developer/README.md) for more details on tooling.
