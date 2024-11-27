@@ -7,28 +7,11 @@ on:
 name: Check and Lint
 
 jobs:
-  check:
-    name: Check
-    runs-on: self-hosted
-    container:
-      image: ubuntu:22.04
-      options: --user root
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-
   python:
     name: Python Lint
     runs-on: self-hosted
     container:
-      image: ubuntu:22.04
+      image: Dockerfile
       options: --user root
     steps:
       - uses: actions/checkout@v2
@@ -42,7 +25,7 @@ jobs:
     name: Rustfmt
     runs-on: self-hosted
     container:
-      image: ubuntu:22.04
+      image: Dockerfile 
       options: --user root
     steps:
       - uses: actions/checkout@v2
@@ -64,7 +47,7 @@ jobs:
       contents: read
     runs-on: self-hosted
     container:
-      image: ubuntu:22.04
+      image: Dockerfile
       options: --user root
     steps:
       - uses: actions/checkout@v2
