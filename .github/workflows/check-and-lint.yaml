@@ -3,7 +3,6 @@ on:
     branches:
       - master
 
-
 name: Check and Lint
 
 jobs:
@@ -11,7 +10,7 @@ jobs:
     name: Python Lint
     runs-on: self-hosted
     container:
-      image: ./Dockerfile
+      image: ubuntu:22.04
       options: --user root
     steps:
       - uses: actions/checkout@v2
@@ -25,7 +24,7 @@ jobs:
     name: Rustfmt
     runs-on: self-hosted
     container:
-      image: ./Dockerfile 
+      image: rust:1.82
       options: --user root
     steps:
       - uses: actions/checkout@v2
@@ -47,7 +46,7 @@ jobs:
       contents: read
     runs-on: self-hosted
     container:
-      image: ./Dockerfile
+      image: ubuntu:1.82
       options: --user root
     steps:
       - uses: actions/checkout@v2
