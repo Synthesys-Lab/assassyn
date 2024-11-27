@@ -16,7 +16,7 @@ jobs:
     name: Test
     runs-on: self-hosted
     container:
-      image: Dockerfile
+      image: ./Dockerfile
       options: --user root
     steps:
       - uses: actions/checkout@v3

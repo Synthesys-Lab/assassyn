@@ -11,7 +11,7 @@ jobs:
     name: Python Lint
     runs-on: self-hosted
     container:
-      image: Dockerfile
+      image: ./Dockerfile
       options: --user root
     steps:
       - uses: actions/checkout@v2
@@ -25,7 +25,7 @@ jobs:
     name: Rustfmt
     runs-on: self-hosted
     container:
-      image: Dockerfile 
+      image: ./Dockerfile 
       options: --user root
     steps:
       - uses: actions/checkout@v2
@@ -47,7 +47,7 @@ jobs:
       contents: read
     runs-on: self-hosted
     container:
-      image: Dockerfile
+      image: ./Dockerfile
       options: --user root
     steps:
       - uses: actions/checkout@v2
