@@ -16,7 +16,8 @@ jobs:
     name: Test
     runs-on: self-hosted
     container:
-      image: ubuntu:20.04
+      image: ubuntu:22.04
+      options: --user root
     steps:
       - uses: actions/checkout@v3
       - name: Install Verilator Depencences

@@ -11,7 +11,8 @@ jobs:
     name: Check
     runs-on: self-hosted
     container:
-      image: ubuntu:20.04
+      image: ubuntu:22.04
+      options: --user root
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -25,7 +26,10 @@ jobs:
 
   python:
     name: Python Lint
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    container:
+      image: ubuntu:22.04
+      options: --user root
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -36,7 +40,10 @@ jobs:
 
   fmt:
     name: Rustfmt
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    container:
+      image: ubuntu:22.04
+      options: --user root
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -55,7 +62,10 @@ jobs:
     permissions:
       checks: write
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    container:
+      image: ubuntu:22.04
+      options: --user root
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
