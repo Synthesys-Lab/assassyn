@@ -347,33 +347,30 @@ impl Visitor<String> for ElaborateModule<'_> {
         let l = slice.l();
         let r = slice.r();
         let dtype = slice.get().dtype();
-        if l < 64 && r < 64 {
+        let mask_bits = "1".repeat(r - l + 1);
+        let result_a = if l < 64 && r < 64 {
           format!(
-            "{{
-                    let a = ValueCastTo::<u64>::cast(&{});
-                    let mask = u64::from_str_radix(\"{}\", 2).unwrap();
-                    let res = (a >> {}) & mask;
-                    ValueCastTo::<{}>::cast(&res)
-                }}",
-            a,
-            "1".repeat(r - l + 1),
-            l,
-            dtype_to_rust_type(&dtype),
+            "let a = ValueCastTo::<u64>::cast(&{});  
+                 let mask = u64::from_str_radix(\"{}\", 2).unwrap();",
+            a, mask_bits,
           )
         } else {
           format!(
-            "{{
-                  let a = ValueCastTo::<BigUint>::cast(&{});
-                  let mask = BigUint::parse_bytes(\"{}\".as_bytes(), 2).unwrap();
-                  let res = (a >> {}) & mask;
-                  ValueCastTo::<{}>::cast(&res)
-              }}",
-            a,
-            "1".repeat(r - l + 1),
-            l,
-            dtype_to_rust_type(&dtype),
+            "let a = ValueCastTo::<BigUint>::cast(&{});  
+                 let mask = BigUint::parse_bytes(\"{}\".as_bytes(), 2).unwrap();",
+            a, mask_bits,
           )
-        }
+        };
+        format!(
+          "{{  
+              {}  
+              let res = (a >> {}) & mask;  
+              ValueCastTo::<{}>::cast(&res)  
+            }}",
+          result_a,
+          l,
+          dtype_to_rust_type(&dtype),
+        )
       }
       Opcode::Concat => {
         let dtype = expr.dtype();
