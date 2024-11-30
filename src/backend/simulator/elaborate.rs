@@ -347,16 +347,16 @@ impl Visitor<String> for ElaborateModule<'_> {
         let l = slice.l();
         let r = slice.r();
         let dtype = slice.get().dtype();
-        if dtype.get_bits() <= 64 {
+        if l < 64 && r < 64 {
           format!(
             "{{
                     let a = ValueCastTo::<u64>::cast(&{});
-                    let mask = (1u64 << {}) - 1;
+                    let mask = u64::from_str_radix(\"{}\", 2).unwrap();
                     let res = (a >> {}) & mask;
                     ValueCastTo::<{}>::cast(&res)
                 }}",
             a,
-            r - l + 1,
+            "1".repeat(r - l + 1),
             l,
             dtype_to_rust_type(&dtype),
           )
