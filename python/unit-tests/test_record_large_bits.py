@@ -56,7 +56,7 @@ def check_raw(raw):
     print("All indices match the expected output.")
 
 def test_record():
-    sys = SysBuilder('record')
+    sys = SysBuilder('record_large')
     with sys:
         record = RegArray(entry,15,attr=[Array.FULLY_PARTITIONED])
         driver = Driver()
