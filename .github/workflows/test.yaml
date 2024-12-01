@@ -28,7 +28,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/python
           ASSASSYN_HOME: ${{ github.workspace }}
         run: |
-          pytest python/unit-tests;
+          pytest -n 8 python/unit-tests;
           python3 examples/systolic-array/systolic_array.py;
           python3 examples/systolic-array/memory_systolic_array.py;
           python3 examples/minor-cpu/src/main.py;
