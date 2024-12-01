@@ -19,11 +19,12 @@ jobs:
       image: rust:1.82
       options: --user root
     steps:
-      - name: Install Verilator Depencences
+      - name: Install Depencences
         run: |
           apt-get update &&
           apt-get install -y git help2man perl make autoconf g++ flex bison ccache \
             libunwind-dev libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev;
+          rustup component add rustfmt
       - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
@@ -44,12 +45,6 @@ jobs:
       - name: Install python dependencies
         run: |
           pip install -r python/requirements.txt;
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-        run: rustup component add rustfmt
       - name: Cache dependencies
         uses: actions/cache@v2
         env:
