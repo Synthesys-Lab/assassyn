@@ -45,8 +45,5 @@ jobs:
       options: --user root
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: -- -Dclippy::all
-          name: Clippy Output
+      - run: rustup component add clippy
+      - run: cargo clippy -- -Dclippy::all
