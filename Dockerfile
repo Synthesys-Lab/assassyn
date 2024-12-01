@@ -35,10 +35,9 @@ RUN pip install decorator==5.1.1 pytest==7.4.3 pylint==3.2.3 --break-system-pack
     && rustup component add rustfmt clippy
 
 # Set environment variables
-ENV PATH="/root/.cargo/bin:$PATH"
 ENV CC="ccache gcc"
 ENV CXX="ccache g++"
-ENV RUSTC_WRAPPER="/root/.cargo/bin/sccache"
+ENV RUSTC_WRAPPER="sccache"
 ENV PYTHONPATH="/app/python"
 ENV ASSASSYN_HOME="/app"
 ENV VERILATOR_ROOT="/usr/local/share/verilator"
