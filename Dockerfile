@@ -30,7 +30,7 @@ SHELL ["/bin/zsh", "-c"]
 # RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # Install Python packages, Cargo tools, and Rust components
-RUN pip install decorator==5.1.1 pytest==7.4.3 pylint==3.2.3 --break-system-packages \
+RUN pip install decorator==5.1.1 pytest==7.4.3 pylint==3.2.3 pytest-xdist==3.6.1 --break-system-packages \
     && cargo install sccache \
     && rustup component add rustfmt clippy
 
