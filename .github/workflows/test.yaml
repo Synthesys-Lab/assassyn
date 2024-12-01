@@ -49,6 +49,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+        run: rustup component add rustfmt
       - name: Cache dependencies
         uses: actions/cache@v2
         env:
