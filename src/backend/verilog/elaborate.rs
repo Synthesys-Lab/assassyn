@@ -1005,7 +1005,7 @@ impl VerilogDumper<'_, '_> {
   }
 }
 
-impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
+impl Visitor<String> for VerilogDumper<'_, '_> {
   // Dump the implentation of each module.
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.current_module = namify(module.get_name()).to_string();
@@ -1851,7 +1851,7 @@ impl<'a> ExposeGather<'a> {
     }
   }
 }
-impl<'a> Visitor<()> for ExposeGather<'a> {
+impl Visitor<()> for ExposeGather<'_> {
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     if let Some((_, v)) = self
       .sys

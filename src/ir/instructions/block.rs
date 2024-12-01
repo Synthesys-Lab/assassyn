@@ -15,7 +15,7 @@ impl BlockIntrinsic<'_> {
   }
 
   pub fn value(&self) -> Option<BaseNode> {
-    return self.get().get_operand_value(0);
+    self.get().get_operand_value(0)
   }
 }
 

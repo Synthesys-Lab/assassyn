@@ -178,7 +178,7 @@ impl<'sys> ModuleRef<'sys> {
   }
 }
 
-impl<'a> ModuleMut<'a> {
+impl ModuleMut<'_> {
   pub fn add_attr(&mut self, attr: Attribute) {
     self.get_mut().attr.insert(attr);
   }
