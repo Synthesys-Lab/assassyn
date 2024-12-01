@@ -49,7 +49,7 @@ def check_raw(raw):
 
 
 def test_record():
-    sys = SysBuilder('record')
+    sys = SysBuilder('record_bundle')
     with sys:
         record_ty = Record({
             (0, 0): ('is_odd', Bits),

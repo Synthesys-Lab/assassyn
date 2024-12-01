@@ -54,6 +54,9 @@ def check_raw(raw):
 
 
 def test_async_call():
+    # NOTE: The name of the system should be unique within all the testcases,
+    # because we currently have no locks to exclusively own a folder, under the
+    # context of multi-thread testing.
     sys = SysBuilder('async_call')
     with sys:
         adder = Adder()
