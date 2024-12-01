@@ -19,9 +19,6 @@ jobs:
       image: jwere/assassyn-dev:v0.0.1
       options: --user root
     steps:
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '3.x'
       - uses: actions/checkout@v3
       - name: Python Frontend Unit Tests
         env:
