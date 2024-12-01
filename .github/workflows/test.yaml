@@ -24,16 +24,12 @@ jobs:
           python-version: '3.x'
       - uses: actions/checkout@v3
       - name: Python Frontend Unit Tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/python
+          ASSASSYN_HOME: ${{ github.workspace }}
         run: |
           pytest python/unit-tests;
-      - name: Test Examples
-        env:
-          PYTHONPATH: python
-          ASSASSYN_HOME: ${{ github.workspace }}
-          RUSTC_WRAPPER: sccache
-          VERILATOR_ROOT: ${{ github.workspace }}/verilator
-        run: |
-          python3 examples/systolic-array/systolic_array.py
-          python3 examples/systolic-array/memory_systolic_array.py
-          python3 examples/minor-cpu/src/main.py
-          python3 examples/priority-queue/main.py
+          python3 examples/systolic-array/systolic_array.py;
+          python3 examples/systolic-array/memory_systolic_array.py;
+          python3 examples/minor-cpu/src/main.py;
+          python3 examples/priority-queue/main.py;
