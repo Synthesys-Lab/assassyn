@@ -16,63 +16,14 @@ jobs:
     name: Test
     runs-on: self-hosted
     container:
-      image: rust:1.82
+      image: jwere/assassyn-dev:v0.0.1
       options: --user root
     steps:
-      - name: Install Depencences
-        run: |
-          apt-get update &&
-          apt-get install -y git help2man perl make autoconf g++ flex bison ccache \
-            libunwind-dev libgoogle-perftools-dev numactl perl-doc libfl2 libfl-dev zlib1g zlib1g-dev;
-          rustup component add rustfmt
       - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
       - uses: actions/checkout@v3
-      - name: Cache verilator build
-        id: cache-verilator-build
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-verilator-build
-        with:
-          path: verilator
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.VERILATOR_VERSION }}
-      - if: ${{ steps.cache-verilator-build.outputs.cache-hit != 'true' }}
-        name: Build verilator
-        run: |
-          git clone https://github.com/verilator/verilator && cd verilator && git checkout $VERILATOR_VERSION;
-          autoconf && ./configure && make -j `nproc`;
-      - name: Install python dependencies
-        run: |
-          pip install -r python/requirements.txt;
-      - name: Cache dependencies
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-dependencies
-        with:
-          path: |
-            ~/.cargo/.crates.toml
-            ~/.cargo/.crates2.json
-            ~/.cargo/bin
-            ~/.cargo/bin/sccache
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            target
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-      - name: Install sccache
-        run: |
-          if ! command -v sccache &> /dev/null
-          then
-            cargo install sccache
-          fi;
       - name: Python Frontend Unit Tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}/python
-          ASSASSYN_HOME: ${{ github.workspace }}
-          RUSTC_WRAPPER: sccache
-          VERILATOR_ROOT: ${{ github.workspace }}/verilator
         run: |
           pytest python/unit-tests;
       - name: Test Examples

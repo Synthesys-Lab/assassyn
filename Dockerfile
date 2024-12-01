@@ -32,7 +32,7 @@ SHELL ["/bin/zsh", "-c"]
 # Install Python packages, Cargo tools, and Rust components
 RUN pip install decorator==5.1.1 pytest==7.4.3 pylint==3.2.3 --break-system-packages \
     && cargo install sccache \
-    && rustup component add rustfmt
+    && rustup component add rustfmt clippy
 
 # Set environment variables
 ENV PATH="/root/.cargo/bin:$PATH"
