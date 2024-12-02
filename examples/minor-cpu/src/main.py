@@ -329,16 +329,16 @@ class Driver(Module):
         super().__init__(ports={})
     @module.combinational
     def build(self, fetcher: Module, user: Module):
-        init_reg = RegArray(Int(1), 1, initializer=[1])
+        init_reg = RegArray(UInt(1), 1, initializer=[1])
         init_cache = SRAM(width=32, depth=32, init_file=f"{workspace}/workload.init")
         init_cache.name = 'init_cache'
         init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0), user=user)
         # Initialze offset at first cycle
-        with Condition(init_reg[0]==Int(1)(1)):
+        with Condition(init_reg[0]==UInt(1)(1)):
             init_cache.bound.async_called()
-            init_reg[0] = Int(1)(0)
+            init_reg[0] = UInt(1)(0)
         # Async_call after first cycle
-        with Condition(init_reg[0] == Int(1)(0)):
+        with Condition(init_reg[0] == UInt(1)(0)):
             
             d_call = fetcher.async_called()
 
