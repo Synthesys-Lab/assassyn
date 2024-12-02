@@ -18,7 +18,7 @@ class Layer(Module):
     """
     def __init__(self, height:int, level:int, elements:RegArray):
         super().__init__(ports={
-            'action': Port(Int(1)),      # 0 means push, 1 means pop
+            'action': Port(UInt(1)),      # 0 means push, 1 means pop
             'index': Port(Int(32)),
             'value': Port(Int(32))
         }, no_arbiter=True)
@@ -37,8 +37,8 @@ class Layer(Module):
     def build(self, next_layer: 'Layer' = None, next_elements: RegArray = None):    
         action, index, value = self.pop_all_ports(True)
 
-        ZERO = Int(1)(0)
-        ONE = Int(1)(1)
+        ZERO = UInt(1)(0)
+        ONE = UInt(1)(1)
         
         index_bit = max(self.level, 1)        
         index0 = index[0:index_bit-1].bitcast(Int(index_bit))
@@ -155,7 +155,7 @@ class HeapPush(Module):
     @module.combinational
     def build(self, layer: Layer):
         push_value = self.pop_all_ports(True)
-        bound = layer.bind(action=Int(1)(0), index=Int(32)(0))
+        bound = layer.bind(action=UInt(1)(0), index=Int(32)(0))
         call = bound.async_called(value=push_value)
         call.bind.set_fifo_depth(action=1, index=1, value=1)
 
@@ -167,7 +167,7 @@ class HeapPop(Module):
 
     @module.combinational
     def build(self, layer: Layer):
-        bound = layer.bind(action=Int(1)(1), index=Int(32)(0), value=Int(32)(1))
+        bound = layer.bind(action=UInt(1)(1), index=Int(32)(0), value=Int(32)(1))
         call = bound.async_called()        
         call.bind.set_fifo_depth(action=1, index=1, value=1)
         
