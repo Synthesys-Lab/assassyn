@@ -420,7 +420,8 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
           *depth
         })
       })
-      .unwrap_or(self.config.fifo_depth);
+      .unwrap_or(self.config.fifo_depth)
+      .next_power_of_two();
 
     res.push_str(&format!("  // fifo: {}, depth: {}\n", fifo, fifo_depth));
 
@@ -479,11 +480,11 @@ impl<'a, 'b> VerilogDumper<'a, 'b> {
     res.push_str(&declare_logic(fifo.scalar_ty(), &push_data));
     res.push_str(&format!("  assign {push_data} = {data};\n"));
 
-    //let log2_depth = fifo_depth.trailing_zeros();
+    let log2_depth = fifo_depth.trailing_zeros();
     // Instantiate the FIFO
     res.push_str(&format!(
       "
-  fifo #({fifo_width}, {fifo_depth}) fifo_{fifo_name}_i (
+  fifo #({fifo_width}, {log2_depth}) fifo_{fifo_name}_i (
     .clk(clk),
     .rst_n(rst_n),
     .push_valid({push_valid}),
@@ -1004,7 +1005,7 @@ impl VerilogDumper<'_, '_> {
   }
 }
 
-impl<'a, 'b> Visitor<String> for VerilogDumper<'a, 'b> {
+impl Visitor<String> for VerilogDumper<'_, '_> {
   // Dump the implentation of each module.
   fn visit_module(&mut self, module: ModuleRef<'_>) -> Option<String> {
     self.current_module = namify(module.get_name()).to_string();
@@ -1334,6 +1335,10 @@ module {} (
       for (a, (_, _)) in self.array_stores.drain() {
         res.push_str(&format!(
           r#"
+
+`ifdef SYNTHESIS
+(* blackbox *)
+`endif
 module memory_blackbox_{a} #(
     parameter DATA_WIDTH = {data_width},   
     parameter ADDR_WIDTH = {addr_bits}     
@@ -1846,7 +1851,7 @@ impl<'a> ExposeGather<'a> {
     }
   }
 }
-impl<'a> Visitor<()> for ExposeGather<'a> {
+impl Visitor<()> for ExposeGather<'_> {
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     if let Some((_, v)) = self
       .sys

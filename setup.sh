@@ -6,9 +6,9 @@ RESTORE_DIR=`pwd`
 # Go to the setup.sh directory
 cd `dirname $0`
 
-
 # Use the repository path to set the PYTHONPATH and ASSASSYN_HOME
 REPO_PATH=`git rev-parse --show-toplevel`
+
 
 which sccache > /dev/null 2>&1
 

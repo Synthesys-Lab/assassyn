@@ -72,9 +72,9 @@ def parse_payload(line):
     realign = ''.join(realign)
 
     # After 40 characters, they are all semantic comments, so we ignore for payload.
-    toks = realign[:40].split()
+    toks = realign[:39].split()
     # But retain for readability hints
-    comment = realign[40:]
+    comment = realign[39:]
 
     addr = int(toks[0][:-1], 16) - offset
 
@@ -84,21 +84,19 @@ def parse_payload(line):
 
     j = 0
     for value in payload:
-        if len(value) == 4:
-            res.append([addr + 2 * j, int(value, 16), ''])
-            j += 1
-        elif len(value) == 8:
-            res.append([addr + 2 * j, int(value[4:], 16), ''])
-            res.append([addr + 2 * j + 2, int(value[:4], 16), ''])
-            j += 2
-        else:
-            try:
-                int(value)
-                assert False, f'TODO: len={len(value)} {line}'
-            except:
-                # TODO(@were): Fix unaligned addresses for byte-level operations.
-                print(value, 'is heuristically skipped')
-                continue
+        try:
+            int(value, 16)
+            if len(value) == 4:
+                res.append([addr + 2 * j, int(value, 16), ''])
+                j += 1
+            elif len(value) == 8:
+                res.append([addr + 2 * j, int(value[4:], 16), ''])
+                res.append([addr + 2 * j + 2, int(value[:4], 16), ''])
+                j += 2
+        except:
+            # TODO(@were): Fix unaligned addresses for byte-level operations.
+            print(value, 'is heuristically terminated')
+            break
 
     if not func_tagged:
         comment = comment + ' ' + func

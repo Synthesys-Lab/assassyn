@@ -215,8 +215,8 @@ class RecordValue:
             assert len(args) == 1, "Expecting only one argument!"
             # TODO(@were): Strictly check the dtype
             # assert args[0].dtype == dtype, "Expecting the same Record type!"
-            self.payload = args[0]
-            self.dtype = dtype
+            self._payload = args[0]
+            self._dtype = dtype
             return
 
         assert isinstance(dtype, Record), "Expecting a Record type!"
@@ -237,15 +237,19 @@ class RecordValue:
         from .expr import concat
         payload = concat(*[v for _, v in ordered_values])
 
-        self.payload = payload
-        self.dtype = dtype
+        self._payload = payload
+        self._dtype = dtype
+
+    def value(self):
+        '''Return the payload as a value'''
+        return self._payload
 
     def as_operand(self):
         '''Return the payload as an operand'''
-        return self.payload.as_operand()
+        return self._payload.as_operand()
 
     def __repr__(self):
-        return f'RecordValue({self.dtype}, {self.payload})'
+        return f'RecordValue({self._dtype}, {self._payload})'
 
     # A Python TIP: __getattr__ is a "fallback" method, when "name" attribute is not found in the
     # self object. However, __getattribute__ is a "hook" method, which is called when every a.b
@@ -261,4 +265,4 @@ class RecordValue:
     # into the AST, which is not what we want. Unless we can have a divergence in the returned
     # object and the wrapped object.
     def __getattr__(self, name):
-        return self.dtype.attributize(self.payload, name)
+        return self._dtype.attributize(self._payload, name)

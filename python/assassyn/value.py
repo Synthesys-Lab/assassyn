@@ -140,6 +140,18 @@ class Value:
         from .expr import Select
         return Select(Select.SELECT, self, true_value, false_value)
 
+    def case(self, cases):
+        '''The frontend API to create a case operation'''
+        assert None in cases, "Expecting a default case"
+        res = cases[None]
+        for k, v in cases.items():
+            if k is None:
+                continue
+            assert isinstance(k, Value), "Expecting a Value object for key"
+            assert isinstance(v, Value), "Expecting a Value object for value"
+            res = (self == k).select(v, res)
+        return res
+
     @ir_builder
     def select1hot(self, *args):
         '''The frontend API to create a select1hot operation'''

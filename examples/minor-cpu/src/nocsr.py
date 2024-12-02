@@ -35,18 +35,14 @@ class Execution(Module):
         exec_bypass_data: Array,
         mem_bypass_reg: Array,
         mem_bypass_data: Array,
-        wb_bypass_reg: Array,
-        wb_bypass_data: Array,
         reg_onwrite: Array,
         offset_reg: Array,
         rf: Array, 
-        csr_f: Array,
+        # csr_f: Array,
         memory: Module, 
         data: str,
         depth_log: int):
 
-        csr_id = Bits(4)(0)
- 
         signals = self.signals.peek()
 
         rs1 = signals.rs1
@@ -55,24 +51,13 @@ class Execution(Module):
 
         on_write = reg_onwrite[0]
 
-        
+        a_valid = (~(on_write >> rs1))[0:0] | (exec_bypass_reg[0] == rs1) | (mem_bypass_reg[0] == rs1) | ~signals.rs1_valid
 
-        a_valid =(exec_bypass_reg[0] == rs1) | (mem_bypass_reg[0] == rs1) | ~signals.rs1_valid | (~(on_write >> rs1))[0:0] #| (wb_bypass_reg[0] == rs1)
-        a_valid_true = a_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rs1).bitcast(Bits(1))) 
-        with Condition(~a_valid):
-            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rs1_valid: {} | (~(on_write >> rs1))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rs1_valid, (~(on_write >> rs1))[0:0])
+        b_valid = (~(on_write >> rs2))[0:0] | (exec_bypass_reg[0] == rs2) | (mem_bypass_reg[0] == rs2) | ~signals.rs2_valid
 
-        b_valid =(exec_bypass_reg[0] == rs2) | (mem_bypass_reg[0] == rs2) | ~signals.rs2_valid | (~(on_write >> rs2))[0:0] #| (wb_bypass_reg[0] == rs2)
-        b_valid_true = b_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rs2).bitcast(Bits(1) ))
-        with Condition(~b_valid):
-            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rs2_valid: {} | (~(on_write >> rs2))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rs2_valid, (~(on_write >> rs2))[0:0])
+        rd_valid = (~(on_write >> rd))[0:0] | (exec_bypass_reg[0] == rd) | (mem_bypass_reg[0] == rd) | ~signals.rd_valid
 
-        rd_valid =  (exec_bypass_reg[0] == rd) | (mem_bypass_reg[0] == rd) | ~signals.rd_valid | (~(on_write >> rd))[0:0] 
-        rd_valid_true = rd_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rd).bitcast(Bits(1) ))
-        with Condition(~rd_valid):
-            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rd_valid: {} | (~(on_write >> rd))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rd_valid, (~(on_write >> rd))[0:0])
-
-        valid = a_valid_true & b_valid_true & rd_valid_true
+        valid = a_valid & b_valid & rd_valid
 
         with Condition(~valid):
             log("pc: 0x{:08x}   | rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {} | backlogged", \
@@ -98,19 +83,19 @@ class Execution(Module):
           (1860, 15), #unknown
         ]
 
-        csr_id = Bits(4)(0)
-        for i, j in raw_id:
-            csr_id = (signals.imm[0:11] == Bits(12)(i)).select(Bits(4)(j), csr_id)
-            csr_id = signals.is_mepc.select(Bits(4)(2), csr_id)
+        # csr_id = Bits(4)(0)
+        # for i, j in raw_id:
+        #     csr_id = (signals.imm[0:11] == Bits(12)(i)).select(Bits(4)(j), csr_id)
+        #     csr_id = signals.is_mepc.select(Bits(4)(2), csr_id)
 
-        is_csr = Bits(1)(0)
-        is_csr = signals.csr_read | signals.csr_write
-        csr_new = Bits(32)(0)
-        csr_new = signals.csr_write.select( rf[rs1] , csr_new)
-        csr_new = signals.is_zimm.select(concat(Bits(27)(0),rs1), csr_new)
+        # is_csr = Bits(1)(0)
+        # is_csr = signals.csr_read | signals.csr_write
+        # csr_new = Bits(32)(0)
+        # csr_new = signals.csr_write.select( rf[rs1] , csr_new)
+        # csr_new = signals.is_zimm.select(concat(Bits(27)(0),rs1), csr_new)
 
-        with Condition(is_csr):
-            log("csr_id: {} | new: {:08x} |", csr_id, csr_new)
+        # with Condition(is_csr):
+        #     log("csr_id: {} | new: {:08x} |", csr_id, csr_new)
 
 
         signals, fetch_addr = self.pop_all_ports(False)
@@ -144,14 +129,12 @@ class Execution(Module):
         a = bypass(mem_bypass_reg, mem_bypass_data, rs1, rf[rs1])
         a = bypass(exec_bypass_reg, exec_bypass_data, rs1, a)
         a = (rs1 == Bits(5)(0)).select(Bits(32)(0), a)
-        a = signals.csr_write.select(Bits(32)(0), a)
-        a = (~a_valid).select( wb_bypass_data[0], a)
+        # a = signals.csr_write.select(Bits(32)(0), a)
 
         b = bypass(mem_bypass_reg, mem_bypass_data, rs2, rf[rs2])
         b = bypass(exec_bypass_reg, exec_bypass_data, rs2, b)
         b = (rs2 == Bits(5)(0)).select(Bits(32)(0), b)
-        b = is_csr.select(csr_f[csr_id], b)
-        b = (~b_valid).select( wb_bypass_data[0], b)
+        # b = is_csr.select(csr_f[csr_id], b)
         
 
         log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
@@ -227,8 +210,8 @@ class Execution(Module):
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
         bound = dcache.bound.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext)
         bound.async_called()
-        with Condition(signals.csr_write):
-            csr_f[csr_id] = csr_new
+        # with Condition(signals.csr_write):
+        #     csr_f[csr_id] = csr_new
 
 
         with Condition(rd != Bits(5)(0)):
@@ -325,9 +308,8 @@ class Onwrite(Downstream):
         wb_rd = writeback_rd.optional(Bits(5)(0))
         ex_bit = (ex_rd != Bits(5)(0)).select(Bits(32)(1) << ex_rd, Bits(32)(0))
         wb_bit = (wb_rd != Bits(5)(0)).select(Bits(32)(1) << wb_rd, Bits(32)(0))
-        
+        log("ownning: {:02}      | releasing: {:02}|", ex_rd, wb_rd)
         reg_onwrite[0] = reg_onwrite[0] ^ ex_bit ^ wb_bit
-        log("ownning: {:02}      | releasing: {:02}| reg_onwrite[0]: {:08x}", ex_rd, wb_rd, reg_onwrite[0])
 
 class MemUser(Module):
     def __init__(self, width):
@@ -349,16 +331,16 @@ class Driver(Module):
         super().__init__(ports={})
     @module.combinational
     def build(self, fetcher: Module, user: Module):
-        init_reg = RegArray(UInt(1), 1, initializer=[1])
+        init_reg = RegArray(Int(1), 1, initializer=[1])
         init_cache = SRAM(width=32, depth=32, init_file=f"{workspace}/workload.init")
         init_cache.name = 'init_cache'
         init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0), user=user)
         # Initialze offset at first cycle
-        with Condition(init_reg[0]==UInt(1)(1)):
+        with Condition(init_reg[0]==Int(1)(1)):
             init_cache.bound.async_called()
-            init_reg[0] = UInt(1)(0)
+            init_reg[0] = Int(1)(0)
         # Async_call after first cycle
-        with Condition(init_reg[0] == UInt(1)(0)):
+        with Condition(init_reg[0] == Int(1)(0)):
             
             d_call = fetcher.async_called()
 
@@ -383,7 +365,7 @@ def build_cpu(depth_log):
         reg_file    = RegArray(bits32, 32)
         reg_onwrite = RegArray(bits32, 1)
 
-        csr_file = RegArray(Bits(32), 16, initializer=[0]*16)
+        # csr_file = RegArray(Bits(32), 16, initializer=[0]*16)
 
         exec_bypass_reg = RegArray(bits5, 1)
         exec_bypass_data = RegArray(bits32, 1)
@@ -391,11 +373,8 @@ def build_cpu(depth_log):
         mem_bypass_reg = RegArray(bits5, 1)
         mem_bypass_data = RegArray(bits32, 1)
 
-        wb_bypass_reg = RegArray(bits5, 1)
-        wb_bypass_data = RegArray(bits32, 1)
-
         writeback = WriteBack()
-        wb_rd = writeback.build(reg_file = reg_file)
+        wb_rd = writeback.build(reg_file = reg_file )
 
         memory_access = MemoryAccess()
 
@@ -408,11 +387,9 @@ def build_cpu(depth_log):
             reg_onwrite = reg_onwrite,
             mem_bypass_reg = mem_bypass_reg,
             mem_bypass_data = mem_bypass_data,
-            wb_bypass_reg = wb_bypass_reg,
-            wb_bypass_data = wb_bypass_data,
             offset_reg = offset_reg,
             rf = reg_file,
-            csr_f = csr_file,
+            # csr_f = csr_file,
             memory = memory_access,
             #writeback = writeback,
             data = f'{workspace}/workload.data',
@@ -422,9 +399,7 @@ def build_cpu(depth_log):
         memory_access.build(
             writeback = writeback, 
             mem_bypass_reg = mem_bypass_reg, 
-            mem_bypass_data=mem_bypass_data,
-            wb_bypass_reg=wb_bypass_reg,
-            wb_bypass_data=wb_bypass_data
+            mem_bypass_data=mem_bypass_data
         )
 
         decoder = Decoder()
@@ -445,7 +420,7 @@ def build_cpu(depth_log):
         '''RegArray exposing'''
         sys.expose_on_top(reg_file, kind='Output')
         sys.expose_on_top(reg_onwrite, kind='Output')
-        sys.expose_on_top(csr_file, kind='Inout')
+        # sys.expose_on_top(csr_file, kind='Inout')
         sys.expose_on_top(pc_reg, kind='Output')
 
 
@@ -483,7 +458,7 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
             value = value[2:]
             open(f'{workspace}/workload.init', 'w').write(value)
 
-    report = True
+    report = False
 
     if report:
         raw = utils.run_simulator(simulator_path, False)
@@ -556,32 +531,32 @@ if __name__ == '__main__':
     # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
     # Define test cases
     test_cases = [
-        #'rv32ui-p-add',
-        #'rv32ui-p-addi',
-        #'rv32ui-p-and',
-        #'rv32ui-p-andi',
-        #'rv32ui-p-auipc',
-        #'rv32ui-p-beq',
-        #'rv32ui-p-bge',
-        #'rv32ui-p-bgeu',
-        #'rv32ui-p-blt',
-        #'rv32ui-p-bltu',
-        #'rv32ui-p-bne',
-        #'rv32ui-p-jal',
-        #'rv32ui-p-jalr',
-        #'rv32ui-p-lui',
-        #'rv32ui-p-lw',
-        #'rv32ui-p-or',
-        #'rv32ui-p-ori',
-        #'rv32ui-p-sll',
-        #'rv32ui-p-slli',
-        #'rv32ui-p-sltu',
-        #'rv32ui-p-srai',
-        #'rv32ui-p-srl',
-        #'rv32ui-p-srli',
-        #'rv32ui-p-sub',
-        #'rv32ui-p-sw',
-        #'rv32ui-p-xori',
+        'rv32ui-p-add',
+        'rv32ui-p-addi',
+        'rv32ui-p-and',
+        'rv32ui-p-andi',
+        'rv32ui-p-auipc',
+        'rv32ui-p-beq',
+        'rv32ui-p-bge',
+        'rv32ui-p-bgeu',
+        'rv32ui-p-blt',
+        'rv32ui-p-bltu',
+        'rv32ui-p-bne',
+        'rv32ui-p-jal',
+        'rv32ui-p-jalr',
+        'rv32ui-p-lui',
+        'rv32ui-p-lw',
+        'rv32ui-p-or',
+        'rv32ui-p-ori',
+        'rv32ui-p-sll',
+        'rv32ui-p-slli',
+        'rv32ui-p-sltu',
+        'rv32ui-p-srai',
+        'rv32ui-p-srl',
+        'rv32ui-p-srli',
+        'rv32ui-p-sub',
+        'rv32ui-p-sw',
+        'rv32ui-p-xori',
         #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
         #'rv32ui-p-sb',#TO CHECK
     ]

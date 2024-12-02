@@ -100,7 +100,6 @@ class Layer(Module):
         index_n = (occupied1^occupied2).select(index_o, index_cn)
         call_n = (action&occupied0&(vacancy0>Int(self.height)(0))).select(UInt(1)(1), UInt(1)(0))
         call_n = (~action&(occupied1|occupied2)).select(UInt(1)(1), call_n)
-        
         self.elements[index0] = type0.bundle(value=value_c, is_occupied=occupied_c, vacancy=vacancy_c)
         if next_elements:
             with Condition(call_n):

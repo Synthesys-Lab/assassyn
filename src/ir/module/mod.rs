@@ -119,11 +119,10 @@ impl<'sys> ModuleRef<'sys> {
   /// Iterate over the external interfaces. External interfaces under the context of this project
   /// typically refers to the arrays (both read and write) and FIFOs (typically push)
   /// that are used by the module.
-  pub(crate) fn ext_interf_iter<'borrow, 'res>(
-    &'borrow self,
+  pub(crate) fn ext_interf_iter<'res>(
+    &self,
   ) -> impl Iterator<Item = (&BaseNode, &HashSet<BaseNode>)>
   where
-    'sys: 'borrow,
     'sys: 'res,
   {
     self.external_interface.iter()
@@ -178,7 +177,7 @@ impl<'sys> ModuleRef<'sys> {
   }
 }
 
-impl<'a> ModuleMut<'a> {
+impl ModuleMut<'_> {
   pub fn add_attr(&mut self, attr: Attribute) {
     self.get_mut().attr.insert(attr);
   }

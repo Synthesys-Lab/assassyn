@@ -3,66 +3,35 @@ on:
     branches:
       - master
 
-
 name: Check and Lint
 
 jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-
   python:
     name: Python Lint
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    container:
+      image: jwere/assassyn-dev:v0.0.1
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
-      - run: pip install -r python/requirements.txt
       - run: pylint --rcfile python/.pylintrc python/assassyn
 
   fmt:
     name: Rustfmt
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    container:
+      image: jwere/assassyn-dev:v0.0.1
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - run: cargo fmt --all -- --check
 
   clippy:
     name: Clippy
-    permissions:
-      checks: write
-      contents: read
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    container:
+      image: jwere/assassyn-dev:v0.0.1
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy
-          override: true
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: -- -Dclippy::all
-          name: Clippy Output
+      - run: cargo clippy -- -Dclippy::all

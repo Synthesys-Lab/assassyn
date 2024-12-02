@@ -42,7 +42,8 @@ class Rhs(Module):
     def build(self, sub: Bind):
         rhs_b = self.pop_all_ports(True)
         call = sub.async_called(sub_b = rhs_b)
-        call.bind.set_fifo_depth(sub_a = 2, sub_b = 2)
+        call.bind.set_fifo_depth(sub_a = 1, sub_b = 1)
+        
 
 class Driver(Module):
     def __init__(self):
@@ -57,9 +58,9 @@ class Driver(Module):
         v = cnt[0] * cnt[0]
 
         call_lhs = lhs.async_called(lhs_a = v[0: 31].bitcast(Int(32)))
-        call_lhs.bind.set_fifo_depth(lhs_a = 2)
+        call_lhs.bind.set_fifo_depth(lhs_a = 1)
         call_rhs = rhs.async_called(rhs_b = cnt[0])
-        call_rhs.bind.set_fifo_depth(rhs_b = 2)
+        call_rhs.bind.set_fifo_depth(rhs_b = 1)
 
 def check_raw(raw):
     cnt = 0

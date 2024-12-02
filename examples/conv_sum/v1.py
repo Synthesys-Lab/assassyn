@@ -31,7 +31,7 @@ class ConvFilter(Downstream):
         
         is_ready = self.ready[0]
         self.ready[0] = is_ready + UInt(32)(1)
-        
+
         # The input is already full.
         with Condition(is_ready > UInt(32)(1)):                        
             # Convolution of two 3x3 matrices:
@@ -70,7 +70,7 @@ class Driver(Module):
 
     @module.combinational
     def build(self, width, init_file, user_1, user_2, user_3):
-        
+
         cnt = RegArray(UInt(32), 1)
         v = cnt[0]
 
@@ -81,15 +81,15 @@ class Driver(Module):
         sram_1 = SRAM(width, sram_depth, init_file)
         sram_1.build(Int(1)(0), Int(1)(1), addr_1, Bits(width)(0), user_1)
         sram_1.bound.async_called()
-        
+
         sram_2 = SRAM(width, sram_depth, init_file)
         sram_2.build(Int(1)(0), Int(1)(1), addr_2, Bits(width)(0), user_2)
         sram_2.bound.async_called()
-        
+
         sram_3 = SRAM(width, sram_depth, init_file)
         sram_3.build(Int(1)(0), Int(1)(1), addr_3, Bits(width)(0), user_3)
         sram_3.bound.async_called()
-        
+
         cnt[0] = v + UInt(32)(1)
 
 def check(raw):
@@ -102,16 +102,16 @@ def check(raw):
             input = [start_1+step, start_1+step+1 , start_1+step+2,
                      start_2+step, start_2+step+1 , start_2+step+2,
                      start_3+step, start_3+step+1 , start_3+step+2]
-            
+
             result = sum(x * y for x, y in zip(input, filter_given))
-            
+
             assert conv_sum == result, f"Mismatch at step {step}: conv_sum != result ({conv_sum} != {result})"
 
 
 def impl(sys_name, width, init_file, resource_base):
     sys = SysBuilder(sys_name)
     with sys:        
-                
+   
         filter_to_use = RegArray(
             scalar_ty=Int(32),
             size=9,
@@ -120,18 +120,18 @@ def impl(sys_name, width, init_file, resource_base):
         
         user_1 = ForwardData()
         value_1 = user_1.build()
-        
+
         user_2 = ForwardData()
         value_2 = user_2.build()
-        
+
         user_3 = ForwardData()
         value_3 = user_3.build()
-        
+
         driver = Driver()
         driver.build(width, init_file, user_1, user_2, user_3)
-        
+
         data_load = [value_1, value_2, value_3]
-        
+
         conv = ConvFilter()
         conv.build(data_load, filter_to_use)
         
@@ -148,7 +148,7 @@ def impl(sys_name, width, init_file, resource_base):
         check(raw)
 
 def test_filter():
-    impl('conv_filter', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
+    impl('conv_sum', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
 
 if __name__ == "__main__":
         test_filter()

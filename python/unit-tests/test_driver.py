@@ -21,23 +21,6 @@ def check(raw):
             expected += 1
     assert expected == 100, f'{expected} != 100'
 
-# Sys: cnt-reg
-# Driver
-# - body-list: []
-# - build()
-#   cnt = RegArray(UInt(32), 1)
-#   cnt[0] = cnt[0] + UInt(32)(1)
-#      - v = cnt[0]
-#      - v = v + 1
-#      - cnt[0] = v
-#      - v1 = cnt[0]
-#      - log("{}", v)
-#
-#  x = Bits(1)(0)
-#  y = Bits(1)(1)
-#
-#  c = x == y
-
 def test_driver():
     sys = SysBuilder('driver')
     with sys:

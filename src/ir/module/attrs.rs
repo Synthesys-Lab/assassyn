@@ -63,7 +63,7 @@ impl MemoryParams {
   }
 
   pub fn is_sram(&self) -> bool {
-    return self.lat.start().eq(&1) && self.lat.end().eq(&1);
+    self.lat.start().eq(&1) && self.lat.end().eq(&1)
   }
 
   pub fn to_string(&self, sys: &SysBuilder) -> String {
