@@ -1,6 +1,6 @@
 '''Data type module for assassyn frontend'''
 
-#pylint: disable=too-few-public-methods,useless-parent-delegation,cyclic-import
+#pylint: disable=too-few-public-methods,useless-parent-delegation,cyclic-import,unused-argument
 
 class DType:
     '''Base class for data type'''
@@ -45,7 +45,7 @@ class Int(DType):
         #pylint: disable=import-outside-toplevel
         from .const import _const_impl
         return _const_impl(self, value)
-    
+
     def inrange(self, value):
         left = -(1 << (self.bits - 1))
         right = (1 << (self.bits - 1)) - 1
@@ -65,7 +65,7 @@ class UInt(DType):
         #pylint: disable=import-outside-toplevel
         from .const import _const_impl
         return _const_impl(self, value)
-    
+
     def inrange(self, value):
         return 0 <= value < (1 << self.bits)
 
@@ -91,7 +91,7 @@ class Bits(DType):
         #pylint: disable=import-outside-toplevel
         from .const import _const_impl
         return _const_impl(self, value)
-    
+
     def inrange(self, value):
         right = (1 << self.bits) - 1
         return 0 <= value <= right
