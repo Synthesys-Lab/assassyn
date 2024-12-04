@@ -147,4 +147,4 @@ def decode_logic(inst):
         csr_calculate=csr_calculate,
         is_zimm = is_zimm,
         is_mepc = is_mepc,
-        mem_ext = mem_ext)
+        mem_ext = mem_ext) 

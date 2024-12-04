@@ -1,7 +1,6 @@
-''' A simplest single issue RISCV CPU, which has no operand buffer.
+'''  
 '''
-import os
-import shutil
+ 
 
 from assassyn.frontend import *
 from assassyn.backend import *
@@ -11,92 +10,62 @@ from opcodes import *
 from decoder import *
 from writeback import *
 from memory_access import *
+from scoreboard import *
 
-offset = UInt(32)(0)
-current_path = os.path.dirname(os.path.abspath(__file__))
-workspace = f'{current_path}/.workspace/'
+offset = None
+data_offset = None
+
+
 
 class Execution(Module):
     
     def __init__(self):
         super().__init__(
             ports={
+                'rs1_value':Port(Bits(32)),
+                'rs2_value':Port(Bits(32)),
                 'signals': Port(deocder_signals),
                 'fetch_addr': Port(Bits(32)),
+                'sb_index':Port(Bits(SCOREBOARD.Bit_size))
+                
             })
         self.name = "E"
-        #self.exe_valid = Bits(1)
 
     @module.combinational
     def build(
         self, 
-        pc: Array, 
-        exec_bypass_reg: Array,
-        exec_bypass_data: Array,
-        mem_bypass_reg: Array,
-        mem_bypass_data: Array,
-        wb_bypass_reg: Array,
-        wb_bypass_data: Array,
-        reg_onwrite: Array,
-        offset_reg: Array,
+        pc: Array,
         rf: Array, 
         csr_f: Array,
         memory: Module, 
+        writeback: Module,
         data: str,
-        depth_log: int):
+        depth_log: int,
+        scoreboard:Array,
+        RMT:Array 
+        ):
+
+        log("In execution")
 
         csr_id = Bits(4)(0)
- 
-        signals = self.signals.peek()
+        
+        signals = self.signals.pop()
+        rs1_value = self.rs1_value.pop()
+        rs2_value = self.rs2_value.pop()
+        fetch_addr = self.fetch_addr.pop()
+        sb_index = self.sb_index.pop()
+        # rs1_value,rs2_value,signals, fetch_addr = self.pop_all_ports(False)
 
         rs1 = signals.rs1
         rs2 = signals.rs2
         rd = signals.rd
 
-        on_write = reg_onwrite[0]
-
-        
-
-        a_valid =(exec_bypass_reg[0] == rs1) | (mem_bypass_reg[0] == rs1) | ~signals.rs1_valid | (~(on_write >> rs1))[0:0] #| (wb_bypass_reg[0] == rs1)
-        a_valid_true = a_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rs1).bitcast(Bits(1))) 
-        with Condition(~a_valid):
-            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rs1_valid: {} | (~(on_write >> rs1))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rs1_valid, (~(on_write >> rs1))[0:0])
-
-        b_valid =(exec_bypass_reg[0] == rs2) | (mem_bypass_reg[0] == rs2) | ~signals.rs2_valid | (~(on_write >> rs2))[0:0] #| (wb_bypass_reg[0] == rs2)
-        b_valid_true = b_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rs2).bitcast(Bits(1) ))
-        with Condition(~b_valid):
-            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rs2_valid: {} | (~(on_write >> rs2))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rs2_valid, (~(on_write >> rs2))[0:0])
-
-        rd_valid =  (exec_bypass_reg[0] == rd) | (mem_bypass_reg[0] == rd) | ~signals.rd_valid | (~(on_write >> rd))[0:0] 
-        rd_valid_true = rd_valid.select(Bits(1)(1),(wb_bypass_reg[0] == rd).bitcast(Bits(1) ))
-        with Condition(~rd_valid):
-            log("exec_bypass_reg: x{:02} | mem_bypass_reg: x{:02} | ~signals.rd_valid: {} | (~(on_write >> rd))[0:0]: {} |", exec_bypass_reg[0], mem_bypass_reg[0], ~signals.rd_valid, (~(on_write >> rd))[0:0])
-
-        valid = a_valid_true & b_valid_true & rd_valid_true
-
-        with Condition(~valid):
-            log("pc: 0x{:08x}   | rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {} | backlogged", \
-                self.fetch_addr.peek(), rs1, a_valid, rs2, b_valid, rd, rd_valid)
-
-        wait_until(valid)
-
-        ex_valid = valid
-        self.exe_valid = ex_valid
+        ex_valid = Bits(1)(1)&Bits(1)(1)
 
 
-        raw_id = [
-          (773, 1), #mtvec
-          (833,2), #mepc
-          (772, 4), #mie
-          (768,8), #mstatus
-          (3860, 9), #mhartid
-          (384, 10), #satp
-          (944, 11), #pmpaddr0
-          (928, 12), #pmpcfg0
-          (770, 13), #medeleg
-          (771, 14), #mideleg
-          (1860, 15), #unknown
-        ]
+
+        raw_id = [(3860, 9), (773, 1) ,(1860, 15) , (384,10) , (944 , 11) , (928 , 12) , (772 , 4 ) , (770 ,13),(771,14),(768,8) ,(833,2)]
+        #mtvec 1 mepc 2 mcause 3 mie 4 mip 5 mtval 6 mscratc 7 msb_status 8 mhartid 9 satp 10 pmpaddr0 11  pmpcfg0 12 medeleg 13 mideleg 14 unkonwn 15
 
         csr_id = Bits(4)(0)
         for i, j in raw_id:
@@ -113,18 +82,11 @@ class Execution(Module):
             log("csr_id: {} | new: {:08x} |", csr_id, csr_new)
 
 
-        signals, fetch_addr = self.pop_all_ports(False)
-        
 
         # TODO(@were): This is a hack to avoid post wait_until checks.
         rd = signals.rd
 
-        is_ebreak = signals.rs1_valid & signals.imm_valid & \
-                    ((signals.imm == Bits(32)(1)) | (signals.imm == Bits(32)(0))) & \
-                    (signals.alu == Bits(16)(0))
-        with Condition(is_ebreak):
-            log('ebreak | halt | ecall')
-            finish()
+        
 
         is_trap = signals.is_branch & \
                   signals.is_offset_br & \
@@ -136,26 +98,15 @@ class Execution(Module):
             log('trap')
             finish()
 
-        # Instruction attributes
 
-        def bypass(bypass_reg, bypass_data, idx, value):
-            return (bypass_reg[0] == idx).select(bypass_data[0], value)
-
-        a = bypass(mem_bypass_reg, mem_bypass_data, rs1, rf[rs1])
-        a = bypass(exec_bypass_reg, exec_bypass_data, rs1, a)
-        a = (rs1 == Bits(5)(0)).select(Bits(32)(0), a)
+        a = rs1_value
         a = signals.csr_write.select(Bits(32)(0), a)
-        a = (~a_valid).select( wb_bypass_data[0], a)
 
-        b = bypass(mem_bypass_reg, mem_bypass_data, rs2, rf[rs2])
-        b = bypass(exec_bypass_reg, exec_bypass_data, rs2, b)
-        b = (rs2 == Bits(5)(0)).select(Bits(32)(0), b)
+
+        b = rs2_value
         b = is_csr.select(csr_f[csr_id], b)
-        b = (~b_valid).select( wb_bypass_data[0], b)
         
 
-        log('mem_bypass.reg: x{:02} | .data: {:08x}', mem_bypass_reg[0], mem_bypass_data[0])
-        log('exe_bypass.reg: x{:02} | .data: {:08x}', exec_bypass_reg[0], exec_bypass_data[0])
 
         # TODO: To support `auipc`, is_branch will be separated into `is_branch` and `is_pc_calc`.
         alu_a = (signals.is_offset_br | signals.is_pc_calc).select(fetch_addr, a)
@@ -200,20 +151,28 @@ class Execution(Module):
 
         # TODO: Make this stricter later.
         produced_by_exec = ~memory_read & (rd != Bits(5)(0))
-        exec_bypass_reg[0] = produced_by_exec.select(rd, Bits(5)(0))
-        exec_bypass_data[0] = produced_by_exec.select(result, Bits(32)(0))
+        
+        # Broadcast scoreboard
+        with Condition(produced_by_exec):
+            scoreboard[sb_index] = modify_entry_exe(scoreboard,sb_index,result,Bits(2)(3))
 
+            ex_update = Bits(1)(1)&Bits(1)(1)
+            # with Condition(signals.rd_valid):
+            #     log("write RMT rd {:02}      index {:07}     |", rd,sb_index)
+            #     RMT[rd]=Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
+            #     log("finish write RMT")
+        
         pc0 = (fetch_addr.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
         with Condition(signals.is_branch):
             br_dest = condition[0:0].select(result, pc0)
+            execution_index = sb_index&Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size-1)
             log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc0)
-            br_sm = RegArray(Bits(1), 1)
-            br_sm[0] = Bits(1)(0)
-
+            br_sm = condition[0:0].select(Bits(1)(1),Bits(1)(0))
+            
         is_memory = memory_read | memory_write
-
+        
         # This `is_memory` hack is to evade rust's overflow check.
-        addr = (result.bitcast(UInt(32)) - is_memory.select(offset_reg[0].bitcast(UInt(32)), UInt(32)(0))).bitcast(Bits(32))
+        addr = (result.bitcast(UInt(32)) - is_memory.select(data_offset, UInt(32)(0))).bitcast(Bits(32))
         request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(UInt(depth_log)), UInt(depth_log)(0))
 
         with Condition(memory_read):
@@ -221,20 +180,88 @@ class Execution(Module):
 
         with Condition(memory_write):
             log("mem-write        | addr: 0x{:05x}| line: 0x{:05x} | value: 0x{:08x} | wdada: 0x{:08x}", result, request_addr, a, b)
-
+        
+        with Condition(is_memory):
+            scoreboard[sb_index] =modify_entry_mem_status(scoreboard=scoreboard,index=sb_index,is_memory_read = memory_read,
+                            result = signals.link_pc.select(pc0, result),
+                            is_csr = signals.csr_write,
+                            csr_id = csr_id,
+                            csr_new = csr_new,
+                            mem_ext = signals.mem_ext,
+                            status=Bits(2)(2),
+                            )
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
-        bound = dcache.bound.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext)
+        bound = dcache.bound.bind(rd=rd,index=sb_index )
+        # with Condition(memory_read):
+        #     bound = dcache.bound.bind(rd=rd,index=sb_index )
+        # log("-3")
         bound.async_called()
-        with Condition(signals.csr_write):
-            csr_f[csr_id] = csr_new
-
+    
+        wb = writeback.bind()
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
+        
+        log("out execution")
+        return  br_sm, br_dest, wb, rd, ex_valid,ex_update,execution_index
 
-        return br_sm, br_dest,  rd, ex_valid
+
+
+class Dispatch(Module):
+
+    def __init__(self):
+        super().__init__(
+            ports={}
+        )
+        self.name = 'p'
+
+    @module.combinational
+    def build(self,scoreboard:Array,executor:Module,RMT:Array  ,head:Array,tail:Array):
+        log("In dispatch")
+        
+        dispatch_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
+        valid_global = Bits(1)(0)  # check if there is a valid entry to be executed
+        valid_temp = Bits(1)(0)
+        not_ready = Bits(1)(0)
+        ebreak_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
+        second_dispatch_index= Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
+        for i in range(SCOREBOARD.size):
+            valid_temp =  (  scoreboard[i].sb_valid & (scoreboard[i].sb_status==Bits(2)(0)) & scoreboard[i].rs1_ready & scoreboard[i].rs2_ready   )  
+            # valid_global = valid_global | valid_temp 
+            second_dispatch_index = dispatch_index
+            dispatch_index = valid_temp.select(Bits(SCOREBOARD.Bit_size)(i), dispatch_index)
+            log("i {}, addr {} valid {}  status {} valid_t  {}  dispatch {}   rs1 {} rs2 {} dep1 {} dep2 {} |",\
+                Bits(6)(i), scoreboard[i].fetch_addr ,scoreboard[i].sb_valid ,scoreboard[i].sb_status, valid_temp ,dispatch_index,\
+                scoreboard[i].rs1_ready,scoreboard[i].rs2_ready,RMT[scoreboard[i].rs1], RMT[scoreboard[i].rs2])
+            signals= deocder_signals.view(scoreboard[i].signals)
+            is_ebreak_temp = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0))) & (signals.alu == Bits(16)(0)))
+            ebreak_index = is_ebreak_temp.select(  Bits(SCOREBOARD.Bit_size)(i) , ebreak_index)
+            not_ready = not_ready | ((scoreboard[i].sb_valid )& (~is_ebreak_temp))
+        
+        signals= deocder_signals.view(scoreboard[dispatch_index].signals)
+        is_ebreak = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0)))\
+                      & (signals.alu == Bits(16)(0))).select(Bits(1)(1),Bits(1)(0))
+        log("is_ebreak: {} | not_ready: {}",is_ebreak,not_ready)
+        dispatch_index = (is_ebreak & (ebreak_index == dispatch_index )).select(second_dispatch_index,dispatch_index)   
+        valid_global =  (dispatch_index!= NoDep) 
+        with Condition(is_ebreak & (~not_ready) ):
+            log('ebreak | halt | ecall')
+            finish()
+        
+        with Condition(valid_global ):
+            scoreboard[dispatch_index] =modify_entry_status(scoreboard,dispatch_index,Bits(2)(1))
+            log("Dispatch call execution index {:05}  sb_status {:07}| ",  dispatch_index, scoreboard[dispatch_index].sb_status)
+            signals=deocder_signals.view(scoreboard[dispatch_index].signals)
+            
+            call = executor.async_called(rs1_value=scoreboard[dispatch_index].rs1_value,rs2_value=scoreboard[dispatch_index].rs2_value ,\
+                                                    signals= scoreboard[dispatch_index].signals,fetch_addr=scoreboard[dispatch_index].fetch_addr ,sb_index=dispatch_index)
+             
+            call.bind.set_fifo_depth()
+        
+        log("out Dispatch") 
+
 
 class Decoder(Module):
     
@@ -244,32 +271,50 @@ class Decoder(Module):
             'fetch_addr': Port(Bits(32)),
         })
         self.name = 'D'
-
+        
     @module.combinational
-    def build(self, executor: Module, br_sm: Array):
-        inst, fetch_addr = self.pop_all_ports(False)
-
+    def build(self, Dispatch: Module,   scoreboard:Array,RMT:Array,reg_file:Array,sb_head:Array,sb_tail:Array ):
+        
+        inst = self.rdata.peek()
+        fetch_addr = self.fetch_addr.peek()
+        log("In decoder")
         log("raw: 0x{:08x}  | addr: 0x{:05x} |", inst, fetch_addr)
-
+        
         signals = decode_logic(inst)
-        br_sm[0] = signals.is_branch
 
-        e_call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
-        e_call.bind.set_fifo_depth(signals=2, fetch_addr=2)
+ 
 
-        return signals.is_branch
+        is_not_full_scoreboard =(((sb_tail[0].bitcast(UInt(32))+UInt(32)(1) ).bitcast(Bits(SCOREBOARD.Bit_size)) )& (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size-1 ))) != sb_head[0] 
+        is_ebreak= (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0))) & (signals.alu == Bits(16)(0)))
+        is_nop = (inst == Bits(32)(51)).select(Bits(1)(1),Bits(1)(0))
+        Index = sb_tail[0]
+        noWAW =  (( RMT[signals.rd] ==Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size))| is_ebreak |is_nop | signals.is_branch  ).select(Bits(1)(1),Bits(1)(0))
+        decode_allowed = ((is_not_full_scoreboard & noWAW))
+        log("tail {:05}  noWAW {:07} | is_not_full_scoreboard {:07} |  decode_allowed {:07} |",  Index, noWAW, is_not_full_scoreboard, decode_allowed) 
+        wait_until(decode_allowed)
+ 
+        inst, fetch_addr = self.pop_all_ports(False)
+        with Condition(~is_nop):
+            RMT[signals.rd]= Index
+            scoreboard[Index] = add_entry(signals,scoreboard,Index,RMT,reg_file,fetch_addr)
+    
+        Dispatch.async_called()
+        log("Out decoder")
+        return is_nop ,decode_allowed, signals.is_branch
 
 class Fetcher(Module):
     
     def __init__(self):
-        super().__init__(ports={}, no_arbiter=True)
+        super().__init__(ports={})
         self.name = 'F'
 
     @module.combinational
     def build(self):
+        log("In Fetch")
         pc_reg = RegArray(Bits(32), 1)
         addr = pc_reg[0]
-        return pc_reg, addr
+        cycle_activate = (addr == Bits(32)(0)).select(Bits(1)(1),Bits(1)(0))
+        return pc_reg, addr,cycle_activate
 
 class FetcherImpl(Downstream):
 
@@ -279,26 +324,27 @@ class FetcherImpl(Downstream):
 
     @downstream.combinational
     def build(self,
-              on_branch: Value,
-              br_sm: Array,
+              on_branch: Value, 
+              br_signal:Array,
               ex_bypass: Value,
               ex_valid: Value,
               pc_reg: Value,
               pc_addr: Value,
               decoder: Decoder,
               data: str,
-              depth_log: int):
-
+              depth_log: int,
+              is_nop:Value):
+        log("In fetchImpl")
         ongoing = RegArray(Int(8), 1, initializer=[0])
-
-        on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
+        
+        on_branch = on_branch.optional(Bits(1)(0))   | br_signal[0]
         should_fetch = ~on_branch | ex_bypass.valid()
         to_fetch = ex_bypass.optional(pc_addr)
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
 
         new_cnt = ongoing[0] - (ex_valid.optional(Bits(1)(0))).select(Int(8)(1), Int(8)(0))
-        real_fetch = should_fetch & (new_cnt < Int(8)(2))
+        real_fetch = should_fetch & (new_cnt < Int(8)(15)) 
 
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} | ongoing: {}",
@@ -307,236 +353,216 @@ class FetcherImpl(Downstream):
         with Condition(real_fetch):
             icache.bound.async_called(fetch_addr=to_fetch)
             pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
-            ongoing[0] = new_cnt + Int(8)(1)
+            ongoing[0] = (is_nop.optional(Bits(1)(0))).select(new_cnt , new_cnt + Int(8)(1))
         
         with Condition(~real_fetch):
             pc_reg[0] = to_fetch
             ongoing[0] = new_cnt
+        log("out fetchImpl")
+        
 
-class Onwrite(Downstream):
-    
+class UpdateScoreboard(Downstream):
+
     def __init__(self):
         super().__init__()
-        self.name = 'W1'
+        self.name = 'U'
 
     @downstream.combinational
-    def build(self, reg_onwrite: Array, exec_rd: Value, writeback_rd: Value):
-        ex_rd = exec_rd.optional(Bits(5)(0))
-        wb_rd = writeback_rd.optional(Bits(5)(0))
-        ex_bit = (ex_rd != Bits(5)(0)).select(Bits(32)(1) << ex_rd, Bits(32)(0))
-        wb_bit = (wb_rd != Bits(5)(0)).select(Bits(32)(1) << wb_rd, Bits(32)(0))
+    def build(self,
+              cycle_activate:Value,
+              mem:Value,
+              ex:Value,
+              scoreboard: Array,
+              RMT: Array ,
+              ex_index:Value ,
+              is_nop:Value ,
+              sb_tail:Array,
+              br_sm:Value ,
+              decode_allowed:Value,
+              decode_on_branch:Value):
+        log("In update sb")
+        mem = mem.optional(Bits(1)(0))
+        ex = ex.optional(Bits(1)(0))  
+        cycle_activate = cycle_activate.optional(Bits(1)(0)) 
+        br_signal = RegArray(Bits(1), 1)
         
-        reg_onwrite[0] = reg_onwrite[0] ^ ex_bit ^ wb_bit
-        log("ownning: {:02}      | releasing: {:02}| reg_onwrite[0]: {:08x}", ex_rd, wb_rd, reg_onwrite[0])
+        is_branch = br_sm.optional(Bits(1)(0))  
+        br_signal[0] = (br_sm.valid()).select( Bits(1)(0) , br_signal[0] | decode_on_branch.optional(Bits(1)(0)) )
+        decoded_allowed = decode_allowed.optional(Bits(1)(0))
+        not_decoded =  is_nop.optional(Bits(1)(0)) | (~decoded_allowed)
+        update_tail = (not_decoded ).select(sb_tail[0],   ((((sb_tail[0].bitcast(UInt(32)) )+UInt(32)(1) ).bitcast(Bits(SCOREBOARD.Bit_size)) )& (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size-1 ))))
+        bypass_tail =  ((((ex_index.optional(sb_tail[0])).bitcast(UInt(32)) )+UInt(32)(1) ).bitcast(Bits(SCOREBOARD.Bit_size)) )& (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size-1 ))
+        sb_tail[0] = (is_branch).select( bypass_tail ,update_tail )
+        log("update is_branch {}    not_decoded {}  tail {}",is_branch,not_decoded,sb_tail[0])
+        
+        with Condition(is_branch):
+            scoreboard[bypass_tail]=modify_entry_valid(scoreboard,bypass_tail,Bits(1)(0))
+        # with Condition( mem | ex):
+        log("in mem |ex updating  is_branch  {}  bypass_tail  {}  ",is_branch,bypass_tail)
+        for i in range(SCOREBOARD.size):
+            with Condition((scoreboard[i].sb_valid & (scoreboard[i].sb_status==Bits(2)(0))& \
+                            (~( ((Bits(SCOREBOARD.Bit_size)(i)==bypass_tail))&(is_branch) ) ) )):
+                rs1_dp = scoreboard[i].rs1_dep
+                rs2_dp = scoreboard[i].rs2_dep
+                rs1_update = (~scoreboard[i].rs1_ready)&(( scoreboard[rs1_dp].sb_status== Bits(2)(3)))
+                rs2_update = (~scoreboard[i].rs2_ready)&(( scoreboard[rs2_dp].sb_status== Bits(2)(3)))
+                log("updating index {} rs1_Update {}  Up {}  rs1_dep {}  dep {} {} {}",Bits(32)(i),rs1_update,rs2_update, RMT[scoreboard[i].rs1], RMT[scoreboard[i].rs2],scoreboard[i].rs1_dep,scoreboard[i].rs2_dep)
+                with Condition(rs1_update|rs2_update):
+                    scoreboard[i]=modify_entry_rs(scoreboard,i,rs1_update,rs2_update)
+        log("Out update sb")
 
-class MemUser(Module):
-    def __init__(self, width):
-        super().__init__(
-            ports={'rdata': Port(Bits(width))}, 
-        )
-    @module.combinational
-    def build(self):
-        width = self.rdata.dtype.bits
-        rdata = self.pop_all_ports(False)
-        rdata = rdata.bitcast(Int(width))
-        offset_reg = RegArray(Bits(width), 1)
-        offset_reg[0] = rdata.bitcast(Bits(width))
-        return offset_reg
-
+        for i in range(32):
+            with Condition(( RMT[i]!=NoDep ) &(scoreboard[RMT[i]].sb_status == Bits(2)(3) )):
+                RMT[i]=NoDep
+        return  br_signal
 
 class Driver(Module):
+    
     def __init__(self):
         super().__init__(ports={})
-    @module.combinational
-    def build(self, fetcher: Module, user: Module):
-        init_reg = RegArray(Int(1), 1, initializer=[1])
-        init_cache = SRAM(width=32, depth=32, init_file=f"{workspace}/workload.init")
-        init_cache.name = 'init_cache'
-        init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0), user=user)
-        # Initialze offset at first cycle
-        with Condition(init_reg[0]==Int(1)(1)):
-            init_cache.bound.async_called()
-            init_reg[0] = Int(1)(0)
-        # Async_call after first cycle
-        with Condition(init_reg[0] == Int(1)(0)):
-            
-            d_call = fetcher.async_called()
 
-def build_cpu(depth_log):
-    sys = SysBuilder('minor_cpu')
+    @module.combinational
+    def build(self, fetcher: Module):
+        fetcher.async_called()
+
+
+def run_cpu(resource_base, workload, depth_log):
+    sys = SysBuilder('o3_cpu')
 
     with sys:
+
+        with open(f'{resource_base}/{workload}.config') as f:
+            global offset, data_offset
+            raw = f.readline()
+            raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
+            offsets = eval(raw)
+            print(offsets)
+            offset = offsets['offset']
+            data_offset = offsets['data_offset']
+            offset = UInt(32)(offset)
+            data_offset = UInt(32)(data_offset)
+
         # Data Types
         bits1   = Bits(1)
         bits5   = Bits(5)
         bits32  = Bits(32)
 
-        user = MemUser(32)
-        offset_reg = user.build()
-
         fetcher = Fetcher()
-        pc_reg, pc_addr = fetcher.build()
+        pc_reg, pc_addr ,cycle_activate= fetcher.build()
 
         fetcher_impl = FetcherImpl()
 
         # Data Structures
         reg_file    = RegArray(bits32, 32)
-        reg_onwrite = RegArray(bits32, 1)
+
+
+
+        reg_map_table = RegArray(Bits(SCOREBOARD.Bit_size),33,initializer=[SCOREBOARD.size]*33,attr=[Array.FULLY_PARTITIONED])
+
+    
+        scoreboard = RegArray(scoreboard_entry,SCOREBOARD.size,attr=[Array.FULLY_PARTITIONED])
+
+        sb_head = RegArray(Bits(SCOREBOARD.Bit_size), 1, initializer=[0])
+        sb_tail = RegArray(Bits(SCOREBOARD.Bit_size), 1, initializer=[0])
+
 
         csr_file = RegArray(Bits(32), 16, initializer=[0]*16)
 
-        exec_bypass_reg = RegArray(bits5, 1)
-        exec_bypass_data = RegArray(bits32, 1)
-
-        mem_bypass_reg = RegArray(bits5, 1)
-        mem_bypass_data = RegArray(bits32, 1)
-
-        wb_bypass_reg = RegArray(bits5, 1)
-        wb_bypass_data = RegArray(bits32, 1)
 
         writeback = WriteBack()
-        wb_rd = writeback.build(reg_file = reg_file)
+        wb_rd = writeback.build(reg_file = reg_file , csr_file = csr_file,scoreboard=scoreboard,RMT=reg_map_table,sb_head=sb_head)
 
         memory_access = MemoryAccess()
 
         executor = Execution()
+        
+        data_init = f'{workload}.data' if os.path.exists(f'{resource_base}/{workload}.data') else None
 
-        br_sm, ex_bypass, exec_rd, ex_valid = executor.build(
+        br_sm, ex_bypass, wb, exec_rd, ex_valid,ex_update,execution_index = executor.build(
             pc = pc_reg,
-            exec_bypass_reg = exec_bypass_reg,
-            exec_bypass_data = exec_bypass_data,
-            reg_onwrite = reg_onwrite,
-            mem_bypass_reg = mem_bypass_reg,
-            mem_bypass_data = mem_bypass_data,
-            wb_bypass_reg = wb_bypass_reg,
-            wb_bypass_data = wb_bypass_data,
-            offset_reg = offset_reg,
             rf = reg_file,
             csr_f = csr_file,
             memory = memory_access,
-            #writeback = writeback,
-            data = f'{workspace}/workload.data',
-            depth_log = depth_log
-        )
-
-        memory_access.build(
-            writeback = writeback, 
-            mem_bypass_reg = mem_bypass_reg, 
-            mem_bypass_data=mem_bypass_data,
-            wb_bypass_reg=wb_bypass_reg,
-            wb_bypass_data=wb_bypass_data
-        )
-
-        decoder = Decoder()
-        on_br = decoder.build(executor=executor, br_sm=br_sm)
-
-        fetcher_impl.build(on_br, br_sm, ex_bypass, ex_valid, pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log)
-
-        onwrite_downstream = Onwrite()
-
-        driver = Driver()
-        driver.build(fetcher, user)
-
-        onwrite_downstream.build(
-            reg_onwrite=reg_onwrite,
-            exec_rd=exec_rd,
-            writeback_rd=wb_rd,
-        )
-        '''RegArray exposing'''
-        sys.expose_on_top(reg_file, kind='Output')
-        sys.expose_on_top(reg_onwrite, kind='Output')
-        sys.expose_on_top(csr_file, kind='Inout')
-        sys.expose_on_top(pc_reg, kind='Output')
-
-
-        '''Exprs exposing'''
-        sys.expose_on_top(offset_reg, kind='Inout')
-        sys.expose_on_top(ex_valid, kind='Output')
-        sys.expose_on_top(on_br, kind='Output')
-        sys.expose_on_top(br_sm, kind='Output')
+            writeback = writeback,
+            data = data_init,
+            depth_log = depth_log,
+            scoreboard=scoreboard,
+            RMT=reg_map_table
+            )
         
+        
+        mem_update = memory_access.build(
+            writeback = wb, 
+            scoreboard=scoreboard,
+            RMT=reg_map_table
+        )
+        dispatch = Dispatch()
+        dispatch.build(executor=executor,scoreboard=scoreboard,RMT=reg_map_table,head=sb_head,tail=sb_tail)
+        
+        decoder = Decoder()
+        
+        update_sb = UpdateScoreboard()
 
+        is_nop,decode_allowed ,decode_on_branch = decoder.build(Dispatch=dispatch, scoreboard=scoreboard, RMT=reg_map_table,reg_file=reg_file,\
+                              sb_head=sb_head,sb_tail=sb_tail)
+
+
+        br_signal = update_sb.build(cycle_activate=cycle_activate ,ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,ex_index=execution_index ,is_nop=is_nop,\
+            sb_tail=sb_tail,br_sm=br_sm,decode_allowed=decode_allowed,decode_on_branch=decode_on_branch )
+        
+        fetcher_impl.build(decode_on_branch,br_signal, ex_bypass, ex_valid, pc_reg, pc_addr, decoder, f'{workload}.exe', depth_log,is_nop)
+        
+        driver = Driver()
+        driver.build(fetcher)
+
+        
+        
 
     print(sys)
     conf = config(
         verilog=utils.has_verilator(),
-        sim_threshold=600000,
-        idle_threshold=600000,
-        resource_base='',
-        fifo_depth=1,
+        sim_threshold=1000000,
+        idle_threshold=1000000,
+        resource_base=resource_base
     )
 
     simulator_path, verilog_path = elaborate(sys, **conf)
 
-    # Return the built system and relevant components
-    return sys, simulator_path, verilog_path
-
-
-def run_cpu(sys, simulator_path, verilog_path, workload='default'):
-    with sys:
-        with open(f'{workspace}/workload.config') as f:
-            raw = f.readline()
-            raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
-            offsets = eval(raw)
-            value = hex(offsets['data_offset'])
-            value = value[1:] if value[0] == '-' else value
-            value = value[2:]
-            open(f'{workspace}/workload.init', 'w').write(value)
-
-    report = True
+    report = False
 
     if report:
-        raw = utils.run_simulator(simulator_path, False)
+        raw, tt = utils.run_simulator(simulator_path, True)
         open(f'{workload}.log', 'w').write(raw)
-        #open(f'{workload}.sim.time', 'w').write(str(tt))
-        raw = utils.run_verilator(verilog_path, False)
+        open(f'{workload}.sim.time', 'w').write(str(tt))
+        raw, tt = utils.run_verilator(verilog_path, True)
         open(f'{workload}.verilog.log', 'w').write(raw)
     else:
-        raw = utils.run_simulator(simulator_path)
+        raw = utils.run_simulator(simulator_path, False)
         open('raw.log', 'w').write(raw)
-        check()
-        raw = utils.run_verilator(verilog_path)
+        check(resource_base, workload)
+        raw = utils.run_verilator(verilog_path, False)
         open('raw.log', 'w').write(raw)
-        check()
+        check(resource_base, workload)
         os.remove('raw.log')
 
 
-def check():
 
-    script = f'{workspace}/workload.sh'
+def check(resource_base, test):
+
+    script = f'{resource_base}/{test}.sh'
     if os.path.exists(script):
-        res = subprocess.run([script, 'raw.log', f'{workspace}/workload.data'])
+        res = subprocess.run([script, 'raw.log', f'{resource_base}/{test}.data'])
     else:
-        script = f'{current_path}/../utils/find_pass.sh'
+        script = f'{resource_base}/../utils/find_pass.sh'
         res = subprocess.run([script, 'raw.log'])
-    assert res.returncode == 0, f'Failed test: {res.returncode}'
+    assert res.returncode == 0, f'Failed test {test}'
     print('Test passed!!!')
-
- 
-def cp_if_exists(src, dst, placeholder):
-    if os.path.exists(src):
-        shutil.copy(src, dst)
-    elif placeholder:
-        open(dst, 'w').write('')
-
-def init_workspace(base_path, case):
-    if os.path.exists(f'{workspace}'):
-        shutil.rmtree(f'{workspace}')
-    os.mkdir(f'{workspace}')
-    cp_if_exists(f'{base_path}/{case}.exe', f'{workspace}/workload.exe', False)
-    cp_if_exists(f'{base_path}/{case}.data', f'{workspace}/workload.data', True)
-    cp_if_exists(f'{base_path}/{case}.config', f'{workspace}/workload.config', False)
-    cp_if_exists(f'{base_path}/{case}.sh', f'{workspace}/workload.sh', False)
+    
 
 if __name__ == '__main__':
-    # Build the CPU Module only once
-    sys, simulator_path, verilog_path = build_cpu(depth_log=16)
-    print("minor-CPU built successfully!")
-    # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         '0to100',
-        #'multiply',
         #'dhrystone',
         #'median',
         #'multiply',
@@ -545,16 +571,9 @@ if __name__ == '__main__':
         #'towers',
         #'vvadd',
     ]
-    # Iterate workloads
     for wl in workloads:
-        # Copy workloads to tmp directory and rename to workload.
-        init_workspace(wl_path, wl)
-        run_cpu(sys, simulator_path, verilog_path , wl)
-    print("minor-CPU workloads ran successfully!")
+        run_cpu(wl_path, wl, 16)
 
-    #================================================================================================
-    # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
-    # Define test cases
     test_cases = [
         #'rv32ui-p-add',
         #'rv32ui-p-addi',
@@ -582,13 +601,13 @@ if __name__ == '__main__':
         #'rv32ui-p-sub',
         #'rv32ui-p-sw',
         #'rv32ui-p-xori',
+
         #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
         #'rv32ui-p-sb',#TO CHECK
     ]
+
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    # Iterate test cases
+
     for case in test_cases:
-        # Copy test cases to tmp directory and rename to workload.
-        init_workspace(tests, case)
-        run_cpu(sys, simulator_path, verilog_path)
-    print("minor-CPU tests ran successfully!")
+        run_cpu(tests, case, 9)
+
