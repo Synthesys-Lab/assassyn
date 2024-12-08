@@ -224,8 +224,6 @@ class Decoder(Module):
         
         signals = decode_logic(inst)
 
- 
-
         is_not_full_scoreboard =(((sb_tail[0].bitcast(UInt(32))+UInt(32)(1) ).bitcast(Bits(SCOREBOARD.Bit_size)) )& (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size-1 ))) != sb_head[0] 
         is_ebreak= (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0))) & (signals.alu == Bits(16)(0)))
         
@@ -233,8 +231,8 @@ class Decoder(Module):
         
         Index = sb_tail[0]
         noWAW =  (( RMT[signals.rd] ==Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size))| is_ebreak |is_nop | signals.is_branch  ).select(Bits(1)(1),Bits(1)(0))
-        decode_allowed = ((is_not_full_scoreboard & noWAW))
-        log("tail {:05}  noWAW {:07} | is_not_full_scoreboard {:07} |  decode_allowed {:07} |",  Index, noWAW, is_not_full_scoreboard, decode_allowed) 
+        decode_allowed = is_not_full_scoreboard.select(Bits(1)(1),Bits(1)(0))
+        log("tail {:05}  noWAW {:07} | is_not_full_scoreboard {:07} |  decode_allowed {} |",  Index, noWAW, is_not_full_scoreboard, decode_allowed) 
         wait_until(decode_allowed)
  
         inst, fetch_addr = self.pop_all_ports(False)
@@ -246,7 +244,6 @@ class Decoder(Module):
             decode_index = Index
             decode_fetch_addr = fetch_addr
             
-
         return is_nop ,decode_allowed, signals.is_branch,rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals
 
 class Fetcher(Module):
@@ -344,19 +341,15 @@ class Dispatch(Downstream):
         is_ebreak = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0)))\
                       & (signals.alu == Bits(16)(0))).select(Bits(1)(1),Bits(1)(0))
         dispatch_index = (is_ebreak).select(second_dispatch_index,dispatch_index)
-        
-        signals= deocder_signals.view(scoreboard[dispatch_index].signals)
-        is_ebreak = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0)))\
-                      & (signals.alu == Bits(16)(0))).select(Bits(1)(1),Bits(1)(0))
-
-        valid_global =  (dispatch_index!= NoDep) &(~is_ebreak )
+         
+        valid_global =  (dispatch_index!= NoDep) 
         with Condition(is_ebreak & (~not_ready) ):
             log('ebreak | halt | ecall')
             finish()
         
         with Condition(valid_global ):
             scoreboard[dispatch_index] =modify_entry_status(scoreboard,dispatch_index,Bits(2)(1))
-            log("Dispatch call execution index {:05}  sb_status {:07}| ",  dispatch_index, scoreboard[dispatch_index].sb_status)
+            log("Dispatch call execution index {:05} | ",  dispatch_index )
             signals=deocder_signals.view(scoreboard[dispatch_index].signals)
             
             call = executor.async_called(rs1_value=scoreboard[dispatch_index].rs1_value,rs2_value=scoreboard[dispatch_index].rs2_value ,\

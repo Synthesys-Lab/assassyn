@@ -303,22 +303,21 @@ def add_entry(signals,scoreboard,Index,RMT,reg_file,fetch_addr,mem_index,ex_inde
         e_is_memory_read = deocder_signals.view(scoreboard[ex_index].signals).memory[0:0]
 
         mem_valid = (mem_index != NoDep)&(m_is_memory_read)
-        rs1_value = (( scoreboard[mem_index].rd==rs1)&(mem_valid)&(~rs1_ready)).select( m_data,rs1_value )
-        rs2_value = (( scoreboard[mem_index].rd==rs2)&(mem_valid)&(~rs2_ready)).select( m_data,rs2_value )
-        rs1_ready = (((scoreboard[mem_index].rd==rs1)&mem_valid&(~rs1_ready))).select(Bits(1)(1),rs1_ready)
-        rs2_ready = (((scoreboard[mem_index].rd==rs2)&mem_valid&(~rs2_ready))).select(Bits(1)(1),rs2_ready)
+        rs1_value = (( RMT[rs1]==mem_index)&(mem_valid)&(~rs1_ready)).select( m_data,rs1_value )
+        rs2_value = (( RMT[rs2]==mem_index)&(mem_valid)&(~rs2_ready)).select( m_data,rs2_value )
+        rs1_ready = (((RMT[rs1]==mem_index)&mem_valid&(~rs1_ready))).select(Bits(1)(1),rs1_ready)
+        rs2_ready = (((RMT[rs2]==mem_index)&mem_valid&(~rs2_ready))).select(Bits(1)(1),rs2_ready)
         log("rs1_value {} rs2_value {} rs1_ready {} rs2_ready {}",rs1_value,rs2_value,rs1_ready,rs2_ready)
 
         exe_valid = ( ex_index != NoDep)&(~e_is_memory_read)&(scoreboard[ex_index].rd!=Bits(5)(0))
-        rs1_value = (( scoreboard[ex_index].rd==rs1)&exe_valid&(~rs1_ready)).select( e_data,rs1_value )
-        rs2_value = (( scoreboard[ex_index].rd==rs2)&exe_valid&(~rs2_ready)).select( e_data,rs2_value )
-        rs1_ready = (((scoreboard[ex_index].rd==rs1)&exe_valid)&(~rs1_ready)).select(Bits(1)(1),rs1_ready)
-        rs2_ready = (((scoreboard[ex_index].rd==rs2)&exe_valid)&(~rs2_ready)).select(Bits(1)(1),rs2_ready)
+        rs1_value = (( RMT[rs1]==ex_index)&exe_valid&(~rs1_ready)).select( e_data,rs1_value )
+        rs2_value = (( RMT[rs2]==ex_index)&exe_valid&(~rs2_ready)).select( e_data,rs2_value )
+        rs1_ready = (((RMT[rs1]==ex_index)&exe_valid)&(~rs1_ready)).select(Bits(1)(1),rs1_ready)
+        rs2_ready = (((RMT[rs2]==ex_index)&exe_valid)&(~rs2_ready)).select(Bits(1)(1),rs2_ready)
         log("rs1_value {} rs2_value {} rs1_ready {} rs2_ready {}",rs1_value,rs2_value,rs1_ready,rs2_ready)
      
         sb_status=Bits(2)(0)
         
-        # dispatched_valid = rs1_ready&rs2_ready
 
         return scoreboard_entry.bundle(
             sb_valid=sb_valid,   
