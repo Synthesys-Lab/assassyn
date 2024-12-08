@@ -27,7 +27,8 @@ class WriteBack(Module):
         with Condition((rd != Bits(5)(0))):
             log("writeback        | x{:02}          | 0x{:08x}", rd, data)
             reg_file[rd] = data
-            
+            rmt_clear_rd = rd
+            rmt_clear_index = sb_head[0]
         with Condition(is_csr):
             log("writeback        | csr[{:02}]       | 0x{:08x}", csr_id, csr_new)
             csr_file[csr_id] = csr_new
@@ -38,4 +39,4 @@ class WriteBack(Module):
         log("Update sb_head {:07} ",sb_head[0])
         log("out writeback")
         #Todo:make it commit in order  
-        return rd
+        return rd,rmt_clear_rd,rmt_clear_index

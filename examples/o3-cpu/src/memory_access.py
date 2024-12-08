@@ -24,7 +24,7 @@ class MemoryAccess(Module):
         log("in mem")
         rd = self.rd.pop()
         index = self.index.pop()
-        
+        mem_update = NoDep
         with Condition( scoreboard[index].sb_status != Bits(2)(3) ):
             with Condition(self.rdata.valid()):
                 data = self.rdata.pop()
@@ -33,7 +33,8 @@ class MemoryAccess(Module):
                 
                 with Condition(rd != Bits(5)(0)):
                     log("mem.bypass       | x{:02} = 0x{:x}", rd, data)
-                    mem_update = Bits(1)(1)&Bits(1)(1)
+                    mem_update = index
+                    mdata = data
             
             
             arg = self.rdata.valid().select(self.rdata.peek(),Bits(32)(0))
@@ -44,4 +45,4 @@ class MemoryAccess(Module):
         
         writeback.async_called()
         
-        return mem_update
+        return mem_update,mdata
