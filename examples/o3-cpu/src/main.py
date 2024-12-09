@@ -307,56 +307,6 @@ class FetcherImpl(Downstream):
             ongoing[0] = new_cnt
             
 
-class Dispatch(Downstream):
-
-    def __init__(self):
-        super().__init__()
-        self.name = 'p'
-
-    @downstream.combinational
-    def build(self,scoreboard:Array,executor:Module,RMT:Array  ,trigger:Value): #,dispatch_new:Value,entry_new_value:Value
-        trigger = trigger.optional(Bits(1)(0))
-        # dispatch_new_index=dispatch_new.optional(NoDep)
-        # with Condition(dispatch_new)
-        
-        valid_global = Bits(1)(0)  # check if there is a valid entry to be executed
-        valid_temp = Bits(1)(0)
-        not_ready = Bits(1)(0)
-        ebreak_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
-        second_dispatch_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
-        dispatch_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
-        for i in range(SCOREBOARD.size):
-            valid_temp =  (  scoreboard[i].sb_valid & (scoreboard[i].sb_status==Bits(2)(0)) & scoreboard[i].rs1_ready & scoreboard[i].rs2_ready   )  
-            second_dispatch_index = valid_temp.select(dispatch_index, second_dispatch_index)
-            dispatch_index = valid_temp.select(Bits(SCOREBOARD.Bit_size)(i), dispatch_index)
-            log("i {}, addr {} valid {}  status {}   dispatch {}   rs1 {} rs2 {} dep1 {} dep2 {} |",\
-                Bits(6)(i), scoreboard[i].fetch_addr ,scoreboard[i].sb_valid ,scoreboard[i].sb_status ,dispatch_index,\
-                scoreboard[i].rs1_ready,scoreboard[i].rs2_ready,RMT[scoreboard[i].rs1], RMT[scoreboard[i].rs2])
-            signals= deocder_signals.view(scoreboard[i].signals)
-            is_ebreak_temp = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0))) & (signals.alu == Bits(16)(0)))
-            ebreak_index = is_ebreak_temp.select(  Bits(SCOREBOARD.Bit_size)(i) , ebreak_index)
-            not_ready = not_ready | ((scoreboard[i].sb_valid )& (~is_ebreak_temp))
-        
-        signals= deocder_signals.view(scoreboard[dispatch_index].signals)
-        is_ebreak = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0)))\
-                      & (signals.alu == Bits(16)(0))).select(Bits(1)(1),Bits(1)(0))
-        dispatch_index = (is_ebreak).select(second_dispatch_index,dispatch_index)
-         
-        valid_global =  (dispatch_index!= NoDep) 
-        with Condition(is_ebreak & (~not_ready) ):
-            log('ebreak | halt | ecall')
-            finish()
-        
-        with Condition(valid_global ):
-            scoreboard[dispatch_index] =modify_entry_status(scoreboard,dispatch_index,Bits(2)(1))
-            log("Dispatch call execution index {:05} | ",  dispatch_index )
-            signals=deocder_signals.view(scoreboard[dispatch_index].signals)
-            
-            call = executor.async_called(rs1_value=scoreboard[dispatch_index].rs1_value,rs2_value=scoreboard[dispatch_index].rs2_value ,\
-                                                    signals= scoreboard[dispatch_index].signals,fetch_addr=scoreboard[dispatch_index].fetch_addr ,sb_index=dispatch_index)
-             
-            call.bind.set_fifo_depth()
-        
 
 class UpdateScoreboard(Downstream):
 
@@ -384,7 +334,7 @@ class UpdateScoreboard(Downstream):
               ex_data:Value,
               mdata:Value,
               reg_file:Array,
-              index:Value,
+              cur_index:Value,
               fetch_addr:Value,
               d_signals:Value):
               
@@ -412,17 +362,21 @@ class UpdateScoreboard(Downstream):
         rmt_up_index=rmt_update_index.valid().select(rmt_update_index ,NoDep)
         RMT[rmt_up_rd] = rmt_up_index
 
-        Index = index.optional(NoDep)
+        cur_index = cur_index.optional(NoDep)
         Fetch_addr = fetch_addr.optional(Bits(32)(0))
         signals = deocder_signals.view(d_signals.optional(Bits(97)(0)))
         e_data = ex_data.optional(Bits(32)(0))
         m_data = mdata.optional(Bits(32)(0))
         
-        with Condition(~(is_nop.optional(Bits(1)(0))) & (Index!=NoDep)):
-            scoreboard[Index] = add_entry(signals,scoreboard,Index,RMT,reg_file,Fetch_addr,mem_index,ex_index,e_data,m_data)
-        #     dispatch_index_new = Index
-        #     entry_newest = add_entry(signals,scoreboard,Index,RMT,reg_file,Fetch_addr,mem_index,ex_index,e_data,m_data)
-        #     entry_new_value= entry_newest.value()
+        with Condition(~(is_nop.optional(Bits(1)(0))) & (cur_index!=NoDep)):
+            newest_index = cur_index
+            newest_entry = add_entry(signals,scoreboard,cur_index,RMT,reg_file,Fetch_addr,mem_index,ex_index,e_data,m_data)
+            entry_value= newest_entry.value()
+            
+            is_ebreak = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0)))\
+                        & (signals.alu == Bits(16)(0))).select(Bits(1)(1),Bits(1)(0))
+
+            early_dispatch_valid =( newest_entry.rs1_ready & newest_entry.rs2_ready &(~is_ebreak)).select(Bits(1)(1),Bits(1)(0))
 
             
     
@@ -447,9 +401,82 @@ class UpdateScoreboard(Downstream):
         with Condition( (rmt_clear_rd != Bits(5)(0))& (rmt_clear_rd!=rmt_up_rd)& (RMT[rmt_clear_rd]==rmt_cl_index)):
             RMT[rmt_clear_rd] = NoDep
             
-        # return  br_signal,dispatch_index_new,entry_new_value
-        return  br_signal
+            
+        return  br_signal,newest_index,entry_value,early_dispatch_valid
  
+
+class Dispatch(Downstream):
+
+    def __init__(self):
+        super().__init__()
+        self.name = 'p'
+
+    @downstream.combinational
+    def build(self,scoreboard:Array,executor:Module,RMT:Array  ,trigger:Value,new_index:Value,new_entry_value:Value,early_dispatch_valid:Value): 
+        
+        trigger = trigger.optional(Bits(1)(0))
+        early_dispatch_valid = early_dispatch_valid.optional(Bits(1)(0))
+        new_entry_valid = new_index.valid()
+        new_index = new_index.optional(NoDep)
+        new_entry_value = new_entry_value.optional(Bits(318+2*SCOREBOARD.Bit_size)(0))
+        with Condition(new_entry_valid):
+            new_entry=scoreboard_entry.view(new_entry_value)
+            update_status_entry = modify_entry_sb_status(new_entry)
+            updated_entry_value = early_dispatch_valid.select( update_status_entry.value(), new_entry_value)
+            wait_to_add_new_entry = scoreboard_entry.view(updated_entry_value)
+            scoreboard[new_index] = wait_to_add_new_entry
+
+            with Condition(early_dispatch_valid):
+                for i in range(SCOREBOARD.size):
+                    log("i {}, addr {} valid {}  status {}  rs1 {} rs2 {} dep1 {} dep2 {} |",\
+                    Bits(6)(i), scoreboard[i].fetch_addr ,scoreboard[i].sb_valid ,scoreboard[i].sb_status ,\
+                    scoreboard[i].rs1_ready,scoreboard[i].rs2_ready,RMT[scoreboard[i].rs1], RMT[scoreboard[i].rs2])
+                
+                log("Dispatch call execution index {:05} | ",  new_index )
+                call = executor.async_called(rs1_value=new_entry.rs1_value,rs2_value=new_entry.rs2_value ,\
+                                                        signals= new_entry.signals,fetch_addr=new_entry.fetch_addr ,sb_index=new_index)
+                
+                call.bind.set_fifo_depth()
+
+        with Condition(~early_dispatch_valid):
+            valid_global = Bits(1)(0)  # check if there is a valid entry to be executed
+            valid_temp = Bits(1)(0)
+            not_ready = Bits(1)(0)
+            ebreak_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
+            second_dispatch_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
+            dispatch_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
+            for i in range(SCOREBOARD.size):
+                valid_temp =  (  scoreboard[i].sb_valid & (scoreboard[i].sb_status==Bits(2)(0)) & scoreboard[i].rs1_ready & scoreboard[i].rs2_ready   )  
+                second_dispatch_index = valid_temp.select(dispatch_index, second_dispatch_index)
+                dispatch_index = valid_temp.select(Bits(SCOREBOARD.Bit_size)(i), dispatch_index)
+                log("i {}, addr {} valid {}  status {}   dispatch {}   rs1 {} rs2 {} dep1 {} dep2 {} |",\
+                    Bits(6)(i), scoreboard[i].fetch_addr ,scoreboard[i].sb_valid ,scoreboard[i].sb_status ,dispatch_index,\
+                    scoreboard[i].rs1_ready,scoreboard[i].rs2_ready,RMT[scoreboard[i].rs1], RMT[scoreboard[i].rs2])
+                signals= deocder_signals.view(scoreboard[i].signals)
+                is_ebreak_temp = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0))) & (signals.alu == Bits(16)(0)))
+                ebreak_index = is_ebreak_temp.select(  Bits(SCOREBOARD.Bit_size)(i) , ebreak_index)
+                not_ready = not_ready | ((scoreboard[i].sb_valid )& (~is_ebreak_temp))
+            
+            signals= deocder_signals.view(scoreboard[dispatch_index].signals)
+            is_ebreak = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0)))\
+                        & (signals.alu == Bits(16)(0))).select(Bits(1)(1),Bits(1)(0))
+            dispatch_index = (is_ebreak).select(second_dispatch_index,dispatch_index)
+            
+            valid_global =  (dispatch_index!= NoDep) 
+            with Condition(is_ebreak & (~not_ready) ):
+                log('ebreak | halt | ecall')
+                finish()
+            
+            with Condition(valid_global ):
+                scoreboard[dispatch_index] =modify_entry_status(scoreboard,dispatch_index,Bits(2)(1))
+                log("Dispatch call execution index {:05} | ",  dispatch_index )
+                signals=deocder_signals.view(scoreboard[dispatch_index].signals)
+                
+                call = executor.async_called(rs1_value=scoreboard[dispatch_index].rs1_value,rs2_value=scoreboard[dispatch_index].rs2_value ,\
+                                                        signals= scoreboard[dispatch_index].signals,fetch_addr=scoreboard[dispatch_index].fetch_addr ,sb_index=dispatch_index)
+                
+                call.bind.set_fifo_depth()
+            
 class Driver(Module):
     
     def __init__(self):
@@ -528,24 +555,26 @@ def run_cpu(resource_base, workload, depth_log):
             scoreboard=scoreboard,
             RMT=reg_map_table
         )
-        dispatch = Dispatch()
+        
         
         decoder = Decoder()
         
         update_sb = UpdateScoreboard()
 
+        
         is_nop,decode_allowed ,decode_on_branch ,rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals= decoder.build( \
              scoreboard=scoreboard, RMT=reg_map_table, sb_head=sb_head,sb_tail=sb_tail)
 
-#dispatch_index_new ,entry_new_value
-        br_signal= update_sb.build(cycle_activate=cycle_activate ,ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,execution_index=execution_index ,is_nop=is_nop,\
+
+        br_signal,newest_index,entry_value,early_dispatch_valid= update_sb.build(cycle_activate=cycle_activate ,ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,execution_index=execution_index ,is_nop=is_nop,\
             sb_tail=sb_tail,br_sm=br_sm,decode_allowed=decode_allowed,decode_on_branch=decode_on_branch ,rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
                 rmt_update_rd=rmt_update_rd,rmt_update_index=rmt_update_index,mdata=m_data,ex_data = ex_data,reg_file=reg_file,\
-                      index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals)
+                      cur_index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals)
         
         fetcher_impl.build(decode_on_branch,br_signal, ex_bypass, ex_valid, pc_reg, pc_addr, decoder, f'{workload}.exe', depth_log,is_nop)
         
-        dispatch.build(executor=executor,scoreboard=scoreboard,RMT=reg_map_table,trigger=cycle_activate) #,dispatch_new=dispatch_index_new,entry_new_value=entry_new_value
+        dispatch = Dispatch()
+        dispatch.build(executor=executor,scoreboard=scoreboard,RMT=reg_map_table,trigger=cycle_activate,new_index=newest_index,new_entry_value=entry_value,early_dispatch_valid=early_dispatch_valid) 
         
         driver = Driver()
         driver.build(fetcher)

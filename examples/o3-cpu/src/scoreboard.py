@@ -276,6 +276,32 @@ def modify_entry_rs(scoreboard,index,rs1_ready_update,rs2_ready_update):
 ) 
 
 
+def modify_entry_sb_status(new_entry):
+     return scoreboard_entry.bundle(
+            sb_valid=new_entry.sb_valid,   
+            rd=new_entry.rd,
+            rs1=new_entry.rs1,
+            rs2=new_entry.rs2,
+            rs1_ready=new_entry.rs1_ready,
+            rs2_ready=new_entry.rs2_ready,
+            rs1_value=new_entry.rs1_value,
+            rs2_value=new_entry.rs2_value,
+            rs1_dep=new_entry.rs1_dep,
+            rs2_dep=new_entry.rs2_dep,
+            result_ready=new_entry.result_ready,
+            result=new_entry.result,
+            sb_status=Bits(2)(1) ,
+            signals=new_entry.signals,
+            fetch_addr=new_entry.fetch_addr,
+            is_memory_read=new_entry.is_memory_read,
+            mdata= new_entry.mdata,
+            is_csr= new_entry.is_csr,
+            csr_id= new_entry.csr_id,
+            csr_new= new_entry.csr_new,
+            mem_ext= new_entry.mem_ext
+) 
+
+
 def add_entry(signals,scoreboard,Index,RMT,reg_file,fetch_addr,mem_index,ex_index,e_data,m_data):
   
         sb_valid=Bits(1)(1)
