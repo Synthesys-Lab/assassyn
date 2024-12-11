@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package create;
+
 // 数据类型定义
 message DataType {
   enum Kind {

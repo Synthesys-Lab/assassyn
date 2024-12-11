@@ -56,6 +56,21 @@ def dump_cargo_toml(path, name):
         f.write('prost-build = "0.13"\n')
     return toml
 
+def dump_build_rs(path):
+    '''
+    Dump the build.rs file for proto compilation
+
+    Args:
+        path (Path): The path to the directory where the build.rs file will be dumped
+    '''
+    build_rs = os.path.join(path, 'build.rs')
+    with open(build_rs, 'w', encoding='utf-8') as f:
+        f.write('fn main() {\n')
+        f.write('    prost_build::compile_protos(&["src/create.proto"],\n')
+        f.write('                               &["src"])\n')
+        f.write('        .unwrap();\n')
+        f.write('}\n')
+
 def make_existing_dir(path):
     '''
     The helper function to create a directory if it does not exist.
@@ -105,9 +120,25 @@ def elaborate( # pylint: disable=too-many-arguments
 
     # Dump the Cargo.toml file
     toml = dump_cargo_toml(sys_dir, sys.name)
-    # Dump the src directory
-    make_existing_dir(os.path.join(sys_dir, 'src'))
     
+    # Dump build.rs file
+    dump_build_rs(sys_dir)
+    
+    # Create src directory
+    src_dir = os.path.join(sys_dir, 'src')
+    make_existing_dir(src_dir)
+    
+    # Copy proto file
+    proto_src = os.path.join(utils.repo_path(), 'python/assassyn/create.proto')
+    proto_dst = os.path.join(src_dir, 'create.proto')
+    try:
+        import shutil
+        shutil.copy2(proto_src, proto_dst)
+    except Exception as e:
+        print(f'[ERROR] Failed to copy proto file: {e}')
+        raise e
+    
+    # Generate and write code
     random_sims = "false"
     if random:
         random_sims = "true"

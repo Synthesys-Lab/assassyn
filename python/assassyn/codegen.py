@@ -255,7 +255,46 @@ class CodeGen(visitor.Visitor):
         self.header.append('use std::collections::HashMap;')
         self.header.append('use assassyn::builder::SysBuilder;')
         self.header.append('use assassyn::ir::node::IsElement;')
+        self.header.append('use std::fs::File;')
+        self.header.append('use prost::Message;')
+        self.header.append('include!(concat!(env!("OUT_DIR"), "/create.rs"));')
+        
+        # 临时代码………………………………        
+        self.header.append('use std::io::Write;')
+        
         self.code.append('fn main() {')
+        
+        # 创建输出文件
+        self.code.append('    let mut output_file = File::create("src/parse_result.txt").expect("Failed to create output file");')
+        self.code.append('    println!("Reading serialized operations:");')
+        self.code.append('    let bytes = std::fs::read("src/create.pb").expect("Failed to read operations file");')
+        self.code.append('    let ops = OperationList::decode(&bytes[..]).expect("Failed to decode operations");')
+        self.code.append('    for op in ops.operations {')
+        self.code.append('        match op.op_type() {')
+        self.code.append('            OpType::CreateModule => {')
+        self.code.append('                if let Some(operation::Params::CreateModule(params)) = op.params {')
+        self.code.append('                    writeln!(output_file, "CREATE_MODULE: {} -> {}", params.name, op.result_var).unwrap();')
+        self.code.append('                    for port in params.ports {')
+        self.code.append('                        writeln!(')
+        self.code.append('                            output_file,')
+        self.code.append('                            "  Port: {} {:?} {}",')
+        self.code.append('                            port.name,')
+        self.code.append('                            port.dtype.unwrap().kind(),')
+        self.code.append('                            port.dtype.unwrap().bits')
+        self.code.append('                        ).unwrap();')
+        self.code.append('                    }')
+        self.code.append('                }')
+        self.code.append('            },')
+        self.code.append('            OpType::CreateDownstream => {')
+        self.code.append('                if let Some(operation::Params::CreateDownstream(params)) = op.params {')
+        self.code.append('                    writeln!(output_file, "CREATE_DOWNSTREAM: {} -> {}", params.name, op.result_var).unwrap();')
+        self.code.append('                }')
+        self.code.append('            },')
+        self.code.append('            _ => writeln!(output_file, "Unknown operation type: {:?}", op.op_type()).unwrap(),')
+        self.code.append('        }')
+        self.code.append('    }')
+        self.code.append('')  # 空行分隔
+    
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
         self.code.append(
                 '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
@@ -277,8 +316,10 @@ class CodeGen(visitor.Visitor):
                     kind = create_pb2.DataType.Kind.UINT
                 elif isinstance(p.dtype, dtype.Bits):
                     kind = create_pb2.DataType.Kind.BITS
-                else:
+                elif isinstance(p.dtype, dtype.Record):
                     kind = create_pb2.DataType.Kind.RECORD
+                else:
+                    raise AssertionError(f'Expecting a known type, but got {p.dtype}')
                 
                 ports_info.append({
                     'name': p.name,
