@@ -107,17 +107,24 @@ def elaborate( # pylint: disable=too-many-arguments
     toml = dump_cargo_toml(sys_dir, sys.name)
     # Dump the src directory
     make_existing_dir(os.path.join(sys_dir, 'src'))
+    
+    random_sims = "false"
+    if random:
+        random_sims = "true"
+    rust_code, serialized_ops = codegen.codegen(
+        sys, simulator, verilog,
+        idle_threshold, sim_threshold, random_sims,
+        resource_base, fifo_depth
+    )
+    
     # Dump the assassyn IR builder
     with open(os.path.join(sys_dir, 'src/main.rs'), 'w', encoding='utf-8') as fd:
-        random_sims = "false"
-        if random:
-            random_sims = "true"
-        raw = codegen.codegen(
-            sys, simulator, verilog,
-            idle_threshold, sim_threshold, random_sims,
-            resource_base, fifo_depth
-        )
-        fd.write(raw)
+        fd.write(rust_code)
+    
+    # Dump the operation serial
+    with open(os.path.join(sys_dir, 'src/create.pb'), 'wb') as fd:
+        fd.write(serialized_ops)
+        
     if pretty_printer:
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir, check=True)

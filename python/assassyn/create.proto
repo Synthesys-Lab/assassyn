@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+// 数据类型定义
+message DataType {
+  enum Kind {
+    INT = 0;
+    UINT = 1;
+    BITS = 2;
+    RECORD = 3;
+  }
+  Kind kind = 1;
+  int32 bits = 2;  // 位宽
+}
+
+// 端口定义
+message Port {
+  string name = 1;
+  DataType dtype = 2;
+}
+
+// 操作类型枚举
+enum OpType {
+  CREATE_MODULE = 0;
+  CREATE_DOWNSTREAM = 1;
+  CREATE_CONDITIONAL_BLOCK = 2;
+  CREATE_CYCLED_BLOCK = 3;
+  CREATE_ASYNC_CALL = 4;
+  CREATE_ARRAY = 5;
+}
+
+// 数组属性
+message ArrayAttr {
+  bool fully_partitioned = 1;
+  // 可以根据需要添加更多属性
+}
+
+// 创建操作的具体参数
+message CreateModuleParams {
+  string name = 1;
+  repeated Port ports = 2;
+}
+
+message CreateDownstreamParams {
+  string name = 1;
+}
+
+message CreateCondBlockParams {
+  string cond = 1;  // 条件表达式的标识符
+}
+
+message CreateCycledBlockParams {
+  int32 cycles = 1;
+}
+
+message CreateAsyncCallParams {
+  string bind_var = 1;
+}
+
+message CreateArrayParams {
+  DataType dtype = 1;
+  string name = 2;
+  int32 size = 3;
+  repeated int64 init_values = 4;  // 可选的初始值
+  ArrayAttr attributes = 5;
+}
+
+// 统一的操作消息
+message Operation {
+  OpType op_type = 1;
+  string result_var = 2;  // 操作结果的变量名
+  oneof params {
+    CreateModuleParams create_module = 3;
+    CreateDownstreamParams create_downstream = 4;
+    CreateCondBlockParams create_cond_block = 5;
+    CreateCycledBlockParams create_cycled_block = 6;
+    CreateAsyncCallParams create_async_call = 7;
+    CreateArrayParams create_array = 8;
+  }
+}
+
+// 操作序列
+message OperationList {
+  repeated Operation operations = 1;
+}

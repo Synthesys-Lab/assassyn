@@ -13,6 +13,10 @@ from .block import Block
 from .expr import Expr
 from .utils import identifierize
 
+from google.protobuf import text_format   
+from . import create_pb2
+import io  
+
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
     expr.BinaryOp.SUB: 'sub',
@@ -139,6 +143,44 @@ class EmitBinds(visitor.Visitor):
 # pylint: disable=too-many-instance-attributes
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
+    
+    def add_operation(self, op_type, result_var, **params):
+        """添加一个操作到序列中"""
+        op = self.op_list.operations.add()
+        op.op_type = op_type
+        op.result_var = result_var
+        
+        # 根据操作类型设置参数
+        if op_type == create_pb2.OpType.CREATE_MODULE:
+            module_params = op.create_module
+            module_params.name = params['name']
+            for port_info in params['ports']:
+                port = module_params.ports.add()
+                port.name = port_info['name']
+                port.dtype.kind = port_info['dtype_kind']
+                port.dtype.bits = port_info['dtype_bits']
+                
+        elif op_type == create_pb2.OpType.CREATE_DOWNSTREAM:
+            op.create_downstream.name = params['name']
+            
+        elif op_type == create_pb2.OpType.CREATE_CONDITIONAL_BLOCK:
+            op.create_cond_block.cond = params['cond']
+            
+        elif op_type == create_pb2.OpType.CREATE_CYCLED_BLOCK:
+            op.create_cycled_block.cycles = params['cycles']
+            
+        elif op_type == create_pb2.OpType.CREATE_ASYNC_CALL:
+            op.create_async_call.bind_var = params['bind_var']
+            
+        elif op_type == create_pb2.OpType.CREATE_ARRAY:
+            array_params = op.create_array
+            array_params.dtype.CopyFrom(params['dtype'])
+            array_params.name = params['name']
+            array_params.size = params['size']
+            if 'init_values' in params:
+                array_params.init_values.extend(params['init_values'])
+            if 'attributes' in params:
+                array_params.attributes.CopyFrom(params['attributes'])
 
     def emit_module_attrs(self, m: Module, var_id: str):
         '''Generate module attributes.'''
@@ -207,6 +249,8 @@ class CodeGen(visitor.Visitor):
 
     # pylint: disable=too-many-locals, too-many-statements
     def visit_system(self, node: SysBuilder):
+        self.op_list = create_pb2.OperationList()
+        
         self.header.append('use std::path::PathBuf;')
         self.header.append('use std::collections::HashMap;')
         self.header.append('use assassyn::builder::SysBuilder;')
@@ -222,10 +266,45 @@ class CodeGen(visitor.Visitor):
             ports = ', '.join(generate_port(p) for p in elem.ports)
             self.code.append(f'  let {lval} = sys.create_module("{name}", vec![{ports}]);')
             self.emit_module_attrs(elem, lval)
+            
+            # 增加序列化操作
+            ports_info = []
+            for p in elem.ports:
+                # 获取数据类型信息
+                if isinstance(p.dtype, dtype.Int):
+                    kind = create_pb2.DataType.Kind.INT
+                elif isinstance(p.dtype, dtype.UInt):
+                    kind = create_pb2.DataType.Kind.UINT
+                elif isinstance(p.dtype, dtype.Bits):
+                    kind = create_pb2.DataType.Kind.BITS
+                else:
+                    kind = create_pb2.DataType.Kind.RECORD
+                
+                ports_info.append({
+                    'name': p.name,
+                    'dtype_kind': kind,
+                    'dtype_bits': p.dtype.bits
+                })
+            
+            self.add_operation(
+                create_pb2.OpType.CREATE_MODULE,
+                lval,  # 使用相同的变量名
+                name=name,
+                ports=ports_info
+            )            
+            
         self.code.append('  // Declare downstream modules')
         for elem in node.downstreams:
             var = self.generate_rval(elem)
             self.code.append(f'  let {var} = sys.create_downstream("{elem.name}");')
+            
+            # 增加序列化操作
+            self.add_operation(
+                create_pb2.OpType.CREATE_DOWNSTREAM,
+                var,  # 使用相同的变量名
+                name=elem.name
+            )            
+            
         self.code.append('  // declare arrays')
         for elem in node.arrays:
             self.visit_array(elem)
@@ -465,6 +544,7 @@ class CodeGen(visitor.Visitor):
         self.random = random
         self.default_fifo_depth = default_fifo_depth
         self.fifo_depths = {}
+        self.op_list = create_pb2.OperationList()
 
     def get_source(self):
         '''Concatenate the generated source code for the given system'''
@@ -496,8 +576,13 @@ def codegen( #pylint: disable=too-many-arguments
     Args:
         sys (SysBuilder): The system to generate the builder for
         kwargs: Additional arguments to pass to the code
+        
+    Returns:
+        tuple: (rust_code, serialized_ops)
+            - rust_code (str): The generated Rust code
+            - serialized_ops (bytes): The serialized operations
     '''
     cg = CodeGen(simulator, verilog, idle_threshold, sim_threshold,
                  random, resource_base , fifo_depth)
     cg.visit_system(sys)
-    return cg.get_source()
+    return (cg.get_source(), cg.op_list.SerializeToString())
