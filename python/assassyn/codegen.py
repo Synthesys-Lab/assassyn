@@ -144,11 +144,10 @@ class EmitBinds(visitor.Visitor):
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
     
-    def add_operation(self, op_type, result_var, **params):
-        """添加一个操作到序列中"""
+    def add_operation(self, op_type, **params):
+        """Add an Operation to the serial"""
         op = self.op_list.operations.add()
         op.op_type = op_type
-        op.result_var = result_var
         
         # 根据操作类型设置参数
         if op_type == create_pb2.OpType.CREATE_MODULE:
@@ -294,10 +293,66 @@ class CodeGen(visitor.Visitor):
         self.code.append('        }')
         self.code.append('    }')
         self.code.append('')  # 空行分隔
-    
+        
+            
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
         self.code.append(
                 '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
+
+        # # Declare modules
+        # for elem in node.modules:
+        #     lval = elem.as_operand()
+        #     name = elem.name.lower()
+        #     ports_info = []
+        #     for p in elem.ports:
+        #         if isinstance(p.dtype, dtype.Int):
+        #             kind = create_pb2.DataType.Kind.INT
+        #         elif isinstance(p.dtype, dtype.UInt):
+        #             kind = create_pb2.DataType.Kind.UINT
+        #         elif isinstance(p.dtype, dtype.Bits):
+        #             kind = create_pb2.DataType.Kind.BITS
+        #         elif isinstance(p.dtype, dtype.Record):
+        #             kind = create_pb2.DataType.Kind.RECORD
+        #         else:
+        #             raise AssertionError(f'Expecting a known type, but got {p.dtype}')
+                
+        #         ports_info.append({
+        #             'name': p.name,
+        #             'dtype_kind': kind,
+        #             'dtype_bits': p.dtype.bits
+        #         })
+            
+        #     self.add_operation(
+        #         create_pb2.OpType.CREATE_MODULE,
+        #         name=name,
+        #         ports=ports_info
+        #     )
+            
+        self.code.append('    // Create modules from serialized operations')
+        self.code.append('    let bytes = std::fs::read("src/create.pb").expect("Failed to read operations file");')
+        self.code.append('    let ops = OperationList::decode(&bytes[..]).expect("Failed to decode operations");')
+        self.code.append('    for op in &ops.operations {')
+        self.code.append('        match op.op_type() {')
+        self.code.append('            create::OpType::CreateModule => {')
+        self.code.append('                if let Some(operation::Params::CreateModule(params)) = &op.params {')
+        self.code.append('                    let mut port_vec = Vec::new();')
+        self.code.append('                    for port in &params.ports {')
+        self.code.append('                        let dtype = match port.dtype.as_ref().unwrap().kind() {')
+        self.code.append('                            create::DataType_Kind::Int => assassyn::ir::DataType::int_ty(port.dtype.as_ref().unwrap().bits as usize),')
+        self.code.append('                            create::DataType_Kind::Uint => assassyn::ir::DataType::uint_ty(port.dtype.as_ref().unwrap().bits as usize),')
+        self.code.append('                            create::DataType_Kind::Bits => assassyn::ir::DataType::bits_ty(port.dtype.as_ref().unwrap().bits as usize),')
+        self.code.append('                            create::DataType_Kind::Record => assassyn::ir::DataType::bits_ty(port.dtype.as_ref().unwrap().bits as usize),')
+        self.code.append('                        };')
+        self.code.append('                        port_vec.push(assassyn::builder::PortInfo::new(&port.name, dtype));')
+        self.code.append('                    }')
+        self.code.append(f'                    let {lval} = sys.create_module(&params.name, port_vec);')
+        self.code.append('                }')
+        self.code.append('            },')
+        self.code.append('            _ => {},')
+        self.code.append('        }')
+        self.code.append('    }')
+            
+        
         self.code.append('  // Declare modules')
         for elem in node.modules:
             lval = elem.as_operand()
@@ -306,10 +361,8 @@ class CodeGen(visitor.Visitor):
             self.code.append(f'  let {lval} = sys.create_module("{name}", vec![{ports}]);')
             self.emit_module_attrs(elem, lval)
             
-            # 增加序列化操作
             ports_info = []
             for p in elem.ports:
-                # 获取数据类型信息
                 if isinstance(p.dtype, dtype.Int):
                     kind = create_pb2.DataType.Kind.INT
                 elif isinstance(p.dtype, dtype.UInt):
@@ -329,7 +382,6 @@ class CodeGen(visitor.Visitor):
             
             self.add_operation(
                 create_pb2.OpType.CREATE_MODULE,
-                lval,  # 使用相同的变量名
                 name=name,
                 ports=ports_info
             )            
@@ -342,7 +394,6 @@ class CodeGen(visitor.Visitor):
             # 增加序列化操作
             self.add_operation(
                 create_pb2.OpType.CREATE_DOWNSTREAM,
-                var,  # 使用相同的变量名
                 name=elem.name
             )            
             
@@ -415,10 +466,24 @@ class CodeGen(visitor.Visitor):
                 self.code.append('  // conditional block')
                 cond = self.generate_rval(node.cond)
                 self.code.append(f'  let {block_var} = sys.create_conditional_block({cond});')
+                
+                # 增加序列化操作
+                self.add_operation(
+                    create_pb2.OpType.CREATE_CONDITIONAL_BLOCK,
+                    cond=cond
+                )
+                
                 self.code.append(f'  sys.set_current_block({block_var});')
             elif isinstance(node, block.CycledBlock):
                 self.code.append('  // cycled block')
                 self.code.append(f'  let {block_var} = sys.create_cycled_block({node.cycle});')
+                
+                # 增加序列化操作
+                self.add_operation(
+                    create_pb2.OpType.CREATE_CYCLED_BLOCK,
+                    cycles=node.cycle
+                )
+                
                 self.code.append(f'  sys.set_current_block({block_var});')
 
         for elem in node.iter():
@@ -494,6 +559,13 @@ class CodeGen(visitor.Visitor):
         elif isinstance(node, expr.AsyncCall):
             bind_var = self.generate_rval(node.bind)
             res = f'sys.create_async_call({bind_var});'
+            
+            # 增加序列化操作
+            self.add_operation(
+                create_pb2.OpType.CREATE_ASYNC_CALL,
+                bind_var=bind_var
+            )
+            
         elif isinstance(node, expr.Concat):
             msb = self.generate_rval(node.msb)
             lsb = self.generate_rval(node.lsb)
@@ -566,6 +638,35 @@ class CodeGen(visitor.Visitor):
         attrs = self.generate_array_attr(node)
         attrs = f'vec![{attrs}]'
         array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
+        
+        # 增加序列化操作
+        dtype_instance = create_pb2.DataType()
+        # 设置数据类型
+        if isinstance(node.scalar_ty, dtype.Int):
+            dtype_instance.kind = create_pb2.DataType.Kind.INT
+        elif isinstance(node.scalar_ty, dtype.UInt):
+            dtype_instance.kind = create_pb2.DataType.Kind.UINT
+        elif isinstance(node.scalar_ty, dtype.Bits):
+            dtype_instance.kind = create_pb2.DataType.Kind.BITS
+        elif isinstance(node.scalar_ty, dtype.Record):
+            dtype_instance.kind = create_pb2.DataType.Kind.RECORD
+        else:
+            raise AssertionError(f'Expecting a known type, but got {node.scalar_ty}')
+        dtype_instance.bits = node.scalar_ty.bits
+        
+        # 设置属性
+        array_attr = create_pb2.ArrayAttr()
+        array_attr.fully_partitioned = Array.FULLY_PARTITIONED in node.attr
+        
+        self.add_operation(
+            create_pb2.OpType.CREATE_ARRAY,
+            dtype=dtype_instance,
+            name=name,
+            size=size,
+            init_values=node.initializer if node.initializer else [],
+            attributes=array_attr
+        )
+        
         self.code.append(array_decl)
 
 
