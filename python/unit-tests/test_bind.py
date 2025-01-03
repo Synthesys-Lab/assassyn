@@ -13,6 +13,7 @@ class Sub(Module):
         super().__init__(
             ports=ports ,
         )
+        self.name = 'sub'
 
     @module.combinational
     def build(self):
@@ -25,6 +26,7 @@ class Lhs(Module):
         super().__init__(
             ports={'lhs_a': Port(Int(32))},
         )
+        self.name = 'lhs'
 
     @module.combinational
     def build(self, sub: Sub):
@@ -37,6 +39,7 @@ class Rhs(Module):
         super().__init__(
             ports={'rhs_b': Port(Int(32))},
         ) 
+        self.name = 'rhs'
         
     @module.combinational
     def build(self, sub: Bind):
@@ -50,6 +53,7 @@ class Driver(Module):
         super().__init__(
             ports={},
         )
+        self.name = 'driver'
  
     @module.combinational
     def build(self, lhs: Lhs, rhs: Rhs):
