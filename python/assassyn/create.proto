@@ -30,6 +30,19 @@ enum OpType {
   CREATE_ARRAY = 5;
 }
 
+// 模块的属性定义
+message ModuleAttributes {
+  bool no_arbiter = 1;
+  enum Timing {
+    NONE = 0;
+    SYSTOLIC = 1;
+    BACKPRESSURE = 2;
+  }
+  Timing timing = 2;  // 这里直接使用内部定义的枚举类型
+  bool is_memory = 3;
+  uint32 present_attrs = 4;  
+}
+
 // 数组属性
 message ArrayAttr {
   bool fully_partitioned = 1;
@@ -38,8 +51,10 @@ message ArrayAttr {
 
 // 创建操作的具体参数
 message CreateModuleParams {
-  string name = 1;
-  repeated Port ports = 2;
+  uint32 id = 1;           // 模块的数字ID
+  string name = 2;         // 模块名称
+  repeated Port ports = 3; // 端口列表
+  ModuleAttributes attrs = 4;  // 模块属性
 }
 
 message CreateDownstreamParams {

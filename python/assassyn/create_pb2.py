@@ -24,37 +24,41 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x63reate.proto\"g\n\x08\x44\x61taType\x12\x1c\n\x04kind\x18\x01 \x01(\x0e\x32\x0e.DataType.Kind\x12\x0c\n\x04\x62its\x18\x02 \x01(\x05\"/\n\x04Kind\x12\x07\n\x03INT\x10\x00\x12\x08\n\x04UINT\x10\x01\x12\x08\n\x04\x42ITS\x10\x02\x12\n\n\x06RECORD\x10\x03\".\n\x04Port\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x18\n\x05\x64type\x18\x02 \x01(\x0b\x32\t.DataType\"&\n\tArrayAttr\x12\x19\n\x11\x66ully_partitioned\x18\x01 \x01(\x08\"8\n\x12\x43reateModuleParams\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x14\n\x05ports\x18\x02 \x03(\x0b\x32\x05.Port\"&\n\x16\x43reateDownstreamParams\x12\x0c\n\x04name\x18\x01 \x01(\t\"%\n\x15\x43reateCondBlockParams\x12\x0c\n\x04\x63ond\x18\x01 \x01(\t\")\n\x17\x43reateCycledBlockParams\x12\x0e\n\x06\x63ycles\x18\x01 \x01(\x05\")\n\x15\x43reateAsyncCallParams\x12\x10\n\x08\x62ind_var\x18\x01 \x01(\t\"~\n\x11\x43reateArrayParams\x12\x18\n\x05\x64type\x18\x01 \x01(\x0b\x32\t.DataType\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x05\x12\x13\n\x0binit_values\x18\x04 \x03(\x03\x12\x1e\n\nattributes\x18\x05 \x01(\x0b\x32\n.ArrayAttr\"\xf6\x02\n\tOperation\x12\x18\n\x07op_type\x18\x01 \x01(\x0e\x32\x07.OpType\x12\x12\n\nresult_var\x18\x02 \x01(\t\x12,\n\rcreate_module\x18\x03 \x01(\x0b\x32\x13.CreateModuleParamsH\x00\x12\x34\n\x11\x63reate_downstream\x18\x04 \x01(\x0b\x32\x17.CreateDownstreamParamsH\x00\x12\x33\n\x11\x63reate_cond_block\x18\x05 \x01(\x0b\x32\x16.CreateCondBlockParamsH\x00\x12\x37\n\x13\x63reate_cycled_block\x18\x06 \x01(\x0b\x32\x18.CreateCycledBlockParamsH\x00\x12\x33\n\x11\x63reate_async_call\x18\x07 \x01(\x0b\x32\x16.CreateAsyncCallParamsH\x00\x12*\n\x0c\x63reate_array\x18\x08 \x01(\x0b\x32\x12.CreateArrayParamsH\x00\x42\x08\n\x06params\"/\n\rOperationList\x12\x1e\n\noperations\x18\x01 \x03(\x0b\x32\n.Operation*\x92\x01\n\x06OpType\x12\x11\n\rCREATE_MODULE\x10\x00\x12\x15\n\x11\x43REATE_DOWNSTREAM\x10\x01\x12\x1c\n\x18\x43REATE_CONDITIONAL_BLOCK\x10\x02\x12\x17\n\x13\x43REATE_CYCLED_BLOCK\x10\x03\x12\x15\n\x11\x43REATE_ASYNC_CALL\x10\x04\x12\x10\n\x0c\x43REATE_ARRAY\x10\x05\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0c\x63reate.proto\x12\x06\x63reate\"n\n\x08\x44\x61taType\x12#\n\x04kind\x18\x01 \x01(\x0e\x32\x15.create.DataType.Kind\x12\x0c\n\x04\x62its\x18\x02 \x01(\x05\"/\n\x04Kind\x12\x07\n\x03INT\x10\x00\x12\x08\n\x04UINT\x10\x01\x12\x08\n\x04\x42ITS\x10\x02\x12\n\n\x06RECORD\x10\x03\"5\n\x04Port\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x1f\n\x05\x64type\x18\x02 \x01(\x0b\x32\x10.create.DataType\"\xb5\x01\n\x10ModuleAttributes\x12\x12\n\nno_arbiter\x18\x01 \x01(\x08\x12/\n\x06timing\x18\x02 \x01(\x0e\x32\x1f.create.ModuleAttributes.Timing\x12\x11\n\tis_memory\x18\x03 \x01(\x08\x12\x15\n\rpresent_attrs\x18\x04 \x01(\r\"2\n\x06Timing\x12\x08\n\x04NONE\x10\x00\x12\x0c\n\x08SYSTOLIC\x10\x01\x12\x10\n\x0c\x42\x41\x43KPRESSURE\x10\x02\"&\n\tArrayAttr\x12\x19\n\x11\x66ully_partitioned\x18\x01 \x01(\x08\"t\n\x12\x43reateModuleParams\x12\n\n\x02id\x18\x01 \x01(\r\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x1b\n\x05ports\x18\x03 \x03(\x0b\x32\x0c.create.Port\x12\'\n\x05\x61ttrs\x18\x04 \x01(\x0b\x32\x18.create.ModuleAttributes\"&\n\x16\x43reateDownstreamParams\x12\x0c\n\x04name\x18\x01 \x01(\t\"%\n\x15\x43reateCondBlockParams\x12\x0c\n\x04\x63ond\x18\x01 \x01(\t\")\n\x17\x43reateCycledBlockParams\x12\x0e\n\x06\x63ycles\x18\x01 \x01(\x05\")\n\x15\x43reateAsyncCallParams\x12\x10\n\x08\x62ind_var\x18\x01 \x01(\t\"\x8c\x01\n\x11\x43reateArrayParams\x12\x1f\n\x05\x64type\x18\x01 \x01(\x0b\x32\x10.create.DataType\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0c\n\x04size\x18\x03 \x01(\x05\x12\x13\n\x0binit_values\x18\x04 \x03(\x03\x12%\n\nattributes\x18\x05 \x01(\x0b\x32\x11.create.ArrayAttr\"\xa7\x03\n\tOperation\x12\x1f\n\x07op_type\x18\x01 \x01(\x0e\x32\x0e.create.OpType\x12\x12\n\nresult_var\x18\x02 \x01(\t\x12\x33\n\rcreate_module\x18\x03 \x01(\x0b\x32\x1a.create.CreateModuleParamsH\x00\x12;\n\x11\x63reate_downstream\x18\x04 \x01(\x0b\x32\x1e.create.CreateDownstreamParamsH\x00\x12:\n\x11\x63reate_cond_block\x18\x05 \x01(\x0b\x32\x1d.create.CreateCondBlockParamsH\x00\x12>\n\x13\x63reate_cycled_block\x18\x06 \x01(\x0b\x32\x1f.create.CreateCycledBlockParamsH\x00\x12:\n\x11\x63reate_async_call\x18\x07 \x01(\x0b\x32\x1d.create.CreateAsyncCallParamsH\x00\x12\x31\n\x0c\x63reate_array\x18\x08 \x01(\x0b\x32\x19.create.CreateArrayParamsH\x00\x42\x08\n\x06params\"6\n\rOperationList\x12%\n\noperations\x18\x01 \x03(\x0b\x32\x11.create.Operation*\x92\x01\n\x06OpType\x12\x11\n\rCREATE_MODULE\x10\x00\x12\x15\n\x11\x43REATE_DOWNSTREAM\x10\x01\x12\x1c\n\x18\x43REATE_CONDITIONAL_BLOCK\x10\x02\x12\x17\n\x13\x43REATE_CYCLED_BLOCK\x10\x03\x12\x15\n\x11\x43REATE_ASYNC_CALL\x10\x04\x12\x10\n\x0c\x43REATE_ARRAY\x10\x05\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'create_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_OPTYPE']._serialized_start=987
-  _globals['_OPTYPE']._serialized_end=1133
-  _globals['_DATATYPE']._serialized_start=16
-  _globals['_DATATYPE']._serialized_end=119
-  _globals['_DATATYPE_KIND']._serialized_start=72
-  _globals['_DATATYPE_KIND']._serialized_end=119
-  _globals['_PORT']._serialized_start=121
-  _globals['_PORT']._serialized_end=167
-  _globals['_ARRAYATTR']._serialized_start=169
-  _globals['_ARRAYATTR']._serialized_end=207
-  _globals['_CREATEMODULEPARAMS']._serialized_start=209
-  _globals['_CREATEMODULEPARAMS']._serialized_end=265
-  _globals['_CREATEDOWNSTREAMPARAMS']._serialized_start=267
-  _globals['_CREATEDOWNSTREAMPARAMS']._serialized_end=305
-  _globals['_CREATECONDBLOCKPARAMS']._serialized_start=307
-  _globals['_CREATECONDBLOCKPARAMS']._serialized_end=344
-  _globals['_CREATECYCLEDBLOCKPARAMS']._serialized_start=346
-  _globals['_CREATECYCLEDBLOCKPARAMS']._serialized_end=387
-  _globals['_CREATEASYNCCALLPARAMS']._serialized_start=389
-  _globals['_CREATEASYNCCALLPARAMS']._serialized_end=430
-  _globals['_CREATEARRAYPARAMS']._serialized_start=432
-  _globals['_CREATEARRAYPARAMS']._serialized_end=558
-  _globals['_OPERATION']._serialized_start=561
-  _globals['_OPERATION']._serialized_end=935
-  _globals['_OPERATIONLIST']._serialized_start=937
-  _globals['_OPERATIONLIST']._serialized_end=984
+  _globals['_OPTYPE']._serialized_start=1324
+  _globals['_OPTYPE']._serialized_end=1470
+  _globals['_DATATYPE']._serialized_start=24
+  _globals['_DATATYPE']._serialized_end=134
+  _globals['_DATATYPE_KIND']._serialized_start=87
+  _globals['_DATATYPE_KIND']._serialized_end=134
+  _globals['_PORT']._serialized_start=136
+  _globals['_PORT']._serialized_end=189
+  _globals['_MODULEATTRIBUTES']._serialized_start=192
+  _globals['_MODULEATTRIBUTES']._serialized_end=373
+  _globals['_MODULEATTRIBUTES_TIMING']._serialized_start=323
+  _globals['_MODULEATTRIBUTES_TIMING']._serialized_end=373
+  _globals['_ARRAYATTR']._serialized_start=375
+  _globals['_ARRAYATTR']._serialized_end=413
+  _globals['_CREATEMODULEPARAMS']._serialized_start=415
+  _globals['_CREATEMODULEPARAMS']._serialized_end=531
+  _globals['_CREATEDOWNSTREAMPARAMS']._serialized_start=533
+  _globals['_CREATEDOWNSTREAMPARAMS']._serialized_end=571
+  _globals['_CREATECONDBLOCKPARAMS']._serialized_start=573
+  _globals['_CREATECONDBLOCKPARAMS']._serialized_end=610
+  _globals['_CREATECYCLEDBLOCKPARAMS']._serialized_start=612
+  _globals['_CREATECYCLEDBLOCKPARAMS']._serialized_end=653
+  _globals['_CREATEASYNCCALLPARAMS']._serialized_start=655
+  _globals['_CREATEASYNCCALLPARAMS']._serialized_end=696
+  _globals['_CREATEARRAYPARAMS']._serialized_start=699
+  _globals['_CREATEARRAYPARAMS']._serialized_end=839
+  _globals['_OPERATION']._serialized_start=842
+  _globals['_OPERATION']._serialized_end=1265
+  _globals['_OPERATIONLIST']._serialized_start=1267
+  _globals['_OPERATIONLIST']._serialized_end=1321
 # @@protoc_insertion_point(module_scope)

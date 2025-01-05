@@ -8,7 +8,7 @@ from . import block
 from . import const
 from .builder import SysBuilder
 from .array import Array
-from .module import Module, Port
+from .module import Module, Port, Timing
 from .block import Block
 from .expr import Expr
 from .utils import identifierize
@@ -136,9 +136,9 @@ class EmitBinds(visitor.Visitor):
 
     def visit_expr(self, node):
         if isinstance(node, expr.Bind):
-            bind_var = self.cg.generate_rval(node)
-            module_var = self.cg.generate_rval(node.callee)
-            self.cg.code.append(f'  let {bind_var} = sys.get_init_bind({module_var});')
+            bind_id = self.cg.generate_rval(node)
+            module_id = self.cg.generate_rval(node.callee)
+            self.cg.code.append(f'  let {bind_id} = sys.get_init_bind({module_id});')
 
 # pylint: disable=too-many-instance-attributes
 class CodeGen(visitor.Visitor):
@@ -148,17 +148,37 @@ class CodeGen(visitor.Visitor):
         """Add an Operation to the serial"""
         op = self.op_list.operations.add()
         op.op_type = op_type
+        op.result_var = params.get('result_var', '')
         
         # 根据操作类型设置参数
         if op_type == create_pb2.OpType.CREATE_MODULE:
             module_params = op.create_module
             module_params.name = params['name']
+            module_params.id = params.get('id', 0)
+            
+            # 设置端口
             for port_info in params['ports']:
                 port = module_params.ports.add()
                 port.name = port_info['name']
-                port.dtype.kind = port_info['dtype_kind']
-                port.dtype.bits = port_info['dtype_bits']
-                
+                dtype = create_pb2.DataType()
+                dtype.kind = create_pb2.DataType.Kind.Value(
+                    create_pb2.DataType.Kind.Name(port_info['dtype_kind']))
+                dtype.bits = port_info['dtype_bits']
+                port.dtype.CopyFrom(dtype)
+
+            # 设置属性
+            if 'attrs' in params:
+                attrs = params['attrs']
+                module_attrs = create_pb2.ModuleAttributes()
+                module_attrs.present_attrs = attrs.get('present_attrs', 0)
+                if 'no_arbiter' in attrs:
+                    module_attrs.no_arbiter = attrs['no_arbiter']
+                if 'timing' in attrs:
+                    module_attrs.timing = attrs['timing']
+                if 'is_memory' in attrs:
+                    module_attrs.is_memory = attrs['is_memory']
+                module_params.attrs.CopyFrom(module_attrs)
+                    
         elif op_type == create_pb2.OpType.CREATE_DOWNSTREAM:
             op.create_downstream.name = params['name']
             
@@ -181,9 +201,9 @@ class CodeGen(visitor.Visitor):
             if 'attributes' in params:
                 array_params.attributes.CopyFrom(params['attributes'])
 
-    def emit_module_attrs(self, m: Module, var_id: str):
+    def emit_module_attrs(self, m: Module, module_id: str):
         '''Generate module attributes.'''
-        module_mut = f'{var_id}.as_mut::<assassyn::ir::Module>(&mut sys).unwrap()'
+        module_mut = f'{module_id}.as_mut::<assassyn::ir::Module>(&mut sys).unwrap()'
         path = 'assassyn::ir::module::Attribute'
         if m.is_systolic:
             self.code.append(f'{module_mut}.add_attr({path}::Systolic);')
@@ -264,105 +284,112 @@ class CodeGen(visitor.Visitor):
         self.code.append('fn main() {')
         
         # 创建输出文件
-        self.code.append('    let mut output_file = File::create("src/parse_result.txt").expect("Failed to create output file");')
-        self.code.append('    println!("Reading serialized operations:");')
+        self.code.append('    println!("Reading serialized operations...");')
         self.code.append('    let bytes = std::fs::read("src/create.pb").expect("Failed to read operations file");')
         self.code.append('    let ops = OperationList::decode(&bytes[..]).expect("Failed to decode operations");')
-        self.code.append('    for op in ops.operations {')
-        self.code.append('        match op.op_type() {')
-        self.code.append('            OpType::CreateModule => {')
-        self.code.append('                if let Some(operation::Params::CreateModule(params)) = op.params {')
-        self.code.append('                    writeln!(output_file, "CREATE_MODULE: {} -> {}", params.name, op.result_var).unwrap();')
-        self.code.append('                    for port in params.ports {')
-        self.code.append('                        writeln!(')
-        self.code.append('                            output_file,')
-        self.code.append('                            "  Port: {} {:?} {}",')
-        self.code.append('                            port.name,')
-        self.code.append('                            port.dtype.unwrap().kind(),')
-        self.code.append('                            port.dtype.unwrap().bits')
-        self.code.append('                        ).unwrap();')
-        self.code.append('                    }')
-        self.code.append('                }')
-        self.code.append('            },')
-        self.code.append('            OpType::CreateDownstream => {')
-        self.code.append('                if let Some(operation::Params::CreateDownstream(params)) = op.params {')
-        self.code.append('                    writeln!(output_file, "CREATE_DOWNSTREAM: {} -> {}", params.name, op.result_var).unwrap();')
-        self.code.append('                }')
-        self.code.append('            },')
-        self.code.append('            _ => writeln!(output_file, "Unknown operation type: {:?}", op.op_type()).unwrap(),')
-        self.code.append('        }')
-        self.code.append('    }')
-        self.code.append('')  # 空行分隔
+
+        # 定义常量
+        self.code.append('    const ATTR_NO_ARBITER_PRESENT: u32 = 1 << 0;')
+        self.code.append('    const ATTR_TIMING_PRESENT: u32 = 1 << 1;')
+        self.code.append('    const ATTR_IS_MEMORY_PRESENT: u32 = 1 << 2;')
+
+        # 生成文件打开代码
+        self.code.append('    let mut output_file = File::create("src/parse_result.txt").expect("Failed to create output file");')
+
+        # 生成主要的匹配逻辑
+        self.code.append('''
+            for op in ops.operations {
+                match op.op_type() {
+                    OpType::CreateModule => {
+                        if let Some(params) = op.params {
+                            if let operation::Params::CreateModule(module_params) = params {
+                                writeln!(output_file, "CREATE_MODULE:").unwrap();
+                                writeln!(output_file, "  ID: {}", module_params.id).unwrap();
+                                writeln!(output_file, "  Name: {}", module_params.name).unwrap();
+                                writeln!(output_file, "  Result Variable: {}", op.result_var).unwrap();
+                                
+                                writeln!(output_file, "  Attributes:").unwrap();
+                                if let Some(attrs) = &module_params.attrs {
+                                    if (attrs.present_attrs & ATTR_NO_ARBITER_PRESENT) != 0 {
+                                        writeln!(output_file, "    no_arbiter: {}", attrs.no_arbiter).unwrap();
+                                    } else {
+                                        writeln!(output_file, "    no_arbiter: <not set>").unwrap();
+                                    }
+                                    
+                                    if (attrs.present_attrs & ATTR_TIMING_PRESENT) != 0 {
+                                        let timing_str = match attrs.timing {
+                                            x if x == i32::from(module_attributes::Timing::None) => "NONE",
+                                            x if x == i32::from(module_attributes::Timing::Systolic) => "SYSTOLIC",
+                                            x if x == i32::from(module_attributes::Timing::Backpressure) => "BACKPRESSURE",
+                                            _ => "UNKNOWN",
+                                        };
+                                        writeln!(output_file, "    timing: {}", timing_str).unwrap();
+                                    } else {
+                                        writeln!(output_file, "    timing: <not set>").unwrap();
+                                    }
+                                    
+                                    if (attrs.present_attrs & ATTR_IS_MEMORY_PRESENT) != 0 {
+                                        writeln!(output_file, "    is_memory: {}", attrs.is_memory).unwrap();
+                                    } else {
+                                        writeln!(output_file, "    is_memory: <not set>").unwrap();
+                                    }
+                                }
+                                
+                                writeln!(output_file, "  Ports:").unwrap();
+                                for port in module_params.ports {
+                                    if let Some(dtype) = &port.dtype {
+                                        let kind_str = match dtype.kind {
+                                            x if x == i32::from(data_type::Kind::Int) => "INT",
+                                            x if x == i32::from(data_type::Kind::Uint) => "UINT",
+                                            x if x == i32::from(data_type::Kind::Bits) => "BITS",
+                                            x if x == i32::from(data_type::Kind::Record) => "RECORD",
+                                            _ => "UNKNOWN",
+                                        };
+                                        writeln!(
+                                            output_file,
+                                            "    {} - {}({} bits)",
+                                            port.name, kind_str, dtype.bits
+                                        ).unwrap();
+                                    }
+                                }
+                                writeln!(output_file, "").unwrap();
+                            }
+                        }
+                    }
+                    _ => writeln!(output_file, "Unknown operation type: {:?}", op.op_type()).unwrap(),
+                }
+            }
+        ''')
         
             
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
         self.code.append(
                 '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
-
-        # # Declare modules
-        # for elem in node.modules:
-        #     lval = elem.as_operand()
-        #     name = elem.name.lower()
-        #     ports_info = []
-        #     for p in elem.ports:
-        #         if isinstance(p.dtype, dtype.Int):
-        #             kind = create_pb2.DataType.Kind.INT
-        #         elif isinstance(p.dtype, dtype.UInt):
-        #             kind = create_pb2.DataType.Kind.UINT
-        #         elif isinstance(p.dtype, dtype.Bits):
-        #             kind = create_pb2.DataType.Kind.BITS
-        #         elif isinstance(p.dtype, dtype.Record):
-        #             kind = create_pb2.DataType.Kind.RECORD
-        #         else:
-        #             raise AssertionError(f'Expecting a known type, but got {p.dtype}')
-                
-        #         ports_info.append({
-        #             'name': p.name,
-        #             'dtype_kind': kind,
-        #             'dtype_bits': p.dtype.bits
-        #         })
-            
-        #     self.add_operation(
-        #         create_pb2.OpType.CREATE_MODULE,
-        #         name=name,
-        #         ports=ports_info
-        #     )
-            
-        # self.code.append('    // Create modules from serialized operations')
-        # self.code.append('    let bytes = std::fs::read("src/create.pb").expect("Failed to read operations file");')
-        # self.code.append('    let ops = OperationList::decode(&bytes[..]).expect("Failed to decode operations");')
-        # self.code.append('    for op in &ops.operations {')
-        # self.code.append('        match op.op_type() {')
-        # self.code.append('            create::OpType::CreateModule => {')
-        # self.code.append('                if let Some(operation::Params::CreateModule(params)) = &op.params {')
-        # self.code.append('                    let mut port_vec = Vec::new();')
-        # self.code.append('                    for port in &params.ports {')
-        # self.code.append('                        let dtype = match port.dtype.as_ref().unwrap().kind() {')
-        # self.code.append('                            create::DataType_Kind::Int => assassyn::ir::DataType::int_ty(port.dtype.as_ref().unwrap().bits as usize),')
-        # self.code.append('                            create::DataType_Kind::Uint => assassyn::ir::DataType::uint_ty(port.dtype.as_ref().unwrap().bits as usize),')
-        # self.code.append('                            create::DataType_Kind::Bits => assassyn::ir::DataType::bits_ty(port.dtype.as_ref().unwrap().bits as usize),')
-        # self.code.append('                            create::DataType_Kind::Record => assassyn::ir::DataType::bits_ty(port.dtype.as_ref().unwrap().bits as usize),')
-        # self.code.append('                        };')
-        # self.code.append('                        port_vec.push(assassyn::builder::PortInfo::new(&port.name, dtype));')
-        # self.code.append('                    }')
-        # self.code.append(f'                    let {lval} = sys.create_module(&params.name, port_vec);')
-        # self.code.append('                }')
-        # self.code.append('            },')
-        # self.code.append('            _ => {},')
-        # self.code.append('        }')
-        # self.code.append('    }')
-            
+        
+                    
+        # 定义属性位掩码
+        ATTR_NO_ARBITER_PRESENT = 1 << 0
+        ATTR_TIMING_PRESENT = 1 << 1
+        ATTR_IS_MEMORY_PRESENT = 1 << 2
         
         self.code.append('  // Declare modules')
+        self.code.append(f'  let mut modules = Vec::new();')   # 存储所有模块的数组
         for elem in node.modules:
-            lval = elem.as_operand()
+            module_id = elem.as_operand()
             name = elem.name.lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
-            self.code.append(f'  let {lval} = sys.create_module("{name}", vec![{ports}]);')
-            self.emit_module_attrs(elem, lval)
             
+            # 获取模块的索引就是它在数组中的位置
+            current_index = len(self.modules)
+            self.modules.append(elem)
+            
+            self.code.append(f'  modules.push(sys.create_module("{name}", vec![{ports}]));')
+            self.emit_module_attrs(elem, f"modules[{current_index}]")
+            
+            # 处理端口信息
             ports_info = []
             for p in elem.ports:
+                # 确定数据类型
                 if isinstance(p.dtype, dtype.Int):
                     kind = create_pb2.DataType.Kind.INT
                 elif isinstance(p.dtype, dtype.UInt):
@@ -379,17 +406,39 @@ class CodeGen(visitor.Visitor):
                     'dtype_kind': kind,
                     'dtype_bits': p.dtype.bits
                 })
-            
+
+            attrs = {}
+            present_attrs = 0
+
+            if Module.ATTR_DISABLE_ARBITER in elem._attrs:
+                attrs['no_arbiter'] = elem.no_arbiter
+                present_attrs |= ATTR_NO_ARBITER_PRESENT
+
+            if elem.timing is not None:
+                attrs['timing'] = (create_pb2.ModuleAttributes.SYSTOLIC if elem.is_systolic 
+                                else create_pb2.ModuleAttributes.BACKPRESSURE if elem.timing == module.Timing.BACKPRESSURE 
+                                else create_pb2.ModuleAttributes.NONE)
+                present_attrs |= ATTR_TIMING_PRESENT
+
+            if Module.ATTR_MEMORY in elem._attrs:
+                attrs['is_memory'] = True
+                present_attrs |= ATTR_IS_MEMORY_PRESENT
+
+            attrs['present_attrs'] = present_attrs
+
             self.add_operation(
                 create_pb2.OpType.CREATE_MODULE,
                 name=name,
-                ports=ports_info
-            )            
+                ports=ports_info,
+                id=current_index,
+                result_var=module_id,
+                attrs=attrs  # 传入包含实际存在属性的字典
+            )    
             
         self.code.append('  // Declare downstream modules')
         for elem in node.downstreams:
-            var = self.generate_rval(elem)
-            self.code.append(f'  let {var} = sys.create_downstream("{elem.name}");')
+            module_id = self.generate_rval(elem)
+            self.code.append(f'  let {module_id} = sys.create_downstream("{elem.name}");')
             
             # 增加序列化操作
             self.add_operation(
@@ -403,9 +452,9 @@ class CodeGen(visitor.Visitor):
         self.code.append('  // Gathered binds')
         for elem in node.modules + node.downstreams:
             bind_emitter = EmitBinds(self)
-            name = self.generate_rval(elem)
+            module_id = self.generate_rval(elem)
             self.code.append('  // Set the current module redundantly to emit related binds')
-            self.code.append(f'  sys.set_current_module({name});')
+            self.code.append(f'  sys.set_current_module({module_id});')
             bind_emitter.visit_module(elem)
         for elem in node.modules:
             self.visit_module(elem)
@@ -415,18 +464,18 @@ class CodeGen(visitor.Visitor):
         self.code.append('  // Emit downstream modules')
         for elem in node.downstreams:
             self.code.append(f'  // Module {elem.name}')
-            var = self.generate_rval(elem)
-            self.code.append(f'  sys.set_current_module({var});')
+            module_id = self.generate_rval(elem)
+            self.code.append(f'  sys.set_current_module({module_id});')
             # FIXME(@were): This is a hack to emit memory parameters, it should be generalized
-            self.emit_memory_attrs(elem, var)
+            self.emit_memory_attrs(elem, module_id)
             self.visit_module(elem)
 
         for elem , kind in node.exposed_nodes.items():
-            name = self.generate_rval(elem)
+            module_id = self.generate_rval(elem)
             if kind is None:
                 kind = 'Inout'
             path = 'assassyn::builder::system::ExposeKind'
-            self.code.append(f'  sys.expose_to_top({name}, {path}::{kind});')
+            self.code.append(f'  sys.expose_to_top({module_id}, {path}::{kind});')
 
         config = self.emit_config()
         self.code.append(f'''
@@ -461,11 +510,11 @@ class CodeGen(visitor.Visitor):
             self.code.append('  // restore current block')
             self.code.append('  block_stack.push(sys.get_current_block().unwrap().upcast());')
 
-            block_var = self.generate_rval(node)
+            block_id = self.generate_rval(node)
             if isinstance(node, block.CondBlock):
                 self.code.append('  // conditional block')
                 cond = self.generate_rval(node.cond)
-                self.code.append(f'  let {block_var} = sys.create_conditional_block({cond});')
+                self.code.append(f'  let {block_id} = sys.create_conditional_block({cond});')
                 
                 # 增加序列化操作
                 self.add_operation(
@@ -473,10 +522,10 @@ class CodeGen(visitor.Visitor):
                     cond=cond
                 )
                 
-                self.code.append(f'  sys.set_current_block({block_var});')
+                self.code.append(f'  sys.set_current_block({block_id});')
             elif isinstance(node, block.CycledBlock):
                 self.code.append('  // cycled block')
-                self.code.append(f'  let {block_var} = sys.create_cycled_block({node.cycle});')
+                self.code.append(f'  let {block_id} = sys.create_cycled_block({node.cycle});')
                 
                 # 增加序列化操作
                 self.add_operation(
@@ -484,7 +533,7 @@ class CodeGen(visitor.Visitor):
                     cycles=node.cycle
                 )
                 
-                self.code.append(f'  sys.set_current_block({block_var});')
+                self.code.append(f'  sys.set_current_block({block_id});')
 
         for elem in node.iter():
             self.dispatch(elem)
@@ -502,14 +551,17 @@ class CodeGen(visitor.Visitor):
             self.code.append(imm_decl)
             return imm_var
         if isinstance(node, module.Port):
-            module_name = self.generate_rval(node.module)
-            port_name = f'{module_name}_{node.name}'
+            module_index = self.modules.index(node.module)
+            module_ref = f"modules[{module_index}]"
+            port_name = f'port_{module_index}_{node.name}'  # 修改端口变量名的生成方式
             self.code.append(f'''  // Get port {node.name}
                 let {port_name} = {{
-                  let module = {module_name}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
-                  module.get_fifo("{node.name}").unwrap().upcast()
+                let module = {module_ref}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
+                module.get_fifo("{node.name}").unwrap().upcast()
                 }};''')
             return port_name
+        if isinstance(node, Module):
+            return f"modules[{self.modules.index(node)}]"
         return node.as_operand()
 
     #pylint: disable=too-many-branches, too-many-locals, too-many-statements
@@ -674,6 +726,7 @@ class CodeGen(visitor.Visitor):
                  random, resource_base,default_fifo_depth):
         self.code = []
         self.header = []
+        self.modules = [] 
         self.emitted_bind = set()
         self.targets = {}
         self.resource_base = resource_base
