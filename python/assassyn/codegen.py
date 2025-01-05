@@ -281,6 +281,63 @@ class CodeGen(visitor.Visitor):
         # 临时代码………………………………        
         self.header.append('use std::io::Write;')
         
+        # 定义常量
+        self.code.append('const ATTR_NO_ARBITER_PRESENT: u32 = 1 << 0;')
+        self.code.append('const ATTR_TIMING_PRESENT: u32 = 1 << 1;')
+        self.code.append('const ATTR_IS_MEMORY_PRESENT: u32 = 1 << 2;')
+        
+        
+        # 生成主要的匹配逻辑
+        self.code.append('''
+            fn create_module_from_proto(
+                sys: &mut SysBuilder,
+                modules: &mut Vec<assassyn::ir::node::BaseNode>,
+                module_params: &CreateModuleParams,
+            ) {
+                // Create port information vector
+                let ports: Vec<assassyn::builder::PortInfo> = module_params
+                    .ports
+                    .iter()
+                    .map(|port| {
+                        let bits = port.dtype.as_ref().unwrap().bits as usize;
+                        let dtype = match port.dtype.as_ref().unwrap().kind() {
+                            data_type::Kind::Int => assassyn::ir::DataType::int_ty(bits),
+                            data_type::Kind::Uint => assassyn::ir::DataType::uint_ty(bits),
+                            data_type::Kind::Bits | data_type::Kind::Record => {
+                                assassyn::ir::DataType::bits_ty(bits)
+                            }
+                        };
+                        assassyn::builder::PortInfo::new(&port.name, dtype)
+                    })
+                    .collect();
+
+                // Create the module
+                let module = sys.create_module(&module_params.name, ports);
+
+                // Set attributes if they exist
+                if let Some(attrs) = &module_params.attrs {
+                    let mut module_mut = module.as_mut::<assassyn::ir::Module>(sys).unwrap();
+
+                    // Handle timing attribute
+                    if (attrs.present_attrs & ATTR_TIMING_PRESENT) != 0 {
+                        if attrs.timing() == module_attributes::Timing::Systolic {
+                            module_mut.add_attr(assassyn::ir::module::Attribute::Systolic);
+                        }
+                    }
+
+                    // Handle no_arbiter attribute
+                    if (attrs.present_attrs & ATTR_NO_ARBITER_PRESENT) != 0 && attrs.no_arbiter {
+                        module_mut.add_attr(assassyn::ir::module::Attribute::NoArbiter);
+                    }
+                }
+
+                // Add to modules vector
+                modules.push(module);
+            }
+        ''')
+        
+        
+        
         self.code.append('fn main() {')
         
         # 创建输出文件
@@ -288,20 +345,15 @@ class CodeGen(visitor.Visitor):
         self.code.append('    let bytes = std::fs::read("src/create.pb").expect("Failed to read operations file");')
         self.code.append('    let ops = OperationList::decode(&bytes[..]).expect("Failed to decode operations");')
 
-        # 定义常量
-        self.code.append('    const ATTR_NO_ARBITER_PRESENT: u32 = 1 << 0;')
-        self.code.append('    const ATTR_TIMING_PRESENT: u32 = 1 << 1;')
-        self.code.append('    const ATTR_IS_MEMORY_PRESENT: u32 = 1 << 2;')
-
         # 生成文件打开代码
         self.code.append('    let mut output_file = File::create("src/parse_result.txt").expect("Failed to create output file");')
 
         # 生成主要的匹配逻辑
         self.code.append('''
-            for op in ops.operations {
+            for op in ops.operations.iter() {
                 match op.op_type() {
                     OpType::CreateModule => {
-                        if let Some(params) = op.params {
+                        if let Some(params) = &op.params {
                             if let operation::Params::CreateModule(module_params) = params {
                                 writeln!(output_file, "CREATE_MODULE:").unwrap();
                                 writeln!(output_file, "  ID: {}", module_params.id).unwrap();
@@ -336,7 +388,7 @@ class CodeGen(visitor.Visitor):
                                 }
                                 
                                 writeln!(output_file, "  Ports:").unwrap();
-                                for port in module_params.ports {
+                                for port in module_params.ports.iter() {
                                     if let Some(dtype) = &port.dtype {
                                         let kind_str = match dtype.kind {
                                             x if x == i32::from(data_type::Kind::Int) => "INT",
@@ -374,8 +426,19 @@ class CodeGen(visitor.Visitor):
         
         self.code.append('  // Declare modules')
         self.code.append(f'  let mut modules = Vec::new();')   # 存储所有模块的数组
+        # 生成主要的匹配逻辑
+        self.code.append('''
+            // First pass: Create all modules from protobuf data
+            for op in ops.operations.iter() {
+                if op.op_type() == OpType::CreateModule {
+                    if let Some(operation::Params::CreateModule(module_params)) = &op.params {
+                        create_module_from_proto(&mut sys, &mut modules, module_params);
+                    }
+                }
+            }
+        ''')
+        
         for elem in node.modules:
-            module_id = elem.as_operand()
             name = elem.name.lower()
             ports = ', '.join(generate_port(p) for p in elem.ports)
             
@@ -383,8 +446,8 @@ class CodeGen(visitor.Visitor):
             current_index = len(self.modules)
             self.modules.append(elem)
             
-            self.code.append(f'  modules.push(sys.create_module("{name}", vec![{ports}]));')
-            self.emit_module_attrs(elem, f"modules[{current_index}]")
+            # self.code.append(f'  modules.push(sys.create_module("{name}", vec![{ports}]));')
+            # self.emit_module_attrs(elem, f"modules[{current_index}]")
             
             # 处理端口信息
             ports_info = []
@@ -431,7 +494,7 @@ class CodeGen(visitor.Visitor):
                 name=name,
                 ports=ports_info,
                 id=current_index,
-                result_var=module_id,
+                result_var="12345",
                 attrs=attrs  # 传入包含实际存在属性的字典
             )    
             
