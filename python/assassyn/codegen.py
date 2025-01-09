@@ -149,13 +149,11 @@ class CodeGen(visitor.Visitor):
         op = self.op_list.operations.add()
         op.op_type = op_type
         
-        # 根据操作类型设置参数
         if op_type == create_pb2.OpType.CREATE_MODULE:
             module_params = op.create_module
             module_params.name = params['name']
             module_params.id = params.get('id', 0)
-            
-            # 设置端口
+
             for port_info in params['ports']:
                 port = module_params.ports.add()
                 port.name = port_info['name']
@@ -165,7 +163,6 @@ class CodeGen(visitor.Visitor):
                 dtype.bits = port_info['dtype_bits']
                 port.dtype.CopyFrom(dtype)
 
-            # 设置属性
             if 'attrs' in params:
                 attrs = params['attrs']
                 module_attrs = create_pb2.ModuleAttributes()
@@ -277,16 +274,15 @@ class CodeGen(visitor.Visitor):
         self.header.append('use prost::Message;')
         self.header.append('include!(concat!(env!("OUT_DIR"), "/create.rs"));')
         
-        # 临时代码………………………………        
+        # Temporary code: visually display the parsing results of the PB file
         self.header.append('use std::io::Write;')
         
-        # 定义常量
         self.code.append('const ATTR_NO_ARBITER_PRESENT: u32 = 1 << 0;')
         self.code.append('const ATTR_TIMING_PRESENT: u32 = 1 << 1;')
         self.code.append('const ATTR_IS_MEMORY_PRESENT: u32 = 1 << 2;')
         
         
-        # 根据序列指令创建module
+        # Create a module based on sequence instructions
         self.code.append('''
             fn create_module_from_proto(
                 sys: &mut SysBuilder,
@@ -335,7 +331,7 @@ class CodeGen(visitor.Visitor):
             }
         ''')
         
-        # 根据序列指令创建downstream
+        # Create a downstream based on sequence instructions
         self.code.append('''
             fn create_downstream_from_proto(
                 sys: &mut SysBuilder,
@@ -350,19 +346,14 @@ class CodeGen(visitor.Visitor):
             }
         ''')
         
-        
-        
         self.code.append('fn main() {')
         
-        # 创建输出文件
         self.code.append('    println!("Reading serialized operations...");')
         self.code.append('    let bytes = std::fs::read("src/create.pb").expect("Failed to read operations file");')
         self.code.append('    let ops = OperationList::decode(&bytes[..]).expect("Failed to decode operations");')
 
-        # 生成文件打开代码
+        # Temporary code: visually display the parsing results of the PB file
         self.code.append('    let mut output_file = File::create("src/parse_result.txt").expect("Failed to create output file");')
-
-        # 生成主要的匹配逻辑
         self.code.append('''
             for op in ops.operations.iter() {
                 match op.op_type() {
@@ -424,7 +415,6 @@ class CodeGen(visitor.Visitor):
                     OpType::CreateDownstream => {
                         if let Some(params) = &op.params {
                             if let operation::Params::CreateDownstream(downstream_params) = params {
-                                // 记录到日志文件
                                 writeln!(output_file, "CREATE_DOWNSTREAM:").unwrap();
                                 writeln!(output_file, "  ID: {}", downstream_params.id).unwrap();
                                 writeln!(output_file, "  Name: {}", downstream_params.name).unwrap();
@@ -442,8 +432,6 @@ class CodeGen(visitor.Visitor):
         self.code.append(
                 '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
         
-                    
-        # 定义属性位掩码
         ATTR_NO_ARBITER_PRESENT = 1 << 0
         ATTR_TIMING_PRESENT = 1 << 1
         ATTR_IS_MEMORY_PRESENT = 1 << 2
@@ -462,15 +450,12 @@ class CodeGen(visitor.Visitor):
         ''')
         
         for elem in node.modules:
-            name = elem.name.lower()
-            
+            name = elem.name.lower()            
             module_index = len(self.modules)
             self.modules.append(elem)
-            
-            # 处理端口信息
+
             ports_info = []
             for p in elem.ports:
-                # 确定数据类型
                 if isinstance(p.dtype, dtype.Int):
                     kind = create_pb2.DataType.Kind.INT
                 elif isinstance(p.dtype, dtype.UInt):
@@ -512,7 +497,7 @@ class CodeGen(visitor.Visitor):
                 name=name,
                 ports=ports_info,
                 id=module_index,
-                attrs=attrs  # 传入包含实际存在属性的字典
+                attrs=attrs
             )    
             
         self.code.append('  // Declare downstream modules')
@@ -528,14 +513,9 @@ class CodeGen(visitor.Visitor):
             }
         ''')
         
-        for elem in node.downstreams:
-            # module_id = self.generate_rval(elem)
-            # self.code.append(f'  let {module_id} = sys.create_downstream("{elem.name}");')
-            
+        for elem in node.downstreams:            
             current_index = len(self.downstreams)
             self.downstreams.append(elem)
-            
-            # 添加到序列化操作
             self.add_operation(
                 create_pb2.OpType.CREATE_DOWNSTREAM,
                 name=elem.name,
@@ -612,7 +592,7 @@ class CodeGen(visitor.Visitor):
                 cond = self.generate_rval(node.cond)
                 self.code.append(f'  let {block_id} = sys.create_conditional_block({cond});')
                 
-                # 增加序列化操作
+                # TODO: Add serialization operation
                 self.add_operation(
                     create_pb2.OpType.CREATE_CONDITIONAL_BLOCK,
                     cond=cond
@@ -623,7 +603,7 @@ class CodeGen(visitor.Visitor):
                 self.code.append('  // cycled block')
                 self.code.append(f'  let {block_id} = sys.create_cycled_block({node.cycle});')
                 
-                # 增加序列化操作
+                # TODO: Add serialization operation
                 self.add_operation(
                     create_pb2.OpType.CREATE_CYCLED_BLOCK,
                     cycles=node.cycle
@@ -649,7 +629,7 @@ class CodeGen(visitor.Visitor):
         if isinstance(node, module.Port):
             module_index = self.modules.index(node.module)
             module_ref = f"modules[{module_index}]"
-            port_name = f'port_{module_index}_{node.name}'  # 修改端口变量名的生成方式
+            port_name = f'port_{module_index}_{node.name}'
             self.code.append(f'''  // Get port {node.name}
                 let {port_name} = {{
                 let module = {module_ref}.as_ref::<assassyn::ir::Module>(&sys).unwrap();
@@ -710,7 +690,7 @@ class CodeGen(visitor.Visitor):
             bind_var = self.generate_rval(node.bind)
             res = f'sys.create_async_call({bind_var});'
             
-            # 增加序列化操作
+            # TODO: Add serialization operation
             self.add_operation(
                 create_pb2.OpType.CREATE_ASYNC_CALL,
                 bind_var=bind_var
@@ -780,18 +760,18 @@ class CodeGen(visitor.Visitor):
 
 
     def visit_array(self, node: Array):
-        name = node.name if f'{id(node)}' in node.name else self.generate_rval(node)
+        name = node.name if f'{id(node)}' in node.name else node.as_operand()
+        module_id = self.generate_rval(node)
         size = node.size
         ty = generate_dtype(node.scalar_ty)
         init = self.generate_init_value(node.initializer, ty)
         self.code.append(f'  // {node}')
         attrs = self.generate_array_attr(node)
         attrs = f'vec![{attrs}]'
-        array_decl = f'  let {name} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
+        array_decl = f'  let {module_id} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
         
-        # 增加序列化操作
+        # TODO: Add serialization operation
         dtype_instance = create_pb2.DataType()
-        # 设置数据类型
         if isinstance(node.scalar_ty, dtype.Int):
             dtype_instance.kind = create_pb2.DataType.Kind.INT
         elif isinstance(node.scalar_ty, dtype.UInt):
@@ -804,7 +784,6 @@ class CodeGen(visitor.Visitor):
             raise AssertionError(f'Expecting a known type, but got {node.scalar_ty}')
         dtype_instance.bits = node.scalar_ty.bits
         
-        # 设置属性
         array_attr = create_pb2.ArrayAttr()
         array_attr.fully_partitioned = Array.FULLY_PARTITIONED in node.attr
         
