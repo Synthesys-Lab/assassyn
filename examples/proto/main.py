@@ -15,7 +15,7 @@ class Testbench(Module):
             log("OK")
 
 def test_proto():
-    sys = SysBuilder('minimal')
+    sys = SysBuilder('protobuf')
     with sys:        
         testbench = Testbench()
         testbench.build()
