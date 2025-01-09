@@ -8,7 +8,7 @@ from . import block
 from . import const
 from .builder import SysBuilder
 from .array import Array
-from .module import Module, Port, Timing
+from .module import Module, Port, Timing, Downstream
 from .block import Block
 from .expr import Expr
 from .utils import identifierize
@@ -148,7 +148,6 @@ class CodeGen(visitor.Visitor):
         """Add an Operation to the serial"""
         op = self.op_list.operations.add()
         op.op_type = op_type
-        op.result_var = params.get('result_var', '')
         
         # 根据操作类型设置参数
         if op_type == create_pb2.OpType.CREATE_MODULE:
@@ -287,7 +286,7 @@ class CodeGen(visitor.Visitor):
         self.code.append('const ATTR_IS_MEMORY_PRESENT: u32 = 1 << 2;')
         
         
-        # 生成主要的匹配逻辑
+        # 根据序列指令创建module
         self.code.append('''
             fn create_module_from_proto(
                 sys: &mut SysBuilder,
@@ -336,6 +335,21 @@ class CodeGen(visitor.Visitor):
             }
         ''')
         
+        # 根据序列指令创建downstream
+        self.code.append('''
+            fn create_downstream_from_proto(
+                sys: &mut SysBuilder,
+                downstreams: &mut Vec<assassyn::ir::node::BaseNode>,
+                downstream_params: &CreateDownstreamParams,
+            ) {
+                // Create the downstream module
+                let downstream = sys.create_downstream(&downstream_params.name);
+                
+                // Add to downstreams vector
+                downstreams.push(downstream);
+            }
+        ''')
+        
         
         
         self.code.append('fn main() {')
@@ -358,7 +372,6 @@ class CodeGen(visitor.Visitor):
                                 writeln!(output_file, "CREATE_MODULE:").unwrap();
                                 writeln!(output_file, "  ID: {}", module_params.id).unwrap();
                                 writeln!(output_file, "  Name: {}", module_params.name).unwrap();
-                                writeln!(output_file, "  Result Variable: {}", op.result_var).unwrap();
                                 
                                 writeln!(output_file, "  Attributes:").unwrap();
                                 if let Some(attrs) = &module_params.attrs {
@@ -408,6 +421,17 @@ class CodeGen(visitor.Visitor):
                             }
                         }
                     }
+                    OpType::CreateDownstream => {
+                        if let Some(params) = &op.params {
+                            if let operation::Params::CreateDownstream(downstream_params) = params {
+                                // 记录到日志文件
+                                writeln!(output_file, "CREATE_DOWNSTREAM:").unwrap();
+                                writeln!(output_file, "  ID: {}", downstream_params.id).unwrap();
+                                writeln!(output_file, "  Name: {}", downstream_params.name).unwrap();
+                                writeln!(output_file, "").unwrap();
+                            }
+                        }
+                    }
                     _ => writeln!(output_file, "Unknown operation type: {:?}", op.op_type()).unwrap(),
                 }
             }
@@ -425,8 +449,7 @@ class CodeGen(visitor.Visitor):
         ATTR_IS_MEMORY_PRESENT = 1 << 2
         
         self.code.append('  // Declare modules')
-        self.code.append(f'  let mut modules = Vec::new();')   # 存储所有模块的数组
-        # 生成主要的匹配逻辑
+        self.code.append(f'  let mut modules = Vec::new();')
         self.code.append('''
             // First pass: Create all modules from protobuf data
             for op in ops.operations.iter() {
@@ -440,14 +463,9 @@ class CodeGen(visitor.Visitor):
         
         for elem in node.modules:
             name = elem.name.lower()
-            ports = ', '.join(generate_port(p) for p in elem.ports)
             
-            # 获取模块的索引就是它在数组中的位置
-            current_index = len(self.modules)
+            module_index = len(self.modules)
             self.modules.append(elem)
-            
-            # self.code.append(f'  modules.push(sys.create_module("{name}", vec![{ports}]));')
-            # self.emit_module_attrs(elem, f"modules[{current_index}]")
             
             # 处理端口信息
             ports_info = []
@@ -493,21 +511,36 @@ class CodeGen(visitor.Visitor):
                 create_pb2.OpType.CREATE_MODULE,
                 name=name,
                 ports=ports_info,
-                id=current_index,
-                result_var="12345",
+                id=module_index,
                 attrs=attrs  # 传入包含实际存在属性的字典
             )    
             
         self.code.append('  // Declare downstream modules')
+        self.code.append('  let mut downstreams = Vec::new();')
+        self.code.append('''
+            // Second pass: Create all downstream modules from protobuf data
+            for op in ops.operations.iter() {
+                if op.op_type() == OpType::CreateDownstream {
+                    if let Some(operation::Params::CreateDownstream(downstream_params)) = &op.params {
+                        create_downstream_from_proto(&mut sys, &mut downstreams, downstream_params);
+                    }
+                }
+            }
+        ''')
+        
         for elem in node.downstreams:
-            module_id = self.generate_rval(elem)
-            self.code.append(f'  let {module_id} = sys.create_downstream("{elem.name}");')
+            # module_id = self.generate_rval(elem)
+            # self.code.append(f'  let {module_id} = sys.create_downstream("{elem.name}");')
             
-            # 增加序列化操作
+            current_index = len(self.downstreams)
+            self.downstreams.append(elem)
+            
+            # 添加到序列化操作
             self.add_operation(
                 create_pb2.OpType.CREATE_DOWNSTREAM,
-                name=elem.name
-            )            
+                name=elem.name,
+                id=current_index
+            )      
             
         self.code.append('  // declare arrays')
         for elem in node.arrays:
@@ -625,6 +658,8 @@ class CodeGen(visitor.Visitor):
             return port_name
         if isinstance(node, Module):
             return f"modules[{self.modules.index(node)}]"
+        if isinstance(node, Downstream):
+            return f"downstreams[{self.downstreams.index(node)}]"
         return node.as_operand()
 
     #pylint: disable=too-many-branches, too-many-locals, too-many-statements
@@ -790,6 +825,7 @@ class CodeGen(visitor.Visitor):
         self.code = []
         self.header = []
         self.modules = [] 
+        self.downstreams = []
         self.emitted_bind = set()
         self.targets = {}
         self.resource_base = resource_base

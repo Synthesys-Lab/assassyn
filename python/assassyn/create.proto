@@ -58,7 +58,8 @@ message CreateModuleParams {
 }
 
 message CreateDownstreamParams {
-  string name = 1;
+  uint32 id = 1;        // 下游模块的数字ID
+  string name = 2;      // 模块名称
 }
 
 message CreateCondBlockParams {
@@ -84,7 +85,6 @@ message CreateArrayParams {
 // 统一的操作消息
 message Operation {
   OpType op_type = 1;
-  string result_var = 2;  // 操作结果的变量名
   oneof params {
     CreateModuleParams create_module = 3;
     CreateDownstreamParams create_downstream = 4;
