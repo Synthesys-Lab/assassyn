@@ -10,7 +10,7 @@ use proc_macro2::Span;
 use quote::quote;
 
 use crate::{
-  analysis::topo_sort,
+  analysis::{topo_sort,sort::{DependencyGraph, GraphVisitor}},
   backend::common::{create_and_clean_dir, upstreams, Config},
   builder::system::{ModuleKind, SysBuilder},
   ir::{expr::subcode, instructions::PureIntrinsic, node::*, visitor::Visitor, *},
@@ -621,6 +621,16 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
     fd.write_all(format!("self.{}.tick(self.stamp);", elem).as_bytes())?;
   }
   fd.write_all("}".as_bytes())?;
+
+  let mut visitor = GraphVisitor::new(sys);
+
+  // 2. 调用 visitor.enter(&sys)，它会对 sys 内部的模块、表达式、操作数进行 DFS
+  visitor.enter(&sys);
+
+  // 3. 取出最终构建的图进行查看或输出
+  //visitor.graph.show_all_edges();
+
+  visitor.graph.show_all_paths_with_weights();
 
   // A topological order among these downstream modules is needed.
   let downstreams = topo_sort(sys);
