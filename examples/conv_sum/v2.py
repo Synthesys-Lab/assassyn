@@ -39,7 +39,7 @@ class MemUser(Module):
         super().__init__(
             ports={'rdata': Port(Bits(width)),
                    'count': Port(UInt(32)),
-                   'is_finish': Port(Int(1))}, 
+                   'is_finish': Port(UInt(1))}, 
         )
         self.steps = RegArray(UInt(32), 1)
         self.result = RegArray(Int(32), 1)
@@ -89,13 +89,13 @@ class Driver(Module):
         addr_offest = (vi_filter * UInt(32)(INPUT_WIDTH))[0:31].bitcast(UInt(32)) + vj_filter
         addr = (addr_base + addr_offest)[0:LINENO_BITLENGTH-1].bitcast(Int(LINENO_BITLENGTH))
         
-        is_finish = Int(1)(1)
-        is_finish = (vi_input==UInt(32)(INPUT_DEPTH-FILTER_WIDTH)).select(is_finish, Int(1)(0))
-        is_finish = (vj_input==UInt(32)(INPUT_WIDTH-FILTER_WIDTH)).select(is_finish, Int(1)(0))
+        is_finish = UInt(1)(1)
+        is_finish = (vi_input==UInt(32)(INPUT_DEPTH-FILTER_WIDTH)).select(is_finish, UInt(1)(0))
+        is_finish = (vj_input==UInt(32)(INPUT_WIDTH-FILTER_WIDTH)).select(is_finish, UInt(1)(0))
         user.bind(count=v_conv, is_finish=is_finish)
         
         sram = SRAM(width, SRAM_DEPTH, init_file)
-        sram.build(Int(1)(0), Int(1)(1), addr, Bits(width)(0), user)
+        sram.build(UInt(1)(0), UInt(1)(1), addr, Bits(width)(0), user)
         sram.bound.async_called()
         
         vi_filter = (vj_filter==UInt(32)(FILTER_WIDTH-1)).select(vi_filter+UInt(32)(1), vi_filter)

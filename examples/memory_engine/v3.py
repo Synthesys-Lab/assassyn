@@ -125,7 +125,7 @@ class Driver(Module):
     @module.combinational
     def build(self, width, init_file, user):
 
-        initialization = RegArray(Int(1), 1)
+        initialization = RegArray(UInt(1), 1)
         init = initialization[0]
         
         cnt_i = RegArray(Int(32), 1)
@@ -150,7 +150,7 @@ class Driver(Module):
                 
         # Initialization.
         with Condition(~(init)):
-            initialization[0] = Int(1)(1)
+            initialization[0] = UInt(1)(1)
             cnt_i[0] = Int(32)(init_i)
             cnt_j[0] = Int(32)(init_j)
             
@@ -178,17 +178,17 @@ class Driver(Module):
             reserve = maskinit & remove # Remove those data before start in this cacheline.
 
             sram = SRAM(width, sram_depth, init_file)
-            sram.build(Int(1)(0), init, lineno, Bits(width)(0), user)
+            sram.build(UInt(1)(0), init, lineno, Bits(width)(0), user)
             
             sentinel = (Int(32)(end) <= row_end).select(Int(32)(end), row_end)
-            nextrow = (Int(32)(end) <= row_end).select(Int(1)(0), Int(1)(1))
+            nextrow = (Int(32)(end) <= row_end).select(UInt(1)(0), UInt(1)(1))
             
             counter = (line_end >= sentinel).select((line_end - sentinel).bitcast(UInt(32)), UInt(32)(0))
             discard = ~((UInt(cachesize)(1) << counter) - UInt(cachesize)(1))
             
             bitmask = reserve & discard # Discard those data after end in this cacheline.
             
-            simu_term = (line_end >= sentinel).select(Int(1)(1), Int(1)(0))
+            simu_term = (line_end >= sentinel).select(UInt(1)(1), UInt(1)(0))
             simu_term = simu_term & ~nextrow
             
             log("\t\tCALL: bitmask={:b}\tlineno={}", bitmask, lineno)
