@@ -48,9 +48,11 @@ heavy-weighted way, like threads, processes, and tasks. Therefore, a clear way t
 concurrency in a light-weighted way is highly desirable.
 
 2. Data write: In software programming, a variable write is visible to users immediately. However,
-in hardware design, a variable can only be written once, and will be only visible in the next cycle.
+in hardware design, register type variables can only be written once on the rising edge of a clock, and the written data can only be accessed on subsequent clock cycles.
 In this language, the "write-once" rule will be double-enforced by both the compiler[^2] and the
 generated simulator runtime.
+   1. Understanding of "`subsequent cycle`": In hardware design, since register variables are only written on the rising edge of the clock, the data `to be written` must be calculated before the rising edge of the clock, so that the data can be written to the corresponding register variable at the rising edge of the clock. And to access the value just written from the register type variable, it is already the next cycle relative to the clock when the value is calculated. This is the meaning of "next cycle", which means that due to the effect of the register, there is a one-clock-cycle delay between the data calculation and the data read. 
+   2. In contrast, combinational type variables (or wire type variables) read the value that is calculated in the same cycle.
 
 3. Resource Constraint: In software programming, different functionalities can share the same
 computing resources through the ISA, while hardware design is to instantiate these
@@ -59,8 +61,7 @@ and the dedicated allocation should be well abstracted.
 
 ## Language & System Components
 
-In this section, each component of the language will be explained in detail, both the frontend
-programming interfaces, and the IR representations.
+In this section, each component of the language will be explained in detail, both the frontend programming interfaces, and the IR representations.
 
 The frontend programming interfaces are embedded in Python involving decorators and operator
 overloading, which makes the feeling of programming as close to software as possible. The backend
@@ -141,11 +142,9 @@ class Driver(Module):
         adder.async_called(a=v, b=v)
 ````
 
-A Driver module is a special module, like a `main` function in software programming, which serves
-as the entrance of the system. It is unconditionally invoked every cycle to drive the whole system.
+A Driver module is a special module, like a `main` function in software programming, which serves as the entrance of the system. It is unconditionally invoked every cycle to drive the whole system.
 
-Such a described module should be instantiated under the scope of a `SysBuilder`, which is like
-the top function in RTL programming.
+Such a described module should be instantiated under the scope of a `SysBuilder`, which is like the top function in RTL programming.
 
 ````Python
 with sys:
@@ -164,13 +163,16 @@ cyclic dependences.
 In each module, we have several operations to describe the behaviors, including arithmetics,
 read/write to arrays, and asynchronous module invocations.
 
-1. Types: Currently, we support `{Int/UInt/Bits}(bit)`, `Float`, and `Record` types.
+1. Basic types: Currently, we support `{Int/UInt/Bits}(bit)`, `Float`, and `Record` types.
     * **Record**: A `Record` type allows multiple fields to be bundled together, each field having its own data type and bit width. Records can be defined either by specifying the field bit ranges manually or by field name directly.
         * Use `bundle()` for packing values when fields are continuously aligned.
         * Use `view()` to create a view of non-continuous or even continuous fields from a given value.
+        * `Record` is a syntactic sugar that concatens any variable in a fixed order into a larger vector.
 2. Values start with ports, arrays, and constants, and can be built by operations among them.
-    * Ports are the inputs of a module, which are typically scalars.
+    * Ports are the inputs of a module, which are typically scalars. Ports can **only** be used to pass register type variables.Its type can only be a basic type, `RegArray` is not a basic type.
     * Arrays are first delared by `RegArray(type, size)`, where `size` should be a constant in the IR.
+      * Variables of type `RegArray` are register type variables, which means they can only be written once in a cycle, and the written data can only be accessed in the next cycle.
+      * It can be passed as a formal parameter of type `Array`.
     * Constants can be declared by `type(value)`, e.g. `Int(32)(1)`.
 3. Expressions
     * Arithmetic operations: `+`, `-`, `*`, `/`, `%`, `**`, `&`, `|`, `^`, `~`, `<<`, `>>`.
@@ -184,24 +186,186 @@ read/write to arrays, and asynchronous module invocations.
 4. Scopes and Conditional Execution:
     * We support if-statement (without else) in our combinational logic.
 
-```` Python
-with Conditional(cond):
-    # do something
-````
+    ```` Python
+    with Conditional(cond):
+        # do something
+    ````
 
     * NOTE: With Condition(cond) is a compilation-time IR builder API.  If you use `if` statement, it is a runtime API. Refer to the usage in `test_async_call.py` and `test_eager_bind.py`  to differentiate these two.
+      * Analogous to the syntax of C
+        1. The use of `With Condition(cond)` is analogous to the `if` statement in C language. It indicates that the execution path will be selected based on the condition `cond`. Here, the compiled code is fixed, but the execution path will vary according to the value of `cond`.
+        2. In contrast, the behavior of the `if` statement in this context is more like a macro instruction in the C language. It states that depending on the condition `cond`, the resulting generated code will also differ. In other words, the compiled code itself will vary because of the different values of `cond`.
+        
+        > hint: The phrase “compiled code” mentioned here refers to the behavior of syntax in the C language for explanation purposes.
+        > 
+        > In reality, in this language, the final outcome is a design result of a hardware circuit.
+
     * Besides, we also support cycle-speicific operation to write testbenches.
 
-```` Python
-with Cycle(1):
-    # do something
-with Cycle(2):
-    # do something
-````
+    ```` Python
+    with Cycle(1):
+        # do something
+    with Cycle(2):
+        # do something
+    ````
 
 5. Array Operations: This is a supplimentary description to expression addressing. All the array reads are immediate, while all the array writes are chronological --- the values are only visible next cycle. No two array writes within the same cycle are allowed. The generated simulator will enforce this.
 
-[^1]: The name "Assasyn" stands for "**As**ynchronous **S**emantics for **A**rchitectural
-**S**imulation and **Syn**thesis".
-[^2]: I have the ambition to build a formal verification to statically enforce this rule, but for
-now, we only have a runtime check.
+---
+
+### In-Depth Analysis with Code Examples
+
+After reading the basic explanation above, you now have a fundamental understanding of this language paradigm. Let’s proceed with the given example and explain the syntax in more detail step by step
+
+> **Note**: Files that have not been assigned a location are in the  directory "python/unit-tests".
+
+#### More basic grammar explanations
+
+1. `test_driver, test_helloworld, test_fib`
+   + Understand what a `Module` is, and be aware of the composition and basic architecture of the project code.
+   + Learn to use `log` to view output values.
+   + Essentially, a `driver` is a clock-driven mechanism(in Verilog as clk), where its `cnt` value represents the clock count.
+2. `test_async_call, test_multi_call`
+   + Event invocation, which in Verilog is equivalent to a simple demo of sequential logic passing information for processing.
+   + Key point: Observe the timing in the log output, focusing on the timing difference between event requests and event execution.
+   + Syntax:
+     1. Ports can only pass basic types, but implicitly, the passing is of register types.
+     2. `async_call` is sequential in nature.
+3. `test_array_partiton0, test_array_partion1`
+   + The relationship between reg type and wire type variables in terms of read and write timing.
+   + The focus is on identifying patterns in the log file.
+4. `test_cse`
+   + Simply observe the timing sequence.
+5. `test_concat`
+   + Demonstrates the `concat` operation, which corresponds to bit concatenation in Verilog.
+6. `test_dt_conv`
+   + Explains the methods for converting between basic types.
+   + Carefully observe the differences between Cycle1 and Cycle2 to reinforce the understanding of register type read and write timing.
+7. `test_finish`
+   + Usage of the `finish()` function.
+8. `test_inline0, test_inline1`
+   + Provides an example of encapsulating a portion of logic within a function and then calling it.
+9. `test_record, test_record_bundle_value, test_record_large_bits`
+   + Explains the details related to the Record basic type.
+     1. Record as a port type, passing register values.
+     2. Accessing members of a Record, which is equivalent to normal operations and used for computation.
+     3. Packaging of Records.
+10. `test_reg_init`
+    + Initialization of register type variables.
+11. `test_select`
+    + Syntax similar to the ternary operator.
+12. `test_select1hot`
+    + Selecting a value through a one-hot code.
+    + Note: This will ultimately describe a hardware circuit, actually implemented using a multiplexer.
+13. `test_testbench`
+    + Usage of `with Cycle(1):`
+14. `test_explict_pop`
+    + An alternative method for reading port data.
+15. `test_peek`
+    + Similar to the operation of viewing the top of a queue in a `Queue`. It corresponds to the `front()` operation in the STL of C++ queues. Essentially, it is looking at the top element of the queue without removing it.
+> By this point, the basic syntax has been fully listed out.
+
+
+#### Engineering
+
+This section combines code in order to explain how to express a combinational logic port module, a timing logic port module, and a more complex mixture of port types, which are the core of how to write a true hardware design rather than just a simple logic operation demo.
+
+##### Pure Sequential Logic Port Module
+
+Ports are connected using `async_called` and `bind` methods.
+The reason for using `bind` is that if ports are obtained from multiple modules separately, as shown in the diagram below, where module C's ports are connected from A and B respectively, it is not possible to directly use `async_called`. Using `bind` returns a handle to wait for new port connections. (In fact, `async_called` also returns a handle for operations, see `test_fifo1`)
+
+```mermaid
+graph LR
+A --> C
+B --> C
+```
+
+Read the code and run the results: `test_bind, test_eager_bind, test_imbalance, test_fifo_valid`
+
+
+Additionally, a simple automatic state machine has been introduced to implement the execution of events/modules after waiting for conditions to be met.
+
+Read the code and run the results: `test_wait_until`
+
+##### Pure Combinational Logic Port Module
+First, it is necessary to expose the combinational logic ports.
+This is achieved through the use of the `return` statement. (Note: The `return` in the `build` method can return anything, such as a single primitive, a list of multiple primitives, a tuple, etc.)
+
+Read the code and run the results: `test_comb_expose`
+
+Once the combinational logic ports are exposed, the next step is to connect them to the formal parameters of the `build` method in the `downstream` module.
+
+Read the code and run the results: `test_toposort, downstream`
+
+It is important to observe the differences between `Module` and `Downstream`, as well as between `combinational port connections` and `sequential port connections`.
+
+##### Mixed Port Types
+
+In practice, most modules receive both combinational and sequential ports, offering a general approach:
+
+```python
+class Fetcher(Module):
+    
+    def __init__(self):
+        super().__init__(ports={}, no_arbiter=True)
+        self.name = 'F'
+
+    @module.combinational
+    def build(self):
+        pc_reg = RegArray(Bits(32), 1)
+        addr = pc_reg[0]
+        return pc_reg, addr
+
+class FetcherImpl(Downstream):
+
+    def __init__(self):
+        super().__init__()
+        self.name = 'F1'
+
+    @downstream.combinational
+    def build(self,
+              on_branch: Value,
+              br_sm: Array,
+              ex_bypass: Value,
+              ex_valid: Value,
+              pc_reg: Value,
+              pc_addr: Value,
+              decoder: Decoder,
+              data: str,
+              depth_log: int):
+
+ 		# …………………… Omitted for brevity ……………………
+
+```
+
+Connect the sequential ports to the `Module` type module of `Fetcher(Module)`, extract their values, and expose them in the manner of combinational ports. These are then received by a `Downstream` type module like `FetcherImpl(Downstream)`, which also receives other combinational ports and processes them uniformly within.
+
+![](./reading_notes/conb_time.png)
+
+The code above comes from `examples/minor-cpu/src/main.py:262`
+
+
+##### FSM
+
+Use `with Condition(Cond)` to indicate the behavior corresponding to different states, which can fully simulate the functionality of the `case` statement in Verilog.
+
+For implementing changes in combinational logic under different states using an `assign` statement (instead of `always + case`) in Verilog, you can use the `select` syntax to choose.
+
+```verilog
+assign temp = array0 & {3{cond[0]}} |
+    	      array1 & {3{cond[1]}} |
+              array2 & {3{cond[2]}} |
+```
+
+In Assasyn, you can achieve the same using the `select` syntax:
+
+```python
+temp = cond.select(array[0], array[1], array[2])
+```
+
+
+
+[^1]: The name "Assasyn" stands for "**As**ynchronous **S**emantics for **A**rchitectural **S**imulation and **Syn**thesis".
+
+[^2]: I have the ambition to build a formal verification to statically enforce this rule, but for now, we only have a runtime check.
