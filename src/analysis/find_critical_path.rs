@@ -32,8 +32,8 @@ impl DependencyGraph {
   pub fn add_edge(&mut self, src: usize, dst: usize, edge_info: Opcode) {
     self
       .adjacency
-      .entry(edge_info.clone())
-      .or_insert_with(Vec::new)
+      .entry(edge_info)
+      .or_default()
       .push(NodeData {
         mom: src,
         childs: dst,
@@ -93,7 +93,7 @@ impl DependencyGraph {
             has_neighbors = true;
             let edge_weight = calculate_weight(edge_info);
 
-            edges.push(edge_info.clone());
+            edges.push(*edge_info);
             dfs(
               graph,
               neighbor.childs,
@@ -125,19 +125,18 @@ impl DependencyGraph {
           all_paths.push((path.clone(), edges.clone(), current_weight));
         } else if let Some(&this_path) = path.first() {
           if this_path == *last_path {
-              if current_weight > *last_weight {
-                  all_paths.pop();
-                  all_paths.push((path.clone(), edges.clone(), current_weight));
-                  *last_path = this_path;
-                  *last_weight = current_weight;
-              }
-          } else {
+            if current_weight > *last_weight {
+              all_paths.pop();
               all_paths.push((path.clone(), edges.clone(), current_weight));
               *last_path = this_path;
               *last_weight = current_weight;
+            }
+          } else {
+            all_paths.push((path.clone(), edges.clone(), current_weight));
+            *last_path = this_path;
+            *last_weight = current_weight;
           }
-      }
-      
+        }
       }
 
       path.pop();
@@ -167,7 +166,7 @@ impl DependencyGraph {
           let path_with_edges: Vec<String> = path
             .windows(2)
             .zip(edges.iter())
-            .map(|(nodes, edge)| format!("\"{}\" -> {}", edge.to_string(), nodes[1]))
+            .map(|(nodes, edge)| format!("\"{}\" -> {}", edge, nodes[1]))
             .collect();
           println!(
             "Path: \\{}\\ {}   {} | Time Weight: {}",
