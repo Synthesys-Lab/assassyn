@@ -11,6 +11,7 @@ pub struct NodeData {
   childs: usize,
 }
 
+
 pub struct DependencyGraph {
   adjacency: HashMap<Opcode, Vec<NodeData>>,
   entry: HashMap<usize, BaseNode>,
@@ -40,6 +41,7 @@ impl DependencyGraph {
     let mut all_paths = vec![];
     let mut last_path: usize = 0;
     let mut last_weight: i32 = 0;
+
 
     fn calculate_weight(opcode: &Opcode) -> i32 {
       match opcode {
