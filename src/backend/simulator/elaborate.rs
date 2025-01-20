@@ -633,7 +633,7 @@ fn dump_simulator(sys: &SysBuilder, config: &Config, fd: &mut std::fs::File) -> 
   // 3. 取出最终构建的图进行查看或输出
   //visitor.graph.show_all_edges();
 
-  visitor.graph.show_all_paths_with_weights(&sys,false);
+  visitor.graph.show_all_paths_with_weights(&sys, false);
 
   // A topological order among these downstream modules is needed.
   let downstreams = topo_sort(sys);
