@@ -15,7 +15,12 @@ pub struct DependencyGraph {
   adjacency: HashMap<Opcode, Vec<NodeData>>,
   entry: HashMap<usize, BaseNode>,
 }
-
+impl Default for DependencyGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+  
 impl DependencyGraph {
   pub fn new() -> Self {
     Self {
@@ -126,8 +131,7 @@ impl DependencyGraph {
                 all_paths.push((path.clone(), edges.clone(), current_weight));
                 *last_path = this_path;
                 *last_weight = current_weight;
-              } else {
-              }
+              } 
             } else {
               all_paths.push((path.clone(), edges.clone(), current_weight));
               *last_path = this_path;
