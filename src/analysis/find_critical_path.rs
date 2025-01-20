@@ -30,14 +30,10 @@ impl DependencyGraph {
   }
 
   pub fn add_edge(&mut self, src: usize, dst: usize, edge_info: Opcode) {
-    self
-      .adjacency
-      .entry(edge_info)
-      .or_default()
-      .push(NodeData {
-        mom: src,
-        childs: dst,
-      });
+    self.adjacency.entry(edge_info).or_default().push(NodeData {
+      mom: src,
+      childs: dst,
+    });
   }
 
   pub fn show_all_paths_with_weights(&self, sys: &SysBuilder, show_all: bool) {
@@ -208,7 +204,7 @@ impl<'sys> Visitor<()> for GraphVisitor<'sys> {
       for operand_ref in expr.operand_iter() {
         self
           .graph
-          .add_edge(operand_ref.get_value().get_key(), expr.get_key(), expr_opcode.clone());
+          .add_edge(operand_ref.get_value().get_key(), expr.get_key(), expr_opcode);
         if (expr_opcode == Opcode::Load) || (expr_opcode == Opcode::FIFOPop) {
           if let Some(DataType::UInt(_)) = operand_ref.get_value().get_dtype(self.sys) {
           } else {
