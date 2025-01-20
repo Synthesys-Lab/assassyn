@@ -16,11 +16,11 @@ pub struct DependencyGraph {
   entry: HashMap<usize, BaseNode>,
 }
 impl Default for DependencyGraph {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self {
+    Self::new()
+  }
 }
-  
+
 impl DependencyGraph {
   pub fn new() -> Self {
     Self {
@@ -123,22 +123,21 @@ impl DependencyGraph {
       if !has_neighbors && path.len() > 1 && is_end && has_entry {
         if show_all {
           all_paths.push((path.clone(), edges.clone(), current_weight));
-        } else {
-          if let Some(&this_path) = path.first() {
-            if this_path == *last_path {
+        } else if let Some(&this_path) = path.first() {
+          if this_path == *last_path {
               if current_weight > *last_weight {
-                all_paths.pop();
-                all_paths.push((path.clone(), edges.clone(), current_weight));
-                *last_path = this_path;
-                *last_weight = current_weight;
-              } 
-            } else {
+                  all_paths.pop();
+                  all_paths.push((path.clone(), edges.clone(), current_weight));
+                  *last_path = this_path;
+                  *last_weight = current_weight;
+              }
+          } else {
               all_paths.push((path.clone(), edges.clone(), current_weight));
               *last_path = this_path;
               *last_weight = current_weight;
-            }
           }
-        }
+      }
+      
       }
 
       path.pop();
