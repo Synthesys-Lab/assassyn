@@ -42,22 +42,25 @@ Hardware design is unique to software programming in many ways. Here we characte
 differences:
 
 1. Excessive concurrency: Transistors that build different hardware modules can be concurrently
-busy, which is also the source of high performance. However, this also makes the hardware design
-hard to debug. Though we do have parallel programming in software, they are managed in a relatively
-heavy-weighted way, like threads, processes, and tasks. Therefore, a clear way that manages the
-concurrency in a light-weighted way is highly desirable.
+    busy, which is also the source of high performance. However, this also makes the hardware design
+    hard to debug. Though we do have parallel programming in software, they are managed in a relatively
+    heavy-weighted way, like threads, processes, and tasks. Therefore, a clear way that manages the
+    concurrency in a light-weighted way is highly desirable.
 
 2. Data write: In software programming, a variable write is visible to users immediately. However,
-in hardware design, register type variables can only be written once on the rising edge of a clock, and the written data can only be accessed on subsequent clock cycles.
-In this language, the "write-once" rule will be double-enforced by both the compiler[^2] and the
-generated simulator runtime.
-   1. Understanding of "`subsequent cycle`": In hardware design, since register variables are only written on the rising edge of the clock, the data `to be written` must be calculated before the rising edge of the clock, so that the data can be written to the corresponding register variable at the rising edge of the clock. And to access the value just written from the register type variable, it is already the next cycle relative to the clock when the value is calculated. This is the meaning of "next cycle", which means that due to the effect of the register, there is a one-clock-cycle delay between the data calculation and the data read. 
-   2. In contrast, combinational type variables (or wire type variables) read the value that is calculated in the same cycle.
+    in hardware design, a register variable can only be written once each cycle on the rising edge of a clock, and the written data can only be accessed on subsequent clock cycles.
+    In this language, the "write-once" rule will be double-enforced by both the compiler[^2] and the 
+    generated simulator runtime.
+
+  ####  Terminology Explanation.
+
+  1. Understanding of "`subsequent cycle`": In hardware design, since register variables are only written on the rising edge of the clock, the data `to be written` must be calculated before the rising edge of the clock, so that the data can be written to the corresponding register variable at the rising edge of the clock. And to access the value just written from the register type variable, it is already the next cycle relative to the clock when the value is calculated. This is the meaning of "next cycle", which means that due to the effect of the register, there is a one-clock-cycle delay between the data calculation and the data read. 
+  2. In contrast, combinational type variables (or wire type variables) read the value that is calculated in the same cycle.
 
 3. Resource Constraint: In software programming, different functionalities can share the same
-computing resources through the ISA, while hardware design is to instantiate these
-computing resources. In this language, the time-multiplexed resource sharing,
-and the dedicated allocation should be well abstracted.
+    computing resources through the ISA, while hardware design is to instantiate these
+    computing resources. In this language, the time-multiplexed resource sharing,
+    and the dedicated allocation should be well abstracted.
 
 ## Language & System Components
 
@@ -158,10 +161,30 @@ with sys:
 We adopt a design/implementation separated style in our language so that we do not suffer from
 cyclic dependences.
 
+The above shows the basic structure of a Module. After explaining the fundamental syntax, we will delve into how to use Modules for hardware programming construction.
+
+Click here to [jump](#Module_2)
+
+<a id = "Module_1"></a>
+
 ### Values and Expressions
 
 In each module, we have several operations to describe the behaviors, including arithmetics,
 read/write to arrays, and asynchronous module invocations.
+
+#### Overview
+
+This Overview outlines the type classification in the system, specifying that only POD and compound types are permissible as parameters for template-like constructs.
+
+`Int/UInt/Float` are POD.
+
+`Record` is compound.
+
+`Reg`, and `Port` are template-like.
+
+You can only pass POD and compound to the parameter of `template`
+
+#### Body
 
 1. Basic types: Currently, we support `{Int/UInt/Bits}(bit)`, `Float`, and `Record` types.
     * **Record**: A `Record` type allows multiple fields to be bundled together, each field having its own data type and bit width. Records can be defined either by specifying the field bit ranges manually or by field name directly.
@@ -169,7 +192,8 @@ read/write to arrays, and asynchronous module invocations.
         * Use `view()` to create a view of non-continuous or even continuous fields from a given value.
         * `Record` is a syntactic sugar that concatens any variable in a fixed order into a larger vector.
 2. Values start with ports, arrays, and constants, and can be built by operations among them.
-    * Ports are the inputs of a module, which are typically scalars. Ports can **only** be used to pass register type variables.Its type can only be a basic type, `RegArray` is not a basic type.
+    * Ports are the inputs of a module, which are typically scalars. 
+    * In fact, ports are special registers, stage FIFO channels. We can push/pop data to them. Therefore, we cannot give them `RegArray`
     * Arrays are first delared by `RegArray(type, size)`, where `size` should be a constant in the IR.
       * Variables of type `RegArray` are register type variables, which means they can only be written once in a cycle, and the written data can only be accessed in the next cycle.
       * It can be passed as a formal parameter of type `Array`.
@@ -194,21 +218,50 @@ read/write to arrays, and asynchronous module invocations.
     * NOTE: With Condition(cond) is a compilation-time IR builder API.  If you use `if` statement, it is a runtime API. Refer to the usage in `test_async_call.py` and `test_eager_bind.py`  to differentiate these two.
       * Analogous to the syntax of C
         1. The use of `With Condition(cond)` is analogous to the `if` statement in C language. It indicates that the execution path will be selected based on the condition `cond`. Here, the compiled code is fixed, but the execution path will vary according to the value of `cond`.
+        
+           ```python
+           # Assassyn Code
+           with Condition(xxx):
+              # do something
+           ```
+        
+           ```c
+           // C Code
+           if (xxx) {
+              // do something
+           }
+           ```
+        
         2. In contrast, the behavior of the `if` statement in this context is more like a macro instruction in the C language. It states that depending on the condition `cond`, the resulting generated code will also differ. In other words, the compiled code itself will vary because of the different values of `cond`.
+        
+           ```python
+           # Assassyn
+           if xxx:
+              # some embedded assassyn code
+           ```
+        
+           ```c
+           // C Code
+           #if xxx
+           some gaurded code
+           #endif
+           ```
+        
+           
         
         > hint: The phrase “compiled code” mentioned here refers to the behavior of syntax in the C language for explanation purposes.
         > 
         > In reality, in this language, the final outcome is a design result of a hardware circuit.
-
+      
     * Besides, we also support cycle-speicific operation to write testbenches.
-
+    
     ```` Python
     with Cycle(1):
         # do something
     with Cycle(2):
         # do something
     ````
-
+    
 5. Array Operations: This is a supplimentary description to expression addressing. All the array reads are immediate, while all the array writes are chronological --- the values are only visible next cycle. No two array writes within the same cycle are allowed. The generated simulator will enforce this.
 
 ---
@@ -220,6 +273,8 @@ After reading the basic explanation above, you now have a fundamental understand
 > **Note**: Files that have not been assigned a location are in the  directory "python/unit-tests".
 
 #### More basic grammar explanations
+
+You can also find the same information in [python/unit-tests/README.md](../python/unit-tests/README.md)
 
 1. `test_driver, test_helloworld, test_fib`
    + Understand what a `Module` is, and be aware of the composition and basic architecture of the project code.
@@ -265,8 +320,11 @@ After reading the basic explanation above, you now have a fundamental understand
     + Similar to the operation of viewing the top of a queue in a `Queue`. It corresponds to the `front()` operation in the STL of C++ queues. Essentially, it is looking at the top element of the queue without removing it.
 > By this point, the basic syntax has been fully listed out.
 
-
+<a id="Module_2"></a>
+[jump back](#Module_1)
 #### Engineering
+
+This is the supplementary content mentioned in the Module section above.
 
 This section combines code in order to explain how to express a combinational logic port module, a timing logic port module, and a more complex mixture of port types, which are the core of how to write a true hardware design rather than just a simple logic operation demo.
 
@@ -299,6 +357,11 @@ Once the combinational logic ports are exposed, the next step is to connect them
 Read the code and run the results: `test_toposort, downstream`
 
 It is important to observe the differences between `Module` and `Downstream`, as well as between `combinational port connections` and `sequential port connections`.
+
+> hint: understanding of `downstream`:
+>
+> 1. The term `downstream` (下游模块) is relative to `upstream` (上游模块) and refers to the existence as a submodule of the upstream module. In this context, `upstream` typically denotes the `Pure Sequential Logic Port Module`, while `downstream` refers to the `Pure Combinational Logic Port Module`.
+> 2. The `downstream` module is conceptualized as the component within a design stage that executes the internal combinational logic. Initially, the `upstream` sequential module gathers the required timing signals, which are subsequently transferred to one or more `downstream` combinational modules for additional processing and logical manipulation.
 
 ##### Mixed Port Types
 
