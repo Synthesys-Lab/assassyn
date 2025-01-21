@@ -1,39 +1,26 @@
-| Python                    | Feature to Test                                    | Status |
-|---------------------------|----------------------------------------------------|--------|
-| test_arbiter.py           | Disable arbiter rewriting using module attr.       | RV     |
-| test_array_multi_read.py  | Expose the same reg to multiple module readers.    | RV     |
-| test_array_multi_write.py | Multiple exclusive writes in a same moudle.        | RV     |
-| test_array_partition0.py  | Partitioned array write with constant indices.     | RV     |
-| test_array_partition1.py  | Partitioned array write with variable indices.     | RV     |
-| test_async_call.py        | Basic async calling convention b/t modules.        | RV     |
-| test_bind.py              | Partial function bind.                             | RV     |
-| test_cse.py               | Common code elimination.                           | RV     |
-| test_concat.py            | Concatentate operator.                             | RV     |
-| test_downstream.py        | Combinational logic across multiple normal modules.| RV     |
-| test_driver.py            | Test a standalone driver module.                   | RV     |
-| test_dt_conv.py           | Data cast operator.                                | RV     |
-| test_eager_bind.rs        | Conditional calling bind.                          | RV     |
-| test_explicit_pop.py      | Explicit pop attribute and operation.              | RV     |
-| test_fib.py               | Register writing roll over.                        | RV     |
-| test_fifo_valid.py        | FIFO.valid operator overloading in frontend.       | RV     |
-| test_helloworld.py        | Hello world! A simplest test case for logger.      | RV     |
-| test_imbalance.py         | Imbalanced data arrival from 2 difference sources. | RV     |
-| test_inline{0/1}.py       | Inlined hierarchical synthesis.                    | RV     |
-| test_memory.py            | Memory module read and file initialization.        | RV     |
-| test_multi_call.rs        | Multiple caller arbiter with backend rewriting.    | RV     |
-| test_reg_init.py          | Register initialization.                           | RV     |
-| test_select.rs            | Select trinary operator                            | RV     |
-| test_testbench.py         | Cycled block, useful in testbench.                 | RV     |
-| test_wait_until.py        | Wait-until execution.                              | RV     |
+## Testcase Overview
 
-- R: Rust simulator is tested.
-- V: Verilog is correctly simulated by Verilator.
-- S: Verilog is correctly simulated by VCS (offline).
-
-TODO: Simulate all the test cases in Verilator.
-TODO: Port systolic array test to examples.
+| Python                                                       | Feature to Test                        |
+| ------------------------------------------------------------ | -------------------------------------- |
+| `test_driver, test_helloworld, test_fib`                     | Module(esp driver), log                |
+| `test_async_call, test_multi_call`                           | async_call, Port                       |
+| `test_array_partiton0, test_array_partion1`                  | reg vs wire variables                  |
+| `test_cse`                                                   | timing sequence                        |
+| `test_concat`                                                | gramme : `concat`                      |
+| `test_dt_conv`                                               | gramme  : `type convert`               |
+| `test_finish`                                                | `finish()` function                    |
+| `test_inline0, test_inline1`                                 | Function Extraction                    |
+| `test_record, test_record_bundle_value,`<br>`test_record_large_bits` | gramme : `record`                      |
+| `test_reg_init`                                              | gramme : `RegArray initial`            |
+| `test_select, test_select1hot`                               | gramme : `select`                      |
+| `test_testbench`                                             | Usage of `with Cycle(1):`              |
+| `test_explict_pop, test_peek`                                | gramme in `Port`                       |
+|                                                              |                                        |
+| `test_fifo1, test_bind, `<br>`test_eager_bind, test_imbalance, `<br>`test_fifo_valid, test_wait_until` | sth about **Pure Sequential Logic**    |
+| `test_comb_expose, test_toposort`<br />`test_downstream, `   | sth about **Pure Combinational Logic** |
 
 
+## Testcase detail
 
 1. `test_driver, test_helloworld, test_fib`
    + Understand what a `Module` is, and be aware of the composition and basic architecture of the project code.

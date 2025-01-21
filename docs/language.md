@@ -163,9 +163,9 @@ cyclic dependences.
 
 The above shows the basic structure of a Module. After explaining the fundamental syntax, we will delve into how to use Modules for hardware programming construction.
 
-Click here to [jump](#Module_2)
-
 <a id = "Module_1"></a>
+
+Click here to [jump](#Module_2)
 
 ### Values and Expressions
 
@@ -266,69 +266,30 @@ You can only pass POD and compound to the parameter of `template`
 
 ---
 
-### In-Depth Analysis with Code Examples
+## In-Depth Analysis with Code Examples
 
 After reading the basic explanation above, you now have a fundamental understanding of this language paradigm. Let’s proceed with the given example and explain the syntax in more detail step by step
 
 > **Note**: Files that have not been assigned a location are in the  directory "python/unit-tests".
 
-#### More basic grammar explanations
+### More basic grammar explanations
 
-You can also find the same information in [python/unit-tests/README.md](../python/unit-tests/README.md)
+You can find the detail information in [python/unit-tests/README.md](../python/unit-tests/README.md)
 
-1. `test_driver, test_helloworld, test_fib`
-   + Understand what a `Module` is, and be aware of the composition and basic architecture of the project code.
-   + Learn to use `log` to view output values.
-   + Essentially, a `driver` is a clock-driven mechanism(in Verilog as clk), where its `cnt` value represents the clock count.
-2. `test_async_call, test_multi_call`
-   + Event invocation, which in Verilog is equivalent to a simple demo of sequential logic passing information for processing.
-   + Key point: Observe the timing in the log output, focusing on the timing difference between event requests and event execution.
-   + Syntax:
-     1. Ports can only pass basic types, but implicitly, the passing is of register types.
-     2. `async_call` is sequential in nature.
-3. `test_array_partiton0, test_array_partion1`
-   + The relationship between reg type and wire type variables in terms of read and write timing.
-   + The focus is on identifying patterns in the log file.
-4. `test_cse`
-   + Simply observe the timing sequence.
-5. `test_concat`
-   + Demonstrates the `concat` operation, which corresponds to bit concatenation in Verilog.
-6. `test_dt_conv`
-   + Explains the methods for converting between basic types.
-   + Carefully observe the differences between Cycle1 and Cycle2 to reinforce the understanding of register type read and write timing.
-7. `test_finish`
-   + Usage of the `finish()` function.
-8. `test_inline0, test_inline1`
-   + Provides an example of encapsulating a portion of logic within a function and then calling it.
-9. `test_record, test_record_bundle_value, test_record_large_bits`
-   + Explains the details related to the Record basic type.
-     1. Record as a port type, passing register values.
-     2. Accessing members of a Record, which is equivalent to normal operations and used for computation.
-     3. Packaging of Records.
-10. `test_reg_init`
-    + Initialization of register type variables.
-11. `test_select`
-    + Syntax similar to the ternary operator.
-12. `test_select1hot`
-    + Selecting a value through a one-hot code.
-    + Note: This will ultimately describe a hardware circuit, actually implemented using a multiplexer.
-13. `test_testbench`
-    + Usage of `with Cycle(1):`
-14. `test_explict_pop`
-    + An alternative method for reading port data.
-15. `test_peek`
-    + Similar to the operation of viewing the top of a queue in a `Queue`. It corresponds to the `front()` operation in the STL of C++ queues. Essentially, it is looking at the top element of the queue without removing it.
 > By this point, the basic syntax has been fully listed out.
 
+
+### More On Modules (Code Engineering)
+
 <a id="Module_2"></a>
+
 [jump back](#Module_1)
-#### Engineering
 
 This is the supplementary content mentioned in the Module section above.
 
 This section combines code in order to explain how to express a combinational logic port module, a timing logic port module, and a more complex mixture of port types, which are the core of how to write a true hardware design rather than just a simple logic operation demo.
 
-##### Pure Sequential Logic Port Module
+#### Pure Sequential Logic Port Module
 
 Ports are connected using `async_called` and `bind` methods.
 The reason for using `bind` is that if ports are obtained from multiple modules separately, as shown in the diagram below, where module C's ports are connected from A and B respectively, it is not possible to directly use `async_called`. Using `bind` returns a handle to wait for new port connections. (In fact, `async_called` also returns a handle for operations, see `test_fifo1`)
@@ -346,7 +307,7 @@ Additionally, a simple automatic state machine has been introduced to implement 
 
 Read the code and run the results: `test_wait_until`
 
-##### Pure Combinational Logic Port Module
+#### Pure Combinational Logic Port Module
 First, it is necessary to expose the combinational logic ports.
 This is achieved through the use of the `return` statement. (Note: The `return` in the `build` method can return anything, such as a single primitive, a list of multiple primitives, a tuple, etc.)
 
@@ -354,7 +315,7 @@ Read the code and run the results: `test_comb_expose`
 
 Once the combinational logic ports are exposed, the next step is to connect them to the formal parameters of the `build` method in the `downstream` module.
 
-Read the code and run the results: `test_toposort, downstream`
+Read the code and run the results: `test_toposort, test_downstream`
 
 It is important to observe the differences between `Module` and `Downstream`, as well as between `combinational port connections` and `sequential port connections`.
 
@@ -363,7 +324,7 @@ It is important to observe the differences between `Module` and `Downstream`, as
 > 1. The term `downstream` (下游模块) is relative to `upstream` (上游模块) and refers to the existence as a submodule of the upstream module. In this context, `upstream` typically denotes the `Pure Sequential Logic Port Module`, while `downstream` refers to the `Pure Combinational Logic Port Module`.
 > 2. The `downstream` module is conceptualized as the component within a design stage that executes the internal combinational logic. Initially, the `upstream` sequential module gathers the required timing signals, which are subsequently transferred to one or more `downstream` combinational modules for additional processing and logical manipulation.
 
-##### Mixed Port Types
+#### Mixed Port Types
 
 In practice, most modules receive both combinational and sequential ports, offering a general approach:
 
@@ -409,7 +370,7 @@ Connect the sequential ports to the `Module` type module of `Fetcher(Module)`, e
 The code above comes from `examples/minor-cpu/src/main.py:262`
 
 
-##### FSM
+#### FSM
 
 Use `with Condition(Cond)` to indicate the behavior corresponding to different states, which can fully simulate the functionality of the `case` statement in Verilog.
 
