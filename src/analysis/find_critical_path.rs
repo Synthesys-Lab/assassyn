@@ -9,11 +9,13 @@ use crate::ir::{Block, Expr, Module, Opcode};
 pub struct NodeData {
   mom: usize,
   childs: usize,
+  delay: i32,
 }
 
 pub struct DependencyGraph {
   adjacency: HashMap<Opcode, Vec<NodeData>>,
   entry: HashMap<usize, BaseNode>,
+
 }
 impl Default for DependencyGraph {
   fn default() -> Self {
@@ -21,7 +23,7 @@ impl Default for DependencyGraph {
   }
 }
 
-impl DependencyGraph {
+impl DependencyGraph {#[allow(clippy::too_many_arguments)]
   pub fn new() -> Self {
     Self {
       adjacency: HashMap::new(),
@@ -29,10 +31,11 @@ impl DependencyGraph {
     }
   }
 
-  pub fn add_edge(&mut self, src: usize, dst: usize, edge_info: Opcode) {
+  pub fn add_edge(&mut self, src: usize, dst: usize, edge_info: Opcode ,delay: i32) {
     self.adjacency.entry(edge_info).or_default().push(NodeData {
       mom: src,
       childs: dst,
+      delay: delay,
     });
   }
 
@@ -41,33 +44,6 @@ impl DependencyGraph {
     let mut last_path: usize = 0;
     let mut last_weight: i32 = 0;
 
-    fn calculate_weight(opcode: &Opcode) -> i32 {
-      match opcode {
-        Opcode::Load => 0,
-        Opcode::Store => 1,
-        Opcode::Binary { binop } => match binop {
-          Binary::Add | Binary::Sub => 2,
-          Binary::Mul => 8,
-          Binary::BitwiseAnd | Binary::BitwiseOr | Binary::BitwiseXor => 1,
-          Binary::Shl | Binary::Shr => 1,
-          Binary::Mod => 4,
-        },
-        Opcode::Unary { .. } => 0,
-        Opcode::Select => 1,
-        Opcode::Select1Hot => 1,
-        Opcode::Compare { .. } => 0,
-        Opcode::Bind => 0,
-        Opcode::FIFOPush => 1,
-        Opcode::FIFOPop => 0,
-        Opcode::AsyncCall => 0,
-        Opcode::Slice => 0,
-        Opcode::Cast { .. } => 0,
-        Opcode::Concat => 0,
-        Opcode::BlockIntrinsic { .. } => 0,
-        Opcode::PureIntrinsic { .. } => 0,
-        Opcode::Log => 0,
-      }
-    }
 
     #[allow(clippy::too_many_arguments)]
     fn dfs(
@@ -88,8 +64,8 @@ impl DependencyGraph {
         for neighbor in neighbors {
           if neighbor.mom == current {
             has_neighbors = true;
-            let edge_weight = calculate_weight(edge_info);
-
+            //let edge_weight = calculate_weight(edge_info);
+            let edge_weight = neighbor.delay;
             edges.push(*edge_info);
             dfs(
               graph,
@@ -170,7 +146,9 @@ impl DependencyGraph {
             base_node_name,
             base_node.get_key(),
             path_with_edges.join("    "),
-            weight
+            weight,
+
+
           );
         }
       }
@@ -200,12 +178,27 @@ impl<'sys> GraphVisitor<'sys> {
 impl<'sys> Visitor<()> for GraphVisitor<'sys> {
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     let expr_opcode = expr.get_opcode();
+    let mut is_first_time = true;
 
     if (expr_opcode != Opcode::Bind) && (expr_opcode != Opcode::AsyncCall) {
+      let mut edge_delay=0;
       for operand_ref in expr.operand_iter() {
+        if is_first_time {
+          match operand_ref.get_value().get_dtype(self.sys) {
+            Some(DataType::Int(bits)) | Some(DataType::UInt(bits)) | Some(DataType::Bits(bits)) => {
+                edge_delay = calculate_weight_pro(&expr_opcode, bits as i32, expr.get_num_operands() as u8);
+            }
+            _ => {
+                edge_delay = calculate_weight_pro(&expr_opcode, 1, expr.get_num_operands() as u8);
+            }
+        }
+        
+          is_first_time = false;
+          
+      }
         self
           .graph
-          .add_edge(operand_ref.get_value().get_key(), expr.get_key(), expr_opcode);
+          .add_edge(operand_ref.get_value().get_key(), expr.get_key(), expr_opcode , edge_delay);
         if (expr_opcode == Opcode::Load) || (expr_opcode == Opcode::FIFOPop) {
           if let Some(DataType::UInt(_)) = operand_ref.get_value().get_dtype(self.sys) {
           } else {
@@ -216,6 +209,7 @@ impl<'sys> Visitor<()> for GraphVisitor<'sys> {
           }
         }
       }
+      
     }
     None
   }
@@ -228,5 +222,34 @@ impl<'sys> Visitor<()> for GraphVisitor<'sys> {
       }
     }
     None
+  }
+}
+
+pub fn calculate_weight_pro(opcode: &Opcode,bit_width: i32 , op_num: u8) -> i32 {
+  match opcode {
+    Opcode::Load => 0,
+    Opcode::Store => 1,
+    Opcode::Binary { binop } => match binop {
+      Binary::Add | Binary::Sub => (2 + (bit_width as f64).log2()as i32) *(op_num - 1) as i32,
+      Binary::Mul => (bit_width + (bit_width - 1)*(2 + (bit_width as f64).log2()as i32))*(op_num - 1) as i32,
+      Binary::BitwiseAnd | Binary::BitwiseOr => 1*(op_num - 1) as i32,
+      Binary::BitwiseXor => 2*(op_num - 1) as i32,
+      Binary::Shl | Binary::Shr => (bit_width as f64).log2() as i32,
+      Binary::Mod => 4,
+    },
+    Opcode::Unary { .. } => 0,
+    Opcode::Select => 1,
+    Opcode::Select1Hot => 1,
+    Opcode::Compare { .. } => 2 *(op_num - 1) as i32,
+    Opcode::Bind => 0,
+    Opcode::FIFOPush => 1,
+    Opcode::FIFOPop => 0,
+    Opcode::AsyncCall => 0,
+    Opcode::Slice => 0,
+    Opcode::Cast { .. } => 0,
+    Opcode::Concat => 0,
+    Opcode::BlockIntrinsic { .. } => 0,
+    Opcode::PureIntrinsic { .. } => 0,
+    Opcode::Log => 0,
   }
 }
