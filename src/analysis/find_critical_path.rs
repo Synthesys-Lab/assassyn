@@ -1,9 +1,9 @@
 use crate::builder::system::{ModuleKind, SysBuilder};
-use std::collections::{HashMap, HashSet};
-use std::vec::Vec;
 use crate::ir::expr::subcode::Binary;
 use crate::ir::{expr::subcode, instructions::PureIntrinsic, node::*, visitor::Visitor, *};
 use crate::ir::{Block, Expr, Module, Opcode};
+use std::collections::{HashMap, HashSet};
+use std::vec::Vec;
 #[derive(Debug, Clone)]
 pub struct NodeData {
   mom: usize,
