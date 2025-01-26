@@ -3,6 +3,7 @@
 import os
 import subprocess
 import tempfile
+import shutil
 
 from .builder import SysBuilder
 from . import utils
@@ -132,7 +133,6 @@ def elaborate( # pylint: disable=too-many-arguments
     proto_src = os.path.join(utils.repo_path(), 'python/assassyn/create.proto')
     proto_dst = os.path.join(src_dir, 'create.proto')
     try:
-        import shutil
         shutil.copy2(proto_src, proto_dst)
     except Exception as e:
         print(f'[ERROR] Failed to copy proto file: {e}')

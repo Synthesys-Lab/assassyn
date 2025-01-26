@@ -15,7 +15,7 @@ from .utils import identifierize
 
 from google.protobuf import text_format
 from . import create_pb2
-import io  
+import io
 
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
@@ -349,11 +349,20 @@ class CodeGen(visitor.Visitor):
         self.code.append('fn main() {')
 
         self.code.append('    println!("Reading serialized operations...");')
-        self.code.append('    let bytes = std::fs::read("src/create.pb").expect("Failed to read operations file");')
-        self.code.append('    let ops = OperationList::decode(&bytes[..]).expect("Failed to decode operations");')
+        self.code.append(
+            '    let bytes = std::fs::read("src/create.pb")'
+            '        .expect("Failed to read operations file");'
+        )
+        self.code.append(
+            '    let ops = OperationList::decode(&bytes[..])'
+            '        .expect("Failed to decode operations");'
+        )
 
         # Temporary code: visually display the parsing results of the PB file
-        self.code.append('    let mut output_file = File::create("src/parse_result.txt").expect("Failed to create output file");')
+        self.code.append(
+            '    let mut output_file = File::create("src/parse_result.txt")'
+            '        .expect("Failed to create output file");'
+        )
         self.code.append('''
             for op in ops.operations.iter() {
                 match op.op_type() {
@@ -481,9 +490,12 @@ class CodeGen(visitor.Visitor):
                 present_attrs |= ATTR_NO_ARBITER_PRESENT
 
             if elem.timing is not None:
-                attrs['timing'] = (create_pb2.ModuleAttributes.SYSTOLIC if elem.is_systolic 
-                                else create_pb2.ModuleAttributes.BACKPRESSURE if elem.timing == module.Timing.BACKPRESSURE
-                                else create_pb2.ModuleAttributes.NONE)
+                if elem.is_systolic:
+                    attrs['timing'] = create_pb2.ModuleAttributes.SYSTOLIC
+                elif elem.timing == module.Timing.BACKPRESSURE:
+                    attrs['timing'] = create_pb2.ModuleAttributes.BACKPRESSURE
+                else:
+                    attrs['timing'] = create_pb2.ModuleAttributes.NONE
                 present_attrs |= ATTR_TIMING_PRESENT
 
             if Module.ATTR_MEMORY in elem._attrs:
@@ -768,7 +780,11 @@ class CodeGen(visitor.Visitor):
         self.code.append(f'  // {node}')
         attrs = self.generate_array_attr(node)
         attrs = f'vec![{attrs}]'
-        array_decl = f'  let {module_id} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
+        array_decl = (
+            f'  let {module_id} = sys.create_array('
+            f'{ty}, "{name}", {size}, {init}, {attrs}'
+            ');'
+        )
 
         # TODO: Add serialization operation
         dtype_instance = create_pb2.DataType()
