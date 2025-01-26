@@ -1,5 +1,6 @@
 '''The module to generate the assassyn IR builder for the given system'''
 
+import io
 from . import visitor
 from . import dtype
 from . import expr
@@ -15,7 +16,6 @@ from .utils import identifierize
 
 from google.protobuf import text_format
 from . import create_pb2
-import io
 
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
@@ -157,11 +157,11 @@ class CodeGen(visitor.Visitor):
             for port_info in params['ports']:
                 port = module_params.ports.add()
                 port.name = port_info['name']
-                dtype = create_pb2.DataType()
-                dtype.kind = create_pb2.DataType.Kind.Value(
+                data_type = create_pb2.DataType()
+                data_type.kind = create_pb2.DataType.Kind.Value(
                     create_pb2.DataType.Kind.Name(port_info['dtype_kind']))
-                dtype.bits = port_info['dtype_bits']
-                port.dtype.CopyFrom(dtype)
+                data_type.bits = port_info['dtype_bits']
+                port.dtype.CopyFrom(data_type)
 
             if 'attrs' in params:
                 attrs = params['attrs']
@@ -441,12 +441,12 @@ class CodeGen(visitor.Visitor):
         self.code.append(
                 '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
 
-        ATTR_NO_ARBITER_PRESENT = 1 << 0
-        ATTR_TIMING_PRESENT = 1 << 1
-        ATTR_IS_MEMORY_PRESENT = 1 << 2
+        ATTR_NO_ARBITER_PRESENT = 1 << 0 # pylint: disable=invalid-name
+        ATTR_TIMING_PRESENT = 1 << 1 # pylint: disable=invalid-name
+        ATTR_IS_MEMORY_PRESENT = 1 << 2 # pylint: disable=invalid-name
 
         self.code.append('  // Declare modules')
-        self.code.append(f'  let mut modules = Vec::new();')
+        self.code.append('  let mut modules = Vec::new();')
         self.code.append('''
             // First pass: Create all modules from protobuf data
             for op in ops.operations.iter() {
@@ -604,7 +604,7 @@ class CodeGen(visitor.Visitor):
                 cond = self.generate_rval(node.cond)
                 self.code.append(f'  let {block_id} = sys.create_conditional_block({cond});')
 
-                # TODO: Add serialization operation
+                # TODO(@wanning): Add serialization operation
                 self.add_operation(
                     create_pb2.OpType.CREATE_CONDITIONAL_BLOCK,
                     cond=cond
@@ -615,7 +615,7 @@ class CodeGen(visitor.Visitor):
                 self.code.append('  // cycled block')
                 self.code.append(f'  let {block_id} = sys.create_cycled_block({node.cycle});')
 
-                # TODO: Add serialization operation
+                # TODO(@wanning): Add serialization operation
                 self.add_operation(
                     create_pb2.OpType.CREATE_CYCLED_BLOCK,
                     cycles=node.cycle
@@ -702,7 +702,7 @@ class CodeGen(visitor.Visitor):
             bind_var = self.generate_rval(node.bind)
             res = f'sys.create_async_call({bind_var});'
 
-            # TODO: Add serialization operation
+            # TODO(@wanning): Add serialization operation
             self.add_operation(
                 create_pb2.OpType.CREATE_ASYNC_CALL,
                 bind_var=bind_var
@@ -786,7 +786,7 @@ class CodeGen(visitor.Visitor):
             ');'
         )
 
-        # TODO: Add serialization operation
+        # TODO(@wanning): Add serialization operation
         dtype_instance = create_pb2.DataType()
         if isinstance(node.scalar_ty, dtype.Int):
             dtype_instance.kind = create_pb2.DataType.Kind.INT
@@ -819,7 +819,7 @@ class CodeGen(visitor.Visitor):
                  random, resource_base,default_fifo_depth):
         self.code = []
         self.header = []
-        self.modules = [] 
+        self.modules = []
         self.downstreams = []
         self.emitted_bind = set()
         self.targets = {}
