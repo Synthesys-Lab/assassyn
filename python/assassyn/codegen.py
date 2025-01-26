@@ -143,12 +143,12 @@ class EmitBinds(visitor.Visitor):
 # pylint: disable=too-many-instance-attributes
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
-    
+
     def add_operation(self, op_type, **params):
         """Add an Operation to the serial"""
         op = self.op_list.operations.add()
         op.op_type = op_type
-        
+
         if op_type == create_pb2.OpType.CREATE_MODULE:
             module_params = op.create_module
             module_params.name = params['name']
@@ -174,19 +174,19 @@ class CodeGen(visitor.Visitor):
                 if 'is_memory' in attrs:
                     module_attrs.is_memory = attrs['is_memory']
                 module_params.attrs.CopyFrom(module_attrs)
-                    
+
         elif op_type == create_pb2.OpType.CREATE_DOWNSTREAM:
             op.create_downstream.name = params['name']
-            
+
         elif op_type == create_pb2.OpType.CREATE_CONDITIONAL_BLOCK:
             op.create_cond_block.cond = params['cond']
-            
+
         elif op_type == create_pb2.OpType.CREATE_CYCLED_BLOCK:
             op.create_cycled_block.cycles = params['cycles']
-            
+
         elif op_type == create_pb2.OpType.CREATE_ASYNC_CALL:
             op.create_async_call.bind_var = params['bind_var']
-            
+
         elif op_type == create_pb2.OpType.CREATE_ARRAY:
             array_params = op.create_array
             array_params.dtype.CopyFrom(params['dtype'])
@@ -265,7 +265,7 @@ class CodeGen(visitor.Visitor):
     # pylint: disable=too-many-locals, too-many-statements
     def visit_system(self, node: SysBuilder):
         self.op_list = create_pb2.OperationList()
-        
+
         self.header.append('use std::path::PathBuf;')
         self.header.append('use std::collections::HashMap;')
         self.header.append('use assassyn::builder::SysBuilder;')
@@ -273,15 +273,15 @@ class CodeGen(visitor.Visitor):
         self.header.append('use std::fs::File;')
         self.header.append('use prost::Message;')
         self.header.append('include!(concat!(env!("OUT_DIR"), "/create.rs"));')
-        
+
         # Temporary code: visually display the parsing results of the PB file
         self.header.append('use std::io::Write;')
-        
+
         self.code.append('const ATTR_NO_ARBITER_PRESENT: u32 = 1 << 0;')
         self.code.append('const ATTR_TIMING_PRESENT: u32 = 1 << 1;')
         self.code.append('const ATTR_IS_MEMORY_PRESENT: u32 = 1 << 2;')
-        
-        
+
+
         # Create a module based on sequence instructions
         self.code.append('''
             fn create_module_from_proto(
@@ -330,7 +330,7 @@ class CodeGen(visitor.Visitor):
                 modules.push(module);
             }
         ''')
-        
+
         # Create a downstream based on sequence instructions
         self.code.append('''
             fn create_downstream_from_proto(
@@ -345,7 +345,7 @@ class CodeGen(visitor.Visitor):
                 downstreams.push(downstream);
             }
         ''')
-        
+
         self.code.append('fn main() {')
         
         self.code.append('    println!("Reading serialized operations...");')
@@ -363,7 +363,7 @@ class CodeGen(visitor.Visitor):
                                 writeln!(output_file, "CREATE_MODULE:").unwrap();
                                 writeln!(output_file, "  ID: {}", module_params.id).unwrap();
                                 writeln!(output_file, "  Name: {}", module_params.name).unwrap();
-                                
+
                                 writeln!(output_file, "  Attributes:").unwrap();
                                 if let Some(attrs) = &module_params.attrs {
                                     if (attrs.present_attrs & ATTR_NO_ARBITER_PRESENT) != 0 {
@@ -371,7 +371,7 @@ class CodeGen(visitor.Visitor):
                                     } else {
                                         writeln!(output_file, "    no_arbiter: <not set>").unwrap();
                                     }
-                                    
+
                                     if (attrs.present_attrs & ATTR_TIMING_PRESENT) != 0 {
                                         let timing_str = match attrs.timing {
                                             x if x == i32::from(module_attributes::Timing::None) => "NONE",
@@ -383,14 +383,14 @@ class CodeGen(visitor.Visitor):
                                     } else {
                                         writeln!(output_file, "    timing: <not set>").unwrap();
                                     }
-                                    
+
                                     if (attrs.present_attrs & ATTR_IS_MEMORY_PRESENT) != 0 {
                                         writeln!(output_file, "    is_memory: {}", attrs.is_memory).unwrap();
                                     } else {
                                         writeln!(output_file, "    is_memory: <not set>").unwrap();
                                     }
                                 }
-                                
+
                                 writeln!(output_file, "  Ports:").unwrap();
                                 for port in module_params.ports.iter() {
                                     if let Some(dtype) = &port.dtype {
@@ -426,16 +426,16 @@ class CodeGen(visitor.Visitor):
                 }
             }
         ''')
-        
-            
+
+
         self.code.append(f'  let mut sys = SysBuilder::new(\"{node.name}\");')
         self.code.append(
                 '  let mut block_stack : Vec<assassyn::ir::node::BaseNode> = Vec::new();\n')
-        
+
         ATTR_NO_ARBITER_PRESENT = 1 << 0
         ATTR_TIMING_PRESENT = 1 << 1
         ATTR_IS_MEMORY_PRESENT = 1 << 2
-        
+
         self.code.append('  // Declare modules')
         self.code.append(f'  let mut modules = Vec::new();')
         self.code.append('''
@@ -448,7 +448,7 @@ class CodeGen(visitor.Visitor):
                 }
             }
         ''')
-        
+
         for elem in node.modules:
             name = elem.name.lower()            
             module_index = len(self.modules)
@@ -466,7 +466,7 @@ class CodeGen(visitor.Visitor):
                     kind = create_pb2.DataType.Kind.RECORD
                 else:
                     raise AssertionError(f'Expecting a known type, but got {p.dtype}')
-                
+
                 ports_info.append({
                     'name': p.name,
                     'dtype_kind': kind,
@@ -498,8 +498,8 @@ class CodeGen(visitor.Visitor):
                 ports=ports_info,
                 id=module_index,
                 attrs=attrs
-            )    
-            
+            )
+
         self.code.append('  // Declare downstream modules')
         self.code.append('  let mut downstreams = Vec::new();')
         self.code.append('''
@@ -512,7 +512,7 @@ class CodeGen(visitor.Visitor):
                 }
             }
         ''')
-        
+
         for elem in node.downstreams:            
             current_index = len(self.downstreams)
             self.downstreams.append(elem)
@@ -520,8 +520,8 @@ class CodeGen(visitor.Visitor):
                 create_pb2.OpType.CREATE_DOWNSTREAM,
                 name=elem.name,
                 id=current_index
-            )      
-            
+            )
+
         self.code.append('  // declare arrays')
         for elem in node.arrays:
             self.visit_array(elem)
@@ -591,24 +591,24 @@ class CodeGen(visitor.Visitor):
                 self.code.append('  // conditional block')
                 cond = self.generate_rval(node.cond)
                 self.code.append(f'  let {block_id} = sys.create_conditional_block({cond});')
-                
+
                 # TODO: Add serialization operation
                 self.add_operation(
                     create_pb2.OpType.CREATE_CONDITIONAL_BLOCK,
                     cond=cond
                 )
-                
+
                 self.code.append(f'  sys.set_current_block({block_id});')
             elif isinstance(node, block.CycledBlock):
                 self.code.append('  // cycled block')
                 self.code.append(f'  let {block_id} = sys.create_cycled_block({node.cycle});')
-                
+
                 # TODO: Add serialization operation
                 self.add_operation(
                     create_pb2.OpType.CREATE_CYCLED_BLOCK,
                     cycles=node.cycle
                 )
-                
+
                 self.code.append(f'  sys.set_current_block({block_id});')
 
         for elem in node.iter():
@@ -689,13 +689,13 @@ class CodeGen(visitor.Visitor):
         elif isinstance(node, expr.AsyncCall):
             bind_var = self.generate_rval(node.bind)
             res = f'sys.create_async_call({bind_var});'
-            
+
             # TODO: Add serialization operation
             self.add_operation(
                 create_pb2.OpType.CREATE_ASYNC_CALL,
                 bind_var=bind_var
             )
-            
+
         elif isinstance(node, expr.Concat):
             msb = self.generate_rval(node.msb)
             lsb = self.generate_rval(node.lsb)
@@ -769,7 +769,7 @@ class CodeGen(visitor.Visitor):
         attrs = self.generate_array_attr(node)
         attrs = f'vec![{attrs}]'
         array_decl = f'  let {module_id} = sys.create_array({ty}, \"{name}\", {size}, {init}, {attrs});'
-        
+
         # TODO: Add serialization operation
         dtype_instance = create_pb2.DataType()
         if isinstance(node.scalar_ty, dtype.Int):
@@ -783,10 +783,10 @@ class CodeGen(visitor.Visitor):
         else:
             raise AssertionError(f'Expecting a known type, but got {node.scalar_ty}')
         dtype_instance.bits = node.scalar_ty.bits
-        
+
         array_attr = create_pb2.ArrayAttr()
         array_attr.fully_partitioned = Array.FULLY_PARTITIONED in node.attr
-        
+
         self.add_operation(
             create_pb2.OpType.CREATE_ARRAY,
             dtype=dtype_instance,
@@ -795,7 +795,7 @@ class CodeGen(visitor.Visitor):
             init_values=node.initializer if node.initializer else [],
             attributes=array_attr
         )
-        
+
         self.code.append(array_decl)
 
 
