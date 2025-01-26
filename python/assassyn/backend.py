@@ -120,14 +120,14 @@ def elaborate( # pylint: disable=too-many-arguments
 
     # Dump the Cargo.toml file
     toml = dump_cargo_toml(sys_dir, sys.name)
-    
+
     # Dump build.rs file
     dump_build_rs(sys_dir)
-    
+
     # Create src directory
     src_dir = os.path.join(sys_dir, 'src')
     make_existing_dir(src_dir)
-    
+
     # Copy proto file
     proto_src = os.path.join(utils.repo_path(), 'python/assassyn/create.proto')
     proto_dst = os.path.join(src_dir, 'create.proto')
@@ -137,7 +137,7 @@ def elaborate( # pylint: disable=too-many-arguments
     except Exception as e:
         print(f'[ERROR] Failed to copy proto file: {e}')
         raise e
-    
+
     # Generate and write code
     random_sims = "false"
     if random:
@@ -147,15 +147,15 @@ def elaborate( # pylint: disable=too-many-arguments
         idle_threshold, sim_threshold, random_sims,
         resource_base, fifo_depth
     )
-    
+
     # Dump the assassyn IR builder
     with open(os.path.join(sys_dir, 'src/main.rs'), 'w', encoding='utf-8') as fd:
         fd.write(rust_code)
-    
+
     # Dump the operation serial
     with open(os.path.join(sys_dir, 'src/create.pb'), 'wb') as fd:
         fd.write(serialized_ops)
-        
+
     if pretty_printer:
         subprocess.run(['cargo', 'fmt', '--manifest-path', toml], cwd=sys_dir, check=True)
     subprocess.run(['cargo', 'run', '--release'], cwd=sys_dir, check=True)

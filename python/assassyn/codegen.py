@@ -13,7 +13,7 @@ from .block import Block
 from .expr import Expr
 from .utils import identifierize
 
-from google.protobuf import text_format   
+from google.protobuf import text_format
 from . import create_pb2
 import io  
 
@@ -340,14 +340,14 @@ class CodeGen(visitor.Visitor):
             ) {
                 // Create the downstream module
                 let downstream = sys.create_downstream(&downstream_params.name);
-                
+
                 // Add to downstreams vector
                 downstreams.push(downstream);
             }
         ''')
 
         self.code.append('fn main() {')
-        
+
         self.code.append('    println!("Reading serialized operations...");')
         self.code.append('    let bytes = std::fs::read("src/create.pb").expect("Failed to read operations file");')
         self.code.append('    let ops = OperationList::decode(&bytes[..]).expect("Failed to decode operations");')
@@ -450,7 +450,7 @@ class CodeGen(visitor.Visitor):
         ''')
 
         for elem in node.modules:
-            name = elem.name.lower()            
+            name = elem.name.lower()
             module_index = len(self.modules)
             self.modules.append(elem)
 
@@ -482,7 +482,7 @@ class CodeGen(visitor.Visitor):
 
             if elem.timing is not None:
                 attrs['timing'] = (create_pb2.ModuleAttributes.SYSTOLIC if elem.is_systolic 
-                                else create_pb2.ModuleAttributes.BACKPRESSURE if elem.timing == module.Timing.BACKPRESSURE 
+                                else create_pb2.ModuleAttributes.BACKPRESSURE if elem.timing == module.Timing.BACKPRESSURE
                                 else create_pb2.ModuleAttributes.NONE)
                 present_attrs |= ATTR_TIMING_PRESENT
 
@@ -513,7 +513,7 @@ class CodeGen(visitor.Visitor):
             }
         ''')
 
-        for elem in node.downstreams:            
+        for elem in node.downstreams:
             current_index = len(self.downstreams)
             self.downstreams.append(elem)
             self.add_operation(
