@@ -4,3 +4,4 @@ target
 verilator
 examples/*/__pycache__/
 /.vscode
+/python/assassyn/create_pb2.py
