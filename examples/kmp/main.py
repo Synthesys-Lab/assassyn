@@ -10,13 +10,13 @@ class Driver(Module):
 
     @module.combinational
     def build(self, kmp):
-        idx = RegArray(Int(13), 1)
+        idx = RegArray(UInt(13), 1)
         sram = SRAM(32, 8192, 'init.hex')
-        read = idx[0] < Int(13)(8191)
+        read = idx[0] < UInt(13)(8191)
         sram.build(Bits(1)(0), read, idx[0], Bits(32)(0), kmp)
         with Condition(read):
             sram.bound.async_called()
-            idx[0] = idx[0] + Int(13)(1)
+            idx[0] = idx[0] + UInt(13)(1)
         with Condition(~read):
             log('done')
             finish()
@@ -26,7 +26,7 @@ class KMP(Module):
 
     def __init__(self):
         super().__init__(ports={'rdata': Port(Bits(32))})
-        self.res = RegArray(Int(32), 1)
+        self.res = RegArray(UInt(32), 1)
         self.pattern = RegArray(Bits(32), 1)
         self.name = "kmp"
 
@@ -37,8 +37,8 @@ class KMP(Module):
         a = last[0]
         b = rdata
         x = a.concat(b)
-        ONE = Int(32)(1)
-        ZERO = Int(32)(0)
+        ONE = UInt(32)(1)
+        ZERO = UInt(32)(0)
         delta = (x[8:39] == self.pattern[0]).select(ZERO, ONE) + \
                 (x[16:47] == self.pattern[0]).select(ZERO, ONE) + \
                 (x[24:55] == self.pattern[0]).select(ZERO, ONE) + \
