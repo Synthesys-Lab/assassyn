@@ -9,13 +9,13 @@ from . import block
 from . import const
 from .builder import SysBuilder
 from .array import Array
-from .module import Module, Port, Timing, Downstream
+from .module import Module, Port, Downstream
 from .block import Block
 from .expr import Expr
 from .utils import identifierize
 
 from google.protobuf import text_format
-from . import create_pb2
+from . import create_pb2 # pylint: disable=no-name-in-module
 
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
@@ -144,6 +144,7 @@ class EmitBinds(visitor.Visitor):
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
 
+    # pylint: disable=too-many-branches
     def add_operation(self, op_type, **params):
         """Add an Operation to the serial"""
         op = self.op_list.operations.add()
@@ -262,7 +263,7 @@ class CodeGen(visitor.Visitor):
         return 'Some(init)'
 
 
-    # pylint: disable=too-many-locals, too-many-statements
+    # pylint: disable=too-many-locals, too-many-statements, too-many-branches
     def visit_system(self, node: SysBuilder):
         self.op_list = create_pb2.OperationList()
 
