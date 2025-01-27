@@ -1,21 +1,22 @@
 '''The module to generate the assassyn IR builder for the given system'''
 
-import io
+# import io
+# from google.protobuf import text_format
+
 from . import visitor
 from . import dtype
 from . import expr
 from . import module
 from . import block
 from . import const
+from . import create_pb2 # pylint: disable=no-name-in-module
+
 from .builder import SysBuilder
 from .array import Array
 from .module import Module, Port, Downstream
 from .block import Block
 from .expr import Expr
 from .utils import identifierize
-
-from google.protobuf import text_format
-from . import create_pb2 # pylint: disable=no-name-in-module
 
 CG_OPCODE = {
     expr.BinaryOp.ADD: 'add',
