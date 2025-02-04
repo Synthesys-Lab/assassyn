@@ -12,15 +12,15 @@ pub struct NodeData {
 }
 #[derive(Debug, Clone)]
 pub struct Stats {
-    count: i32,
-    sum_x_1: i64,
-    sum_x_2: i64,
+  count: i32,
+  sum_x_1: i64,
+  sum_x_2: i64,
 }
 
 pub struct DependencyGraph {
   adjacency: HashMap<Opcode, Vec<NodeData>>,
   entry: HashMap<usize, BaseNode>,
-  path_attr: HashMap<usize,Stats >,
+  path_attr: HashMap<usize, Stats>,
 }
 impl Default for DependencyGraph {
   fn default() -> Self {
@@ -46,13 +46,15 @@ impl DependencyGraph {
     });
   }
 
-
   pub fn show_all_paths_with_weights(&mut self, sys: &SysBuilder, show_all: bool) {
     let mut all_paths = vec![];
     let mut last_path: usize = 0;
     let mut last_weight: i32 = 0;
-    let mut all_stats = Stats{  count: 0, sum_x_1: 0, sum_x_2: 0};
-
+    let mut all_stats = Stats {
+      count: 0,
+      sum_x_1: 0,
+      sum_x_2: 0,
+    };
 
     #[allow(clippy::too_many_arguments)]
     fn dfs(
@@ -65,8 +67,7 @@ impl DependencyGraph {
       show_all: bool,
       last_path: &mut usize,
       last_weight: &mut i32,
-      path_attr: &mut HashMap<usize,Stats >,
-
+      path_attr: &mut HashMap<usize, Stats>,
     ) {
       path.push(current);
 
@@ -79,7 +80,6 @@ impl DependencyGraph {
             let edge_weight = neighbor.delay;
             edges.push(*edge_info);
 
-
             dfs(
               graph,
               neighbor.childs,
@@ -91,7 +91,6 @@ impl DependencyGraph {
               last_path,
               last_weight,
               path_attr,
-
             );
             edges.pop();
           }
@@ -110,15 +109,21 @@ impl DependencyGraph {
 
       if !has_neighbors && path.len() > 1 && is_end && has_entry {
         if let Some(&start_node) = path.first() {
-          path_attr.entry(start_node).and_modify(|stats| {
-            stats.count += 1;
-            stats.sum_x_1 += current_weight as i64 ;
-            stats.sum_x_2 += (current_weight as i64).pow(2);
-        }).or_insert(Stats { count: 1, sum_x_1: current_weight as i64, sum_x_2: (current_weight as i64).pow(2)});
-        
-        //dbg!(&path_attr);
-        }
+          path_attr
+            .entry(start_node)
+            .and_modify(|stats| {
+              stats.count += 1;
+              stats.sum_x_1 += current_weight as i64;
+              stats.sum_x_2 += (current_weight as i64).pow(2);
+            })
+            .or_insert(Stats {
+              count: 1,
+              sum_x_1: current_weight as i64,
+              sum_x_2: (current_weight as i64).pow(2),
+            });
 
+          //dbg!(&path_attr);
+        }
 
         if show_all {
           all_paths.push((path.clone(), edges.clone(), current_weight));
@@ -155,7 +160,6 @@ impl DependencyGraph {
         &mut last_path,
         &mut last_weight,
         &mut self.path_attr,
-
       );
     }
 
@@ -163,9 +167,7 @@ impl DependencyGraph {
     for (path, edges, weight) in all_paths {
       if let Some(&start_node) = path.first() {
         if let Some(base_node) = self.entry.get(&start_node) {
-          if let Some(attr) = self.path_attr.get(&start_node)
-          {
-
+          if let Some(attr) = self.path_attr.get(&start_node) {
             let base_node_name = base_node.to_string(sys);
             let path_with_edges: Vec<String> = path
               .windows(2)
@@ -178,16 +180,20 @@ impl DependencyGraph {
               base_node.get_key(),
               path_with_edges.join("    "),
               weight,
-              ((attr.sum_x_2/attr.count as i64)-(attr.sum_x_1/attr.count as i64).pow(2))
-          );
-          all_stats.count += 1;
-          all_stats.sum_x_1 += weight as i64 ;
-          all_stats.sum_x_2 += (weight as i64).pow(2);
-        }
+              ((attr.sum_x_2 / attr.count as i64) - (attr.sum_x_1 / attr.count as i64).pow(2))
+            );
+            all_stats.count += 1;
+            all_stats.sum_x_1 += weight as i64;
+            all_stats.sum_x_2 += (weight as i64).pow(2);
+          }
         }
       }
     }
-    println!("=== All Paths Var is {}===", ((all_stats.sum_x_2/all_stats.count as i64)-(all_stats.sum_x_1/all_stats.count as i64).pow(2)) );
+    println!(
+      "=== All Paths Var is {}===",
+      ((all_stats.sum_x_2 / all_stats.count as i64)
+        - (all_stats.sum_x_1 / all_stats.count as i64).pow(2))
+    );
   }
 }
 
@@ -246,7 +252,6 @@ impl<'sys> Visitor<()> for GraphVisitor<'sys> {
               .graph
               .entry
               .insert(operand_ref.get_value().get_key(), *operand_ref.get_value());
-            
           }
         }
       }
