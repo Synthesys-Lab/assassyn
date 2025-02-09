@@ -43,7 +43,9 @@ class Execution(Module):
         csr_f: Array,
         memory: Module, 
         data: str,
-        depth_log: int):
+        depth_log: int,
+        exec_br_dest: Array,
+        exec_br_sm: Array):
 
         csr_id = Bits(4)(0)
  
@@ -203,12 +205,14 @@ class Execution(Module):
         exec_bypass_reg[0] = produced_by_exec.select(rd, Bits(5)(0))
         exec_bypass_data[0] = produced_by_exec.select(result, Bits(32)(0))
 
+
+
         pc0 = (fetch_addr.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
         with Condition(signals.is_branch):
-            br_dest = condition[0:0].select(result, pc0)
+            exec_br_dest[0] = condition[0:0].select(result, pc0)
             log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc0)
-            br_sm = RegArray(Bits(1), 1)
-            br_sm[0] = Bits(1)(0)
+            #exec_br_sm[0] = Bits(1)(0)
+
 
         is_memory = memory_read | memory_write
 
@@ -234,7 +238,7 @@ class Execution(Module):
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
 
-        return br_sm, br_dest,  rd, ex_valid
+        return  rd, ex_valid 
 
 class Decoder(Module):
     
@@ -257,7 +261,7 @@ class Decoder(Module):
         e_call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
         e_call.bind.set_fifo_depth(signals=2, fetch_addr=2)
 
-        return signals.is_branch
+
 
 class Fetcher(Module):
     
@@ -279,9 +283,8 @@ class FetcherImpl(Downstream):
 
     @downstream.combinational
     def build(self,
-              on_branch: Value,
               br_sm: Array,
-              ex_bypass: Value,
+              ex_bypass: Array,
               ex_valid: Value,
               pc_reg: Value,
               pc_addr: Value,
@@ -291,9 +294,9 @@ class FetcherImpl(Downstream):
 
         ongoing = RegArray(Int(8), 1, initializer=[0])
 
-        on_branch = on_branch.optional(Bits(1)(0)) | br_sm[0]
-        should_fetch = ~on_branch | ex_bypass.valid()
-        to_fetch = ex_bypass.optional(pc_addr)
+        should_fetch = ~br_sm[0]
+        to_fetch = Bits(32)(0)
+        to_fetch = should_fetch.select(pc_addr, ex_bypass[0].bitcast(Bits(32)))
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
 
@@ -302,7 +305,7 @@ class FetcherImpl(Downstream):
 
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} | ongoing: {}",
-            on_branch, ex_bypass.valid(), real_fetch, to_fetch, new_cnt)
+            br_sm[0], ex_valid.optional(Bits(1)(0)), real_fetch, to_fetch, new_cnt)
 
         with Condition(real_fetch):
             icache.bound.async_called(fetch_addr=to_fetch)
@@ -394,6 +397,9 @@ def build_cpu(depth_log):
         wb_bypass_reg = RegArray(bits5, 1)
         wb_bypass_data = RegArray(bits32, 1)
 
+        exec_br_dest = RegArray(Bits(32), 1)
+        exec_br_sm = RegArray(Bits(1), 1)
+
         writeback = WriteBack()
         wb_rd = writeback.build(reg_file = reg_file)
 
@@ -401,7 +407,7 @@ def build_cpu(depth_log):
 
         executor = Execution()
 
-        br_sm, ex_bypass, exec_rd, ex_valid = executor.build(
+        exec_rd, ex_valid = executor.build(
             pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
             exec_bypass_data = exec_bypass_data,
@@ -416,7 +422,10 @@ def build_cpu(depth_log):
             memory = memory_access,
             #writeback = writeback,
             data = f'{workspace}/workload.data',
-            depth_log = depth_log
+            depth_log = depth_log,
+            exec_br_dest = exec_br_dest,
+            exec_br_sm = exec_br_sm,
+
         )
 
         memory_access.build(
@@ -428,9 +437,9 @@ def build_cpu(depth_log):
         )
 
         decoder = Decoder()
-        on_br = decoder.build(executor=executor, br_sm=br_sm)
+        decoder.build(executor=executor, br_sm=exec_br_sm)
 
-        fetcher_impl.build(on_br, br_sm, ex_bypass, ex_valid, pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log)
+        fetcher_impl.build(exec_br_sm, exec_br_dest, ex_valid, pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log)
 
         onwrite_downstream = Onwrite()
 
@@ -447,13 +456,12 @@ def build_cpu(depth_log):
         sys.expose_on_top(reg_onwrite, kind='Output')
         sys.expose_on_top(csr_file, kind='Inout')
         sys.expose_on_top(pc_reg, kind='Output')
-
+        sys.expose_on_top(exec_br_sm, kind='Output')
 
         '''Exprs exposing'''
         sys.expose_on_top(offset_reg, kind='Inout')
         sys.expose_on_top(ex_valid, kind='Output')
-        sys.expose_on_top(on_br, kind='Output')
-        sys.expose_on_top(br_sm, kind='Output')
+
         
 
 
@@ -483,7 +491,7 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
             value = value[2:]
             open(f'{workspace}/workload.init', 'w').write(value)
 
-    report = True
+    report = False
 
     if report:
         raw = utils.run_simulator(simulator_path, False)
