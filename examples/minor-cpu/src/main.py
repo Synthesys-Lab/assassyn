@@ -45,7 +45,10 @@ class Execution(Module):
         data: str,
         depth_log: int,
         exec_br_dest: Array,
-        exec_br_sm: Array):
+        exec_br_sm: Array,
+        exec_br_jumped: Array,
+        br_no_jump: Array,
+        ):
 
         csr_id = Bits(4)(0)
  
@@ -80,8 +83,10 @@ class Execution(Module):
             log("pc: 0x{:08x}   | rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {} | backlogged", \
                 self.fetch_addr.peek(), rs1, a_valid, rs2, b_valid, rd, rd_valid)
 
+        jump_flag = br_no_jump[0] & exec_br_jumped[0]
+        valid = valid #& (~ jump_flag)
+        
         wait_until(valid)
-
         ex_valid = valid
         self.exe_valid = ex_valid
 
@@ -124,6 +129,9 @@ class Execution(Module):
         is_ebreak = signals.rs1_valid & signals.imm_valid & \
                     ((signals.imm == Bits(32)(1)) | (signals.imm == Bits(32)(0))) & \
                     (signals.alu == Bits(16)(0))
+        
+
+
         with Condition(is_ebreak):
             log('ebreak | halt | ecall')
             finish()
@@ -205,14 +213,14 @@ class Execution(Module):
         exec_bypass_reg[0] = produced_by_exec.select(rd, Bits(5)(0))
         exec_bypass_data[0] = produced_by_exec.select(result, Bits(32)(0))
 
-
-
+  
         pc0 = (fetch_addr.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
         with Condition(signals.is_branch):
             exec_br_dest[0] = condition[0:0].select(result, pc0)
             log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc0)
-            #exec_br_sm[0] = Bits(1)(0)
-
+            
+        exec_br_jumped[0] = signals.is_branch.select(condition[0:0], Bits(1)(0))
+        exec_br_sm[0] = signals.is_branch
 
         is_memory = memory_read | memory_write
 
@@ -257,9 +265,11 @@ class Decoder(Module):
 
         signals = decode_logic(inst)
         br_sm[0] = signals.is_branch
-
+        
         e_call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
         e_call.bind.set_fifo_depth(signals=2, fetch_addr=2)
+
+        return signals.is_branch
 
 
 
@@ -283,29 +293,40 @@ class FetcherImpl(Downstream):
 
     @downstream.combinational
     def build(self,
-              br_sm: Array,
+              on_branch: Value,
               ex_bypass: Array,
               ex_valid: Value,
               pc_reg: Value,
               pc_addr: Value,
               decoder: Decoder,
               data: str,
-              depth_log: int):
+              depth_log: int,
+              br_sm: Array,
+              br_jump: Array,
+              exec_br_buffer: Array,
+              br_no_jump: Array,
+              ):
 
         ongoing = RegArray(Int(8), 1, initializer=[0])
 
-        should_fetch = ~br_sm[0]
-        to_fetch = Bits(32)(0)
-        to_fetch = should_fetch.select(pc_addr, ex_bypass[0].bitcast(Bits(32)))
+        on_branch = on_branch.optional(Bits(1)(0))
+        should_fetch = ( ~ on_branch & ~ br_sm[0])
+        br_no_jump[0] = ~ br_jump[0]
+
+        
+
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
 
         new_cnt = ongoing[0] - (ex_valid.optional(Bits(1)(0))).select(Int(8)(1), Int(8)(0))
-        real_fetch = should_fetch & (new_cnt < Int(8)(2))
-
+        to_fetch = Bits(32)(0)
+        #to_fetch = should_fetch.select(pc_addr, to_fetch)
+        to_fetch = (br_jump[0]& (~ new_cnt[0:0])).select(ex_bypass[0].bitcast(Bits(32)), pc_addr)
+        real_fetch = (should_fetch  | exec_br_buffer[0])& (new_cnt < Int(8)(3))
+        log("on_br: {}         | br_sm: {}     | br_jump: {}      | fetch: {}      | addr: 0x{:05x} | ongoing: {}", on_branch, br_sm[0], br_jump[0], should_fetch, to_fetch, ongoing[0])
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
-        log("on_br: {}         | ex_by: {}     | fetch: {}      | addr: 0x{:05x} | ongoing: {}",
-            br_sm[0], ex_valid.optional(Bits(1)(0)), real_fetch, to_fetch, new_cnt)
+        log("on_br: {}         | de_by: {}     | ex_by: {}      | fetch: {}      | addr: 0x{:05x} | ongoing: {}",
+            on_branch, ex_valid.optional(Bits(1)(0)), exec_br_buffer[0],real_fetch, to_fetch, new_cnt)
 
         with Condition(real_fetch):
             icache.bound.async_called(fetch_addr=to_fetch)
@@ -398,7 +419,10 @@ def build_cpu(depth_log):
         wb_bypass_data = RegArray(bits32, 1)
 
         exec_br_dest = RegArray(Bits(32), 1)
-        exec_br_sm = RegArray(Bits(1), 1)
+        d_br_buffer = RegArray(Bits(1), 1)
+        exec_br_jumped = RegArray(Bits(1), 1)
+        mem_br_no_jump = RegArray(Bits(1), 1)
+        exec_br_buffer = RegArray(Bits(1), 1)
 
         writeback = WriteBack()
         wb_rd = writeback.build(reg_file = reg_file)
@@ -424,7 +448,9 @@ def build_cpu(depth_log):
             data = f'{workspace}/workload.data',
             depth_log = depth_log,
             exec_br_dest = exec_br_dest,
-            exec_br_sm = exec_br_sm,
+            exec_br_sm = exec_br_buffer,
+            exec_br_jumped = exec_br_jumped,
+            br_no_jump = mem_br_no_jump,
 
         )
 
@@ -437,9 +463,11 @@ def build_cpu(depth_log):
         )
 
         decoder = Decoder()
-        decoder.build(executor=executor, br_sm=exec_br_sm)
+        on_br = decoder.build(executor=executor, br_sm=d_br_buffer)
 
-        fetcher_impl.build(exec_br_sm, exec_br_dest, ex_valid, pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log)
+        fetcher_impl.build(on_br, exec_br_dest, ex_valid, pc_reg,
+                            pc_addr, decoder, f'{workspace}/workload.exe',
+                              depth_log, d_br_buffer , exec_br_jumped , exec_br_buffer,mem_br_no_jump)
 
         onwrite_downstream = Onwrite()
 
@@ -456,7 +484,7 @@ def build_cpu(depth_log):
         sys.expose_on_top(reg_onwrite, kind='Output')
         sys.expose_on_top(csr_file, kind='Inout')
         sys.expose_on_top(pc_reg, kind='Output')
-        sys.expose_on_top(exec_br_sm, kind='Output')
+
 
         '''Exprs exposing'''
         sys.expose_on_top(offset_reg, kind='Inout')
@@ -543,7 +571,7 @@ if __name__ == '__main__':
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        '0to100',
+        #'0to100',
         #'multiply',
         #'dhrystone',
         #'median',
@@ -564,32 +592,32 @@ if __name__ == '__main__':
     # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
     # Define test cases
     test_cases = [
-        #'rv32ui-p-add',
-        #'rv32ui-p-addi',
-        #'rv32ui-p-and',
-        #'rv32ui-p-andi',
-        #'rv32ui-p-auipc',
-        #'rv32ui-p-beq',
-        #'rv32ui-p-bge',
-        #'rv32ui-p-bgeu',
-        #'rv32ui-p-blt',
-        #'rv32ui-p-bltu',
-        #'rv32ui-p-bne',
-        #'rv32ui-p-jal',
-        #'rv32ui-p-jalr',
-        #'rv32ui-p-lui',
-        #'rv32ui-p-lw',
-        #'rv32ui-p-or',
-        #'rv32ui-p-ori',
-        #'rv32ui-p-sll',
-        #'rv32ui-p-slli',
-        #'rv32ui-p-sltu',
-        #'rv32ui-p-srai',
-        #'rv32ui-p-srl',
-        #'rv32ui-p-srli',
-        #'rv32ui-p-sub',
-        #'rv32ui-p-sw',
-        #'rv32ui-p-xori',
+        'rv32ui-p-add',
+        'rv32ui-p-addi',
+        'rv32ui-p-and',
+        'rv32ui-p-andi',
+        'rv32ui-p-auipc',
+        'rv32ui-p-beq',
+        'rv32ui-p-bge',
+        'rv32ui-p-bgeu',
+        'rv32ui-p-blt',
+        'rv32ui-p-bltu',
+        'rv32ui-p-bne',
+        'rv32ui-p-jal',
+        'rv32ui-p-jalr',
+        'rv32ui-p-lui',
+        'rv32ui-p-lw',
+        'rv32ui-p-or',
+        'rv32ui-p-ori',
+        'rv32ui-p-sll',
+        'rv32ui-p-slli',
+        'rv32ui-p-sltu',
+        'rv32ui-p-srai',
+        'rv32ui-p-srl',
+        'rv32ui-p-srli',
+        'rv32ui-p-sub',
+        'rv32ui-p-sw',
+        'rv32ui-p-xori',
         #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
         #'rv32ui-p-sb',#TO CHECK
     ]
