@@ -65,10 +65,9 @@ def modify_entry_mdata_status(scoreboard,index,mdata, status ):
             mem_ext= scoreboard[index].mem_ext
 )
 
-def modify_entry_exe(scoreboard,index,result,status):
-    status= status
+def modify_entry_exe(scoreboard,index,result): 
     result=result
-    log("modify index {}  result {}   status {}",index,result,status)
+    
     return scoreboard_entry.bundle(
             sb_valid=scoreboard[index].sb_valid,   
             rd=scoreboard[index].rd,
@@ -82,7 +81,7 @@ def modify_entry_exe(scoreboard,index,result,status):
             rs2_dep=scoreboard[index].rs2_dep,
             result_ready=Bits(1)(1),
             result=result,
-            sb_status= status ,
+            sb_status= Bits(2)(3) ,
             signals=scoreboard[index].signals,
             fetch_addr=scoreboard[index].fetch_addr,
             is_memory_read=scoreboard[index].is_memory_read,
@@ -93,6 +92,34 @@ def modify_entry_exe(scoreboard,index,result,status):
             mem_ext= scoreboard[index].mem_ext
 )
 
+def modify_link_pc_result(scoreboard,index,result):
+    result=result 
+    log("modify index {}  result {}",index,result)
+    return scoreboard_entry.bundle(
+            sb_valid=scoreboard[index].sb_valid,   
+            rd=scoreboard[index].rd,
+            rs1=scoreboard[index].rs1,
+            rs2=scoreboard[index].rs2,
+            rs1_ready=scoreboard[index].rs1_ready,
+            rs2_ready=scoreboard[index].rs2_ready,
+            rs1_value=scoreboard[index].rs1_value,
+            rs2_value=scoreboard[index].rs2_value,
+            rs1_dep=scoreboard[index].rs1_dep,
+            rs2_dep=scoreboard[index].rs2_dep,
+            result_ready=Bits(1)(1),
+            result=result,
+            sb_status= Bits(2)(3),
+            signals=scoreboard[index].signals,
+            fetch_addr=scoreboard[index].fetch_addr,
+            is_memory_read=scoreboard[index].is_memory_read,
+            mdata=  scoreboard[index].mdata,
+            is_csr= scoreboard[index].is_csr,
+            csr_id= scoreboard[index].csr_id,
+            csr_new= scoreboard[index].csr_new,
+            mem_ext= scoreboard[index].mem_ext
+            
+)
+     
 def modify_entry_mem_status(scoreboard,index,is_memory_read ,result  ,is_csr  ,csr_id ,csr_new,mem_ext,status):
     is_memory_read=is_memory_read
     result=result
@@ -317,7 +344,7 @@ def add_entry(signals,scoreboard,Index,RMT,reg_file,fetch_addr,mem_index,ex_inde
         rs1_dep=(~rs1_ready).select(RMT[rs1],NoDep)
         rs1_value=(rs1_result_valid).select(rs1_value_prefetch,reg_file[signals.rs1])
         log("rs1_valid {} rs1_value_prefetch {} rs1_ready {} rs1_dep {} rs1_value {}",signals.rs1_valid,rs1_value_prefetch,rs1_ready,rs1_dep,rs1_value)
-        
+        log("RMT[rs1] {}   entry_rs1.is_memory_read {}    entry_rs1.mdata {} entry_rs1.result  {}  reg_file[signals.rs1] {}",RMT[rs1],entry_rs1.is_memory_read,entry_rs1.mdata,entry_rs1.result,reg_file[signals.rs1])
         rs2_result_valid =  ((entry_rs2.sb_status== Bits(2)(3) )& (RMT[rs2] != NoDep))
         rs2_value_prefetch = (entry_rs2.is_memory_read).select( entry_rs2.mdata , entry_rs2.result)
         rs2_ready=(signals.rs2_valid & (RMT[rs2] != NoDep)&(~rs2_result_valid)).select(Bits(1)(0), Bits(1)(1))

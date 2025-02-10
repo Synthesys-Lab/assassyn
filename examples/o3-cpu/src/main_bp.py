@@ -629,7 +629,7 @@ if __name__ == '__main__':
         '0to100',
         #'dhrystone',
         #'median',
-        #'multiply',
+        # 'multiply',
         #'qsort',
         #'rsort',
         #'towers',

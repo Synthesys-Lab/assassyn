@@ -49,7 +49,7 @@ def decode_logic(inst):
         if ri.has_rd:
             fmt = fmt + "| rd: x{:02}      "
             args.append(ri.view().rd)
-            rd_valid = rd_valid | eq
+            rd_valid = rd_valid | eq 
         else:
             fmt = fmt + '|              '
 

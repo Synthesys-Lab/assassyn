@@ -34,9 +34,9 @@ class WriteBack(Module):
             csr_file[csr_id] = csr_new
          
         scoreboard[sb_head[0]] = modify_entry_valid(scoreboard,sb_head[0],Bits(1)(0))
-        sb_head[0]= ((((sb_head[0].bitcast(UInt(32)) )+UInt(32)(1) ).bitcast(Bits(SCOREBOARD.Bit_size)) )& (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size-1 )))
-        
+        sb_head[0] = (
+            (sb_head[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1))
+        ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
         log("Update sb_head {:07} ",sb_head[0])
-        log("out writeback")
-        #Todo:make it commit in order  
+        
         return rd,rmt_clear_rd,rmt_clear_index
