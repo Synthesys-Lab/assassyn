@@ -48,6 +48,8 @@ class Execution(Module):
         exec_br_sm: Array,
         exec_br_jumped: Array,
         br_no_jump: Array,
+        no_br_buffer: Array,
+        exec_br_flag: Array,         
         ):
 
         csr_id = Bits(4)(0)
@@ -84,6 +86,7 @@ class Execution(Module):
                 self.fetch_addr.peek(), rs1, a_valid, rs2, b_valid, rd, rd_valid)
 
         jump_flag = br_no_jump[0] & exec_br_jumped[0]
+        
         valid = valid #& (~ jump_flag)
         
         wait_until(valid)
@@ -220,8 +223,6 @@ class Execution(Module):
             log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc0)
             
         exec_br_jumped[0] = signals.is_branch.select(condition[0:0], Bits(1)(0))
-        exec_br_sm[0] = signals.is_branch
-
         is_memory = memory_read | memory_write
 
         # This `is_memory` hack is to evade rust's overflow check.
@@ -241,7 +242,6 @@ class Execution(Module):
         bound.async_called()
         with Condition(signals.csr_write):
             csr_f[csr_id] = csr_new
-
 
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
@@ -264,7 +264,7 @@ class Decoder(Module):
         log("raw: 0x{:08x}  | addr: 0x{:05x} |", inst, fetch_addr)
 
         signals = decode_logic(inst)
-        br_sm[0] = signals.is_branch
+ 
         
         e_call = executor.async_called(signals=signals, fetch_addr=fetch_addr)
         e_call.bind.set_fifo_depth(signals=2, fetch_addr=2)
@@ -305,15 +305,19 @@ class FetcherImpl(Downstream):
               br_jump: Array,
               exec_br_buffer: Array,
               br_no_jump: Array,
+              no_br_buffer: Array,
+              exec_br_flag: Array,
               ):
 
         ongoing = RegArray(Int(8), 1, initializer=[0])
 
         on_branch = on_branch.optional(Bits(1)(0))
+        br_sm[0] = on_branch 
         should_fetch = ( ~ on_branch & ~ br_sm[0])
         br_no_jump[0] = ~ br_jump[0]
-
-        
+        exec_br_buffer[0] = br_sm[0]
+        no_br_buffer[0] = ~ exec_br_buffer[0]
+        exec_br_flag[0] = br_sm[0] & (~ br_sm[0])
 
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
@@ -322,11 +326,11 @@ class FetcherImpl(Downstream):
         to_fetch = Bits(32)(0)
         #to_fetch = should_fetch.select(pc_addr, to_fetch)
         to_fetch = (br_jump[0]& (~ new_cnt[0:0])).select(ex_bypass[0].bitcast(Bits(32)), pc_addr)
-        real_fetch = (should_fetch  | exec_br_buffer[0])& (new_cnt < Int(8)(3))
+        real_fetch = (should_fetch  | exec_br_flag[0])& (new_cnt < Int(8)(3))
         log("on_br: {}         | br_sm: {}     | br_jump: {}      | fetch: {}      | addr: 0x{:05x} | ongoing: {}", on_branch, br_sm[0], br_jump[0], should_fetch, to_fetch, ongoing[0])
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
-        log("on_br: {}         | de_by: {}     | ex_by: {}      | fetch: {}      | addr: 0x{:05x} | ongoing: {}",
-            on_branch, ex_valid.optional(Bits(1)(0)), exec_br_buffer[0],real_fetch, to_fetch, new_cnt)
+        log("on_br: {}         | de_by: {}     | ex_by: {}      | fetch: {}      | addr: 0x{:05x} | new_cnt: {} | exec_br_flag: {}",
+            on_branch, ex_valid.optional(Bits(1)(0)), exec_br_buffer[0],real_fetch, to_fetch, new_cnt, exec_br_flag[0])
 
         with Condition(real_fetch):
             icache.bound.async_called(fetch_addr=to_fetch)
@@ -423,6 +427,8 @@ def build_cpu(depth_log):
         exec_br_jumped = RegArray(Bits(1), 1)
         mem_br_no_jump = RegArray(Bits(1), 1)
         exec_br_buffer = RegArray(Bits(1), 1)
+        no_br_buffer = RegArray(Bits(1), 1)
+        exec_br_flag = RegArray(Bits(1), 1)
 
         writeback = WriteBack()
         wb_rd = writeback.build(reg_file = reg_file)
@@ -451,6 +457,8 @@ def build_cpu(depth_log):
             exec_br_sm = exec_br_buffer,
             exec_br_jumped = exec_br_jumped,
             br_no_jump = mem_br_no_jump,
+            no_br_buffer = no_br_buffer,
+            exec_br_flag = exec_br_flag,
 
         )
 
@@ -467,7 +475,8 @@ def build_cpu(depth_log):
 
         fetcher_impl.build(on_br, exec_br_dest, ex_valid, pc_reg,
                             pc_addr, decoder, f'{workspace}/workload.exe',
-                              depth_log, d_br_buffer , exec_br_jumped , exec_br_buffer,mem_br_no_jump)
+                              depth_log, d_br_buffer , exec_br_jumped , exec_br_buffer,
+                              mem_br_no_jump, no_br_buffer,exec_br_flag)
 
         onwrite_downstream = Onwrite()
 
@@ -571,9 +580,9 @@ if __name__ == '__main__':
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        '0to100',
+        #'0to100',
         #'multiply',
-        #'dhrystone',
+        'dhrystone',
         #'median',
         #'multiply',
         #'qsort',
