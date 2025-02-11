@@ -41,7 +41,6 @@ class External_loop(Module):
     def build(self):
         In_full_flag = self.pop_all_ports(True)
         span = RegArray(Int(32), 1)
-        span[0] = Int(32)(FFT_SIZE) >> Int(32)(1) # initialization?
         with Condition(In_full_flag == Bits(1)(1)):
             con = Bits(1)(0)
             con = span[0] > Int(32)(0)
@@ -57,17 +56,22 @@ class Internal_loop(Module):
         ) 
         
     @module.combinational
-    def build(self, outter_loop: External_loop, span: Array):
+    def build(self):
         
-        odd = RegArray(Int(32), 1)
-        odd[0] = span[0] # initialization?
+        j = RegArray(Int(32), 1, initializer=[0])
+        span = RegArray(Int(32), 1, initializer=[FFT_SIZE >> 1])
+        
+        with Condition(span[0] == Int(32)(0)):
+            finish()
+        
         con = Bits(1)(0)
-        full_flag = Bits(1)(0)
-        con = odd[0] < Int(32)(FFT_SIZE)
-        full_flag = odd[0] == (Int(32)(FFT_SIZE)-Int(32)(1))
-        odd[0] = con.select((odd[0].bitcast(Int(32)) + Int(32)(1)), Int(32)(0))
-        outter_loop.async_called( In_full_flag = full_flag.bitcast(Bits(1)))
-        return odd
+        con = j[0] == Int(32)(FFT_SIZE)
+        j[0] = con.select(Int(32)(0), (j[0].bitcast(Int(32)) + Int(32)(1)))
+        
+        span[0] = con.select((span[0].bitcast(Int(32)) >> Int(32)(1)), span[0])
+        
+        # outter_loop.async_called( In_full_flag = full_flag.bitcast(Bits(1)))
+        return span, j
 
 
 
@@ -85,14 +89,14 @@ class Driver(Module):
 def test_fft():
     sys =  SysBuilder('fft')
     with sys:
-        external_loop = External_loop()
-        span = external_loop.build()
+        # external_loop = External_loop()
+        # span = external_loop.build()
 
         internal_loop = Internal_loop()
-        odd = internal_loop.build(external_loop, span)
+        span, j = internal_loop.build()
 
         loop_user = Loop_user()
-        loop_user.build(span, odd)
+        loop_user.build(span, j)
 
         driver = Driver()
         driver.build(internal_loop, loop_user)
