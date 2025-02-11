@@ -225,7 +225,7 @@ supported_opcodes = [
 
   ('jalr'  , (0b1100111, 0b000, RV32I_ALU.ALU_ADD, (RV32I_ALU.ALU_TRUE, False), None, None), IInst),
   ('addi'  , (0b0010011, 0b000, RV32I_ALU.ALU_ADD, None, None, None), IInst),
-  ('xori'  , (0b0010011, 0b100, RV32I_ALU.ALU_XOR, None, None, None), IInst),
+
 
   ('lw'    , (0b0000011, 0b010, RV32I_ALU.ALU_ADD, None, None, None), IInst),
   ('lbu'   , (0b0000011, 0b100, RV32I_ALU.ALU_ADD, None, None, None), IInst),
