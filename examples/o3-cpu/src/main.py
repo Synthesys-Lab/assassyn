@@ -242,7 +242,7 @@ class Decoder(Module):
         Index = sb_tail[0]
         noWAW =  (( RMT[signals.rd] ==Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size))| is_ebreak |is_nop | signals.is_branch  ).select(Bits(1)(1),Bits(1)(0))
         decode_allowed = is_not_full_scoreboard.select(Bits(1)(1),Bits(1)(0))
-        log("tail {:05}  noWAW {:07} | is_not_full_scoreboard {:07} |  decode_allowed {} |",  Index, noWAW, is_not_full_scoreboard, decode_allowed) 
+        
         wait_until(decode_allowed)
  
         inst, fetch_addr = self.pop_all_ports(False)
@@ -371,20 +371,17 @@ class UpdateScoreboard(Downstream):
         update_tail = (not_decoded ).select(
             sb_tail[0],
             (
-                (sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1))  # Convert to Int, add as Int
-            ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1)) # Convert back to Bits for modulo
+                (sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1))   
+            ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))  
         )
 
         bypass_tail =  (
             (
-                (execution_index.optional(sb_tail[0])).bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) # Convert to Int, add as Int
-            ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1)) # Convert back to Bits for modulo
+                (execution_index.optional(sb_tail[0])).bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) 
+            ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))  
         )
         sb_tail[0] = (is_branch).select( bypass_tail ,update_tail )
-        
-        # with Condition(is_branch):
-        #     scoreboard[bypass_tail]=modify_entry_valid(scoreboard,bypass_tail,Bits(1)(0))
-
+         
         rmt_clear_rd = rmt_clear_rd.optional(Bits(5)(0))
         rmt_up_rd = rmt_update_rd.optional(Bits(5)(0))
         mem_index = mem.optional(NoDep)
@@ -410,30 +407,42 @@ class UpdateScoreboard(Downstream):
 
             early_dispatch_valid =( newest_entry.rs1_ready & newest_entry.rs2_ready &(~is_ebreak)).select(Bits(1)(1),Bits(1)(0))
  
-                    
+
+     
+     
+        ready_dispatch_index = NoDep
+        ready_entry_value = Bits(318+2*SCOREBOARD.Bit_size)(0) 
         for i in range(SCOREBOARD.size):
-            with Condition((scoreboard[i].sb_valid & (scoreboard[i].sb_status==Bits(2)(0))& \
-                            (~( ((Bits(SCOREBOARD.Bit_size)(i)==bypass_tail))&(is_branch) ) ) )):
+            with Condition(scoreboard[i].sb_valid & (scoreboard[i].sb_status==Bits(2)(0) )):
                 
                 rs1_dp = scoreboard[i].rs1_dep
                 rs2_dp = scoreboard[i].rs2_dep
-                with Condition((~scoreboard[i].rs1_ready)&(( rs1_dp == mem_index)|(rs1_dp == ex_index)) &(scoreboard[rs1_dp].sb_status!= Bits(2)(3))):
-                    result = ( rs1_dp == mem_index).select(m_data,e_data)
-                    scoreboard[i]=modify_entry_rs1(scoreboard,i,result)
-                with Condition((~scoreboard[i].rs2_ready)&(( rs2_dp == mem_index)|(rs2_dp == ex_index)) &(scoreboard[rs2_dp].sb_status!= Bits(2)(3)) ):
-                    result = ( rs2_dp == mem_index).select(m_data,e_data)
-                    scoreboard[i]=modify_entry_rs2(scoreboard,i,result)
+                
+                rs1_prefetch = (~scoreboard[i].rs1_ready)&(( rs1_dp == mem_index)|(rs1_dp == ex_index)) &(scoreboard[rs1_dp].sb_status!= Bits(2)(3))
+                rs2_prefetch = (~scoreboard[i].rs2_ready)&(( rs2_dp == mem_index)|(rs2_dp == ex_index)) &(scoreboard[rs2_dp].sb_status!= Bits(2)(3)) 
                 
                 rs1_update = (~scoreboard[i].rs1_ready)&(( scoreboard[rs1_dp].sb_status== Bits(2)(3)))
                 rs2_update = (~scoreboard[i].rs2_ready)&(( scoreboard[rs2_dp].sb_status== Bits(2)(3)))
-                with Condition(rs1_update|rs2_update):
-                    scoreboard[i]=modify_entry_rs(scoreboard,i,rs1_update,rs2_update)
+
+                rs1_result = ( rs1_dp == mem_index).select(m_data,e_data)
+                rs2_result = ( rs2_dp == mem_index).select(m_data,e_data)
+                
+                updated_rs_entry=modify_entry_update_rs(scoreboard,i,rs1_result,rs2_result,rs1_prefetch,rs2_prefetch,rs1_update,rs2_update)
+                updated_rs_entry_value = updated_rs_entry.value()
+                rs_ready = (updated_rs_entry.rs1_ready & updated_rs_entry.rs2_ready ).select(Bits(1)(1),Bits(1)(0))
+                     
+                with Condition( rs1_prefetch | rs2_prefetch | rs1_update|rs2_update):
+                    with Condition(~rs_ready):
+                        scoreboard[i]=updated_rs_entry
+                    with Condition(rs_ready):    
+                        scoreboard[ready_dispatch_index] =  scoreboard_entry.view(ready_entry_value.optional(Bits(318+2*SCOREBOARD.Bit_size)(0)))
+                        ready_dispatch_index = Bits(SCOREBOARD.Bit_size)(i)
+                        ready_entry_value = updated_rs_entry_value 
                 
         with Condition( (rmt_clear_rd != Bits(5)(0))& (rmt_clear_rd!=rmt_up_rd)& (RMT[rmt_clear_rd]==rmt_cl_index)):
             RMT[rmt_clear_rd] = NoDep
-            
-            
-        return  br_signal,newest_index,entry_value,early_dispatch_valid
+             
+        return  br_signal,newest_index,entry_value,early_dispatch_valid  ,ready_dispatch_index,ready_entry_value
  
 
 class Dispatch(Downstream):
@@ -443,15 +452,25 @@ class Dispatch(Downstream):
         self.name = 'p'
 
     @downstream.combinational
-    def build(self,scoreboard:Array,executor:Module,RMT:Array  ,trigger:Value,new_index:Value,new_entry_value:Value,early_dispatch_valid:Value): 
+    def build(self,
+            scoreboard:Array,
+            executor:Module,
+            RMT:Array  ,
+            trigger:Value,
+            new_index:Value,
+            new_entry_value:Value,
+            early_dispatch_valid:Value,
+            ready_dispatch_index:Value,
+            ready_entry_value:Value
+             ): 
         
         trigger = trigger.optional(Bits(1)(0))
+
         early_dispatch_valid = early_dispatch_valid.optional(Bits(1)(0))
         new_entry_valid = new_index.valid()
         new_index = new_index.optional(NoDep)
         new_entry_value = new_entry_value.optional(Bits(318+2*SCOREBOARD.Bit_size)(0))
         with Condition(new_entry_valid):
-            log("aa")
             new_entry=scoreboard_entry.view(new_entry_value)
             update_status_entry = modify_entry_sb_status(new_entry)
             updated_entry_value = early_dispatch_valid.select( update_status_entry.value(), new_entry_value)
@@ -464,13 +483,30 @@ class Dispatch(Downstream):
                     Bits(6)(i), scoreboard[i].fetch_addr ,scoreboard[i].sb_valid ,scoreboard[i].sb_status ,\
                     scoreboard[i].rs1_ready,scoreboard[i].rs2_ready,RMT[scoreboard[i].rs1], RMT[scoreboard[i].rs2])
                 
-                log("Dispatch call execution index {:05} | ",  new_index )
                 call = executor.async_called(rs1_value=new_entry.rs1_value,rs2_value=new_entry.rs2_value ,\
                                                         signals= new_entry.signals,fetch_addr=new_entry.fetch_addr ,sb_index=new_index)
                 
                 call.bind.set_fifo_depth()
 
-        with Condition(~early_dispatch_valid):
+        # ready_entry_value =( ready_entry_value.valid() ).select( ready_entry_value.optional(Bits(318+2*SCOREBOARD.Bit_size)(0)) ,ready_entry_value )
+        # update_rs_valid = (ready_entry_value!=Bits(318+2*SCOREBOARD.Bit_size)(0))
+        ready_index_value = ready_dispatch_index.optional(NoDep)
+        update_rs_valid = (ready_dispatch_index.valid() & (ready_index_value!=NoDep) )
+        with Condition( (~early_dispatch_valid) & update_rs_valid ):
+            new_entry=scoreboard_entry.view(ready_entry_value)
+            update_status_entry = modify_entry_sb_status(new_entry)
+            scoreboard[ready_dispatch_index] = update_status_entry
+             
+            call = executor.async_called(rs1_value=new_entry.rs1_value,rs2_value=new_entry.rs2_value ,\
+                                                        signals= new_entry.signals,fetch_addr=new_entry.fetch_addr ,sb_index=ready_dispatch_index)
+                
+            call.bind.set_fifo_depth()
+         
+        with Condition( early_dispatch_valid & update_rs_valid ):
+            new_entry=scoreboard_entry.view(ready_entry_value) 
+            scoreboard[ready_dispatch_index] = new_entry
+         
+        with Condition( (~early_dispatch_valid ) & (~update_rs_valid)  ): 
             valid_global = Bits(1)(0)  # check if there is a valid entry to be executed
             valid_temp = Bits(1)(0)
             not_ready = Bits(1)(0)
@@ -485,6 +521,7 @@ class Dispatch(Downstream):
                 log("i {}, addr {} valid {}  status {}   dispatch {}   rs1 {} rs2 {} dep1 {} dep2 {} |",\
                     Bits(6)(i), scoreboard[i].fetch_addr ,scoreboard[i].sb_valid ,scoreboard[i].sb_status ,dispatch_index,\
                     scoreboard[i].rs1_ready,scoreboard[i].rs2_ready,RMT[scoreboard[i].rs1], RMT[scoreboard[i].rs2])
+                
                 signals= deocder_signals.view(scoreboard[i].signals)
                 is_ebreak_temp = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0))) & (signals.alu == Bits(16)(0)))
                 ebreak_index = is_ebreak_temp.select(  Bits(SCOREBOARD.Bit_size)(i) , ebreak_index)
@@ -502,7 +539,6 @@ class Dispatch(Downstream):
             
             with Condition(valid_global ):
                 scoreboard[dispatch_index] =modify_entry_status(scoreboard,dispatch_index,Bits(2)(1))
-                log("Dispatch call execution index {:05} | ",  dispatch_index )
                 signals=deocder_signals.view(scoreboard[dispatch_index].signals)
                 
                 call = executor.async_called(rs1_value=scoreboard[dispatch_index].rs1_value,rs2_value=scoreboard[dispatch_index].rs2_value ,\
@@ -573,7 +609,7 @@ def build_cpu(depth_log):
         reg_map_table = RegArray(Bits(SCOREBOARD.Bit_size),32,initializer=[SCOREBOARD.size]*32,attr=[Array.FULLY_PARTITIONED])
 
     
-        scoreboard = RegArray(scoreboard_entry,SCOREBOARD.size,attr=[Array.FULLY_PARTITIONED])
+        scoreboard = RegArray(scoreboard_entry,SCOREBOARD.size+1,attr=[Array.FULLY_PARTITIONED])
 
         sb_head = RegArray(Bits(SCOREBOARD.Bit_size), 1, initializer=[0])
         sb_tail = RegArray(Bits(SCOREBOARD.Bit_size), 1, initializer=[0])
@@ -620,7 +656,7 @@ def build_cpu(depth_log):
              scoreboard=scoreboard, RMT=reg_map_table, sb_head=sb_head,sb_tail=sb_tail)
 
 
-        br_signal,newest_index,entry_value,early_dispatch_valid= update_sb.build(cycle_activate=cycle_activate ,ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,execution_index=execution_index ,is_nop=is_nop,\
+        br_signal,newest_index,entry_value,early_dispatch_valid ,ready_dispatch_index,ready_entry_value  = update_sb.build(cycle_activate=cycle_activate ,ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,execution_index=execution_index ,is_nop=is_nop,\
             sb_tail=sb_tail,br_sm=br_sm,decode_allowed=decode_allowed,decode_on_branch=decode_on_branch ,rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
                 rmt_update_rd=rmt_update_rd,rmt_update_index=rmt_update_index,mdata=m_data,ex_data = ex_data,reg_file=reg_file,\
                       cur_index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals)
@@ -628,7 +664,9 @@ def build_cpu(depth_log):
         fetcher_impl.build(decode_on_branch,br_signal, ex_bypass, ex_valid, pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log,is_nop,  sb_head, sb_tail)
         
         dispatch = Dispatch()
-        dispatch.build(executor=executor,scoreboard=scoreboard,RMT=reg_map_table,trigger=cycle_activate,new_index=newest_index,new_entry_value=entry_value,early_dispatch_valid=early_dispatch_valid) 
+        dispatch.build(executor=executor,scoreboard=scoreboard,RMT=reg_map_table,trigger=cycle_activate,new_index=newest_index,\
+            new_entry_value=entry_value,early_dispatch_valid=early_dispatch_valid,ready_dispatch_index=ready_dispatch_index,ready_entry_value=ready_entry_value)  
+             
         
         
         driver = Driver()
@@ -662,14 +700,13 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
             value = value[2:]
             open(f'{workspace}/workload.init', 'w').write(value)
 
-    report = False
+    report = True
 
     if report:
         raw = utils.run_simulator(simulator_path, False)
-        open(f'{workload}.log', 'w').write(raw)
-        #open(f'{workload}.sim.time', 'w').write(str(tt))
-        raw = utils.run_verilator(verilog_path, False)
-        open(f'{workload}.verilog.log', 'w').write(raw)
+        open(f'{workload}.log', 'w').write(raw) 
+        # raw = utils.run_verilator(verilog_path, False)
+        # open(f'{workload}.verilog.log', 'w').write(raw)
     else:
         raw = utils.run_simulator(simulator_path)
         open('raw.log', 'w').write(raw)
@@ -718,13 +755,13 @@ if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         # '0to100',
-        # 'multiply', #1
+        # 'multiply', 
         #'dhrystone',
         # 'median',
-        'multiply',
-        # 'qsort', #?
+        # 'multiply',
+        # 'qsort',  
         # 'rsort',
-        # 'towers',
+        'towers',
         # 'vvadd',
     ]
     # Iterate workloads
