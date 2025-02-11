@@ -407,11 +407,13 @@ class UpdateScoreboard(Downstream):
 
             early_dispatch_valid =( newest_entry.rs1_ready & newest_entry.rs2_ready &(~is_ebreak)).select(Bits(1)(1),Bits(1)(0))
  
-
+        with Condition( (rmt_clear_rd != Bits(5)(0))& (rmt_clear_rd!=rmt_up_rd)& (RMT[rmt_clear_rd]==rmt_cl_index)):
+            RMT[rmt_clear_rd] = NoDep 
      
      
-        ready_dispatch_index = NoDep
-        ready_entry_value = Bits(318+2*SCOREBOARD.Bit_size)(0) 
+        ready_dispatch_index= Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size) 
+        last_rs1_value = Bits(32)(0)
+        last_rs2_value = Bits(32)(0)  
         for i in range(SCOREBOARD.size):
             with Condition(scoreboard[i].sb_valid & (scoreboard[i].sb_status==Bits(2)(0) )):
                 
@@ -428,21 +430,21 @@ class UpdateScoreboard(Downstream):
                 rs2_result = ( rs2_dp == mem_index).select(m_data,e_data)
                 
                 updated_rs_entry=modify_entry_update_rs(scoreboard,i,rs1_result,rs2_result,rs1_prefetch,rs2_prefetch,rs1_update,rs2_update)
-                updated_rs_entry_value = updated_rs_entry.value()
-                rs_ready = (updated_rs_entry.rs1_ready & updated_rs_entry.rs2_ready ).select(Bits(1)(1),Bits(1)(0))
-                     
-                with Condition( rs1_prefetch | rs2_prefetch | rs1_update|rs2_update):
-                    with Condition(~rs_ready):
-                        scoreboard[i]=updated_rs_entry
-                    with Condition(rs_ready):    
-                        scoreboard[ready_dispatch_index] =  scoreboard_entry.view(ready_entry_value.optional(Bits(318+2*SCOREBOARD.Bit_size)(0)))
-                        ready_dispatch_index = Bits(SCOREBOARD.Bit_size)(i)
-                        ready_entry_value = updated_rs_entry_value 
-                
-        with Condition( (rmt_clear_rd != Bits(5)(0))& (rmt_clear_rd!=rmt_up_rd)& (RMT[rmt_clear_rd]==rmt_cl_index)):
-            RMT[rmt_clear_rd] = NoDep
-             
-        return  br_signal,newest_index,entry_value,early_dispatch_valid  ,ready_dispatch_index,ready_entry_value
+                 
+                rs_ready = (updated_rs_entry.rs1_ready &  updated_rs_entry.rs2_ready ).select(Bits(1)(1),Bits(1)(0))
+                update_operand =  rs1_prefetch | rs2_prefetch | rs1_update|rs2_update
+                 
+                valid_issue = ( update_operand & rs_ready)
+  
+                ready_dispatch_index = valid_issue.select( Bits(SCOREBOARD.Bit_size)(i),ready_dispatch_index)
+                last_rs1_value = valid_issue.select( updated_rs_entry.rs1_value ,last_rs1_value)
+                last_rs2_value = valid_issue.select( updated_rs_entry.rs2_value ,last_rs2_value)
+
+                with Condition( update_operand & (~rs_ready) ):
+                    scoreboard[i]=updated_rs_entry
+                 
+
+        return  br_signal,newest_index,entry_value,early_dispatch_valid,ready_dispatch_index ,last_rs1_value,last_rs2_value
  
 
 class Dispatch(Downstream):
@@ -461,11 +463,12 @@ class Dispatch(Downstream):
             new_entry_value:Value,
             early_dispatch_valid:Value,
             ready_dispatch_index:Value,
-            ready_entry_value:Value
-             ): 
+            last_rs1_value:Value,
+            last_rs2_value:Value 
+            ): 
         
         trigger = trigger.optional(Bits(1)(0))
-
+        
         early_dispatch_valid = early_dispatch_valid.optional(Bits(1)(0))
         new_entry_valid = new_index.valid()
         new_index = new_index.optional(NoDep)
@@ -488,22 +491,20 @@ class Dispatch(Downstream):
                 
                 call.bind.set_fifo_depth()
 
-        # ready_entry_value =( ready_entry_value.valid() ).select( ready_entry_value.optional(Bits(318+2*SCOREBOARD.Bit_size)(0)) ,ready_entry_value )
-        # update_rs_valid = (ready_entry_value!=Bits(318+2*SCOREBOARD.Bit_size)(0))
-        ready_index_value = ready_dispatch_index.optional(NoDep)
-        update_rs_valid = (ready_dispatch_index.valid() & (ready_index_value!=NoDep) )
+        update_rs_valid = ready_dispatch_index.valid()
+        log("a     update_rs_valid {}   early_dispatch_valid{}",update_rs_valid,early_dispatch_valid)
         with Condition( (~early_dispatch_valid) & update_rs_valid ):
-            new_entry=scoreboard_entry.view(ready_entry_value)
-            update_status_entry = modify_entry_sb_status(new_entry)
-            scoreboard[ready_dispatch_index] = update_status_entry
+            log("in ") 
+            update_status_entry = modify_status_rs(scoreboard,ready_dispatch_index,last_rs1_value,last_rs2_value)
+            scoreboard[ready_dispatch_index ] = update_status_entry
              
             call = executor.async_called(rs1_value=new_entry.rs1_value,rs2_value=new_entry.rs2_value ,\
                                                         signals= new_entry.signals,fetch_addr=new_entry.fetch_addr ,sb_index=ready_dispatch_index)
                 
             call.bind.set_fifo_depth()
-         
-        with Condition( early_dispatch_valid & update_rs_valid ):
-            new_entry=scoreboard_entry.view(ready_entry_value) 
+        log("b")
+        with Condition( early_dispatch_valid & update_rs_valid ): 
+            update_status_entry = modify_entry_rs(scoreboard,ready_dispatch_index,last_rs1_value,last_rs2_value)
             scoreboard[ready_dispatch_index] = new_entry
          
         with Condition( (~early_dispatch_valid ) & (~update_rs_valid)  ): 
@@ -609,7 +610,7 @@ def build_cpu(depth_log):
         reg_map_table = RegArray(Bits(SCOREBOARD.Bit_size),32,initializer=[SCOREBOARD.size]*32,attr=[Array.FULLY_PARTITIONED])
 
     
-        scoreboard = RegArray(scoreboard_entry,SCOREBOARD.size+1,attr=[Array.FULLY_PARTITIONED])
+        scoreboard = RegArray(scoreboard_entry,SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size,attr=[Array.FULLY_PARTITIONED])
 
         sb_head = RegArray(Bits(SCOREBOARD.Bit_size), 1, initializer=[0])
         sb_tail = RegArray(Bits(SCOREBOARD.Bit_size), 1, initializer=[0])
@@ -656,7 +657,7 @@ def build_cpu(depth_log):
              scoreboard=scoreboard, RMT=reg_map_table, sb_head=sb_head,sb_tail=sb_tail)
 
 
-        br_signal,newest_index,entry_value,early_dispatch_valid ,ready_dispatch_index,ready_entry_value  = update_sb.build(cycle_activate=cycle_activate ,ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,execution_index=execution_index ,is_nop=is_nop,\
+        br_signal,newest_index,entry_value,early_dispatch_valid ,ready_dispatch_index,last_rs1_value,last_rs2_value = update_sb.build(cycle_activate=cycle_activate ,ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,execution_index=execution_index ,is_nop=is_nop,\
             sb_tail=sb_tail,br_sm=br_sm,decode_allowed=decode_allowed,decode_on_branch=decode_on_branch ,rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
                 rmt_update_rd=rmt_update_rd,rmt_update_index=rmt_update_index,mdata=m_data,ex_data = ex_data,reg_file=reg_file,\
                       cur_index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals)
@@ -665,7 +666,7 @@ def build_cpu(depth_log):
         
         dispatch = Dispatch()
         dispatch.build(executor=executor,scoreboard=scoreboard,RMT=reg_map_table,trigger=cycle_activate,new_index=newest_index,\
-            new_entry_value=entry_value,early_dispatch_valid=early_dispatch_valid,ready_dispatch_index=ready_dispatch_index,ready_entry_value=ready_entry_value)  
+            new_entry_value=entry_value,early_dispatch_valid=early_dispatch_valid,ready_dispatch_index=ready_dispatch_index,last_rs1_value=last_rs1_value,last_rs2_value=last_rs2_value )  
              
         
         
