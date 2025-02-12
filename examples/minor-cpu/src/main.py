@@ -46,11 +46,11 @@ class Execution(Module):
         depth_log: int,
         exec_br_dest: Array,
         jump_flag_reg: Array,
-             
+        pre_valid: Array,
         ):
 
 
-        log("pre_failed: {}",jump_flag_reg[0])
+        
         csr_id = Bits(4)(0)
 
         signals = self.signals.peek()
@@ -74,8 +74,13 @@ class Execution(Module):
         with Condition(~valid):
             log("pc: 0x{:08x}   | rs1-x{:02}: {}       | rs2-x{:02}: {}   | rd-x{:02}: {} | backlogged", \
                 self.fetch_addr.peek(), rs1, a_valid, rs2, b_valid, rd, rd_valid)
-        
-        valid = valid | jump_flag_reg[0]
+            
+        jump_reg=RegArray(Bits(1), 1, initializer=[0])
+        pre_failed = (jump_reg[0] & pre_valid[0]) | jump_flag_reg[0]
+        log("pre_failed: {}",pre_failed)
+
+
+        valid = valid | pre_failed
         wait_until(valid)
         ex_valid = valid
         self.exe_valid = ex_valid
@@ -83,7 +88,8 @@ class Execution(Module):
 
         signals, fetch_addr = self.pop_all_ports(False)
         pc0 = (fetch_addr.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
-        alu = jump_flag_reg[0].select(Bits(16)(1<<RV32I_ALU.ALU_NONE),signals.alu)
+        alu = pre_failed.select(Bits(16)(1<<RV32I_ALU.ALU_NONE),signals.alu)
+        rd = pre_failed.select(Bits(5)(0),rd)
 
         raw_id = [
           (773, 1), #mtvec
@@ -147,13 +153,13 @@ class Execution(Module):
         # TODO: Fix this bullshit.
         result = alu.select1hot(*results)
 
-        memory_read = jump_flag_reg[0].select(Bits(1)(0),signals.memory[0:0])
-        memory_write = jump_flag_reg[0].select(Bits(1)(0),signals.memory[1:1])
+        memory_read = pre_failed.select(Bits(1)(0),signals.memory[0:0])
+        memory_write = pre_failed.select(Bits(1)(0),signals.memory[1:1])
 
-        #with Condition(jump_flag_reg[0]):
-        
 
-        with Condition(~jump_flag_reg[0]):
+
+
+        with Condition(~pre_failed):
 
             with Condition(is_csr):
                 log("csr_id: {} | new: {:08x} |", csr_id, csr_new)
@@ -196,6 +202,7 @@ class Execution(Module):
 
             with Condition(signals.is_branch):
                 exec_br_dest[0] = condition[0:0].select(result, pc0)
+                jump_reg[0] = condition[0:0]
                 log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc0)
 
             #exec_br_jumped[0] = signals.is_branch.select(condition[0:0], Bits(1)(0))
@@ -222,11 +229,8 @@ class Execution(Module):
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
         
-
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
-        log("log")
         bound = dcache.bound.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext)
-        log("log")
         bound.async_called()
 
         return  rd , ex_valid ,exec_br_jump
@@ -289,6 +293,7 @@ class FetcherImpl(Downstream):
               br_no_jump: Array,
               exec_br_jump: Value,
               jump_flag_reg: Array,
+              pre_valid: Array,
               ):
 
         ongoing = RegArray(Int(8), 1, initializer=[0])
@@ -300,13 +305,17 @@ class FetcherImpl(Downstream):
         br_no_jump[0] = ~ br_jump[0]
 
         fetch_valid=RegArray(Bits(1), 1, initializer=[1])
+        wait_unvalid = Bits(1)(0)
+        #with Condition(br_sm[0]):
+        #    fetch_valid[0] = ex_valid.optional(Bits(1)(0)).select(Bits(1)(1), Bits(1)(0))
+        #    wait_unvalid = ex_valid.optional(Bits(1)(0)).select(Bits(1)(1), Bits(1)(0))
+        #with Condition(~fetch_valid[0]):
+        #    fetch_valid[0] = Bits(1)(1)
+        fetch_valid[0] = br_sm[0].select(ex_valid.optional(Bits(1)(0)), Bits(1)(1))
+        pre_valid[0] = ~fetch_valid[0]
+        should_fetch =  (~ on_branch)   & (~ wait_unvalid) & fetch_valid[0]
 
-        with Condition(br_sm[0]):
-            fetch_valid[0] = ex_valid.optional(Bits(1)(0)).select(Bits(1)(1), Bits(1)(0))
-        with Condition(~fetch_valid[0]):
-            fetch_valid[0] = Bits(1)(1)
-
-        should_fetch =  (~ on_branch)  & fetch_valid[0]
+        log("fetch_valid: {} | pre_valid: {} |", fetch_valid[0], pre_valid[0])   
 
 
         jump_flag = br_jump[0] & br_no_jump[0]
@@ -422,7 +431,7 @@ def build_cpu(depth_log):
         d_br_buffer = RegArray(Bits(1), 1)
 
         jump_flag_reg = RegArray(Bits(1), 1)
-
+        pre_valid = RegArray(Bits(1), 1)
 
         writeback = WriteBack()
         wb_rd = writeback.build(reg_file = reg_file)
@@ -449,6 +458,7 @@ def build_cpu(depth_log):
             depth_log = depth_log,
             exec_br_dest = exec_br_dest,
             jump_flag_reg = jump_flag_reg,
+            pre_valid = pre_valid,
 
         )
 
@@ -467,7 +477,7 @@ def build_cpu(depth_log):
         fetcher_impl.build(on_br, exec_br_dest, ex_valid, pc_reg,
                             pc_addr, decoder, f'{workspace}/workload.exe',
                               depth_log, d_br_buffer , exec_br_jumped , 
-                              mem_br_no_jump,exec_br_jump,jump_flag_reg)
+                              mem_br_no_jump,exec_br_jump,jump_flag_reg,pre_valid)
 
         onwrite_downstream = Onwrite()
 
@@ -572,12 +582,12 @@ if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         #'0to100',
-        #'median',
-        #'multiply',
-        #'qsort',
-        #'rsort',
-        #'towers',
-        #'vvadd',
+        'median',
+        'multiply',
+        'qsort',
+        'rsort',
+        'towers',
+        'vvadd',
     ]
     # Iterate workloads
     for wl in workloads:
@@ -594,7 +604,7 @@ if __name__ == '__main__':
         #'rv32ui-p-addi',
         #'rv32ui-p-and',
         #'rv32ui-p-andi',
-        'rv32ui-p-auipc',
+        #'rv32ui-p-auipc',
         #'rv32ui-p-beq',
         #'rv32ui-p-bge',
         #'rv32ui-p-bgeu',
