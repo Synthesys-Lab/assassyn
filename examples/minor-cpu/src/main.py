@@ -330,7 +330,7 @@ class FetcherImpl(Downstream):
         new_cnt = ongoing[0] - (ex_valid.optional(Bits(1)(0))).select(Int(8)(1), Int(8)(0))
         to_fetch = Bits(32)(0)
         #to_fetch = should_fetch.select(pc_addr, to_fetch)
-        to_fetch = (jump_flag& (~ new_cnt[0:0])).select(ex_bypass[0].bitcast(Bits(32)), pc_addr)
+        to_fetch = (jump_flag).select(ex_bypass[0].bitcast(Bits(32)), pc_addr)
         real_fetch = (should_fetch  )& (new_cnt < Int(8)(3))
         log("on_br: {}         | br_sm: {}     | br_jump: {}      | fetch: {}      | ex_bypass: 0x{:05x} | ongoing: {} | jump_flag: {}",
              on_branch, br_sm[0], br_jump[0], should_fetch, ex_bypass[0], ongoing[0],jump_flag)
@@ -580,13 +580,13 @@ if __name__ == '__main__':
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        #'0to100',
-        'median',
-        'multiply',
-        'qsort',
-        'rsort',
-        'towers',
-        'vvadd',
+        '0to100',
+        #'median',
+        #'multiply',
+        #'qsort',
+        #'rsort',
+        #'towers',
+        #'vvadd',
     ]
     # Iterate workloads
     for wl in workloads:
