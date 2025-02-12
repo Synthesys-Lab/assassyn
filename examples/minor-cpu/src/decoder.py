@@ -87,7 +87,7 @@ def decode_logic(inst):
     mem_ext = concat(eqs['lbu'], eqs['lbu']) 
 
     # BInst and JInst are designed for branches.
-    is_branch = is_type[BInst] | is_type[JInst] | eqs['ebreak'] | eqs['jalr'] | eqs['mret']
+    is_branch = is_type[BInst] | is_type[JInst] | eqs['jalr'] | eqs['mret']
     is_offset_br = is_type[BInst] | eqs['jal'] 
     link_pc = eqs['jalr'] | eqs['jal']
 
