@@ -212,6 +212,7 @@ class RV32I_ALU:
     ALU_CMP_LTU = 10
     # Always true.
     ALU_TRUE = 11
+    ALU_NONE = 15
 
 supported_opcodes = [
   # mn,     opcode,      operator
@@ -230,7 +231,7 @@ supported_opcodes = [
   ('lw'    , (0b0000011, 0b010, RV32I_ALU.ALU_ADD, None, None, None), IInst),
   ('lbu'   , (0b0000011, 0b100, RV32I_ALU.ALU_ADD, None, None, None), IInst),
 
-  ('ebreak', (0b1110011, 0b000, None, None,0b000000000001,None), IInst),
+  ('ebreak', (0b1110011, 0b000, RV32I_ALU.ALU_NONE, None,0b000000000001,None), IInst),
 
   ('sw'    , (0b0100011, 0b010, RV32I_ALU.ALU_ADD), SInst),
 
@@ -259,7 +260,7 @@ supported_opcodes = [
   ('mret' , (0b1110011, 0b000, 0b0011000,RV32I_ALU.ALU_ADD,0b00010), RInst ),
   #we have only a sigle thread, so we don't need to deal with 'fence' instruction
   ('fence' , (0b0001111, 0b000, RV32I_ALU.ALU_ADD, None,None,None), IInst),
-  ('ecall' , (0b1110011, 0b000, None, None,0b000000000000,None), IInst),
+  ('ecall' , (0b1110011, 0b000, RV32I_ALU.ALU_NONE, None,0b000000000000,None), IInst),
   
   ('and' , (0b0110011, 0b111, 0b0000000, RV32I_ALU.ALU_AND), RInst),
   ('andi' , (0b0010011, 0b111, RV32I_ALU.ALU_AND, None,None,None), IInst),

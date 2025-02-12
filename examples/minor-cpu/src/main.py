@@ -83,7 +83,7 @@ class Execution(Module):
 
         signals, fetch_addr = self.pop_all_ports(False)
         pc0 = (fetch_addr.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
-        alu = jump_flag_reg[0].select(Bits(16)(1),signals.alu)
+        alu = jump_flag_reg[0].select(Bits(16)(1<<RV32I_ALU.ALU_NONE),signals.alu)
 
         raw_id = [
           (773, 1), #mtvec
@@ -143,6 +143,7 @@ class Execution(Module):
         results[RV32I_ALU.ALU_SLL] = a << alu_b[0:4]
         results[RV32I_ALU.ALU_SRA] = sra_signed_result 
         results[RV32I_ALU.ALU_SRA_U] = a >> alu_b[0:4]
+        results[RV32I_ALU.ALU_NONE] = Bits(32)(0)
         # TODO: Fix this bullshit.
         result = alu.select1hot(*results)
 
@@ -161,7 +162,7 @@ class Execution(Module):
 
             is_ebreak = signals.rs1_valid & signals.imm_valid & \
                         ((signals.imm == Bits(32)(1)) | (signals.imm == Bits(32)(0))) & \
-                        (signals.alu == Bits(16)(0))
+                        (signals.alu == Bits(16)(1<<RV32I_ALU.ALU_NONE))
 
             with Condition(is_ebreak):
                 log('ebreak | halt | ecall')
@@ -318,7 +319,7 @@ class FetcherImpl(Downstream):
         new_cnt = ongoing[0] - (ex_valid.optional(Bits(1)(0))).select(Int(8)(1), Int(8)(0))
         to_fetch = Bits(32)(0)
 
-        to_fetch = (jump_flag& (~ new_cnt[0:0])).select(ex_bypass[0].bitcast(Bits(32)), pc_addr)
+        to_fetch = (jump_flag).select(ex_bypass[0].bitcast(Bits(32)), pc_addr)
         real_fetch = (should_fetch  )& (new_cnt < Int(8)(3))
         log("on_br: {}         | br_sm: {}     | br_jump: {}      | fetch: {}      | ex_bypass: 0x{:05x} | ongoing: {} | jump_flag: {}",
              on_branch, br_sm[0], br_jump[0], should_fetch, ex_bypass[0], ongoing[0],jump_flag)
@@ -570,7 +571,7 @@ if __name__ == '__main__':
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
-        '0to100',
+        #'0to100',
         #'median',
         #'multiply',
         #'qsort',
@@ -593,7 +594,7 @@ if __name__ == '__main__':
         #'rv32ui-p-addi',
         #'rv32ui-p-and',
         #'rv32ui-p-andi',
-        #'rv32ui-p-auipc',
+        'rv32ui-p-auipc',
         #'rv32ui-p-beq',
         #'rv32ui-p-bge',
         #'rv32ui-p-bgeu',
@@ -622,6 +623,7 @@ if __name__ == '__main__':
     # Iterate test cases
     for case in test_cases:
         # Copy test cases to tmp directory and rename to workload.
+        print(f"Running test: {case}")
         init_workspace(tests, case)
         run_cpu(sys, simulator_path, verilog_path)
     print("minor-CPU tests ran successfully!")
