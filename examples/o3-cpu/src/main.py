@@ -415,6 +415,7 @@ class UpdateScoreboard(Downstream):
         last_rs1_value = Bits(32)(0)
         last_rs2_value = Bits(32)(0)  
         for i in range(SCOREBOARD.size):
+            rs_ready = Bits(1)(0)
             with Condition(scoreboard[i].sb_valid & (scoreboard[i].sb_status==Bits(2)(0) )):
                 
                 rs1_dp = scoreboard[i].rs1_dep
@@ -431,16 +432,16 @@ class UpdateScoreboard(Downstream):
                 
                 updated_rs_entry=modify_entry_update_rs(scoreboard,i,rs1_result,rs2_result,rs1_prefetch,rs2_prefetch,rs1_update,rs2_update)
                  
-                rs_ready = (updated_rs_entry.rs1_ready &  updated_rs_entry.rs2_ready ).select(Bits(1)(1),Bits(1)(0))
+                rs_ready = (updated_rs_entry.rs1_ready &  updated_rs_entry.rs2_ready ).select(Bits(1)(1),rs_ready)
                 update_operand =  rs1_prefetch | rs2_prefetch | rs1_update|rs2_update
                  
                 valid_issue = ( update_operand & rs_ready)
   
-                ready_dispatch_index = valid_issue.select( Bits(SCOREBOARD.Bit_size)(i),ready_dispatch_index)
-                last_rs1_value = valid_issue.select( updated_rs_entry.rs1_value ,last_rs1_value)
-                last_rs2_value = valid_issue.select( updated_rs_entry.rs2_value ,last_rs2_value)
+                # ready_dispatch_index = valid_issue.select( Bits(SCOREBOARD.Bit_size)(i),ready_dispatch_index)
+                # last_rs1_value = valid_issue.select( updated_rs_entry.rs1_value ,last_rs1_value)
+                # last_rs2_value = valid_issue.select( updated_rs_entry.rs2_value ,last_rs2_value)
 
-                with Condition( update_operand & (~rs_ready) ):
+                with Condition( update_operand  ):
                     scoreboard[i]=updated_rs_entry
                  
 
@@ -491,10 +492,9 @@ class Dispatch(Downstream):
                 
                 call.bind.set_fifo_depth()
 
-        update_rs_valid = ready_dispatch_index.valid()
-        log("a     update_rs_valid {}   early_dispatch_valid{}",update_rs_valid,early_dispatch_valid)
-        with Condition( (~early_dispatch_valid) & update_rs_valid ):
-            log("in ") 
+        update_rs_valid = Bits(1)(0)
+        
+        with Condition( (~early_dispatch_valid) & update_rs_valid ): 
             update_status_entry = modify_status_rs(scoreboard,ready_dispatch_index,last_rs1_value,last_rs2_value)
             scoreboard[ready_dispatch_index ] = update_status_entry
              
@@ -502,7 +502,7 @@ class Dispatch(Downstream):
                                                         signals= new_entry.signals,fetch_addr=new_entry.fetch_addr ,sb_index=ready_dispatch_index)
                 
             call.bind.set_fifo_depth()
-        log("b")
+         
         with Condition( early_dispatch_valid & update_rs_valid ): 
             update_status_entry = modify_entry_rs(scoreboard,ready_dispatch_index,last_rs1_value,last_rs2_value)
             scoreboard[ready_dispatch_index] = new_entry
