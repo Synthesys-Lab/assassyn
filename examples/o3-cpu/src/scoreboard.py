@@ -9,6 +9,7 @@ class SCOREBOARD:
 
 NoDep=Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
 
+
 scoreboard_entry = Record(
     sb_valid=Bits(1),
     rd=Bits(5),
@@ -35,6 +36,32 @@ scoreboard_entry = Record(
     mem_ext= Bits(2)
     
 )
+
+
+NONE_entry = scoreboard_entry.bundle(
+            sb_valid=Bits(1)(0),   
+            rd=Bits(5)(0),
+            rs1=Bits(5)(0),
+            rs2=Bits(5)(0),
+            rs1_ready=Bits(1)(0),
+            rs2_ready=Bits(1)(0),
+            rs1_value=Bits(32)(0),
+            rs2_value=Bits(32)(0),
+            rs1_dep=Bits(SCOREBOARD.Bit_size)(0),
+            rs2_dep=Bits(SCOREBOARD.Bit_size)(0),
+            result_ready=Bits(1)(0),
+            result=Bits(32)(0),
+            sb_status= Bits(2)(0),
+            signals=Bits(97)(0),
+            fetch_addr=Bits(32)(0),
+            is_memory_read=Bits(1)(0),
+            mdata= Bits(32)(0),
+            is_csr= Bits(1)(0),
+            csr_id= Bits(4)(0),
+            csr_new= Bits(32)(0),
+            mem_ext= Bits(2)(0)
+ 
+) 
 
 
 
@@ -168,7 +195,7 @@ def modify_entry_valid(scoreboard,index,valid):
             rs2_dep=scoreboard[index].rs2_dep,
             result_ready=scoreboard[index].result_ready,
             result=scoreboard[index].result,
-            sb_status= scoreboard[index].sb_status ,
+            sb_status= Bits(2)(0) ,
             signals=scoreboard[index].signals,
             fetch_addr=scoreboard[index].fetch_addr,
             is_memory_read=scoreboard[index].is_memory_read,
@@ -178,6 +205,7 @@ def modify_entry_valid(scoreboard,index,valid):
             csr_new= scoreboard[index].csr_new,
             mem_ext= scoreboard[index].mem_ext
 )
+
 
 def modify_entry_status(scoreboard,index,status):
     log("write s[{:06}]  status {:04}",index,status)
@@ -282,8 +310,7 @@ def modify_entry_update_rs(scoreboard,i,rs1_result,rs2_result,rs1_prefetch,rs2_p
     
     rs1_value = rs1_prefetch.select(rs1_result,rs1_value)
     rs2_value = rs2_prefetch.select(rs2_result,rs2_value)
-    
-
+     
     return scoreboard_entry.bundle(
             sb_valid=scoreboard[index].sb_valid,   
             rd=scoreboard[index].rd,
@@ -343,15 +370,16 @@ def add_entry(signals,scoreboard,Index,RMT,reg_file,fetch_addr,mem_index,ex_inde
         
         entry_rs1 = scoreboard[RMT[rs1]]
         entry_rs2 = scoreboard[RMT[rs2]]
-        rs1_result_valid =  ((entry_rs1.sb_status== Bits(2)(3) )& (RMT[rs1] != NoDep))
+        rs1_result_valid =  ((entry_rs1.sb_status== Bits(2)(3) )& (RMT[rs1] != NoDep)&entry_rs1.sb_valid&(entry_rs1.rd == rs1))
         rs1_value_prefetch = (entry_rs1.is_memory_read).select( entry_rs1.mdata , entry_rs1.result)
-        rs1_ready=(signals.rs1_valid & (RMT[rs1] != NoDep)&(~rs1_result_valid)).select(Bits(1)(0), Bits(1)(1))
+        rs1_ready=(signals.rs1_valid & (RMT[rs1] != NoDep)&(~rs1_result_valid)&(entry_rs1.sb_valid)&(entry_rs1.rd == rs1)).select(Bits(1)(0), Bits(1)(1))
+        log("RMT[rs1] {} entry_rs1.sb_valid {}  entry_rs1.rd {}    ",RMT[rs1],entry_rs1.sb_valid ,entry_rs1.rd )
         rs1_dep=(~rs1_ready).select(RMT[rs1],NoDep)
         rs1_value=(rs1_result_valid).select(rs1_value_prefetch,reg_file[signals.rs1])
         
-        rs2_result_valid =  ((entry_rs2.sb_status== Bits(2)(3) )& (RMT[rs2] != NoDep))
+        rs2_result_valid =  ((entry_rs2.sb_status== Bits(2)(3) )& (RMT[rs2] != NoDep)&(entry_rs2.sb_valid)&(entry_rs2.rd == rs2))
         rs2_value_prefetch = (entry_rs2.is_memory_read).select( entry_rs2.mdata , entry_rs2.result)
-        rs2_ready=(signals.rs2_valid & (RMT[rs2] != NoDep)&(~rs2_result_valid)).select(Bits(1)(0), Bits(1)(1))
+        rs2_ready=(signals.rs2_valid & (RMT[rs2] != NoDep)&(~rs2_result_valid)&(entry_rs2.sb_valid)&(entry_rs2.rd == rs2)).select(Bits(1)(0), Bits(1)(1))
         rs2_dep=(~rs2_ready).select(RMT[rs2],NoDep)
         rs2_value=(rs2_result_valid).select(rs2_value_prefetch,reg_file[signals.rs2])
         
@@ -359,10 +387,10 @@ def add_entry(signals,scoreboard,Index,RMT,reg_file,fetch_addr,mem_index,ex_inde
         e_is_memory_read = deocder_signals.view(scoreboard[ex_index].signals).memory[0:0]
 
         mem_valid = (mem_index != NoDep)&(m_is_memory_read)
-        rs1_value = (( RMT[rs1]==mem_index)&(mem_valid)&(~rs1_ready)).select( m_data,rs1_value )
-        rs2_value = (( RMT[rs2]==mem_index)&(mem_valid)&(~rs2_ready)).select( m_data,rs2_value )
-        rs1_ready = (((RMT[rs1]==mem_index)&mem_valid&(~rs1_ready))).select(Bits(1)(1),rs1_ready)
-        rs2_ready = (((RMT[rs2]==mem_index)&mem_valid&(~rs2_ready))).select(Bits(1)(1),rs2_ready)
+        rs1_value = (( RMT[rs1]==mem_index)&(mem_valid)&(~rs1_ready)&(entry_rs1.sb_valid)).select( m_data,rs1_value )
+        rs2_value = (( RMT[rs2]==mem_index)&(mem_valid)&(~rs2_ready)&(entry_rs2.sb_valid)).select( m_data,rs2_value )
+        rs1_ready = (((RMT[rs1]==mem_index)&mem_valid&(~rs1_ready)&(entry_rs1.sb_valid))).select(Bits(1)(1),rs1_ready)
+        rs2_ready = (((RMT[rs2]==mem_index)&mem_valid&(~rs2_ready))&(entry_rs2.sb_valid)).select(Bits(1)(1),rs2_ready)
         log("rs1_value {} rs2_value {} rs1_ready {} rs2_ready {}",rs1_value,rs2_value,rs1_ready,rs2_ready)
 
         exe_valid = ( ex_index != NoDep)&(~e_is_memory_read)&(scoreboard[ex_index].rd!=Bits(5)(0))

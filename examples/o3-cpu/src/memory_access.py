@@ -35,14 +35,9 @@ class MemoryAccess(Module):
                     log("mem.bypass       | x{:02} = 0x{:x}", rd, data)
                     mem_update = index
                     mdata = data
-            
-            
+             
             arg = self.rdata.valid().select(self.rdata.peek(),Bits(32)(0))
-                
-            scoreboard[index] =modify_entry_mdata_status(scoreboard,index,arg  ,Bits(2)(3))
-                
-            
-        
+                   
         writeback.async_called()
         
-        return mem_update,mdata
+        return mem_update,mdata,arg,index
