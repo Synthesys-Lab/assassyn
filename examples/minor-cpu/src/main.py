@@ -602,12 +602,12 @@ if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         #'0to100',
-        #'median',
-        #'multiply',
-        #'qsort',
-        #'rsort',
+        'median',
+        'multiply',
+        'qsort',
+        'rsort',
         'towers',
-        #'vvadd',
+        'vvadd',
     ]
     # Iterate workloads
     for wl in workloads:
