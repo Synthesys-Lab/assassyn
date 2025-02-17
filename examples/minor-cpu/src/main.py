@@ -581,12 +581,12 @@ if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         #'0to100',
-        #'median',
-        #'multiply',
-        #'qsort',
-        #'rsort',
-        #'towers',
-        #'vvadd',
+        'median',
+        'multiply',
+        'qsort',
+        'rsort',
+        'towers',
+        'vvadd',
     ]
     # Iterate workloads
     for wl in workloads:
@@ -603,7 +603,7 @@ if __name__ == '__main__':
         #'rv32ui-p-addi',
         #'rv32ui-p-and',
         #'rv32ui-p-andi',
-        'rv32ui-p-auipc',
+        #'rv32ui-p-auipc',
         #'rv32ui-p-beq',
         #'rv32ui-p-bge',
         #'rv32ui-p-bgeu',
