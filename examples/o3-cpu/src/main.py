@@ -37,16 +37,14 @@ class Execution(Module):
 
     @module.combinational
     def build(
-        self, 
-        pc: Array,
+        self,  
         rf: Array, 
         csr_f: Array,
         memory: Module, 
         writeback: Module,
         data: str,
         depth_log: int,
-        scoreboard:Array,
-        RMT:Array ,
+        scoreboard:Array, 
         offset_reg: Array
         ):
 
@@ -168,8 +166,7 @@ class Execution(Module):
             log("condition: {}.a.b | a: {:08x}  | b: {:08x}   |", condition[0:0], result, pc0)
             predict_wrong = condition[0:0].select(Bits(1)(0),Bits(1)(1)) 
             predict_wrong = (signals.is_branch & (~signals.is_offset_br)&signals.link_pc).select(Bits(1)(1),predict_wrong) 
-            br_sm = condition[0:0].select(Bits(1)(1),Bits(1)(0))
-            
+           
         is_memory = memory_read | memory_write
         
         # This `is_memory` hack is to evade rust's overflow check.
@@ -202,7 +199,7 @@ class Execution(Module):
             log("own x{:02}          |", rd)
 
         
-        return  br_sm, br_dest, wb,  ex_update,execution_index,ex_data,predict_wrong
+        return    br_dest, wb,  ex_update,execution_index,ex_data,predict_wrong
 
 
 
@@ -248,7 +245,7 @@ class Decoder(Module):
             with Condition(is_br & (~is_ebreak)):
                 predicted_addr =( (signals.imm).bitcast(Int(32)) + fetch_addr.bitcast(Int(32)) ).bitcast(Bits(32))
                 
-        return  is_nop,signals.is_branch,rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jalr 
+        return  is_nop,rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jalr 
     
 class Fetcher(Module):
     
@@ -272,9 +269,7 @@ class FetcherImpl(Downstream):
 
     @downstream.combinational
     def build(self,
-              scoreboard:Array,
-              on_branch: Value, 
-              br_signal:Array,
+              scoreboard:Array, 
               ex_bypass: Value, 
               pc_reg: Value,
               pc_addr: Value,
@@ -288,7 +283,7 @@ class FetcherImpl(Downstream):
               is_jal:Value, 
               ):
  
-        on_branch = on_branch.optional(Bits(1)(0))   | br_signal[0]
+        
         pw = predict_wrong.optional(Bits(1)(0))
         next_index1 = ( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(2) \
                       ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
@@ -335,9 +330,7 @@ class UpdateScoreboard(Downstream):
               scoreboard: Array,
               RMT: Array ,
               execution_index:Value ,
-              sb_tail:Array,
-              br_sm:Value , 
-              decode_on_branch:Value,
+              sb_tail:Array,  
               is_nop:Value, 
               rmt_update_rd:Value,
               rmt_update_index:Value,
@@ -357,10 +350,9 @@ class UpdateScoreboard(Downstream):
         cycle_activate = cycle_activate.optional(Bits(1)(0)) 
         predict_wrong = predict_wrong.optional(Bits(1)(0))
         # log("prediction wrong {}" ,predict_wrong) 
-        br_signal = RegArray(Bits(1), 1)
+        
         is_nop = is_nop.optional(Bits(1)(0))
-        br_signal[0] = (br_sm.valid()).select( Bits(1)(0) , br_signal[0] | decode_on_branch.optional(Bits(1)(0)) )
-           
+         
         update_tail =  ((~cur_index.valid()) ).select(
             sb_tail[0],
             (
@@ -463,7 +455,7 @@ class UpdateScoreboard(Downstream):
             
 
                  
-        return  br_signal,newest_index,entry_value,early_dispatch_valid
+        return   newest_index,entry_value,early_dispatch_valid
  
 
 class Dispatch(Downstream):
@@ -623,23 +615,21 @@ def build_cpu(depth_log):
 
 
         writeback = WriteBack()
-        wb_rd ,rmt_clear_rd,rmt_clear_index= writeback.build(reg_file = reg_file , csr_file = csr_file,scoreboard=scoreboard,RMT=reg_map_table,sb_head=sb_head)
+        rmt_clear_rd,rmt_clear_index= writeback.build(reg_file = reg_file , csr_file = csr_file,scoreboard=scoreboard,RMT=reg_map_table,sb_head=sb_head)
 
         memory_access = MemoryAccess()
 
         executor = Execution()
         
         
-        br_sm, ex_bypass, wb,  ex_update,execution_index,ex_data,predict_wrong = executor.build(
-            pc = pc_reg,
+        ex_bypass, wb,  ex_update,execution_index,ex_data,predict_wrong = executor.build( 
             rf = reg_file,
             csr_f = csr_file,
             memory = memory_access,
             writeback = writeback,
             data = f'{workspace}/workload.data',
             depth_log = depth_log,
-            scoreboard=scoreboard,
-            RMT=reg_map_table,
+            scoreboard=scoreboard, 
             offset_reg = offset_reg,
             )
         
@@ -656,17 +646,17 @@ def build_cpu(depth_log):
         update_sb = UpdateScoreboard()
 
         
-        is_nop, decode_on_branch ,rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jal= decoder.build( sb_tail=sb_tail )
+        is_nop,  rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jal= decoder.build( sb_tail=sb_tail )
 
 
-        br_signal,newest_index,entry_value,early_dispatch_valid = update_sb.build(cycle_activate=cycle_activate , \
+        newest_index,entry_value,early_dispatch_valid = update_sb.build(cycle_activate=cycle_activate , \
             ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,execution_index=execution_index , \
-            sb_tail=sb_tail,br_sm=br_sm, decode_on_branch=decode_on_branch ,rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
+            sb_tail=sb_tail,  rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
                 rmt_update_rd=rmt_update_rd,is_nop=is_nop,rmt_update_index=rmt_update_index,mdata=m_data,ex_data = ex_data,reg_file=reg_file,\
                       cur_index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals,predict_wrong = predict_wrong, \
                         m_index=m_index,m_arg=m_arg)
         
-        fetcher_impl.build(scoreboard,decode_on_branch,br_signal, ex_bypass,  pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log, \
+        fetcher_impl.build(scoreboard,  ex_bypass,  pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log, \
                              sb_head, sb_tail,predicted_addr,predict_wrong,is_jal)
         
         dispatch = Dispatch()

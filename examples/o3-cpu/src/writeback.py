@@ -39,4 +39,4 @@ class WriteBack(Module):
         ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
         log("Update sb_head {:07} ",sb_head[0])
         
-        return rd,rmt_clear_rd,rmt_clear_index
+        return rmt_clear_rd,rmt_clear_index
