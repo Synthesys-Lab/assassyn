@@ -267,7 +267,7 @@ supported_opcodes = [
   ('xori' , (0b0010011, 0b100, RV32I_ALU.ALU_XOR, None,None,None), IInst),
 ]
 
-deocder_signals = Record(
+decoder_signals = Record(
   # prepare the operands
   rs1=Bits(5),
   rs1_valid=Bits(1),

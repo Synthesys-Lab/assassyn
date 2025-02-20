@@ -17,7 +17,7 @@ class MemoryAccess(Module):
         self, 
         writeback: Module,
         scoreboard:Array,
-        RMT:Array
+        
     ):
         self.timing = 'systolic'
         
@@ -25,7 +25,7 @@ class MemoryAccess(Module):
         rd = self.rd.pop()
         index = self.index.pop()
         mem_update = NoDep
-        with Condition( scoreboard[index].sb_status != Bits(2)(3) ):
+        with Condition( scoreboard['sb_status'][index] != Bits(2)(3) ):
             with Condition(self.rdata.valid()):
                 data = self.rdata.pop()
                 

@@ -2,429 +2,101 @@ from opcodes import *
 from instructions import *
 
 class SCOREBOARD:
-    size = 8
-    init_size = 9
-    Bit_size = 4
+    size = 4
+    init_size = 5
+    Bit_size = 3
     sizeI = UInt(32)(size)
 
 NoDep=Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
 
 
 scoreboard_entry = Record(
-    sb_valid=Bits(1),
-    rd=Bits(5),
-    rs1=Bits(5),
-    rs2=Bits(5),
+    sb_valid=Bits(1), 
     rs1_ready=Bits(1),
     rs2_ready=Bits(1),
     rs1_value=Bits(32),
-    rs2_value=Bits(32),
-    # Dependent entry on rs1, MAX
+    rs2_value=Bits(32), 
     rs1_dep=Bits(SCOREBOARD.Bit_size),
-    rs2_dep=Bits(SCOREBOARD.Bit_size),
-    result_ready=Bits(1),
-    result = Bits(32),
-    # 0: Issued; 1: Executed;  
+    rs2_dep=Bits(SCOREBOARD.Bit_size),  
     sb_status=Bits(2),
-    signals=deocder_signals,
-    fetch_addr=Bits(32),
-    is_memory_read=Bits(1),
-    mdata= Bits(32),
-    is_csr= Bits(1),
-    csr_id= Bits(4),
-    csr_new= Bits(32),
-    mem_ext= Bits(2)
-    
+    signals=decoder_signals,
+    fetch_addr=Bits(32), 
 )
 
-
-NONE_entry = scoreboard_entry.bundle(
-            sb_valid=Bits(1)(0),   
-            rd=Bits(5)(0),
-            rs1=Bits(5)(0),
-            rs2=Bits(5)(0),
-            rs1_ready=Bits(1)(0),
-            rs2_ready=Bits(1)(0),
-            rs1_value=Bits(32)(0),
-            rs2_value=Bits(32)(0),
-            rs1_dep=Bits(SCOREBOARD.Bit_size)(0),
-            rs2_dep=Bits(SCOREBOARD.Bit_size)(0),
-            result_ready=Bits(1)(0),
-            result=Bits(32)(0),
-            sb_status= Bits(2)(0),
-            signals=Bits(97)(0),
-            fetch_addr=Bits(32)(0),
-            is_memory_read=Bits(1)(0),
-            mdata= Bits(32)(0),
-            is_csr= Bits(1)(0),
-            csr_id= Bits(4)(0),
-            csr_new= Bits(32)(0),
-            mem_ext= Bits(2)(0)
- 
-) 
-
-
-
-def modify_entry_mdata_status(scoreboard,index,mdata, status ):
-    mdata = mdata
-    status= status  
-    log("modify s[{:06}]  mdata {:08x}   status {}",index,mdata, status)
-    return scoreboard_entry.bundle(
-            sb_valid=scoreboard[index].sb_valid,   
-            rd=scoreboard[index].rd,
-            rs1=scoreboard[index].rs1,
-            rs2=scoreboard[index].rs2,
-            rs1_ready=scoreboard[index].rs1_ready,
-            rs2_ready=scoreboard[index].rs2_ready,
-            rs1_value=scoreboard[index].rs1_value,
-            rs2_value=scoreboard[index].rs2_value,
-            rs1_dep=scoreboard[index].rs1_dep,
-            rs2_dep=scoreboard[index].rs2_dep,
-            result_ready=Bits(1)(1),
-            result=scoreboard[index].result,
-            sb_status= status ,
-            signals=scoreboard[index].signals,
-            fetch_addr=scoreboard[index].fetch_addr,
-            is_memory_read=scoreboard[index].is_memory_read,
-            mdata=  mdata,
-            is_csr= scoreboard[index].is_csr,
-            csr_id= scoreboard[index].csr_id,
-            csr_new= scoreboard[index].csr_new,
-            mem_ext= scoreboard[index].mem_ext
-)
-
-def modify_entry_exe(scoreboard,index,result): 
-    result=result
-    
-    return scoreboard_entry.bundle(
-            sb_valid=scoreboard[index].sb_valid,   
-            rd=scoreboard[index].rd,
-            rs1=scoreboard[index].rs1,
-            rs2=scoreboard[index].rs2,
-            rs1_ready=scoreboard[index].rs1_ready,
-            rs2_ready=scoreboard[index].rs2_ready,
-            rs1_value=scoreboard[index].rs1_value,
-            rs2_value=scoreboard[index].rs2_value,
-            rs1_dep=scoreboard[index].rs1_dep,
-            rs2_dep=scoreboard[index].rs2_dep,
-            result_ready=Bits(1)(1),
-            result=result,
-            sb_status= Bits(2)(3) ,
-            signals=scoreboard[index].signals,
-            fetch_addr=scoreboard[index].fetch_addr,
-            is_memory_read=scoreboard[index].is_memory_read,
-            mdata=  scoreboard[index].mdata,
-            is_csr= scoreboard[index].is_csr,
-            csr_id= scoreboard[index].csr_id,
-            csr_new= scoreboard[index].csr_new,
-            mem_ext= scoreboard[index].mem_ext
-)
-
-def modify_link_pc_result(scoreboard,index,result):
-    result=result 
-    return scoreboard_entry.bundle(
-            sb_valid=scoreboard[index].sb_valid,   
-            rd=scoreboard[index].rd,
-            rs1=scoreboard[index].rs1,
-            rs2=scoreboard[index].rs2,
-            rs1_ready=scoreboard[index].rs1_ready,
-            rs2_ready=scoreboard[index].rs2_ready,
-            rs1_value=scoreboard[index].rs1_value,
-            rs2_value=scoreboard[index].rs2_value,
-            rs1_dep=scoreboard[index].rs1_dep,
-            rs2_dep=scoreboard[index].rs2_dep,
-            result_ready=Bits(1)(1),
-            result=result,
-            sb_status= Bits(2)(3),
-            signals=scoreboard[index].signals,
-            fetch_addr=scoreboard[index].fetch_addr,
-            is_memory_read=scoreboard[index].is_memory_read,
-            mdata=  scoreboard[index].mdata,
-            is_csr= scoreboard[index].is_csr,
-            csr_id= scoreboard[index].csr_id,
-            csr_new= scoreboard[index].csr_new,
-            mem_ext= scoreboard[index].mem_ext
-            
-)
-     
-def modify_entry_mem_status(scoreboard,index,is_memory_read ,result  ,is_csr  ,csr_id ,csr_new,mem_ext,status):
-    is_memory_read=is_memory_read
-    result=result
-    is_csr=is_csr
-    csr_id=csr_id
-    csr_new=csr_new
-    mem_ext=mem_ext
-    status=status
-    return scoreboard_entry.bundle(
-           sb_valid=scoreboard[index].sb_valid,   
-           rd=scoreboard[index].rd,
-           rs1=scoreboard[index].rs1,
-           rs2=scoreboard[index].rs2,
-           rs1_ready=scoreboard[index].rs1_ready,
-           rs2_ready=scoreboard[index].rs2_ready,
-           rs1_value=scoreboard[index].rs1_value,
-           rs2_value= scoreboard[index].rs2_value,
-           rs1_dep=scoreboard[index].rs1_dep,
-           rs2_dep=scoreboard[index].rs2_dep,
-           result_ready=scoreboard[index].result_ready,
-           result=result,
-           sb_status= status,
-           signals=scoreboard[index].signals,
-           fetch_addr=scoreboard[index].fetch_addr,
-           is_memory_read=is_memory_read,
-           mdata=  scoreboard[index].mdata,
-           is_csr= is_csr,
-           csr_id= csr_id,
-           csr_new=  csr_new,
-           mem_ext= mem_ext
-)
-     
-
-def modify_entry_valid(scoreboard,index,valid):
-    valid = valid
-    return scoreboard_entry.bundle(
-            sb_valid=valid,   
-            rd=scoreboard[index].rd,
-            rs1=scoreboard[index].rs1,
-            rs2=scoreboard[index].rs2,
-            rs1_ready=scoreboard[index].rs1_ready,
-            rs2_ready=scoreboard[index].rs2_ready,
-            rs1_value=scoreboard[index].rs1_value,
-            rs2_value=scoreboard[index].rs2_value,
-            rs1_dep=scoreboard[index].rs1_dep,
-            rs2_dep=scoreboard[index].rs2_dep,
-            result_ready=scoreboard[index].result_ready,
-            result=scoreboard[index].result,
-            sb_status= Bits(2)(0) ,
-            signals=scoreboard[index].signals,
-            fetch_addr=scoreboard[index].fetch_addr,
-            is_memory_read=scoreboard[index].is_memory_read,
-            mdata= scoreboard[index].mdata,
-            is_csr= scoreboard[index].is_csr,
-            csr_id= scoreboard[index].csr_id,
-            csr_new= scoreboard[index].csr_new,
-            mem_ext= scoreboard[index].mem_ext
-)
-
-
-def modify_entry_status(scoreboard,index,status):
-    log("write s[{:06}]  status {:04}",index,status)
-    sb_status = status
-    return scoreboard_entry.bundle(
-            sb_valid=scoreboard[index].sb_valid,   
-            rd=scoreboard[index].rd,
-            rs1=scoreboard[index].rs1,
-            rs2=scoreboard[index].rs2,
-            rs1_ready=scoreboard[index].rs1_ready,
-            rs2_ready=scoreboard[index].rs2_ready,
-            rs1_value=scoreboard[index].rs1_value,
-            rs2_value=scoreboard[index].rs2_value,
-            rs1_dep=scoreboard[index].rs1_dep,
-            rs2_dep=scoreboard[index].rs2_dep,
-            result_ready=scoreboard[index].result_ready,
-            result=scoreboard[index].result,
-            sb_status= sb_status ,
-            signals=scoreboard[index].signals,
-            fetch_addr=scoreboard[index].fetch_addr,
-            is_memory_read=scoreboard[index].is_memory_read,
-            mdata= scoreboard[index].mdata,
-            is_csr= scoreboard[index].is_csr,
-            csr_id= scoreboard[index].csr_id,
-            csr_new= scoreboard[index].csr_new,
-            mem_ext= scoreboard[index].mem_ext
-    )
-
-def modify_status_rs(scoreboard,ready_dispatch_index,last_rs1_value,last_rs2_value):
-    index = ready_dispatch_index
-    rs1_result = last_rs1_value
-    rs2_result = last_rs2_value
-
-    return scoreboard_entry.bundle(
-            sb_valid=scoreboard[index].sb_valid,   
-            rd=scoreboard[index].rd,
-            rs1=scoreboard[index].rs1,
-            rs2=scoreboard[index].rs2,
-            rs1_ready=Bits(1)(1),
-            rs2_ready=Bits(1)(1),
-            rs1_value=rs1_result,
-            rs2_value=rs2_result,
-            rs1_dep=scoreboard[index].rs1_dep,
-            rs2_dep=scoreboard[index].rs2_dep,
-            result_ready=scoreboard[index].result_ready,
-            result=scoreboard[index].result,
-            sb_status=Bits(2)(1) ,
-            signals=scoreboard[index].signals,
-            fetch_addr=scoreboard[index].fetch_addr,
-            is_memory_read=scoreboard[index].is_memory_read,
-            mdata= scoreboard[index].mdata,
-            is_csr= scoreboard[index].is_csr,
-            csr_id= scoreboard[index].csr_id,
-            csr_new= scoreboard[index].csr_new,
-            mem_ext= scoreboard[index].mem_ext
-)
-
-
-def modify_entry_rs(scoreboard,i,rs1_result,rs2_result):
-    index = i
-    rs1_result = rs1_result
-    rs2_result = rs2_result
-
-    return scoreboard_entry.bundle(
-            sb_valid=scoreboard[index].sb_valid,   
-            rd=scoreboard[index].rd,
-            rs1=scoreboard[index].rs1,
-            rs2=scoreboard[index].rs2,
-            rs1_ready=Bits(1)(1),
-            rs2_ready=Bits(1)(1),
-            rs1_value=rs1_result,
-            rs2_value=rs2_result,
-            rs1_dep=scoreboard[index].rs1_dep,
-            rs2_dep=scoreboard[index].rs2_dep,
-            result_ready=scoreboard[index].result_ready,
-            result=scoreboard[index].result,
-            sb_status=scoreboard[index].sb_status ,
-            signals=scoreboard[index].signals,
-            fetch_addr=scoreboard[index].fetch_addr,
-            is_memory_read=scoreboard[index].is_memory_read,
-            mdata= scoreboard[index].mdata,
-            is_csr= scoreboard[index].is_csr,
-            csr_id= scoreboard[index].csr_id,
-            csr_new= scoreboard[index].csr_new,
-            mem_ext= scoreboard[index].mem_ext
-)
-
-def modify_entry_update_rs(scoreboard,i,rs1_result,rs2_result,rs1_prefetch,rs2_prefetch,rs1_ready_update,rs2_ready_update):
-    index = i
-    
-    rs1_ready = rs1_ready_update.select(Bits(1)(1), scoreboard[index].rs1_ready)
-    rs2_ready = rs2_ready_update.select(Bits(1)(1), scoreboard[index].rs2_ready)
-    rs1_ready = rs1_prefetch.select(Bits(1)(1),rs1_ready)
-    rs2_ready = rs2_prefetch.select(Bits(1)(1),rs2_ready)
-    
-    rs1_dep=scoreboard[index].rs1_dep
-    rs1_update_value = (scoreboard[rs1_dep].is_memory_read).select(scoreboard[rs1_dep].mdata , scoreboard[rs1_dep].result)
-    rs1_value = rs1_ready_update.select(rs1_update_value,scoreboard[index].rs1_value)
-    rs2_dep=scoreboard[index].rs2_dep
-    rs2_update_value = (scoreboard[rs2_dep].is_memory_read).select(scoreboard[rs2_dep].mdata , scoreboard[rs2_dep].result)
-    rs2_value = rs2_ready_update.select(rs2_update_value,scoreboard[index].rs2_value)
-    
-    rs1_value = rs1_prefetch.select(rs1_result,rs1_value)
-    rs2_value = rs2_prefetch.select(rs2_result,rs2_value)
-     
-    return scoreboard_entry.bundle(
-            sb_valid=scoreboard[index].sb_valid,   
-            rd=scoreboard[index].rd,
-            rs1=scoreboard[index].rs1,
-            rs2=scoreboard[index].rs2,
-            rs1_ready=rs1_ready,
-            rs2_ready=rs2_ready,
-            rs1_value=rs1_value,
-            rs2_value=rs2_value,
-            rs1_dep=scoreboard[index].rs1_dep,
-            rs2_dep=scoreboard[index].rs2_dep,
-            result_ready=scoreboard[index].result_ready,
-            result=scoreboard[index].result,
-            sb_status=scoreboard[index].sb_status ,
-            signals=scoreboard[index].signals,
-            fetch_addr=scoreboard[index].fetch_addr,
-            is_memory_read=scoreboard[index].is_memory_read,
-            mdata= scoreboard[index].mdata,
-            is_csr= scoreboard[index].is_csr,
-            csr_id= scoreboard[index].csr_id,
-            csr_new= scoreboard[index].csr_new,
-            mem_ext= scoreboard[index].mem_ext
-)
- 
-def modify_entry_sb_status(new_entry):
-     return scoreboard_entry.bundle(
-            sb_valid=new_entry.sb_valid,   
-            rd=new_entry.rd,
-            rs1=new_entry.rs1,
-            rs2=new_entry.rs2,
-            rs1_ready=new_entry.rs1_ready,
-            rs2_ready=new_entry.rs2_ready,
-            rs1_value=new_entry.rs1_value,
-            rs2_value=new_entry.rs2_value,
-            rs1_dep=new_entry.rs1_dep,
-            rs2_dep=new_entry.rs2_dep,
-            result_ready=new_entry.result_ready,
-            result=new_entry.result,
-            sb_status=Bits(2)(1) ,
-            signals=new_entry.signals,
-            fetch_addr=new_entry.fetch_addr,
-            is_memory_read=new_entry.is_memory_read,
-            mdata= new_entry.mdata,
-            is_csr= new_entry.is_csr,
-            csr_id= new_entry.csr_id,
-            csr_new= new_entry.csr_new,
-            mem_ext= new_entry.mem_ext
-) 
- 
-
-def add_entry(signals,scoreboard,Index,RMT,reg_file,fetch_addr,mem_index,ex_index,e_data,m_data):
+# mem_ext = signals.mem_ext,
+# is_csr = signals.csr_write,
   
-        sb_valid=Bits(1)(1)
-        rd=signals.rd
-        rs1=signals.rs1
-        rs2=signals.rs2
-        
-        entry_rs1 = scoreboard[RMT[rs1]]
-        entry_rs2 = scoreboard[RMT[rs2]]
-        rs1_result_valid =  ((entry_rs1.sb_status== Bits(2)(3) )& (RMT[rs1] != NoDep)&entry_rs1.sb_valid&(entry_rs1.rd == rs1))
-        rs1_value_prefetch = (entry_rs1.is_memory_read).select( entry_rs1.mdata , entry_rs1.result)
-        rs1_ready=(signals.rs1_valid & (RMT[rs1] != NoDep)&(~rs1_result_valid)&(entry_rs1.sb_valid)&(entry_rs1.rd == rs1)).select(Bits(1)(0), Bits(1)(1))
-        log("RMT[rs1] {} entry_rs1.sb_valid {}  entry_rs1.rd {}    ",RMT[rs1],entry_rs1.sb_valid ,entry_rs1.rd )
-        rs1_dep=(~rs1_ready).select(RMT[rs1],NoDep)
-        rs1_value=(rs1_result_valid).select(rs1_value_prefetch,reg_file[signals.rs1])
-        
-        rs2_result_valid =  ((entry_rs2.sb_status== Bits(2)(3) )& (RMT[rs2] != NoDep)&(entry_rs2.sb_valid)&(entry_rs2.rd == rs2))
-        rs2_value_prefetch = (entry_rs2.is_memory_read).select( entry_rs2.mdata , entry_rs2.result)
-        rs2_ready=(signals.rs2_valid & (RMT[rs2] != NoDep)&(~rs2_result_valid)&(entry_rs2.sb_valid)&(entry_rs2.rd == rs2)).select(Bits(1)(0), Bits(1)(1))
-        rs2_dep=(~rs2_ready).select(RMT[rs2],NoDep)
-        rs2_value=(rs2_result_valid).select(rs2_value_prefetch,reg_file[signals.rs2])
-        
-        m_is_memory_read = deocder_signals.view(scoreboard[mem_index].signals).memory[0:0]
-        e_is_memory_read = deocder_signals.view(scoreboard[ex_index].signals).memory[0:0]
+ 
+def add_entry(signals, scoreboard, RMT, reg_file, fetch_addr, mem_index, ex_index, e_data, m_data):
+    sb_valid = Bits(1)(1) 
+    rs1 = signals.rs1
+    rs2 = signals.rs2
+ 
+    entry_rs1 = RMT[rs1]
+    entry_rs2 = RMT[rs2]
+ 
+    rs1_result_valid = ((scoreboard['sb_status'][entry_rs1] == Bits(2)(3)) & 
+                         (RMT[rs1] != NoDep) & 
+                         scoreboard['sb_valid'][entry_rs1] & 
+                         (scoreboard['signals'][entry_rs1].rd == rs1))
+    
+    rs1_value_prefetch = scoreboard['is_memory_read'][entry_rs1].select(scoreboard['mdata'][entry_rs1], scoreboard['result'][entry_rs1])
+    rs1_ready = (signals.rs1_valid & (RMT[rs1] != NoDep) & (~rs1_result_valid) & 
+                 scoreboard['sb_valid'][entry_rs1] & 
+                 (scoreboard['signals'][entry_rs1].rd == rs1)).select(Bits(1)(0), Bits(1)(1))
+ 
+    rs1_dep = (~rs1_ready).select(RMT[rs1], NoDep)
+    rs1_value = rs1_result_valid.select(rs1_value_prefetch, reg_file[signals.rs1])
 
-        mem_valid = (mem_index != NoDep)&(m_is_memory_read)
-        rs1_value = (( RMT[rs1]==mem_index)&(mem_valid)&(~rs1_ready)&(entry_rs1.sb_valid)).select( m_data,rs1_value )
-        rs2_value = (( RMT[rs2]==mem_index)&(mem_valid)&(~rs2_ready)&(entry_rs2.sb_valid)).select( m_data,rs2_value )
-        rs1_ready = (((RMT[rs1]==mem_index)&mem_valid&(~rs1_ready)&(entry_rs1.sb_valid))).select(Bits(1)(1),rs1_ready)
-        rs2_ready = (((RMT[rs2]==mem_index)&mem_valid&(~rs2_ready))&(entry_rs2.sb_valid)).select(Bits(1)(1),rs2_ready)
-        log("rs1_value {} rs2_value {} rs1_ready {} rs2_ready {}",rs1_value,rs2_value,rs1_ready,rs2_ready)
+    rs2_result_valid = ((scoreboard['sb_status'][entry_rs2] == Bits(2)(3)) & 
+                         (RMT[rs2] != NoDep) & 
+                         scoreboard['sb_valid'][entry_rs2] & 
+                         (scoreboard['signals'][entry_rs2].rd == rs2))
+    
+    rs2_value_prefetch = scoreboard['is_memory_read'][entry_rs2].select(scoreboard['mdata'][entry_rs2], scoreboard['result'][entry_rs2])
+    rs2_ready = (signals.rs2_valid & (RMT[rs2] != NoDep) & (~rs2_result_valid) & 
+                 scoreboard['sb_valid'][entry_rs2] & 
+                 (scoreboard['signals'][entry_rs2].rd == rs2)).select(Bits(1)(0), Bits(1)(1))
 
-        exe_valid = ( ex_index != NoDep)&(~e_is_memory_read)&(scoreboard[ex_index].rd!=Bits(5)(0))
-        rs1_value = (( RMT[rs1]==ex_index)&exe_valid&(~rs1_ready)).select( e_data,rs1_value )
-        rs2_value = (( RMT[rs2]==ex_index)&exe_valid&(~rs2_ready)).select( e_data,rs2_value )
-        rs1_ready = (((RMT[rs1]==ex_index)&exe_valid)&(~rs1_ready)).select(Bits(1)(1),rs1_ready)
-        rs2_ready = (((RMT[rs2]==ex_index)&exe_valid)&(~rs2_ready)).select(Bits(1)(1),rs2_ready)
-        log("rs1_value {} rs2_value {} rs1_ready {} rs2_ready {}",rs1_value,rs2_value,rs1_ready,rs2_ready)
-     
-        sb_status=Bits(2)(0)
-        
+    rs2_dep = (~rs2_ready).select(RMT[rs2], NoDep)
+    rs2_value = rs2_result_valid.select(rs2_value_prefetch, reg_file[signals.rs2])
 
-        return scoreboard_entry.bundle(
-            sb_valid=sb_valid,   
-            rd=rd,
-            rs1=rs1,
-            rs2=rs2,
-            rs1_ready=rs1_ready,
-            rs2_ready=rs2_ready,
-            rs1_value=rs1_value,
-            rs2_value=rs2_value,
-            rs1_dep=rs1_dep,
-            rs2_dep=rs2_dep,
-            result_ready=Bits(1)(0),
-            result=Bits(32)(0),
-            sb_status=sb_status ,
-            signals=signals,
-            fetch_addr=fetch_addr,
-            is_memory_read=Bits(1)(0),
-            mdata= Bits(32)(0),
-            is_csr= Bits(1)(0),
-            csr_id= Bits(4)(0),
-            csr_new= Bits(32)(0),
-            mem_ext= Bits(2)(0)
-) 
+    m_is_memory_read = scoreboard['signals'][mem_index].memory[0:0]
+    e_is_memory_read = scoreboard['signals'][ex_index].memory[0:0]
+
+    mem_valid = (mem_index != NoDep) & m_is_memory_read
+    rs1_value = ((RMT[rs1] == mem_index) & mem_valid & (~rs1_ready) & 
+                 scoreboard['sb_valid'][entry_rs1]).select(m_data, rs1_value)
+    
+    rs2_value = ((RMT[rs2] == mem_index) & mem_valid & (~rs2_ready) & 
+                 scoreboard['sb_valid'][entry_rs2]).select(m_data, rs2_value)
+    
+    
+    log("rs1_value {} rs2_value {} rs1_ready {} rs2_ready {}", rs1_value, rs2_value, rs1_ready, rs2_ready)
+
+    exe_valid = (ex_index != NoDep) & (~e_is_memory_read) & (scoreboard['signals'][ex_index].rd != Bits(5)(0))
+    rs1_value = ((RMT[rs1] == ex_index) & exe_valid & (~rs1_ready)).select(e_data, rs1_value)
+    rs2_value = ((RMT[rs2] == ex_index) & exe_valid & (~rs2_ready)).select(e_data, rs2_value)
+    
+    rs1_ready = (((RMT[rs1] == mem_index) & mem_valid & (~rs1_ready)  ) | (((RMT[rs1] == ex_index) & exe_valid) & (~rs1_ready)) ).select(Bits(1)(1), rs1_ready)
+    
+    rs2_ready = ((RMT[rs2] == mem_index) & mem_valid & (~rs2_ready) |  (((RMT[rs2] == ex_index) & exe_valid) & (~rs2_ready)) ).select(Bits(1)(1), rs2_ready)
+ 
+    log("rs1_value {} rs2_value {} rs1_ready {} rs2_ready {}", rs1_value, rs2_value, rs1_ready, rs2_ready)
+
+    sb_status = Bits(2)(0)
+
+    return scoreboard_entry.bundle(
+        sb_valid=sb_valid,    
+        rs1_ready=rs1_ready,
+        rs2_ready=rs2_ready,
+        rs1_value=rs1_value,
+        rs2_value=rs2_value,
+        rs1_dep=rs1_dep,
+        rs2_dep=rs2_dep,  
+        sb_status=sb_status,
+        signals=signals,
+        fetch_addr=fetch_addr 
+    )
 
 

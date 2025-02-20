@@ -125,7 +125,7 @@ def decode_logic(inst):
         view = views[IInst].view()
         log("CSR instruction: opcode = 0x{:x} funct3: 0x{:x} csr_addr: 0x{:x}", view.opcode, view.funct3, view.imm)
 
-    return deocder_signals.bundle(
+    return decoder_signals.bundle(
         memory=memory,
         alu=alu,
         cond=cond,
