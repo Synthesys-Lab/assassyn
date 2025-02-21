@@ -512,10 +512,10 @@ class Dispatch(Downstream):
                             scoreboard['rs2_ready'][i])
                 
                 dispatch_index = valid_temp.select(Bits(SCOREBOARD.Bit_size)(i), dispatch_index)
+                branch_index = ((~br_valid)&(valid_temp&signals.is_branch&(~is_ebreak_temp))).select(Bits(SCOREBOARD.Bit_size)(i),branch_index )
                 
                 br_valid = (valid_temp & signals.is_branch & (~is_ebreak_temp)) | br_valid
-
-                branch_index = (valid_temp&signals.is_branch&(~is_ebreak_temp)).select(Bits(SCOREBOARD.Bit_size)(i),branch_index )
+                # branch_index = (valid_temp&signals.is_branch&(~is_ebreak_temp)).select(Bits(SCOREBOARD.Bit_size)(i),branch_index )
                 # log("i {}, addr {} valid {}  status {}   dispatch_index {}   rs1 {} rs2 {}  |",\
                 #     Bits(6)(i), scoreboard[i].fetch_addr ,scoreboard[i].sb_valid ,scoreboard[i].sb_status ,\
                 #     dispatch_index,scoreboard[i].rs1_ready,scoreboard[i].rs2_ready) 
@@ -733,8 +733,8 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
     if report:
         raw = utils.run_simulator(simulator_path, False)
         open(f'{workload}.log', 'w').write(raw) 
-        raw = utils.run_verilator(verilog_path, False)
-        open(f'{workload}.verilog.log', 'w').write(raw)
+        # raw = utils.run_verilator(verilog_path, False)
+        # open(f'{workload}.verilog.log', 'w').write(raw)
     else:
         raw = utils.run_simulator(simulator_path)
         open('raw.log', 'w').write(raw)
@@ -785,11 +785,11 @@ if __name__ == '__main__':
         '0to100',
         # 'multiply', 
         #'dhrystone',
-        # 'median',
-        # 'multiply',
-        # 'qsort',  
-        # 'rsort',
-        # 'towers',
+        'median',
+        'multiply',
+        'qsort',  
+        'rsort',
+        'towers',
         'vvadd',
     ]
     # Iterate workloads
