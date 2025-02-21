@@ -3,7 +3,7 @@ from instructions import *
 
 class SCOREBOARD:
     size = 8
-    init_size = 5
+    init_size = size+1
     Bit_size = 4
     sizeI = UInt(32)(size)
 
