@@ -2,9 +2,9 @@ from opcodes import *
 from instructions import *
 
 class SCOREBOARD:
-    size = 4
+    size = 8
     init_size = 5
-    Bit_size = 3
+    Bit_size = 4
     sizeI = UInt(32)(size)
 
 NoDep=Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
