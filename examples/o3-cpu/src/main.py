@@ -255,10 +255,7 @@ class Fetcher(Module):
         cycle_activate = (addr == Bits(32)(0)).select(Bits(1)(1),Bits(1)(0))
         return pc_reg, addr,cycle_activate
  
-            
              
- 
-
 class Dispatch(Downstream):
 
     def __init__(self):
@@ -432,8 +429,7 @@ class Dispatch(Downstream):
                         rs2_update_value = (scoreboard['is_memory_read'][rs2_dep]).select(scoreboard['mdata'][rs2_dep], scoreboard['result'][rs2_dep])
                         scoreboard['rs2_value'][i] = rs2_update_value   
                         scoreboard['rs2_ready'][i] = Bits(1)(1)
-        
-
+         
             #Dispatch 
  
             valid_temp = Bits(1)(0)
@@ -492,8 +488,7 @@ class Dispatch(Downstream):
                 with Condition(exe_dispatch_valid ):
                      
                     scoreboard['sb_status'][newest_index] = Bits(2)(1)
-                    log("Dispatch {}  ",newest_index)
-
+                    
                     call = executor.async_called( sb_index=newest_index)
                     
                     call.bind.set_fifo_depth()  
@@ -512,9 +507,7 @@ class MemUser(Module):
         offset_reg = RegArray(Bits(width), 1)
         offset_reg[0] = rdata.bitcast(Bits(width))
         return offset_reg
-
-
-
+ 
 class Driver(Module):
     
     def __init__(self):
@@ -667,8 +660,8 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
     if report:
         raw = utils.run_simulator(simulator_path, False)
         open(f'{workload}.log', 'w').write(raw) 
-        # raw = utils.run_verilator(verilog_path, False)
-        # open(f'{workload}.verilog.log', 'w').write(raw)
+        raw = utils.run_verilator(verilog_path, False)
+        open(f'{workload}.verilog.log', 'w').write(raw)
     else:
         raw = utils.run_simulator(simulator_path)
         open('raw.log', 'w').write(raw)
