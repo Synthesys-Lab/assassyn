@@ -439,10 +439,10 @@ class UpdateScoreboard(Downstream):
                 scoreboard['fetch_addr'][newest_index] = newest_entry.fetch_addr
                   
                 with Condition(exe_dispatch_valid ):
-                    for i in range(SCOREBOARD.size):     
-                        log("i {}, addr {} valid {}  status {}     rs1 {} rs2 {}  |",\
-                        Bits(6)(i), scoreboard['fetch_addr'][i] ,scoreboard['sb_valid'][i] ,scoreboard['sb_status'][i] ,\
-                        scoreboard['rs1_ready'][i],scoreboard['rs2_ready'][i]) 
+                    # for i in range(SCOREBOARD.size):     
+                    #     log("i {}, addr {} valid {}  status {}     rs1 {} rs2 {}  |",\
+                    #     Bits(6)(i), scoreboard['fetch_addr'][i] ,scoreboard['sb_valid'][i] ,scoreboard['sb_status'][i] ,\
+                    #     scoreboard['rs1_ready'][i],scoreboard['rs2_ready'][i]) 
              
                     scoreboard['sb_status'][newest_index] = Bits(2)(1)
 
@@ -637,8 +637,12 @@ def build_cpu(depth_log):
 
 
         writeback = WriteBack()
-        rmt_clear_rd,rmt_clear_index= writeback.build(reg_file = reg_file , csr_file = csr_file,scoreboard=scoreboard,RMT=reg_map_table,sb_head=sb_head)
-
+        rmt_clear_rd,rmt_clear_index= writeback.build(reg_file = reg_file , csr_file = csr_file,sb_valid_array=scoreboard['sb_valid'],sb_status_array=scoreboard['sb_status'],sb_head=sb_head, \
+                    is_memory_read_array = scoreboard['is_memory_read'] , result_array = scoreboard['result']  , \
+                    mdata_array = scoreboard['mdata'] , \
+                    csr_id_array = scoreboard['csr_id'] , csr_new_array = scoreboard['csr_new'] , \
+                    signals_array = scoreboard['signals']  )
+ 
         memory_access = MemoryAccess()
 
         executor = Execution()
