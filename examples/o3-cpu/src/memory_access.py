@@ -20,8 +20,7 @@ class MemoryAccess(Module):
         
     ):
         self.timing = 'systolic'
-        
-        log("in mem")
+         
         rd = self.rd.pop()
         index = self.index.pop()
         mem_update = NoDep

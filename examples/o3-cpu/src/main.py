@@ -281,8 +281,12 @@ class FetcherImpl(Downstream):
         pw = predict_wrong.optional(Bits(1)(0))
         # next_index1 = ( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(2) \
         #               ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
+        
         next_index2 = ( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) \
                       ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
+        
+        # next_index2 = (( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) \
+        #               ) % (Int(SCOREBOARD.Bit_size)(SCOREBOARD.size))).bitcast(Bits(SCOREBOARD.Bit_size))
         
         is_not_full_scoreboard = ( (next_index2 != sb_head[0])) | (~scoreboard['sb_valid'][sb_head[0]]) 
         is_jal = is_jal.optional(Bits(1)(0))
@@ -350,7 +354,7 @@ class UpdateScoreboard(Downstream):
         with Condition(br_flag<UInt(32)(1)):
             br_signal[0] = (predict_wrong.valid() | predicted_addr.valid()).select(UInt(32)(0), br_flag+UInt(32)(1) )
         
-        log("br signal {}",br_flag)
+        
         predict_wrong = predict_wrong.optional(Bits(1)(0))
         # log("prediction wrong {}" ,predict_wrong) 
         
@@ -358,9 +362,9 @@ class UpdateScoreboard(Downstream):
         valid_global = valid_global.optional(Bits(1)(0))
         update_tail =  ((~cur_index.valid()) ).select(
             sb_tail[0],
-            (
+            ((
                 (sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1))   
-            ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))  
+            ).bitcast(Bits(SCOREBOARD.Bit_size))) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))  
         )
 
         bypass_tail =  (
@@ -368,9 +372,9 @@ class UpdateScoreboard(Downstream):
                 (execution_index.optional(sb_tail[0])).bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) 
             ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))  
         )
-
-        sb_tail[0] = predict_wrong.select( bypass_tail ,update_tail )
         
+        sb_tail[0] = predict_wrong.select( bypass_tail ,update_tail )
+         
         rmt_clear_rd = rmt_clear_rd.optional(Bits(5)(0))
         rmt_up_rd = rmt_update_rd.optional(Bits(5)(0))
         mem_index = mem.optional(NoDep)
@@ -386,8 +390,6 @@ class UpdateScoreboard(Downstream):
         m_index = m_index.optional(NoDep)
         m_arg = m_arg.optional(Bits(32)(0))
          
-        # log("bypass_tail {}  sb tail {} ",bypass_tail,sb_tail[0]) 
-
         with Condition(predict_wrong): 
             with Condition(br_flag!=UInt(32)(0)):
                 for i in range(SCOREBOARD.size): 
@@ -415,18 +417,17 @@ class UpdateScoreboard(Downstream):
 
         with Condition(~predict_wrong):
             RMT[rmt_up_rd] =  (rmt_up_rd == Bits(5)(0)).select( NoDep ,rmt_update_index )   
-
+             
             with Condition( ~is_nop & (cur_index!=NoDep)): 
-                newest_index = cur_index
+               
+                newest_index = cur_index     
                 newest_entry = add_entry(signals,scoreboard,RMT,reg_file,Fetch_addr,mem_index,ex_index,e_data,m_data)
-                entry_value= newest_entry.value()
                 
                 is_ebreak = (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0)))\
                             & (signals.alu == Bits(16)(0))).select(Bits(1)(1),Bits(1)(0))
 
                 early_dispatch_valid =( newest_entry.rs1_ready & newest_entry.rs2_ready &(~is_ebreak)).select(Bits(1)(1),Bits(1)(0))
-                # log("index {}  dispatch_valid {}",newest_index,early_dispatch_valid)
-                 
+                
                 exe_dispatch_valid = early_dispatch_valid &(~valid_global)
                 scoreboard['sb_valid'][newest_index] = Bits(1)(1) 
                 scoreboard['rs1_ready'][newest_index] = newest_entry.rs1_ready
@@ -437,7 +438,7 @@ class UpdateScoreboard(Downstream):
                 scoreboard['rs2_dep'][newest_index] =  newest_entry.rs2_dep
                 scoreboard['signals'][newest_index] =  newest_entry.signals
                 scoreboard['fetch_addr'][newest_index] = newest_entry.fetch_addr
-                  
+                 
                 with Condition(exe_dispatch_valid ):
                     # for i in range(SCOREBOARD.size):     
                     #     log("i {}, addr {} valid {}  status {}     rs1 {} rs2 {}  |",\
@@ -487,7 +488,7 @@ class UpdateScoreboard(Downstream):
                         scoreboard['rs2_value'][i] = rs2_update_value   
                         scoreboard['rs2_ready'][i] = Bits(1)(1)
         
-        return   newest_index,entry_value,early_dispatch_valid
+      
  
 
 class Dispatch(Downstream):
