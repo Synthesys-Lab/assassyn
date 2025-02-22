@@ -254,62 +254,7 @@ class Fetcher(Module):
         addr = pc_reg[0]
         cycle_activate = (addr == Bits(32)(0)).select(Bits(1)(1),Bits(1)(0))
         return pc_reg, addr,cycle_activate
-
-class FetcherImpl(Downstream):
-
-    def __init__(self):
-        super().__init__()
-        self.name = 'F1'
-
-    @downstream.combinational
-    def build(self,
-              scoreboard:Array, 
-              ex_bypass: Value, 
-              pc_reg: Value,
-              pc_addr: Value,
-              decoder: Decoder,
-              data: str,
-              depth_log: int, 
-              sb_head:Array,
-              sb_tail:Array,
-              predicted_addr:Value,
-              predict_wrong:Value,
-              is_jal:Value, 
-              ):
  
-        
-        pw = predict_wrong.optional(Bits(1)(0))
-        # next_index1 = ( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(2) \
-        #               ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
-        
-        next_index2 = ( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) \
-                      ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
-        
-        # next_index2 = (( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) \
-        #               ) % (Int(SCOREBOARD.Bit_size)(SCOREBOARD.size))).bitcast(Bits(SCOREBOARD.Bit_size))
-        
-        is_not_full_scoreboard = ( (next_index2 != sb_head[0])) | (~scoreboard['sb_valid'][sb_head[0]]) 
-        is_jal = is_jal.optional(Bits(1)(0))
-        should_fetch =  is_not_full_scoreboard & (~is_jal) 
-        
-        to_fetch = predicted_addr.optional(pc_addr)
-        ex_bypass = ex_bypass.optional(to_fetch) 
-        to_fetch = pw.select(ex_bypass,to_fetch) 
-        icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
-        icache.name = 'icache'
-         
-        real_fetch = should_fetch  
-
-        icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
-        # log("on_br: {}         | predict wrong: {}     | fetch: {}      | addr: 0x{:05x}  ",
-        #     on_branch, pw , real_fetch, to_fetch)
-
-        with Condition(real_fetch):
-            icache.bound.async_called(fetch_addr=to_fetch)
-            pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
-            
-        with Condition(~real_fetch):
-            pc_reg[0] = to_fetch
             
             
 
@@ -440,11 +385,7 @@ class UpdateScoreboard(Downstream):
                 scoreboard['fetch_addr'][newest_index] = newest_entry.fetch_addr
                  
                 with Condition(exe_dispatch_valid ):
-                    # for i in range(SCOREBOARD.size):     
-                    #     log("i {}, addr {} valid {}  status {}     rs1 {} rs2 {}  |",\
-                    #     Bits(6)(i), scoreboard['fetch_addr'][i] ,scoreboard['sb_valid'][i] ,scoreboard['sb_status'][i] ,\
-                    #     scoreboard['rs1_ready'][i],scoreboard['rs2_ready'][i]) 
-             
+                     
                     scoreboard['sb_status'][newest_index] = Bits(2)(1)
 
                     call = executor.async_called( sb_index=newest_index)
@@ -503,7 +444,17 @@ class Dispatch(Downstream):
             executor:Module, 
             trigger:Value, 
             predict_wrong:Value,
-             
+            ex_bypass: Value, 
+            pc_reg: Value,
+            pc_addr: Value,
+            decoder: Decoder,
+            data: str,
+            depth_log: int, 
+            sb_head:Array,
+            sb_tail:Array,
+            predicted_addr:Value, 
+            is_jal:Value,
+            
             ): 
         
         trigger = trigger.optional(Bits(1)(0))
@@ -529,11 +480,7 @@ class Dispatch(Downstream):
                 branch_index = ((~br_valid)&(valid_temp&signals.is_branch )).select(Bits(SCOREBOARD.Bit_size)(i),branch_index )
                 
                 br_valid = (valid_temp & signals.is_branch ) | br_valid
-                
-                # log("i {}, addr {} valid {}  status {}   dispatch_index {}   rs1 {} rs2 {}  |",\
-                #     Bits(6)(i), scoreboard['fetch_addr'][i] ,scoreboard['sb_valid'][i] ,scoreboard['sb_status'][i] ,\
-                #     dispatch_index,scoreboard['rs1_ready'][i],scoreboard['rs2_ready'][i]) 
-             
+                 
             dispatch_index = (br_valid).select(branch_index,dispatch_index)
              
             valid_global =  (dispatch_index== NoDep).select(Bits(1)(0),Bits(1)(1))
@@ -548,6 +495,33 @@ class Dispatch(Downstream):
                 )
 
                 call.bind.set_fifo_depth()
+        
+
+        #Fetch Impl  
+        next_index2 = ( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) \
+                      ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
+         
+        is_not_full_scoreboard = ( (next_index2 != sb_head[0])) | (~scoreboard['sb_valid'][sb_head[0]]) 
+        is_jal = is_jal.optional(Bits(1)(0))
+        should_fetch =  is_not_full_scoreboard & (~is_jal) 
+        
+        to_fetch = predicted_addr.optional(pc_addr)
+        ex_bypass = ex_bypass.optional(to_fetch) 
+        to_fetch = predict_wrong.select(ex_bypass,to_fetch) 
+        icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
+        icache.name = 'icache'
+         
+        real_fetch = should_fetch  
+
+        icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
+        
+        with Condition(real_fetch):
+            icache.bound.async_called(fetch_addr=to_fetch)
+            pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
+            
+        with Condition(~real_fetch):
+            pc_reg[0] = to_fetch
+
         return valid_global
            
 
@@ -602,8 +576,7 @@ def build_cpu(depth_log):
 
         fetcher = Fetcher()
         pc_reg, pc_addr ,cycle_activate= fetcher.build()
-
-        fetcher_impl = FetcherImpl()
+ 
 
         # Data Structures
         reg_file    = RegArray(bits32, 32)
@@ -670,8 +643,7 @@ def build_cpu(depth_log):
         decoder = Decoder()
         
         dispatch = Dispatch()
-        valid_global = dispatch.build(executor=executor,scoreboard=scoreboard,trigger=cycle_activate, \
-             predict_wrong=predict_wrong )  
+        
              
         
         update_sb = UpdateScoreboard()
@@ -679,18 +651,18 @@ def build_cpu(depth_log):
         
         is_nop,  rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jal= decoder.build( sb_tail=sb_tail )
 
-
+        valid_global = dispatch.build(executor=executor,scoreboard=scoreboard,trigger=cycle_activate, \
+             predict_wrong=predict_wrong ,ex_bypass = ex_bypass, pc_reg = pc_reg, pc_addr =pc_addr, decoder =decoder, data=f'{workspace}/workload.exe',depth_log= depth_log, \
+                            sb_head = sb_head, sb_tail=sb_tail,predicted_addr = predicted_addr,is_jal =is_jal)
+           
+           
         update_sb.build(cycle_activate=cycle_activate , \
             ex=ex_update,mem=mem_update,scoreboard=scoreboard,RMT=reg_map_table,execution_index=execution_index , \
             sb_tail=sb_tail,  rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
                 rmt_update_rd=rmt_update_rd,is_nop=is_nop,rmt_update_index=rmt_update_index,mdata=m_data,ex_data = ex_data,reg_file=reg_file,\
                       cur_index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals,predict_wrong = predict_wrong, \
                         m_index=m_index,m_arg=m_arg,predicted_addr=predicted_addr,valid_global=valid_global,executor=executor)
-        
-        fetcher_impl.build(scoreboard,  ex_bypass,  pc_reg, pc_addr, decoder, f'{workspace}/workload.exe', depth_log, \
-                             sb_head, sb_tail,predicted_addr,predict_wrong,is_jal)
-        
-        
+         
         
         driver = Driver()
         driver.build(fetcher, user)
