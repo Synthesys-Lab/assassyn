@@ -2,9 +2,9 @@ from opcodes import *
 from instructions import *
 
 class SCOREBOARD:
-    size = 8
+    size = 6
     init_size = size+1
-    Bit_size = 4
+    Bit_size = 3
     sizeI = UInt(8)(size)
 
 NoDep=Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
@@ -75,7 +75,7 @@ def add_entry(signals, scoreboard, RMT, reg_file, fetch_addr, mem_index, ex_inde
 
     m_is_memory_read = scoreboard['signals'][mem_index].memory[0:0]
     e_is_memory_read = scoreboard['signals'][ex_index].memory[0:0]
-    
+
     mem_valid = (mem_index != NoDep) & m_is_memory_read
     exe_valid = (ex_index != NoDep) & (~e_is_memory_read) & (scoreboard['signals'][ex_index].rd != Bits(5)(0))
 

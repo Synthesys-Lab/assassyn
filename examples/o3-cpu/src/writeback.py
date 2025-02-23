@@ -43,8 +43,11 @@ class WriteBack(Module):
         sb_valid_array[sb_head[0]] = Bits(1)(0)
         sb_status_array[sb_head[0]] = Bits(2)(0)
 
-        sb_head[0] = (
-            (sb_head[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1))
-        ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
-         
+        bypass_tail = (
+                (sb_head[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) 
+            ).bitcast(Bits(SCOREBOARD.Bit_size)) 
+        )
+        bypass_tail = (bypass_tail==NoDep).select(Bits(SCOREBOARD.Bit_size)(0),bypass_tail)
+        
+        sb_head[0] = bypass_tail
         return rmt_clear_rd,rmt_clear_index

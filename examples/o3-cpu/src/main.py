@@ -307,12 +307,12 @@ class Dispatch(Downstream):
         predict_wrong = predict_wrong.optional(Bits(1)(0))
         
         #Fetch Impl  
-        next_index2 = ( sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) \
-                      ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))
-         
+        next_index2 =   (sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1)).bitcast(Bits(SCOREBOARD.Bit_size))
+        next_index2 = (next_index2==NoDep).select(Bits(SCOREBOARD.Bit_size)(0),next_index2)
+        
         is_not_full_scoreboard = ( (next_index2 != sb_head[0])) | (~scoreboard['sb_valid'][sb_head[0]]) 
         is_jal = is_jal.optional(Bits(1)(0))
-        should_fetch =  is_not_full_scoreboard & (~is_jal) 
+        real_fetch =  is_not_full_scoreboard & (~is_jal) 
         
         to_fetch = predicted_addr.optional(pc_addr)
         ex_bypass = ex_bypass.optional(to_fetch) 
@@ -320,8 +320,8 @@ class Dispatch(Downstream):
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
          
-        real_fetch = should_fetch  
-
+         
+        log("fetch next index {}, should_fetch {}",next_index2,real_fetch)
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         
         with Condition(real_fetch):
@@ -333,24 +333,25 @@ class Dispatch(Downstream):
 
 
         #update RMT and s
-        
          
         is_nop = is_nop.optional(Bits(1)(0)) 
         update_tail =  ((~cur_index.valid()) ).select(
             sb_tail[0],
-            ((
-                (sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1))   
-            ).bitcast(Bits(SCOREBOARD.Bit_size))) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))  
-        )
+             
+                (sb_tail[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1)).bitcast(Bits(SCOREBOARD.Bit_size)) )  
+          
+        
+        update_tail = (update_tail==NoDep).select(Bits(SCOREBOARD.Bit_size)(0),update_tail)
 
         bypass_tail =  (
             (
                 (execution_index.optional(sb_tail[0])).bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) 
-            ).bitcast(Bits(SCOREBOARD.Bit_size)) & (Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size - 1))  
+            ).bitcast(Bits(SCOREBOARD.Bit_size)) 
         )
+        bypass_tail = (bypass_tail==NoDep).select(Bits(SCOREBOARD.Bit_size)(0),bypass_tail)
         
         sb_tail[0] = predict_wrong.select( bypass_tail ,update_tail )
-         
+        log("bypass_tail {}  update_tail {}",bypass_tail,update_tail)
         rmt_clear_rd = rmt_clear_rd.optional(Bits(5)(0))
         rmt_up_rd = rmt_update_rd.optional(Bits(5)(0))
         mem_index = mem.optional(NoDep)
