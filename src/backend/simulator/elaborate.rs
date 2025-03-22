@@ -331,7 +331,8 @@ impl Visitor<String> for ElaborateModule<'_> {
           let dump = dump_rval_ref(self.module_ctx, self.sys, elem.get_value());
           let dump = if elem
             .get_value()
-            .get_dtype(self.sys).is_some_and(|x| x.get_bits() == 1)
+            .get_dtype(self.sys)
+            .is_some_and(|x| x.get_bits() == 1)
           {
             format!("if {} {{ 1 }} else {{ 0 }}", dump)
           } else {

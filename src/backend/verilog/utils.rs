@@ -202,7 +202,8 @@ pub(super) fn parse_format_string(args: Vec<BaseNode>, sys: &SysBuilder) -> Stri
               };
               let width = if substr
                 .chars()
-                .nth(width_idx).is_some_and(|c| c.is_ascii_digit())
+                .nth(width_idx)
+                .is_some_and(|c| c.is_ascii_digit())
               {
                 width_idx += 1;
                 substr
@@ -217,7 +218,8 @@ pub(super) fn parse_format_string(args: Vec<BaseNode>, sys: &SysBuilder) -> Stri
               };
               let vfmt = if substr
                 .chars()
-                .nth(width_idx).is_some_and(|c| c.is_alphabetic())
+                .nth(width_idx)
+                .is_some_and(|c| c.is_alphabetic())
               {
                 substr.chars().nth(width_idx).unwrap().to_string()
               } else {
