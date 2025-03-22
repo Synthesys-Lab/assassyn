@@ -99,7 +99,7 @@ impl BlockRef<'_> {
   pub fn get_wait_until(&self) -> Option<BaseNode> {
     self.body_iter().find(|x| {
       x.as_expr::<instructions::BlockIntrinsic>(self.sys)
-        .map_or(false, |x| x.get_subcode() == subcode::BlockIntrinsic::WaitUntil)
+        .is_ok_and(|x| x.get_subcode() == subcode::BlockIntrinsic::WaitUntil)
     })
   }
 
