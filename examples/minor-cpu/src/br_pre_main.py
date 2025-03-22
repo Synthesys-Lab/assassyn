@@ -549,7 +549,7 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
             value = value[2:]
             open(f'{workspace}/workload.init', 'w').write(value)
 
-    report = True
+    report = False
 
     if report:
         raw = utils.run_simulator(simulator_path, False)
@@ -602,12 +602,12 @@ if __name__ == '__main__':
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         #'0to100',
-        'median',
-        'multiply',
-        'qsort',
-        'rsort',
-        'towers',
-        'vvadd',
+        #'median',
+        #'multiply',
+        #'qsort',
+        #'rsort',
+        #'towers',
+        #'vvadd',
     ]
     # Iterate workloads
     for wl in workloads:
@@ -620,32 +620,32 @@ if __name__ == '__main__':
     # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
     # Define test cases
     test_cases = [
-        #'rv32ui-p-add',
-        #'rv32ui-p-addi',
-        #'rv32ui-p-and',
-        #'rv32ui-p-andi',
-        #'rv32ui-p-auipc',
-        #'rv32ui-p-beq',
-        #'rv32ui-p-bge',
-        #'rv32ui-p-bgeu',
-        #'rv32ui-p-blt',
-        #'rv32ui-p-bltu',
-        #'rv32ui-p-bne',
-        #'rv32ui-p-jal',
-        #'rv32ui-p-jalr',
-        #'rv32ui-p-lui',
-        #'rv32ui-p-lw',
-        #'rv32ui-p-or',
-        #'rv32ui-p-ori',
-        #'rv32ui-p-sll',
-        #'rv32ui-p-slli',
-        #'rv32ui-p-sltu',
-        #'rv32ui-p-srai',
-        #'rv32ui-p-srl',
-        #'rv32ui-p-srli',
-        #'rv32ui-p-sub',
-        #'rv32ui-p-sw',
-        #'rv32ui-p-xori',
+        'rv32ui-p-add',
+        'rv32ui-p-addi',
+        'rv32ui-p-and',
+        'rv32ui-p-andi',
+        'rv32ui-p-auipc',
+        'rv32ui-p-beq',
+        'rv32ui-p-bge',
+        'rv32ui-p-bgeu',
+        'rv32ui-p-blt',
+        'rv32ui-p-bltu',
+        'rv32ui-p-bne',
+        'rv32ui-p-jal',
+        'rv32ui-p-jalr',
+        'rv32ui-p-lui',
+        'rv32ui-p-lw',
+        'rv32ui-p-or',
+        'rv32ui-p-ori',
+        'rv32ui-p-sll',
+        'rv32ui-p-slli',
+        'rv32ui-p-sltu',
+        'rv32ui-p-srai',
+        'rv32ui-p-srl',
+        'rv32ui-p-srli',
+        'rv32ui-p-sub',
+        'rv32ui-p-sw',
+        'rv32ui-p-xori',
         #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
         #'rv32ui-p-sb',#TO CHECK
     ]
