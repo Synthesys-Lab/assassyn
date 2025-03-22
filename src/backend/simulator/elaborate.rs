@@ -332,7 +332,7 @@ impl Visitor<String> for ElaborateModule<'_> {
           let dump = if elem
             .get_value()
             .get_dtype(self.sys)
-            .map_or(false, |x| x.get_bits() == 1)
+            .is_some_and(|x| x.get_bits() == 1)
           {
             format!("if {} {{ 1 }} else {{ 0 }}", dump)
           } else {
