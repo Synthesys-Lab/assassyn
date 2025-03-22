@@ -414,7 +414,7 @@ class Driver(Module):
             d_call = fetcher.async_called()
 
 def build_cpu(depth_log):
-    sys = SysBuilder('minor_cpu')
+    sys = SysBuilder('minor_cpu_br_pre')
 
     with sys:
         # Data Types

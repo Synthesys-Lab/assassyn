@@ -125,7 +125,7 @@ class Execution(Module):
 
         is_ebreak = signals.rs1_valid & signals.imm_valid & \
                     ((signals.imm == Bits(32)(1)) | (signals.imm == Bits(32)(0))) & \
-                    (signals.alu == Bits(16)(0))
+                    (signals.alu == Bits(16)(1<<RV32I_ALU.ALU_NONE))
         
 
 
@@ -190,6 +190,7 @@ class Execution(Module):
         results[RV32I_ALU.ALU_SLL] = a << alu_b[0:4]
         results[RV32I_ALU.ALU_SRA] = sra_signed_result 
         results[RV32I_ALU.ALU_SRA_U] = a >> alu_b[0:4]
+        results[RV32I_ALU.ALU_NONE] = Bits(32)(0)
 
         # TODO: Fix this bullshit.
         alu = signals.alu
