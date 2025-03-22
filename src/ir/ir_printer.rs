@@ -225,7 +225,7 @@ impl Visitor<String> for IRPrinter {
     let here = ip.module == block.get_module() && ip.block == block.upcast();
     let restore_ident = self.indent;
     for (i, elem) in block.body_iter().enumerate() {
-      if here && ip.at.map_or(false, |x| x == i) {
+      if here && ip.at == Some(i) {
         res.push_str(&format!("{}-----{{Insert Here}}-----\n", " ".repeat(self.indent)));
       }
       match elem.get_kind() {

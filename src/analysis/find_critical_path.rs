@@ -197,7 +197,7 @@ impl<'sys> GraphVisitor<'sys> {
   }
 }
 
-impl<'sys> Visitor<()> for GraphVisitor<'sys> {
+impl Visitor<()> for GraphVisitor<'_> {
   fn visit_expr(&mut self, expr: ExprRef<'_>) -> Option<()> {
     let expr_opcode = expr.get_opcode();
 
