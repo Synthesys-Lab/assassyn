@@ -125,8 +125,7 @@ class Execution(Module):
 
         is_ebreak = signals.rs1_valid & signals.imm_valid & \
                     ((signals.imm == Bits(32)(1)) | (signals.imm == Bits(32)(0))) & \
-                    (signals.alu == Bits(16)(1<<RV32I_ALU.ALU_NONE))
-        
+                    (signals.alu == Bits(16)(1<<RV32I_ALU.ALU_NONE))        
 
 
         with Condition(is_ebreak):
@@ -596,7 +595,7 @@ if __name__ == '__main__':
         run_cpu(sys, simulator_path, verilog_path , wl)
     print("minor-CPU workloads ran successfully!")
 
-    #================================================================================================
+    # ========================================================================================
     # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
     # Define test cases
     test_cases = [
