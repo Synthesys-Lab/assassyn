@@ -10,19 +10,17 @@ class WriteBack(Module):
         self.name = 'W'
 
     @module.combinational
-    def build(self, reg_file: Array , csr_file: Array,sb_valid_array:Array,sb_status_array:Value, sb_head:Array,  \
+    def build(self, reg_file: Array ,sb_valid_array:Array,sb_status_array:Value, sb_head:Array,  \
         is_memory_read_array:Array, result_array:Array , \
-                    mdata_array:Array , \
-                    csr_id_array:Array, csr_new_array:Array, \
+                    mdata_array:Array ,  
                     signals_array:Array,):
           
         wb_valid =(sb_status_array[sb_head[0]]==Bits(2)(3)) 
         wait_until(wb_valid)
          
-        is_memory_read, result, rd, mdata, is_csr, csr_id, csr_new, mem_ext = \
+        is_memory_read, result, rd, mdata,   mem_ext = \
             is_memory_read_array[sb_head[0]], result_array[sb_head[0]], signals_array[sb_head[0]].rd, \
-            mdata_array[sb_head[0]], signals_array[sb_head[0]].csr_write, \
-            csr_id_array[sb_head[0]], csr_new_array[sb_head[0]], \
+            mdata_array[sb_head[0]],  \
             signals_array[sb_head[0]].mem_ext
 
         data_cut = Bits(32)(0)
@@ -35,14 +33,11 @@ class WriteBack(Module):
             log("writeback        | x{:02}          | 0x{:08x}", rd, data)
             reg_file[rd] = data
             rmt_clear_rd = rd
-            rmt_clear_index = sb_head[0]
-        with Condition(is_csr):
-            log("writeback        | csr[{:02}]       | 0x{:08x}", csr_id, csr_new)
-            csr_file[csr_id] = csr_new
-         
+            rmt_clear_index = sb_head[0] 
+            
         sb_valid_array[sb_head[0]] = Bits(1)(0)
         sb_status_array[sb_head[0]] = Bits(2)(0)
-
+        log("head {}",sb_head[0])
         bypass_tail = (
                 (sb_head[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) 
             ).bitcast(Bits(SCOREBOARD.Bit_size)) 
