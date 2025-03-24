@@ -35,8 +35,7 @@ class Execution(Module):
         self,  
         rf: Array, 
         csr_f: Array,
-        memory: Module, 
-        writeback: Module,
+        memory: Module,  
         data: str,
         depth_log: int,
         scoreboard:Array, 
@@ -67,10 +66,7 @@ class Execution(Module):
         csr_new = Bits(32)(0)
         csr_new = signals.csr_write.select( rf[rs1] , csr_new)
         csr_new = signals.is_zimm.select(concat(Bits(27)(0),rs1), csr_new)
-
-        with Condition(is_csr):
-            log("csr_id: {} | new: {:08x} |", csr_id, csr_new)
-
+ 
         # TODO(@were): This is a hack to avoid post wait_until checks.
         rd = signals.rd
 
@@ -169,8 +165,7 @@ class Execution(Module):
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
         bound = dcache.bound.bind(rd=rd,index=sb_index )
         
-        bound.async_called()
-        wb = writeback.bind()
+        bound.async_called() 
 
         with Condition(signals.csr_write):
             csr_f[csr_id] = csr_new
@@ -185,16 +180,17 @@ class Execution(Module):
            
         with Condition(~is_memory ): 
             with Condition((rd != Bits(5)(0))):
+                exe_update = sb_index  
                 res = signals.link_pc.select(pc0, result) 
+                ex_data = res 
                 scoreboard['result'][sb_index] = res
                 scoreboard['sb_status'][sb_index] = Bits(2)(3) 
                 scoreboard['is_memory_read'][sb_index] = Bits(1)(0)
                 
-                exe_update = sb_index
-                ex_data = res  
+                
 
         
-        return    br_dest, wb,  exe_update,execution_index,ex_data,predict_wrong
+        return    br_dest,  exe_update,execution_index,ex_data,predict_wrong
 
 
 
@@ -321,8 +317,7 @@ class Dispatch(Downstream):
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
          
-         
-        log("fetch next index {}, should_fetch {}",next_index2,real_fetch)
+          
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         
         with Condition(real_fetch):
@@ -354,17 +349,16 @@ class Dispatch(Downstream):
         sb_tail[0] = predict_wrong.select( bypass_tail ,update_tail ) 
         rmt_clear_rd = rmt_clear_rd.optional(Bits(5)(0))
         rmt_up_rd = rmt_update_rd.optional(Bits(5)(0)) 
-        log("exe pass id valid {}",exe_pass_id.valid())
-        
+        exe_bypass = ex_data.valid()
+         
         mem_pass_index = mem_pass_id.optional(NoDep)
-        exe_pass_index = exe_pass_id.optional(NoDep)   
-        # exe_pass_index = scoreboard['is_memory_read'][exe_pass_index].select(NoDep,exe_pass_index)
-        # mem_pass_index = scoreboard['is_memory_read'][mem_pass_index].select(mem_pass_index,NoDep)
+        exe_pass_index = exe_bypass.select(exe_pass_id,NoDep)  
         rmt_cl_index = rmt_clear_index.optional(NoDep)
          
         cur_index = cur_index.optional(NoDep)
         Fetch_addr = fetch_addr.optional(Bits(32)(0))
         de_signals = decoder_signals.view(d_signals.optional(Bits(97)(0)))
+        
         e_data = ex_data.optional(Bits(32)(0))
         m_data = mdata.optional(Bits(32)(0))
         mem_valid = m_arg.valid()
@@ -413,10 +407,7 @@ class Dispatch(Downstream):
             br_valid = Bits(1)(0) 
             valid_global = Bits(1)(0)  
             for i in range(SCOREBOARD.size):  
-                
-                # log("index {} valid {}  status {}  rs1 {} rs2 {}",Bits(4)(i),scoreboard['sb_valid'][i], \
-                #         scoreboard['sb_status'][i],scoreboard['rs1_dep'][i],scoreboard['rs2_dep'][i])
-                
+                 
                 rs1_dep = scoreboard['rs1_dep'][i]
                 mem1 = (rs1_dep == mem_pass_index)
                 rs1_prefetch =   (mem1 | (rs1_dep == exe_pass_index))  
@@ -436,15 +427,13 @@ class Dispatch(Downstream):
                             scoreboard['rs1_ready'][i] = Bits(1)(1)
  
                     with Condition(rs2_un_rdy): 
-                        with Condition(rs2_prefetch): 
-                            with Condition( ~scoreboard['is_memory_read'][exe_pass_index] ):
-                                log("rs2_prefetch mem {}  exe_pass_index {}",mem2,exe_pass_index)
-                                scoreboard['rs2_value'][i] = (mem2).select(m_data, e_data)    
-                                scoreboard['rs2_ready'][i] = Bits(1)(1)
+                        with Condition(rs2_prefetch):   
+                            scoreboard['rs2_value'][i] = (mem2).select(m_data, e_data)    
+                            scoreboard['rs2_ready'][i] = Bits(1)(1)
   
                 valid_temp = (to_issue & 
-                            scoreboard['rs1_ready'][i] & 
-                            scoreboard['rs2_ready'][i])
+                            (scoreboard['rs1_ready'][i] | rs1_prefetch) & 
+                            (scoreboard['rs2_ready'][i] | rs2_prefetch) )
                 
                 is_br =  ((scoreboard['signals'][i].is_branch )& valid_temp)
                       
@@ -464,7 +453,7 @@ class Dispatch(Downstream):
               
             with Condition(valid_global ): 
                 scoreboard['sb_status'][d_id] = Bits(2)(1) 
-                log("dispatch {}",d_id)
+                
                 call = executor.async_called(
                     sb_index=d_id
                 )
@@ -591,11 +580,10 @@ def build_cpu(depth_log):
         executor = Execution()
         
         
-        ex_bypass, wb,  exe_update,execution_index,ex_data,predict_wrong = executor.build( 
+        ex_bypass,   exe_update,execution_index,ex_data,predict_wrong = executor.build( 
             rf = reg_file,
             csr_f = csr_file,
-            memory = memory_access,
-            writeback = writeback,
+            memory = memory_access, 
             data = f'{workspace}/workload.data',
             depth_log = depth_log,
             scoreboard=scoreboard, 
@@ -604,7 +592,7 @@ def build_cpu(depth_log):
         
         
         mem_update,m_data,m_arg,m_index = memory_access.build(
-            writeback = wb, 
+            writeback = writeback, 
             scoreboard=scoreboard, 
         )
         

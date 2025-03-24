@@ -97,8 +97,7 @@ def add_entry(signals, scoreboard, RMT, reg_file, fetch_addr, mem_index, ex_inde
     
     rs2_ready = (mem_rs2_update |  ex_rs2_update ).select(Bits(1)(1), rs2_ready)
   
-    sb_status = Bits(2)(0) 
-    log("signals rd {}",signals.rd)
+    sb_status = Bits(2)(0)  
     return scoreboard_entry.bundle(
         sb_valid=sb_valid,    
         rs1_ready=rs1_ready,
