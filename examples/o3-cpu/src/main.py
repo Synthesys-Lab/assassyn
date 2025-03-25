@@ -612,8 +612,13 @@ def build_cpu(depth_log):
         
         driver = Driver()
         driver.build(fetcher, user)
- 
 
+        '''RegArray exposing'''
+        sys.expose_on_top(reg_file, kind='Output') 
+        sys.expose_on_top(csr_file, kind='Inout')
+        sys.expose_on_top(pc_reg, kind='Output')
+
+         
     print(sys)
     conf = config(
         verilog=utils.has_verilator(),
