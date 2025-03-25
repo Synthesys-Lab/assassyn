@@ -7,8 +7,7 @@ class MemoryAccess(Module):
     
     def __init__(self):
         super().__init__(
-            ports={'rdata': Port(Bits(32)), 
-            'rd': Port(Bits(5)),
+            ports={'rdata': Port(Bits(32)),  
             'index':Port(Bits(SCOREBOARD.Bit_size))},
             no_arbiter=True)
         self.name = 'm'
@@ -20,23 +19,16 @@ class MemoryAccess(Module):
         
     ):
         self.timing = 'systolic'
-         
-        rd = self.rd.pop()
-        index = self.index.pop()
-        mem_update = NoDep
+          
+        index = self.index.pop() 
         with Condition( scoreboard['sb_status'][index] != Bits(2)(3) ):
             with Condition(self.rdata.valid()):
-                data = self.rdata.pop()
+                mdata = self.rdata.pop()
                 
-                log("mem.rdata        | 0x{:x}", data)
-                
-                with Condition(rd != Bits(5)(0)):
-                    log("mem.bypass       | x{:02} = 0x{:x}", rd, data)
-                    mem_update = index
-                    mdata = data
-             
+                log("mem.rdata        | 0x{:x}", mdata) 
+                  
             arg = self.rdata.valid().select(self.rdata.peek(),Bits(32)(0))
                    
         writeback.async_called()
         
-        return mem_update,mdata,arg,index
+        return  mdata,arg,index

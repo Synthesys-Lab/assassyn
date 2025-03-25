@@ -39,6 +39,7 @@ class Execution(Module):
         data: str,
         depth_log: int,
         scoreboard:Array, 
+        signals_array:Array,
         offset_reg: Array
         ):
 
@@ -48,7 +49,7 @@ class Execution(Module):
         # rs1_value,rs2_value,signals, fetch_addr = self.pop_all_ports(False)
         rs1_value=scoreboard['rs1_value'][sb_index]
         rs2_value=scoreboard['rs2_value'][sb_index]
-        signals=scoreboard['signals'][sb_index]
+        signals=signals_array[sb_index]
         fetch_addr=scoreboard['fetch_addr'][sb_index]
         rs1 = signals.rs1 
         rd = signals.rd
@@ -66,7 +67,8 @@ class Execution(Module):
         csr_new = Bits(32)(0)
         csr_new = signals.csr_write.select( rf[rs1] , csr_new)
         csr_new = signals.is_zimm.select(concat(Bits(27)(0),rs1), csr_new)
- 
+         
+
         # TODO(@were): This is a hack to avoid post wait_until checks.
         rd = signals.rd
 
@@ -143,27 +145,19 @@ class Execution(Module):
         
               
         is_memory = memory_read | memory_write
-        
-        # This `is_memory` hack is to evade rust's overflow check.
+         
         addr = (result.bitcast(UInt(32)) - is_memory.select(offset_reg[0].bitcast(UInt(32)), UInt(32)(0))).bitcast(Bits(32))
         request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(UInt(depth_log)), UInt(depth_log)(0))
         with Condition(memory_read):
             log("mem-read         | addr: 0x{:05x}| line: 0x{:05x} |", result, request_addr)
         with Condition(memory_write):
             log("mem-write        | addr: 0x{:05x}| line: 0x{:05x} | value: 0x{:08x} | wdada: 0x{:08x}", result, request_addr, a, b)
-        
-        with Condition(is_memory):  
-            scoreboard['is_memory_read'][sb_index] = memory_read
-            scoreboard['result'][sb_index] = signals.link_pc.select(pc0, result) 
-            scoreboard['csr_id'][sb_index] = csr_id
-            scoreboard['csr_new'][sb_index] = csr_new 
-            scoreboard['sb_status'][sb_index] = Bits(2)(2)
-            
- 
+         
+              
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
-        bound = dcache.bound.bind(rd=rd,index=sb_index )
+        bound = dcache.bound.bind( index=sb_index )
         
         bound.async_called() 
 
@@ -180,15 +174,10 @@ class Execution(Module):
            
         with Condition(~is_memory ): 
             with Condition((rd != Bits(5)(0))):
-                exe_update = sb_index  
-                res = signals.link_pc.select(pc0, result) 
-                ex_data = res 
-                scoreboard['result'][sb_index] = res
-                scoreboard['sb_status'][sb_index] = Bits(2)(3) 
-                scoreboard['is_memory_read'][sb_index] = Bits(1)(0)
-                
-                
-
+                exe_update = sb_index   
+                ex_data = signals.link_pc.select(pc0, result) 
+                 
+                 
         
         return    br_dest,  exe_update,execution_index,ex_data,predict_wrong
 
@@ -274,8 +263,7 @@ class Dispatch(Downstream):
             sb_head:Array,
             sb_tail:Array,
             predicted_addr:Value, 
-            is_jal:Value,
-            mem_pass_id:Value,
+            is_jal:Value, 
             exe_pass_id:Value, 
             RMT: Array ,
             execution_index:Value , 
@@ -287,6 +275,7 @@ class Dispatch(Downstream):
             ex_data:Value,
             mdata:Value,
             reg_file:Array,
+            signals_array:Array,
             cur_index:Value,
             fetch_addr:Value,
             d_signals:Value, 
@@ -316,7 +305,6 @@ class Dispatch(Downstream):
         to_fetch = predict_wrong.select(ex_bypass,to_fetch) 
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
-         
           
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
         
@@ -349,20 +337,25 @@ class Dispatch(Downstream):
         sb_tail[0] = predict_wrong.select( bypass_tail ,update_tail ) 
         rmt_clear_rd = rmt_clear_rd.optional(Bits(5)(0))
         rmt_up_rd = rmt_update_rd.optional(Bits(5)(0)) 
-        exe_bypass = ex_data.valid()
-         
-        mem_pass_index = mem_pass_id.optional(NoDep)
-        exe_pass_index = exe_bypass.select(exe_pass_id,NoDep)  
         rmt_cl_index = rmt_clear_index.optional(NoDep)
+
+        exe_bypass = ex_data.valid() 
+        
+        exe_pass_index = exe_bypass.select(exe_pass_id,NoDep)  
+        with Condition(exe_bypass):
+            scoreboard['result'][execution_index] = ex_data
+            scoreboard['sb_status'][execution_index] = Bits(2)(3) 
          
         cur_index = cur_index.optional(NoDep)
         Fetch_addr = fetch_addr.optional(Bits(32)(0))
         de_signals = decoder_signals.view(d_signals.optional(Bits(97)(0)))
         
-        e_data = ex_data.optional(Bits(32)(0))
-        m_data = mdata.optional(Bits(32)(0))
         mem_valid = m_arg.valid()
+        mem_value_update = mdata.valid()
+        e_data = ex_data.optional(Bits(32)(0))
+         
         m_index = m_index.optional(NoDep)
+        mem_pass_index = m_index
         m_arg = m_arg.optional(Bits(32)(0))
          
         with Condition(predict_wrong): 
@@ -375,15 +368,17 @@ class Dispatch(Downstream):
                     with Condition( (move1 | move2 | move3) ):
                         scoreboard['sb_valid'][i] = Bits(1)(0)
                         scoreboard['sb_status'][i] = Bits(2)(0)
-                         
+                        
             with Condition(mem_valid):
                 move1 = (m_index <sb_tail[0]) & (m_index >= bypass_tail)
                 move2 = (m_index >=bypass_tail) & ( (sb_tail[0]<bypass_tail)  )
                 move3 = ( (sb_tail[0]<bypass_tail) & (m_index <sb_tail[0]) )
                 un_pw = ~(move1 | move2 | move3) 
                 with Condition(un_pw): 
-                    scoreboard['mdata'][m_index] = m_arg
                     scoreboard['sb_status'][m_index] = Bits(2)(3)
+                    with Condition(mem_value_update):
+                        scoreboard['mdata'][m_index] = m_arg
+
                     
             with Condition( (rmt_clear_rd != Bits(5)(0)) & (RMT[rmt_clear_rd]==rmt_cl_index)):
                 RMT[rmt_clear_rd] = NoDep
@@ -394,9 +389,10 @@ class Dispatch(Downstream):
             with Condition( (rmt_clear_rd != Bits(5)(0))& (rmt_clear_rd!=rmt_up_rd)& (RMT[rmt_clear_rd]==rmt_cl_index)):
                 RMT[rmt_clear_rd] = NoDep 
 
-            with Condition(mem_valid):
-                scoreboard['mdata'][m_index] = m_arg
+            with Condition(mem_valid): 
                 scoreboard['sb_status'][m_index] = Bits(2)(3)
+                with Condition(mem_value_update):
+                        scoreboard['mdata'][m_index] = m_arg
             
             #Dispatch 
  
@@ -423,19 +419,19 @@ class Dispatch(Downstream):
 
                     with Condition(rs1_un_rdy):  
                         with Condition(rs1_prefetch):  
-                            scoreboard['rs1_value'][i] =  (mem1).select(m_data, e_data)  
+                            scoreboard['rs1_value'][i] =  (mem1).select(m_arg, e_data)  
                             scoreboard['rs1_ready'][i] = Bits(1)(1)
  
                     with Condition(rs2_un_rdy): 
                         with Condition(rs2_prefetch):   
-                            scoreboard['rs2_value'][i] = (mem2).select(m_data, e_data)    
+                            scoreboard['rs2_value'][i] = (mem2).select(m_arg, e_data)    
                             scoreboard['rs2_ready'][i] = Bits(1)(1)
   
                 valid_temp = (to_issue & 
                             (scoreboard['rs1_ready'][i] | rs1_prefetch) & 
                             (scoreboard['rs2_ready'][i] | rs2_prefetch) )
                 
-                is_br =  ((scoreboard['signals'][i].is_branch )& valid_temp)
+                is_br =  ((signals_array[i].is_branch )& valid_temp)
                       
                 temp_faddr = scoreboard['fetch_addr'][Bits(SCOREBOARD.Bit_size)(i)]
 
@@ -464,7 +460,7 @@ class Dispatch(Downstream):
             with Condition( ~is_nop & (cur_index!=NoDep)): 
                
                 newest_index = cur_index     
-                newest_entry = add_entry(de_signals,scoreboard,RMT,reg_file,Fetch_addr,mem_pass_index,exe_pass_index,e_data,m_data)
+                newest_entry = add_entry(de_signals,scoreboard,signals_array,RMT,reg_file,Fetch_addr,mem_pass_index,exe_pass_index,e_data,m_arg)
                  
                 early_dispatch_valid =( newest_entry.rs1_ready & newest_entry.rs2_ready ).select(Bits(1)(1),Bits(1)(0))
                 
@@ -476,7 +472,7 @@ class Dispatch(Downstream):
                 scoreboard['rs2_value'][newest_index] = newest_entry.rs2_value
                 scoreboard['rs1_dep'][newest_index] = newest_entry.rs1_dep
                 scoreboard['rs2_dep'][newest_index] =  newest_entry.rs2_dep
-                scoreboard['signals'][newest_index] =  newest_entry.signals
+                signals_array[newest_index] = de_signals
                 scoreboard['fetch_addr'][newest_index] = newest_entry.fetch_addr
                  
                 with Condition(exe_dispatch_valid ):
@@ -554,15 +550,12 @@ def build_cpu(depth_log):
             'rs2_dep': RegArray(Bits(SCOREBOARD.Bit_size), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
             'result': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
             'sb_status': RegArray(Bits(2), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size,attr=[Array.FULLY_PARTITIONED]),
-            'signals': RegArray(decoder_signals, SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
-            'fetch_addr': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
-            'is_memory_read': RegArray(Bits(1), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
-            'mdata': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
-            'csr_id': RegArray(Bits(4), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
-            'csr_new': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
+            
+            'fetch_addr': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ), 
+            'mdata': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ) 
         }
 
-  
+        signals_array = RegArray(decoder_signals, SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size )
         sb_head = RegArray(Bits(SCOREBOARD.Bit_size), 1, initializer=[0])
         sb_tail = RegArray(Bits(SCOREBOARD.Bit_size), 1, initializer=[0])
 
@@ -572,8 +565,8 @@ def build_cpu(depth_log):
 
         writeback = WriteBack()
         rmt_clear_rd,rmt_clear_index= writeback.build(reg_file = reg_file , sb_valid_array=scoreboard['sb_valid'],sb_status_array=scoreboard['sb_status'],sb_head=sb_head, \
-                    is_memory_read_array = scoreboard['is_memory_read'] , result_array = scoreboard['result']  , \
-                    mdata_array = scoreboard['mdata'] ,  signals_array = scoreboard['signals']  )
+                      result_array = scoreboard['result']  , \
+                    mdata_array = scoreboard['mdata'] ,  signals_array = signals_array )
  
         memory_access = MemoryAccess()
 
@@ -588,10 +581,11 @@ def build_cpu(depth_log):
             depth_log = depth_log,
             scoreboard=scoreboard, 
             offset_reg = offset_reg,
+            signals_array=signals_array
             )
         
         
-        mem_update,m_data,m_arg,m_index = memory_access.build(
+        mdata,m_arg,m_index = memory_access.build(
             writeback = writeback, 
             scoreboard=scoreboard, 
         )
@@ -609,11 +603,11 @@ def build_cpu(depth_log):
         dispatch.build(executor=executor,scoreboard=scoreboard,trigger=cycle_activate, \
              predict_wrong=predict_wrong ,ex_bypass = ex_bypass, pc_reg = pc_reg, pc_addr =pc_addr, decoder =decoder, data=f'{workspace}/workload.exe',depth_log= depth_log, \
                             sb_head = sb_head, sb_tail=sb_tail,predicted_addr = predicted_addr,is_jal =is_jal , \
-            exe_pass_id=exe_update,mem_pass_id=mem_update, RMT=reg_map_table,execution_index=execution_index , \
+            exe_pass_id=exe_update , mdata = mdata,RMT=reg_map_table,execution_index=execution_index , \
             rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
-                rmt_update_rd=rmt_update_rd,is_nop=is_nop,rmt_update_index=rmt_update_index,mdata=m_data,ex_data = ex_data,reg_file=reg_file,\
+                rmt_update_rd=rmt_update_rd,is_nop=is_nop,rmt_update_index=rmt_update_index, ex_data = ex_data,reg_file=reg_file,\
                       cur_index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals, \
-                        m_index=m_index,m_arg=m_arg )
+                        m_index=m_index,m_arg=m_arg,signals_array=signals_array )
          
         
         driver = Driver()

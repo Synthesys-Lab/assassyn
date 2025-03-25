@@ -11,7 +11,7 @@ class WriteBack(Module):
 
     @module.combinational
     def build(self, reg_file: Array ,sb_valid_array:Array,sb_status_array:Value, sb_head:Array,  \
-        is_memory_read_array:Array, result_array:Array , \
+          result_array:Array , \
                     mdata_array:Array ,  
                     signals_array:Array,):
           
@@ -19,7 +19,7 @@ class WriteBack(Module):
         wait_until(wb_valid)
          
         is_memory_read, result, rd, mdata,   mem_ext = \
-            is_memory_read_array[sb_head[0]], result_array[sb_head[0]], signals_array[sb_head[0]].rd, \
+            (signals_array[sb_head[0]].memory[0:0]), result_array[sb_head[0]], signals_array[sb_head[0]].rd, \
             mdata_array[sb_head[0]],  \
             signals_array[sb_head[0]].mem_ext
 
@@ -37,7 +37,7 @@ class WriteBack(Module):
             
         sb_valid_array[sb_head[0]] = Bits(1)(0)
         sb_status_array[sb_head[0]] = Bits(2)(0)
-        log("head {}",sb_head[0])
+         
         bypass_tail = (
                 (sb_head[0].bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) 
             ).bitcast(Bits(SCOREBOARD.Bit_size)) 
