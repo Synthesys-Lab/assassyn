@@ -5,17 +5,16 @@ class WriteBack(Module):
     
     def __init__(self):
         super().__init__(
-            ports={}, no_arbiter=True)
+            ports={ }, no_arbiter=True)
 
         self.name = 'W'
 
     @module.combinational
     def build(self, reg_file: Array ,scoreboard:Array, sb_head:Array,  signals_array:Array):
-        
-        s_head = sb_head[0]
-        wb_valid =(scoreboard['sb_status'][s_head]==Bits(2)(3)) 
-        wait_until(wb_valid)
-        
+         
+        s_head = sb_head[0]  
+        wait_until(scoreboard['sb_status'][s_head]==Bits(2)(3))
+
         signals = signals_array[s_head]
         is_memory_read, result, rd, mdata,   mem_ext = \
             (signals.memory[0:0]), scoreboard['result'][s_head], signals.rd, \
@@ -33,15 +32,16 @@ class WriteBack(Module):
             reg_file[rd] = data
             rmt_clear_rd = rd
             rmt_clear_index = s_head 
-            
+         
         scoreboard['sb_valid'][s_head] = Bits(1)(0)
         scoreboard['sb_status'][s_head] = Bits(2)(0)
          
-        bypass_tail = (
+        bypass_head = (
                 (s_head.bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1) 
             ).bitcast(Bits(SCOREBOARD.Bit_size)) 
         )
-        bypass_tail = (bypass_tail==NoDep).select(Bits(SCOREBOARD.Bit_size)(0),bypass_tail)
+        bypass_head = (bypass_head==NoDep).select(Bits(SCOREBOARD.Bit_size)(0),bypass_head)
         
-        sb_head[0] = bypass_tail
+        sb_head[0] = bypass_head 
+
         return rmt_clear_rd,rmt_clear_index

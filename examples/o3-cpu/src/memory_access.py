@@ -13,10 +13,8 @@ class MemoryAccess(Module):
         self.name = 'm'
     @module.combinational
     def build(
-        self, 
-        writeback: Module,
-        scoreboard:Array,
-        
+        self,  
+        scoreboard:Array, 
     ):
         self.timing = 'systolic'
           
@@ -24,11 +22,10 @@ class MemoryAccess(Module):
         with Condition( scoreboard['sb_status'][index] != Bits(2)(3) ):
             with Condition(self.rdata.valid()):
                 mdata = self.rdata.pop()
-                
+                scoreboard['mdata'][index] = mdata
                 log("mem.rdata        | 0x{:x}", mdata) 
-                  
-            arg = self.rdata.valid().select(self.rdata.peek(),Bits(32)(0))
-                   
-        writeback.async_called()
-        
-        return  mdata,arg,index
+             
+            scoreboard['sb_status'][index] = Bits(2)(3)
+            
+  
+        return  index

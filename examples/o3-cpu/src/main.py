@@ -55,20 +55,19 @@ class Execution(Module):
         rd = signals.rd
 
         rs1_dep = scoreboard['rs1_dep'][sb_index]
-  
-        rs1_dep_valid  = (scoreboard['sb_status'][rs1_dep] == Bits(2)(3))&(signals_array[rs1_dep].rd == rs1)
+ 
+        rs1_dep_valid  = ( (scoreboard['sb_status'][rs1_dep]!=Bits(2)(1)) & scoreboard['sb_valid'][rs1_dep]   )&(signals_array[rs1_dep].rd == rs1)
 
         rs1_dep_result = (signals_array[rs1_dep].memory[0:0]).select( scoreboard['mdata'][rs1_dep], scoreboard['result'][rs1_dep])
         rs1_value=rs1_dep_valid.select(rs1_dep_result ,rf[rs1]) 
 
-        rs2_dep = scoreboard['rs2_dep'][sb_index]
-        rs2_dep_valid  = (scoreboard['sb_status'][rs2_dep]== Bits(2)(3))&(signals_array[rs2_dep].rd == rs2)
+        rs2_dep = scoreboard['rs2_dep'][sb_index] 
+
+        rs2_dep_valid  = ((scoreboard['sb_status'][rs2_dep]!=Bits(2)(1)) & scoreboard['sb_valid'][rs2_dep]  )&(signals_array[rs2_dep].rd == rs2)
 
         rs2_dep_result = (signals_array[rs2_dep].memory[0:0]).select( scoreboard['mdata'][rs2_dep], scoreboard['result'][rs2_dep])
         rs2_value=rs2_dep_valid.select(rs2_dep_result,rf[rs2] )
-
-          
-         
+ 
         raw_id = [(3860, 9), (773, 1) ,(1860, 15) , (384,10) , (944 , 11) , (928 , 12) , (772 , 4 ) , (770 ,13),(771,14),(768,8) ,(833,2)]
         #mtvec 1 mepc 2 mcause 3 mie 4 mip 5 mtval 6 mscratc 7 msb_status 8 mhartid 9 satp 10 pmpaddr0 11  pmpcfg0 12 medeleg 13 mideleg 14 unkonwn 15
 
@@ -215,29 +214,22 @@ class Decoder(Module):
         log("raw: 0x{:08x}  | addr: 0x{:05x} |", inst, fetch_addr)
         
         signals = decode_logic(inst)
-        
-        is_ebreak= (signals.rs1_valid & signals.imm_valid & ((signals.imm == Bits(32)(1))|(signals.imm == Bits(32)(0))) & (signals.alu == Bits(16)(0)))
-        
-        is_nop = ((inst == Bits(32)(51)) | (inst==Bits(32)(0))).select(Bits(1)(1),Bits(1)(0))
-        
+         
         Index = sb_tail[0] 
         inst, fetch_addr = self.pop_all_ports(False)
- 
-        
-        with Condition(~is_nop):
-            decode_signals = signals.value()
-            decode_index = Index
-            decode_fetch_addr = fetch_addr
-            is_br =  signals.is_branch
-            is_jalr = (signals.is_branch & (~signals.is_offset_br)&signals.link_pc)
-            
-            with Condition( (signals.rd_valid)&(signals.rd!=Bits(5)(0)) ): 
-                rmt_update_rd = signals.rd
-                rmt_update_index = Index
-            with Condition(is_br & (~is_ebreak)):
-                predicted_addr =( (signals.imm).bitcast(Int(32)) + fetch_addr.bitcast(Int(32)) ).bitcast(Bits(32))
+  
+        decode_signals = signals.value()
+        decode_index = Index
+        decode_fetch_addr = fetch_addr
+        is_br =  signals.is_branch
+        is_jalr = (is_br & (~signals.is_offset_br)&signals.link_pc)
+        new_rd = signals.rd
+        with Condition( new_rd !=Bits(5)(0)): 
+            rmt_update_rd = new_rd
+        with Condition(is_br  ):
+            predicted_addr =( (signals.imm).bitcast(Int(32)) + fetch_addr.bitcast(Int(32)) ).bitcast(Bits(32))
                 
-        return  is_nop,rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jalr 
+        return  rmt_update_rd,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jalr 
     
 class Fetcher(Module):
     
@@ -278,20 +270,17 @@ class Dispatch(Downstream):
             is_jal:Value, 
             exe_pass_id:Value, 
             RMT: Array ,
-            execution_index:Value , 
-            is_nop:Value, 
-            rmt_update_rd:Value,
-            rmt_update_index:Value,
+            execution_index:Value ,  
+            rmt_update_rd:Value, 
             rmt_clear_rd:Value,
             rmt_clear_index:Value,
-            ex_data:Value,
-            mdata:Value, 
+            ex_data:Value, 
             signals_array:Array,
             cur_index:Value,
             fetch_addr:Value,
             d_signals:Value, 
-            m_index:Value,
-            m_arg:Value ):
+            m_index:Value, 
+            writeback:Module):
         
         trigger = trigger.optional(Bits(1)(0))
         
@@ -307,7 +296,8 @@ class Dispatch(Downstream):
         next_index2 =   (stail.bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1)).bitcast(Bits(SCOREBOARD.Bit_size))
         next_index2 = (next_index2==NoDep).select(Bits(SCOREBOARD.Bit_size)(0),next_index2)
         
-        is_not_full_scoreboard = ( (next_index2 != sb_head[0])) | (~scoreboard['sb_valid'][sb_head[0]]) 
+        shead = sb_head[0]
+        is_not_full_scoreboard = ( (next_index2 != shead)) | (~scoreboard['sb_valid'][shead]) 
         is_jal = is_jal.optional(Bits(1)(0))
         real_fetch =  is_not_full_scoreboard & (~is_jal) 
         
@@ -328,8 +318,7 @@ class Dispatch(Downstream):
 
 
         #update RMT and register files
-         
-        is_nop = is_nop.optional(Bits(1)(0)) 
+          
         update_tail =  ((~cur_index.valid()) ).select( stail , \
                 (stail.bitcast(Int(SCOREBOARD.Bit_size)) + Int(SCOREBOARD.Bit_size)(1)).bitcast(Bits(SCOREBOARD.Bit_size)) )  
           
@@ -353,24 +342,19 @@ class Dispatch(Downstream):
         exe_pass_index = exe_bypass.select(exe_pass_id,NoDep)  
         with Condition(exe_bypass):
             scoreboard['result'][execution_index] = ex_data
-            scoreboard['sb_status'][execution_index] = Bits(2)(3) 
+            scoreboard['sb_status'][execution_index] = Bits(2)(2) 
          
         newest_index = cur_index.optional(NoDep)
         Fetch_addr = fetch_addr.optional(Bits(32)(0))
         de_signals = decoder_signals.view(d_signals.optional(Bits(97)(0)))
-        
-        mem_valid = m_arg.valid()
-        mem_value_update = mdata.valid()
-       
-        with Condition(mem_valid): 
-            scoreboard['sb_status'][m_index] = Bits(2)(3)
-            with Condition(mem_value_update):
-                    scoreboard['mdata'][m_index] = m_arg
+          
 
-        m_index = m_index.optional(NoDep)
-        mem_pass_index = m_index
-        m_arg = m_arg.optional(Bits(32)(0))
+        mem_pass_index = m_index.optional(NoDep)
          
+         
+        writeback.async_called()
+ 
+        rmt_clear =  (rmt_clear_rd != Bits(5)(0)) & (RMT[rmt_clear_rd]==rmt_cl_index)
         with Condition(predict_wrong): 
             with Condition(br_flag!=UInt(32)(0)):
                 for i in range(SCOREBOARD.size): 
@@ -378,32 +362,26 @@ class Dispatch(Downstream):
     
                     move2 = (Bits(SCOREBOARD.Bit_size)(i) >=bypass_tail) & ( (stail<bypass_tail)  )
                     move3 = ( (stail<bypass_tail) & (Bits(SCOREBOARD.Bit_size)(i) <stail) )
-                    with Condition( (move1 | move2 | move3) ):
-                        scoreboard['sb_valid'][i] = Bits(1)(0)
-                        scoreboard['sb_status'][i] = Bits(2)(0)
-                 
-                    
-            with Condition( (rmt_clear_rd != Bits(5)(0)) & (RMT[rmt_clear_rd]==rmt_cl_index)):
+                    with Condition( (move1 | move2 | move3) ): 
+                        scoreboard['sb_valid'][i] = Bits(1)(0) 
+                  
+            with Condition(rmt_clear):
                 RMT[rmt_clear_rd] = NoDep
 
+
         with Condition(~predict_wrong):
-            RMT[rmt_up_rd] =  (rmt_up_rd == Bits(5)(0)).select( NoDep ,rmt_update_index )   
+            RMT[rmt_up_rd] =  (rmt_up_rd == Bits(5)(0)).select( NoDep ,newest_index )   
             
-            with Condition( (rmt_clear_rd != Bits(5)(0))& (rmt_clear_rd!=rmt_up_rd)& (RMT[rmt_clear_rd]==rmt_cl_index)):
-                RMT[rmt_clear_rd] = NoDep 
- 
-            
+            with Condition( rmt_clear & (rmt_clear_rd!=rmt_up_rd) ):
+                RMT[rmt_clear_rd] = NoDep  
             #Dispatch 
- 
             valid_temp = Bits(1)(0)
             
             dispatch_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
             branch_index = Bits(SCOREBOARD.Bit_size)(SCOREBOARD.size)
             br_valid = Bits(1)(0) 
             valid_global = Bits(1)(0)  
-            for i in range(SCOREBOARD.size):  
-                # log("index {}   valid {}   status {}   rs1_dep {}  rs2_dep {}",Bits(5)(i),scoreboard['sb_valid'][i], \
-                #         scoreboard['sb_status'][i],scoreboard['rs1_dep'][i],scoreboard['rs2_dep'][i] )
+            for i in range(SCOREBOARD.size):   
                 rs1_dep = scoreboard['rs1_dep'][i]
                 mem1 = (rs1_dep == mem_pass_index)
                 rs1_dep_rd = (scoreboard['sb_status'][rs1_dep]==Bits(2)(3))
@@ -416,15 +394,10 @@ class Dispatch(Downstream):
                 
                 to_issue = scoreboard['sb_valid'][i] & (scoreboard['sb_status'][i] == Bits(2)(0))
                 with Condition(to_issue): 
-                    rs1_un_rdy = (~scoreboard['rs1_ready'][i])
-                    rs2_un_rdy = (~scoreboard['rs2_ready'][i])
-
-                    with Condition(rs1_un_rdy):  
-                        with Condition(rs1_prefetch):   
+                    with Condition(rs1_prefetch):   
                             scoreboard['rs1_ready'][i] = Bits(1)(1)
  
-                    with Condition(rs2_un_rdy): 
-                        with Condition(rs2_prefetch):    
+                    with Condition(rs2_prefetch):    
                             scoreboard['rs2_ready'][i] = Bits(1)(1)
   
                 valid_temp = (to_issue & 
@@ -432,15 +405,9 @@ class Dispatch(Downstream):
                             (scoreboard['rs2_ready'][i] | rs2_prefetch) )
                 
                 is_br =  ((signals_array[i].is_branch )& valid_temp)
-                      
-                temp_faddr = scoreboard['fetch_addr'][Bits(SCOREBOARD.Bit_size)(i)]
-
-                d_temp = (temp_faddr<  scoreboard['fetch_addr'][dispatch_index]).select(Bits(1)(1),Bits(1)(0)) 
-                dispatch_index = (valid_temp & ( d_temp | (~valid_global) )).select(Bits(SCOREBOARD.Bit_size)(i), dispatch_index)
-                 
-                br_temp = (temp_faddr<  scoreboard['fetch_addr'][branch_index]).select(Bits(1)(1),Bits(1)(0)) 
-                branch_index = (is_br&(br_temp| (~br_valid) )).select(Bits(SCOREBOARD.Bit_size)(i),branch_index)
- 
+                       
+                dispatch_index = valid_temp.select(Bits(SCOREBOARD.Bit_size)(i), dispatch_index) 
+                branch_index = (is_br&(~br_valid)).select(Bits(SCOREBOARD.Bit_size)(i),branch_index)
                 br_valid =  is_br | br_valid 
                 valid_global = valid_global | valid_temp
                  
@@ -457,23 +424,22 @@ class Dispatch(Downstream):
                 call.bind.set_fifo_depth()
         
 
-            with Condition( ~is_nop & (newest_index!=NoDep)): 
+            with Condition(newest_index!=NoDep): 
                 
                 newest_index = cur_index     
-                rs_1 = de_signals.rs1
-                rs_2 = de_signals.rs2
-                rs_1_valid = de_signals.rs1_valid
-                rs_2_valid = de_signals.rs2_valid
+                rs1 = de_signals.rs1
+                rs2 = de_signals.rs2
+                rs1_valid = de_signals.rs1_valid
+                rs2_valid = de_signals.rs2_valid
 
-                entry_rs1 = RMT[rs_1] 
-                entry_rs2 = RMT[rs_2]
-
-                rs1_ready,rs2_ready = call_rs(rs_1,rs_2,rs_1_valid ,rs_2_valid ,scoreboard,signals_array,entry_rs1,entry_rs2,mem_pass_index,exe_pass_index )
-                 
-                early_dispatch_valid =(rs1_ready & rs2_ready ).select(Bits(1)(1),Bits(1)(0))
-                
-                exe_dispatch_valid = early_dispatch_valid &(~valid_global)
+                entry_rs1 = RMT[rs1] 
+                entry_rs2 = RMT[rs2]
+ 
+                rs1_ready,rs2_ready = call_rs(rs1,rs2,rs1_valid ,rs2_valid ,scoreboard,signals_array,entry_rs1,entry_rs2,mem_pass_index,exe_pass_index )
+                  
+                exe_dispatch_valid =  (~valid_global)&(rs1_ready & rs2_ready )
                 scoreboard['sb_valid'][newest_index] = Bits(1)(1) 
+                
                 scoreboard['rs1_ready'][newest_index] = rs1_ready
                 scoreboard['rs2_ready'][newest_index] = rs2_ready
  
@@ -481,15 +447,14 @@ class Dispatch(Downstream):
                 scoreboard['rs2_dep'][newest_index] =  entry_rs2
                 signals_array[newest_index] = de_signals
                 scoreboard['fetch_addr'][newest_index] =  Fetch_addr
-                 
-                with Condition(exe_dispatch_valid ):
-                     
-                    scoreboard['sb_status'][newest_index] = Bits(2)(1)
+                scoreboard['sb_status'][newest_index] = exe_dispatch_valid.select( Bits(2)(1), Bits(2)(0))
+
+                with Condition(exe_dispatch_valid ):  
                     
                     call = executor.async_called( sb_index=newest_index )
                     
-                    call.bind.set_fifo_depth()  
-
+                    call.bind.set_fifo_depth()   
+                 
 
 class MemUser(Module):
     def __init__(self, width):
@@ -589,9 +554,8 @@ def build_cpu(depth_log):
             )
         
         
-        mdata,m_arg,m_index = memory_access.build(
-            writeback = writeback, 
-            scoreboard=scoreboard, 
+        m_index = memory_access.build( 
+            scoreboard=scoreboard,  
         )
         
         
@@ -602,16 +566,16 @@ def build_cpu(depth_log):
              
          
         
-        is_nop,  rmt_update_rd,rmt_update_index,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jal= decoder.build( sb_tail=sb_tail )
+        rmt_update_rd,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jal= decoder.build( sb_tail=sb_tail )
 
         dispatch.build(executor=executor,scoreboard=scoreboard,trigger=cycle_activate, \
              predict_wrong=predict_wrong ,ex_bypass = ex_bypass, pc_reg = pc_reg, pc_addr =pc_addr, decoder =decoder, data=f'{workspace}/workload.exe',depth_log= depth_log, \
                             sb_head = sb_head, sb_tail=sb_tail,predicted_addr = predicted_addr,is_jal =is_jal , \
-            exe_pass_id=exe_update , mdata = mdata,RMT=reg_map_table,execution_index=execution_index , \
+            exe_pass_id=exe_update , RMT=reg_map_table,execution_index=execution_index , \
             rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
-                rmt_update_rd=rmt_update_rd,is_nop=is_nop,rmt_update_index=rmt_update_index, ex_data = ex_data, \
+                rmt_update_rd=rmt_update_rd, ex_data = ex_data, \
                       cur_index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals, \
-                        m_index=m_index,m_arg=m_arg,signals_array=signals_array )
+                        m_index=m_index,signals_array=signals_array,writeback = writeback )
          
         
         driver = Driver()
@@ -728,34 +692,34 @@ if __name__ == '__main__':
     ]
 
     test_cases = [
-        # 'rv32ui-p-add',
-        # 'rv32ui-p-addi',
-        # 'rv32ui-p-and',
-        # 'rv32ui-p-andi',
-        # 'rv32ui-p-auipc',
-        # 'rv32ui-p-beq',
-        # 'rv32ui-p-bge',
-        # 'rv32ui-p-bgeu',
-        # 'rv32ui-p-blt',
-        # 'rv32ui-p-bltu',
-        # 'rv32ui-p-bne',
-        # 'rv32ui-p-jal',
-        # 'rv32ui-p-jalr',
-        # 'rv32ui-p-lui',
-        # 'rv32ui-p-lw',
-        # 'rv32ui-p-or',
-        # 'rv32ui-p-ori',
-        # 'rv32ui-p-sll',
-        # 'rv32ui-p-slli',
-        # 'rv32ui-p-sltu',
-        # 'rv32ui-p-srai',
-        # 'rv32ui-p-srl',
-        # 'rv32ui-p-srli',
-        # 'rv32ui-p-sub',
-        # 'rv32ui-p-sw',
-        # 'rv32ui-p-xori',
-        # 'rv32ui-p-lbu',#TO DEBUG&TO CHECK
-        # 'rv32ui-p-sb',#TO CHECK
+        'rv32ui-p-add',
+        'rv32ui-p-addi',
+        'rv32ui-p-and',
+        'rv32ui-p-andi',
+        'rv32ui-p-auipc',
+        'rv32ui-p-beq',
+        'rv32ui-p-bge',
+        'rv32ui-p-bgeu',
+        'rv32ui-p-blt',
+        'rv32ui-p-bltu',
+        'rv32ui-p-bne',
+        'rv32ui-p-jal',
+        'rv32ui-p-jalr',
+        'rv32ui-p-lui',
+        'rv32ui-p-lw',
+        'rv32ui-p-or',
+        'rv32ui-p-ori',
+        'rv32ui-p-sll',
+        'rv32ui-p-slli',
+        'rv32ui-p-sltu',
+        'rv32ui-p-srai',
+        'rv32ui-p-srl',
+        'rv32ui-p-srli',
+        'rv32ui-p-sub',
+        'rv32ui-p-sw',
+        'rv32ui-p-xori',
+        'rv32ui-p-lbu',#TO DEBUG&TO CHECK
+        'rv32ui-p-sb',#TO CHECK
     ]
     tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
     
@@ -795,7 +759,4 @@ if __name__ == '__main__':
         init_workspace(tests, case)
         run_cpu(sys, simulator_path, verilog_path)
     if run_tests:
-        print("minor-CPU tests ran successfully!")
-
-
-
+        print("o3-CPU tests ran successfully!")

@@ -2,7 +2,7 @@ from opcodes import *
 from instructions import *
 
 class SCOREBOARD:
-    size = 6
+    size = 5
     init_size = size+1
     Bit_size = 3
     sizeI = UInt(8)(size)
