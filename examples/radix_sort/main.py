@@ -335,7 +335,7 @@ def build_system():
         sys.expose_on_top(radix_reg, kind="Output")
     conf = config(
         verilog=utils.has_verilator(),
-        sim_threshold=3000,
+        sim_threshold=100000,
         idle_threshold=10,
         resource_base="",
         fifo_depth=1,
@@ -350,3 +350,5 @@ if __name__ == "__main__":
     print("System built successfully!")
     utils.run_simulator(simulator_path)
     print("Simulation check completed!")
+    if utils.has_verilator():
+        raw = utils.run_verilator(verilog_path)
