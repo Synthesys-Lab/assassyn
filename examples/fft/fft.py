@@ -143,6 +143,7 @@ class External_loop(Module):
         with Condition(state[0] == SRAM_USER.S10):
             
             with Condition(self.span[0] == UInt(32)(0)):
+                log("finish")
                 finish()
             
             con = Bits(1)(0)

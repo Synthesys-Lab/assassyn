@@ -196,6 +196,8 @@ def test_sort():
     simulator_path, verilator_path = backend.elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
+    #if utils.has_verilator():
+    #    raw = utils.run_verilator(verilator_path)
 
 
 if __name__ == "__main__":

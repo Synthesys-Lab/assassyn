@@ -273,6 +273,7 @@ class Driver(Module):
                 # log("Memory async called: re={:08x}; we={:08x}; addr_reg[0]={:08x};", re[0], we[0],addr_reg[0])
                 numbers_mem.bound.async_called()
         with Condition(offset_reg[0] == UInt(data_width)(data_width)):
+            log("finish")
             finish()
         return mem_start, mem_end
 

@@ -166,6 +166,12 @@ class External_loop(Module):
             i[0] = con.select((i[0].bitcast(Int(32)) + Int(32)(1)) , Int(32)(0))
         
         log("outterloop----------In_full_flag: {} | i: {} |Stop-signal: {}", In_full_flag,i[0],full_flag[0])
+
+        finish_flag = In_full_flag & (i[0] == Int(32)(I_MAX)) & (~ full_flag[0])
+        with Condition(finish_flag):
+            log("finish")
+            finish()
+
         sram_master.async_called(Start = ~full_flag[0])
 
         

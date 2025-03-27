@@ -18,7 +18,7 @@ class Driver(Module):
             sram.bound.async_called()
             idx[0] = idx[0] + UInt(13)(1)
         with Condition(~read):
-            log('done')
+            log("finish")
             finish()
         return idx
 

@@ -64,6 +64,7 @@ class MemUser(Module):
             self.steps[0] = step
             self.result[0] = Int(32)(0)
             with Condition(is_finish):
+                log("finish")
                 finish()
 
 class Driver(Module):
