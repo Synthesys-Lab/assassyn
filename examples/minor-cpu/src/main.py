@@ -11,6 +11,7 @@ from opcodes import *
 from decoder import *
 from writeback import *
 from memory_access import *
+import sys as py_sys
 
 offset = UInt(32)(0)
 current_path = os.path.dirname(os.path.abspath(__file__))
@@ -528,7 +529,7 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
             value = value[2:]
             open(f'{workspace}/workload.init', 'w').write(value)
 
-    report = False
+    report = True
 
     if report:
         raw = utils.run_simulator(simulator_path, False)
@@ -576,62 +577,70 @@ def init_workspace(base_path, case):
 if __name__ == '__main__':
     # Build the CPU Module only once
     sys, simulator_path, verilog_path = build_cpu(depth_log=16)
+    args = py_sys.argv[1:]
     print("minor-CPU built successfully!")
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
-    workloads = [
-        #'0to100',
-        #'median',
-        #'multiply',
-        #'qsort',
-        #'rsort',
-        #'towers',
-        #'vvadd',
-    ]
-    # Iterate workloads
-    for wl in workloads:
-        # Copy workloads to tmp directory and rename to workload.
-        init_workspace(wl_path, wl)
-        run_cpu(sys, simulator_path, verilog_path , wl)
-    print("minor-CPU workloads ran successfully!")
+    if not args:
+        workloads = [
+            #'0to100',
+            #'median',
+            #'multiply',
+            #'qsort',
+            #'rsort',
+            #'towers',
+            #'vvadd',
+        ]
+        # Iterate workloads
+        for wl in workloads:
+            # Copy workloads to tmp directory and rename to workload.
+            init_workspace(wl_path, wl)
+            run_cpu(sys, simulator_path, verilog_path , wl)
+        print("minor-CPU workloads ran successfully!")
 
-    # ========================================================================================
-    # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
-    # Define test cases
-    test_cases = [
-        'rv32ui-p-add',
-        'rv32ui-p-addi',
-        'rv32ui-p-and',
-        'rv32ui-p-andi',
-        'rv32ui-p-auipc',
-        'rv32ui-p-beq',
-        'rv32ui-p-bge',
-        'rv32ui-p-bgeu',
-        'rv32ui-p-blt',
-        'rv32ui-p-bltu',
-        'rv32ui-p-bne',
-        'rv32ui-p-jal',
-        'rv32ui-p-jalr',
-        'rv32ui-p-lui',
-        'rv32ui-p-lw',
-        'rv32ui-p-or',
-        'rv32ui-p-ori',
-        'rv32ui-p-sll',
-        'rv32ui-p-slli',
-        'rv32ui-p-sltu',
-        'rv32ui-p-srai',
-        'rv32ui-p-srl',
-        'rv32ui-p-srli',
-        'rv32ui-p-sub',
-        'rv32ui-p-sw',
-        'rv32ui-p-xori',
-        #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
-        #'rv32ui-p-sb',#TO CHECK
-    ]
-    tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
-    # Iterate test cases
-    for case in test_cases:
-        # Copy test cases to tmp directory and rename to workload.
-        init_workspace(tests, case)
-        run_cpu(sys, simulator_path, verilog_path)
-    print("minor-CPU tests ran successfully!")
+        # ========================================================================================
+        # The same logic should be able to apply to the tests below, while the offsets&data_offsets should be changed accordingly.
+        # Define test cases
+        test_cases = [
+            'rv32ui-p-add',
+            'rv32ui-p-addi',
+            'rv32ui-p-and',
+            'rv32ui-p-andi',
+            'rv32ui-p-auipc',
+            'rv32ui-p-beq',
+            'rv32ui-p-bge',
+            'rv32ui-p-bgeu',
+            'rv32ui-p-blt',
+            'rv32ui-p-bltu',
+            'rv32ui-p-bne',
+            'rv32ui-p-jal',
+            'rv32ui-p-jalr',
+            'rv32ui-p-lui',
+            'rv32ui-p-lw',
+            'rv32ui-p-or',
+            'rv32ui-p-ori',
+            'rv32ui-p-sll',
+            'rv32ui-p-slli',
+            'rv32ui-p-sltu',
+            'rv32ui-p-srai',
+            'rv32ui-p-srl',
+            'rv32ui-p-srli',
+            'rv32ui-p-sub',
+            'rv32ui-p-sw',
+            'rv32ui-p-xori',
+            #'rv32ui-p-lbu',#TO DEBUG&TO CHECK
+            #'rv32ui-p-sb',#TO CHECK
+        ]
+        tests = f'{utils.repo_path()}/examples/minor-cpu/unit-tests'
+        # Iterate test cases
+        for case in test_cases:
+            # Copy test cases to tmp directory and rename to workload.
+            init_workspace(tests, case)
+            run_cpu(sys, simulator_path, verilog_path)
+        print("minor-CPU tests ran successfully!")
+    else:
+        # If user DID specify workloads, run exactly those, skipping default & tests:
+        for wl in args:
+            init_workspace(wl_path, wl)
+            run_cpu(sys, simulator_path, verilog_path, wl)
+        print("Done running user-specified workload(s)!")
