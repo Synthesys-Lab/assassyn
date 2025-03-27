@@ -1,6 +1,0 @@
-[package]
-name = "minor_cpu"
-version = "0.0.0"
-edition = "2021"
-[dependencies]
-assassyn = { path = "/Users/lychee/DAY1029/assassyn" }
