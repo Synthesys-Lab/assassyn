@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::vec::Vec;
 //use crate::ir::node::{BaseNode, IsElement, NodeKind, Parented};
 use crate::ir::expr::subcode::Binary;
-use crate::ir::{node::*, visitor::Visitor, *};
 use crate::ir::Opcode;
+use crate::ir::{node::*, visitor::Visitor, *};
 #[derive(Debug, Clone)]
 pub struct NodeData {
   mom: usize,

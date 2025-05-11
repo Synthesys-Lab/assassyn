@@ -10,10 +10,7 @@ use proc_macro2::Span;
 use quote::quote;
 
 use crate::{
-  analysis::{
-    find_critical_path::GraphVisitor,
-    topo_sort,
-  },
+  analysis::{find_critical_path::GraphVisitor, topo_sort},
   backend::common::{create_and_clean_dir, upstreams, Config},
   builder::system::{ModuleKind, SysBuilder},
   ir::{expr::subcode, instructions::PureIntrinsic, node::*, visitor::Visitor, *},
