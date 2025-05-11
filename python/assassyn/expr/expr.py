@@ -2,12 +2,15 @@
 
 #pylint: disable=cyclic-import,import-outside-toplevel
 
+from __future__ import annotations
 from functools import reduce
 
 from ..builder import ir_builder
 from ..value import Value
 from ..dtype import DType
 from ..utils import identifierize
+from ..module import Port, Module
+from ..array import Array
 
 class Expr(Value):
     '''The frontend base node for expressions'''
@@ -99,9 +102,9 @@ class BinaryOp(Expr):
 class FIFOPush(Expr):
     '''The class for FIFO push operation'''
 
-    fifo: 'Port'  # FIFO port to push to
+    fifo: Port  # FIFO port to push to
     val: Value  # Value to push
-    bind: 'Bind'  # Bind reference
+    bind: Bind  # Bind reference
     fifo_depth: int  # Depth of the FIFO
 
     FIFO_PUSH  = 302
@@ -120,7 +123,7 @@ class FIFOPush(Expr):
 class FIFOPop(Expr):
     '''The class for FIFO pop operation'''
 
-    fifo: 'Port'  # FIFO port to pop from
+    fifo: Port  # FIFO port to pop from
     dtype: DType  # Data type of the popped value
 
     FIFO_POP = 301
@@ -140,7 +143,7 @@ class FIFOPop(Expr):
 class ArrayWrite(Expr):
     '''The class for array write operation, where arr[idx] = val'''
 
-    arr: 'Array'  # Array to write to
+    arr: Array  # Array to write to
     idx: Value  # Index to write at
     val: Value  # Value to write
 
@@ -159,7 +162,7 @@ class ArrayWrite(Expr):
 class ArrayRead(Expr):
     '''The class for array read operation, where arr[idx] as a right value'''
 
-    arr: 'Array'  # Array to read from
+    arr: Array  # Array to read from
     idx: Value  # Index to read at
     dtype: DType  # Data type of the read value
 
@@ -316,7 +319,6 @@ class PureInstrinsic(Expr):
 
     def __getattr__(self, name):
         if self.opcode == PureInstrinsic.FIFO_PEEK:
-            from ..module import Port
             port = self.args[0]
             assert isinstance(port, Port)
             return port.dtype.attributize(self, name)
@@ -328,8 +330,8 @@ class Bind(Expr):
     '''The class for binding operations. Function bind is a functional programming concept like
     Python's `functools.partial`.'''
 
-    callee: 'Module'  # Module being bound
-    pushes: list  # List of push operations
+    callee: Module  # Module being bound
+    pushes: list[FIFOPush]  # List of push operations
     fifo_depths: dict  # Dictionary of FIFO depths
 
     BIND = 501
@@ -447,7 +449,7 @@ class Select1Hot(Expr):
     '''The class for the 1hot select operation'''
 
     cond: Value  # One-hot condition
-    values: list  # List of possible values
+    values: list[Value]  # List of possible values
 
     # Triary operations
     SELECT_1HOT = 1001

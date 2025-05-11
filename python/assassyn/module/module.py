@@ -155,7 +155,7 @@ class Port:
 
     dtype: DType  # Data type of the port
     name: str  # Name of the port
-    module: 'Module'  # Module this port belongs to
+    module: Module  # Module this port belongs to
 
     def __init__(self, dtype: DType):
         assert isinstance(dtype, DType)

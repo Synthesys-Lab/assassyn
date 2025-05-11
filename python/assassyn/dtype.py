@@ -1,5 +1,7 @@
 '''Data type module for assassyn frontend'''
 
+from .expr import Value
+
 #pylint: disable=too-few-public-methods,useless-parent-delegation,cyclic-import,unused-argument
 
 class DType:
@@ -214,7 +216,7 @@ class RecordValue:
     '''The value class for the record type. Remember, this is a right-value object, so each
     field of this record is immutable!'''
 
-    _payload: 'Value'  # The underlying value of this record
+    _payload: Value  # The underlying value of this record
     _dtype: Record  # The record type of this value
 
     def __init__(self, dtype, *args, **kwargs):

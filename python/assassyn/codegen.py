@@ -128,8 +128,6 @@ def generate_port(port: Port):
 class EmitBinds(visitor.Visitor):
     '''Gather all the binds and emit them in advance'''
 
-    cg: 'CodeGen'  # Reference to the code generator
-
     def __init__(self, cg):
         self.cg = cg
 

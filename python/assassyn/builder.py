@@ -4,23 +4,6 @@ import site
 import inspect
 from decorator import decorator
 
-class Singleton(type):
-    '''The class maintains the global singleton instance of the system builder.'''
-    builder: 'SysBuilder' = None  # Global singleton instance of the system builder
-    repr_ident: int = None  # Indentation level for string representation
-    id_slice: slice = slice(-6, -1)  # Slice for identifiers
-    with_py_loc: bool = False  # Whether to include Python location in string representation
-    all_dirs_to_exclude: list = []  # Directories to exclude for stack inspection
-
-    @classmethod
-    def initialize_dirs_to_exclude(mcs):
-        '''Initialize the directories to exclude if not already initialized.'''
-        if not mcs.all_dirs_to_exclude:
-            site_package_dirs = site.getsitepackages()
-            user_site_package_dir = site.getusersitepackages()
-            mcs.all_dirs_to_exclude = site_package_dirs + [user_site_package_dir]
-
-
 @decorator
 def ir_builder(func, *args, **kwargs):
     '''The decorator annotates the function whose return value will be inserted into the AST.'''
@@ -115,3 +98,19 @@ class SysBuilder:
         body = body + '\n\n' + '\n\n'.join(map(repr, self.downstreams))
         array = '  ' + '\n  '.join(repr(elem) for elem in self.arrays)
         return f'system {self.name} {{\n{array}\n\n{body}\n}}'
+
+class Singleton(type):
+    '''The class maintains the global singleton instance of the system builder.'''
+    builder: SysBuilder = None  # Global singleton instance of the system builder
+    repr_ident: int = None  # Indentation level for string representation
+    id_slice: slice = slice(-6, -1)  # Slice for identifiers
+    with_py_loc: bool = False  # Whether to include Python location in string representation
+    all_dirs_to_exclude: list = []  # Directories to exclude for stack inspection
+
+    @classmethod
+    def initialize_dirs_to_exclude(mcs):
+        '''Initialize the directories to exclude if not already initialized.'''
+        if not mcs.all_dirs_to_exclude:
+            site_package_dirs = site.getsitepackages()
+            user_site_package_dir = site.getusersitepackages()
+            mcs.all_dirs_to_exclude = site_package_dirs + [user_site_package_dir]
