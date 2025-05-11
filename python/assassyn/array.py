@@ -32,6 +32,12 @@ def RegArray( #pylint: disable=invalid-name
 class Array:
     '''The class represents a register array in the AST IR.'''
 
+    scalar_ty: DType  # Data type of each element in the array
+    size: int  # Size of the array
+    attr: list  # List of attributes for this array
+    initializer: list  # Initial values for the array elements
+    _name: str  # Internal name storage
+
     FULLY_PARTITIONED = 1
 
     def as_operand(self):

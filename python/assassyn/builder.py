@@ -6,11 +6,11 @@ from decorator import decorator
 
 class Singleton(type):
     '''The class maintains the global singleton instance of the system builder.'''
-    builder = None
-    repr_ident = None
-    id_slice = slice(-6, -1)
-    with_py_loc = False
-    all_dirs_to_exclude = []
+    builder: 'SysBuilder' = None  # Global singleton instance of the system builder
+    repr_ident: int = None  # Indentation level for string representation
+    id_slice: slice = slice(-6, -1)  # Slice for identifiers
+    with_py_loc: bool = False  # Whether to include Python location in string representation
+    all_dirs_to_exclude: list = []  # Directories to exclude for stack inspection
 
     @classmethod
     def initialize_dirs_to_exclude(mcs):
@@ -51,6 +51,13 @@ def ir_builder(func, *args, **kwargs):
 #pylint: disable=too-many-instance-attributes
 class SysBuilder:
     '''The class serves as both the system and the IR builder.'''
+
+    name: str  # Name of the system
+    modules: list  # List of modules
+    downstreams: list  # List of downstream modules
+    arrays: list  # List of arrays
+    _ctx_stack: dict  # Stack for context tracking
+    _exposes: dict  # Dictionary of exposed nodes
 
     @property
     def current_module(self):

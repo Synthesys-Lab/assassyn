@@ -15,8 +15,8 @@ def _reserved_module_name(name):
 #pylint: disable=too-few-public-methods
 class Timing:
     '''The enum class for the timing policy of a module.'''
-    SYSTOLIC = 1
-    BACKPRESSURE = 2
+    SYSTOLIC = 1  # Systolic timing policy
+    BACKPRESSURE = 2  # Backpressure timing policy
 
     @staticmethod
     def to_string(value):
@@ -25,6 +25,11 @@ class Timing:
 
 class Module(ModuleBase):
     '''The AST node for defining a module.'''
+
+    body: Block  # Body of the module
+    name: str  # Name of the module
+    _attrs: dict  # Dictionary of module attributes
+    _ports: list  # List of ports
 
     ATTR_DISABLE_ARBITER = 1
     ATTR_TIMING = 2
@@ -147,6 +152,10 @@ class Module(ModuleBase):
 
 class Port:
     '''The AST node for defining a port in modules.'''
+
+    dtype: DType  # Data type of the port
+    name: str  # Name of the port
+    module: 'Module'  # Module this port belongs to
 
     def __init__(self, dtype: DType):
         assert isinstance(dtype, DType)

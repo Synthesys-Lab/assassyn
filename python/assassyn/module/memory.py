@@ -1,13 +1,25 @@
 '''Memory module, a special and subclass of Module.'''
 
 from .downstream import Downstream, combinational
-from ..array import RegArray
+from ..array import RegArray, Array
 from ..block import Condition
 from ..dtype import Bits
+from ..expr import Bind
+from ..value import Value
 
 
 class SRAM(Downstream): # pylint: disable=too-many-instance-attributes
     '''The SRAM module, a subclass of Downstream.'''
+
+    width: int  # Width of the memory in bits
+    depth: int  # Depth of the memory in words
+    init_file: str  # Path to initialization file
+    payload: Array  # Array holding the memory contents
+    we: Value  # Write enable signal
+    re: Value  # Read enable signal
+    addr: Value  # Address signal
+    wdata: Value  # Write data signal
+    bound: Bind  # Bind handle
 
     def __init__(self, width, depth, init_file):
         super().__init__()

@@ -5,6 +5,8 @@
 class DType:
     '''Base class for data type'''
 
+    bits: int  # Number of bits in this data type
+
     def __init__(self, bits: int):
         '''The constructor, only records the bits'''
         self.bits = bits
@@ -99,10 +101,13 @@ class Bits(DType):
 class Record(DType):
     '''Record data type'''
 
+    fields: dict  # Dictionary mapping field names to (dtype, slice) tuples
+    readonly: bool  # Whether this record is readonly
+
     def __init__(self, *args, **kwargs):
         '''Instantiate a record type with fields in kwargs.
         NOTE: After Python-3.6, the order of fields is guaranteed to be the same as the order fed to
-        the argument. Thus, we can make the asumption that the order of feeding the arguments 
+        the argument. Thus, we can make the asumption that the order of feeding the arguments
         is from msb to lsb.
 
         Args:
@@ -208,6 +213,9 @@ def to_int(value: int, bits=None):
 class RecordValue:
     '''The value class for the record type. Remember, this is a right-value object, so each
     field of this record is immutable!'''
+
+    _payload: 'Value'  # The underlying value of this record
+    _dtype: Record  # The record type of this value
 
     def __init__(self, dtype, *args, **kwargs):
 

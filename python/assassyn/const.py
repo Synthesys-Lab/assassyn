@@ -1,10 +1,13 @@
 '''The AST node module for constant values.'''
 
 from .value import Value
-from .dtype import Bits
+from .dtype import Bits, DType
 
 class Const(Value):
     '''The AST node data structure for constant values.'''
+
+    dtype: DType  # Data type of this constant
+    value: int  # The actual value of this constant
 
     def __init__(self, dtype, value):
         assert dtype.inrange(value), f"Value {value} is out of range for {dtype}"

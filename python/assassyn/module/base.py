@@ -7,6 +7,7 @@ from ..expr import PureInstrinsic
 # pylint: disable=too-few-public-methods
 class ModuleBase:
     '''The base class for the module definition.'''
+    # Base class with no attributes of its own - attributes are added by derived classes
 
     def __init__(self):
         pass

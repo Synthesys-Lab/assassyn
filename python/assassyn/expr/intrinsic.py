@@ -20,6 +20,9 @@ class Intrinsic(Expr):
     ASSERT = 902
     BARRIER = 903
 
+    opcode: int  # Operation code for this intrinsic
+    args: tuple  # Arguments to the intrinsic operation
+
     def __init__(self, opcode, *args):
         super().__init__(opcode)
         _, num_args, _, _ = INTRIN_INFO[opcode]

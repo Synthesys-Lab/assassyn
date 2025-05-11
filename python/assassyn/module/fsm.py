@@ -6,7 +6,12 @@ from ..array import Array
 
 class FSM:# pylint: disable=R0903
     '''FSM inside the module.'''
-    def __init__(self, state_reg,  transition_table):
+    state_reg: Array  # State register to store the current state
+    transition_table: dict  # Dictionary mapping state transitions
+    state_bits: int  # Number of bits needed to represent all states
+    state_map: dict  # Dictionary mapping state names to bit representations
+
+    def __init__(self, state_reg, transition_table):
         '''FSM constructor.'''
         assert isinstance(state_reg, Array), "Expecting a Array object"
         self.state_reg = state_reg

@@ -128,6 +128,8 @@ def generate_port(port: Port):
 class EmitBinds(visitor.Visitor):
     '''Gather all the binds and emit them in advance'''
 
+    cg: 'CodeGen'  # Reference to the code generator
+
     def __init__(self, cg):
         self.cg = cg
 
@@ -140,6 +142,17 @@ class EmitBinds(visitor.Visitor):
 # pylint: disable=too-many-instance-attributes
 class CodeGen(visitor.Visitor):
     '''Generate the assassyn IR builder for the given system'''
+
+    code: list  # List of code lines to be generated
+    header: list  # List of header lines to be generated
+    emitted_bind: set  # Set of emitted binds
+    targets: dict  # Target backends for code generation
+    resource_base: str  # Base directory for resources
+    idle_threshold: int  # Idle threshold parameter
+    sim_threshold: int  # Simulation threshold parameter
+    random: bool  # Random parameter
+    default_fifo_depth: int  # Default FIFO depth
+    fifo_depths: dict  # Dictionary of FIFO depths
 
     def emit_module_attrs(self, m: Module, var_id: str):
         '''Generate module attributes.'''

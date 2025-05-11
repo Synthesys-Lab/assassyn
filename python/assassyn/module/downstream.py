@@ -25,6 +25,9 @@ def combinational(
 class Downstream(ModuleBase):
     '''Downstream class implementation.'''
 
+    name: str  # Name of the downstream module
+    body: Block  # Body of the downstream module
+
     def __init__(self):
         super().__init__()
         self.name = type(self).__name__

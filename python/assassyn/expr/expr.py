@@ -6,10 +6,14 @@ from functools import reduce
 
 from ..builder import ir_builder
 from ..value import Value
+from ..dtype import DType
 from ..utils import identifierize
 
 class Expr(Value):
     '''The frontend base node for expressions'''
+
+    opcode: int  # Operation code for this expression
+    loc: str  # Source location information
 
     def __init__(self, opcode):
         '''Initialize the expression with an opcode'''
@@ -35,6 +39,9 @@ class Expr(Value):
 
 class BinaryOp(Expr):
     '''The class for binary operations'''
+
+    lhs: Value  # Left-hand side operand
+    rhs: Value  # Right-hand side operand
 
     # Binary operations
     ADD         = 200
@@ -92,6 +99,11 @@ class BinaryOp(Expr):
 class FIFOPush(Expr):
     '''The class for FIFO push operation'''
 
+    fifo: 'Port'  # FIFO port to push to
+    val: Value  # Value to push
+    bind: 'Bind'  # Bind reference
+    fifo_depth: int  # Depth of the FIFO
+
     FIFO_PUSH  = 302
 
     def __init__(self, fifo, val):
@@ -107,6 +119,9 @@ class FIFOPush(Expr):
 
 class FIFOPop(Expr):
     '''The class for FIFO pop operation'''
+
+    fifo: 'Port'  # FIFO port to pop from
+    dtype: DType  # Data type of the popped value
 
     FIFO_POP = 301
 
@@ -125,6 +140,10 @@ class FIFOPop(Expr):
 class ArrayWrite(Expr):
     '''The class for array write operation, where arr[idx] = val'''
 
+    arr: 'Array'  # Array to write to
+    idx: Value  # Index to write at
+    val: Value  # Value to write
+
     ARRAY_WRITE = 401
 
     def __init__(self, arr, idx: Value, val: Value):
@@ -139,6 +158,10 @@ class ArrayWrite(Expr):
 
 class ArrayRead(Expr):
     '''The class for array read operation, where arr[idx] as a right value'''
+
+    arr: 'Array'  # Array to read from
+    idx: Value  # Index to read at
+    dtype: DType  # Data type of the read value
 
     ARRAY_READ = 400
 
@@ -158,6 +181,8 @@ class Log(Expr):
     '''The class for log operation. NOTE: This operation is just like verilog $display, which is
     non-synthesizable. It is used for debugging purpose only.'''
 
+    args: tuple  # Arguments to the log operation
+
     LOG = 600
 
     def __init__(self, *args):
@@ -170,6 +195,11 @@ class Log(Expr):
 
 class Slice(Expr):
     '''The class for slice operation, where x[l:r] as a right value'''
+
+    x: Value  # Value to slice
+    l: Value  # Left index
+    r: Value  # Right index
+    dtype: DType  # Data type of the sliced value
 
     SLICE = 700
 
@@ -190,6 +220,9 @@ class Slice(Expr):
 class Concat(Expr):
     '''The class for concatenation operation, where {msb, lsb} as a right value'''
 
+    msb: Value  # Most significant bits
+    lsb: Value  # Least significant bits
+
     CONCAT = 701
 
     def __init__(self, msb, lsb):
@@ -202,6 +235,9 @@ class Concat(Expr):
 
 class Cast(Expr):
     '''The class for casting operation, including bitcast, zext, and sext.'''
+
+    x: Value  # Value to cast
+    dtype: DType  # Target data type
 
     BITCAST = 800
     ZEXT = 801
@@ -231,6 +267,8 @@ def log(*args):
 class UnaryOp(Expr):
     '''The class for unary operations'''
 
+    x: Value  # Operand
+
     # Unary operations
     NEG  = 100
     FLIP = 101
@@ -249,6 +287,8 @@ class UnaryOp(Expr):
 
 class PureInstrinsic(Expr):
     '''The class for accessing FIFO fields, valid, and peek'''
+
+    args: list  # Arguments to the intrinsic operation
 
     # FIFO operations
     FIFO_VALID = 300
@@ -287,6 +327,10 @@ class PureInstrinsic(Expr):
 class Bind(Expr):
     '''The class for binding operations. Function bind is a functional programming concept like
     Python's `functools.partial`.'''
+
+    callee: 'Module'  # Module being bound
+    pushes: list  # List of push operations
+    fifo_depths: dict  # Dictionary of FIFO depths
 
     BIND = 501
 
@@ -359,6 +403,9 @@ class Bind(Expr):
 
 class AsyncCall(Expr):
     '''The class for async call operations. It is used to call a function asynchronously.'''
+
+    bind: Bind  # The bind operation to call asynchronously
+
     # Call operations
     ASYNC_CALL = 500
 
@@ -372,6 +419,10 @@ class AsyncCall(Expr):
 
 class Select(Expr):
     '''The class for the select operation'''
+
+    cond: Value  # Condition
+    true_value: Value  # Value if condition is true
+    false_value: Value  # Value if condition is false
 
     # Triary operations
     SELECT = 1000
@@ -394,6 +445,9 @@ class Select(Expr):
 
 class Select1Hot(Expr):
     '''The class for the 1hot select operation'''
+
+    cond: Value  # One-hot condition
+    values: list  # List of possible values
 
     # Triary operations
     SELECT_1HOT = 1001

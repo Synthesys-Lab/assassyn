@@ -7,6 +7,7 @@ from .block import Block
 
 class Visitor:
     '''The visitor pattern class for the frontend AST'''
+    # Base visitor class with no attributes of its own - it just defines visit methods
 
     def visit_system(self, node: SysBuilder):
         '''Enter a system'''
