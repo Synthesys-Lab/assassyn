@@ -1,10 +1,10 @@
 use crate::builder::system::{ModuleKind, SysBuilder};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::vec::Vec;
 //use crate::ir::node::{BaseNode, IsElement, NodeKind, Parented};
 use crate::ir::expr::subcode::Binary;
-use crate::ir::{expr::subcode, instructions::PureIntrinsic, node::*, visitor::Visitor, *};
-use crate::ir::{Block, Expr, Module, Opcode};
+use crate::ir::{node::*, visitor::Visitor, *};
+use crate::ir::Opcode;
 #[derive(Debug, Clone)]
 pub struct NodeData {
   mom: usize,

@@ -1,5 +1,4 @@
 use crate::builder::PortInfo;
-use crate::ir::expr::subcode::Binary;
 use crate::ir::instructions;
 use crate::ir::node::BlockRef;
 use crate::ir::node::ExprRef;
@@ -16,14 +15,12 @@ use crate::{
   builder::{system::ModuleKind, SysBuilder},
   ir::{
     expr::{self, subcode},
-    instructions::BlockIntrinsic,
-    module,
     node::{BaseNode, ModuleRef},
     visitor::Visitor,
     Opcode,
   },
 };
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct SubModule {
