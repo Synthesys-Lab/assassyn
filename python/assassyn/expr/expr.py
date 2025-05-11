@@ -3,14 +3,18 @@
 #pylint: disable=cyclic-import,import-outside-toplevel
 
 from __future__ import annotations
+
 from functools import reduce
+import typing
 
 from ..builder import ir_builder
 from ..value import Value
-from ..dtype import DType
 from ..utils import identifierize
-from ..module import Port, Module
-from ..array import Array
+
+if typing.TYPE_CHECKING:
+    from ..array import Array
+    from ..module import Port, Module
+    from ..dtype import DType
 
 class Expr(Value):
     '''The frontend base node for expressions'''
@@ -320,6 +324,8 @@ class PureInstrinsic(Expr):
     def __getattr__(self, name):
         if self.opcode == PureInstrinsic.FIFO_PEEK:
             port = self.args[0]
+            # pylint: disable=import-outside-toplevel
+            from ..module import Port
             assert isinstance(port, Port)
             return port.dtype.attributize(self, name)
 

@@ -1,13 +1,18 @@
 '''The module AST implementation.'''
 
+from __future__ import annotations
+
+import typing
 from decorator import decorator
 
 from ..builder import Singleton, ir_builder
-from ..dtype import DType
 from ..block import Block
 from ..expr import Bind, FIFOPop, PureInstrinsic, FIFOPush, AsyncCall
 from ..expr.intrinsic import wait_until
 from .base import ModuleBase
+
+if typing.TYPE_CHECKING:
+    from ..dtype import DType
 
 def _reserved_module_name(name):
     return name in ['Driver', 'Testbench']
@@ -158,6 +163,8 @@ class Port:
     module: Module  # Module this port belongs to
 
     def __init__(self, dtype: DType):
+        #pylint: disable=import-outside-toplevel
+        from ..dtype import DType
         assert isinstance(dtype, DType)
         self.dtype = dtype
         self.name = self.module = None
