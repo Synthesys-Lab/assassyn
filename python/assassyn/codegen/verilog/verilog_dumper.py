@@ -37,7 +37,8 @@ def fifo_name(fifo: Port):
 class VerilogDumper(Visitor):
     """Dumps Verilog code for Assassyn modules."""
 
-    def __init__(self, sys: SysBuilder, config, external_usage, topo, array_memory_params_map, module_expr_map):
+    def __init__(self, sys: SysBuilder, config, external_usage, topo,
+                 array_memory_params_map, module_expr_map):
         """Initialize a VerilogDumper."""
         self.sys = sys
         self.config = config
@@ -886,14 +887,21 @@ module memory_blackbox_{a} #(
 
         res.append("  // Gather all the push signal\n")
         if module_name != "driver" and module_name != "testbench":
-            res.append(f"  assign {delta_value} = {reduce([x.field('counter_delta') for x in callers], ' + ')};\n")
+            callers_delta = reduce([x.field('counter_delta') for x in callers], ' + ')
+            res.append(f"  assign {delta_value} = {callers_delta};\n")
         res.append("  // Broadcast the push_ready signal to all the pushers\n")
         res.append(declare_logic(bool_ty(), pop_ready))
         if module_name != "driver" and module_name != "testbench":
             for x in callers:
                 res.append(f"  assign {x.field('counter_delta_ready')} = {pop_ready};\n")
         res.append(declare_logic(bool_ty(), pop_valid))
-        res.append(f"  trigger_counter #(8) {module_name}_trigger_i (\n    .clk(clk),\n    .rst_n(rst_n),\n    .delta({delta_value}),\n    .delta_ready({delta_ready}),\n    .pop_valid({pop_valid}),\n    .pop_ready({pop_ready}));\n")
+        res.append(f"  trigger_counter #(8) {module_name}_trigger_i (\n"
+                 f"    .clk(clk),\n"
+                 f"    .rst_n(rst_n),\n"
+                 f"    .delta({delta_value}),\n"
+                 f"    .delta_ready({delta_ready}),\n"
+                 f"    .pop_valid({pop_valid}),\n"
+                 f"    .pop_ready({pop_ready}));\n")
         return ''.join(res)
 
     def dump_module_instance(self, module: Module) -> str:
@@ -910,7 +918,10 @@ module memory_blackbox_{a} #(
         is_memory_instance = False
         res.append(declare_logic(bool_ty(), f"{module_name}_executed"))
 
-        res.append(f"  // {module_name}\n  {module_name} {module_name}_i (\n    .clk(clk),\n    .rst_n(rst_n),\n")
+        res.append(f"  // {module_name}\n"
+                 f"  {module_name} {module_name}_i (\n"
+                 f"    .clk(clk),\n"
+                 f"    .rst_n(rst_n),\n")
         for port in module.ports:
             local = DisplayInstance.from_fifo(port, False)
             global_ = DisplayInstance.from_fifo(port, True)
@@ -920,7 +931,8 @@ module memory_blackbox_{a} #(
                 fifo = interf
                 fifo_display = DisplayInstance.from_fifo(fifo, True)
                 edge = Edge(fifo_display, module)
-                res.append(connect_top(fifo_display, edge, ["push_valid", "push_data", "push_ready"]))
+                conn_signals = ["push_valid", "push_data", "push_ready"]
+                res.append(connect_top(fifo_display, edge, conn_signals))
             elif isinstance(interf, Array):
                 array_ref = interf
                 display = DisplayInstance.from_array(array_ref)

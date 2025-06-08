@@ -5,7 +5,6 @@ import tempfile
 from pathlib import Path
 
 from .builder import SysBuilder
-from . import utils
 from . import codegen
 
 def config( # pylint: disable=too-many-arguments

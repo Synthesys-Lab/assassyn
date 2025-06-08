@@ -80,4 +80,3 @@ def fifo_name(fifo: Port):
     """
     module = fifo.module
     return f"{namify(module.name)}_{namify(fifo.name)}"
-

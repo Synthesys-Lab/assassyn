@@ -116,7 +116,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
         '''Get the number of bits needed to index the array.'''
         is_p2 = self.size & (self.size - 1) == 0
         return self.size.bit_length() - is_p2
-    
+
     def index_type(self):
         '''Get the type of the index.'''
         #pylint: disable=import-outside-toplevel
@@ -145,7 +145,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
         assert res is not None, f'{res} is None'
 
         return res
-    
+
     def get_flattened_size(self):
         '''Get the flattened size of the array.'''
         return self.size * self.scalar_ty.bits
@@ -174,4 +174,3 @@ class Array:  #pylint: disable=too-many-instance-attributes
                 self._partition[i].__setitem__(0, value)
 
         return None
-

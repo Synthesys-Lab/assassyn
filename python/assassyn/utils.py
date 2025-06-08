@@ -3,7 +3,6 @@
 import timeit
 import os
 import subprocess
-import shutil
 
 
 def identifierize(obj):

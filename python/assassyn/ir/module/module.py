@@ -6,7 +6,6 @@ import typing
 from decorator import decorator
 
 from ...builder import Singleton, ir_builder
-from ...utils import namify
 from ..block import Block
 from ..expr import Bind, FIFOPop, PureIntrinsic, FIFOPush, AsyncCall, Expr
 from ..expr.intrinsic import wait_until

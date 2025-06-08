@@ -44,7 +44,7 @@ def topo_downstream_modules(sys):
             if in_degree[neighbor] == 0:
                 queue.append(neighbor)
 
-    return result 
+    return result
 
 
 def get_upstreams(module):

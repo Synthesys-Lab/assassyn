@@ -35,7 +35,7 @@ def expr_externally_used(expr: Expr, exclude_push: bool) -> typing.Set[Module]:
         if user_parent_module != this_module:
             res.add(user_parent_module)
 
-    return res 
+    return res
 
 class BiExternalUsage:
 
