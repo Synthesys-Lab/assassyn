@@ -6,9 +6,7 @@ import typing
 from ..ir.expr import Expr, FIFOPush
 from ..ir.module import Module
 from ..ir.block import CondBlock
-from ..ir.visitor import Visitor
 from ..ir.expr import Operand
-from ..builder import SysBuilder
 
 def get_module(operand: Operand) -> Module:
     """Get the module that contains the given operand."""
@@ -40,33 +38,3 @@ def expr_externally_used(expr: Expr, exclude_push: bool) -> typing.Set[Module]:
             res.add(user_parent_module)
 
     return res
-
-class BiExternalUsage:
-    """Bidirectional external usage analysis results."""
-
-    # Expressions used by this module externally
-    module_uses_expr: typing.Dict[Module, typing.Set[Expr]]
-
-    # Modules that externally use this expression
-    expr_used_by_module: typing.Dict[Expr, typing.Set[Module]]
-
-    def __init__(self):
-        self.module_uses_expr = {}
-        self.expr_used_by_module = {}
-
-class ExternalUsageAnalyzer(Visitor):
-    """Visitor that analyzes external usage patterns."""
-
-    def __init__(self, _: SysBuilder):
-        self.res = BiExternalUsage()
-
-    def visit_expr(self, node: Expr):
-        self.res.expr_used_by_module[node] = expr_externally_used(node, False)
-        for module in self.res.expr_used_by_module[node]:
-            self.res.module_uses_expr[module].add(node)
-
-def analyze_bidirectional_external_usage(sys: SysBuilder) -> BiExternalUsage:
-    """Analyze bidirectional external usage in the system."""
-    analyzer = ExternalUsageAnalyzer(sys)
-    analyzer.visit_system(sys)
-    return analyzer.res
