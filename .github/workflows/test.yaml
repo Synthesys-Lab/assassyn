@@ -21,7 +21,7 @@ jobs:
         run: docker build -t assassyn-dev .
       - name: Python Frontend Unit Tests
         run: |
-          docker run --rm -v ${{ github.workspace }}:/app assassyn-dev bash -c "
+          docker run --rm -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn-dev bash -c "
             pytest -n 8 python/unit-tests;
             python3 examples/systolic-array/systolic_array.py;
             python3 examples/systolic-array/memory_systolic_array.py;
