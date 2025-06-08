@@ -51,7 +51,7 @@ class BiExternalUsage:
 
 class ExternalUsageAnalyzer(Visitor):
 
-    def __init__(self, sys: SysBuilder):
+    def __init__(self, _: SysBuilder):
         self.res = BiExternalUsage()
 
     def visit_expr(self, node: Expr):
