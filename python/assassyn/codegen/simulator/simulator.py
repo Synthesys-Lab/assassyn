@@ -95,10 +95,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
             # Gather expressions with external visibility for downstream modules
             for expr in module.externals:
                 if isinstance(expr, Expr):
-                    if expr_externally_used(expr):
-                        expr_validities.add(expr)
-                    else:
-                        print('Not externally used!')
+                    expr_validities.add(expr)
 
     # Add value validity tracking for expressions with external visibility
     for expr in expr_validities:

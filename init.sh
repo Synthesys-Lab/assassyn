@@ -9,7 +9,7 @@ else
   cargo install sccache
 fi
 
-# Install Python Dependences
+
 REPO_DIR=`dirname $0`
 pip install --user -r $REPO_DIR/python/requirements.txt
 

@@ -1,5 +1,14 @@
 # NOTE: This script should be sourced by ZSH! O.w. the directory behaviors will be wrong!
 
+# Check for --no-verilator flag
+NO_VERILATOR=false
+for arg in "$@"; do
+  if [ "$arg" = "--no-verilator" ]; then
+    NO_VERILATOR=true
+    break
+  fi
+done
+
 # Restore the original directory
 RESTORE_DIR=`pwd`
 
@@ -25,9 +34,13 @@ export PYTHONPATH=$REPO_PATH/python:$PYTHONPATH
 echo "Setting ASSASSYN_HOME to $REPO_PATH"
 export ASSASSYN_HOME=$REPO_PATH
 
+if [ "$NO_VERILATOR" = false ]; then
 if [ -d $REPO_PATH/verilator ]; then
   echo "In-repo verilator found, setting VERILATOR_ROOT to $REPO_PATH/verilator"
   export VERILATOR_ROOT=$REPO_PATH/verilator
+fi
+else
+  echo "Verilator is disabled by --no-verilator flag"
 fi
 
 # Go back to the original directory

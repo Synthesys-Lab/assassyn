@@ -20,6 +20,8 @@ def topo_downstream_modules(sys):
 
     for module in downstreams:
         deps = set()
+        in_degree[module] = 0
+        graph[module] = []
         for elem in module.externals.keys():
             if isinstance(elem, Expr):
                 depend = elem.parent.module
