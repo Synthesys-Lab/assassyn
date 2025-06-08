@@ -184,6 +184,7 @@ def parse_format_string(args: List) -> str:
     return result
 
 def find_wait_until(module: Module) -> Optional[Intrinsic]:
+    """Find the WAIT_UNTIL intrinsic in a module if it exists."""
     for elem in module.body.body:
         if isinstance(elem, Intrinsic):
             if elem.opcode == Intrinsic.WAIT_UNTIL:

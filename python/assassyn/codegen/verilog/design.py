@@ -1,3 +1,5 @@
+"""Verilog design generation and code dumping."""
+
 from typing import List, Dict, Tuple
 
 from ...analysis import expr_externally_used
@@ -36,17 +38,16 @@ def dump_rval(node, with_namespace: bool) -> str:
 
     if isinstance(node, Module):
         return namify(node.name)
-    elif isinstance(node, Array):
+    if isinstance(node, Array):
         array = node
         return namify(array.name)
-    elif isinstance(node, Port):
+    if isinstance(node, Port):
         return namify(node.name)
-    elif isinstance(node, FIFOPop):
+    if isinstance(node, FIFOPop):
         if not with_namespace:
             return f'self.{namify(node.fifo.name)}'
-        else:
-            return namify(node.fifo.module.name) + "_" + namify(node.fifo.name)
-    elif isinstance(node, Const):
+        return namify(node.fifo.module.name) + "_" + namify(node.fifo.name)
+    if isinstance(node, Const):
         int_imm = node
         value = int_imm.value
         ty = dump_type(int_imm.dtype)
@@ -64,9 +65,9 @@ def dump_type(ty: DType) -> str:
     """Dump a type to a string."""
     if isinstance(ty, Int):
         return f"SInt({ty.bits})"
-    elif isinstance(ty, UInt):
+    if isinstance(ty, UInt):
         return f"UInt({ty.bits})"
-    elif isinstance(ty, Bits):
+    if isinstance(ty, Bits):
         return f"Bits({ty.bits})"
     raise ValueError(f"Unknown type: {type(ty)}")
 
@@ -74,13 +75,14 @@ def dump_type_cast(ty: DType) -> str:
     """Dump a type to a string."""
     if isinstance(ty, Int):
         return "as_sint()"
-    elif isinstance(ty, UInt):
+    if isinstance(ty, UInt):
         return "as_uint()"
-    elif isinstance(ty, Bits):
+    if isinstance(ty, Bits):
         return "as_bits()"
     raise ValueError(f"Unknown type: {type(ty)}")
 
 class CIRCTDumper(Visitor):
+    """Dumps IR to CIRCT-compatible Verilog code."""
 
     wait_until: bool
     indent: int
@@ -103,17 +105,21 @@ class CIRCTDumper(Visitor):
         self.current_module = None
 
     def get_pred(self) -> str:
+        """Get the current predicate for conditional execution."""
         if not self.cond_stack:
             return "Bits(1)(1)" if self.wait_until is None else self.wait_until
-        return " & ".join(self.cond_stack) + (" & {self.wait_until}" if self.wait_until is not None else "")
+        return (" & ".join(self.cond_stack) +
+                (" & {self.wait_until}" if self.wait_until is not None else ""))
 
     def append_code(self, code: str):
+        """Append code with proper indentation."""
         if code.strip() == '':
             self.code.append('')
         else:
             self.code.append(self.indent * ' ' + code)
 
     def append_port(self, name: str, kind: str, dtype: str, connect: str):
+        """Append a port definition with connection."""
         self.append_code(f'{name} = {kind}({dtype})')
         if kind == 'Input':
             self.connections.append((self.current_module, name, connect))
@@ -188,7 +194,8 @@ class CIRCTDumper(Visitor):
         elif isinstance(expr, ArrayRead):
             array_ref = expr.array
             array_idx = unwrap_operand(expr.idx)
-            array_idx = dump_rval(array_idx, False) if not isinstance(array_idx, Const) else array_idx.value
+            array_idx = (dump_rval(array_idx, False)
+                         if not isinstance(array_idx, Const) else array_idx.value)
             array_name = dump_rval(array_ref, False)
             rval = dump_rval(expr, False)
             body = f'{rval} = self.{array_name}_payload[{array_idx}]'
@@ -278,7 +285,8 @@ class CIRCTDumper(Visitor):
             intrinsic = expr.opcode
             if intrinsic == Intrinsic.FINISH:
                 pred = self.get_pred() or "1"
-                body = f"\n`ifndef SYNTHESIS\n  always_ff @(posedge clk) if (executed && {pred}) $finish();\n`endif\n"
+                body = (f"\n`ifndef SYNTHESIS\n  always_ff @(posedge clk) "
+                        f"if (executed && {pred}) $finish();\n`endif\n")
             elif intrinsic == Intrinsic.ASSERT:
                 self.expose('expr', expr.args[0])
             elif intrinsic == Intrinsic.WAIT_UNTIL:
@@ -298,6 +306,7 @@ class CIRCTDumper(Visitor):
             self.append_code(body)
 
     def cleanup_post_generation(self):
+        """Clean up and finalize code generation."""
         self.append_code('')
         for key, exposes in self._exposes.items():
             if isinstance(key, Array):
@@ -364,7 +373,8 @@ class CIRCTDumper(Visitor):
                         self.append_code(f'{array}_ce = Output(Bits(1))')
                         self.append_code(f'{array}_wdata = Output(Bits({expr.val.dtype.bits}))')
                         if key.index_bits > 0:
-                            self.append_code(f'{array}_widx = Output({dump_type(key.index_type())})')
+                            self.append_code(
+                                f'{array}_widx = Output({dump_type(key.index_type())})')
                         write_dumped = True
                     if read_dumped and write_dumped:
                         break
@@ -406,7 +416,8 @@ class CIRCTDumper(Visitor):
         self.indent -= 4
         self.append_code('')
         self._exposes
-        self.append_code(f'system = System([{node.name}], name="{node.name}", output_directory="sv")')
+        self.append_code(
+            f'system = System([{node.name}], name="{node.name}", output_directory="sv")')
         self.append_code('system.compile()')
 
 header = '''from pycde import Input, Output, Module, System, Clock, Reset
@@ -443,6 +454,7 @@ def TriggerCounter(WIDTH: int):
 '''
 
 def generate_design(fname: str, sys: SysBuilder):
+    """Generate a complete Verilog design file for the system."""
     with open(fname, 'w', encoding='utf-8') as fd:
         # Generate the header
         fd.write(header)

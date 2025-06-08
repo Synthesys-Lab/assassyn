@@ -1,4 +1,6 @@
 
+"""Testbench generation for Verilog simulation."""
+
 from typing import List
 from ...builder import SysBuilder
 
@@ -40,6 +42,7 @@ if __name__ == "__main__":
     runner()'''
 
 def generate_testbench(fname: str, sys: SysBuilder, sim_threshold: int, dump_logger: List[str]):
+    """Generate a testbench file for the given system."""
     with open(fname, "w") as f:
         dump_logger = '\n        '.join(dump_logger)
         tb_dump = template.format(sim_threshold, dump_logger, sys.name)
