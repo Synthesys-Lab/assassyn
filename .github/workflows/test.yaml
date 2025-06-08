@@ -15,19 +15,17 @@ jobs:
   test:
     name: Test
     runs-on: self-hosted
-    container:
-      image: jwere/assassyn-dev:v0.0.1
-      options: --user root
     steps:
       - uses: actions/checkout@v3
+      - name: Build Container
+        run: docker build -t assassyn-dev .
       - name: Python Frontend Unit Tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}/python
-          ASSASSYN_HOME: ${{ github.workspace }}
         run: |
-          pytest -n 8 python/unit-tests;
-          python3 examples/systolic-array/systolic_array.py;
-          python3 examples/systolic-array/memory_systolic_array.py;
-          python3 examples/minor-cpu/src/main.py;
-          python3 examples/minor-cpu/src/br_pre_main.py;
-          python3 examples/priority-queue/main.py;
+          docker run --rm -v ${{ github.workspace }}:/app assassyn-dev bash -c "
+            pytest -n 8 python/unit-tests;
+            python3 examples/systolic-array/systolic_array.py;
+            python3 examples/systolic-array/memory_systolic_array.py;
+            python3 examples/minor-cpu/src/main.py;
+            python3 examples/minor-cpu/src/br_pre_main.py;
+            python3 examples/priority-queue/main.py;
+          "

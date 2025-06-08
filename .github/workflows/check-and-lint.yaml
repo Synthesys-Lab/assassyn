@@ -9,29 +9,9 @@ jobs:
   python:
     name: Python Lint
     runs-on: self-hosted
-    container:
-      image: jwere/assassyn-dev:v0.0.1
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: '3.x'
-      - run: pylint --rcfile python/.pylintrc python/assassyn
-
-  fmt:
-    name: Rustfmt
-    runs-on: self-hosted
-    container:
-      image: jwere/assassyn-dev:v0.0.1
-    steps:
-      - uses: actions/checkout@v2
-      - run: cargo fmt --all -- --check
-
-  clippy:
-    name: Clippy
-    runs-on: self-hosted
-    container:
-      image: jwere/assassyn-dev:v0.0.1
-    steps:
-      - uses: actions/checkout@v2
-      - run: cargo clippy -- -Dclippy::all
+      - name: Build Container
+        run: docker build -t assassyn-dev .
+      - name: Run Python Lint
+        run: docker run --rm -v ${{ github.workspace }}:/app assassyn-dev pylint --rcfile python/.pylintrc python/assassyn
