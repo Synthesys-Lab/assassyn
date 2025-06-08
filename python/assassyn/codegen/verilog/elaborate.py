@@ -35,3 +35,5 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
     logs = generate_design(path / "design.py", sys)
 
     generate_testbench(path / "tb.py", sys, kwargs['sim_threshold'], logs)
+
+    return path

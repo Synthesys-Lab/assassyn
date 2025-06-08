@@ -4,7 +4,7 @@
 from typing import List
 from ...builder import SysBuilder
 
-template = '''
+TEMPLATE = '''
 import cocotb
 from cocotb.triggers import Timer
 from cocotb.runner import get_runner
@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
 def generate_testbench(fname: str, sys: SysBuilder, sim_threshold: int, dump_logger: List[str]):
     """Generate a testbench file for the given system."""
-    with open(fname, "w") as f:
+    with open(fname, "w", encoding='utf-8') as f:
         dump_logger = '\n        '.join(dump_logger)
-        tb_dump = template.format(sim_threshold, dump_logger, sys.name)
+        tb_dump = TEMPLATE.format(sim_threshold, dump_logger, sys.name)
         f.write(tb_dump)

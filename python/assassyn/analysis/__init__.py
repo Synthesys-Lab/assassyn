@@ -3,7 +3,7 @@
 from ..ir.expr import Expr, FIFOPush
 from ..ir.module import Downstream
 
-from .external_usage import expr_externally_used, analyze_bidirectional_external_usage
+from .external_usage import expr_externally_used
 
 
 def topo_downstream_modules(sys):

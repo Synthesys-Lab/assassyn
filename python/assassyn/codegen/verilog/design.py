@@ -31,7 +31,7 @@ from ...ir.expr import (
     Intrinsic
 )
 
-def dump_rval(node, with_namespace: bool) -> str:
+def dump_rval(node, with_namespace: bool) -> str:  # pylint: disable=too-many-return-statements
     """Dump a reference to a node with options."""
 
     node = unwrap_operand(node)
@@ -52,14 +52,13 @@ def dump_rval(node, with_namespace: bool) -> str:
         value = int_imm.value
         ty = dump_type(int_imm.dtype)
         return f"{ty}({value})"
-    elif isinstance(node, str):
+    if isinstance(node, str):
         value = node
         return f'"{value}"'
-    elif isinstance(node, Expr):
+    if isinstance(node, Expr):
         raw = namify(node.as_operand())
         return raw
-    else:
-        raise ValueError(f"Unknown node of kind {type(node).__name__}")
+    raise ValueError(f"Unknown node of kind {type(node).__name__}")
 
 def dump_type(ty: DType) -> str:
     """Dump a type to a string."""
@@ -81,7 +80,7 @@ def dump_type_cast(ty: DType) -> str:
         return "as_bits()"
     raise ValueError(f"Unknown type: {type(ty)}")
 
-class CIRCTDumper(Visitor):
+class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes
     """Dumps IR to CIRCT-compatible Verilog code."""
 
     wait_until: bool
@@ -93,7 +92,7 @@ class CIRCTDumper(Visitor):
     connections: List[Tuple[Module, str, str]]
     current_module: Module
 
-    def __init__(self, fd) -> None:
+    def __init__(self):
         super().__init__()
         self.wait_until = None
         self.indent = 0
@@ -126,10 +125,11 @@ class CIRCTDumper(Visitor):
 
     def expose(self, kind: str, expr: Expr):
         ''' Expose an expression out of the module.'''
-        ret = False
+        ret = False  # pylint: disable=unused-variable
+        key = None
         if kind == 'expr':
             key = expr
-        if kind == 'array':
+        elif kind == 'array':  # pylint: disable=possibly-used-before-assignment
             assert isinstance(expr, (ArrayRead, ArrayWrite))
             key = expr.array
         if kind == 'fifo':
@@ -138,6 +138,7 @@ class CIRCTDumper(Visitor):
         if kind == 'trigger':
             assert isinstance(expr, AsyncCall)
             key = expr.bind.callee
+        assert key is not None
         if key not in self._exposes:
             self._exposes[key] = []
         self._exposes[key].append((expr, self.get_pred()))
@@ -156,7 +157,7 @@ class CIRCTDumper(Visitor):
         if isinstance(node, CondBlock):
             self.cond_stack.pop()
 
-    def visit_expr(self, expr: Expr):
+    def visit_expr(self, expr: Expr):  # pylint: disable=arguments-renamed,too-many-locals,too-many-branches,too-many-statements
         # Handle different expression types
         self.append_code(f'# {expr}')
         body = None
@@ -176,7 +177,7 @@ class CIRCTDumper(Visitor):
             op_str = "~" if uop == UnaryOp.FLIP else "-"
             x = dump_rval(expr.x, False)
             body = f"{op_str}{x}"
-            body = f'self.{dump_rval(expr)} = {body}'
+            body = f'self.{dump_rval(expr, with_namespace=False)} = {body}'
         elif isinstance(expr, FIFOPop):
             fifo = dump_rval(expr.fifo, False)
             dtype = dump_type(expr.fifo.dtype)
@@ -218,12 +219,12 @@ class CIRCTDumper(Visitor):
                 value = expr.operands[0].value
                 value_expr = value
                 if value_expr.parent.module != expr.parent.module:
-                    body = f"{rval} = self.{namify(str(value_expr).as_operand())}_valid"
+                    body = f"{rval} = self.{namify(str(value_expr).as_operand())}_valid"  # pylint: disable=no-member
                 else:
                     pred = self.get_pred()
                     body = f"{rval} = (executed & {pred})"
             else:
-                # TODO: Handle other intrinsics
+                # TODO(@were): Handle other intrinsics
                 raise ValueError(f"Unknown intrinsic: {expr}")
         elif isinstance(expr, AsyncCall):
             self.expose('trigger', expr)
@@ -274,7 +275,7 @@ class CIRCTDumper(Visitor):
             dbits = expr.dtype.bits
             cond = dump_rval(expr.cond, False)
             terms = []
-            mask = "1" * expr.dtype.bits
+            mask = "1" * expr.dtype.bits  # pylint: disable=unused-variable
             mask = "Bits({expr.dtype.bits})({mask})"
             dtype = f"Bits({expr.dtype.bits})"
             for i, elem in enumerate(expr.values):
@@ -305,7 +306,7 @@ class CIRCTDumper(Visitor):
         if body is not None:
             self.append_code(body)
 
-    def cleanup_post_generation(self):
+    def cleanup_post_generation(self):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         """Clean up and finalize code generation."""
         self.append_code('')
         for key, exposes in self._exposes.items():
@@ -356,7 +357,7 @@ class CIRCTDumper(Visitor):
                     ce = ce + " | " + pred
                 self.append_code(f'self.{rval}_trigger = {ce}')
         if self.wait_until is None:
-            self.append_code(f'self.executed = Bits(1)(1)')
+            self.append_code('self.executed = Bits(1)(1)')  # pylint: disable=f-string-without-interpolation
 
         self.indent -= 4
         self.append_code('')
@@ -415,12 +416,12 @@ class CIRCTDumper(Visitor):
             assert False, "TODO"
         self.indent -= 4
         self.append_code('')
-        self._exposes
+        self._exposes  # pylint: disable=pointless-statement
         self.append_code(
             f'system = System([{node.name}], name="{node.name}", output_directory="sv")')
         self.append_code('system.compile()')
 
-header = '''from pycde import Input, Output, Module, System, Clock, Reset
+HEADER = '''from pycde import Input, Output, Module, System, Clock, Reset
 from pycde import generator, modparams
 from pycde.constructs import Reg, Array, Mux
 from pycde.types import Bits, SInt, UInt\n
@@ -457,9 +458,9 @@ def generate_design(fname: str, sys: SysBuilder):
     """Generate a complete Verilog design file for the system."""
     with open(fname, 'w', encoding='utf-8') as fd:
         # Generate the header
-        fd.write(header)
+        fd.write(HEADER)
         # Generate the module implementations
-        dumper = CIRCTDumper(fd)
+        dumper = CIRCTDumper()
         dumper.visit_system(sys)
         code = '\n'.join(dumper.code)
         fd.write(code)

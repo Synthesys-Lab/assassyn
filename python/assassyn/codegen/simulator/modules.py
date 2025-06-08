@@ -44,6 +44,7 @@ class ElaborateModule(Visitor):
 
     def __init__(self, sys):
         """Initialize the module elaborator."""
+        super().__init__()
         self.sys = sys
         self.indent = 0
         self.module_name = ""

@@ -9,6 +9,12 @@ class Visitor:
     '''The visitor pattern class for the frontend AST'''
     # Base visitor class with no attributes of its own - it just defines visit methods
 
+    current_module: Module
+
+    def __init__(self):
+        '''Initialize the visitor with no current module'''
+        self.current_module = None
+
     def visit_system(self, node: SysBuilder):
         '''Enter a system'''
         for elem in node.arrays:
