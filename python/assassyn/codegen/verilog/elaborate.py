@@ -23,7 +23,7 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
             - idle_threshold: Idle threshold
             - random: Whether to randomize execution
             - fifo_depth: Default FIFO depth
-    
+
     Returns:
         Path to the generated Verilog files
     """

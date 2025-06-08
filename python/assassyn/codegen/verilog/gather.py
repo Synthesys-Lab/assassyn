@@ -12,20 +12,20 @@ from .utils import select_1h
 
 class Gather:
     """Gather multiple conditional values into a single value."""
-    
+
     def __init__(self, cond: str, value: str, bits: int):
         """Initialize a Gather instance."""
         self.bits = bits
         self.condition = [cond]
         self.value = [value]
-    
+
     def and_(self, cond: str, join: str) -> str:
         """Combine condition with the gathered conditions."""
         if self.is_conditional():
             gather_cond = " || ".join([f"({x})" for x in self.condition])
             return f"({cond}) && ({gather_cond})"
         return cond
-    
+
     def select_1h(self) -> str:
         """Select a value based on one-hot encoding."""
         if self.is_conditional():
@@ -34,12 +34,12 @@ class Gather:
                 self.bits
             )
         return self.value[0]
-    
+
     def is_conditional(self) -> bool:
         """Check if this gather is conditional."""
         assert self.condition, "Condition list cannot be empty"
         return bool(self.condition[0])
-    
+
     def push(self, cond: str, value: str, bits: int):
         """Push a new conditional value into the gather."""
         assert self.is_conditional(), "Cannot push to a non-conditional gather"
@@ -49,23 +49,23 @@ class Gather:
 
 class ExternalUsage:
     """Track expressions used by external modules."""
-    
+
     def __init__(self):
         """Initialize an ExternalUsage instance."""
         self.module_use_external_expr = defaultdict(set)
         self.expr_externally_used = defaultdict(set)
-    
+
     def is_externally_used(self, expr: Expr) -> bool:
         """Check if an expression is externally used."""
         module = expr.parent.module
         return module in self.expr_externally_used and expr in self.expr_externally_used[module]
-    
+
     def out_bounds(self, module: Module):
         """Get expressions used externally from this module."""
         if module in self.expr_externally_used:
             return self.expr_externally_used[module]
         return set()
-    
+
     def in_bounds(self, module: Module):
         """Get external expressions used by this module."""
         if module in self.module_use_external_expr:

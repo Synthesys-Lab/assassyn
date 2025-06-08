@@ -59,7 +59,7 @@ def dump_rval(node, with_namespace: bool) -> str:
         return raw
     else:
         raise ValueError(f"Unknown node of kind {type(node).__name__}")
-    
+
 def dump_type(ty: DType) -> str:
     """Dump a type to a string."""
     if isinstance(ty, Int):
@@ -106,13 +106,13 @@ class CIRCTDumper(Visitor):
         if not self.cond_stack:
             return "Bits(1)(1)" if self.wait_until is None else self.wait_until
         return " & ".join(self.cond_stack) + (" & {self.wait_until}" if self.wait_until is not None else "")
-    
+
     def append_code(self, code: str):
         if code.strip() == '':
             self.code.append('')
         else:
             self.code.append(self.indent * ' ' + code)
-    
+
     def append_port(self, name: str, kind: str, dtype: str, connect: str):
         self.append_code(f'{name} = {kind}({dtype})')
         if kind == 'Input':
@@ -248,8 +248,8 @@ class CIRCTDumper(Visitor):
                 body = f"{{{pad}'b0, {a}}}"
             elif expr.cast_kind == Cast.SEXT:
                 dest_dtype = expr.dtype
-                if (src_dtype.is_int() and src_dtype.is_signed and 
-                    dest_dtype.is_int() and dest_dtype.is_signed and 
+                if (src_dtype.is_int() and src_dtype.is_signed and
+                    dest_dtype.is_int() and dest_dtype.is_signed and
                     dest_dtype.bits > src_dtype.bits):
                     # perform sext
                     body = f"{{{pad}'{{{a}[{src_dtype.bits - 1}]}}, {a}}}"

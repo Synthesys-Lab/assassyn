@@ -19,30 +19,30 @@ generate
     if (DEPTH_LOG2 == 0) begin : single_element_fifo
         // Single element FIFO for DEPTH_LOG2 = 0
 
-        logic fifo_full; 
+        logic fifo_full;
 
-        assign push_ready = ~fifo_full || (fifo_full && pop_ready); 
-        assign pop_valid  = fifo_full;                              
+        assign push_ready = ~fifo_full || (fifo_full && pop_ready);
+        assign pop_valid  = fifo_full;
 
         always @(posedge clk or negedge rst_n) begin
             if (!rst_n) begin
                 fifo_full <= 1'b0;
                 pop_data <= 'x;
             end else begin
-                
+
                 if (push_valid && pop_ready) begin
-                    pop_data <= push_data; 
-                    fifo_full <= 1'b1;     
+                    pop_data <= push_data;
+                    fifo_full <= 1'b1;
                 end
-                
+
                 else if (push_valid && ~fifo_full) begin
-                    pop_data <= push_data; 
-                    fifo_full <= 1'b1;     
+                    pop_data <= push_data;
+                    fifo_full <= 1'b1;
                 end
-                
+
                 else if (pop_ready && fifo_full) begin
-                    fifo_full <= 1'b0;     
-                    pop_data <= 'x;        
+                    fifo_full <= 1'b0;
+                    pop_data <= 'x;
                 end
             end
         end

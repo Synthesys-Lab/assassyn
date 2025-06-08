@@ -36,7 +36,7 @@ def fifo_name(fifo: Port):
 
 class VerilogDumper(Visitor):
     """Dumps Verilog code for Assassyn modules."""
-    
+
     def __init__(self, sys: SysBuilder, config, external_usage, topo, array_memory_params_map, module_expr_map):
         """Initialize a VerilogDumper."""
         self.sys = sys
@@ -51,12 +51,12 @@ class VerilogDumper(Visitor):
         self.topo = topo
         self.array_memory_params_map = array_memory_params_map
         self.module_expr_map = module_expr_map
-    
+
     @classmethod
     def new(cls, sys, config, external_usage, topo, array_memory_params_map, module_expr_map):
         """Create a new VerilogDumper."""
         return cls(sys, config, external_usage, topo, array_memory_params_map, module_expr_map)
-    
+
     @classmethod
     def collect_array_memory_params_map(cls, sys):
         """Collect array memory parameters."""
@@ -71,7 +71,7 @@ class VerilogDumper(Visitor):
         if not self.pred_stack:
             return None
         return self.pred_stack[-1]
-    
+
     def print_body(self, node) -> str:
         """Print the body of a node."""
         if isinstance(node, Expr):
@@ -82,7 +82,7 @@ class VerilogDumper(Visitor):
             return self.visit_block(block) or ""
         else:
             raise ValueError(f"Unexpected reference type: {node}")
-    
+
     def dump_memory_nodes(self, node, res: str) -> None:
         """Dump memory nodes."""
         # This is a placeholder for the actual implementation
@@ -431,31 +431,31 @@ top top_i (
                     fd.write(f",\n  .{id}_exposed_i_valid({id}_exposed_i_valid)")
 
         fd.write("\n);\n\nendmodule\n")
-    
+
     def visit_module(self, module: Module) -> Optional[str]:
         """Visit a module and generate Verilog code."""
         self.current_module = namify(module.name)
-        
+
         result = []
-        
+
         # Module header
         result.append(f"""
 module {self.current_module} (
   input logic clk,
   input logic rst_n,
 """)
-        
+
         # FIFO ports
         for port in module.ports:
             name = fifo_name(port)
             ty = port.dtype
             display = DisplayInstance.from_fifo(port, False)
-            
+
             result.append(f"  // Port FIFO {name}")
             result.append(declare_in(bool_ty(), display.field("pop_valid")))
             result.append(declare_in(ty, display.field("pop_data")))
             result.append(declare_out(bool_ty(), display.field("pop_ready")))
-        
+
         # Memory parameters
         has_memory_params = False
         has_memory_init_path = False
@@ -466,7 +466,7 @@ module {self.current_module} (
             'addr': None,
             'wdata': None,
         }
-        
+
         memory_params = {
             'width': 0,
             'depth': 0,
@@ -474,9 +474,9 @@ module {self.current_module} (
             'init_file': None,
             'pins': empty_pins,
         }
-        
+
         init_file_path = self.config.get("resource_base", ".")
-        
+
         # External interfaces
         for interf, ops in module.externals:
             if isinstance(interf, Port):
@@ -488,52 +488,52 @@ module {self.current_module} (
                 result.append(declare_out(bool_ty(), display.field("push_valid")))
                 result.append(declare_out(fifo.dtype, display.field("push_data")))
                 result.append(declare_in(bool_ty(), display.field("push_ready")))
-            
+
             elif isinstance(interf, Array):
                 array = interf
                 display = DisplayInstance.from_array(array)
                 result.append(f"  /* {array} */")
-                
+
                 # Check for memory parameters
                 for attr in module.attrs:
                     if isinstance(attr, MemoryParams):
                         has_memory_params = True
                         memory_params = attr
-                        
+
                         if attr.init_file:
                             init_file_path = os.path.join(init_file_path, attr.init_file)
                             result.append(f"  /* {init_file_path} */")
                             has_memory_init_path = True
-                
+
                 if has_memory_params:
                     pass
                 else:
                     if self.sys.user_contains_opcode(ops, Opcode.LOAD):
                         result.append(declare_array("input", array, display.field("q"), ","))
-                    
+
                     if self.sys.user_contains_opcode(ops, Opcode.STORE):
                         result.append(declare_out(bool_ty(), display.field("w")))
                         result.append(declare_out(array.get_idx_type(), display.field("widx")))
                         result.append(declare_out(array.dtype, display.field("d")))
-            
+
             elif isinstance(interf, Module):
                 module_ref = interf
                 display = utils.DisplayInstance.from_module(module_ref)
                 result.append(f"  // Module {module_ref.name}")
-                
+
                 # FIXME: Don't hardcode counter delta width
                 result.append(declare_out(Int(8), display.field("counter_delta")))
                 result.append(declare_in(bool_ty(), display.field("counter_delta_ready")))
-            
+
             elif isinstance(interf, Expr):
                 # Handled below in module_expr_map
                 pass
-            
+
             else:
                 raise ValueError(f"Unknown interf kind {type(interf)}")
-            
+
             result.append("")
-        
+
         # External usage out bounds
         out_bounds = self.external_usage.out_bounds(module)
         if out_bounds:
@@ -542,7 +542,7 @@ module {self.current_module} (
                 dtype = elem.dtype
                 result.append(declare_out(dtype, f"expose_{id_}"))
                 result.append(declare_out(bool_ty(), f"expose_{id_}_valid"))
-        
+
         # External usage in bounds
         in_bounds = self.external_usage.in_bounds(module)
         if in_bounds:
@@ -551,7 +551,7 @@ module {self.current_module} (
                 dtype = elem.dtype
                 result.append(declare_in(dtype, id_))
                 result.append(declare_in(bool_ty(), f"{id_}_valid"))
-        
+
         # Exposed expressions
         if module in self.module_expr_map:
             exposed_map = self.module_expr_map[module]
@@ -561,24 +561,24 @@ module {self.current_module} (
                     id_ = identifierize(str(expr))
                     dtype = exposed_node.dtype
                     bits = dtype.bits - 1
-                    
+
                     if kind == "Output" or kind == "Inout":
                         result.append(f"  output logic [{bits}:0] {id_}_exposed_o,")
-                    
+
                     if kind == "Input" or kind == "Inout":
                         result.append(f"  input logic [{bits}:0] {id_}_exposed_i,")
                         result.append(f"  input logic {id_}_exposed_i_valid,")
-        
+
         # Event queue for non-downstream modules
         if not isinstance(module, Downstream):
             result.append("  // self.event_q")
             result.append("  input logic counter_pop_valid,")
             result.append("  input logic counter_delta_ready,")
             result.append("  output logic counter_pop_ready,")
-        
+
         # End of port declarations
         result.append("  output logic expose_executed);\n")
-        
+
         # Wait until handling
         wait_until = ""
         skip = 0
@@ -586,22 +586,22 @@ module {self.current_module} (
         wu_intrin = find_wait_until(module)
         if wu_intrin is not None:
             self.before_wait_until = True
-            
+
             body_iter = module.body.body
             for i, elem in enumerate(body_iter):
                 if id(elem) == id(wu_intrin):
                     skip = i + 1
                     break
                 result.append(self.print_body(elem))
-            
+
             value = wu_intrin.args[0].value
             wait_until = f" && ({namify(value.as_operand())})"
-            
+
         self.before_wait_until = False
-        
+
         # Executed logic
         result.append("  logic executed;")
-        
+
         # Testbench cycle counter
         if self.current_module == "testbench":
             result.append("""
@@ -609,12 +609,12 @@ module {self.current_module} (
   always_ff @(posedge clk or negedge rst_n) if (!rst_n) cycle_cnt <= 0;
   else if (executed) cycle_cnt <= cycle_cnt + 1;
 """)
-        
+
         # Clear data structures for gathering
         self.fifo_pushes.clear()
         self.array_stores.clear()
         self.triggers.clear()
-        
+
         # Handle memory parameters
         if has_memory_params:
             result.append(f"  logic [{memory_params.width - 1}:0] dataout;")
@@ -622,39 +622,39 @@ module {self.current_module} (
         else:
             for elem in list(module.body.body)[skip:]:
                 result.append(self.print_body(elem))
-        
+
         # Generate triggers
         for m, g in self.triggers.items():
             trigger_str = "1"
             if g.is_conditional():
                 bits = g.bits
                 trigger_str = " + ".join([f"{{ {bits-1}'b0, |{x} }}" for x in g.condition])
-                
+
             result.append(f"  assign {m}_counter_delta = executed ? {trigger_str} : 0;\n")
-        
+
         # Generate FIFO pushes
         result.append("  // Gather FIFO pushes")
         for fifo, g in self.fifo_pushes.items():
             result.append(f"""  assign fifo_{fifo}_push_valid = {g.and_("executed", " || ")};
   assign fifo_{fifo}_push_data = {g.select_1h()};
 """)
-        
+
         # Generate array writes
         result.append("  // Gather Array writes")
         if has_memory_params:
             result.append("  // this is Mem Array")
-            
+
             for a, (idx, data) in self.array_stores.items():
                 result.append(f"  logic array_{a}_w;")
                 result.append(f"  logic [{memory_params.width - 1}:0] array_{a}_d;")
                 addr_bits = (63 - (memory_params.depth - 1).bit_length())
                 result.append(f"  logic [{addr_bits}:0] array_{a}_widx;")
-                
+
                 result.append(f"""  assign array_{a}_w = {idx.and_("executed", " || ")};
   assign array_{a}_d = {data.select_1h()};
   assign array_{a}_widx = {idx.value[0]};
 """)
-                
+
                 result.append(f"""
   memory_blackbox_{a} #(
         .DATA_WIDTH({memory_params.width}),
@@ -677,25 +677,25 @@ module {self.current_module} (
     assign array_{a}_widx = {idx.select_1h()};
 
   """)
-        
+
         # Executed logic
         if not isinstance(module, Downstream):
             result.append(f"  assign executed = counter_pop_valid{wait_until};")
             result.append("  assign counter_pop_ready = executed;")
         else:
-            upstream_execs = [f"{identifierize(x.as_ref(Module, module.sys).name)}_executed" 
+            upstream_execs = [f"{identifierize(x.as_ref(Module, module.sys).name)}_executed"
                             for x in upstreams(module, self.topo)]
             result.append(f"  assign executed = {' || '.join(upstream_execs)};")
-        
+
         result.append("  assign expose_executed = executed;")
         result.append(f"endmodule // {self.current_module}\n")
-        
+
         # Memory blackbox modules
         if has_memory_params:
             for a, (_, _) in self.array_stores.items():
                 data_width = memory_params.width
                 addr_bits = (63 - (memory_params.depth).bit_length())
-                
+
                 result.append(f"""
 `ifdef SYNTHESIS
 (* blackbox *)
@@ -718,7 +718,7 @@ module memory_blackbox_{a} #(
     reg [DATA_WIDTH-1:0] mem [DEPTH-1:0];
 
   """)
-                
+
                 if has_memory_init_path:
                     result.append(f"""  initial begin
           $readmemh("{init_file_path}", mem);
@@ -749,33 +749,33 @@ module memory_blackbox_{a} #(
 
     endmodule
               """)
-        
+
         return "\n".join(result)
-    
+
     def visit_block(self, block: Block) -> Optional[str]:
         """Visit a block and generate Verilog code."""
         result = []
         skip = 0
-        
+
         # Handle block condition
         if isinstance(block, CondBlock):
             cond = block.cond
             dtype = cond.dtype
-            
+
             if dtype.bits == 1:
                 pred = dump_ref(self.sys, cond, True)
             else:
                 pred = f"(|{dump_ref(self.sys, cond, False)})"
-                
+
             self.pred_stack.append(pred)
             skip = 1
-        
+
         # Handle cycled block
         elif block.cycle is not None:
             cycle = block.cycle
             self.pred_stack.append(f"(cycle_cnt == {cycle})")
             skip = 1
-        
+
         # Process block body
         for elem in list(block.body)[skip:]:
             if isinstance(elem, Expr):
@@ -786,12 +786,12 @@ module memory_blackbox_{a} #(
                 result.append(self.visit_block(sub_block) or "")
             else:
                 raise ValueError(f"Unexpected reference type: {type(elem)}")
-        
+
         if skip > 0:
             self.pred_stack.pop()
-            
+
         return "".join(result)
-    
+
     def visit_expr(self, expr: Expr) -> Optional[str]:
         """Visit an expression and generate Verilog code."""
         return visit_expr_impl(self, expr)
@@ -986,23 +986,23 @@ def generate_cpp_testbench(dir_path, sys, config):
         with open(os.path.join(tb_resource, "main.cpp"), "r") as src:
             with open(main_fname, "w") as dst:
                 dst.write(src.read())
-        
+
         make_fname = os.path.join(dir_path, "Makefile")
         with open(os.path.join(tb_resource, "Makefile"), "r") as src:
             content = src.read().format(sys.name)
             with open(make_fname, "w") as dst:
                 dst.write(content)
-    
+
     return True
 
 class ExposeGather:
     """Gathers exposed expressions."""
-    
+
     def __init__(self, sys):
         """Initialize an ExposeGather."""
         self.exposed_map = {}
         self.sys = sys
-    
+
     def visit_expr(self, expr: Expr) -> None:
         """Visit an expression to check if it's exposed."""
         for node, kind in self.sys.exposed_nodes:

@@ -11,32 +11,32 @@ from ...utils import namify, identifierize
 
 class DisplayInstance:
     """A display instance for a module element."""
-    
+
     def __init__(self, prefix: str, id_: str):
         self.prefix = prefix
         self.id = id_
-    
+
     @classmethod
     def from_module(cls, module: Module) -> 'DisplayInstance':
         """Create a display instance from a module."""
         return cls("", identifierize(module.name))
-    
+
     @classmethod
     def from_array(cls, array: Array) -> 'DisplayInstance':
         """Create a display instance from an array."""
         return cls("array", namify(array.name))
-    
+
     @classmethod
     def from_fifo(cls, fifo: Port, global_: bool) -> 'DisplayInstance':
         """Create a display instance from a FIFO."""
         raw = namify(fifo.name)
         fifo_name = f"{namify(fifo.module.name)}_{raw}" if global_ else raw
         return cls("fifo", fifo_name)
-    
+
     def field(self, attr: str) -> str:
         """Get the field of the display instance."""
         return f"{self}_{attr}"
-    
+
     def __str__(self) -> str:
         if not self.prefix:
             return self.id
@@ -44,11 +44,11 @@ class DisplayInstance:
 
 class Edge:
     """An edge in the module graph."""
-    
+
     def __init__(self, instance: DisplayInstance, driver: Module):
         self.instance = instance
         self.driver = identifierize(driver.name)
-    
+
     def field(self, field: str) -> str:
         """Get the field of the edge."""
         return f"{self.instance}_driver_{self.driver}_{field}"
@@ -119,7 +119,7 @@ def parse_format_string(args: List) -> str:
     fmt = deque(raw)
     result = ""
     arg_idx = 1
-    
+
     while fmt:
         c = fmt.popleft()
         if c == '{':
@@ -131,13 +131,13 @@ def parse_format_string(args: List) -> str:
                 substr = ""
                 if not fmt:
                     raise ValueError("Invalid format string, missing closing brace")
-                
+
                 next_char = fmt.popleft()
                 if next_char == '}':
                     result += f"%{type_to_fmt(dtype)}"
                     arg_idx += 1
                     continue
-                
+
                 substr = next_char
                 closed = False
                 while fmt:
@@ -146,30 +146,30 @@ def parse_format_string(args: List) -> str:
                         closed = True
                         break
                     substr += next_char
-                
+
                 if not closed:
                     raise ValueError(f"Invalid format string, missing closing brace: {raw}")
-                
+
                 if not substr:
                     new_fmt = type_to_fmt(dtype)
                 elif substr.startswith(':'):
                     width_idx = 1
                     pad = "0" if substr[1:2] == "0" else ""
                     width_idx += 1 if pad else 0
-                    
+
                     width = ""
                     if width_idx < len(substr) and substr[width_idx].isdigit():
                         width = substr[width_idx]
                         width_idx += 1
-                    
+
                     vfmt = type_to_fmt(dtype)
                     if width_idx < len(substr) and substr[width_idx].isalpha():
                         vfmt = substr[width_idx]
-                    
+
                     new_fmt = f"%{pad}{width}{vfmt}"
                 else:
                     raise ValueError(f"Invalid format string: {raw}")
-                
+
                 result += new_fmt
                 arg_idx += 1
         elif c == '}':
@@ -180,7 +180,7 @@ def parse_format_string(args: List) -> str:
                 raise ValueError("Invalid format string, because of a single }")
         else:
             result += c
-    
+
     return result
 
 def find_wait_until(module: Module) -> Optional[Intrinsic]:
