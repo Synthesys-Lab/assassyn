@@ -8,6 +8,7 @@ import typing
 
 from ...ir.visitor import Visitor
 from ...ir.block import Block, CondBlock, CycledBlock
+from ...ir.dtype import RecordValue
 from ...ir.expr import (
         Expr,
         BinaryOp,
@@ -343,6 +344,8 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
                 result.append(self.visit_expr(elem))
             elif isinstance(elem, Block):
                 result.append(self.visit_block(elem))
+            elif isinstance(elem, RecordValue):
+                result.append(self.visit_expr(elem.value()))
             else:
                 raise ValueError(f"Unexpected reference type: {type(elem).__name__}")
 

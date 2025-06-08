@@ -5,7 +5,7 @@ from __future__ import annotations
 import typing
 
 from ..builder import ir_builder, Singleton
-from .dtype import to_uint, RecordValue
+from .dtype import to_uint, RecordValue, Record
 from .expr import ArrayRead, ArrayWrite, Expr
 from .value import Value
 from ..utils import identifierize
@@ -125,23 +125,26 @@ class Array:  #pylint: disable=too-many-instance-attributes
 
     @ir_builder
     def __getitem__(self, index: typing.Union[int, Value]):
+        res = None
         # If not partitioned, return the value at the given index
         if self._partition is None:
             if isinstance(index, int):
                 index = to_uint(index, self.index_bits)
-            return ArrayRead(self, index)
-
+            res = ArrayRead(self, index)
         # If partitioned, return the value from the partitioned array
-
         # If the index is an integer, return the value from the partitioned array
-        if isinstance(index, int):
-            return self._partition[index][0]
+        elif isinstance(index, int):
+            res = self._partition[index][0]
+        else:
+            cases = { None: self._partition[0].__getitem__(0) }
+            for i in range(self.size):
+                cases[to_uint(i, self.index_bits)] = self._partition[i].__getitem__(0)
+            res = index.case(cases)
+            if isinstance(self.scalar_ty, Record):
+                res = RecordValue(self.scalar_ty, res)
+        assert res is not None, f'{res} is None'
 
-        # If the index is a value, select the value from the partitioned array
-        cases = { None: self.scalar_ty(0) }
-        for i in range(self.size):
-            cases[to_uint(i, self.index_bits)] = self._partition[i].__getitem__(0)
-        return index.case(cases)
+        return res
     
     def get_flattened_size(self):
         '''Get the flattened size of the array.'''

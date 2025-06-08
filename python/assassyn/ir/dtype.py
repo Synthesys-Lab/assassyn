@@ -25,6 +25,7 @@ class DType:
 
     def attributize(self, value, name):
         '''The syntax sugar for creating a port'''
+        pass
 
     def inrange(self, value):
         '''Check if the value is in the range of the data type'''

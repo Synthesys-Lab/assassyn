@@ -57,6 +57,7 @@ class Expr(Value):
         from ..array import Array
         from ..const import Const
         from ..module import Port
+        from ..dtype import RecordValue
         self.opcode = opcode
         self.loc = self.parent = None
         # NOTE: We only wrap values in Operand, not Ports or Arrays
@@ -68,7 +69,7 @@ class Expr(Value):
             elif isinstance(i, Expr):
                 wrapped = Operand(i, self)
                 i.users.append(wrapped)
-            elif isinstance(i, (Const, str)):
+            elif isinstance(i, (Const, str, RecordValue)):
                 wrapped = Operand(i, self)
             else:
                 assert False, f'{i} is a {type(i)}'

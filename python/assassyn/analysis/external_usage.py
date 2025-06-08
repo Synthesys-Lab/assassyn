@@ -31,7 +31,7 @@ def expr_externally_used(expr: Expr, exclude_push: bool) -> typing.Set[Module]:
     # Check if any user is in a different module
     for user in expr.users:
         assert isinstance(user, Operand), f'{user} is a {type(user)}'
-        user_parent_module = get_module(user)
+        user_parent_module = user.user.parent.module
         if user_parent_module != this_module:
             res.add(user_parent_module)
 
