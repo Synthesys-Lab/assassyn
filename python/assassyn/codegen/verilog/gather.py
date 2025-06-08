@@ -1,12 +1,10 @@
 """Gather classes for the Verilog backend."""
 
 from collections import defaultdict
-from typing import Dict, List, Optional, Set, Tuple
 
 from ...builder import SysBuilder
 from ...ir.module import Module
-from ...ir.visitor import Visitor
-from ...ir.expr import Operand, Expr
+from ...ir.expr import Expr
 
 from .utils import select_1h
 

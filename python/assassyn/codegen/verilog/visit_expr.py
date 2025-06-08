@@ -1,8 +1,8 @@
 """Expression visitor for the Verilog backend."""
 
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
-from ...utils import identifierize, unwrap_operand
+from ...utils import unwrap_operand
 from ...builder import SysBuilder
 from ...ir.expr import (
     Expr, BinaryOp, UnaryOp, FIFOPop, Log, ArrayRead, ArrayWrite,

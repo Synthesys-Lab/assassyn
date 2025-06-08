@@ -2,16 +2,16 @@
 
 import os
 
-from collections import defaultdict, deque
-from typing import Dict, List, Optional, Set, Tuple, Any
+from collections import deque
+from typing import Optional
 
 from ...builder import SysBuilder
 from ...ir.block import Block, CondBlock
-from ...ir.expr import Expr, Intrinsic, Operand, ArrayWrite, FIFOPush, ArrayRead
+from ...ir.expr import Expr, ArrayWrite, FIFOPush, ArrayRead
 from ...ir.array import Array
 from ...ir.module import Module, SRAM, Port, Downstream
 from ...ir.visitor import Visitor
-from ...ir.dtype import DType, Int
+from ...ir.dtype import Int
 from ...utils import namify, identifierize, repo_path
 
 from .utils import (
@@ -27,8 +27,7 @@ from .utils import (
     Edge,
     connect_top,
 )
-from .visit_expr import visit_expr_impl, dump_ref, dump_arith_ref
-from .gather import Gather, ExternalUsage
+from .visit_expr import visit_expr_impl, dump_ref
 
 def fifo_name(fifo: Port):
     """Get the name of a FIFO."""

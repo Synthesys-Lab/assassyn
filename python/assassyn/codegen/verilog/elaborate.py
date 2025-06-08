@@ -1,7 +1,6 @@
 """Elaborate Assassyn IR to Verilog."""
 
 import os
-from typing import Dict, List, Optional, Set, Tuple, Any
 from pathlib import Path
 from .testbench import generate_testbench
 from .design import generate_design

@@ -6,7 +6,7 @@ from typing import Iterator, List, Optional, Tuple
 from ...ir.array import Array
 from ...ir.module import Port, Module
 from ...ir.expr import Intrinsic
-from ...ir.dtype import DType, Int, UInt, Bits, Record
+from ...ir.dtype import Int, UInt, Bits
 from ...utils import namify, identifierize
 
 class DisplayInstance:
