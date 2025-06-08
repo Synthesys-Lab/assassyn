@@ -190,14 +190,15 @@ class ElaborateModule(Visitor):
             result = [f'print!("@line:{{:<5}} {{:<10}}: [{mn}]\\t", line!(), cyclize(sim.stamp));']
             result.append("println!(")
 
-            for elem in node.operands:
+            result.append(f"{dump_rval_ref(self.module_ctx, self.sys, node.operands[0])}, ")
+
+            for elem in node.operands[1:]:
                 dump = dump_rval_ref(self.module_ctx, self.sys, elem)
 
-                if not isinstance(elem, str):
-                    dtype = elem.dtype
-                    # Special handling for boolean display
-                    if dtype.bits == 1:
-                        dump = f"if {dump} {{ 1 }} else {{ 0 }}"
+                dtype = elem.dtype
+                # Special handling for boolean display
+                if dtype.bits == 1:
+                    dump = f"if {dump} {{ 1 }} else {{ 0 }}"
 
                 result.append(f"{dump}, ")
 

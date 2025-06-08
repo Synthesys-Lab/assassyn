@@ -3,8 +3,16 @@ import typing
 
 from ..ir.expr import Expr, FIFOPush
 from ..ir.module import Module
+from ..ir.block import CondBlock
 from ..ir.visitor import Visitor
+from ..ir.expr import Operand
 from ..builder import SysBuilder
+
+def get_module(operand: Operand) -> Module:
+    if isinstance(operand.user, Expr):
+        return operand.user.parent.module
+    elif isinstance(operand, CondBlock):
+        return operand.user.module
 
 def expr_externally_used(expr: Expr, exclude_push: bool) -> typing.Set[Module]:
     """Check if an expression is used outside its module.
@@ -22,7 +30,8 @@ def expr_externally_used(expr: Expr, exclude_push: bool) -> typing.Set[Module]:
 
     # Check if any user is in a different module
     for user in expr.users:
-        user_parent_module = user.parent.module
+        assert isinstance(user, Operand), f'{user} is a {type(user)}'
+        user_parent_module = get_module(user)
         if user_parent_module != this_module:
             res.add(user_parent_module)
 

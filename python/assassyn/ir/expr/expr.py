@@ -15,12 +15,12 @@ if typing.TYPE_CHECKING:
     from ..array import Array
     from ..module import Port, Module
     from ..dtype import DType
-    from ..block import Block
+    from ..block import Block, CondBlock
 
 class Operand:
     '''The base class for all operands. It is used to dump the operand as a string.'''
     _value: Value # The value of this operand
-    _user: Expr # The user of this operand
+    _user: typing.Union[Expr, CondBlock] # The user of this operand
 
     def __init__(self, value: Value, user: Expr):
         self._value = value
@@ -55,6 +55,7 @@ class Expr(Value):
         '''Initialize the expression with an opcode'''
         #pylint: disable=import-outside-toplevel
         from ..array import Array
+        from ..const import Const
         from ..module import Port
         self.opcode = opcode
         self.loc = self.parent = None
@@ -62,10 +63,15 @@ class Expr(Value):
         self._operands = []
         for i in operands:
             wrapped = i
-            if isinstance(i, (Expr, Array, Port)):
+            if isinstance(i, (Array, Port)):
                 i.users.append(self)
-            if isinstance(i, Value):
+            elif isinstance(i, Expr):
                 wrapped = Operand(i, self)
+                i.users.append(wrapped)
+            elif isinstance(i, (Const, str)):
+                wrapped = Operand(i, self)
+            else:
+                assert False, f'{i} is a {type(i)}'
             self._operands.append(wrapped)
         self.users = []
 
