@@ -34,6 +34,12 @@ export PYTHONPATH=$REPO_PATH/python:$PYTHONPATH
 echo "Setting ASSASSYN_HOME to $REPO_PATH"
 export ASSASSYN_HOME=$REPO_PATH
 
+# Add PyCDE specific PYTHONPATH
+# This assumes you are in the 'build' directory relative to the repository root when sourcing this.
+# If PyCDE is built elsewhere, you'll need to adjust this path accordingly.
+export PYTHONPATH="$REPO_PATH/3rd-party/circt/build/tools/circt/python_packages/pycde"
+echo "PYTHONPATH set for this session to include PyCDE."
+
 if [ "$NO_VERILATOR" = false ]; then
 if [ -d $REPO_PATH/verilator ]; then
   echo "In-repo verilator found, setting VERILATOR_ROOT to $REPO_PATH/verilator"
