@@ -1,3 +1,6 @@
 [submodule "3rd-party/circt"]
 	path = 3rd-party/circt
 	url = https://github.com/llvm/circt.git
+[submodule "3rd-party/verilator"]
+	path = 3rd-party/verilator
+	url = https://github.com/verilator/verilator.git

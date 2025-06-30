@@ -1,7 +1,6 @@
 target
 .vim/*
 .DS_Store
-verilator
 examples/*/__pycache__/
 /.vscode
 *.log
