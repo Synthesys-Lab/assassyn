@@ -14,7 +14,7 @@ REPO_DIR=`dirname $0`
 pip install --user -r $REPO_DIR/python/requirements.txt
 
 # Install PyCDE
-echo "PyCDE not found. Installing and building PyCDE..."
+echo "Installing PyCDE by building it from source..."
 CURRENT_DIR_BEFORE_PYCDE_BUILD="$(pwd)"
 cd $REPO_DIR/3rd-party/circt
 git submodule update --init
@@ -30,5 +30,13 @@ cmake \
     -DCIRCT_BINDINGS_PYTHON_ENABLED=ON \
     -DCIRCT_ENABLE_FRONTENDS=PyCDE \
     -G Ninja ../llvm/llvm
-Ninja
+ninja
 cd "$CURRENT_DIR_BEFORE_PYCDE_BUILD"
+
+echo "Installing Verilator by building it from source..."
+CURRENT_DIR_BEFORE_VERILATOR_BUILD="$(pwd)"
+cd $REPO_DIR/3rd-party/verilator
+autoconf
+./configure
+make -j$(nproc)
+cd "$CURRENT_DIR_BEFORE_VERILATOR_BUILD"
