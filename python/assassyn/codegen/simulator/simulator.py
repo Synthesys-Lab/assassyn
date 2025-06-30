@@ -9,7 +9,7 @@ from ...builder import SysBuilder
 from ...ir.block import CycledBlock
 from ...ir.expr import Expr
 from ...ir.module import Downstream, Module, SRAM
-from ...utils import namify
+from ...utils import namify, repo_path
 
 
 def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-many-statements
@@ -304,5 +304,50 @@ mod simulator;
 fn main() {
   simulator::simulate();
 }
+    """)
+    return True
+
+def dump_build(fd):
+    """Generate the build.rs file.
+
+    """
+    home_path = repo_path()
+    fd.write(f"""
+use std::path::Path;
+
+fn main() {{
+    let wrapper_path = "{home_path}/testbench/simulator/build/lib";
+    let ramulator_path = "{home_path}/3rd-party/ramulator2";
+
+    // Verify library files exist
+    assert!(
+        Path::new(&format!("{{}}/libwrapper.so", wrapper_path)).exists(),
+        "libwrapper.so not found"
+    );
+    assert!(
+        Path::new(&format!("{{}}/libramulator.so", ramulator_path)).exists(),
+        "libramulator.so not found"
+    );
+
+    println!("cargo:rustc-link-search=all={{}}", wrapper_path);
+    println!("cargo:rustc-link-search=all={{}}", ramulator_path);
+
+    println!(
+        "cargo:rustc-env=LD_LIBRARY_PATH={{0}}:{{1}}:$LD_LIBRARY_PATH",
+        ramulator_path, wrapper_path
+    );
+
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{{}}", ramulator_path);
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{{}}", wrapper_path);
+
+    println!("cargo:rustc-link-arg=-Wl,--enable-new-dtags");
+
+    println!("cargo:rustc-link-lib=ramulator");
+    println!("cargo:rustc-link-lib=wrapper");
+
+    println!("cargo:warning=wrapper_path: {{}}", wrapper_path);
+    println!("cargo:warning=ramulator_path: {{}}", ramulator_path);
+}}
+
     """)
     return True

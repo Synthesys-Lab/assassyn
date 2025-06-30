@@ -1,3 +1,6 @@
 [submodule "3rd-party/circt"]
 	path = 3rd-party/circt
 	url = https://github.com/llvm/circt.git
+[submodule "3rd-party/ramulator2"]
+	path = 3rd-party/ramulator2
+	url = https://github.com/CMU-SAFARI/ramulator2.git

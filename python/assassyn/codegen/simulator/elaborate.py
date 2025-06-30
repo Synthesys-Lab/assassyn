@@ -8,7 +8,7 @@ import subprocess
 import typing
 from pathlib import Path
 from .modules import ElaborateModule
-from .simulator import dump_simulator, dump_main
+from .simulator import dump_simulator, dump_main, dump_build
 from .runtime import dump_runtime
 
 if typing.TYPE_CHECKING:
@@ -67,6 +67,7 @@ def elaborate_impl(sys, config):
         cargo.write('num-bigint = "0.4"\n')
         cargo.write('num-traits = "0.2"\n')
         cargo.write('rand = "0.8"\n')
+        cargo.write('libloading = "0.8"\n')
 
     # Create rustfmt.toml if available
     rustfmt_src = None
@@ -98,7 +99,8 @@ def elaborate_impl(sys, config):
     # Generate main.rs
     with open(simulator_path / "src/main.rs", 'w', encoding='utf-8') as fd:
         dump_main(fd)
-
+    with open(simulator_path / "build.rs", 'w', encoding='utf-8') as fd:
+        dump_build(fd)
     return manifest_path
 
 

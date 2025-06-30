@@ -40,3 +40,39 @@ else
   cd "$CURRENT_DIR_BEFORE_PYCDE_BUILD"
 
 fi
+
+# build Ramulator2
+echo "Checking if Ramulator2 is already built..."
+RAMULATOR_BUILD_DIR="$REPO_DIR/3rd-party/ramulator2/build"
+RAMULATOR_LIB="$REPO_DIR/3rd-party/ramulator2/libramulator.so"
+if [ -f "$RAMULATOR_LIB" ]; then
+  echo "\"Ramulator2\" already built"
+else
+  echo "Building Ramulator2..."
+  CURRENT_DIR_BEFORE_RAMULATOR_BUILD="$(pwd)"
+  cd "$REPO_DIR/3rd-party/ramulator2"
+  mkdir -p build
+  cd build
+  cmake ..
+  make -j$(nproc)
+  cd "$CURRENT_DIR_BEFORE_RAMULATOR_BUILD"
+fi
+
+# build wrapper
+# Check if wrapper (simulator) is already built
+echo "Checking if wrapper (simulator) is already built..."
+WRAPPER_BUILD_DIR="$REPO_DIR/testbench/simulator/build"
+WRAPPER_LIB="$WRAPPER_BUILD_DIR/lib/libwrapper.so"
+
+if [ -f "$WRAPPER_LIB" ]; then
+  echo "\"libwrapper.so\" already built at $WRAPPER_LIB"
+else
+  CURRENT_DIR_BEFORE_WRAPPER_BUILD="$(pwd)"
+  echo "Building libwrapper.so from testbench/simulator..."
+  cd "$REPO_DIR/testbench/simulator"
+  mkdir -p build
+  cd build
+  cmake ..
+  make
+  cd "$CURRENT_DIR_BEFORE_WRAPPER_BUILD"
+fi
