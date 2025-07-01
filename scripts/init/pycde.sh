@@ -8,13 +8,13 @@ LLVM_PARALLEL_LINK_JOBS=1
 # Parse arguments
 for arg in "$@"; do
   case $arg in
-    --compile-jobs=*)
+    --llvm-compile-jobs=*)
       LLVM_PARALLEL_COMPILE_JOBS="${arg#*=}"
       ;;
-    --link-jobs=*)
+    --llvm-link-jobs=*)
       LLVM_PARALLEL_LINK_JOBS="${arg#*=}"
       ;;
-    --tbg-jobs=*)
+    --llvm-tbg-jobs=*)
       LLVM_PARALLEL_TABLEGEN_JOBS="${arg#*=}"
       ;;
   esac
