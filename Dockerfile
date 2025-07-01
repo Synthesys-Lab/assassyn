@@ -5,6 +5,8 @@ FROM rust:1.82
 RUN apt-get update && apt-get install -y --no-install-recommends \
     zsh \
     python3-pip \
+    python3-dev \
+    pybind11-dev \
     python-is-python3 \
     git \
     autoconf \
@@ -29,14 +31,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set default shell to zsh
 SHELL ["/bin/zsh", "-c"]
 # You can use the following command instead
-# RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
-# Set environment variables
+# Set build environment variables
 ENV CC="ccache gcc"
 ENV CXX="ccache g++"
 ENV CCACHE_DIR="/tmp/ccache"
-ENV PYTHONPATH="/app/python"
+ENV PYTHONUSERBASE="/tmp/.local"
+
+# Set up Assassyn related environment variables
 ENV ASSASSYN_HOME="/app"
+ENV PYTHONPATH="/app/python:app/3rd-party/circt/build/tools/circt/python_packages/pycde"
 
 # Set working directory
 WORKDIR /app
