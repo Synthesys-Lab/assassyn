@@ -21,16 +21,16 @@ for arg in "$@"; do
 
 done
 
-# TODO: Later add a flag to force PyCDE installation via source
+# TODO: Later add a flag to force CIRCT installation via source
 pip install --user pycde --break-system-packages
 if [ $? -eq 0 ]; then
-  echo "PyCDE installed successfully via pip."
+  echo "CIRCT installed successfully via pip."
   exit 0
 fi
 
 RESTORE=`pwd`
 
-echo "Failed to install PyCDE via pip. Fall back to building from source."
+echo "Failed to install CIRCT via pip. Fall back to building from source."
 CURRENT_DIR_BEFORE_PYCDE_BUILD="$(pwd)"
 cd $ASSASSYN_HOME/3rd-party/circt
 git submodule update --init
@@ -59,11 +59,10 @@ fi
 ninja
 
 if [ $? -ne 0 ]; then
-  echo "Failed to build PyCDE. Please check the build output."
+  echo "Failed to build CIRCT. Please check the build output."
   exit 1
 fi
 
 cd $RESTORE
 
-echo "PyCDE built successfully."
-exit 0
+echo "CIRCT built successfully."

@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
 
-scripts/init/py-package.sh $@
-scripts/init/pycde.sh $@
-scripts/init/verilator.sh $@
+source scripts/init/py-package.sh $@
+source scripts/init/circt.sh $@
+source scripts/init/verilator.sh $@
