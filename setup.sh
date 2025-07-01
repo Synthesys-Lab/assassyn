@@ -33,7 +33,6 @@ export PYTHONPATH=$REPO_PATH/python:$PYTHONPATH
 echo "Setting ASSASSYN_HOME to $REPO_PATH"
 export ASSASSYN_HOME=$REPO_PATH
 
-
 echo "Adding PyCDE to PYTHONPATH."
 export PYTHONPATH="$REPO_PATH/3rd-party/circt/build/tools/circt/python_packages/pycde:$PYTHONPATH"
 

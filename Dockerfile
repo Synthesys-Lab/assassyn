@@ -32,7 +32,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 SHELL ["/bin/zsh", "-c"]
 # You can use the following command instead
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-
 # Set build environment variables
 ENV CC="ccache gcc"
 ENV CXX="ccache g++"
@@ -45,6 +44,9 @@ ENV PYTHONPATH="/app/python:app/3rd-party/circt/build/tools/circt/python_package
 
 # Set working directory
 WORKDIR /app
+
+RUN --mount=type=bind,source=./python/requirements.txt,target=/app/requirements.txt \
+    pip install --user -r /app/requirements.txt --break-system-packages
 
 # Ensure setup.sh is sourced on shell startup if it exists
 RUN echo '[ -f /app/setup.sh ] && source /app/setup.sh --no-verilator' >> /root/.zshrc
