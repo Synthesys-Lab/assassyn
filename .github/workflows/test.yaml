@@ -8,9 +8,6 @@ on:
 
 name: Test
 
-env:
-  VERILATOR_VERSION: v5.026
-
 jobs:
   test:
     name: Test
