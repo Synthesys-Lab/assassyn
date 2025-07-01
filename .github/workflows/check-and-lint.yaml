@@ -14,4 +14,6 @@ jobs:
       - name: Build Container
         run: docker build -t assassyn-dev .
       - name: Run Python Lint
-        run: docker run --rm -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn-dev pylint --rcfile python/.pylintrc python/assassyn
+        run:
+          docker run --rm -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn-dev \
+          pylint --rcfile python/.pylintrc python/assassyn
