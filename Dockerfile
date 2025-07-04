@@ -28,6 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ninja-build \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Set default shell to zsh
+SHELL ["/bin/zsh", "-c"]
+
 RUN pip install \
     decorator==5.1.1 \
     pytest==7.4.3 \
@@ -47,7 +50,7 @@ ENV PYTHONUSERBASE="/tmp/.local"
 
 # Set up Assassyn related environment variables
 ENV ASSASSYN_HOME="/app"
-ENV PYTHONPATH="/app/python:app/3rd-party/circt/build/tools/circt/python_packages/pycde"
+ENV PYTHONPATH="/app/python"
 
 # Set working directory
 WORKDIR /app
