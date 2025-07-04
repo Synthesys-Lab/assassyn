@@ -62,5 +62,6 @@ RUN echo '[ -f /app/setup.sh ] && source /app/setup.sh --no-verilator' >> /root/
 CMD ["/bin/zsh"]
 
 RUN ls /usr/local/bin/pylint*
+RUN echo $PATH
 RUN pip show pylint
 RUN which pylint
