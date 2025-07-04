@@ -45,8 +45,13 @@ ENV PYTHONPATH="/app/python:app/3rd-party/circt/build/tools/circt/python_package
 # Set working directory
 WORKDIR /app
 
-RUN --mount=type=bind,source=./python/requirements.txt,target=/app/requirements.txt \
-    pip install --user -r /app/requirements.txt --break-system-packages
+RUN pip install --user --break-system-packages \
+    decorator == 5.1.1 \
+    pytest == 7.4.3 \
+    pylint == 3.2.3 \
+    pytest-xdist == 3.6.1 \
+    nanobind == 2.7.0
+
 
 # Ensure setup.sh is sourced on shell startup if it exists
 RUN echo '[ -f /app/setup.sh ] && source /app/setup.sh --no-verilator' >> /root/.zshrc
