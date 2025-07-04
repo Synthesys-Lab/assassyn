@@ -28,6 +28,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ninja-build \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN pip install \
+    decorator == 5.1.1 \
+    pytest == 7.4.3 \
+    pylint == 3.2.3 \
+    pytest-xdist == 3.6.1 \
+    nanobind == 2.7.0 \
+    --pre \
+    --break-system-packages
+
 # You can use the following command instead
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 # Set build environment variables
@@ -42,14 +51,6 @@ ENV PYTHONPATH="/app/python:app/3rd-party/circt/build/tools/circt/python_package
 
 # Set working directory
 WORKDIR /app
-
-RUN pip install --user --break-system-packages \
-    decorator == 5.1.1 \
-    pytest == 7.4.3 \
-    pylint == 3.2.3 \
-    pytest-xdist == 3.6.1 \
-    nanobind == 2.7.0
-
 
 # Ensure setup.sh is sourced on shell startup if it exists
 RUN echo '[ -f /app/setup.sh ] && source /app/setup.sh --no-verilator' >> /root/.zshrc
