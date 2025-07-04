@@ -29,11 +29,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN pip install \
-    decorator == 5.1.1 \
-    pytest == 7.4.3 \
-    pylint == 3.2.3 \
-    pytest-xdist == 3.6.1 \
-    nanobind == 2.7.0 \
+    decorator==5.1.1 \
+    pytest==7.4.3 \
+    pylint==3.2.3 \
+    pytest-xdist==3.6.1 \
+    nanobind==2.7.0 \
     --pre \
     --break-system-packages
 
