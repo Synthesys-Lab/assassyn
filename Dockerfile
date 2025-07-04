@@ -61,5 +61,6 @@ RUN echo '[ -f /app/setup.sh ] && source /app/setup.sh --no-verilator' >> /root/
 # Define the default command
 CMD ["/bin/zsh"]
 
+RUN ls /usr/local/bin/pylint*
 RUN pip show pylint
 RUN which pylint
