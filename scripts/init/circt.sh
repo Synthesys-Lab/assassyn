@@ -25,7 +25,7 @@ done
 pip install --user pycde --break-system-packages
 if [ $? -eq 0 ]; then
   echo "CIRCT installed successfully via pip."
-  exit 0
+  return 0
 fi
 
 RESTORE=`pwd`
@@ -53,16 +53,17 @@ cmake \
 
 if [ $? -ne 0 ]; then
   echo "Failed to configure CIRCT build. Please check the CMake configuration."
-  exit 1
+  return 1
 fi
 
 ninja
 
 if [ $? -ne 0 ]; then
   echo "Failed to build CIRCT. Please check the build output."
-  exit 1
+  return 1
 fi
 
 cd $RESTORE
 
 echo "CIRCT built successfully."
+return 0

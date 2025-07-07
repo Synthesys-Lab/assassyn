@@ -8,7 +8,7 @@ done
 
 if [ "$NO_VERILATOR" = true ]; then
   echo "Verilator is disabled by --no-verilator flag"
-  exit 0
+  return 0
 fi
 
 echo "Installing Verilator by building it from source..."
@@ -22,7 +22,8 @@ make -j$(nproc)
 
 if [ $? -ne 0 ]; then
   echo "Failed to configure Verilator build. Please check the configuration."
-  exit 1
+  return 1
 fi
 
 cd $RESTORE
+return 0
