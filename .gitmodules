@@ -4,3 +4,6 @@
 [submodule "3rd-party/verilator"]
 	path = 3rd-party/verilator
 	url = https://github.com/verilator/verilator.git
+[submodule "3rd-party/ramulator2"]
+	path = 3rd-party/ramulator2
+	url = https://github.com/CMU-SAFARI/ramulator2.git
