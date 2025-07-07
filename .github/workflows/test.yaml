@@ -14,6 +14,8 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Build Container
         run: docker build -t assassyn:latest .
       - name: Stop & Remove Existing Container
