@@ -62,3 +62,11 @@ Feel free to give a different parameter and run again.
 ## Run an Example
 
 TODO: A tutorial to running the example here.
+
+
+## Docker Quickstart
+
+```bash
+docker build -t assassyn:latest .
+docker run --rm -tid -v $(pwd):/app --user $(id -u):$(id -g) -m 32g --name assassyn assassyn:latest
+docker exec -it assassyn ./init.sh --llvm-compile-jobs 8 --llvm-tbg-jobs 8 --llvm-link-jobs 1
