@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: recursive
+          submodules: false
       - name: Clean stale submodule folders
         run: |
           rm -rf 3rd-party/ramulator2
