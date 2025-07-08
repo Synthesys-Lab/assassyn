@@ -14,11 +14,6 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: false
-      - name: Clean ramulator2 submodule folder
-        run: rm -rf 3rd-party/ramulator2
-
       - name: Initialize ramulator2 submodule only
         run: git submodule update --init -- 3rd-party/ramulator2
       - name: Build Container
