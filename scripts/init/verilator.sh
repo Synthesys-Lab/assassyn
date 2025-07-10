@@ -16,6 +16,7 @@ echo "Installing Verilator by building it from source..."
 RESTORE="$(pwd)"
 
 cd $ASSASSYN_HOME/3rd-party/verilator
+git submodule update --init
 autoconf
 ./configure
 make -j$(nproc)
