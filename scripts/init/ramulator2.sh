@@ -10,6 +10,7 @@ echo "Building Ramulator2..."
 
 RESTORE="$(pwd)"
 cd "$ASSASSYN_HOME/3rd-party/ramulator2"
+git submodule update --init
 mkdir -p build
 cd build
 cmake ..
