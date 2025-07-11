@@ -31,6 +31,8 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     # Write imports
     fd.write("use std::collections::VecDeque;\n")
     fd.write("use super::runtime::*;\n")
+    fd.write("use libloading::Library;\n")
+    fd.write("use std::sync::Arc;\n")
     fd.write("use num_bigint::{BigInt, BigUint};\n")
     fd.write("use rand::seq::SliceRandom;\n\n")
 
@@ -41,7 +43,9 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
 
     # Begin simulator struct definition
     fd.write("pub struct Simulator { pub stamp: usize, ")
-
+    fd.write("pub mem_interface: Arc<MemoryInterface<'static>>,\n")
+    fd.write("_lib: Arc<Library>,\n")
+    home = repo_path()
     # Add array fields to simulator struct
     for elem in sys.arrays:
 
@@ -109,10 +113,25 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
 
     # Constructor
     fd.write("  pub fn new() -> Self {\n")
+    fd.write(f"""
+    let lib = Arc::new(
+        unsafe {{ Library::new("{home}/testbench/simulator/build/lib/libwrapper.so") }}
+            .expect("Failed to load library"),
+    );
+    let lib_ref = lib.clone();
+
+    let mem = unsafe {{
+        let lib_static = Box::leak(Box::new(lib.clone()));
+
+        Arc::new(MemoryInterface::new(&*lib_static).expect("Failed to create MemoryInterface"))
+    }};
+    """)
     fd.write("    Simulator {\n")
     fd.write("      stamp: 0,\n")
     for init in simulator_init:
         fd.write(f"      {init}\n")
+    fd.write("      mem_interface: mem,\n")
+    fd.write("      _lib: lib,\n")
     fd.write("    }\n")
     fd.write("  }\n\n")
 
@@ -188,6 +207,12 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     # Generate simulate function
     fd.write("pub fn simulate() {\n")
     fd.write("  let mut sim = Simulator::new();\n")
+    fd.write(f"""
+     unsafe {{
+            sim.mem_interface
+                .init("{home}/testbench/simulator/configs/example_config.yaml");
+        }}
+    """)
 
     # Handle randomization if enabled
     if config.get('random', False):
@@ -282,6 +307,10 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
 
         sim.stamp += 50;
         sim.tick_registers();
+        unsafe {{
+            sim.mem_interface.frontend_tick();
+            sim.mem_interface.memory_tick();
+        }}
       }}
     """)
 

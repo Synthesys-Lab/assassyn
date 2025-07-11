@@ -67,6 +67,7 @@ def elaborate_impl(sys, config):
         cargo.write('num-bigint = "0.4"\n')
         cargo.write('num-traits = "0.2"\n')
         cargo.write('rand = "0.8"\n')
+        cargo.write('libloading = "0.7"\n')
 
     # Create rustfmt.toml if available
     rustfmt_src = None
