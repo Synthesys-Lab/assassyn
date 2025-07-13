@@ -299,7 +299,6 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
 
             elif intrinsic == Intrinsic.BARRIER:
                 code.append("/* Barrier */")
-            
             elif intrinsic == Intrinsic.MEM_READ:
                 array = node.args[0]
                 idx = node.args[1]
