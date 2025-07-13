@@ -33,7 +33,6 @@ RESTORE=`pwd`
 echo "Failed to install CIRCT via pip. Fall back to building from source."
 CURRENT_DIR_BEFORE_PYCDE_BUILD="$(pwd)"
 cd $ASSASSYN_HOME/3rd-party/circt
-git submodule update --init
 mkdir -p build 
 cd build
 cmake \

@@ -15,6 +15,8 @@ mkdir -p build
 cd build
 cmake ..
 make -j$(nproc)
+cp ./ramulator2 ../ramulator2
+cd ..
 
 if [ $? -ne 0 ]; then
   echo "Failed to build Ramulator2."
