@@ -191,6 +191,11 @@ class ElaborateModule(Visitor):
             value = dump_rval_ref(self.module_ctx, self.sys, node.val)
             module_writer = self.module_name
             self.modules_for_callback["MemUser_rdata"] = fifo_id
+            code.append(f"""{{
+              let stamp = sim.stamp;
+              sim.{fifo_id}.push.push(
+                FIFOPush::new(stamp + 50, {value}.clone(), "{module_writer}"));
+            }}""")
 
         elif isinstance(node, Log):
             mn = self.module_name
