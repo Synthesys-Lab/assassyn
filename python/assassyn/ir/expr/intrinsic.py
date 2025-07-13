@@ -10,6 +10,8 @@ INTRIN_INFO = {
     901: ('finish', 0, False, True),
     902: ('assert', 1, False, True),
     903: ('barrier', 1, False, True),
+    904: ('mem_read', 2, False, True),
+    905: ('mem_write', 3, False, True),
 }
 
 class Intrinsic(Expr):
@@ -19,6 +21,8 @@ class Intrinsic(Expr):
     FINISH = 901
     ASSERT = 902
     BARRIER = 903
+    MEM_READ = 904
+    MEM_WRITE = 905
 
     opcode: int  # Operation code for this intrinsic
 
@@ -79,3 +83,16 @@ def finish():
 def barrier(node):
     '''Barrier the current simulation state.'''
     return Intrinsic(Intrinsic.BARRIER, node)
+
+@ir_builder
+def mem_read(payload, addr):
+    '''Memory read operation.'''
+    print(f"mem_read: {payload}, {addr}")
+    return Intrinsic(Intrinsic.MEM_READ, payload, addr)
+
+@ir_builder
+def mem_write(payload, addr, wdata):
+    '''Memory write operation.'''
+    #pylint: disable=import-outside-toplevel
+    print(f"mem_write: {payload}, {addr}, {wdata}")
+    return Intrinsic(Intrinsic.MEM_WRITE, payload, addr, wdata)

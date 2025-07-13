@@ -6,6 +6,7 @@ from ..block import Condition
 from ..dtype import Bits
 from ..expr import Bind
 from ..value import Value
+from ..expr import mem_read, mem_write
 
 
 class SRAM(Downstream): # pylint: disable=too-many-instance-attributes
@@ -54,8 +55,10 @@ class SRAM(Downstream): # pylint: disable=too-many-instance-attributes
         self.wdata = wdata
 
         with Condition(we):
-            self.payload[addr] = wdata
+            # self.payload[addr] = wdata
+            mem_write(self.payload, addr, wdata)
         with Condition(re):
+            mem_read(self.payload, addr)
             self.bound = user.bind(rdata=self.payload[addr])
 
         return self.bound

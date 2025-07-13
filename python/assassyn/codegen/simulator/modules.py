@@ -49,6 +49,15 @@ class ElaborateModule(Visitor):
         self.indent = 0
         self.module_name = ""
         self.module_ctx = None
+        self.modules_for_callback = dict()
+    
+    def visit_module_for_callback(self, node: Module):
+        """Visit a module to collect module names for callback."""
+        self.module_name = node.name
+        self.module_ctx = node
+
+        body = self.visit_block(node.body)
+        return self.modules_for_callback
 
     def visit_module(self, node: Module):
         """Visit a module and generate its implementation."""
@@ -113,7 +122,17 @@ class ElaborateModule(Visitor):
             idx = node.idx
             array_name = namify(array.name)
             idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
+            # TODO: we can not read here, we need to call the rust callback function
             code.append(f"sim.{array_name}.payload[{idx_val} as usize].clone()")
+            # code.append(f"""{{
+            #     unsafe {{
+            #         let mem_interface = Arc::clone(&sim.mem_interface);
+            #         let success = mem_interface.as_ref().send_request({idx_val} as i64, false, rust_callback, sim as *const _ as *mut _,);
+            #         if !success {{
+            #             return false
+            #         }}
+            #     }}
+            # }}""")
 
         elif isinstance(node, ArrayWrite):
             array = node.array
@@ -124,12 +143,27 @@ class ElaborateModule(Visitor):
             idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
             value_val = dump_rval_ref(self.module_ctx, self.sys, value)
             module_writer = self.module_name
-
+            # self.modules_for_callback["memory"] = module_writer
+            # self.modules_for_callback["store"] = array_name
+            # TODO: if we assume the input size for write is only 32
             code.append(f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
               sim.{array_name}.write.push(
                 ArrayWrite::new(stamp, {idx_val} as usize, {value_val}.clone(), "{module_writer}"));
             }}""")
+            # code.append(f"""{{
+            #   unsafe {{
+            #     let mem_interface = Arc::clone(&sim.mem_interface);
+            #     let success = mem_interface.as_ref().send_request({idx_val} as i64, true, rust_callback, sim as *const _ as *mut _,);
+            #     if success {{
+            #         let stamp = sim.stamp - sim.stamp % 100 + 50;
+            #         sim.{array_name}.write.push(
+            #             ArrayWrite::new(stamp, {idx_val} as usize, {value_val}.clone(), "{module_writer}"));
+            #     }} else {{
+            #         sim.stamp = sim.stamp - sim.stamp % 100 + 50;
+            #     }}
+            #   }}
+            # }}""")
 
         elif isinstance(node, AsyncCall):
 
@@ -150,7 +184,11 @@ class ElaborateModule(Visitor):
             code.append(f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
               sim.{fifo_id}.pop.push(FIFOPop::new(stamp, "{module_name}"));
-              sim.{fifo_id}.payload.front().unwrap().clone()
+              //sim.{fifo_id}.payload.front().unwrap().clone()
+              match sim.{fifo_id}.payload.front() {{
+                Some(value) => value.clone(),
+                None => return false,
+              }}
             }}""")
 
         elif isinstance(node, PureIntrinsic):
@@ -181,11 +219,14 @@ class ElaborateModule(Visitor):
             value = dump_rval_ref(self.module_ctx, self.sys, node.val)
             module_writer = self.module_name
 
-            code.append(f"""{{
-              let stamp = sim.stamp;
-              sim.{fifo_id}.push.push(
-                FIFOPush::new(stamp + 50, {value}.clone(), "{module_writer}"));
-            }}""")
+            # self.modules_for_callback["memory"] = module_writer
+            self.modules_for_callback["MemUser_rdata"] = fifo_id
+            # TODO we probably do not need them, because rust_callback will do this job.
+            # code.append(f"""{{
+            #   let stamp = sim.stamp;
+            #   sim.{fifo_id}.push.push(
+            #     FIFOPush::new(stamp + 50, {value}.clone(), "{module_writer}"));
+            # }}""")
 
         elif isinstance(node, Log):
             mn = self.module_name
@@ -294,6 +335,49 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
 
             elif intrinsic == Intrinsic.BARRIER:
                 code.append("/* Barrier */")
+            
+            elif intrinsic == Intrinsic.MEM_READ:
+                array = node.args[0]
+                idx = node.args[1]
+                array_name = namify(array.name)
+                idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
+                module_writer = self.module_name
+                self.modules_for_callback["memory"] = module_writer
+                self.modules_for_callback["store"] = array_name
+                code.append(f"""{{
+                    unsafe {{
+                        let mem_interface = Arc::clone(&sim.mem_interface);
+                        let success = mem_interface.as_ref().send_request({idx_val} as i64, false, rust_callback, sim as *const _ as *mut _,);
+                        if !success {{
+                            return false
+                        }}
+                    }}
+                }}""")
+
+            elif intrinsic == Intrinsic.MEM_WRITE:
+                array = node.args[0]
+                idx = node.args[1]
+                value = node.args[2]
+                array_name = namify(array.name)
+                idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
+                value_val = dump_rval_ref(self.module_ctx, self.sys, value)
+                module_writer = self.module_name
+                self.modules_for_callback["memory"] = module_writer
+                self.modules_for_callback["store"] = array_name
+                code.append(f"""{{
+                    unsafe {{
+                        let mem_interface = Arc::clone(&sim.mem_interface);
+                        let success = mem_interface.as_ref().send_request({idx_val} as i64, true, rust_callback, sim as *const _ as *mut _,);
+                        if success {{
+                            let stamp = sim.stamp - sim.stamp % 100 + 50;
+                            sim.{array_name}.write.push(
+                                ArrayWrite::new(stamp, {idx_val} as usize, {value_val}.clone(), "{module_writer}"));
+                        }} else {{
+                            sim.stamp = sim.stamp - sim.stamp % 100 + 50;
+                        }}
+                    }}
+                }}""")
+
 
         # Format the result with proper indentation and variable assignment
         indent_str = " " * self.indent

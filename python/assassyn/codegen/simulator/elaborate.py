@@ -26,11 +26,36 @@ use super::runtime::*;
 use super::simulator::Simulator;
 use std::collections::VecDeque;
 use num_bigint::{BigInt, BigUint};
+use libloading::{Library, Symbol};
+use std::ffi::{CString, c_char, c_float, c_longlong, c_void};
+use std::sync::Arc;
     """)
 
     # Generate each module's implementation
+    dict_modules_callback = {}
     em = ElaborateModule(sys)
     for module in sys.modules[:] + sys.downstreams[:]:
+        # first time, try to write another visit module function to get the modules information for rust_callback.
+        dict_modules_callback = em.visit_module_for_callback(module)
+    
+    if dict_modules_callback.get("memory") is not None and dict_modules_callback.get("store") is not None and dict_modules_callback.get("MemUser_rdata") is not None:
+        fd.write(f"""
+extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
+    unsafe {{
+        let req = &*req;
+        let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
+        let cycles = (req.depart - req.arrive) as usize;
+        let stamp = sim.stamp;
+        sim.{dict_modules_callback.get("MemUser_rdata")}.push.push(FIFOPush::new(
+            stamp + 50 + 100 * cycles,
+            sim.{dict_modules_callback.get("store")}.payload[req.addr as usize].clone().try_into().unwrap(),
+            "{dict_modules_callback.get("memory")}",
+        ));
+    }}
+}}
+        """)
+    for module in sys.modules[:] + sys.downstreams[:]:
+        # Then, second time dump
         module_code = em.visit_module(module)
         fd.write(module_code)
 
