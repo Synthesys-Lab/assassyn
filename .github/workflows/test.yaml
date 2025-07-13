@@ -5,13 +5,13 @@ on:
   pull_request:
     branches:
       - master
-  workflow_dispatch:
+
 name: Test
 
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3
       - name: Build Container
@@ -23,12 +23,6 @@ jobs:
       - name: Initialize the Container
         run: |
           docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest ./init.sh
-      - name: Run Python Lint
-        run:
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest pylint --rcfile python/.pylintrc python/assassyn
-      - name: Python Frontend Unit Tests
-        run: |
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest pytest -n 8 python/unit-tests
       - name: Restore Verilator Cache
         id: cache-verilator 
         uses: actions/cache@v4
@@ -41,24 +35,13 @@ jobs:
         if: steps.cache-verilator.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building and installing Verilator"
-          docker run -v ${{ github.workspace }}:/app assassyn:latest \
-          /bin/zsh -c "
-          git config --global --add safe.directory /app/3rd-party/verilator
-          cd /app/3rd-party/verilator
-          mkdir ./install
-          git branch
-          pwd
-          ls -a
-          autoconf
-          ./configure --prefix=/app/3rd-party/verilator/install
-          make   
-          make install
-          "
+          docker run -v ${{ github.workspace }}:/app assassyn:latest /bin/zsh -c "source scripts/init/verilator.sh $@"
+          
       - name: Restore ramulator2 Cache
         id: cache-ramulator
         uses: actions/cache@v4
         with: 
-          path: ${{ github.workspace }}/3rd-party/ramulator2/build
+          path: ${{ github.workspace }}/3rd-party/ramulator2
           key: ${{ runner.os }}-ramulator-${{ hashFiles('ramulator2/.git/HEAD') }} 
           restore-keys: |
             ${{ runner.os }}-ramulator2- 
@@ -66,15 +49,39 @@ jobs:
         if: steps.cache-ramulator.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building and installing Ramulator2"
-          docker run -v ${{ github.workspace }}:/app assassyn:latest \
-          /bin/zsh -c "
-          mkdir build
-          cd build
-          cmake ..
-          make -j
-          cp ./ramulator2 ../ramulator2
-          cd ..
-          "
+          docker run -v ${{ github.workspace }}:/app assassyn:latest /bin/zsh -c "source scripts/init/ramulator2.sh"
+      - name: Restore circt Cache
+        id: cache-circt
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/3rd-party/circt/build
+          key: ${{ runner.os }}-circt-${{ hashFiles('circt/.git/HEAD') }} 
+          restore-keys: |
+            ${{ runner.os }}-circt- 
+      - name: Build and Install circt in Container #if cache miss
+        if: steps.cache-circt.outputs.cache-hit != 'true'
+        run: |
+          echo "Cache miss, building and installing circt"
+          docker run -v ${{ github.workspace }}:/app assassyn:latest /bin/zsh -c "source scripts/init/circt.sh $@"
+      - name: Restore wrapper Cache
+        id: cache-wrapper
+        uses: actions/cache@v4
+        with:   
+          path: ${{ github.workspace }}/testbench/simulator/build
+          key: ${{ runner.os }}-wrapper-${{ hashFiles('testbench/simulator/.git/HEAD') }}
+          restore-keys: |
+            ${{ runner.os }}-wrapper-
+      - name: Build and Install wrapper in Container #if cache miss
+        if: steps.cache-wrapper.outputs.cache-hit != 'true'
+        run: |
+          echo "Cache miss, building and installing wrapper"
+          docker run -v ${{ github.workspace }}:/app assassyn:latest /bin/zsh -c "source scripts/init/wrapper.sh"
+      - name: Run Python Lint
+        run:
+          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest pylint --rcfile python/.pylintrc python/assassyn
+      - name: Python Frontend Unit Tests
+        run: |
+          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest pytest -n 8 python/unit-tests
       - name: Cleanup Containers
         run: |
           docker rm -f $(docker ps -a --filter ancestor=assassyn:latest -q) 2>/dev/null || true
