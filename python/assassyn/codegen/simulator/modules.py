@@ -50,7 +50,6 @@ class ElaborateModule(Visitor):
         self.module_name = ""
         self.module_ctx = None
         self.modules_for_callback = dict()
-    
     def visit_module_for_callback(self, node: Module):
         """Visit a module to collect module names for callback."""
         self.module_name = node.name
@@ -124,15 +123,6 @@ class ElaborateModule(Visitor):
             idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
             # TODO: we can not read here, we need to call the rust callback function
             code.append(f"sim.{array_name}.payload[{idx_val} as usize].clone()")
-            # code.append(f"""{{
-            #     unsafe {{
-            #         let mem_interface = Arc::clone(&sim.mem_interface);
-            #         let success = mem_interface.as_ref().send_request({idx_val} as i64, false, rust_callback, sim as *const _ as *mut _,);
-            #         if !success {{
-            #             return false
-            #         }}
-            #     }}
-            # }}""")
 
         elif isinstance(node, ArrayWrite):
             array = node.array
@@ -151,19 +141,6 @@ class ElaborateModule(Visitor):
               sim.{array_name}.write.push(
                 ArrayWrite::new(stamp, {idx_val} as usize, {value_val}.clone(), "{module_writer}"));
             }}""")
-            # code.append(f"""{{
-            #   unsafe {{
-            #     let mem_interface = Arc::clone(&sim.mem_interface);
-            #     let success = mem_interface.as_ref().send_request({idx_val} as i64, true, rust_callback, sim as *const _ as *mut _,);
-            #     if success {{
-            #         let stamp = sim.stamp - sim.stamp % 100 + 50;
-            #         sim.{array_name}.write.push(
-            #             ArrayWrite::new(stamp, {idx_val} as usize, {value_val}.clone(), "{module_writer}"));
-            #     }} else {{
-            #         sim.stamp = sim.stamp - sim.stamp % 100 + 50;
-            #     }}
-            #   }}
-            # }}""")
 
         elif isinstance(node, AsyncCall):
 
@@ -218,15 +195,7 @@ class ElaborateModule(Visitor):
             fifo_id = fifo_name(fifo)
             value = dump_rval_ref(self.module_ctx, self.sys, node.val)
             module_writer = self.module_name
-
-            # self.modules_for_callback["memory"] = module_writer
             self.modules_for_callback["MemUser_rdata"] = fifo_id
-            # TODO we probably do not need them, because rust_callback will do this job.
-            # code.append(f"""{{
-            #   let stamp = sim.stamp;
-            #   sim.{fifo_id}.push.push(
-            #     FIFOPush::new(stamp + 50, {value}.clone(), "{module_writer}"));
-            # }}""")
 
         elif isinstance(node, Log):
             mn = self.module_name

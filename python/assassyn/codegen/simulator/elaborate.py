@@ -35,10 +35,9 @@ use std::sync::Arc;
     dict_modules_callback = {}
     em = ElaborateModule(sys)
     for module in sys.modules[:] + sys.downstreams[:]:
-        # first time, try to write another visit module function to get the modules information for rust_callback.
         dict_modules_callback = em.visit_module_for_callback(module)
-    
-    if dict_modules_callback.get("memory") is not None and dict_modules_callback.get("store") is not None and dict_modules_callback.get("MemUser_rdata") is not None:
+    required_keys = ["memory", "store", "MemUser_rdata"]
+    if all(dict_modules_callback.get(k) is not None for k in required_keys):
         fd.write(f"""
 extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
     unsafe {{
