@@ -49,13 +49,12 @@ class ElaborateModule(Visitor):
         self.indent = 0
         self.module_name = ""
         self.module_ctx = None
-        self.modules_for_callback = dict()
+        self.modules_for_callback = {}
     def visit_module_for_callback(self, node: Module):
         """Visit a module to collect module names for callback."""
         self.module_name = node.name
         self.module_ctx = node
-
-        body = self.visit_block(node.body)
+        self.visit_block(node.body)
         return self.modules_for_callback
 
     def visit_module(self, node: Module):
@@ -121,7 +120,6 @@ class ElaborateModule(Visitor):
             idx = node.idx
             array_name = namify(array.name)
             idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
-            # TODO: we can not read here, we need to call the rust callback function
             code.append(f"sim.{array_name}.payload[{idx_val} as usize].clone()")
 
         elif isinstance(node, ArrayWrite):
@@ -133,9 +131,6 @@ class ElaborateModule(Visitor):
             idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
             value_val = dump_rval_ref(self.module_ctx, self.sys, value)
             module_writer = self.module_name
-            # self.modules_for_callback["memory"] = module_writer
-            # self.modules_for_callback["store"] = array_name
-            # TODO: if we assume the input size for write is only 32
             code.append(f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
               sim.{array_name}.write.push(
