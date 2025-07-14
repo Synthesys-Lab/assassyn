@@ -13,10 +13,6 @@ jobs:
     name: Test
     runs-on: self-hosted
     steps:
-      - name: Force Cleanup Repository Directory
-        run: |
-          sudo rm -rf "${{ github.workspace }}"/* 
-          sudo rm -rf "${{ github.workspace }}"/.git 
       - uses: actions/checkout@v3
       - name: Build Container
         run: docker build -t assassyn:latest .
