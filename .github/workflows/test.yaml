@@ -22,7 +22,7 @@ jobs:
           docker container rm assassyn || true
       - name: Initialize the Container
         run: |
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest ./init.sh
+          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest git submodule update --init
       - name: Restore Verilator Cache
         id: cache-verilator 
         uses: actions/cache@v4
