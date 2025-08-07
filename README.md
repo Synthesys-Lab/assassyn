@@ -14,6 +14,12 @@ of coding, tooling, and development, where this repo is located
 in your _physical_ machine, while the execution is in the docker _virtual_
 machine (VM).
 
+Still, before doing anything, make sure you have this repo fully initialized:
+
+````sh
+git submodule update --init --recursive
+````
+
 ### Build the Docker Image
 
 Assuming you are at the root of this source tree:
@@ -45,7 +51,7 @@ docker run --rm -tid -v `pwd`:/app --user $(id -u):$(id -g) \
 If it is the first time, the repo should be initialized using the command below.
 
 ```sh
-docker exec -it ./init.sh \
+docker exec -it ./build.sh \
     --llvm-compile-jobs 16 \
     --llvm-tbg-jobs 16 \
     --llvm-link-jobs 1
