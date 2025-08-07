@@ -25,7 +25,7 @@ def process_naming(expr, line_of_code: str, lineno: int) -> typing.Dict[str, typ
     naming_manager = Singleton.naming_manager
     try:
         parsed_ast = ast.parse(line_of_code)
-        print(ast.dump(parsed_ast, indent=4))
+        # print(ast.dump(parsed_ast, indent=4))
         if parsed_ast.body and isinstance(parsed_ast.body[0], ast.Assign):
             assign_node = parsed_ast.body[0]
 
