@@ -6,12 +6,14 @@ import typing
 
 from ..builder import ir_builder, Singleton
 from .dtype import to_uint, RecordValue, Record
-from .expr import ArrayRead, ArrayWrite, Expr
+from .expr import ArrayRead, ArrayWrite, Expr,BinaryOp
 from .value import Value
 from ..utils import identifierize
+from .writeport import WritePort,PartitionedWritePort
 
 if typing.TYPE_CHECKING:
     from .dtype import DType
+    from .module.base import ModuleBase
 
 def RegArray( #pylint: disable=invalid-name,too-many-arguments
         scalar_ty: DType,
@@ -54,6 +56,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
     _users: typing.List[Expr]  # Users of the array
     _name: str  # Internal name storage
     _partition: list # Partitioned arrays
+    _write_ports: typing.Dict['ModuleBase', 'WritePort'] = {} # Write ports for this array
 
     FULLY_PARTITIONED = 1
 
@@ -88,12 +91,14 @@ class Array:  #pylint: disable=too-many-instance-attributes
         self._name = None
         self._partition = None
         self._users = []
+        self._write_ports = {}
         if partition == 'full':
             self._partition = []
             self.attr = [self.FULLY_PARTITIONED]
             for i in range(size):
                 init = initializer[i] if initializer is not None else 0
-                self._partition.append(Array(scalar_ty, 1, [init], None))
+                sub_array = Array(scalar_ty, 1, [init], None)
+                self._partition.append(sub_array)
                 self._partition[i].name = f'{self.name}_{i}'
                 self._partition[i].parent = self
 
@@ -102,13 +107,48 @@ class Array:  #pylint: disable=too-many-instance-attributes
         '''Get the users of the array.'''
         return self._users
 
+    def __and__(self, other):
+        '''
+        Overload & operator to create WritePort when combined with a Module.
+        This enables multi-port write access: (array & module)[idx] <= value
+        '''
+        from .module.base import ModuleBase #pylint: disable=import-outside-toplevel
+        if self._partition is not None:
+            return PartitionedWritePort(self, other)
+
+        if isinstance(other, ModuleBase):
+            if other in self._write_ports:
+                return self._write_ports[other]
+
+            return WritePort(self, other)
+
+        # Fall back to regular bitwise AND with Value
+        if isinstance(other, Value):
+            return BinaryOp(BinaryOp.BITWISE_AND, self, other)
+
+        raise TypeError(f"Cannot AND Array with {type(other)}")
+
     def __repr__(self):
+        '''Enhanced repr to show write port information'''
         res = f'array {self.name}[{self.scalar_ty}; {self.size}] ='
+
+        # Add write port information if any
+        if hasattr(self, '_write_ports') and self._write_ports:
+            port_info = f' /* {len(self._write_ports)} write ports: '
+            port_info += ', '.join(m.name for m in self._write_ports)
+            port_info += ' */'
+            res += port_info
+
         if self._partition is None:
             return res + f' {self.initializer}'
         res += ' [ '
         for i in range(self.size):
+            res += '\n'
             res += f'{self._partition[i].name}, '
+            if self._partition[i]._write_ports:
+                res += f'write_ports: /* {len(self._partition[i]._write_ports)}: '
+                res += ', '.join(m.name for m in self._partition[i]._write_ports)
+                res += ' */'
         return res + ' ]'
 
     @property
@@ -122,6 +162,14 @@ class Array:  #pylint: disable=too-many-instance-attributes
         #pylint: disable=import-outside-toplevel
         from .dtype import UInt
         return UInt(self.index_bits)
+
+    def get_write_ports(self):
+        '''Get the write_ports.'''
+        return getattr(self, '_write_ports', {})
+
+    def has_multi_port_writes(self):
+        '''check if there are multiple write_ports.'''
+        return len(self.get_write_ports()) > 1
 
     @ir_builder
     def __getitem__(self, index: typing.Union[int, Value]):
