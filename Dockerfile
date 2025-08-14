@@ -31,20 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set default shell to zsh
 SHELL ["/bin/zsh", "-c"]
 
-RUN pip install \
-    pycde \
-    cocotb==1.9.2 \
-    numpy \
-    decorator==5.1.1 \
-    pytest==7.4.3 \
-    pylint==3.2.3 \
-    pytest-xdist==3.6.1 \
-    nanobind==2.7.0 \
-    --pre \
-    --break-system-packages
-
 # You can use the following command instead
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
 # Set build environment variables
 ENV CC="ccache gcc"
 ENV CXX="ccache g++"
@@ -59,11 +48,7 @@ ENV PYTHONPATH="/app/python"
 WORKDIR /app
 
 # Ensure setup.sh is sourced on shell startup if it exists
-RUN echo '[ -f /app/setup.sh ] && source /app/setup.sh --no-verilator' >> /root/.zshrc
+RUN echo '[ -f /app/setup.sh ] && source /app/setup.sh' >> /root/.zshrc
 
 # Define the default command
 CMD ["/bin/zsh"]
-
-RUN ls /usr/local/bin/pylint*
-RUN echo $PATH
-
