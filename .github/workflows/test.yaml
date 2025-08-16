@@ -23,6 +23,11 @@ jobs:
       - name: Initialize the Container
         run: |
           docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest git submodule update --init
+
+      - name: Install Python Packages
+        run: |
+          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest /bin/zsh -c "source scripts/init/py-package.sh"
+
       - name: Restore Verilator Cache
         id: cache-verilator 
         uses: actions/cache@v4
@@ -31,9 +36,7 @@ jobs:
           key: ${{ runner.os }}-verilator-${{ hashFiles('verilator/.git/HEAD') }} 
           restore-keys: |
             ${{ runner.os }}-verilator- 
-      - name: Install Python Packages
-        run: |
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest /bin/zsh -c "source scripts/init/py-package.sh"
+
       - name: Build and Install Verilator in Container #if cache miss
         if: steps.cache-verilator.outputs.cache-hit != 'true'
         run: |
@@ -81,7 +84,7 @@ jobs:
           docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest /bin/zsh -c "source scripts/init/wrapper.sh"
       - name: Run Python Lint
         run:
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest pylint --rcfile python/.pylintrc python/assassyn
+          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest python -m pylint --rcfile python/.pylintrc python/assassyn
       - name: Python Frontend Unit Tests
         run: |
           docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest pytest -n 8 python/unit-tests
