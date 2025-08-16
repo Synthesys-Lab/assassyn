@@ -31,6 +31,9 @@ jobs:
           key: ${{ runner.os }}-verilator-${{ hashFiles('verilator/.git/HEAD') }} 
           restore-keys: |
             ${{ runner.os }}-verilator- 
+      - name: Install Python Packages
+        run: |
+          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest /bin/zsh -c "source scripts/init/py-package.sh"
       - name: Build and Install Verilator in Container #if cache miss
         if: steps.cache-verilator.outputs.cache-hit != 'true'
         run: |
