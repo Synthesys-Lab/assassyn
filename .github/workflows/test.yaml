@@ -7,7 +7,7 @@ on:
       - master
 
 env:
-  ASSASSYN_DOCKER: ${{ env.ASSASSYN_DOCKER }}
+  ASSASSYN_DOCKER: docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest
 
 name: Test
 
