@@ -31,6 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set default shell to zsh
 SHELL ["/bin/zsh", "-c"]
 
+RUN pip install pylint==3.2.3
+
 # You can use the following command instead
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
