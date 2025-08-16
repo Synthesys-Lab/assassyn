@@ -14,6 +14,12 @@ of coding, tooling, and development, where this repo is located
 in your _physical_ machine, while the execution is in the docker _virtual_
 machine (VM).
 
+Still, before doing anything, make sure you have this repo fully initialized:
+
+````sh
+git submodule update --init --recursive
+````
+
 ### Build the Docker Image
 
 Assuming you are at the root of this source tree:

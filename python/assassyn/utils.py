@@ -1,6 +1,6 @@
 '''The untilities for the project'''
 
-import timeit
+# import timeit
 import os
 import subprocess
 
@@ -50,25 +50,31 @@ def run_simulator(manifest_path, offline=False, release=True):
     res = _cmd_wrapper(cmd)
     return res
 
-def run_verilator(path, count_time=False):
+def run_verilator(path):
     '''The helper function to run the verilator'''
-    restore = os.getcwd()
+    # restore = os.getcwd()
     os.chdir(path)
-    cmd = ['make', 'main', '-j']
-    subprocess.check_output(cmd).decode('utf-8')
-    # TODO(@were): Fix this hardcoded Vtb later.
-    cmd = ['./obj_dir/Vtb']
-    res = _cmd_wrapper(cmd)
-    if count_time:
-        a = timeit.timeit(lambda: _cmd_wrapper(cmd), number=5)
-        os.chdir(restore)
-        return (res, a)
-    os.chdir(restore)
+    cmd_design = ['python3', 'design.py']
+    subprocess.check_output(cmd_design)
+
+    cmd_tb = ['python3', 'tb.py']
+    res = _cmd_wrapper(cmd_tb)
+    # cmd = ['make', 'main', '-j']
+    # subprocess.check_output(cmd).decode('utf-8')
+    # # TODO(@were): Fix this hardcoded Vtb later.
+    # cmd = ['./obj_dir/Vtb']
+    # res = _cmd_wrapper(cmd)
+    # if count_time:
+    #     a = timeit.timeit(lambda: _cmd_wrapper(cmd), number=5)
+    #     os.chdir(restore)
+    #     return (res, a)
+    # os.chdir(restore)
     return res
 
 def parse_verilator_cycle(toks):
     '''Helper function to parse verilator dumped cycle'''
-    return int(toks[0]) // 100
+    # return int(toks[0]) // 100
+    return int(toks[2][1:-4])
 
 def parse_simulator_cycle(toks):
     '''Helper function to parse rust-simulator dumped cycle'''

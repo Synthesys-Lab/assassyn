@@ -43,6 +43,7 @@ class Operand:
 class Expr(Value):
     '''The frontend base node for expressions'''
 
+    source_name: str
     opcode: int  # Operation code for this expression
     loc: str  # Source location information
     parent: typing.Optional[Block]  # Parent block of this expression
@@ -60,6 +61,7 @@ class Expr(Value):
         from ..dtype import RecordValue
         self.opcode = opcode
         self.loc = self.parent = None
+        self.source_name = None
         # NOTE: We only wrap values in Operand, not Ports or Arrays
         self._operands = []
         for i in operands:
@@ -91,6 +93,8 @@ class Expr(Value):
 
     def as_operand(self):
         '''Dump the expression as an operand'''
+        if self.source_name is not None:
+            return f'{self.source_name}'
         return f'_{namify(identifierize(self))}'
 
     def is_binary(self):

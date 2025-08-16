@@ -298,6 +298,11 @@ class RecordValue:
         '''Return the payload as an operand'''
         return self._payload.as_operand()
 
+    @property
+    def dtype(self):
+        '''Return the Record type of this value.'''
+        return self._dtype
+
     def __repr__(self):
         return f'RecordValue({self._dtype}, {self._payload})'
 

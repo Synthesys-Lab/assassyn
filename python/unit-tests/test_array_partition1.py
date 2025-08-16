@@ -44,7 +44,7 @@ def test_array_partition1():
 
     print(sys)
 
-    simulator_path, verilator_path = elaborate(sys, verilog=False)
+    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
 
     raw = utils.run_simulator(simulator_path)
     check(raw, utils.parse_simulator_cycle)

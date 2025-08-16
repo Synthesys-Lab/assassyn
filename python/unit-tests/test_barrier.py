@@ -108,6 +108,10 @@ def impl(is_gold):
     simulator_path, verilator_path  = elaborate(sys, **config)
     raw = utils.run_simulator(simulator_path)
 
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
+
+
 def test_barrier():
     impl(False)
 

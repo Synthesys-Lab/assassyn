@@ -6,6 +6,9 @@ on:
     branches:
       - master
 
+env:
+  ASSASSYN_DOCKER: docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest
+
 name: Test
 
 jobs:
@@ -22,7 +25,8 @@ jobs:
           docker container rm assassyn || true
       - name: Initialize the Container
         run: |
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest ./init.sh
+          ${{ env.ASSASSYN_DOCKER }} git submodule update --init
+
       - name: Restore Verilator Cache
         id: cache-verilator 
         uses: actions/cache@v4
@@ -31,11 +35,12 @@ jobs:
           key: ${{ runner.os }}-verilator-${{ hashFiles('verilator/.git/HEAD') }} 
           restore-keys: |
             ${{ runner.os }}-verilator- 
+
       - name: Build and Install Verilator in Container #if cache miss
         if: steps.cache-verilator.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building and installing Verilator"
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest /bin/zsh -c "source scripts/init/verilator.sh $@"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/verilator.sh $@"
           
       - name: Restore ramulator2 Cache
         id: cache-ramulator
@@ -49,7 +54,7 @@ jobs:
         if: steps.cache-ramulator.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building and installing Ramulator2"
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest /bin/zsh -c "source scripts/init/ramulator2.sh"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/ramulator2.sh"
       - name: Restore circt Cache
         id: cache-circt
         uses: actions/cache@v4
@@ -62,7 +67,7 @@ jobs:
         if: steps.cache-circt.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building and installing circt"
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest /bin/zsh -c "source scripts/init/circt.sh $@"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/circt.sh $@"
       - name: Restore wrapper Cache
         id: cache-wrapper
         uses: actions/cache@v4
@@ -75,13 +80,13 @@ jobs:
         if: steps.cache-wrapper.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building and installing wrapper"
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest /bin/zsh -c "source scripts/init/wrapper.sh"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/wrapper.sh"
       - name: Run Python Lint
         run:
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest pylint --rcfile python/.pylintrc python/assassyn
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/py-package.sh && python -m pylint --rcfile python/.pylintrc python/assassyn"
       - name: Python Frontend Unit Tests
         run: |
-          docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest pytest -n 8 python/unit-tests
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/py-package.sh && python -m pytest -n 8 python/unit-tests"
       - name: Cleanup Containers
         run: |
           docker rm -f $(docker ps -a --filter ancestor=assassyn:latest -q) 2>/dev/null || true

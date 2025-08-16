@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import shutil
 from .testbench import generate_testbench
 from .design import generate_design
 
@@ -34,6 +35,22 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
 
     logs = generate_design(path / "design.py", sys)
 
+
     generate_testbench(path / "tb.py", sys, kwargs['sim_threshold'], logs)
+
+
+    default_home = os.getenv('ASSASSYN_HOME', os.getcwd())
+    resource_path = Path(default_home) / "python/assassyn/codegen/verilog"
+
+    files_to_copy = ["fifo.sv", "trigger_counter.sv"]
+    for file_name in files_to_copy:
+        source_file = resource_path / file_name
+
+        if source_file.is_file():
+            destination_file = path / file_name
+            shutil.copy(source_file, destination_file)
+            print(f"Copied {source_file} to {destination_file}")
+        else:
+            print(f"Warning: Resource file not found: {source_file}")
 
     return path

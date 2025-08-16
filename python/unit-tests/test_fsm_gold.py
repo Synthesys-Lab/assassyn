@@ -74,7 +74,8 @@ def test_fsm_gold():
     simulator_path, verilator_path  = elaborate(sys, **config)
 
     raw = utils.run_simulator(simulator_path)
-
+    if verilator_path:
+        raw = utils.run_verilator(verilator_path)
 
 
 if __name__ == '__main__':

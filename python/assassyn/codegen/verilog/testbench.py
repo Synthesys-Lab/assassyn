@@ -5,10 +5,13 @@ from typing import List
 from ...builder import SysBuilder
 
 TEMPLATE = '''
+import os
+from pathlib import Path
+
 import cocotb
 from cocotb.triggers import Timer
 from cocotb.runner import get_runner
-from cocotb.log import Path
+
 
 
 @cocotb.test()
@@ -19,21 +22,23 @@ async def test_tb(dut):
     await Timer(500, units="ns")
     dut.clk.value = 0
     dut.rst.value = 0
-
+    await Timer(500, units="ns")
     for cycle in range({}):
-        await Timer(500, units="ns")
+        
         dut.clk.value = 1
-        {}
+       
         await Timer(500, units="ns")
         dut.clk.value = 0
+        await Timer(500, units="ns")
+        {}
 
 
 def runner():
     sim = 'verilator'
-    path = Path('./{}/hw')
+    path = Path('./sv/hw')
     with open(path / 'filelist.f', 'r') as f:
         srcs = [path / i.strip() for i in f.readlines()]
-    srcs = srcs + ['common.sv']
+    srcs = srcs + ['fifo.sv', 'trigger_counter.sv']
     runner = get_runner(sim)
     runner.build(sources=srcs, hdl_toplevel='Top', always=True)
     runner.test(hdl_toplevel='Top', test_module='tb')

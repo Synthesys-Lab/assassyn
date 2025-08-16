@@ -5,4 +5,7 @@ examples/*/__pycache__/
 /.vscode
 *.log
 
+testbench/simulator/ext
+testbench/simulator/build
+
 **/.claude/settings.local.json

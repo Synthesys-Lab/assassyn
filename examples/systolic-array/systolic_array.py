@@ -3,7 +3,6 @@ import re
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
-from assassyn.expr import Bind
 
 #  # PE Array (4 + 1) x (4 + 1)
 #           [Pusher]      [Pusher]      [Pusher]      [Pusher]
@@ -35,7 +34,7 @@ class ComputePE(Module):
         self.acc = RegArray(Int(19), 1)
 
     @module.combinational
-    def build(self, east: Bind, south: Bind):
+    def build(self, east, south):
         west, north = self.pop_all_ports(False)
         acc = self.acc
         val = acc[0]
@@ -64,7 +63,7 @@ class Pusher(Module):
         self.name = f'{prefix}_Pusher_{idx}'
 
     @module.combinational
-    def build(self, direction: str, dest: Bind):
+    def build(self, direction: str, dest):
         data = self.pop_all_ports(False)
         log(f"{self.name} pushes {{}}", data)
         kwargs = {direction: data}

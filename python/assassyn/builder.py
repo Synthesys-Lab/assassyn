@@ -7,13 +7,70 @@ import os
 import typing
 import site
 import inspect
+import ast
+import logging
 from decorator import decorator
+from .namify import NamingManager
 
 if typing.TYPE_CHECKING:
     from .ir.module import Module
     from .ir.array import Array
     from .ir.dtype import DType
     from .ir.value import Value
+
+def process_naming(expr, line_of_code: str, lineno: int) -> typing.Dict[str, typing.Any]:
+    """Process naming for an expression based on line context"""
+
+    line_expression_tracker = Singleton.line_expression_tracker
+    naming_manager = Singleton.naming_manager
+    try:
+        parsed_ast = ast.parse(line_of_code)
+        # print(ast.dump(parsed_ast, indent=4))
+        if parsed_ast.body and isinstance(parsed_ast.body[0], ast.Assign):
+            assign_node = parsed_ast.body[0]
+
+            if lineno not in line_expression_tracker:
+                line_expression_tracker[lineno] = {
+                    'expressions': [],
+                    'assign_node': assign_node,
+                    'names_generated': False,
+                    'generated_names': []
+                }
+            line_data = line_expression_tracker[lineno]
+
+            if  line_data['names_generated'] and expr.opcode == 800:
+                line_data = line_expression_tracker[lineno]
+                expr_position = len(line_data['expressions']) - 1
+                generated_names = line_data['generated_names']
+                if expr_position < len(generated_names):
+                    return f"{generated_names[expr_position]}_cast"
+
+            line_data['expressions'].append(expr)
+
+            if not line_data['names_generated']:
+                generated_names = naming_manager.generate_source_names(
+                    lineno, assign_node
+                )
+                line_data['generated_names'] = generated_names
+                line_data['names_generated'] = True
+
+            expr_position = len(line_data['expressions']) - 1
+            generated_names = line_data['generated_names']
+
+            if expr_position < len(generated_names):
+                source_name = generated_names[expr_position]
+            else:
+                base_name = generated_names[0] if generated_names else "expr"
+                source_name = f"tmp_{base_name}_{expr_position}"
+
+            return source_name
+
+    except SyntaxError as e:
+        logging.warning("Failed to parse line due to SyntaxError: %s", e)
+
+
+    return None
+
 
 @decorator
 def ir_builder(func, *args, **kwargs):
@@ -47,6 +104,16 @@ def ir_builder(func, *args, **kwargs):
             and not any(fname_abs.startswith(exclude_dir) \
                          for exclude_dir in Singleton.all_dirs_to_exclude):
             res.loc = f'{fname}:{lineno}'
+
+            if isinstance(res, Expr):
+                if res.is_valued() and i.code_context:
+                    line_of_code = i.code_context[0].strip()
+
+                    naming_result = process_naming(
+                    res, line_of_code, lineno
+                )
+                    if naming_result:
+                        res.source_name = naming_result
             break
     assert hasattr(res, 'loc')
     return res
@@ -62,6 +129,8 @@ class SysBuilder:
     arrays: typing.List[Array]  # List of arrays
     _ctx_stack: dict  # Stack for context tracking
     _exposes: dict  # Dictionary of exposed nodes
+    line_expression_tracker: dict  # Dictionary of line expression tracker
+    naming_manager: NamingManager  # Naming manager
 
     @property
     def current_module(self):
@@ -111,6 +180,8 @@ class SysBuilder:
         self.arrays = []
         self._ctx_stack = {'module': [], 'block': []}
         self._exposes = {}
+        self.line_expression_tracker = {}
+        self.naming_manager = NamingManager()
 
     def expose_on_top(self, node, kind=None):
         '''Expose the given node in the top function with the given kind.'''
@@ -125,12 +196,16 @@ class SysBuilder:
         '''Designate the scope of this system builder.'''
         assert Singleton.builder is None
         Singleton.builder = self
+        Singleton.line_expression_tracker = self.line_expression_tracker
+        Singleton.naming_manager = self.naming_manager
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         '''Leave the scope of this system builder.'''
         assert Singleton.builder is self
         Singleton.builder = None
+        Singleton.line_expression_tracker = None
+        Singleton.naming_manager = None
 
     def __repr__(self):
         body = '\n\n'.join(map(repr, self.modules))
