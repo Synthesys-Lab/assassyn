@@ -51,7 +51,7 @@ docker run --rm -tid -v `pwd`:/app --user $(id -u):$(id -g) \
 If it is the first time, the repo should be initialized using the command below.
 
 ```sh
-docker exec -it ./build.sh \
+docker exec -it ./init.sh \
     --llvm-compile-jobs 16 \
     --llvm-tbg-jobs 16 \
     --llvm-link-jobs 1
