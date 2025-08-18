@@ -49,7 +49,6 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
         if source_file.is_file():
             destination_file = path / file_name
             shutil.copy(source_file, destination_file)
-            print(f"Copied {source_file} to {destination_file}")
         else:
             print(f"Warning: Resource file not found: {source_file}")
 

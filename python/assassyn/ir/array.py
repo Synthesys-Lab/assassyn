@@ -6,7 +6,7 @@ import typing
 
 from ..builder import ir_builder, Singleton
 from .dtype import to_uint, RecordValue, Record
-from .expr import ArrayRead, ArrayWrite, Expr,BinaryOp
+from .expr import ArrayRead, Expr,BinaryOp
 from .value import Value
 from ..utils import identifierize
 from .writeport import WritePort,PartitionedWritePort
@@ -206,7 +206,10 @@ class Array:  #pylint: disable=too-many-instance-attributes
                 index = to_uint(index)
             assert isinstance(index, Value)
             assert isinstance(value, (Value, RecordValue)), type(value)
-            return ArrayWrite(self, index, value)
+            current_module = Singleton.builder.current_module
+
+            write_port = self & current_module
+            return write_port._create_write(index, value)
 
         # If the index is an integer, set the value in the partitioned array
         if isinstance(index, int):
