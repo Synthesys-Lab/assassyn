@@ -102,6 +102,7 @@ class UInt(DType):
 
     def __init__(self, bits: int):
         assert isinstance(bits, int), 'Expecting an integer for the bitwidth'
+        bits = max(bits, 1)
         super().__init__(bits)
 
     def __repr__(self):

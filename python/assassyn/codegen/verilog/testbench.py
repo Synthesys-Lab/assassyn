@@ -22,14 +22,16 @@ async def test_tb(dut):
     await Timer(500, units="ns")
     dut.clk.value = 0
     dut.rst.value = 0
+    _ , rst_time_ns = cocotb.simulator.get_sim_time()
     await Timer(500, units="ns")
     for cycle in range({}):
-        
         dut.clk.value = 1
-       
         await Timer(500, units="ns")
         dut.clk.value = 0
         await Timer(500, units="ns")
+        _ , sim_time_ns = cocotb.simulator.get_sim_time()
+        sim_time_ns -= rst_time_ns
+        current_cycle = sim_time_ns // 1000000
         {}
 
 

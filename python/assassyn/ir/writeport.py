@@ -86,41 +86,80 @@ class IndexedWritePort:
         self.write_port = write_port
         self.index = index
 
-
-    def __le__(self, other):
+    def __le__(self, value):
         '''
         Overload <= operator for non-blocking assignment syntax.
         '''
-        value = other
         return self.write_port._create_write(self.index, value)
 
-class PartitionedWritePort:
+class PartitionedIndexedWritePort(IndexedWritePort):
+    '''
+    A proxy object for handling dynamic index writes to partitioned arrays.
+    '''
+    def __init__(self, write_port, index):
+        super().__init__(write_port, index)
+
+    def __le__(self, value):
+        '''
+        Handle the <= operator for dynamic index writes to partitioned arrays.
+        '''
+        from .block import Condition
+        from .dtype import UInt
+
+        arr = self.write_port.array
+        idx_ty = UInt(arr.index_bits)
+
+        # Create conditional writes for each partition
+        for i in range(arr.size):
+            with Condition(self.index.bitcast(idx_ty) == to_uint(i, arr.index_bits)):
+                sub_array = arr._partition[i]
+                write_port = self.write_port._sub_array_ports[sub_array]
+                write_port._create_write(0, value)
+
+        return None
+
+class PartitionedWritePort(WritePort):
     '''
     A specialized WritePort for partitioned arrays.
     '''
     def __init__(self, array, module):
-
+        super().__init__(array, module)
         assert array._partition is not None, "This must be used with a partitioned array."
-        self.array = array
-        self.module = module
+        self._sub_array_ports = {}
+        for sub_array in array._partition:
+            self._sub_array_ports[sub_array] = WritePort(sub_array, module)
 
     def __getitem__(self, index):
         if isinstance(index, int):
             # Get the correct sub-array and its corresponding WritePort
             sub_array = self.array._partition[index]
-            write_port = WritePort(sub_array, self.module)
-            return write_port.__getitem__(0) # write to index 0 of the single-element sub_array
+            if self.module not in sub_array._write_ports:
+                sub_array._write_ports[self.module] = self._sub_array_ports[sub_array]
+            write_port = sub_array._write_ports[self.module]
+            return write_port.__getitem__(0)
 
-        from .block import Condition  # pylint: disable=import-outside-toplevel
-        from .dtype import UInt  # pylint: disable=import-outside-toplevel
+        return PartitionedIndexedWritePort(self, index)
+
+
+    def __setitem__(self, index, value):
+        '''
+        Handles the `(a&self)[0] = v` syntax directly for partitioned arrays.
+        '''
+        if isinstance(index, int):
+            sub_array = self.array._partition[index]
+            write_port = self._sub_array_ports[sub_array]
+            return write_port._create_write(0, value)
+
+        from .block import Condition
+        from .dtype import UInt
         arr = self.array
         idx_ty = UInt(arr.index_bits)
         for i in range(arr.size):
             with Condition(index.bitcast(idx_ty) == to_uint(i, arr.index_bits)):
-                # Get the correct sub-array and its corresponding WritePort
                 sub_array = arr._partition[i]
-                write_port = WritePort(sub_array, self.module)
-                return write_port.__getitem__(0) # write to index 0 of the single-element sub_array
+                write_port = self._sub_array_ports[sub_array]
+                write_port._create_write(0, value)
+        return None
 
 class MultiPortArrayWrite(ArrayWrite):
     '''

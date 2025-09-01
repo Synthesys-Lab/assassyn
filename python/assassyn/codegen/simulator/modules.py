@@ -1,6 +1,4 @@
-"""Module elaboration for simulator code generation."""
-
-#pylint: disable=cyclic-import
+"""Module elaboration for simulator code generation with multi-port write support."""
 
 from __future__ import annotations
 
@@ -35,12 +33,10 @@ from ...analysis import expr_externally_used
 
 if typing.TYPE_CHECKING:
     from ...ir.module import Module
+    from ...ir.writeport import MultiPortArrayWrite
 
 class ElaborateModule(Visitor):
-    """Visitor for elaborating modules.
-
-    This matches the Rust class in src/backend/simulator/elaborate.rs
-    """
+    """Visitor for elaborating modules with multi-port write support."""
 
     def __init__(self, sys):
         """Initialize the module elaborator."""
@@ -50,6 +46,7 @@ class ElaborateModule(Visitor):
         self.module_name = ""
         self.module_ctx = None
         self.modules_for_callback = {}
+
     def visit_module_for_callback(self, node: Module):
         """Visit a module to collect module names for callback."""
         self.module_name = node.name
@@ -79,10 +76,12 @@ class ElaborateModule(Visitor):
 
         return "\n".join(result)
 
-    def visit_expr( # pylint: disable=too-many-branches, too-many-statements, too-many-locals
-                   self, node: Expr):
+    # pylint: disable = too-many-statements, too-many-branches,too-many-locals
+    def visit_expr(self, node: Expr):
         """Visit an expression and generate its implementation."""
-        # Determine if the expression produces a value and if it needs exposure
+        # pylint: disable=import-outside-toplevel
+        from ...ir.writeport import MultiPortArrayWrite
+
         id_and_exposure = None
         if node.is_valued():
             need_exposure = expr_externally_used(node, True)
@@ -105,7 +104,6 @@ class ElaborateModule(Visitor):
 
             lhs = dump_rval_ref(self.module_ctx, self.sys, node.lhs)
             rhs = dump_rval_ref(self.module_ctx, self.sys, node.rhs)
-            # Special handling for shift operations
             lhs = f"ValueCastTo::<{rust_ty}>::cast(&{lhs})"
             rhs = f"ValueCastTo::<{rust_ty}>::cast(&{rhs})"
             code.append(f"{lhs} {binop} {rhs}")
@@ -122,7 +120,28 @@ class ElaborateModule(Visitor):
             idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
             code.append(f"sim.{array_name}.payload[{idx_val} as usize].clone()")
 
+        elif isinstance(node, MultiPortArrayWrite):
+            # Handle multi-port array write with port information
+            array = node.array
+            idx = node.idx
+            value = node.val
+            module = node.module
+
+            array_name = namify(array.name)
+            idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
+            value_val = dump_rval_ref(self.module_ctx, self.sys, value)
+            module_writer = namify(module.name)
+            port_id = id(module)  # Use module id as port identifier
+
+            code.append(f"""{{
+              let stamp = sim.stamp - sim.stamp % 100 + 50;
+              sim.{array_name}.write_multiport.push(
+                MultiPortArrayWrite::new(stamp, {idx_val} as usize, \
+                      {value_val}.clone(), "{module_writer}", {port_id}));
+            }}""")
+
         elif isinstance(node, ArrayWrite):
+            # Handle regular array write (fallback for non-multi-port)
             array = node.array
             idx = node.idx
             value = node.val
@@ -131,18 +150,31 @@ class ElaborateModule(Visitor):
             idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
             value_val = dump_rval_ref(self.module_ctx, self.sys, value)
             module_writer = self.module_name
-            code.append(f"""{{
-              let stamp = sim.stamp - sim.stamp % 100 + 50;
-              sim.{array_name}.write.push(
-                ArrayWrite::new(stamp, {idx_val} as usize, {value_val}.clone(), "{module_writer}"));
-            }}""")
+
+            # Check if this array has multi-port writes
+            has_multiport = array.has_multi_port_writes()
+
+            if has_multiport:
+                # Use multi-port write for arrays with multiple writers
+                port_id = id(self.module_ctx)
+                code.append(f"""{{
+                  let stamp = sim.stamp - sim.stamp % 100 + 50;
+                  sim.{array_name}.write_multiport.push(
+                    MultiPortArrayWrite::new(stamp, {idx_val} as usize, \
+                        {value_val}.clone(), "{module_writer}", {port_id}));
+                }}""")
+            else:
+                # Use single-port write for arrays with single writer
+                code.append(f"""{{
+                  let stamp = sim.stamp - sim.stamp % 100 + 50;
+                  sim.{array_name}.write.push(
+                    ArrayWrite::new(stamp, {idx_val} as usize, \
+                        {value_val}.clone(), "{module_writer}"));
+                }}""")
 
         elif isinstance(node, AsyncCall):
-
             bind = node.bind
-
             event_q = f"{namify(bind.callee.name)}_event"
-
             code.append(f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 100;
               sim.{event_q}.push_back(stamp)
@@ -156,7 +188,6 @@ class ElaborateModule(Visitor):
             code.append(f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
               sim.{fifo_id}.pop.push(FIFOPop::new(stamp, "{module_name}"));
-              //sim.{fifo_id}.payload.front().unwrap().clone()
               match sim.{fifo_id}.payload.front() {{
                 Some(value) => value.clone(),
                 None => return false,
@@ -164,7 +195,6 @@ class ElaborateModule(Visitor):
             }}""")
 
         elif isinstance(node, PureIntrinsic):
-
             intrinsic = node.opcode
 
             if intrinsic == PureIntrinsic.FIFO_PEEK:
@@ -201,17 +231,13 @@ class ElaborateModule(Visitor):
             mn = self.module_name
             result = [f'print!("@line:{{:<5}} {{:<10}}: [{mn}]\\t", line!(), cyclize(sim.stamp));']
             result.append("println!(")
-
             result.append(f"{dump_rval_ref(self.module_ctx, self.sys, node.operands[0])}, ")
 
             for elem in node.operands[1:]:
                 dump = dump_rval_ref(self.module_ctx, self.sys, elem)
-
                 dtype = elem.dtype
-                # Special handling for boolean display
                 if dtype.bits == 1:
                     dump = f"if {dump} {{ 1 }} else {{ 0 }}"
-
                 result.append(f"{dump}, ")
 
             result.append(")")
@@ -254,19 +280,16 @@ let mask = BigUint::parse_bytes("{mask_bits}".as_bytes(), 2).unwrap();'''
             cond = dump_rval_ref(self.module_ctx, self.sys, node.cond)
             true_value = dump_rval_ref(self.module_ctx, self.sys, node.true_value)
             false_value = dump_rval_ref(self.module_ctx, self.sys, node.false_value)
-
             code.append(f"if {cond} {{ {true_value} }} else {{ {false_value} }}")
 
         elif isinstance(node, Select1Hot):
             cond = dump_rval_ref(self.module_ctx, self.sys, node.cond)
-
             result = [f'''{{ let cond = {cond};
 assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
 
             for i, value in enumerate(node.values):
                 if i != 0:
                     result.append(" else ")
-
                 result.append(f'''if cond >> {i} & 1 != 0
 {{ {dump_rval_ref(self.module_ctx, self.sys, value)} }}''')
 
@@ -286,14 +309,9 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
         elif isinstance(node, Intrinsic):
             intrinsic = node.opcode
 
-            if  intrinsic == Intrinsic.WAIT_UNTIL:
+            if intrinsic == Intrinsic.WAIT_UNTIL:
                 value = dump_rval_ref(self.module_ctx, self.sys, node.args[0])
                 code.append(f"if !{value} {{ return false; }}")
-
-            # elif intrinsic == Intrinsic.CONDITION:
-            #     value = dump_rval_ref(self.module_ctx, self.sys, expr.args[0])
-            #     open_scope = True
-            #     code.append(f"if {value} {{")
 
             elif intrinsic == Intrinsic.FINISH:
                 code.append("std::process::exit(0);")
@@ -304,6 +322,7 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
 
             elif intrinsic == Intrinsic.BARRIER:
                 code.append("/* Barrier */")
+
             elif intrinsic == Intrinsic.MEM_READ:
                 array = node.args[0]
                 idx = node.args[1]
@@ -315,7 +334,8 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
                 code.append(f"""{{
                     unsafe {{
                         let mem_interface = Arc::clone(&sim.mem_interface);
-                        let success = mem_interface.as_ref().send_request({idx_val} as i64, false, rust_callback, sim as *const _ as *mut _,);
+                        let success = mem_interface.as_ref().send_request({idx_val} \
+                            as i64, false, rust_callback, sim as *const _ as *mut _,);
                         if !success {{
                             return false
                         }}
@@ -335,17 +355,18 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
                 code.append(f"""{{
                     unsafe {{
                         let mem_interface = Arc::clone(&sim.mem_interface);
-                        let success = mem_interface.as_ref().send_request({idx_val} as i64, true, rust_callback, sim as *const _ as *mut _,);
+                        let success = mem_interface.as_ref().send_request({idx_val} \
+                                as i64, true, rust_callback, sim as *const _ as *mut _,);
                         if success {{
                             let stamp = sim.stamp - sim.stamp % 100 + 50;
-                            sim.{array_name}.write.push(
-                                ArrayWrite::new(stamp, {idx_val} as usize, {value_val}.clone(), "{module_writer}"));
+                            sim.{array_name}.write.push( \
+                                ArrayWrite::new(stamp, {idx_val} as usize, \
+                                        {value_val}.clone(), "{module_writer}"));
                         }} else {{
                             sim.stamp = sim.stamp - sim.stamp % 100 + 50;
                         }}
                     }}
                 }}""")
-
 
         # Format the result with proper indentation and variable assignment
         indent_str = " " * self.indent
@@ -364,7 +385,6 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
             for line in code:
                 result += f"{indent_str}{line};\n"
 
-        # Adjust indentation if we opened a scope
         if open_scope:
             self.indent += 2
 
@@ -406,9 +426,5 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
         if restore_indent != self.indent:
             self.indent -= 2
             result.append(f"{' ' * self.indent}}}\n")
-
-        # Handle block value if present
-        # if node.get_value():
-        #     return f"{{ {''.join(result)} }}"
 
         return "".join(result)

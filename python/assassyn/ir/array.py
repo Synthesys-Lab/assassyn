@@ -113,14 +113,13 @@ class Array:  #pylint: disable=too-many-instance-attributes
         This enables multi-port write access: (array & module)[idx] <= value
         '''
         from .module.base import ModuleBase #pylint: disable=import-outside-toplevel
-        if self._partition is not None:
-            return PartitionedWritePort(self, other)
-
         if isinstance(other, ModuleBase):
-            if other in self._write_ports:
-                return self._write_ports[other]
+            if self._partition is not None:
+                return PartitionedWritePort(self, other)
 
-            return WritePort(self, other)
+            if other not in self._write_ports:
+                self._write_ports[other] = WritePort(self, other)
+            return self._write_ports[other]
 
         # Fall back to regular bitwise AND with Value
         if isinstance(other, Value):

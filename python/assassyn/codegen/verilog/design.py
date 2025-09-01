@@ -565,49 +565,51 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         #pylint: disable=too-many-nested-blocks
         for key, exposes in self._exposes.items():
             if isinstance(key, Array):
-                # Separate multi-port and single-port writes
                 multiport_writes = [
-                    (e, p) for e, p in exposes
-                    if isinstance(e, MultiPortArrayWrite)
-                ]
-                # Group by module/port
-                array_name = self.dump_rval(key, False)
-                array_dtype = key.scalar_ty
-                port_mapping = self.array_write_port_mapping.get(key, {})
-                # Group writes by their source module
-                writes_by_module = {}
-                for expr, pred in multiport_writes:
-                    module = expr.module
-                    if module not in writes_by_module:
-                        writes_by_module[module] = []
-                    writes_by_module[module].append((expr, pred))
-                # Generate signals for each port
-                for module, module_writes in writes_by_module.items():
-                    port_idx = port_mapping[module]
-                    port_suffix = f"_port{port_idx}"
-                    # Write enable
-                    ce_terms = [p for _, p in module_writes]
-                    self.append_code(
-                        f'self.{array_name}_w{port_suffix} = '
-                        f'executed_wire & ({" | ".join(ce_terms)})'
-                    )
-                    # Write data (mux if multiple writes from same module)
-                    if len(module_writes) == 1:
-                        wdata = self.dump_rval(module_writes[0][0].val, False)
-                        if module_writes[0][0].val.dtype != dump_type(array_dtype):
-                            wdata = f"{wdata}.{dump_type_cast(array_dtype)}"
-                    else:
-                        # Build mux chain
-                        wdata = self._build_mux_chain(module_writes, array_dtype)
-                    self.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata}')
-                    widx_mux = (
-                        f"Mux({module_writes[0][1]},"
-                        f" {dump_type(module_writes[0][0].idx.dtype)}(0),"
-                        f" {self.dump_rval(module_writes[0][0].idx, False)})"
-                    )
-                    for expr, pred in module_writes[1:]:
-                        widx_mux = f"Mux({pred},  {widx_mux},{self.dump_rval(expr.idx, False)})"
-                    self.append_code(f'self.{array_name}_widx{port_suffix} = {widx_mux}')
+                        (e, p) for e, p in exposes
+                        if isinstance(e, MultiPortArrayWrite)
+                    ]
+                for arr in key.partition:
+                    # Group by module/port
+                    array_name = self.dump_rval(arr, False)
+                    array_dtype = arr.scalar_ty
+                    port_mapping = self.array_write_port_mapping.get(arr, {})
+                    # Group writes by their source module
+                    writes_by_module = {}
+                    for expr, pred in multiport_writes:
+                        module = expr.module
+                        if module not in writes_by_module:
+                            writes_by_module[module] = []
+                        writes_by_module[module].append((expr, pred))
+                    # Generate signals for each port
+                    for module, module_writes in writes_by_module.items():
+                        port_idx = port_mapping[module]
+                        port_suffix = f"_port{port_idx}"
+                        # Write enable
+                        ce_terms = [p for _, p in module_writes]
+                        self.append_code(
+                            f'self.{array_name}_w{port_suffix} = '
+                            f'executed_wire & ({" | ".join(ce_terms)})'
+                        )
+                        # Write data (mux if multiple writes from same module)
+                        if len(module_writes) == 1:
+                            wdata = self.dump_rval(module_writes[0][0].val, False)
+                            if module_writes[0][0].val.dtype != dump_type(array_dtype):
+                                wdata = f"{wdata}.{dump_type_cast(array_dtype)}"
+                        else:
+                            # Build mux chain
+                            wdata = self._build_mux_chain(module_writes, array_dtype)
+                        self.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata}')
+                        widx_mux = (
+                            f"Mux({module_writes[0][1]},"
+                            f" {dump_type(module_writes[0][0].idx.dtype)}(0),"
+                            f" {self.dump_rval(module_writes[0][0].idx, False)})"
+                        )
+                        for expr, pred in module_writes[1:]:
+                            widx_mux = f"Mux({pred},  {widx_mux},{self.dump_rval(expr.idx, False)})"
+                        self.append_code(
+                            f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()'
+                            )
 
             elif isinstance(key, Port):
                 has_push = any(isinstance(e, FIFOPush) for e, p in exposes)
@@ -786,24 +788,24 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                         f"{namify(arr.name)}_q_in = "
                         f"Input(dim({dump_type(arr.scalar_ty)}, {arr.size}))"
                     )
-                    
+
                     port_mapping = self.array_write_port_mapping.get(arr, {})
                     for module_key, port_idx in port_mapping.items():
                         if module_key == node:
                             port_suffix = f"_port{port_idx}"
-                            idx_type = next(e.idx.dtype \
-                                    for e in self._walk_expressions(node.body) \
-                                        if isinstance(e, ArrayWrite) and e.array == arr)
                             self.append_code( \
                                 f'{namify(arr.name)}_w{port_suffix} = Output(Bits(1))')
                             self.append_code(
                                 f'{namify(arr.name)}_wdata{port_suffix} ='
                                 f' Output({dump_type(arr.scalar_ty)})'
                             )
+
+                            idx_type = arr.index_bits if arr.index_bits > 0 else 1
                             self.append_code(
                                 f'{namify(arr.name)}_widx{port_suffix} ='
-                                f' Output({dump_type(idx_type)})'
+                                f' Output(Bits({idx_type}))'
                             )
+
 
         for port_code in self.exposed_ports_to_add:
             self.append_code(port_code)
@@ -845,13 +847,14 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.sys = sys
 
         for arr_container in sys.arrays:
-            for arr in arr_container.partition:
-                if arr.get_write_ports():
-                    port_mapping = {}
-                    # Use the frontend's stored write ports for a definitive list
-                    for port_idx, module in enumerate(arr.get_write_ports().keys()):
-                        port_mapping[module] = port_idx
-                    self.array_write_port_mapping[arr] = port_mapping
+            for sub_array in arr_container.partition:
+                if sub_array not in self.array_write_port_mapping:
+                    self.array_write_port_mapping[sub_array] = {}
+                sub_array_writers = sub_array.get_write_ports()
+                for module, _ in sub_array_writers.items():
+                    if module not in self.array_write_port_mapping[sub_array]:
+                        port_idx = len(self.array_write_port_mapping[sub_array])
+                        self.array_write_port_mapping[sub_array][module] = port_idx
 
         for arr_container in sys.arrays:
             for arr in arr_container.partition:
@@ -906,7 +909,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self._generate_top_harness()
         self.is_top_generation = False
 
-
+    # pylint: too-many-statements
     def visit_array(self, node: Array):
         """Generates a PyCDE Module to encapsulate an array and its write logic."""
         array = node
@@ -915,7 +918,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         index_bits = array.index_bits if array.index_bits > 0 else 1
 
         writers = list(array.get_write_ports().keys())
-        num_write_ports = max(1, len(writers))
+        num_write_ports = len(writers)
 
         dim_type = f"dim({dump_type(dtype)}, {size})"
         class_name = namify(array.name)
@@ -949,31 +952,32 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             f'clk=self.clk, rst=self.rst, rst_value={rst_value_str})'
         )
         self.append_code('')
-
-        self.append_code('# Multi-port write logic')
-        self.append_code('next_data_values = []')
-        self.append_code(f'for i in range({size}):')
-        self.indent += 4
-        self.append_code('# Check each write port for this address')
-        self.append_code('element_value = data_reg[i]')
-        for port_idx in reversed(range(num_write_ports)):
-            port_suffix = f"_port{port_idx}"
-            self.append_code(
-                f'# Port {port_idx} write check'
-            )
-            self.append_code(
-                f'if_write_port{port_idx} = '
-                f'(self.w{port_suffix} & '
-                f'(self.widx{port_suffix} == Bits({index_bits})(i)))'
-            )
-            self.append_code(
-                f'element_value = Mux(if_write_port{port_idx}, '
-                f'element_value, self.wdata{port_suffix})'
-            )
-        self.append_code('next_data_values.append(element_value)')
-        self.indent -= 4
-        self.append_code(f'next_data = {dim_type}(next_data_values)')
-
+        if num_write_ports != 0:
+            self.append_code('# Multi-port write logic')
+            self.append_code('next_data_values = []')
+            self.append_code(f'for i in range({size}):')
+            self.indent += 4
+            self.append_code('# Check each write port for this address')
+            self.append_code('element_value = data_reg[i]')
+            for port_idx in reversed(range(num_write_ports)):
+                port_suffix = f"_port{port_idx}"
+                self.append_code(
+                    f'# Port {port_idx} write check'
+                )
+                self.append_code(
+                    f'if_write_port{port_idx} = '
+                    f'(self.w{port_suffix} & '
+                    f'(self.widx{port_suffix} == Bits({index_bits})(i)))'
+                )
+                self.append_code(
+                    f'element_value = Mux(if_write_port{port_idx}, '
+                    f'element_value, self.wdata{port_suffix})'
+                )
+            self.append_code('next_data_values.append(element_value)')
+            self.indent -= 4
+            self.append_code(f'next_data = {dim_type}(next_data_values)')
+        else:
+            self.append_code('next_data = data_reg')
         self.append_code('data_reg.assign(next_data)')
         self.append_code('self.q_out = data_reg')
 
@@ -1237,7 +1241,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     def _connect_multiport_array(self, arr):
         """Connect a multi-port array to its writers"""
         arr_name = namify(arr.name)
-        port_mapping = self.array_write_port_mapping[arr]
+        port_mapping = self.array_write_port_mapping.get(arr, {})
+        if not port_mapping:
+            return
 
         self.append_code(f'# Multi-port connections for {arr_name}')
 
@@ -1246,9 +1252,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             module_name = namify(module.name)
             port_suffix = f"_port{port_idx}"
 
-            self.append_code(
-                f'# Port {port_idx} connected to {module_name}'
-            )
             self.append_code(
                 f'aw_{arr_name}_w{port_suffix}.assign('
                 f'inst_{module_name}.{arr_name}_w{port_suffix})'

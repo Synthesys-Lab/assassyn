@@ -326,6 +326,21 @@ class ArrayRead(Expr):
     def __getattr__(self, name):
         return self.dtype.attributize(self, name)
 
+    def __le__(self, value):
+        '''
+        Handle the <= operator for array writes.
+        '''
+        from ...builder import Singleton
+        from ..dtype import RecordValue,to_uint
+
+        assert isinstance(value, (Value, RecordValue)), \
+            f"Value must be Value or RecordValue, got {type(value)}"
+
+        current_module = Singleton.builder.current_module
+
+        write_port = self.array & current_module
+        return write_port._create_write(self.idx.value, value)
+
 class Log(Expr):
     '''The class for log operation. NOTE: This operation is just like verilog $display, which is
     non-synthesizable. It is used for debugging purpose only.'''

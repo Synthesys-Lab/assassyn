@@ -57,9 +57,11 @@ class UnifiedNamingStrategy:
                 # a.is_ood = ... → record_a_is_ood
                 target_name = f"record_{target.value.id}_{target.attr}"
             elif isinstance(target, ast.Subscript):
-                base_name = target.value.id
+                if hasattr(target.value, 'id'):
+                    base_name = target.value.id
+                else:
+                    base_name = target.value.left.id
                 index_node = target.slice
-
                 if isinstance(index_node, ast.Constant):
                     # Handles a numeric index, e.g., my_array[0]
                     index_val = index_node.value

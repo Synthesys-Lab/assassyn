@@ -1,12 +1,7 @@
-"""Runtime code generation for Assassyn simulator."""
-
-
+"""Runtime code generation for Assassyn simulator with multi-port write support."""
 
 def dump_runtime(fd):
-    """Generate the runtime module.
-
-    This matches the Rust function in src/backend/simulator/runtime.rs
-    """
+    """Generate the runtime module with multi-port write support."""
     # Add imports
     fd.write("""
 use std::collections::VecDeque;
@@ -27,6 +22,7 @@ pub trait Cycled {
   fn pusher(&self) -> &'static str;
 }
 
+// Regular single-port array write
 pub struct ArrayWrite<T: Sized + Default + Clone> {
   cycle: usize,
   addr: usize,
@@ -40,9 +36,61 @@ impl <T: Sized + Default + Clone> ArrayWrite<T> {
   }
 }
 
+// Multi-port array write with port ID
+pub struct MultiPortArrayWrite<T: Sized + Default + Clone> {
+  cycle: usize,
+  addr: usize,
+  data: T,
+  pusher: &'static str,
+  port_id: usize,  // Unique identifier for the write port
+}
+
+impl <T: Sized + Default + Clone> MultiPortArrayWrite<T> {
+  pub fn new(cycle: usize, addr: usize, data: T, pusher: &'static str, port_id: usize) -> Self {
+    MultiPortArrayWrite { cycle, addr, data, pusher, port_id }
+  }
+}
+
+// Multi-port write queue that can handle multiple writes per cycle
+pub struct MultiPortXEQ<T: Sized + Default + Clone> {
+  // Map from cycle to list of writes for that cycle
+  q: BTreeMap<usize, Vec<MultiPortArrayWrite<T>>>,
+}
+
+impl <T: Sized + Default + Clone> MultiPortXEQ<T> {
+  pub fn new() -> Self {
+    MultiPortXEQ { q: BTreeMap::new() }
+  }
+
+  pub fn push(&mut self, event: MultiPortArrayWrite<T>) {
+    self.q.entry(event.cycle)
+      .or_insert_with(Vec::new)
+      .push(event);
+  }
+
+  pub fn pop_all(&mut self, current: usize) -> Vec<MultiPortArrayWrite<T>> {
+    let mut writes = Vec::new();
+    
+    // Collect all writes up to current cycle
+    while let Some((&cycle, _)) = self.q.first_key_value() {
+      if cycle <= current {
+        if let Some((_, cycle_writes)) = self.q.pop_first() {
+          writes.extend(cycle_writes);
+        }
+      } else {
+        break;
+      }
+    }
+    
+    writes
+  }
+}
+
+// Enhanced Array with both single-port and multi-port write support
 pub struct Array<T: Sized + Default + Clone> {
   pub payload: Vec<T>,
-  pub write: XEQ<ArrayWrite<T>>,
+  pub write: XEQ<ArrayWrite<T>>,  // Single-port writes (for backward compatibility)
+  pub write_multiport: MultiPortXEQ<T>,  // Multi-port writes
 }
 
 impl <T: Sized + Default + Clone> Array<T> {
@@ -50,17 +98,38 @@ impl <T: Sized + Default + Clone> Array<T> {
     Array {
       payload: vec![T::default(); n],
       write: XEQ::new(),
+      write_multiport: MultiPortXEQ::new(),
     }
   }
+  
   pub fn new_with_init(payload: Vec<T>) -> Self {
     Array {
       payload,
       write: XEQ::new(),
+      write_multiport: MultiPortXEQ::new(),
     }
   }
+  
   pub fn tick(&mut self, cycle: usize) {
+    // Process single-port writes first (for backward compatibility)
     if let Some(event) = self.write.pop(cycle) {
       self.payload[event.addr] = event.data;
+    }
+    
+    // Process multi-port writes
+    let multiport_writes = self.write_multiport.pop_all(cycle);
+    
+    // Apply writes with conflict resolution
+    // Strategy: Last write wins (could be changed to priority-based or other schemes)
+    let mut write_map: BTreeMap<usize, (T, &'static str, usize)> = BTreeMap::new();
+    
+    for write in multiport_writes {
+      write_map.insert(write.addr, (write.data, write.pusher, write.port_id));
+    }
+    
+    // Apply all writes
+    for (addr, (data, _, _)) in write_map {
+      self.payload[addr] = data;
     }
   }
 }
@@ -132,6 +201,15 @@ impl <T: Sized + Default + Clone> Cycled for ArrayWrite<T> {
   }
 }
 
+impl <T: Sized + Default + Clone> Cycled for MultiPortArrayWrite<T> {
+  fn cycle(&self) -> usize {
+    self.cycle
+  }
+  fn pusher(&self) -> &'static str {
+    self.pusher
+  }
+}
+
 impl <T: Sized> Cycled for FIFOPush<T> {
   fn cycle(&self) -> usize {
     self.cycle
@@ -150,12 +228,12 @@ impl Cycled for FIFOPop {
   }
 }
 
+// Single-port write queue (kept for backward compatibility)
 pub struct XEQ<T: Sized + Cycled> {
   q: BTreeMap<usize, T>,
 }
 
 impl <T: Sized + Cycled>XEQ<T> {
-
   pub fn new() -> Self {
     XEQ { q: BTreeMap::new(), }
   }
