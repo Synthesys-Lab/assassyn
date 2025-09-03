@@ -15,15 +15,11 @@ class Driver(Module):
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         new_v = v + Int(32)(1)
-        cnt[0] = new_v
+        (cnt&self)[0] <= new_v
         idx0 = v[0: 1]
         idx1 = new_v[0: 1]
-        a[idx0] <=  ((v * v)[0: 31].bitcast(Int(32)))
-        a[idx1] <=  new_v + new_v
-        # a[idx0] =  ((v * v)[0: 31].bitcast(Int(32)))
-        # a[idx1] =  new_v + new_v
-        # (a&self)[idx0] <=  ((v * v)[0: 31].bitcast(Int(32)))
-        # (a&self)[idx1] <=  new_v + new_v
+        (a&self)[idx0] <=  ((v * v)[0: 31].bitcast(Int(32)))
+        (a&self)[idx1] <=  new_v + new_v
         a_sum = a[idx0] + a[idx1]
         log("a[idx0] + a[idx1] = {}", a_sum)
 
