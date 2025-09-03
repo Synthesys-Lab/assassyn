@@ -909,7 +909,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self._generate_top_harness()
         self.is_top_generation = False
 
-    # pylint: too-many-statements
+    # pylint:disable = too-many-statements
     def visit_array(self, node: Array):
         """Generates a PyCDE Module to encapsulate an array and its write logic."""
         array = node

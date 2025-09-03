@@ -96,13 +96,11 @@ class PartitionedIndexedWritePort(IndexedWritePort):
     '''
     A proxy object for handling dynamic index writes to partitioned arrays.
     '''
-    def __init__(self, write_port, index):
-        super().__init__(write_port, index)
-
     def __le__(self, value):
         '''
         Handle the <= operator for dynamic index writes to partitioned arrays.
         '''
+        #pylint: disable=import-outside-toplevel
         from .block import Condition
         from .dtype import UInt
 
@@ -116,7 +114,6 @@ class PartitionedIndexedWritePort(IndexedWritePort):
                 write_port = self.write_port._sub_array_ports[sub_array]
                 write_port._create_write(0, value)
 
-        return None
 
 class PartitionedWritePort(WritePort):
     '''
@@ -149,7 +146,7 @@ class PartitionedWritePort(WritePort):
             sub_array = self.array._partition[index]
             write_port = self._sub_array_ports[sub_array]
             return write_port._create_write(0, value)
-
+        #pylint:disable=import-outside-toplevel
         from .block import Condition
         from .dtype import UInt
         arr = self.array

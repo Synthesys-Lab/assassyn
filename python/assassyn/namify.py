@@ -39,7 +39,7 @@ class UnifiedNamingStrategy:
             ast.BitXor: "xor",
         }
         return op_map.get(type(op_node), "op")
-
+    # pylint: disable=R0912
     def generate_names(self, context: NamingContext) -> typing.List[str]:
         """Generate names for any assignment pattern"""
         # Reset state

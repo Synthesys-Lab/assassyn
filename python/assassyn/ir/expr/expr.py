@@ -331,7 +331,7 @@ class ArrayRead(Expr):
         Handle the <= operator for array writes.
         '''
         from ...builder import Singleton
-        from ..dtype import RecordValue,to_uint
+        from ..dtype import RecordValue
 
         assert isinstance(value, (Value, RecordValue)), \
             f"Value must be Value or RecordValue, got {type(value)}"
