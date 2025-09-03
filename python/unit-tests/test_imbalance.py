@@ -11,8 +11,8 @@ class Sub(Module):
             'b': Port(Int(32))
         }
         super().__init__(
-            ports=ports, 
-        ) 
+            ports=ports,
+        )
 
     @module.combinational
     def build(self):
@@ -22,12 +22,12 @@ class Sub(Module):
 
 class Lhs(Module):
 
-    
+
     def __init__(self):
         super().__init__(
-            ports={'a': Port(Int(32))}, 
+            ports={'a': Port(Int(32))},
         )
-        
+
     @module.combinational
     def build(self, sub: Sub):
         a = self.pop_all_ports(True)
@@ -37,15 +37,15 @@ class Lhs(Module):
 class Driver(Module):
     def __init__(self):
             super().__init__(ports={})
-             
+
     @module.combinational
     def build(self, lhs: Lhs, rhs):
         cnt = RegArray(Int(32), 1)
         v = cnt[0] + Int(32)(1)
-        cnt[0] = v
+        (cnt&self)[0] <= v
 
         lhs.async_called(a = v + v)
-        rhs.async_called(b = v) 
+        rhs.async_called(b = v)
 
 
 def check(raw):
@@ -82,6 +82,6 @@ def test_imbalance():
         raw = utils.run_verilator(verilator_path)
         check(raw)
 
-    
+
 if __name__ == '__main__':
     test_imbalance()

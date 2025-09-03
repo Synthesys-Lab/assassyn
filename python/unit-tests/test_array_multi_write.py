@@ -16,9 +16,9 @@ class ModA(Module):
         a = self.pop_all_ports(True)
         v = a[0: 0]
         with Condition(v):
-            arr[0] = a
+            (arr&self)[0] <= a
         with Condition(~v):
-            arr[0] = a + Int(32)(1)
+            (arr&self)[0] <= a + Int(32)(1)
 
 class ModC(Module):
 
@@ -32,10 +32,10 @@ class ModC(Module):
         log("a = {} arr = {}", a, v)
 
 class Driver(Module):
-    
+
     def __init__(self):
         super().__init__(ports={})
-    
+
     @module.combinational
     def build(self, mod_a: ModA, mod_c: ModC):
         cnt = RegArray(Int(32), 1)
@@ -62,9 +62,9 @@ def test_array_multi_write():
         driver.build(mod_a, mod_c)
 
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-    
+
     utils.run_simulator(simulator_path)
-    
+
     if verilator_path:
         utils.run_verilator(verilator_path)
 

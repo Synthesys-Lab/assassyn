@@ -8,7 +8,7 @@ class Testbench(Module):
 
     def __init__(self):
             super().__init__(ports={})
-        
+
 
     @module.combinational
     def build(self):

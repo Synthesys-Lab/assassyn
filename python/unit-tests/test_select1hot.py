@@ -5,11 +5,11 @@ from assassyn.backend import elaborate
 from assassyn import utils
 
 class Driver(Module):
-    
+
     def __init__(self):
             super().__init__(ports={},no_arbiter=True,)
-        
-        
+
+
     @module.combinational
     def build(self):
         cond = RegArray(Int(5), 1, initializer=[0])
@@ -19,7 +19,7 @@ class Driver(Module):
         mux = gt.select1hot(values[0], values[1], values[2], values[3], values[4])
 
         log("onehot select 0b{:b} from [1,2,4,8,16]: {}", gt, mux)
-        cond[0] = (cond[0] + Int(5)(1)) % Int(5)(5)
+        (cond&self)[0] <= (cond[0] + Int(5)(1)) % Int(5)(5)
 
 def check(raw: str):
     for i in raw.splitlines():

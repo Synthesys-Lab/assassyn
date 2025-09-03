@@ -32,7 +32,7 @@ class Driver(Module):
         is_odd = value[0:0]
         new_value = (value + Int(32)(1)).bitcast(Bits(32))
         new_record = record_ty.bundle(is_odd=is_odd, payload=new_value).value()
-        bundle[0] = new_record
+        (bundle&self)[0] = new_record
         adder.async_called(a = new_record, b = new_record)
 
 def check_raw(raw):

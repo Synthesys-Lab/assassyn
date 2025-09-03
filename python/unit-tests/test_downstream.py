@@ -5,7 +5,7 @@ from assassyn import utils
 
 
 class Driver(Module):
- 
+
     def __init__(self):
         super().__init__(ports={})
 
@@ -22,7 +22,7 @@ class ForwardData(Module):
     def __init__(self):
         super().__init__(
             ports={'data': Port(UInt(32))},
-        ) 
+        )
 
     @module.combinational
     def build(self):

@@ -36,7 +36,7 @@ class Driver(Module):
         # with Condition(cond):
         #     adder.async_called(a = v, b = v)
         cnt = RegArray(Int(32), 1)
-        cnt[0] = cnt[0] + Int(32)(1)
+        (cnt&self)[0] <= cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(100)
         with Condition(cond):
             adder.async_called(a = cnt[0], b = cnt[0])

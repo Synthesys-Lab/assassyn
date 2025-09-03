@@ -35,25 +35,25 @@ class Rhs(Module):
     def __init__(self):
         super().__init__(
             ports={'rhs_b': Port(Int(32))},
-        ) 
-        
+        )
+
     @module.combinational
     def build(self, sub):
         rhs_b = self.pop_all_ports(True)
         call = sub.async_called(sub_b = rhs_b)
         call.bind.set_fifo_depth(sub_a = 1, sub_b = 1)
-        
+
 
 class Driver(Module):
     def __init__(self):
         super().__init__(
             ports={},
         )
- 
+
     @module.combinational
     def build(self, lhs: Lhs, rhs: Rhs):
         cnt = RegArray(Int(32), 1)
-        cnt[0] = cnt[0] + Int(32)(1)
+        (cnt&self)[0] <= cnt[0] + Int(32)(1)
         v = cnt[0] * cnt[0]
 
         call_lhs = lhs.async_called(lhs_a = v[0: 31].bitcast(Int(32)))
@@ -92,7 +92,7 @@ def test_bind():
 
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
-    
+
     if verilator_path:
         raw = utils.run_verilator(verilator_path)
         check_raw(raw)

@@ -5,7 +5,7 @@ from assassyn.backend import elaborate
 from assassyn import utils
 
 class Sub(Module):
-    
+
     def __init__(self):
         super().__init__(ports={
             'a': Port(Int(32)),
@@ -24,7 +24,7 @@ class Sub(Module):
 
 
 class Lhs(Module):
-    
+
     def __init__(self):
         super().__init__({
             'v': Port(Int(32)),
@@ -37,7 +37,7 @@ class Lhs(Module):
         return rhs
 
 class Driver(Module):
-    
+
         def __init__(self):
             super().__init__(ports={})
 
@@ -50,7 +50,7 @@ class Driver(Module):
             vv = v + v
             lhs.async_called(v = vv)
             rhs.async_called(b = v)
- 
+
 
 def check(raw):
     cnt = 0
@@ -70,7 +70,7 @@ def test_fifo_valid():
     with sys:
         sub = Sub()
         sub.build()
-        
+
         lhs = Lhs()
         rhs = lhs.build(sub)
 

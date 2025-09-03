@@ -3,7 +3,7 @@ import pytest
 
 from assassyn.backend import elaborate
 from assassyn.frontend import *
-from assassyn import utils 
+from assassyn import utils
 
 
 class Adder(Module):
@@ -24,18 +24,18 @@ class Adder(Module):
         log("adder: {} + {} = {}", a, b, c);
 
 class Driver(Module):
-    
-    def __init__(self): 
+
+    def __init__(self):
         super().__init__(
             ports={} ,
-        )  
+        )
 
     @module.combinational
     def build(self, adder: Adder):
         cnt = RegArray(Int(32), 1)
         k = cnt[0]
         v = k + Int(32)(1)
-        cnt[0] = v
+        cnt[0] <= v
         adder.async_called(a = v, b = v)
 
 def check_raw(raw):

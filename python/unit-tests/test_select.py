@@ -5,7 +5,7 @@ from assassyn.backend import elaborate
 from assassyn import utils
 
 class Driver(Module):
-    
+
     def __init__(self):
             super().__init__(ports={})
 
@@ -19,7 +19,7 @@ class Driver(Module):
 
         v0 = v0 * UInt(32)(12345)
         v1 = v1 * UInt(32)(54321)
-        
+
         rand0 = v0 + UInt(64)(67890)
         rand1 = v1 + UInt(64)(9876)
 
@@ -33,7 +33,7 @@ class Driver(Module):
         mux = gt.select(rand0, rand1)
 
         log("select: {} >? {} = {}", rand0, rand1, mux)
- 
+
 
 def check(raw: str):
     for i in raw.splitlines():
@@ -43,7 +43,7 @@ def check(raw: str):
             c = i.split()[-1]
             assert max(int(a), int(b)) == int(c)
 
-        
+
 def test_select():
     sys = SysBuilder('select')
     with sys:

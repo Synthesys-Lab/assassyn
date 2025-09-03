@@ -4,14 +4,14 @@ from assassyn import utils
 import assassyn
 
 class Adder(Module):
- 
+
     def __init__(self, record_ty):
         ports={
             'a': Port(record_ty),
             'b': Port(record_ty)
         }
         super().__init__(
-            ports=ports, 
+            ports=ports,
         )
 
     @module.combinational

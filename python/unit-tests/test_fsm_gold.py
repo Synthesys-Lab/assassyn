@@ -32,7 +32,7 @@ class FSM_m(Module):
             state[0] = UInt(2)(0)
 
         log("state: {} | a: {} |  temp: {} ", state[0] , a , temp[0])
-        
+
 
 class Driver(Module):
 

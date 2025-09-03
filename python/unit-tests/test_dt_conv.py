@@ -18,11 +18,11 @@ class Driver(Module):
         i64s = i32.sext(Int(64))
 
         b32_array = RegArray(Bits(32), 1)
-        b32_array[0] = b32
+        b32_array[0] <= b32
         i64z_array = RegArray(Int(64), 1)
         i64s_array = RegArray(Int(64), 1)
-        i64z_array[0] = i64z
-        i64s_array[0] = i64s
+        (i64z_array&self)[0] <= i64z
+        (i64s_array&self)[0] <= i64s
         log("Cast: {} {} {}", b32_array[0], i64z_array[0], i64s_array[0]);
 
 
@@ -33,7 +33,7 @@ def check(raw: str):
     assert cnt == 100 - 1
 
 def test_dt_conv():
-    
+
     sys = SysBuilder('dt_conv')
     with sys:
         driver = Driver()
@@ -42,9 +42,9 @@ def test_dt_conv():
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
 
     raw = utils.run_simulator(simulator_path)
-    
+
     if verilator_path:
         raw = utils.run_verilator(verilator_path)
-    
+
 if __name__ == '__main__':
     test_dt_conv()

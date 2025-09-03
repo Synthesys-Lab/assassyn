@@ -13,16 +13,16 @@ class Driver(Module):
     def build(self, lhs: Module, rhs: Module):
         cnt = RegArray(UInt(32), 1)
         v = cnt[0]
-        cnt[0] = cnt[0] + UInt(32)(1)
+        (cnt&self)[0] <= cnt[0] + UInt(32)(1)
         lhs.async_called(data=v)
         rhs.async_called(data=v)
 
 
 class ForwardData(Module):
-    
+
     def __init__(self):
         super().__init__(
-            ports={'data': Port(UInt(32))}, 
+            ports={'data': Port(UInt(32))},
         )
 
     @module.combinational
@@ -65,12 +65,12 @@ def test_toposort():
         hs2 = ForwardData()
         hs3 = ForwardData()
         hs4 = ForwardData()
-        
+
         a = hs1.build()
         b = hs2.build()
         c = hs3.build()
         d = hs4.build()
-        
+
         adder1 = Adder()
         adder1.name = 'adder1'
         adder2 = Adder()
@@ -79,7 +79,7 @@ def test_toposort():
         adder3.name = 'adder3'
 
         driver.build(hs1, hs2)
-        
+
         c = adder1.build(a, b, "c")
         d = adder2.build(a, b, "d")
         adder3.build(c, d, "e")

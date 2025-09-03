@@ -8,7 +8,7 @@ class MemUser(Module):
 
     def __init__(self, width):
         super().__init__(
-            ports={'rdata': Port(Bits(width))}, 
+            ports={'rdata': Port(Bits(width))},
         )
 
     @module.combinational

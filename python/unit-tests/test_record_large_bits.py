@@ -7,7 +7,7 @@ import assassyn
 entry = Record(
     symbol = Bits(1),
     a = Bits(32),
-    b = Bits(32)   
+    b = Bits(32)
 )
 
 class Driver(Module):
@@ -25,10 +25,10 @@ class Driver(Module):
             valid_temp = ~record[i].symbol
             valid_global = valid_global | valid_temp
             index = valid_temp.select(Bits(32)(i), index)
-        
+
         with Condition(valid_global):
-            record[index] = entry.bundle(
-                symbol = ~record[index].symbol, 
+            (record&self)[index] <= entry.bundle(
+                symbol = ~record[index].symbol,
                 a = record[index].a,
                 b = index
             ).value()
@@ -44,9 +44,11 @@ def check_raw(raw):
     lines = raw.split('\n')
     expected_indices = list(range(14, -1, -1))  # Expected indices: 14 to 0
     cycle = 1
+    log_lines = (line for line in lines if "index" in line)
     for i, expected_index in enumerate(expected_indices):
         try:
-            actual_index = int(lines[i].strip().split()[-1])
+            log_line = next(log_lines)
+            actual_index = int(log_line.strip().split()[-1])
         except (IndexError, ValueError):
             raise ValueError(f"Line {i} is invalid or does not contain an index: {lines[i]}")
 

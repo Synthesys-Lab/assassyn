@@ -6,7 +6,7 @@ from assassyn import utils
 
 class ModA(Module):
 
- 
+
     def __init__(self):
         super().__init__(ports={'a': Port(Int(32))})
 
@@ -14,11 +14,12 @@ class ModA(Module):
     def build(self, arr: Array):
         a = self.pop_all_ports(True)
         with Condition(a[0: 0]):
-            arr[0] = a
+            (arr&self)[0] <= a
+            # arr[0] = a
 
 
 class ModB(Module):
-    
+
     def __init__(self):
         ports = {
             'a': Port(Int(32))
@@ -29,10 +30,11 @@ class ModB(Module):
     def build(self, arr: Array):
         a = self.pop_all_ports(True)
         with Condition(~a[0: 0]):
-            arr[0] = a
+            (arr&self)[0] = a
+            # arr[0] = a
 
 class ModC(Module):
-    
+
     def __init__(self):
         ports = {
             'a': Port(Int(32))
@@ -43,10 +45,10 @@ class ModC(Module):
     def build(self, arr: Array):
         a = self.pop_all_ports(True)
         v = arr[0]
-        log("a = {} arr = {}", a, v)
-    
+        log("a = {} arr = {} ", a, v)
+
 class Driver(Module):
-     
+
     def __init__(self):
         super().__init__(ports={})
 
@@ -77,7 +79,7 @@ def test_array_multi_read():
     sys = SysBuilder('array_multi_read')
     with sys:
         arr = RegArray(Int(32), 1)
-        
+
         mod_a = ModA()
         mod_a.build(arr)
 
@@ -91,7 +93,7 @@ def test_array_multi_read():
         driver.build(mod_a, mod_b, mod_c)
 
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-    
+
     raw = utils.run_simulator(simulator_path)
     check(raw)
 

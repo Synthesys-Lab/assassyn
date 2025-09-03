@@ -7,7 +7,7 @@ from assassyn import utils
 
 
 class Adder(Module):
-     
+
     def __init__(self):
         ports={
             'msb': Port(Int(32)),
@@ -16,7 +16,7 @@ class Adder(Module):
         super().__init__(
             ports=ports ,
         )
-        
+
     @module.combinational
     def build(self):
         msb, lsb = self.pop_all_ports(True)
@@ -27,11 +27,11 @@ class Adder(Module):
 class Driver(Module):
     def __init__(self):
         super().__init__(ports={})
-    
+
     @module.combinational
     def build(self, add: Adder):
         cnt = RegArray(Int(32), 1)
-        cnt[0] = cnt[0] + Int(32)(1)
+        (cnt&self)[0] <= cnt[0] + Int(32)(1)
         add.async_called(msb = cnt[0], lsb = cnt[0])
 
 def check_concat(raw):

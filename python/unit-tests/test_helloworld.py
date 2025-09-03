@@ -5,12 +5,12 @@ from assassyn.frontend import *
 from assassyn import utils
 
 class Driver(Module):
-    
-    def __init__(self): 
+
+    def __init__(self):
         super().__init__(
             ports={} ,
-        )  
-        
+        )
+
     @module.combinational
     def build(self):
         log("Hello, World!")
@@ -24,7 +24,7 @@ def check_raw(raw):
 
 
 def test_helloworld():
-    
+
     sys = SysBuilder('helloworld')
 
     with sys:
@@ -32,7 +32,7 @@ def test_helloworld():
         driver.build()
 
     simulator_path, verilog_path = elaborate(sys, verilog=utils.has_verilator())
-    
+
     raw = utils.run_simulator(simulator_path)
     check_raw(raw)
 

@@ -10,7 +10,7 @@ def ae(a, b):
     return (c, eq)
 
 class Driver(Module):
-     
+
     def __init__(self):
         super().__init__(ports={})
 

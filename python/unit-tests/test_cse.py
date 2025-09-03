@@ -7,7 +7,7 @@ from assassyn import utils
 
 
 class Adder(Module):
-  
+
     def __init__(self):
         ports={
             'a': Port(Int(32)),
@@ -29,7 +29,7 @@ class Driver(Module):
         super().__init__(
             ports={} ,
         )
-        
+
     @module.combinational
     def build(self, add: Adder):
         cnt = RegArray(Int(32), 1)

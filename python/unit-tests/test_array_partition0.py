@@ -5,20 +5,20 @@ from assassyn.backend import elaborate
 from assassyn.frontend import *
 
 class Driver(Module):
-      
+
     def __init__(self):
             super().__init__(ports={})
-            
+
     @module.combinational
     def build(self):
         a = RegArray(Int(32), 4, partition='full')
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         cnt[0] = v + Int(32)(1)
-        a[0] = v
-        a[1] = v
-        a[2] = v
-        a[3] = v
+        (a&self)[0] <= v
+        (a&self)[1] <= v
+        a[2] <= v
+        (a&self)[3] = v
         a_sum = a[0] + a[1] + a[2] + a[3]
         log("sum(a[:]) = {}", a_sum)
 

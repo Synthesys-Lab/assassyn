@@ -18,7 +18,7 @@ class FSM_m(Module):
         a= self.pop_all_ports(True)
 
         temp = RegArray(Int(32), 1)
-        
+
         cond_default = Bits(1)(1)
         cond1 = a[0:1] == UInt(2)(0)
 
@@ -32,9 +32,9 @@ class FSM_m(Module):
         #TODO how to do it in a more elegant way?
 
         def s0_body():
-            temp[0] = a
+            temp[0] <= a
         def s3_body():
-            temp[0] = (temp[0] * Int(32)(2)).bitcast(Int(32))
+            (temp&self)[0] <= (temp[0] * Int(32)(2)).bitcast(Int(32))
         body_table = {
             "s0": s0_body,
             "s3": s3_body,
@@ -44,7 +44,7 @@ class FSM_m(Module):
 
 
         log("state: {} | a: {} |  temp: {}  ", user_state[0] , a , temp[0])
-        
+
 
 class Driver(Module):
 

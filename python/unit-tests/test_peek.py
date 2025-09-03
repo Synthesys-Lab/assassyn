@@ -5,10 +5,10 @@ from assassyn.backend import elaborate
 from assassyn import utils
 
 class Peeker(Module):
-     
+
     def __init__(self):
         super().__init__(
-            ports={'data': Port(Int(32))}, 
+            ports={'data': Port(Int(32))},
         )
 
     @module.combinational
@@ -17,12 +17,12 @@ class Peeker(Module):
         data_pop    = self.data.pop()
         log("peek: {} pop: {}", data_peek, data_pop)
 
-        
+
 class Driver(Module):
-    
+
     def __init__(self):
             super().__init__(ports={})
-            
+
     @module.combinational
     def build(self, peeker: Module):
         cnt = RegArray(Int(32), 1)
@@ -48,7 +48,7 @@ def test_peek():
         driver.build(peeker)
 
     simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-    
+
     raw = utils.run_simulator(simulator_path)
     check(raw)
 
@@ -58,4 +58,4 @@ def test_peek():
 
 if __name__ == '__main__':
     test_peek()
-        
+

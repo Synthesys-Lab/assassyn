@@ -17,7 +17,7 @@ class Adder2(Module):
     def build(self):
         a, b = self.pop_all_ports(True)
         c = a * b
- 
+
         d = a + b + c
         log("combi: {} + {} + {}*{} = {} ", a, b, a, b, d)
 
@@ -42,7 +42,7 @@ class Adder1(Module):
             d = a + b + e
             if not is_gold:
                 barrier(d)
-            f = d * c        
+            f = d * c
             adder.async_called(a = f[0:31].bitcast(Int(32)), b = d[0:31].bitcast(Int(32)))
 
         return f
@@ -57,7 +57,7 @@ class Driver(Module):
     def build(self, adder: Adder1):
 
         cnt = RegArray(Int(32), 1)
-        cnt[0] = cnt[0] + Int(32)(1)
+        (cnt&self)[0] <= cnt[0] + Int(32)(1)
         cnt_div2_temp = cnt[0] + Int(32)(1)
         cnt_div2 = Int(32)(0)
         cnt_div2 = cnt[0][0:0].select(cnt[0], cnt_div2_temp)

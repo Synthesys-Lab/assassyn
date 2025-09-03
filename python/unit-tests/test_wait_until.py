@@ -45,7 +45,7 @@ class Driver(Module):
         with Condition(is_even):
             flip = ~lock[0]
             log('flip to {}', flip)
-            lock[0] = flip
+            (lock&self)[0] <= flip
 
 def parse_simulator_log(toks):
     cycle = utils.parse_simulator_cycle(toks)

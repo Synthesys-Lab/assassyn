@@ -6,7 +6,7 @@ from assassyn import utils
 
 
 class Squarer(Module):
-    
+
     def __init__(self):
         super().__init__(
             ports={'a': Port(Int(32))},
@@ -54,15 +54,15 @@ class Arbiter(Module):
             log("grants even")
             a0 = self.a0.pop()
             sqr.async_called(a = a0)
-            grant_1h[0] = Bits(2)(1)
+            (grant_1h&self)[0] = Bits(2)(1)
         with Condition(grant1):
             log("grants odd")
             a1 = self.a1.pop()
             sqr.async_called(a = a1)
-            grant_1h[0] = Bits(2)(2)
+            (grant_1h&self)[0] = Bits(2)(2)
 
 class Driver(Module):
-    
+
         def __init__(self):
             super().__init__(ports={})
 
@@ -101,7 +101,7 @@ def test_arbiter():
 
         arb = Arbiter()
         arb.build(sqr)
-        
+
         driver = Driver()
         driver.build(arb)
 
@@ -114,6 +114,7 @@ def test_arbiter():
 
     if verilog_path:
         raw = utils.run_verilator(verilog_path)
+        print(raw)
         check(raw)
 
 if __name__ == '__main__':

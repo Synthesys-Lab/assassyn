@@ -22,10 +22,10 @@ class MulStage1(Module):
     @module.combinational
     def build(self, stage1_reg: Array):
         a, b, cnt = self.pop_all_ports(True)
-        
+
         with Condition(cnt < Int(32)(32)):# avoid overflow
             b_bit = ((b >> cnt) & Int(32)(1)).bitcast(Int(32))  # to get the cnt-th bit from the right
-            stage1_reg[0] = a * b_bit  # 'a' multiply b[cnt-1]
+            (stage1_reg&self)[0] <= a * b_bit  # 'a' multiply b[cnt-1]
             log("MulStage1: {:?} * {:?} = {:?}", a, b_bit, a * b_bit)
 
 
@@ -46,7 +46,7 @@ class MulStage2(Module):
             bit_num = cnt - Int(32)(1)   # avoid overflow
             with Condition(bit_num < Int(32)(32)):
                 # left shift to multiply weight
-                stage2_reg[0] = (stage1_reg[0] << bit_num).bitcast(Int(64))
+                stage2_reg[0] <= (stage1_reg[0] << bit_num).bitcast(Int(64))
                 log("MulStage2: {:?}", stage2_reg[0])
 
 
