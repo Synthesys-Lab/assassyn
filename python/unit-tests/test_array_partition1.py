@@ -33,8 +33,8 @@ def check(raw, parse_cycle):
             idx1 = (cycle + 1) % 4
             expect = a[idx0] + a[idx1]
             assert expect == int(line_toks[-1]), f"@cycle: {cycle}: expect {expect}, got {line_toks[-1]}"
-            (a & self)[idx0] <= cycle * cycle
-            (a & self)[idx1] <= (cycle + 1) * 2
+            a[idx0] = cycle * cycle
+            a[idx1] = (cycle + 1) * 2
 
 def test_array_partition1():
     sys = SysBuilder('array_partition1')
