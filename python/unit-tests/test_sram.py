@@ -36,7 +36,7 @@ class Driver(Module):
         waddr = plused[0:8]
         raddr = v[0:8]
         addr = we.select(waddr, raddr).bitcast(Int(9))
-        cnt[0] = plused
+        (cnt & self)[0] <= plused
         sram = SRAM(width, 512, init_file)
         sram.build(we, re, addr, v.bitcast(Bits(width)), user)
         with Condition(re):

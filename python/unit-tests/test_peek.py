@@ -29,7 +29,7 @@ class Driver(Module):
         v = cnt[0]
         peeker.async_called(data = v)
         v = v + Int(32)(1)
-        cnt[0] = v
+        (cnt & self)[0] <= v
 
 def check(raw):
     for i in raw.split('\n'):

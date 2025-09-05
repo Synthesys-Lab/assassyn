@@ -42,7 +42,7 @@ class Driver(Module):
     def build(self, lhs: Lhs, rhs):
         cnt = RegArray(Int(32), 1)
         v = cnt[0] + Int(32)(1)
-        (cnt&self)[0] <= v
+        (cnt & self)[0] <= v
 
         lhs.async_called(a = v + v)
         rhs.async_called(b = v)

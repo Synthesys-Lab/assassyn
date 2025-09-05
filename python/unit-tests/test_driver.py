@@ -10,7 +10,7 @@ class Driver(Module):
     @module.combinational
     def build(self):
         cnt = RegArray(UInt(32), 1)
-        cnt[0] = cnt[0] + UInt(32)(1)
+        (cnt & self)[0] <= cnt[0] + UInt(32)(1)
         log('cnt: {}', cnt[0]);
 
 def check(raw):

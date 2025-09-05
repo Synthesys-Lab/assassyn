@@ -39,7 +39,7 @@ class Driver(Module):
         cnt = RegArray(Int(32), 1)
         is_odd = cnt[0][0:0]
         is_even = ~is_odd
-        cnt[0] = cnt[0] + Int(32)(1)
+        (cnt & self)[0] <= cnt[0] + Int(32)(1)
         with Condition(is_odd):
             agent.async_called(a = cnt[0])
         with Condition(is_even):

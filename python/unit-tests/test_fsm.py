@@ -32,9 +32,9 @@ class FSM_m(Module):
         #TODO how to do it in a more elegant way?
 
         def s0_body():
-            temp[0] <= a
+            (temp & self)[0] <= a
         def s3_body():
-            (temp&self)[0] <= (temp[0] * Int(32)(2)).bitcast(Int(32))
+            (temp & self)[0] <= (temp[0] * Int(32)(2)).bitcast(Int(32))
         body_table = {
             "s0": s0_body,
             "s3": s3_body,

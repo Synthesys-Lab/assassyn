@@ -15,10 +15,10 @@ class Driver(Module):
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         cnt[0] = v + Int(32)(1)
-        (a&self)[0] <= v
-        (a&self)[1] <= v
-        a[2] <= v
-        (a&self)[3] = v
+        (a & self)[0] <= v
+        (a & self)[1] <= v
+        (a & self)[2] <= v
+        (a & self)[3] <= v
         a_sum = a[0] + a[1] + a[2] + a[3]
         log("sum(a[:]) = {}", a_sum)
 

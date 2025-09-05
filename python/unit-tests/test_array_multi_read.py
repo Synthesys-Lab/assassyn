@@ -57,7 +57,7 @@ class Driver(Module):
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         new_v = v + Int(32)(1)
-        cnt[0] = new_v
+        (cnt & self)[0] <= new_v
         mod_a.async_called(a = v)
         mod_b.async_called(a = v)
         mod_c.async_called(a = v)

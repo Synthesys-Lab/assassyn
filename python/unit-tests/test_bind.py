@@ -53,7 +53,7 @@ class Driver(Module):
     @module.combinational
     def build(self, lhs: Lhs, rhs: Rhs):
         cnt = RegArray(Int(32), 1)
-        (cnt&self)[0] <= cnt[0] + Int(32)(1)
+        (cnt & self)[0] <= cnt[0] + Int(32)(1)
         v = cnt[0] * cnt[0]
 
         call_lhs = lhs.async_called(lhs_a = v[0: 31].bitcast(Int(32)))

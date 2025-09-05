@@ -31,7 +31,7 @@ class Driver(Module):
     @module.combinational
     def build(self, add: Adder):
         cnt = RegArray(Int(32), 1)
-        (cnt&self)[0] <= cnt[0] + Int(32)(1)
+        (cnt & self)[0] <= cnt[0] + Int(32)(1)
         add.async_called(msb = cnt[0], lsb = cnt[0])
 
 def check_concat(raw):

@@ -26,8 +26,8 @@ class Driver(Module):
         rand0 = rand0[0: 31].bitcast(UInt(32))
         rand1 = rand1[0: 31].bitcast(UInt(32))
 
-        rng0[0] = rand0
-        rng1[0] = rand1
+        (rng0 & self)[0] <= rand0
+        (rng1 & self)[0] <= rand1
 
         gt = rand0 > rand1
         mux = gt.select(rand0, rand1)

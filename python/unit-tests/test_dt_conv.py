@@ -18,7 +18,7 @@ class Driver(Module):
         i64s = i32.sext(Int(64))
 
         b32_array = RegArray(Bits(32), 1)
-        b32_array[0] <= b32
+        (b32_array & self)[0] <= b32
         i64z_array = RegArray(Int(64), 1)
         i64s_array = RegArray(Int(64), 1)
         (i64z_array&self)[0] <= i64z

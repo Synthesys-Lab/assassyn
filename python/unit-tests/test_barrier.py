@@ -67,13 +67,13 @@ class Driver(Module):
         # The code below is equivalent
         # cnt = RegArray(Int(32), 0)
         # v = cnt[0]
-        # cnt[0] = v + Int(32)(1)
+        # (cnt & self)[0] <= v + Int(32)(1)
         # NOTE: cnt[0]'s new value is NOT visible until next cycle.
         # cond = v < Int(32)(100)
         # with Condition(cond):
         #     adder.async_called(a = v, b = v)
         cnt = RegArray(Int(32), 1)
-        (cnt&self)[0] <= cnt[0] + Int(32)(1)
+        (cnt & self)[0] <= cnt[0] + Int(32)(1)
         cnt_div2_temp = cnt[0] + Int(32)(1)
         cnt_div2 = Int(32)(0)
         cnt_div2 = cnt[0][0:0].select(cnt[0], cnt_div2_temp)

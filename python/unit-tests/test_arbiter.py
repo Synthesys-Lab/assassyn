@@ -54,12 +54,12 @@ class Arbiter(Module):
             log("grants even")
             a0 = self.a0.pop()
             sqr.async_called(a = a0)
-            (grant_1h&self)[0] = Bits(2)(1)
+            (grant_1h & self)[0] <= Bits(2)(1)
         with Condition(grant1):
             log("grants odd")
             a1 = self.a1.pop()
             sqr.async_called(a = a1)
-            (grant_1h&self)[0] = Bits(2)(2)
+            (grant_1h & self)[0] <= Bits(2)(2)
 
 class Driver(Module):
 
@@ -75,7 +75,7 @@ class Driver(Module):
             even = even[0: 31]
             even = even.bitcast(Int(32))
             odd = even + Int(32)(1)
-            cnt[0] = v
+            (cnt & self)[0] <= v
             is_odd = v[0: 0]
             with Condition(is_odd):
                 # arb.async_called(a0 = even, a1 = odd)

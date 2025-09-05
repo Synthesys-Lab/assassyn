@@ -46,7 +46,7 @@ class MulStage2(Module):
             bit_num = cnt - Int(32)(1)   # avoid overflow
             with Condition(bit_num < Int(32)(32)):
                 # left shift to multiply weight
-                stage2_reg[0] <= (stage1_reg[0] << bit_num).bitcast(Int(64))
+                (stage2_reg & self)[0] <= (stage1_reg[0] << bit_num).bitcast(Int(64))
                 log("MulStage2: {:?}", stage2_reg[0])
 
 
@@ -63,7 +63,7 @@ class MulStage3(Module):
     @module.combinational
     def build(self, stage2_reg: Array, stage3_reg: Array):
         cnt, a, b = self.pop_all_ports(True)
-        stage3_reg[0] = stage2_reg[0] + stage3_reg[0]
+        (stage3_reg&self)[0] <= stage2_reg[0] + stage3_reg[0]
         log("MulStage3: {:?}", stage3_reg[0])
         log("Temp result {:?} of {:?} * {:?} = {:?}", cnt, a, b, stage3_reg[0])
 
@@ -78,7 +78,7 @@ class Driver(Module):
     @module.combinational
     def build(self, mulstage1: MulStage1, mulstage2: MulStage2, mulstage3: MulStage3):
         cnt = RegArray(Int(32), 1)
-        cnt[0] = cnt[0] + Int(32)(1)
+        (cnt & self)[0] <= cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(35)
 
         # random test input

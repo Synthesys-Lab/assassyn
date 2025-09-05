@@ -20,16 +20,19 @@ class FSM_m(Module):
         temp = RegArray(Int(32), 1)
 
         with Condition(state[0] == UInt(2)(0)):
-            temp[0] = a
-            state[0] = UInt(2)(1)
+            (temp & self)[0] <= a
+            (state & self)[0] <= UInt(2)(1)
+
         with Condition(state[0] == UInt(2)(1)):
             with Condition(a[0:1] == UInt(2)(0)):
-                state[0] = UInt(2)(2)
+                (state & self)[0] <= UInt(2)(2)
+
         with Condition(state[0] == UInt(2)(2)):
-            state[0] = UInt(2)(3)
+            (state & self)[0] <= UInt(2)(3)
+
         with Condition(state[0] == UInt(2)(3)):
-            temp[0] = (temp[0] * Int(32)(2)).bitcast(Int(32))
-            state[0] = UInt(2)(0)
+            (temp & self)[0] <= (temp[0] * Int(32)(2)).bitcast(Int(32))
+            (state & self)[0] <= UInt(2)(0)
 
         log("state: {} | a: {} |  temp: {} ", state[0] , a , temp[0])
 
@@ -43,7 +46,7 @@ class Driver(Module):
     def build(self, adder: FSM_m):
 
         cnt = RegArray(Int(32), 1)
-        cnt[0] = cnt[0] + Int(32)(1)
+        (cnt & self)[0] <= cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(100)
         with Condition(cond):
             adder.async_called(a = cnt[0])

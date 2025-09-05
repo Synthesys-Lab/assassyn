@@ -27,7 +27,7 @@ class Driver(Module):
             index = valid_temp.select(Bits(32)(i), index)
 
         with Condition(valid_global):
-            (record&self)[index] <= entry.bundle(
+            (record & self)[index] <= entry.bundle(
                 symbol = ~record[index].symbol,
                 a = record[index].a,
                 b = index

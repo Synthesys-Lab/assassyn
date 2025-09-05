@@ -46,7 +46,7 @@ class Driver(Module):
             cnt = RegArray(Int(32), 1)
             k = cnt[0]
             v = k + Int(32)(1)
-            cnt[0] = v
+            (cnt & self)[0] <= v
             vv = v + v
             lhs.async_called(v = vv)
             rhs.async_called(b = v)
