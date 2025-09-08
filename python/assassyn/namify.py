@@ -200,19 +200,21 @@ class UnifiedNamingStrategy:
                     stop = node.slice.upper.value if node.slice.upper else 32
                     self.collected_names.append(f"{node.value.id}_bits_{start}to{stop}")
             else:
-                # Simple subscript: cnt[0] → array_cnt_0
-                base_name = node.value.id
-                index_node = node.slice
+                current_node = node
+                indices = []
+                while isinstance(current_node, ast.Subscript):
+                    index_node = current_node.slice
+                    if isinstance(index_node, ast.Constant):
+                        indices.append(index_node.value)
+                    elif isinstance(index_node, ast.Name):
+                        indices.append(index_node.id)
+                    current_node = current_node.value
+                base_name = current_node.id
+                indices.reverse()
 
-                if isinstance(index_node, ast.Constant):
-                    # Handles a numeric index, e.g., my_array[0]
-                    index_val = index_node.value
-                    target_name = f"array_{base_name}_{index_val}"
-                elif isinstance(index_node, ast.Name):
-                    # Handles a variable index, e.g., my_array[i]
-                    index_val = index_node.id
-                    target_name = f"array_{base_name}_{index_val}"
-                self.collected_names.append(f"{target_name}")
+                indices_str = '_'.join(map(str, indices))
+                target_name = f"array_{base_name}_{indices_str}"
+                self.collected_names.append(target_name)
 
     def _process_pop_all_ports(self, target: ast.Tuple) -> None:
         """Process pop_all_ports tuple unpacking"""

@@ -569,47 +569,46 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                         (e, p) for e, p in exposes
                         if isinstance(e, MultiPortArrayWrite)
                     ]
-                for arr in key.partition:
-                    # Group by module/port
-                    array_name = self.dump_rval(arr, False)
-                    array_dtype = arr.scalar_ty
-                    port_mapping = self.array_write_port_mapping.get(arr, {})
-                    # Group writes by their source module
-                    writes_by_module = {}
-                    for expr, pred in multiport_writes:
-                        module = expr.module
-                        if module not in writes_by_module:
-                            writes_by_module[module] = []
-                        writes_by_module[module].append((expr, pred))
-                    # Generate signals for each port
-                    for module, module_writes in writes_by_module.items():
-                        port_idx = port_mapping[module]
-                        port_suffix = f"_port{port_idx}"
-                        # Write enable
-                        ce_terms = [p for _, p in module_writes]
-                        self.append_code(
-                            f'self.{array_name}_w{port_suffix} = '
-                            f'executed_wire & ({" | ".join(ce_terms)})'
+                arr = key
+                array_name = self.dump_rval(arr, False)
+                array_dtype = arr.scalar_ty
+                port_mapping = self.array_write_port_mapping.get(arr, {})
+                # Group writes by their source module
+                writes_by_module = {}
+                for expr, pred in multiport_writes:
+                    module = expr.module
+                    if module not in writes_by_module:
+                        writes_by_module[module] = []
+                    writes_by_module[module].append((expr, pred))
+                # Generate signals for each port
+                for module, module_writes in writes_by_module.items():
+                    port_idx = port_mapping[module]
+                    port_suffix = f"_port{port_idx}"
+                    # Write enable
+                    ce_terms = [p for _, p in module_writes]
+                    self.append_code(
+                        f'self.{array_name}_w{port_suffix} = '
+                        f'executed_wire & ({" | ".join(ce_terms)})'
+                    )
+                    # Write data (mux if multiple writes from same module)
+                    if len(module_writes) == 1:
+                        wdata = self.dump_rval(module_writes[0][0].val, False)
+                        if module_writes[0][0].val.dtype != dump_type(array_dtype):
+                            wdata = f"{wdata}.{dump_type_cast(array_dtype)}"
+                    else:
+                        # Build mux chain
+                        wdata = self._build_mux_chain(module_writes, array_dtype)
+                    self.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata}')
+                    widx_mux = (
+                        f"Mux({module_writes[0][1]},"
+                        f" {dump_type(module_writes[0][0].idx.dtype)}(0),"
+                        f" {self.dump_rval(module_writes[0][0].idx, False)})"
+                    )
+                    for expr, pred in module_writes[1:]:
+                        widx_mux = f"Mux({pred},  {widx_mux},{self.dump_rval(expr.idx, False)})"
+                    self.append_code(
+                        f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()'
                         )
-                        # Write data (mux if multiple writes from same module)
-                        if len(module_writes) == 1:
-                            wdata = self.dump_rval(module_writes[0][0].val, False)
-                            if module_writes[0][0].val.dtype != dump_type(array_dtype):
-                                wdata = f"{wdata}.{dump_type_cast(array_dtype)}"
-                        else:
-                            # Build mux chain
-                            wdata = self._build_mux_chain(module_writes, array_dtype)
-                        self.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata}')
-                        widx_mux = (
-                            f"Mux({module_writes[0][1]},"
-                            f" {dump_type(module_writes[0][0].idx.dtype)}(0),"
-                            f" {self.dump_rval(module_writes[0][0].idx, False)})"
-                        )
-                        for expr, pred in module_writes[1:]:
-                            widx_mux = f"Mux({pred},  {widx_mux},{self.dump_rval(expr.idx, False)})"
-                        self.append_code(
-                            f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()'
-                            )
 
             elif isinstance(key, Port):
                 has_push = any(isinstance(e, FIFOPush) for e, p in exposes)
@@ -782,29 +781,27 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             self.append_code(f'{namify(callee.name)}_trigger = Output(UInt(8))')
         # pylint: disable=too-many-nested-blocks
         for arr_container in self.sys.arrays:
-            for arr in arr_container.partition:
-                if node in self.array_users.get(arr, []):
-                    self.append_code(
-                        f"{namify(arr.name)}_q_in = "
-                        f"Input(dim({dump_type(arr.scalar_ty)}, {arr.size}))"
-                    )
-
-                    port_mapping = self.array_write_port_mapping.get(arr, {})
-                    for module_key, port_idx in port_mapping.items():
-                        if module_key == node:
-                            port_suffix = f"_port{port_idx}"
-                            self.append_code( \
-                                f'{namify(arr.name)}_w{port_suffix} = Output(Bits(1))')
-                            self.append_code(
-                                f'{namify(arr.name)}_wdata{port_suffix} ='
-                                f' Output({dump_type(arr.scalar_ty)})'
-                            )
-
-                            idx_type = arr.index_bits if arr.index_bits > 0 else 1
-                            self.append_code(
-                                f'{namify(arr.name)}_widx{port_suffix} ='
-                                f' Output(Bits({idx_type}))'
-                            )
+            arr = arr_container
+            if node in self.array_users.get(arr, []):
+                self.append_code(
+                    f"{namify(arr.name)}_q_in = "
+                    f"Input(dim({dump_type(arr.scalar_ty)}, {arr.size}))"
+                )
+                port_mapping = self.array_write_port_mapping.get(arr, {})
+                for module_key, port_idx in port_mapping.items():
+                    if module_key == node:
+                        port_suffix = f"_port{port_idx}"
+                        self.append_code( \
+                            f'{namify(arr.name)}_w{port_suffix} = Output(Bits(1))')
+                        self.append_code(
+                            f'{namify(arr.name)}_wdata{port_suffix} ='
+                            f' Output({dump_type(arr.scalar_ty)})'
+                        )
+                        idx_type = arr.index_bits if arr.index_bits > 0 else 1
+                        self.append_code(
+                            f'{namify(arr.name)}_widx{port_suffix} ='
+                            f' Output(Bits({idx_type}))'
+                        )
 
 
         for port_code in self.exposed_ports_to_add:
@@ -847,18 +844,17 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.sys = sys
 
         for arr_container in sys.arrays:
-            for sub_array in arr_container.partition:
-                if sub_array not in self.array_write_port_mapping:
-                    self.array_write_port_mapping[sub_array] = {}
-                sub_array_writers = sub_array.get_write_ports()
-                for module, _ in sub_array_writers.items():
-                    if module not in self.array_write_port_mapping[sub_array]:
-                        port_idx = len(self.array_write_port_mapping[sub_array])
-                        self.array_write_port_mapping[sub_array][module] = port_idx
+            sub_array = arr_container
+            if sub_array not in self.array_write_port_mapping:
+                self.array_write_port_mapping[sub_array] = {}
+            sub_array_writers = sub_array.get_write_ports()
+            for module, _ in sub_array_writers.items():
+                if module not in self.array_write_port_mapping[sub_array]:
+                    port_idx = len(self.array_write_port_mapping[sub_array])
+                    self.array_write_port_mapping[sub_array][module] = port_idx
 
         for arr_container in sys.arrays:
-            for arr in arr_container.partition:
-                self.visit_array(arr)
+            self.visit_array(arr_container)
 
         expr_to_module = {}
         for module in sys.modules + sys.downstreams:
@@ -891,13 +887,13 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
         self.array_users = {}
         for arr_container in self.sys.arrays:# pylint: disable=R1702
-            for arr in arr_container.partition:
-                self.array_users[arr] = []
-                for mod in self.sys.modules + self.sys.downstreams:
-                    for expr in self._walk_expressions(mod.body):
-                        if isinstance(expr, (ArrayRead, ArrayWrite)) and expr.array == arr:
-                            if mod not in self.array_users[arr]:
-                                self.array_users[arr].append(mod)
+            arr = arr_container
+            self.array_users[arr] = []
+            for mod in self.sys.modules + self.sys.downstreams:
+                for expr in self._walk_expressions(mod.body):
+                    if isinstance(expr, (ArrayRead, ArrayWrite)) and expr.array == arr:
+                        if mod not in self.array_users[arr]:
+                            self.array_users[arr].append(mod)
 
         for elem in sys.modules:
             self.current_module = elem
@@ -1032,35 +1028,34 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             self.append_code(f'{tc_base_name}_pop_ready = Wire(Bits(1))')
 
         for arr_container in self.sys.arrays:
-            for arr in arr_container.partition:
-                arr_name = namify(arr.name)
-                index_bits = arr.index_bits if arr.index_bits > 0 else 1
-
-                port_mapping = self.array_write_port_mapping.get(arr, {})
-                num_ports = len(port_mapping)
-                self.append_code(f'# Multi-port array {arr_name} with {num_ports} write ports')
-                # Declare wires for each port
-                for port_idx in range(num_ports):
-                    port_suffix = f"_port{port_idx}"
-                    self.append_code(f'aw_{arr_name}_w{port_suffix} = Wire(Bits(1))')
-                    self.append_code(
-                        f'aw_{arr_name}_wdata{port_suffix} = Wire({dump_type(arr.scalar_ty)})'
-                    )
-                    self.append_code(
-                        f'aw_{arr_name}_widx{port_suffix} = Wire(Bits({index_bits}))'
-                    )
-                # Instantiate multi-port array
-                port_connections = ['clk=self.clk', 'rst=self.rst']
-                for port_idx in range(num_ports):
-                    port_suffix = f"_port{port_idx}"
-                    port_connections.extend([
-                        f'w{port_suffix}=aw_{arr_name}_w{port_suffix}',
-                        f'wdata{port_suffix}=aw_{arr_name}_wdata{port_suffix}',
-                        f'widx{port_suffix}=aw_{arr_name}_widx{port_suffix}'
-                    ])
+            arr = arr_container
+            arr_name = namify(arr.name)
+            index_bits = arr.index_bits if arr.index_bits > 0 else 1
+            port_mapping = self.array_write_port_mapping.get(arr, {})
+            num_ports = len(port_mapping)
+            self.append_code(f'# Multi-port array {arr_name} with {num_ports} write ports')
+            # Declare wires for each port
+            for port_idx in range(num_ports):
+                port_suffix = f"_port{port_idx}"
+                self.append_code(f'aw_{arr_name}_w{port_suffix} = Wire(Bits(1))')
                 self.append_code(
-                    f'array_writer_{arr_name} = {arr_name}({", ".join(port_connections)})'
+                    f'aw_{arr_name}_wdata{port_suffix} = Wire({dump_type(arr.scalar_ty)})'
                 )
+                self.append_code(
+                    f'aw_{arr_name}_widx{port_suffix} = Wire(Bits({index_bits}))'
+                )
+            # Instantiate multi-port array
+            port_connections = ['clk=self.clk', 'rst=self.rst']
+            for port_idx in range(num_ports):
+                port_suffix = f"_port{port_idx}"
+                port_connections.extend([
+                    f'w{port_suffix}=aw_{arr_name}_w{port_suffix}',
+                    f'wdata{port_suffix}=aw_{arr_name}_wdata{port_suffix}',
+                    f'widx{port_suffix}=aw_{arr_name}_widx{port_suffix}'
+                ])
+            self.append_code(
+                f'array_writer_{arr_name} = {arr_name}({", ".join(port_connections)})'
+            )
 
         # --- 2. Hardware Instantiations (Generic) ---
         self.append_code('\n# --- Hardware Instantiations ---')
@@ -1210,8 +1205,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                         )
         self.append_code('\n# --- Array Write-Back Connections ---')
         for arr_container in self.sys.arrays:
-            for arr in arr_container.partition:
-                self._connect_multiport_array(arr)
+            self._connect_multiport_array(arr_container)
 
         self.append_code('\n# --- Trigger Counter Delta Connections ---')
         for module in self.sys.modules:

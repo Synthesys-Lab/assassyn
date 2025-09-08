@@ -47,25 +47,20 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("_lib: Arc<Library>,\n")
     home = repo_path()
     # Add array fields to simulator struct
-    for elem in sys.arrays:
-
-        for array in elem.partition:
-            name = namify(array.name)
-
-            dtype = dtype_to_rust_type(array.scalar_ty)
-            fd.write(f"pub {name} : Array<{dtype}>, ")
-
-            # Handle array initialization
-            if array.initializer:
-                init_values = []
-                for x in array.initializer:
-                    init_values.append(int_imm_dumper_impl(array.scalar_ty, x))
-                init_str = ", ".join(init_values)
-                simulator_init.append(f"{name} : Array::new_with_init(vec![{init_str}]),")
-            else:
-                simulator_init.append(f"{name} : Array::new({array.size}),")
-
-            registers.append(name)
+    for array in sys.arrays:
+        name = namify(array.name)
+        dtype = dtype_to_rust_type(array.scalar_ty)
+        fd.write(f"pub {name} : Array<{dtype}>, ")
+        # Handle array initialization
+        if array.initializer:
+            init_values = []
+            for x in array.initializer:
+                init_values.append(int_imm_dumper_impl(array.scalar_ty, x))
+            init_str = ", ".join(init_values)
+            simulator_init.append(f"{name} : Array::new_with_init(vec![{init_str}]),")
+        else:
+            simulator_init.append(f"{name} : Array::new({array.size}),")
+        registers.append(name)
 
     # Track expressions with external visibility
     expr_validities = set()
