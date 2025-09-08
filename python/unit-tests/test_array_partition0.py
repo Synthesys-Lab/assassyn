@@ -11,15 +11,15 @@ class Driver(Module):
 
     @module.combinational
     def build(self):
-        a = RegArray(Int(32), 4, partition='full')
+        a = [RegArray(Int(32), 1) for _ in range(4)]
         cnt = RegArray(Int(32), 1)
         v = cnt[0]
         cnt[0] = v + Int(32)(1)
-        (a & self)[0] <= v
-        (a & self)[1] <= v
-        (a & self)[2] <= v
-        (a & self)[3] <= v
-        a_sum = a[0] + a[1] + a[2] + a[3]
+        (a[0] & self)[0] <= v
+        (a[1] & self)[0] <= v
+        (a[2] & self)[0] <= v
+        (a[3] & self)[0] <= v
+        a_sum = a[0][0] + a[1][0] + a[2][0] + a[3][0]
         log("sum(a[:]) = {}", a_sum)
 
 def check(raw, parser):
