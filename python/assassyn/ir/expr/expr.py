@@ -705,6 +705,8 @@ class Select1Hot(Expr):
         for i in values:
             assert reference.dtype == i.dtype, f'{reference.dtype} != {i.dtype}'
         super().__init__(opcode, [cond] + list(values))
+        # pylint: disable=import-outside-toplevel
+        from ..dtype import Int
 
     @property
     def dtype(self) -> DType:

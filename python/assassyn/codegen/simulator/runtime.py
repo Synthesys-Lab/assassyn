@@ -70,7 +70,7 @@ impl <T: Sized + Default + Clone> MultiPortXEQ<T> {
 
   pub fn pop_all(&mut self, current: usize) -> Vec<MultiPortArrayWrite<T>> {
     let mut writes = Vec::new();
-    
+
     // Collect all writes up to current cycle
     while let Some((&cycle, _)) = self.q.first_key_value() {
       if cycle <= current {
@@ -81,7 +81,7 @@ impl <T: Sized + Default + Clone> MultiPortXEQ<T> {
         break;
       }
     }
-    
+
     writes
   }
 }
@@ -101,7 +101,7 @@ impl <T: Sized + Default + Clone> Array<T> {
       write_multiport: MultiPortXEQ::new(),
     }
   }
-  
+
   pub fn new_with_init(payload: Vec<T>) -> Self {
     Array {
       payload,
@@ -109,24 +109,24 @@ impl <T: Sized + Default + Clone> Array<T> {
       write_multiport: MultiPortXEQ::new(),
     }
   }
-  
+
   pub fn tick(&mut self, cycle: usize) {
     // Process single-port writes first (for backward compatibility)
     if let Some(event) = self.write.pop(cycle) {
       self.payload[event.addr] = event.data;
     }
-    
+
     // Process multi-port writes
     let multiport_writes = self.write_multiport.pop_all(cycle);
-    
+
     // Apply writes with conflict resolution
     // Strategy: Last write wins (could be changed to priority-based or other schemes)
     let mut write_map: BTreeMap<usize, (T, &'static str, usize)> = BTreeMap::new();
-    
+
     for write in multiport_writes {
       write_map.insert(write.addr, (write.data, write.pusher, write.port_id));
     }
-    
+
     // Apply all writes
     for (addr, (data, _, _)) in write_map {
       self.payload[addr] = data;
@@ -248,7 +248,7 @@ impl <T: Sized + Cycled>XEQ<T> {
   }
 
   pub fn pop(&mut self, current: usize) -> Option<T> {
-    if self.q.first_key_value().map_or(false, |(cycle, _)| *cycle <= current) {
+    if self.q.first_key_value().map_or(false, |(cycle, _)| *cycle >= current) {
       self.q.pop_first().map(|(_, event)| event)
     } else {
       None

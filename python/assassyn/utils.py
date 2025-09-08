@@ -3,7 +3,7 @@
 # import timeit
 import os
 import subprocess
-
+import re
 
 def identifierize(obj):
     '''The helper function to get the identifier of the given object. You can change `id_slice`
@@ -40,6 +40,29 @@ def package_path():
 def _cmd_wrapper(cmd):
     return subprocess.check_output(cmd).decode('utf-8')
 
+def patch_fifo(file_path):
+    """
+    Replaces all occurrences of 'fifo_n #(' with 'fifo #(' in the Top.sv
+    """
+    if not os.path.isfile(file_path):
+        return
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        pattern = re.compile(r'fifo_\d+\s*#\s*\(')
+        replacement = 'fifo #('
+
+        new_content, num_replacements = pattern.subn(replacement, content)
+
+        if num_replacements > 0:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(new_content)
+    except Exception:
+        pass
+
+
 def run_simulator(manifest_path, offline=False, release=True):
     '''The helper function to run the simulator'''
     cmd = ['cargo', 'run', '--manifest-path', manifest_path]
@@ -54,10 +77,10 @@ def run_verilator(path):
     '''The helper function to run the verilator'''
     # restore = os.getcwd()
     os.chdir(path)
-    cmd_design = ['python3', 'design.py']
+    cmd_design = ['python', 'design.py']
     subprocess.check_output(cmd_design)
-
-    cmd_tb = ['python3', 'tb.py']
+    patch_fifo("sv/hw/Top.sv")
+    cmd_tb = ['python', 'tb.py']
     res = _cmd_wrapper(cmd_tb)
     # cmd = ['make', 'main', '-j']
     # subprocess.check_output(cmd).decode('utf-8')

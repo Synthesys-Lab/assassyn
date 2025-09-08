@@ -1,51 +1,53 @@
 """Analysis utilities for Assassyn."""
 
-from ..ir.expr import Expr, FIFOPush
+from ..ir.expr import Expr, FIFOPush,Bind
 from ..ir.module import Downstream
 
 from .external_usage import expr_externally_used
 
-
 def topo_downstream_modules(sys):
-    """Analyze the topological order of modules.
+    """Topologically sort downstream modules based on their dependencies."""
+    from collections import defaultdict, deque
 
-    This is a simplified implementation of the topo_sort function in Rust.
-    """
-    # Get all downstream modules
-    downstreams = sys.downstreams[:]
+    downstreams = list(sys.downstreams) if hasattr(sys, 'downstreams') else []
 
-    # Build dependency graph
-    graph = {}
-    in_degree = {}
+    graph = defaultdict(list)
+    in_degree = defaultdict(int)
 
     for module in downstreams:
-        deps = set()
-        in_degree[module] = 0
-        graph[module] = []
-        for elem in module.externals.keys():
-            if isinstance(elem, Expr):
-                depend = elem.parent.module
-                if isinstance(depend, Downstream):
-                    deps.add(depend)
-        for dep in deps:
-            graph[dep].append(module)
-            in_degree[module] += 1
+        if module not in graph:
+            graph[module] = []
+        if module not in in_degree:
+            in_degree[module] = 0
+
+    for module in downstreams:
+        # Get upstream modules (modules this module depends on)
+        upstreams = get_upstreams(module)
+
+        # For each upstream, if it's also a downstream, add dependency
+        for upstream in upstreams:
+            if upstream in downstreams:
+                # upstream -> module (module depends on upstream)
+                graph[upstream].append(module)
+                in_degree[module] += 1
 
     # Topological sort
-    queue = [m for m in downstreams if in_degree[m] == 0]
+    queue = deque([m for m in downstreams if in_degree[m] == 0])
     result = []
 
     while queue:
-        node = queue.pop(0)
-        result.append(node)
+        module = queue.popleft()
+        result.append(module)
 
-        for neighbor in graph[node]:
+        for neighbor in graph[module]:
             in_degree[neighbor] -= 1
             if in_degree[neighbor] == 0:
                 queue.append(neighbor)
 
-    return result
+    if len(result) != len(downstreams):
+        raise ValueError("Circular dependency detected in downstream modules")
 
+    return result
 
 def get_upstreams(module):
     """Get upstream modules of a given module.
@@ -55,7 +57,7 @@ def get_upstreams(module):
 
     for elem in module.externals.keys():
         if isinstance(elem, Expr):
-            if not isinstance(elem, FIFOPush):
+            if not isinstance(elem, FIFOPush) and not isinstance(elem, Bind):
                 res.add(elem.parent.module)
 
     return res

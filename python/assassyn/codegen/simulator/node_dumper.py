@@ -6,6 +6,7 @@ from ...ir.expr import Expr
 from ...ir.array import Array
 from ...ir.const import Const
 from ...ir.module import Module, Port
+from ...ir.expr import PureIntrinsic
 
 def dump_rval_ref( # pylint: disable=too-many-branches, too-many-return-statements
         module_ctx, _, node):
@@ -29,17 +30,22 @@ def dump_rval_ref( # pylint: disable=too-many-branches, too-many-return-statemen
         # Figure out the ID format based on context
         parent_block = unwrapped.parent
         if module_ctx != parent_block.module:
-            # Expression from another module
             raw = namify(unwrapped.as_operand())
             field_id = f"{raw}_value"
             panic_log = f"Value {raw} invalid!"
-            return f"""if let Some(x) = &sim.{field_id} {{
-                        x
-                      }} else {{
-                        panic!("{panic_log}");
-                      }}.clone()"""
+            # Return as a block expression that evaluates to the value
+            return f"""{{
+                if let Some(x) = &sim.{field_id} {{
+                    x
+                }} else {{
+                    panic!("{panic_log}");
+                }}
+            }}.clone()"""
+
 
         ref = namify(unwrapped.as_operand())
+        if isinstance(unwrapped, PureIntrinsic) and unwrapped.opcode == PureIntrinsic.FIFO_PEEK:
+            return f"{ref}.clone().unwrap()"
 
         dtype = unwrapped.dtype
         if dtype.bits <= 64:

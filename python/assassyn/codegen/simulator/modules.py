@@ -33,7 +33,6 @@ from ...analysis import expr_externally_used
 
 if typing.TYPE_CHECKING:
     from ...ir.module import Module
-    from ...ir.writeport import MultiPortArrayWrite
 
 class ElaborateModule(Visitor):
     """Visitor for elaborating modules with multi-port write support."""
@@ -101,7 +100,6 @@ class ElaborateModule(Visitor):
                 rust_ty = node.dtype
 
             rust_ty = dtype_to_rust_type(rust_ty)
-
             lhs = dump_rval_ref(self.module_ctx, self.sys, node.lhs)
             rhs = dump_rval_ref(self.module_ctx, self.sys, node.rhs)
             lhs = f"ValueCastTo::<{rust_ty}>::cast(&{lhs})"
@@ -185,7 +183,7 @@ class ElaborateModule(Visitor):
             fifo_id = fifo_name(fifo)
             module_name = self.module_name
 
-            code.append(f"""{{
+            pop_code = (f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
               sim.{fifo_id}.pop.push(FIFOPop::new(stamp, "{module_name}"));
               match sim.{fifo_id}.payload.front() {{
@@ -193,13 +191,14 @@ class ElaborateModule(Visitor):
                 None => return false,
               }}
             }}""")
+            code.append(pop_code)
 
         elif isinstance(node, PureIntrinsic):
             intrinsic = node.opcode
 
             if intrinsic == PureIntrinsic.FIFO_PEEK:
                 port_self = dump_rval_ref(self.module_ctx, self.sys, node.get_operand(0))
-                code.append(f"sim.{port_self}.front().cloned().unwrap()")
+                code.append(f"sim.{port_self}.front().cloned()")
 
             elif intrinsic == PureIntrinsic.FIFO_VALID:
                 port_self = dump_rval_ref(self.module_ctx, self.sys, node.get_operand(0))
@@ -248,7 +247,8 @@ class ElaborateModule(Visitor):
             l = node.l.value.value
             r = node.r.value.value
             dtype = node.dtype
-            mask_bits = "1" * dtype.bits
+            num_bits = r - l + 1
+            mask_bits = "1" * num_bits
 
             if l < 64 and r < 64:
                 result_a = f'''let a = ValueCastTo::<u64>::cast(&{a});
@@ -284,14 +284,16 @@ let mask = BigUint::parse_bytes("{mask_bits}".as_bytes(), 2).unwrap();'''
 
         elif isinstance(node, Select1Hot):
             cond = dump_rval_ref(self.module_ctx, self.sys, node.cond)
+            target_type = dtype_to_rust_type(node.dtype)
             result = [f'''{{ let cond = {cond};
 assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
 
             for i, value in enumerate(node.values):
                 if i != 0:
                     result.append(" else ")
+                value_ref = dump_rval_ref(self.module_ctx, self.sys, value)
                 result.append(f'''if cond >> {i} & 1 != 0
-{{ {dump_rval_ref(self.module_ctx, self.sys, value)} }}''')
+{{ ValueCastTo::<{target_type}>::cast(&{value_ref}) }}''')
 
             result.append(" else { unreachable!() } }")
             code.append("".join(result))
@@ -334,7 +336,7 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
                 code.append(f"""{{
                     unsafe {{
                         let mem_interface = Arc::clone(&sim.mem_interface);
-                        let success = mem_interface.as_ref().send_request({idx_val} \
+                        let success = mem_interface.as_ref().send_request({idx_val}
                             as i64, false, rust_callback, sim as *const _ as *mut _,);
                         if !success {{
                             return false
@@ -375,7 +377,6 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
         if id_and_exposure:
             id_expr, need_exposure = id_and_exposure
             code_block = "\n".join(code)
-
             valid_update = ""
             if need_exposure:
                 valid_update = f"sim.{id_expr}_value = Some({id_expr}.clone());"
@@ -399,6 +400,7 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
     def visit_block(self, node: Block):
         """Visit a block and generate its implementation."""
         result = []
+        visited = set()
 
         # Save current indentation
         restore_indent = self.indent
@@ -413,6 +415,10 @@ assert!(cond.count_ones() == 1, \"Select1Hot: condition is not 1-hot\");''']
 
         # Visit each element in the block
         for elem in node.iter():
+            elem_id = id(elem)
+            if elem_id in visited:
+                continue
+            visited.add(elem_id)
             if isinstance(elem, Expr):
                 result.append(self.visit_expr(elem))
             elif isinstance(elem, Block):

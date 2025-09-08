@@ -6,6 +6,7 @@ from ...builder import SysBuilder
 
 TEMPLATE = '''
 import os
+import glob
 from pathlib import Path
 
 import cocotb
@@ -22,16 +23,12 @@ async def test_tb(dut):
     await Timer(500, units="ns")
     dut.clk.value = 0
     dut.rst.value = 0
-    _ , rst_time_ns = cocotb.simulator.get_sim_time()
     await Timer(500, units="ns")
     for cycle in range({}):
         dut.clk.value = 1
         await Timer(500, units="ns")
         dut.clk.value = 0
         await Timer(500, units="ns")
-        _ , sim_time_ns = cocotb.simulator.get_sim_time()
-        sim_time_ns -= rst_time_ns
-        current_cycle = sim_time_ns // 1000000
         {}
 
 
@@ -40,6 +37,8 @@ def runner():
     path = Path('./sv/hw')
     with open(path / 'filelist.f', 'r') as f:
         srcs = [path / i.strip() for i in f.readlines()]
+    memory_blackbox_files = glob.glob('memory_blackbox_*.sv')
+    srcs = srcs + memory_blackbox_files
     srcs = srcs + ['fifo.sv', 'trigger_counter.sv']
     runner = get_runner(sim)
     runner.build(sources=srcs, hdl_toplevel='Top', always=True)

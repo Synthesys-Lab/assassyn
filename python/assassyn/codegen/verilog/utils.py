@@ -2,9 +2,43 @@
 
 from typing import Optional
 
-from ...ir.module import Module
+from ...ir.module import Module,SRAM
 from ...ir.expr import Intrinsic
 from ...ir.dtype import Int, UInt, Bits, DType, Record
+from ...utils import namify
+
+def get_sram_info(node: SRAM) -> dict:
+    """Extract SRAM-specific information."""
+    return {
+        'array': node.payload,
+        'init_file': node.init_file,
+        'width': node.width,
+        'depth': node.depth
+    }
+
+
+def extract_sram_params(node: SRAM) -> dict:
+    """Extract common SRAM parameters from an SRAM module.
+
+    Args:
+        sram: SRAM module object
+
+    Returns:
+        dict: Dictionary containing array_name, data_width, and addr_width
+    """
+    sram_info = get_sram_info(node)
+    array = sram_info['array']
+    array_name = namify(array.name)
+    data_width = array.scalar_ty.bits
+    addr_width = array.index_bits if array.index_bits > 0 else 1
+
+    return {
+        'sram_info': sram_info,
+        'array': array,
+        'array_name': array_name,
+        'data_width': data_width,
+        'addr_width': addr_width
+    }
 
 def find_wait_until(module: Module) -> Optional[Intrinsic]:
     """Find the WAIT_UNTIL intrinsic in a module if it exists."""

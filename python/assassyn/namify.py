@@ -43,47 +43,49 @@ class UnifiedNamingStrategy:
     def generate_names(self, context: NamingContext) -> typing.List[str]:
         """Generate names for any assignment pattern"""
         # Reset state
-        self.collected_names = []
-        self.temp_counter = 0
-        node = context.ast_node
-        if isinstance(node, ast.Assign):
-            assign = context.ast_node
+        try:
+            self.collected_names = []
+            self.temp_counter = 0
+            node = context.ast_node
+            if isinstance(node, ast.Assign):
+                assign = context.ast_node
 
-            target = assign.targets[0]
-            value = assign.value
-            if isinstance(target, ast.Name):
-                target_name = target.id
-            elif isinstance(target, ast.Attribute):
-                # a.is_ood = ... → record_a_is_ood
-                target_name = f"record_{target.value.id}_{target.attr}"
-            elif isinstance(target, ast.Subscript):
-                if hasattr(target.value, 'id'):
-                    base_name = target.value.id
+                target = assign.targets[0]
+                value = assign.value
+                if isinstance(target, ast.Name):
+                    target_name = target.id
+                elif isinstance(target, ast.Attribute):
+                    # a.is_ood = ... → record_a_is_ood
+                    target_name = f"record_{target.value.id}_{target.attr}"
+                elif isinstance(target, ast.Subscript):
+                    if hasattr(target.value, 'id'):
+                        base_name = target.value.id
+                    else:
+                        base_name = target.value.left.id
+                    index_node = target.slice
+                    if isinstance(index_node, ast.Constant):
+                        # Handles a numeric index, e.g., my_array[0]
+                        index_val = index_node.value
+                        target_name = f"array_{base_name}__{index_val}"
+                    elif isinstance(index_node, ast.Name):
+                        # Handles a variable index, e.g., my_array[i]
+                        index_val = index_node.id
+                        target_name = f"array_{base_name}__{index_val}"
+                elif isinstance(target, ast.Tuple):
+                    # Multiple targets - handled specially
+                    target_name = None
+                elif isinstance(target, ast.Subscript):
+                    if isinstance(target.value, ast.Name):
+                        target_name = f"array_{target.value.id}__{target.slice.value}"
                 else:
-                    base_name = target.value.left.id
-                index_node = target.slice
-                if isinstance(index_node, ast.Constant):
-                    # Handles a numeric index, e.g., my_array[0]
-                    index_val = index_node.value
-                    target_name = f"array_{base_name}__{index_val}"
-                elif isinstance(index_node, ast.Name):
-                    # Handles a variable index, e.g., my_array[i]
-                    index_val = index_node.id
-                    target_name = f"array_{base_name}__{index_val}"
-            elif isinstance(target, ast.Tuple):
-                # Multiple targets - handled specially
-                target_name = None
-            elif isinstance(target, ast.Subscript):
-                if isinstance(target.value, ast.Name):
-                    target_name = f"array_{target.value.id}__{target.slice.value}"
-            else:
-                target_name = "result"
+                    target_name = "result"
 
-            self._process_value(value, target_name, target)
+                self._process_value(value, target_name, target)
 
-        elif isinstance(node, ast.Expr):
-            self._process_value(node.value, None, None)
-
+            elif isinstance(node, ast.Expr):
+                self._process_value(node.value, None, None)
+        except Exception:
+            pass
         return self.collected_names
 
     def _process_value(self, node: ast.AST, target_name: str=None, target: ast.AST=None) -> None:
@@ -235,17 +237,20 @@ class UnifiedNamingStrategy:
     def _process_select(self, node: ast.Call, target_name: str) -> None:
         """Process select() calls"""
         # Process each argument
-        for arg in node.args:
-            if isinstance(arg, ast.Subscript) and isinstance(arg.slice, ast.Slice):
-                # Array slice: value[0:0] → value_0
-                start = arg.slice.lower.value if arg.slice.lower else 0
-                self.collected_names.append(f"{arg.value.id}_{start}")
-            elif isinstance(arg, ast.Attribute):
-                # Attribute: rand0.is_addr → rand0_is_addr
-                self.collected_names.append(f"{arg.value.id}_{arg.attr}")
-            elif isinstance(arg, ast.Subscript):
-                # Simple subscript: values[0] → values_0
-                self.collected_names.append(f"{arg.value.id}_{arg.slice.value}")
+        try:
+            for arg in node.args:
+                if isinstance(arg, ast.Subscript) and isinstance(arg.slice, ast.Slice):
+                    # Array slice: value[0:0] → value_0
+                    start = arg.slice.lower.value if arg.slice.lower else 0
+                    self.collected_names.append(f"{arg.value.id}_{start}")
+                elif isinstance(arg, ast.Attribute):
+                    # Attribute: rand0.is_addr → rand0_is_addr
+                    self.collected_names.append(f"{arg.value.id}_{arg.attr}")
+                elif isinstance(arg, ast.Subscript):
+                    # Simple subscript: values[0] → values_0
+                    self.collected_names.append(f"{arg.value.id}_{arg.slice.value}")
+        except Exception:
+            pass
 
         self.collected_names.append(target_name)
 
