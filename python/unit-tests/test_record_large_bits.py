@@ -22,17 +22,18 @@ class Driver(Module):
         valid_global = Bits(1)(0)
 
         for i in range(15):
-            valid_temp = ~record[i].symbol
+            valid_temp = ~record[i][0].symbol
             valid_global = valid_global | valid_temp
             index = valid_temp.select(Bits(32)(i), index)
-
         with Condition(valid_global):
-            (record & self)[index] <= entry.bundle(
-                symbol = ~record[index].symbol,
-                a = record[index].a,
-                b = index
-            ).value()
-            log("index {:05} ",index)
+            for i in range(15):
+                with Condition(index == Bits(32)(i)):
+                    (record[i] & self)[0] <= entry.bundle(
+                        symbol = ~record[i][0].symbol,
+                        a = record[i][0].a,
+                        b = index
+                    ).value()
+                    log("index {:05} ",index)
 
 def check_raw(raw):
     """
@@ -59,7 +60,7 @@ def check_raw(raw):
 def test_record():
     sys = SysBuilder('record_large')
     with sys:
-        record = RegArray(entry,15,attr=[Array.FULLY_PARTITIONED])
+        record = [RegArray(entry,1) for _ in range(15)]
         driver = Driver()
         call = driver.build( record )
 
