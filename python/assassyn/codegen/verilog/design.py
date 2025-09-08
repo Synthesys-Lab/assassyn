@@ -281,7 +281,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                     f".as_bits({dtype.bits})[0:{dtype.bits}]"
                     f".{dump_type_cast(dtype)}"
                 )
-            elif BinaryOp.is_comparative(binop):
+            elif expr.is_comparative():
                 # Convert to uint for comparison
                 if not expr.lhs.dtype.is_int():
                     a= f"{a}.as_uint()"
@@ -871,9 +871,8 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                 if sram_info:
                     sram_array = sram_info['array']
                     self.append_code(f'mem_dataout = Input({dump_type(sram_array.scalar_ty)})')
-                    self.append_code(f'mem_address ='
-                                f' Output(Bits({sram_array.index_bits \
-                                        if sram_array.index_bits > 0 else 1}))')
+                    index_bits = sram_array.index_bits if sram_array.index_bits > 0 else 1
+                    self.append_code(f'mem_address = Output(Bits({index_bits}))')
                     self.append_code(f'mem_write_data = Output({dump_type(sram_array.scalar_ty)})')
                     self.append_code('mem_write_enable = Output(Bits(1))')
                     self.append_code('mem_read_enable = Output(Bits(1))')
