@@ -1,14 +1,10 @@
 """Analysis utilities for Assassyn."""
-
+from collections import defaultdict, deque
 from ..ir.expr import Expr, FIFOPush,Bind
-from ..ir.module import Downstream
-
 from .external_usage import expr_externally_used
 
 def topo_downstream_modules(sys):
     """Topologically sort downstream modules based on their dependencies."""
-    from collections import defaultdict, deque
-
     downstreams = list(sys.downstreams) if hasattr(sys, 'downstreams') else []
 
     graph = defaultdict(list)

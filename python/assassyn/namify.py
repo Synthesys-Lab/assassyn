@@ -5,8 +5,11 @@ This module provides classes for analyzing Python code assignments and generatin
 meaningful names based on the structure of the expressions.
 """
 import ast
+import logging
 import typing
 from dataclasses import dataclass
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -84,8 +87,9 @@ class UnifiedNamingStrategy:
 
             elif isinstance(node, ast.Expr):
                 self._process_value(node.value, None, None)
-        except Exception:
-            pass
+        except (AttributeError, IndexError) as e:
+            log.warning("Could not generate name for node %s: %s", ast.dump(node), e)
+
         return self.collected_names
 
     def _process_value(self, node: ast.AST, target_name: str=None, target: ast.AST=None) -> None:
@@ -236,9 +240,8 @@ class UnifiedNamingStrategy:
 
     def _process_select(self, node: ast.Call, target_name: str) -> None:
         """Process select() calls"""
-        # Process each argument
-        try:
-            for arg in node.args:
+        for arg in node.args:
+            try:
                 if isinstance(arg, ast.Subscript) and isinstance(arg.slice, ast.Slice):
                     # Array slice: value[0:0] → value_0
                     start = arg.slice.lower.value if arg.slice.lower else 0
@@ -249,8 +252,9 @@ class UnifiedNamingStrategy:
                 elif isinstance(arg, ast.Subscript):
                     # Simple subscript: values[0] → values_0
                     self.collected_names.append(f"{arg.value.id}_{arg.slice.value}")
-        except Exception:
-            pass
+            except AttributeError as e:
+                log.warning("Could not process select() argument node %s: %s", ast.dump(arg), e)
+
 
         self.collected_names.append(target_name)
 

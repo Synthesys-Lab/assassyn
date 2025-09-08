@@ -47,20 +47,14 @@ def patch_fifo(file_path):
     if not os.path.isfile(file_path):
         return
 
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        pattern = re.compile(r'fifo_\d+\s*#\s*\(')
-        replacement = 'fifo #('
-
-        new_content, num_replacements = pattern.subn(replacement, content)
-
-        if num_replacements > 0:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(new_content)
-    except Exception:
-        pass
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    pattern = re.compile(r'fifo_\d+\s*#\s*\(')
+    replacement = 'fifo #('
+    new_content, num_replacements = pattern.subn(replacement, content)
+    if num_replacements > 0:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(new_content)
 
 
 def run_simulator(manifest_path, offline=False, release=True):

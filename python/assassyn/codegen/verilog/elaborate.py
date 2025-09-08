@@ -51,7 +51,7 @@ module memory_blackbox_{array_name} #(
     always @ (posedge clk) begin
 '''
         else:
-            verilog_code += f'''
+            verilog_code += '''
     always @ (posedge clk) begin
         if (!rst_n) begin
             mem[address] <= {{DATA_WIDTH{{1'b0}}}};

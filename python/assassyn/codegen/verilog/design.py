@@ -111,7 +111,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         return port_name
 
 
-    def dump_rval(self,node, with_namespace: bool,module_name:str=None) -> str:  # pylint: disable=too-many-return-statements
+    def dump_rval(self,node, with_namespace: bool,module_name:str=None) -> str:  # pylint: disable=too-many-return-statements,too-many-branches
         """Dump a reference to a node with options."""
 
         node = unwrap_operand(node)
@@ -510,7 +510,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             if len(values) == 1:
                 body = f"{rval} = {values[0]}"
             else:
-                binary_selector_name = f"{rval}_selector"
                 num_values = len(values)
                 selector_bits = max((num_values - 1).bit_length(), 1)
                 if num_values == 2:
@@ -518,7 +517,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                 else:
                     self.append_code(f"{cond}_res = Bits({selector_bits})(0)")
                     for i in range(num_values):
-                        self.append_code(f"{cond}_res = Mux({cond}[{i}] , {cond}_res , Bits({selector_bits})({i}))")
+                        self.append_code(
+                            f"{cond}_res = Mux({cond}[{i}] ,"
+                            f" {cond}_res , Bits({selector_bits})({i}))")
 
                     values_str = ", ".join(values)
                     mux_code = f"{rval} = Mux({cond}_res, {values_str})"
@@ -858,7 +859,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             if node in self.downstream_dependencies:
                 for dep_mod in self.downstream_dependencies[node]:
                     self.append_code(f'{namify(dep_mod.name)}_executed = Input(Bits(1))')
-            externals_by_producer = {}
             for ext_val in node.externals:
                 if isinstance(ext_val,Bind) or isinstance(unwrap_operand(ext_val), Const):
                     continue

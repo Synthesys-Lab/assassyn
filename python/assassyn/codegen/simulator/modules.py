@@ -183,7 +183,7 @@ class ElaborateModule(Visitor):
             fifo_id = fifo_name(fifo)
             module_name = self.module_name
 
-            pop_code = (f"""{{
+            code.append(f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
               sim.{fifo_id}.pop.push(FIFOPop::new(stamp, "{module_name}"));
               match sim.{fifo_id}.payload.front() {{
@@ -191,7 +191,6 @@ class ElaborateModule(Visitor):
                 None => return false,
               }}
             }}""")
-            code.append(pop_code)
 
         elif isinstance(node, PureIntrinsic):
             intrinsic = node.opcode
