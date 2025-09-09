@@ -79,8 +79,6 @@ class ElaborateModule(Visitor):
     def visit_expr(self, node: Expr):
         """Visit an expression and generate its implementation."""
         # pylint: disable=import-outside-toplevel
-        from ...ir.writeport import MultiPortArrayWrite
-
         id_and_exposure = None
         if node.is_valued():
             need_exposure = expr_externally_used(node, True)
@@ -118,8 +116,8 @@ class ElaborateModule(Visitor):
             idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
             code.append(f"sim.{array_name}.payload[{idx_val} as usize].clone()")
 
-        elif isinstance(node, MultiPortArrayWrite):
-            # Handle multi-port array write with port information
+        elif isinstance(node, ArrayWrite):
+            # Handle array write with port information
             array = node.array
             idx = node.idx
             value = node.val
@@ -133,42 +131,10 @@ class ElaborateModule(Visitor):
 
             code.append(f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
-              sim.{array_name}.write_multiport.push(
-                MultiPortArrayWrite::new(stamp, {idx_val} as usize, \
+              sim.{array_name}.write_port.push(
+                ArrayWrite::new(stamp, {idx_val} as usize, \
                       {value_val}.clone(), "{module_writer}", {port_id}));
             }}""")
-
-        elif isinstance(node, ArrayWrite):
-            # Handle regular array write (fallback for non-multi-port)
-            array = node.array
-            idx = node.idx
-            value = node.val
-
-            array_name = namify(array.name)
-            idx_val = dump_rval_ref(self.module_ctx, self.sys, idx)
-            value_val = dump_rval_ref(self.module_ctx, self.sys, value)
-            module_writer = self.module_name
-
-            # Check if this array has multi-port writes
-            has_multiport = array.has_multi_port_writes()
-
-            if has_multiport:
-                # Use multi-port write for arrays with multiple writers
-                port_id = id(self.module_ctx)
-                code.append(f"""{{
-                  let stamp = sim.stamp - sim.stamp % 100 + 50;
-                  sim.{array_name}.write_multiport.push(
-                    MultiPortArrayWrite::new(stamp, {idx_val} as usize, \
-                        {value_val}.clone(), "{module_writer}", {port_id}));
-                }}""")
-            else:
-                # Use single-port write for arrays with single writer
-                code.append(f"""{{
-                  let stamp = sim.stamp - sim.stamp % 100 + 50;
-                  sim.{array_name}.write.push(
-                    ArrayWrite::new(stamp, {idx_val} as usize, \
-                        {value_val}.clone(), "{module_writer}"));
-                }}""")
 
         elif isinstance(node, AsyncCall):
             bind = node.bind

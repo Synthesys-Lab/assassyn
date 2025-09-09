@@ -89,7 +89,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
     def __and__(self, other):
         '''
         Overload & operator to create WritePort when combined with a Module.
-        This enables multi-port write access: (array & module)[idx] <= value
+        This enables write access: (array & module)[idx] <= value
         '''
         from .module.base import ModuleBase #pylint: disable=import-outside-toplevel
         if isinstance(other, ModuleBase):
@@ -139,10 +139,6 @@ class Array:  #pylint: disable=too-many-instance-attributes
     def get_write_ports(self):
         '''Get the write_ports.'''
         return getattr(self, '_write_ports', {})
-
-    def has_multi_port_writes(self):
-        '''check if there are multiple write_ports.'''
-        return len(self.get_write_ports()) > 1
 
     @ir_builder
     def __getitem__(self, index: typing.Union[int, Value]):

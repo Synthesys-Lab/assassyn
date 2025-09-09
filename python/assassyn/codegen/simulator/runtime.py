@@ -1,7 +1,7 @@
-"""Runtime code generation for Assassyn simulator with multi-port write support."""
+"""Runtime code generation for Assassyn simulator."""
 
 def dump_runtime(fd):
-    """Generate the runtime module with multi-port write support."""
+    """Generate the runtime module."""
     # Add imports
     fd.write("""
 use std::collections::VecDeque;
@@ -22,22 +22,7 @@ pub trait Cycled {
   fn pusher(&self) -> &'static str;
 }
 
-// Regular single-port array write
 pub struct ArrayWrite<T: Sized + Default + Clone> {
-  cycle: usize,
-  addr: usize,
-  data: T,
-  pusher: &'static str,
-}
-
-impl <T: Sized + Default + Clone> ArrayWrite<T> {
-  pub fn new(cycle: usize, addr: usize, data: T, pusher: &'static str) -> Self {
-    ArrayWrite { cycle, addr, data, pusher }
-  }
-}
-
-// Multi-port array write with port ID
-pub struct MultiPortArrayWrite<T: Sized + Default + Clone> {
   cycle: usize,
   addr: usize,
   data: T,
@@ -45,30 +30,36 @@ pub struct MultiPortArrayWrite<T: Sized + Default + Clone> {
   port_id: usize,  // Unique identifier for the write port
 }
 
-impl <T: Sized + Default + Clone> MultiPortArrayWrite<T> {
+impl<T: Sized + Default + Clone> ArrayWrite<T> {
   pub fn new(cycle: usize, addr: usize, data: T, pusher: &'static str, port_id: usize) -> Self {
-    MultiPortArrayWrite { cycle, addr, data, pusher, port_id }
+    ArrayWrite {
+      cycle,
+      addr,
+      data,
+      pusher,
+      port_id,
+    }
   }
 }
 
-// Multi-port write queue that can handle multiple writes per cycle
-pub struct MultiPortXEQ<T: Sized + Default + Clone> {
+// The write queue that can handle multiple writes per cycle
+pub struct PortXEQ<T: Sized + Default + Clone> {
   // Map from cycle to list of writes for that cycle
-  q: BTreeMap<usize, Vec<MultiPortArrayWrite<T>>>,
+  q: BTreeMap<usize, Vec<ArrayWrite<T>>>,
 }
 
-impl <T: Sized + Default + Clone> MultiPortXEQ<T> {
+impl <T: Sized + Default + Clone> PortXEQ<T> {
   pub fn new() -> Self {
-    MultiPortXEQ { q: BTreeMap::new() }
+    PortXEQ { q: BTreeMap::new() }
   }
 
-  pub fn push(&mut self, event: MultiPortArrayWrite<T>) {
+  pub fn push(&mut self, event: ArrayWrite<T>) {
     self.q.entry(event.cycle)
       .or_insert_with(Vec::new)
       .push(event);
   }
 
-  pub fn pop_all(&mut self, current: usize) -> Vec<MultiPortArrayWrite<T>> {
+  pub fn pop_all(&mut self, current: usize) -> Vec<ArrayWrite<T>> {
     let mut writes = Vec::new();
 
     // Collect all writes up to current cycle
@@ -86,44 +77,35 @@ impl <T: Sized + Default + Clone> MultiPortXEQ<T> {
   }
 }
 
-// Enhanced Array with both single-port and multi-port write support
 pub struct Array<T: Sized + Default + Clone> {
   pub payload: Vec<T>,
-  pub write: XEQ<ArrayWrite<T>>,  // Single-port writes (for backward compatibility)
-  pub write_multiport: MultiPortXEQ<T>,  // Multi-port writes
+  pub write_port: PortXEQ<T>,
 }
 
 impl <T: Sized + Default + Clone> Array<T> {
   pub fn new(n: usize) -> Self {
     Array {
       payload: vec![T::default(); n],
-      write: XEQ::new(),
-      write_multiport: MultiPortXEQ::new(),
+      write_port: PortXEQ::new(),
     }
   }
 
   pub fn new_with_init(payload: Vec<T>) -> Self {
     Array {
       payload,
-      write: XEQ::new(),
-      write_multiport: MultiPortXEQ::new(),
+      write_port: PortXEQ::new(),
     }
   }
 
   pub fn tick(&mut self, cycle: usize) {
-    // Process single-port writes first (for backward compatibility)
-    if let Some(event) = self.write.pop(cycle) {
-      self.payload[event.addr] = event.data;
-    }
 
-    // Process multi-port writes
-    let multiport_writes = self.write_multiport.pop_all(cycle);
+    let port_writes = self.write_port.pop_all(cycle);
 
     // Apply writes with conflict resolution
     // Strategy: Last write wins (could be changed to priority-based or other schemes)
     let mut write_map: BTreeMap<usize, (T, &'static str, usize)> = BTreeMap::new();
 
-    for write in multiport_writes {
+    for write in port_writes {
       write_map.insert(write.addr, (write.data, write.pusher, write.port_id));
     }
 
@@ -193,15 +175,6 @@ impl <T: Sized> FIFO<T> {
 }
 
 impl <T: Sized + Default + Clone> Cycled for ArrayWrite<T> {
-  fn cycle(&self) -> usize {
-    self.cycle
-  }
-  fn pusher(&self) -> &'static str {
-    self.pusher
-  }
-}
-
-impl <T: Sized + Default + Clone> Cycled for MultiPortArrayWrite<T> {
   fn cycle(&self) -> usize {
     self.cycle
   }

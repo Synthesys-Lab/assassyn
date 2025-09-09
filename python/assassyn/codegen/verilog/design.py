@@ -15,7 +15,6 @@ from ...ir.const import Const
 from ...ir.array import Array
 from ...ir.dtype import Int, Bits, Record,RecordValue
 from ...utils import namify, unwrap_operand
-from ...ir.writeport import MultiPortArrayWrite
 from ...ir.expr import (
     Expr,
     BinaryOp,
@@ -676,9 +675,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             if isinstance(key, Array):
                 if key in self.sram_payload_arrays:
                     continue
-                multiport_writes = [
+                array_writes = [
                         (e, p) for e, p in exposes
-                        if isinstance(e, MultiPortArrayWrite)
+                        if isinstance(e, ArrayWrite)
                     ]
                 arr = key
                 array_name = self.dump_rval(arr, False)
@@ -686,7 +685,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                 port_mapping = self.array_write_port_mapping.get(arr, {})
                 # Group writes by their source module
                 writes_by_module = {}
-                for expr, pred in multiport_writes:
+                for expr, pred in array_writes:
                     module = expr.module
                     if module not in writes_by_module:
                         writes_by_module[module] = []
@@ -1468,7 +1467,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.append_code('\n# --- Array Write-Back Connections ---')
         for arr_container in self.sys.arrays:
             if arr_container in self.array_users and arr_container not in self.sram_payload_arrays:
-                self._connect_multiport_array(arr_container)
+                self._connect_array(arr_container)
 
         self.append_code('\n# --- Trigger Counter Delta Connections ---')
         for module in self.sys.modules:
@@ -1495,8 +1494,8 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.append_code('system = System([Top], name="Top", output_directory="sv")')
         self.append_code('system.compile()')
 
-    def _connect_multiport_array(self, arr):
-        """Connect a multi-port array to its writers"""
+    def _connect_array(self, arr):
+        """Connect each array to its writers"""
         arr_name = namify(arr.name)
         port_mapping = self.array_write_port_mapping.get(arr, {})
         if not port_mapping:

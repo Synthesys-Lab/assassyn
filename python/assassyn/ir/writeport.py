@@ -1,6 +1,6 @@
 '''
 The module for multi-port register array access.
-It defines the WritePort class and the MultiPortArrayWrite expression.
+It defines the WritePort class and the ArrayWrite expression.
 To support the (array & module)[index] <= value syntax.
 '''
 
