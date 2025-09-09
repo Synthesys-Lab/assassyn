@@ -30,6 +30,7 @@ from .utils import dtype_to_rust_type, fifo_name
 from ...utils import namify
 from .node_dumper import dump_rval_ref
 from ...analysis import expr_externally_used
+from ...ir.module import Downstream
 
 if typing.TYPE_CHECKING:
     from ...ir.module import Module
@@ -81,7 +82,9 @@ class ElaborateModule(Visitor):
         # pylint: disable=import-outside-toplevel
         id_and_exposure = None
         if node.is_valued():
-            need_exposure = expr_externally_used(node, True)
+            need_exposure = False
+            if isinstance(self.module_ctx, Downstream):
+                need_exposure = expr_externally_used(node, True)
             id_expr = namify(node.as_operand())
             id_and_exposure = (id_expr, need_exposure)
 
