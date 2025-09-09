@@ -1551,7 +1551,7 @@ def generate_design(fname: str, sys: SysBuilder):
 @modparams
 def MemoryBlackbox_{array_name}():
     class MemoryBlackboxImpl(Module):
-        module_name = "memory_blackbox_{array_name}"
+        module_name = "sram_blackbox_{array_name}"
         clk = Clock()
         rst_n = Input(Bits(1))
         address = Input(Bits({addr_width}))

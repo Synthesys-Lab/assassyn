@@ -37,8 +37,8 @@ def runner():
     path = Path('./sv/hw')
     with open(path / 'filelist.f', 'r') as f:
         srcs = [path / i.strip() for i in f.readlines()]
-    memory_blackbox_files = glob.glob('memory_blackbox_*.sv')
-    srcs = srcs + memory_blackbox_files
+    sram_blackbox_files = glob.glob('sram_blackbox_*.sv')
+    srcs = srcs + sram_blackbox_files
     srcs = srcs + ['fifo.sv', 'trigger_counter.sv']
     runner = get_runner(sim)
     runner.build(sources=srcs, hdl_toplevel='Top', always=True)
