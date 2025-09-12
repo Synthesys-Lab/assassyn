@@ -101,10 +101,21 @@ class ElaborateModule(Visitor):
             rust_ty = dtype_to_rust_type(rust_ty)
             lhs = dump_rval_ref(self.module_ctx, self.sys, node.lhs)
             rhs = dump_rval_ref(self.module_ctx, self.sys, node.rhs)
-            lhs = f"ValueCastTo::<{rust_ty}>::cast(&{lhs})"
-            rhs = f"ValueCastTo::<{rust_ty}>::cast(&{rhs})"
-            code.append(f"{lhs} {binop} {rhs}")
 
+            # Special handling for shift operations with signed values
+            if node.opcode == BinaryOp.SHR and node.lhs.dtype.is_signed():
+                # For signed right shift, cast to signed type first
+                if node.lhs.dtype.bits <= 64:
+                    lhs = f"ValueCastTo::<i{node.lhs.dtype.bits}>::cast(&{lhs})"
+                    rhs = f"ValueCastTo::<i{node.lhs.dtype.bits}>::cast(&{rhs})"
+                else:
+                    lhs = f"ValueCastTo::<BigInt>::cast(&{lhs})"
+                    rhs = f"ValueCastTo::<BigInt>::cast(&{rhs})"
+            else:
+                lhs = f"ValueCastTo::<{rust_ty}>::cast(&{lhs})"
+                rhs = f"ValueCastTo::<{rust_ty}>::cast(&{rhs})"
+
+            code.append(f"{lhs} {binop} {rhs}")
         elif isinstance(node, UnaryOp):
             operand = dump_rval_ref(self.module_ctx, self.sys, node.x)
             uniop = UnaryOp.OPERATORS[node.opcode]
