@@ -8,7 +8,6 @@ import typing
 import site
 import inspect
 import ast
-import logging
 from decorator import decorator
 from .namify import NamingManager
 
@@ -65,8 +64,8 @@ def process_naming(expr, line_of_code: str, lineno: int) -> typing.Dict[str, typ
 
             return source_name
 
-    except SyntaxError as e:
-        logging.warning("Failed to parse line due to SyntaxError: %s", e)
+    except SyntaxError:
+        pass
 
 
     return None

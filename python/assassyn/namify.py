@@ -1,16 +1,13 @@
 """
-Module for generating descriptive names from Abstract Syntax Trees (ASTs).
-
-This module provides classes for analyzing Python code assignments and generating
-meaningful names based on the structure of the expressions.
+generating descriptive names from Abstract Syntax Trees.
 """
 import ast
 import logging
 import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from collections import OrderedDict
 
 log = logging.getLogger(__name__)
-
 
 @dataclass
 class NamingContext:
@@ -18,293 +15,286 @@ class NamingContext:
     ast_node: ast.AST
     target_names: typing.List[str]
     lineno: int
+    generated_names: typing.Set[str] = field(default_factory=set)
 
-# pylint: disable=R0903
-class UnifiedNamingStrategy:
-    """Single unified recursive strategy for all naming patterns"""
+class NamingStrategy:
+    """recursive strategy with deduplication"""
 
     def __init__(self):
         self.collected_names = []
         self.temp_counter = 0
+        self.name_cache = OrderedDict()
+        self.seen_names = set()
 
     def _get_op_symbol(self, op_node: ast.operator) -> str:
-        """Helper to convert an AST operator to a descriptive string."""
+        """Convert an AST operator to a descriptive string."""
         op_map = {
-            ast.Add: "add",
-            ast.Sub: "sub",
-            ast.Mult: "mul",
-            ast.Div: "div",
-            ast.Mod: "mod",
-            ast.LShift: "shl",
-            ast.RShift: "shr",
-            ast.BitAnd: "and",
-            ast.BitOr: "or",
+            ast.Add: "add", ast.Sub: "sub", ast.Mult: "mul",
+            ast.Div: "div", ast.Mod: "mod", ast.LShift: "shl",
+            ast.RShift: "shr", ast.BitAnd: "and", ast.BitOr: "or",
             ast.BitXor: "xor",
         }
         return op_map.get(type(op_node), "op")
-    # pylint: disable=R0912
-    def generate_names(self, context: NamingContext) -> typing.List[str]:
-        """Generate names for any assignment pattern"""
-        # Reset state
+
+    def _get_unique_name(self, base_name: str) -> str:
+        """Ensure name is unique by adding suffix if needed"""
+        if base_name not in self.seen_names:
+            self.seen_names.add(base_name)
+            return base_name
+
+        counter = 2
+        while f"{base_name}_{counter}" in self.seen_names:
+            counter += 1
+        unique_name = f"{base_name}_{counter}"
+        self.seen_names.add(unique_name)
+        return unique_name
+
+    def _extract_simple_name(self, node: ast.AST) -> str:
+        """Extract name from simple node types"""
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Constant):
+            return str(node.value)
+        return ""
+
+    #pylint: disable = too-many-return-statements
+    def _extract_complex_name(self, node: ast.AST) -> str:
+        """Extract name from complex node types"""
+        if isinstance(node, ast.Attribute):
+            base = self._extract_base_name_from_complex(node.value)
+            return f"{base}_{node.attr}" if base else node.attr
+
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Attribute):
+                base = self._extract_base_name_from_complex(node.func.value)
+                method = node.func.attr
+                return f"{base}_{method}" if base else method
+            if isinstance(node.func, ast.Name):
+                return node.func.id
+            return "call"
+
+        if isinstance(node, ast.Subscript):
+            base = self._extract_base_name_from_complex(node.value)
+            index = self._extract_index_name(node.slice)
+            return f"{base}_{index}" if base else f"item_{index}"
+
+        if isinstance(node, ast.BinOp):
+            left = self._extract_base_name_from_complex(node.left)
+            op = self._get_op_symbol(node.op)
+            right = self._extract_base_name_from_complex(node.right)
+            return f"{left}_{op}_{right}"
+
+        if isinstance(node, ast.UnaryOp):
+            operand = self._extract_base_name_from_complex(node.operand)
+            return f"not_{operand}" if isinstance(node.op, ast.Invert) else f"unary_{operand}"
+
+        if isinstance(node, ast.Compare):
+            left = self._extract_base_name_from_complex(node.left)
+            return f"cmp_{left}"
+
+        return "expr"
+
+    def _extract_index_name(self, slice_node: ast.AST) -> str:
+        """Extract index name from slice node"""
+        if isinstance(slice_node, ast.Name):
+            return slice_node.id
+        if isinstance(slice_node, ast.Constant):
+            return str(slice_node.value)
+        if isinstance(slice_node, ast.Slice):
+            lower = slice_node.lower.value if slice_node.lower else 0
+            upper = slice_node.upper.value if slice_node.upper else "end"
+            return f"{lower}_to_{upper}"
+        return "idx"
+
+    def _extract_base_name_from_complex(self, node: ast.AST) -> str:
+        """Extract a base name from complex nested structures"""
+        node_repr = ast.dump(node)
+        if node_repr in self.name_cache:
+            return self.name_cache[node_repr]
+
         try:
-            self.collected_names = []
-            self.temp_counter = 0
+            # Try simple extraction first
+            simple_name = self._extract_simple_name(node)
+            if simple_name:
+                self.name_cache[node_repr] = simple_name
+                return simple_name
+
+            # Then try complex extraction
+            complex_name = self._extract_complex_name(node)
+            self.name_cache[node_repr] = complex_name
+            return complex_name
+
+        except (AttributeError, IndexError, TypeError) as e:
+            log.debug("Could not extract base name from %s: %s", type(node).__name__, e)
+            return "expr"
+
+    def generate_names(self, context: NamingContext) -> typing.List[str]:
+        """Generate names for any assignment pattern with deduplication"""
+        self.collected_names = []
+        self.temp_counter = 0
+
+        try:
             node = context.ast_node
             if isinstance(node, ast.Assign):
-                assign = context.ast_node
-
-                target = assign.targets[0]
-                value = assign.value
-                if isinstance(target, ast.Name):
-                    target_name = target.id
-                elif isinstance(target, ast.Attribute):
-                    # a.is_ood = ... → record_a_is_ood
-                    target_name = f"record_{target.value.id}_{target.attr}"
-                elif isinstance(target, ast.Subscript):
-                    if hasattr(target.value, 'id'):
-                        base_name = target.value.id
-                    else:
-                        base_name = target.value.left.id
-                    index_node = target.slice
-                    if isinstance(index_node, ast.Constant):
-                        # Handles a numeric index, e.g., my_array[0]
-                        index_val = index_node.value
-                        target_name = f"array_{base_name}__{index_val}"
-                    elif isinstance(index_node, ast.Name):
-                        # Handles a variable index, e.g., my_array[i]
-                        index_val = index_node.id
-                        target_name = f"array_{base_name}__{index_val}"
-                elif isinstance(target, ast.Tuple):
-                    # Multiple targets - handled specially
-                    target_name = None
-                elif isinstance(target, ast.Subscript):
-                    if isinstance(target.value, ast.Name):
-                        target_name = f"array_{target.value.id}__{target.slice.value}"
-                else:
-                    target_name = "result"
-
-                self._process_value(value, target_name, target)
-
+                self._process_assignment(node)
             elif isinstance(node, ast.Expr):
-                self._process_value(node.value, None, None)
-        except (AttributeError, IndexError) as e:
-            log.warning("Could not generate name for node %s: %s", ast.dump(node), e)
+                self._process_expression(node.value)
+        except (AttributeError, TypeError, ValueError) as e:
+            log.warning("Error generating names for node: %s", e)
+            fallback_name = self._get_unique_name("expr")
+            self.collected_names.append(fallback_name)
 
         return self.collected_names
 
-    def _process_value(self, node: ast.AST, target_name: str=None, target: ast.AST=None) -> None:
-        """Recursively process the value expression"""
+    def _process_assignment(self, assign: ast.Assign):
+        """Process assignment statements"""
+        target = assign.targets[0]
+        value = assign.value
+        target_name = self._extract_target_name(target)
+        self._process_value(value, target_name, target)
 
+    #pylint: disable = too-many-return-statements
+    def _extract_target_name(self, target: ast.AST) -> typing.Optional[str]:
+        """Extract name from assignment target"""
+        if isinstance(target, ast.Name):
+            return target.id
+        if isinstance(target, ast.Attribute):
+            base = self._extract_base_name_from_complex(target.value)
+            return f"{base}_{target.attr}"
+        if isinstance(target, ast.Subscript):
+            base = self._extract_base_name_from_complex(target.value)
+            if isinstance(target.slice, ast.Constant):
+                return f"array_{base}_{target.slice.value}"
+            if isinstance(target.slice, ast.Name):
+                return f"array_{base}_{target.slice.id}"
+            return f"array_{base}"
+        if isinstance(target, ast.Tuple):
+            return None  # Handled specially
+        return "target"
+
+    def _process_expression(self, node: ast.AST):
+        """Process standalone expression"""
+        base = self._extract_base_name_from_complex(node)
+        unique_name = self._get_unique_name(base)
+        self.collected_names.append(unique_name)
+
+    def _process_value(self, node: ast.AST, target_name: str = None, target: ast.AST = None):
+        """Process value expression with enhanced handling"""
         if isinstance(node, ast.BinOp):
-            self._process_binop(node, target_name)
-
+            self._process_binop_enhanced(node, target_name)
         elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            # Method calls
-            method = node.func.attr
-
-            if method == 'pop_all_ports':
-                if isinstance(target, ast.Name):
-                    pop_name = target.id
-                    self.collected_names.append(f"{pop_name}_valid")
-                    self.collected_names.extend(pop_name)
-                else:
-                    self._process_pop_all_ports(target)
-
-            elif method in ('select', 'select1hot'):
-                # Conditional select
-                self._process_operand(node.func.value,target_name)
-                self._process_select(node, target_name)
-
-            #This is not worked yet.
-            elif method == 'async_called':
-                # print(f"async called: {node}")
-                # Handle async_called method calls
-                self._process_async_called(node)
-
-            else:
-                # Other method calls - just use target name
-                if target_name:
-                    self.collected_names.append(target_name)
-
-        elif isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Slice):
-            # Array slice: value[0:0] → just use target name
-            if target_name:
-                self.collected_names.append(target_name)
-
+            self._process_method_call(node, target_name, target)
         else:
-            # Simple assignments - just use target name
-            if target_name:
-                self.collected_names.append(target_name)
+            self._process_default(node, target_name)
 
+    def _process_method_call(self, node: ast.Call, target_name: str, target: ast.AST):
+        """Process method calls"""
+        method = node.func.attr
 
-    def _process_binop(self, node: ast.BinOp, base_name: str, is_root: bool = True) -> None:
-        """Process binary operations recursively"""
+        if method in {'select', 'select1hot'}:  # Using set as suggested
+            self._process_select_enhanced(node, target_name)
+        elif method == 'pop_all_ports':
+            if isinstance(target, ast.Tuple):
+                self._process_pop_all_ports(target)
+            else:
+                name = self._get_unique_name(target_name or "pop_result")
+                self.collected_names.append(name)
+        else:
+            base = self._extract_base_name_from_complex(node.func.value)
+            name = self._get_unique_name(
+                f"{base}_{method}_result" if base else target_name or "result"
+            )
+            self.collected_names.append(name)
+
+    def _process_default(self, node: ast.AST, target_name: str):
+        """Process default case"""
+        if target_name:
+            unique_name = self._get_unique_name(target_name)
+        else:
+            base = self._extract_base_name_from_complex(node)
+            unique_name = self._get_unique_name(base)
+        self.collected_names.append(unique_name)
+
+    def _process_binop_enhanced(self, node: ast.BinOp, base_name: str):
+        """Enhanced binary operation processing"""
+        left_name = self._extract_base_name_from_complex(node.left)
+        right_name = self._extract_base_name_from_complex(node.right)
         op_str = self._get_op_symbol(node.op)
-        # Create more descriptive base names for the left and right sides
-        left_base_name = f"{base_name}_{op_str}_lhs"
-        right_base_name = f"{base_name}_{op_str}_rhs"
-        # Process left operand
-        self._process_operand(node.left, left_base_name)
-        # Process right operand
-        self._process_operand(node.right, right_base_name)
-        # Add name for this BinOp result
-        if is_root:
-            self.collected_names.append(base_name)
-        else:
-            self.temp_counter += 1
-            self.collected_names.append(f"{base_name}_temp{self.temp_counter}")
 
-    def _process_async_called(self, node: ast.Call) -> None:
-        """Process async_called method calls"""
-        # Process each keyword argument
-        for kw in node.keywords:
-            if kw.value:
-                self.collected_names.append(kw.arg)
-                self._process_async_arg(kw.value)
+        if isinstance(node.left, (ast.BinOp, ast.Call)):
+            self.collected_names.append(self._get_unique_name(f"{left_name}_temp"))
+        if isinstance(node.right, (ast.BinOp, ast.Call)):
+            self.collected_names.append(self._get_unique_name(f"{right_name}_temp"))
 
-    def _process_async_arg(self, node: ast.AST) -> None:
-        """Process an argument in async_called"""
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            # Method call like f[0:31].bitcast(Int(32))
-            if node.func.attr == 'bitcast':
-                # Process the object being bitcast
-                if isinstance(node.func.value, ast.Subscript) and \
-                    isinstance(node.func.value.slice, ast.Slice):
-                    # f[0:31] → f_bits_0to31
-                    obj = node.func.value
-                    start = obj.slice.lower.value if obj.slice.lower else 0
-                    stop = obj.slice.upper.value if obj.slice.upper else 32
-                    base_name = f"{obj.value.id}_bits_{start}to{stop}"
-                    self.collected_names.append(base_name)
+        result_name = base_name or f"{left_name}_{op_str}_{right_name}"
+        self.collected_names.append(self._get_unique_name(result_name))
 
-        elif isinstance(node, ast.Subscript):
-            # Simple subscript like cnt[0] → array_cnt_0
-            if isinstance(node.value, ast.Name):
-                self.collected_names.append(f"array_{node.value.id}_{node.slice.value}")
+    def _process_select_enhanced(self, node: ast.Call, target_name: str):
+        """Enhanced select processing"""
+        cond_name = self._extract_base_name_from_complex(node.func.value)
+        self.collected_names.append(self._get_unique_name(f"{cond_name}_cond"))
 
-    def _process_operand(self, node: ast.AST, base_name: str) -> None:
-        """Process an operand in a binary operation"""
+        for i, arg in enumerate(node.args):
+            arg_name = self._extract_base_name_from_complex(arg)
+            self.collected_names.append(self._get_unique_name(f"{arg_name}_sel{i}"))
 
-        if isinstance(node, ast.BinOp):
-            # Nested BinOp
-            self._process_binop(node, base_name, is_root=False)
+        result = target_name or f"{cond_name}_select_result"
+        self.collected_names.append(self._get_unique_name(result))
 
-        elif isinstance(node, ast.Attribute):
-            if isinstance(node.value, ast.Name):
-                attr_name = f"{node.value.id}_{node.attr}"
-                self.collected_names.append(attr_name)
+    def _process_pop_all_ports(self, target: ast.Tuple):
+        """Process pop_all_ports with tuple unpacking"""
+        for elt in target.elts:
+            if isinstance(elt, ast.Name):
+                self.collected_names.append(self._get_unique_name(f"{elt.id}_valid"))
+                self.collected_names.append(self._get_unique_name(elt.id))
 
-            elif isinstance(node.value, ast.Subscript):
-                self.collected_names.append("value")
-
-        elif isinstance(node, ast.Subscript):
-            # Handle both slice and simple subscript
-            if isinstance(node.slice, ast.Slice):
-                # Array slice in expression
-                if isinstance(node.value, ast.Name):
-                    start = node.slice.lower.value if node.slice.lower else 0
-                    stop = node.slice.upper.value if node.slice.upper else 32
-                    self.collected_names.append(f"{node.value.id}_bits_{start}to{stop}")
-            else:
-                current_node = node
-                indices = []
-                while isinstance(current_node, ast.Subscript):
-                    index_node = current_node.slice
-                    if isinstance(index_node, ast.Constant):
-                        indices.append(index_node.value)
-                    elif isinstance(index_node, ast.Name):
-                        indices.append(index_node.id)
-                    current_node = current_node.value
-                base_name = current_node.id
-                indices.reverse()
-
-                indices_str = '_'.join(map(str, indices))
-                target_name = f"array_{base_name}_{indices_str}"
-                self.collected_names.append(target_name)
-
-    def _process_pop_all_ports(self, target: ast.Tuple) -> None:
-        """Process pop_all_ports tuple unpacking"""
-
-        target_names = [elt.id for elt in target.elts if isinstance(elt, ast.Name)]
-        n = 0
-
-        # Individual validations
-        for name in target_names:
-            self.collected_names.append(f"{name}_valid")
-            if n > 0:
-                combined_name = "_".join(target_names[:n+1]) + "_valid"
-                self.collected_names.append(combined_name)
-            n += 1
-
-        self.collected_names.extend(target_names)
-
-    def _process_select(self, node: ast.Call, target_name: str) -> None:
-        """Process select() calls"""
-        for arg in node.args:
-            try:
-                if isinstance(arg, ast.Subscript) and isinstance(arg.slice, ast.Slice):
-                    # Array slice: value[0:0] → value_0
-                    start = arg.slice.lower.value if arg.slice.lower else 0
-                    self.collected_names.append(f"{arg.value.id}_{start}")
-                elif isinstance(arg, ast.Attribute):
-                    # Attribute: rand0.is_addr → rand0_is_addr
-                    self.collected_names.append(f"{arg.value.id}_{arg.attr}")
-                elif isinstance(arg, ast.Subscript):
-                    # Simple subscript: values[0] → values_0
-                    self.collected_names.append(f"{arg.value.id}_{arg.slice.value}")
-            except AttributeError as e:
-                log.warning("Could not process select() argument node %s: %s", ast.dump(arg), e)
-
-
-        self.collected_names.append(target_name)
+    def reset(self):
+        """Reset the strategy state"""
+        self.collected_names = []
+        self.temp_counter = 0
+        self.name_cache.clear()
+        self.seen_names.clear()
 
 class NamingManager:
-    """Simplified naming manager with single unified strategy"""
+    """Enhanced naming manager with better deduplication"""
 
     def __init__(self):
-        self.strategy = UnifiedNamingStrategy()
+        self.strategy = NamingStrategy()
         self.line_contexts = {}
+        self.line_name_cache = {}
 
-    def analyze_assignment(self, ast_node: ast.Assign) -> NamingContext:
-        """Create naming context"""
-        if isinstance(ast_node, ast.Expr):
-            target_names = None
-        else:
-            target_names = self._extract_target_names(ast_node)
+    def generate_source_names(self, lineno: int, target_ast_node: ast.AST) -> typing.List[str]:
+        """Generate source names with caching to avoid duplicates"""
+        cache_key = (lineno, ast.dump(target_ast_node))
+        if cache_key in self.line_name_cache:
+            return self.line_name_cache[cache_key]
 
-        return NamingContext(
-            ast_node=ast_node,
-            target_names=target_names,
-            lineno=getattr(ast_node, 'lineno', 0)
+        context = NamingContext(
+            ast_node=target_ast_node,
+            target_names=self._extract_target_names(target_ast_node),
+            lineno=lineno
         )
 
-    def _extract_target_names(self, ast_node: ast.Assign) -> list:
+        names = self.strategy.generate_names(context)
+        self.line_name_cache[cache_key] = names
+        return names
+
+    def _extract_target_names(self, ast_node: ast.AST) -> list:
         """Extract target variable names"""
+        if isinstance(ast_node, ast.Expr):
+            return []
+
         target_names = []
-
-        if len(ast_node.targets) == 1:
+        if hasattr(ast_node, 'targets') and ast_node.targets:
             target = ast_node.targets[0]
-
             if isinstance(target, ast.Name):
                 target_names = [target.id]
             elif isinstance(target, ast.Tuple):
                 target_names = [elt.id for elt in target.elts if isinstance(elt, ast.Name)]
-            elif isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
-                target_names = [target.value.id]
-            elif isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name):
-                target_names = [target.attr]
-
         return target_names
 
-    def generate_source_names(self, lineno: int, target_ast_node: ast.Assign) -> typing.List[str]:
-        """Generate source names using unified strategy"""
-
-        context = self.analyze_assignment(target_ast_node)
-        context.lineno = lineno
-        # Track context
-        if lineno not in self.line_contexts:
-            self.line_contexts[lineno] = []
-        self.line_contexts[lineno].append(context)
-
-        names = self.strategy.generate_names(context)
-        return names
+    def reset(self):
+        """Reset the manager state"""
+        self.strategy.reset()
+        self.line_contexts.clear()
+        self.line_name_cache.clear()
