@@ -15,6 +15,7 @@ from ...ir.const import Const
 from ...ir.array import Array
 from ...ir.dtype import Int, Bits, Record,RecordValue
 from ...utils import namify, unwrap_operand
+from ...analysis import get_upstreams
 from ...ir.expr import (
     Expr,
     BinaryOp,
@@ -51,7 +52,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     async_callees: Dict[Module, List[Module]]
     downstream_dependencies: Dict[Module, List[Module]]
     is_top_generation: bool
-    finish_body:str
+    finish_body:list[str]
     sram_payload_arrays:set
     memory_defs:set
 
@@ -71,7 +72,8 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.downstream_dependencies = {}
         self.is_top_generation = False
         self.array_users = {}
-        self.finish_body = None
+        self.finish_body = []
+        self.finish_conditions = []
         self.array_write_port_mapping = {}
         self.sram_payload_arrays = set()
         self.memory_defs = set()
@@ -536,7 +538,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     if ({{0}} & {{1}}) $finish;
 `endif
 """
-                self.finish_body = (f"sv.VerbatimOp({verilog_template!r}, "
+                self.finish_body.append(f"sv.VerbatimOp({verilog_template!r}, "
                         f"substitutions=[{predicate_signal}.value, executed_wire.value])")
                 body = None
             elif intrinsic == Intrinsic.ASSERT:
@@ -585,7 +587,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         if body is not None:
             self.append_code(body)
 
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals,too-many-branches
     def _generate_sram_control_signals(self, sram_info):
         """Generate control signals for SRAM memory interface."""
         array = sram_info['array']
@@ -622,8 +624,11 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
         # Address selection (prioritize write address when writing)
         if write_addr and read_addr:
-            self.append_code(f'self.mem_address = Mux({write_enable},'
-                f' {write_addr}.as_bits(), {read_addr}.as_bits())')
+            if write_addr != read_addr:
+                self.append_code(f'self.mem_address = Mux({write_enable},'
+                    f' {read_addr}.as_bits(), {write_addr}.as_bits())')
+            else:
+                self.append_code(f'self.mem_address = {write_addr}.as_bits()')
         elif write_addr:
             self.append_code(f'self.mem_address = {write_addr}.as_bits()')
         elif read_addr:
@@ -663,13 +668,13 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                 self.append_code(f"executed_wire = {' & '.join(exec_conditions)}")
 
         if self.finish_body:
-            self.append_code(self.finish_body)
+            for finish in self.finish_body:
+                self.append_code(finish)
 
         if isinstance(self.current_module,SRAM):
             sram_info = get_sram_info(self.current_module)
             if sram_info:
                 self._generate_sram_control_signals(sram_info)
-
         #pylint: disable=too-many-nested-blocks
         for key, exposes in self._exposes.items():
             if isinstance(key, Array):
@@ -709,13 +714,18 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                         # Build mux chain
                         wdata = self._build_mux_chain(module_writes, array_dtype)
                     self.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata}')
-                    widx_mux = (
-                        f"Mux({module_writes[0][1]},"
-                        f" {dump_type(module_writes[0][0].idx.dtype)}(0),"
-                        f" {self.dump_rval(module_writes[0][0].idx, False)})"
-                    )
-                    for expr, pred in module_writes[1:]:
-                        widx_mux = f"Mux({pred},  {widx_mux},{self.dump_rval(expr.idx, False)})"
+                    if len(module_writes) == 1:
+                        # Single write - no mux needed, just use the index directly
+                        widx_mux = self.dump_rval(module_writes[0][0].idx, False)
+                    else:
+                        # Multiple writes - build mux chain
+                        widx_mux = (
+                            f"Mux({module_writes[0][1]},"
+                            f" {dump_type(module_writes[0][0].idx.dtype)}(0),"
+                            f" {self.dump_rval(module_writes[0][0].idx, False)})"
+                        )
+                        for expr, pred in module_writes[1:]:
+                            widx_mux = f"Mux({pred},  {widx_mux},{self.dump_rval(expr.idx, False)})"
                     self.append_code(
                         f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()'
                         )
@@ -727,7 +737,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                 if has_push:
                     fifo = self.dump_rval(key, False)
                     pushes = [(e, p) for e, p in exposes if isinstance(e, FIFOPush)]
-
                     final_push_predicate = " | ".join([f"({p})" for _, p in pushes]) \
                     if pushes else "Bits(1)(0)"
 
@@ -830,7 +839,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.cond_stack = []
         self.current_module = node
         self.exposed_ports_to_add = []
-        self.finish_body = None
+        self.finish_body = []
 
         self.visit_block(node.body)
         self.cleanup_post_generation()
@@ -983,8 +992,13 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     def visit_system(self, node: SysBuilder):# pylint: disable=too-many-locals,R0912
         sys = node
         self.sys = sys
+        for module in sys.downstreams:
+            if isinstance(module, SRAM) and hasattr(module, 'payload'):
+                self.sram_payload_arrays.add(module.payload)
 
         for arr_container in sys.arrays:
+            if arr_container in self.sram_payload_arrays:
+                continue
             sub_array = arr_container
             if sub_array not in self.array_write_port_mapping:
                 self.array_write_port_mapping[sub_array] = {}
@@ -994,12 +1008,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                     port_idx = len(self.array_write_port_mapping[sub_array])
                     self.array_write_port_mapping[sub_array][module] = port_idx
 
-        for module in sys.downstreams:
-            if isinstance(module, SRAM) and hasattr(module, 'payload'):
-                self.sram_payload_arrays.add(module.payload)
-
         for arr_container in sys.arrays:
-            self.visit_array(arr_container)
+            if arr_container not in self.sram_payload_arrays:
+                self.visit_array(arr_container)
 
         expr_to_module = {}
         for module in sys.modules + sys.downstreams:
@@ -1008,19 +1019,10 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                     expr_to_module[expr] = module
 
         for ds_module in sys.downstreams:
-            self.downstream_dependencies[ds_module] = []
-            deps = set()
-            for expr in self._walk_expressions(ds_module.body):
-                # An operand is a dependency if it's an Expr defined in another module.
-                for operand in expr.operands:
-                    op = unwrap_operand(operand)
-                    if isinstance(op, Expr) and op in expr_to_module:
-                        producer_module = expr_to_module[op]
-                        if producer_module != ds_module:
-                            deps.add(producer_module)
-            self.downstream_dependencies[ds_module] = list(deps)
+            self.downstream_dependencies[ds_module] = get_upstreams(ds_module)
 
-        for module in sys.modules:
+        all_modules = self.sys.modules + self.sys.downstreams
+        for module in all_modules:
             for expr in self._walk_expressions(module.body):
                 if isinstance(expr, AsyncCall):
                     callee = expr.bind.callee
@@ -1032,6 +1034,8 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
         self.array_users = {}
         for arr_container in self.sys.arrays:# pylint: disable=R1702
+            if arr_container in self.sram_payload_arrays:
+                continue
             arr = arr_container
             self.array_users[arr] = []
             for mod in self.sys.modules + self.sys.downstreams:
@@ -1157,7 +1161,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                 # Instantiate memory blackbox (as external Verilog module)
                 self.append_code('# Instantiate memory blackbox module')
                 self.append_code(
-                    f'mem_{array_name}_inst = MemoryBlackbox_{array_name}()'
+                    f'mem_{array_name}_inst = sramBlackbox_{array_name}()'
                     '(clk=self.clk, rst_n=~self.rst, '
                     f'address=mem_{array_name}_address, '
                     f'wd=mem_{array_name}_write_data, '
@@ -1535,7 +1539,7 @@ def generate_design(fname: str, sys: SysBuilder):
 
         dumper = CIRCTDumper()
 
-        # Generate MemoryBlackbox module definitions for each SRAM
+        # Generate sramBlackbox module definitions for each SRAM
         sram_modules = [m for m in sys.downstreams if isinstance(m, SRAM)]
         if sram_modules:
             for sram in sram_modules:
@@ -1545,12 +1549,12 @@ def generate_design(fname: str, sys: SysBuilder):
                 addr_width = params['addr_width']
                 dumper.memory_defs.add((data_width, addr_width, array_name))
 
-            # Write MemoryBlackbox module definitions
+            # Write sramBlackbox module definitions
             for data_width, addr_width, array_name in dumper.memory_defs:
                 fd.write(f'''
 @modparams
-def MemoryBlackbox_{array_name}():
-    class MemoryBlackboxImpl(Module):
+def sramBlackbox_{array_name}():
+    class sramBlackboxImpl(Module):
         module_name = "sram_blackbox_{array_name}"
         clk = Clock()
         rst_n = Input(Bits(1))
@@ -1560,7 +1564,7 @@ def MemoryBlackbox_{array_name}():
         read = Input(Bits(1))
         write = Input(Bits(1))
         dataout = Output(Bits({data_width}))
-    return MemoryBlackboxImpl
+    return sramBlackboxImpl
 
 ''')
         dumper.visit_system(sys)
