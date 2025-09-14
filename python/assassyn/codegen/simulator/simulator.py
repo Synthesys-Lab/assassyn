@@ -19,10 +19,10 @@ def dynamiclib_suffix():
     Returns:
         str: The dynamic library suffix (.dll for Windows, .dylib for macOS, .so for Linux)
     """
-    os = platform.system().lower()
-    if os == "windows":
+    system = platform.system().lower()
+    if system == "windows":
         return ".dll"
-    if os == "darwin":
+    if system == "darwin":
         return ".dylib"
     # Linux and other Unix-like systems
     return ".so"
@@ -133,7 +133,8 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("let mem = unsafe {")
     midfix = '/testbench/simulator/build/lib/libwrapper'
     if platform_os == 'darwin':
-        fd.write(f'let lib = Library::open(Some("{home}{midfix}{dynamiclib_suffix()}"), RTLD_GLOBAL | RTLD_LAZY).unwrap();')
+        fd.write(f'let lib = Library::open(Some("{home}{midfix}{dynamiclib_suffix()}"), '
+                 'RTLD_GLOBAL | RTLD_LAZY).unwrap();')
     else:
         fd.write(f'let lib = Library::open("{home}{midfix}{dynamiclib_suffix()}").unwrap();')
     fd.write('MemoryInterface::new(lib).expect("Failed to create MemoryInterface") };')
