@@ -1,7 +1,6 @@
 '''The programming interfaces involing assassyn backends'''
 
 import os
-import tempfile
 from pathlib import Path
 
 from .builder import SysBuilder
