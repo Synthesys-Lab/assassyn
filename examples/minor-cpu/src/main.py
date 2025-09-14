@@ -535,7 +535,7 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
         raw = utils.run_simulator(simulator_path, False)
         open(f'{workload}.log', 'w').write(raw)
         #open(f'{workload}.sim.time', 'w').write(str(tt))
-        raw = utils.run_verilator(verilog_path, False)
+        raw = utils.run_verilator(verilog_path)
         open(f'{workload}.verilog.log', 'w').write(raw)
     else:
         raw = utils.run_simulator(simulator_path)
