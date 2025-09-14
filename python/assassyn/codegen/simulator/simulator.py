@@ -48,8 +48,8 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("use std::collections::VecDeque;\n")
     fd.write("use super::runtime::*;\n")
     fd.write("use super::ramulator::*;\n")
-    os = platform.system().lower()
-    if os == 'darwin':
+    platform_os = platform.system().lower()
+    if platform_os == 'darwin':
         fd.write("use libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n")
     else:
         fd.write("use libloading::Library;\n")
@@ -132,7 +132,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("  pub fn new() -> Self {\n")
     fd.write("let mem = unsafe {")
     midfix = '/testbench/simulator/build/lib/libwrapper'
-    if os == 'darwin':
+    if platform_os == 'darwin':
         fd.write(f'let lib = Library::open(Some("{home}{midfix}{dynamiclib_suffix()}"), RTLD_GLOBAL | RTLD_LAZY).unwrap();')
     else:
         fd.write(f'let lib = Library::open("{home}{midfix}{dynamiclib_suffix()}").unwrap();')
