@@ -137,7 +137,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
                  'RTLD_GLOBAL | RTLD_LAZY).unwrap();')
     else:
         fd.write(f'let lib = Library::open("{home}{midfix}{dynamiclib_suffix()}").unwrap();')
-    fd.write('MemoryInterface::new(lib).expect("Failed to create MemoryInterface") };')
+    fd.write('MemoryInterface::new(lib.into()).expect("Failed to create MemoryInterface") };')
     fd.write("    Simulator {\n")
     fd.write("      stamp: 0,\n")
     for init in simulator_init:
