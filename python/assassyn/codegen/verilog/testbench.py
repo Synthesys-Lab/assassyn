@@ -30,6 +30,9 @@ async def test_tb(dut):
         dut.clk.value = 0
         await Timer(500, units="ns")
         {}
+        if dut.global_finish.value == 1:
+            break
+        
 
 
 def runner():
