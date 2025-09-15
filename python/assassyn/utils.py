@@ -64,28 +64,20 @@ def run_simulator(manifest_path, offline=False, release=True):
         cmd += ['--offline']
     if release:
         cmd += ['--release']
+    print(cmd)
     res = _cmd_wrapper(cmd)
     return res
 
 def run_verilator(path):
     '''The helper function to run the verilator'''
-    # restore = os.getcwd()
+    restore = os.getcwd()
     os.chdir(path)
     cmd_design = ['python', 'design.py']
     subprocess.check_output(cmd_design)
     patch_fifo("sv/hw/Top.sv")
     cmd_tb = ['python', 'tb.py']
     res = _cmd_wrapper(cmd_tb)
-    # cmd = ['make', 'main', '-j']
-    # subprocess.check_output(cmd).decode('utf-8')
-    # # TODO(@were): Fix this hardcoded Vtb later.
-    # cmd = ['./obj_dir/Vtb']
-    # res = _cmd_wrapper(cmd)
-    # if count_time:
-    #     a = timeit.timeit(lambda: _cmd_wrapper(cmd), number=5)
-    #     os.chdir(restore)
-    #     return (res, a)
-    # os.chdir(restore)
+    os.chdir(restore)
     return res
 
 def parse_verilator_cycle(toks):
