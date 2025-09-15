@@ -649,7 +649,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             finish_terms = []
             for pred, exec_signal in self.finish_conditions:
                 finish_terms.append(f"({pred} & {exec_signal})")
-            
+
             if len(finish_terms) == 1:
                 self.append_code(f'self.finish = {finish_terms[0]}')
             else:
