@@ -46,20 +46,13 @@ else
   echo "Verilator is disabled by --no-verilator flag"
 fi
 
-# Export library paths based on the operating system
-OS=$(uname -s)
-if [ "$OS" = "Darwin" ]; then
-  # For macOS, use DYLD_LIBRARY_PATH
-  echo "Adding $REPO_PATH/3rd-party/ramulator2 to DYLD_LIBRARY_PATH"
-  export DYLD_LIBRARY_PATH=$REPO_PATH/3rd-party/ramulator2:$DYLD_LIBRARY_PATH
-  echo "Adding $REPO_PATH/testbench/simulator/build/lib to DYLD_LIBRARY_PATH"
-  export DYLD_LIBRARY_PATH=$REPO_PATH/testbench/simulator/build/lib:$DYLD_LIBRARY_PATH
+# Install pre-commit hook if not already installed
+if [ ! -f "$REPO_PATH/.git/hooks/pre-commit" ]; then
+  echo "Installing pre-commit hook..."
+  ln -s "$REPO_PATH/scripts/pre-commit" "$REPO_PATH/.git/hooks/pre-commit"
+  echo "Pre-commit hook installed successfully."
 else
-  # For Linux, use LD_LIBRARY_PATH
-  echo "Adding $REPO_PATH/3rd-party/ramulator2 to LD_LIBRARY_PATH"
-  export LD_LIBRARY_PATH=$REPO_PATH/3rd-party/ramulator2:$LD_LIBRARY_PATH
-  echo "Adding $REPO_PATH/testbench/simulator/build/lib to LD_LIBRARY_PATH"
-  export LD_LIBRARY_PATH=$REPO_PATH/testbench/simulator/build/lib:$LD_LIBRARY_PATH
+  echo "Pre-commit hook already installed."
 fi
 
 # Go back to the original directory

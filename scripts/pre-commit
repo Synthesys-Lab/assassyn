@@ -3,10 +3,5 @@
 # It is highly recommended to put this to your git pre-commit hook, to format your code
 # before checking anything in.
 
-cargo check --all-targets
-cargo fmt --all
-cargo clippy -- -Dclippy::all
-
-ASSASSYN_REPO=`git rev-parse --show-toplevel`
-
-pylint --rcfile $ASSASSYN_REPO/python/.pylintrc $ASSASSYN_REPO/python/assassyn
+pylint --rcfile $ASSASSYN_HOME/python/.pylintrc $ASSASSYN_HOME/python/assassyn
+pytest -n 8 $ASSASSYN_HOME/python/unit-tests

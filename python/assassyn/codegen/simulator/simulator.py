@@ -135,8 +135,10 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     if platform_os == 'darwin':
         fd.write(f'let lib = Library::open(Some("{home}{midfix}{dynamiclib_suffix()}"), '
                  'RTLD_GLOBAL | RTLD_LAZY).unwrap();')
+    elif platform_os == 'windows':
+        raise NotImplementedError
     else:
-        fd.write(f'let lib = Library::open("{home}{midfix}{dynamiclib_suffix()}").unwrap();')
+        fd.write(f'let lib = Library::new("{home}{midfix}{dynamiclib_suffix()}").unwrap();')
     fd.write('MemoryInterface::new(lib.into()).expect("Failed to create MemoryInterface") };')
     fd.write("    Simulator {\n")
     fd.write("      stamp: 0,\n")
