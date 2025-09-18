@@ -12,7 +12,7 @@ from ...builder import SysBuilder
 
 from ...utils import create_and_clean_dir
 
-def generate_sram_blackbox_files(sys, path):
+def generate_sram_blackbox_files(sys, path,resource_base):
     """Generate separate Verilog files for SRAM memory blackboxes."""
     sram_modules = [m for m in sys.downstreams if isinstance(m, SRAM)]
     for sram in sram_modules:
@@ -43,9 +43,11 @@ module sram_blackbox_{array_name} #(
 '''
 
         if sram_info['init_file']:
+            init_file =  sram_info['init_file']
+            src_file = os.path.join(resource_base, init_file) if resource_base else init_file
             verilog_code += f'''
     initial begin
-        $readmemh("{sram_info['init_file']}", mem);
+        $readmemh("{src_file}", mem);
     end
 
     always @ (posedge clk) begin
@@ -104,7 +106,7 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
 
     default_home = os.getenv('ASSASSYN_HOME', os.getcwd())
     resource_path = Path(default_home) / "python/assassyn/codegen/verilog"
-    generate_sram_blackbox_files(sys, path)
+    generate_sram_blackbox_files(sys, path,kwargs.get('resource_base'))
     files_to_copy = ["fifo.sv", "trigger_counter.sv"]
     for file_name in files_to_copy:
         source_file = resource_path / file_name

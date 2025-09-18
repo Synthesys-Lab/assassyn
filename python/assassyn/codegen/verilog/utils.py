@@ -1,5 +1,5 @@
 """Utility functions for the Verilog backend."""
-
+import re
 from typing import Optional
 
 from ...ir.module import Module,SRAM
@@ -47,6 +47,23 @@ def find_wait_until(module: Module) -> Optional[Intrinsic]:
             if elem.opcode == Intrinsic.WAIT_UNTIL:
                 return elem
     return None
+
+
+def ensure_bits(expr_str: str) -> str:
+    """Ensure an expression is of Bits type, converting if necessary."""
+    uint_pattern = r'UInt\(([^)]+)\)\(([^)]+)\)'
+    if re.search(uint_pattern, expr_str):
+        expr_str = re.sub(uint_pattern, r'Bits(\1)(\2)', expr_str)
+        return expr_str
+    if "Bits(" in expr_str:
+        return expr_str
+    if ".as_bits()" in expr_str:
+        return expr_str
+    if any(pattern in expr_str for pattern in \
+           ["executed_wire", "_valid", "_pop_valid", "_push_valid"]):
+        return expr_str
+    return f"{expr_str}.as_bits()"
+
 
 
 def dump_type(ty: DType) -> str:

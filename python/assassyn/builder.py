@@ -42,7 +42,11 @@ def process_naming(expr, line_of_code: str, lineno: int) -> typing.Dict[str, typ
                 expr_position = len(line_data['expressions']) - 1
                 generated_names = line_data['generated_names']
                 if expr_position < len(generated_names):
-                    return f"{generated_names[expr_position]}_cast"
+                    # Ensure uniqueness for cast operations
+                    base_name = f"{generated_names[expr_position]}_cast"
+                    # Use the naming manager to ensure global uniqueness
+                    unique_name = naming_manager.strategy.get_unique_name(base_name)
+                    return unique_name
 
             line_data['expressions'].append(expr)
 
@@ -61,6 +65,7 @@ def process_naming(expr, line_of_code: str, lineno: int) -> typing.Dict[str, typ
             else:
                 base_name = generated_names[0] if generated_names else "expr"
                 source_name = f"tmp_{base_name}_{expr_position}"
+                source_name = naming_manager.strategy.get_unique_name(source_name)
 
             return source_name
 

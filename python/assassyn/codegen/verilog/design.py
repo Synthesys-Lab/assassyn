@@ -4,8 +4,8 @@
 from typing import List, Dict, Tuple
 from string import Formatter
 from collections import defaultdict, deque
+from .utils import HEADER,dump_type, dump_type_cast,get_sram_info,extract_sram_params,ensure_bits
 
-from .utils import HEADER,dump_type, dump_type_cast,get_sram_info,extract_sram_params
 from ...analysis import expr_externally_used
 from ...ir.module import Module, Downstream, Port,SRAM
 from ...builder import SysBuilder
@@ -85,7 +85,11 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         """Get the current predicate for conditional execution."""
         if not self.cond_stack:
             return "Bits(1)(1)"
-        return " & ".join([s for s, _ in self.cond_stack])
+        pred_parts = []
+        for s, _ in self.cond_stack:
+            s_bits = ensure_bits(s)
+            pred_parts.append(s_bits)
+        return " & ".join(pred_parts)
 
     def get_external_port_name(self, node: Expr) -> str:
         """Get the mangled port name for an external value."""
@@ -405,9 +409,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                 array_idx = unwrap_operand(expr.idx)
                 array_idx = (self.dump_rval(array_idx, False)
                             if not isinstance(array_idx, Const) else array_idx.value)
-
+                index_bits = array_ref.index_bits if array_ref.index_bits > 0 else 1
                 if dump_type(expr.idx.dtype)!=Bits and not isinstance(array_idx, int):
-                    array_idx = f"{array_idx}.as_bits()"
+                    array_idx = f"{array_idx}.as_bits({index_bits})"
 
                 array_name = self.dump_rval(array_ref, False)
                 if isinstance(expr.dtype, Record):
@@ -527,7 +531,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
                 final_cond = cond
                 if is_async_callee:
-                    final_cond = f"({cond}.as_bits() & self.trigger_counter_pop_valid)"
+                    final_cond = f"({cond} & self.trigger_counter_pop_valid)"
 
                 self.wait_until = final_cond
             elif intrinsic == Intrinsic.BARRIER:

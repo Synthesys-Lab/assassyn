@@ -1,9 +1,11 @@
 """
 Optimized AST naming generator with clearer, more concise naming rules.
+Fixed to ensure global name uniqueness across the entire system.
 """
 import ast
 import logging
 import typing
+import hashlib
 from dataclasses import dataclass, field
 from collections import OrderedDict
 
@@ -51,29 +53,39 @@ class NamingStrategy:
         ast.LtE: 'le', ast.Gt: 'gt', ast.GtE: 'ge'
     }
 
+    # Class-level global names tracker - shared across all instances
+    _global_seen_names = set()
+
     def __init__(self):
         self.collected_names = []
-        self.seen_names = set()
         self.name_cache = OrderedDict()
         self.context_stack = []  # Track nested context
+        # Reference the class-level global names
+        self.global_seen_names = NamingStrategy._global_seen_names
 
-    def _get_unique_name(self, base_name: str, max_length: int = 30) -> str:
-        """Generate unique name with length limit"""
+    def get_unique_name(self, base_name: str, max_length: int = 30) -> str:
+        """Generate unique name with length limit using global tracking"""
         # Truncate if too long
         if len(base_name) > max_length:
             base_name = self._abbreviate_name(base_name)
 
-        if base_name not in self.seen_names:
-            self.seen_names.add(base_name)
+        # Check against global names
+        if base_name not in self.global_seen_names:
+            self.global_seen_names.add(base_name)
             return base_name
 
         # Add numeric suffix for uniqueness
         for i in range(2, 100):
-            candidate = f"{base_name}{i}"
-            if candidate not in self.seen_names:
-                self.seen_names.add(candidate)
+            candidate = f"{base_name}_{i}"  # Use underscore for clarity
+            if candidate not in self.global_seen_names:
+                self.global_seen_names.add(candidate)
                 return candidate
-        return base_name
+
+        hash_suffix = hashlib.md5(f"{base_name}{len(self.global_seen_names)}" \
+                                  .encode()).hexdigest()[:6]
+        candidate = f"{base_name}_{hash_suffix}"
+        self.global_seen_names.add(candidate)
+        return candidate
 
     def _abbreviate_name(self, name: str) -> str:
         """Abbreviate long names intelligently"""
@@ -129,6 +141,7 @@ class NamingStrategy:
         name = self._extract_name_impl(node, depth)
         self.name_cache[node_repr] = name
         return name
+
     #pylint: disable = too-many-return-statements,too-many-branches
     def _extract_name_impl(self, node: ast.AST, depth: int) -> str:
         """Implementation of name extraction"""
@@ -156,7 +169,8 @@ class NamingStrategy:
         if isinstance(node, ast.Subscript):
             base = self._extract_name_from_node(node.value, depth + 1)
             if isinstance(node.slice, ast.Constant):
-                return f"{base}[{node.slice.value}]"[:20]
+                # Don't use brackets in names as they can cause issues
+                return f"{base}_{node.slice.value}"[:20]
             if isinstance(node.slice, ast.Slice):
                 return f"{base}_slice"
             return f"{base}_idx"
@@ -214,8 +228,9 @@ class NamingStrategy:
         except (AttributeError, TypeError, KeyError, IndexError) as e:
             log.debug("Error generating names for node type %s: %s",
                      type(context.ast_node).__name__, e)
-            self.collected_names.append(self._get_unique_name("expr"))
+            self.collected_names.append(self.get_unique_name("expr"))
         return self.collected_names
+
     #pylint: disable=too-many-branches
     def _process_assignment(self, assign: ast.Assign):
         """Process assignment with optimized naming"""
@@ -237,7 +252,7 @@ class NamingStrategy:
             # Handle tuple unpacking
             for _, elt in enumerate(target.elts):
                 if isinstance(elt, ast.Name):
-                    self.collected_names.append(self._get_unique_name(elt.id))
+                    self.collected_names.append(self.get_unique_name(elt.id))
             return
         else:
             target_name = "var"
@@ -246,38 +261,45 @@ class NamingStrategy:
         if isinstance(value, ast.Call) and isinstance(value.func, ast.Attribute):
             method = value.func.attr
             if method in ['select', 'select1hot']:
-                self.collected_names.append(self._get_unique_name(f"{target_name}_sel"))
+                self.collected_names.append(self.get_unique_name(f"{target_name}_sel"))
             elif method == 'bitcast':
-                self.collected_names.append(self._get_unique_name(f"{target_name}_cast"))
+                self.collected_names.append(self.get_unique_name(f"{target_name}_cast"))
             else:
-                self.collected_names.append(self._get_unique_name(target_name))
+                self.collected_names.append(self.get_unique_name(target_name))
         else:
             # Use target name directly for simple assignments
-            self.collected_names.append(self._get_unique_name(target_name))
+            self.collected_names.append(self.get_unique_name(target_name))
 
     def _process_expression(self, node: ast.AST):
         """Process standalone expression"""
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             if node.func.id == 'log':
-                self.collected_names.append(self._get_unique_name("log_stmt"))
+                self.collected_names.append(self.get_unique_name("log_stmt"))
                 return
 
         base = self._extract_name_from_node(node, 0)
-        self.collected_names.append(self._get_unique_name(base))
+        self.collected_names.append(self.get_unique_name(base))
 
     def reset(self):
-        """Reset strategy state"""
+        """Reset strategy state (but NOT global names)"""
         self.collected_names = []
-        self.seen_names.clear()
+        # Don't clear global_seen_names!
         self.name_cache.clear()
         self.context_stack = []
 
+    @classmethod
+    def clear_global_names(cls):
+        """Clear global names - call this only when starting a new system"""
+        cls._global_seen_names.clear()
+
+
 class NamingManager:
-    """Optimized naming manager"""
+    """Optimized naming manager with global name tracking"""
 
     def __init__(self):
         self.strategy = NamingStrategy()
         self.line_name_cache = {}
+        self.generated_names_global = set()  # Track all generated names
 
     def generate_source_names(self, lineno: int, target_ast_node: ast.AST) -> typing.List[str]:
         """Generate optimized source names with caching"""
@@ -299,6 +321,7 @@ class NamingManager:
         for name in names:
             if name not in ['val', 'expr', 'const'] or len(names) == 1:
                 filtered_names.append(name)
+                self.generated_names_global.add(name)
 
         self.line_name_cache[cache_key] = filtered_names
         return filtered_names
@@ -322,3 +345,10 @@ class NamingManager:
         """Reset manager state"""
         self.strategy.reset()
         self.line_name_cache.clear()
+        # Don't clear generated_names_global unless explicitly needed
+
+    def clear_all(self):
+        """Completely reset including global names - use when starting new system"""
+        self.reset()
+        self.generated_names_global.clear()
+        NamingStrategy.clear_global_names()
