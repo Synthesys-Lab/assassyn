@@ -9,17 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pybind11-dev \
     python-is-python3 \
     git \
-    autoconf \
-    g++ \
-    flex \
-    bison \
     libfl2 \
     libfl-dev \
     libexpat1-dev \
     gettext \
-    make \
     perl \
-    ccache \
     libgoogle-perftools-dev \
     numactl \
     perl-doc \
@@ -35,8 +29,8 @@ SHELL ["/bin/zsh", "-c"]
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # Set build environment variables
-ENV CC="ccache gcc"
-ENV CXX="ccache g++"
+ENV CC="gcc"
+ENV CXX="g++"
 ENV CCACHE_DIR="/tmp/ccache"
 ENV PYTHONUSERBASE="/tmp/.local"
 
