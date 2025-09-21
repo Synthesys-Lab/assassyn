@@ -8,63 +8,45 @@ and verfication.
 
 ## Getting Started
 
-It is highly recommended to use [Docker](https://www.docker.com/) to
-automatically manage the dependences. We decide to adopt a hybrid style
-of coding, tooling, and development, where this repo is located
-in your _physical_ machine, while the execution is in the docker _virtual_
-machine (VM).
+You either refer to the [docker doc](./docs/docker.md) to use the framework in a virtual
+machine, or build it on your physical machine. The instructions below are Ubuntu based:
 
-Still, before doing anything, make sure you have this repo fully initialized:
-
+1. Make sure you have all the repos propoerly cloned.
 ````sh
 git submodule update --init --recursive
 ````
 
-### Build the Docker Image
+2. Have your packaged updated.
+````sh
+sudo apt-get update
+````
 
-Assuming you are at the root of this source tree:
+3. This commands rips of the Docker container command to install all the dependent packages.
+````sh
+sudo apt-get install -y $(awk '
+  /apt-get install/ {
+    inblock=1
+    sub(/.*apt-get install -y --no-install-recommends/,"")
+    gsub(/\\/,"")
+    print
+    next
+  }
+  /apt-get clean/ {inblock=0}
+  inblock {
+    gsub(/\\/,"")
+    print
+  }
+' Dockerfile)
+````
 
-```sh
-docker build -t assassyn:latest .
-```
+4. Have this repo built from source.
+````sh
+source setup.sh
+source init.sh
+````
 
-### Run the Docker Container
-
-At least read point 3 below before typing your command!!!
-
-1. `-v <src>:<dst>` mounts a physical source directory into the VM destination.
-2. `--name` specifies the name of this VM container, which avoids a random `<adj>_<noun>` name.
-3. `-m` specifies the memory limit of a container. However, this flag only works on Linux.
-    - If you are using Docker client on Windows or Mac OS with UI, memory should be tuned in the client.
-    - Click the bottom bar of the client <img src="./docs/imag/resource-bar.png" width=75%>.
-    - A resource slide bar will pop up as shown <img src="./docs/imag/resource-bar.png" width=75%>.
-    - Tune the memory usage **before** starting your VM container.
-
-```sh
-docker run --rm -tid -v `pwd`:/app --user $(id -u):$(id -g) \
-  -m 32g \
-  --name assassyn assassyn:latest
-```
-
-### Build Initialization
-
-If it is the first time, the repo should be initialized using the command below.
-
-```sh
-docker exec -it ./init.sh \
-    --llvm-compile-jobs 16 \
-    --llvm-tbg-jobs 16 \
-    --llvm-link-jobs 1
-```
-
-LLVM linkage is super memory consuming, while `ninja` build can only use fixed #thread
-parallelization, which may overwhelm the memory. Feel free to tune your own parameters to have
-a balance between performance and machine limit. If you see something like `g++ is killed Signal 9`
-or `truncated file`, with high probability it is caused by out of memory (OOM).
-Feel free to give a different parameter and run again.
-
----
-
-## Run an Example
-
-TODO: A tutorial to running the example here.
+5. Verify your installation.
+````sh
+python -c 'import assassyn' # import this module
+echo $? # 0 is expected
+````

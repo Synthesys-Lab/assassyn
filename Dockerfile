@@ -6,18 +6,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zsh \
     python3-pip \
     python3-dev \
+    python3-venv \
     pybind11-dev \
     python-is-python3 \
     git \
     autoconf \
-    g++ \
+    build-essential \
     flex \
     bison \
     libfl2 \
     libfl-dev \
     libexpat1-dev \
     gettext \
-    make \
     perl \
     ccache \
     libgoogle-perftools-dev \

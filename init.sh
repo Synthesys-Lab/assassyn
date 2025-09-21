@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-git submodule update --init
+git submodule update --init --recursive
 
 source ./scripts/init/py-package.sh
 source ./scripts/init/circt.sh
