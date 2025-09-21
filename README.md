@@ -1,6 +1,6 @@
 # Assassyn: **As**ynchronous **S**emantics for **A**rchitectural **S**imulation & **Syn**thesis
 
-[![Tests](https://github.com/were/assassyn/actions/workflows/test.yaml/badge.svg)](https://github.com/were/assassyn/actions/workflows/test.yaml)
+[![Tests](https://github.com/synthesys-lab/assassyn/actions/workflows/test.yaml/badge.svg)](https://github.com/synthesys-lab/assassyn/actions/workflows/test.yaml)
 
 Assassyn is aimed at developing a new programming paradigm for hardware development.
 The ultimate goal is to unify the hardware modeling (simulation), implementation (RTL),
