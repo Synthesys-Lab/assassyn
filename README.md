@@ -23,22 +23,9 @@ git submodule update --init --recursive
 sudo apt-get update
 ````
 
-3. This commands rips of the Docker container command to install all the dependent packages.
+3. This commands rips of the Docker container build command to install all the dependent packages.
 ````sh
-sudo apt-get install -y $(awk '
-  /apt-get install/ {
-    inblock=1
-    sub(/.*apt-get install -y --no-install-recommends/,"")
-    gsub(/\\/,"")
-    print
-    next
-  }
-  /apt-get clean/ {inblock=0}
-  inblock {
-    gsub(/\\/,"")
-    print
-  }
-' Dockerfile)
+sudo apt-get install -y $(sed -n '/apt-get install/,/apt-get clean/p' Dockerfile | tail -n+2 | head -n-1 | sed 's/\\//')
 ````
 
 4. Have this repo built from source.
