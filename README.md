@@ -25,14 +25,26 @@ sudo apt-get update
 
 3. This commands rips of the Docker container build command to install all the dependent packages.
 ````sh
-sudo apt-get install -y $(sed -n '/apt-get install/,/apt-get clean/p' Dockerfile | tail -n+2 | head -n-1 | sed 's/\\//')
+sudo apt-get install -y $(
+  sed -n '/apt-get install/,/apt-get clean/p' Dockerfile \
+  | tail -n+2 | head -n-1 \
+  | sed -e 's/\r$//' -e 's/\\$//' -e 's/^[[:space:]]*//' \
+  | grep -v '^[[:space:]]*$'
+)
 ````
 
 4. Have this repo built from source.
+> make sure you are using zsh
 ````sh
+zsh
 source setup.sh
 source init.sh
 ````
+
+If you encounter an error such as `Error 1 g++: fatal error: Killed signal terminated program cc1plus compilation terminated.`, it likely means your machine is out of memory (OOM). In this case, try replacing all `make -j` commands in the scripts referenced by [`init.sh`](./init.sh) with `make -j4` or a lower parallelism value to reduce memory usage.
+
+
+
 
 5. Verify your installation.
 ````sh
