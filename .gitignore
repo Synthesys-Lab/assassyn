@@ -10,5 +10,6 @@ testbench/simulator/build
 tutorials/*
 !tutorials/*.qmd
 !tutorials/*.py
+.cache
 **/.claude/settings.local.json
 
