@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Driver(Module):
 
@@ -21,6 +20,10 @@ class Driver(Module):
         log("onehot select 0b{:b} from [1,2,4,8,16]: {}", gt, mux)
         (cond & self)[0] <= (cond[0] + Int(5)(1)) % Int(5)(5)
 
+def top():
+    driver = Driver()
+    driver.build()
+
 def check(raw: str):
     for i in raw.splitlines():
         if 'onehot select' in i:
@@ -29,19 +32,7 @@ def check(raw: str):
             assert int(a, 2) == int(b)
 
 def test_select1hot():
-    sys = SysBuilder('select1hot')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('select1hot', top, check)
 
 if __name__ == '__main__':
     test_select1hot()

@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Driver(Module):
 
@@ -25,6 +24,10 @@ class Driver(Module):
         (a & self)[0] <= bb
         b[0] = cc
 
+def top():
+    driver = Driver()
+    driver.build()
+
 def check(raw):
     expect_a = 0
     expect_b = 1
@@ -41,20 +44,7 @@ def check(raw):
             assert int(a) + int(b) == int(c)
 
 def test_fib():
-
-    sys = SysBuilder('fib')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('fib', top, check)
 
 
 if __name__ == '__main__':

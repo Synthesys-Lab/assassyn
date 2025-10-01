@@ -6,7 +6,7 @@ from assassyn.ir.module.external import ExternalSV
 
 
 class Driver(Module):
- 
+
     def __init__(self):
         super().__init__(ports={})
 
@@ -23,7 +23,7 @@ class ForwardData(Module):
     def __init__(self):
         super().__init__(
             ports={'data': Port(UInt(32))},
-        ) 
+        )
 
     @module.combinational
     def build(self):
@@ -50,7 +50,7 @@ class ExternalMultiplier(ExternalSV):
             },
             **in_wire_connections
         )
-    
+
     def __getattr__(self, name):
         # Allow accessing output wires as attributes
         if hasattr(self, 'out_wires') and name in self.out_wires:
@@ -58,7 +58,7 @@ class ExternalMultiplier(ExternalSV):
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
 class Sink(Module):
-    
+
     def __init__(self):
         super().__init__(
             ports={'data': Port(UInt(32*2))},
@@ -102,7 +102,7 @@ def test_pipemul_external():
 
         ext_mul = ExternalMultiplier()
         wrapper = Wrapper()
-        sink = Sink()   
+        sink = Sink()
         sink.build()
 
         driver.build(lhs, rhs)

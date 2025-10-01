@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 
 class Driver(Module):
@@ -21,19 +20,11 @@ def check(raw):
             assert int(i.split()[-1]) == 10
 
 def test_driver():
-    sys = SysBuilder('reg_init')
-    with sys:
+    def top():
         driver = Driver()
         driver.build()
 
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('reg_init', top, check)
 
 
 if __name__ == '__main__':

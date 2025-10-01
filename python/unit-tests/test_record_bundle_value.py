@@ -1,7 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
+from assassyn.test import run_test
 
 class Adder(Module):
 
@@ -49,8 +47,7 @@ def check_raw(raw):
 
 
 def test_record():
-    sys = SysBuilder('record_bundle')
-    with sys:
+    def top():
         record_ty = Record({
             (0, 0): ('is_odd', Bits),
             (1, 32): ('payload', Bits),
@@ -58,20 +55,12 @@ def test_record():
         adder = Adder(record_ty)
         adder.build()
         driver = Driver()
-        call = driver.build(adder, record_ty)
+        driver.build(adder, record_ty)
 
-    print(sys)
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=200,
-            idle_threshold=200,
-            random=True)
-    simulator_path, verilator_path = elaborate(sys, **config)
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_raw(raw)
+    run_test('record_bundle', top, check_raw,
+             sim_threshold=200,
+             idle_threshold=200,
+             random=True)
 
 
 if __name__ == '__main__':

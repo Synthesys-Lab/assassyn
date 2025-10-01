@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Sub(Module):
 
@@ -52,6 +51,17 @@ class Driver(Module):
             rhs.async_called(b = v)
 
 
+def top():
+    sub = Sub()
+    sub.build()
+
+    lhs = Lhs()
+    rhs = lhs.build(sub)
+
+    driver = Driver()
+    driver.build(rhs, lhs)
+
+
 def check(raw):
     cnt = 0
     for i in raw.split('\n'):
@@ -66,27 +76,7 @@ def check(raw):
 
 
 def test_fifo_valid():
-    sys = SysBuilder('fifo_valid')
-    with sys:
-        sub = Sub()
-        sub.build()
-
-        lhs = Lhs()
-        rhs = lhs.build(sub)
-
-        driver = Driver()
-        driver.build(rhs, lhs)
-
-    print(sys)
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('fifo_valid', top, check)
 
 
 if __name__ == '__main__':

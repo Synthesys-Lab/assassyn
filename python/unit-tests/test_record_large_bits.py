@@ -1,7 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
+from assassyn.test import run_test
 
 
 entry = Record(
@@ -35,6 +33,11 @@ class Driver(Module):
                     ).value()
                     log("index {:05} ",index)
 
+def build_system():
+    record = [RegArray(entry,1) for _ in range(15)]
+    driver = Driver()
+    call = driver.build( record )
+
 def check_raw(raw):
     """
     Validate the simulation output for the correct index log sequence.
@@ -58,27 +61,14 @@ def check_raw(raw):
     print("All indices match the expected output.")
 
 def test_record():
-    sys = SysBuilder('record_large')
-    with sys:
-        record = [RegArray(entry,1) for _ in range(15)]
-        driver = Driver()
-        call = driver.build( record )
-
-    print(sys)
-
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=200,
-            idle_threshold=200,
-            random=True)
-
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_raw(raw)
+    run_test(
+        'record_large',
+        build_system,
+        check_raw,
+        sim_threshold=200,
+        idle_threshold=200,
+        random=True
+    )
 
 
 if __name__ == '__main__':

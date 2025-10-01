@@ -1,7 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
+from assassyn.test import run_test
 
 # TODO(@were): Make this barrier work with more careful tests.
 
@@ -86,37 +84,38 @@ class Driver(Module):
 
 
 
-def impl(is_gold):
-    if is_gold:
-        sys = SysBuilder('Comb_barrier_gold')
-    else:
-        sys = SysBuilder('Comb_barrier')
-    with sys:
-        adder2 = Adder2()
-        res = adder2.build()
-        adder1 = Adder1()
-        d = adder1.build(adder2,is_gold)
-        driver = Driver()
-        driver.build(adder1)
-    print(sys)
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=200,
-            idle_threshold=200,
-            random=True)
+def build_system(is_gold):
+    """Build system without gold barriers."""
+    adder2 = Adder2()
+    res = adder2.build()
+    adder1 = Adder1()
+    d = adder1.build(adder2, is_gold)
+    driver = Driver()
+    driver.build(adder1)
 
-    simulator_path, verilator_path  = elaborate(sys, **config)
-    raw = utils.run_simulator(simulator_path)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-
+def checker(raw):
+    """Validate that output contains expected log messages."""
+    assert 'combi:' in raw, "Expected combinational log output not found"
 
 def test_barrier():
-    impl(False)
+    run_test(
+        'Comb_barrier',
+        lambda: build_system(False),
+        checker,
+        sim_threshold=200,
+        idle_threshold=200,
+        random=True
+    )
 
 def test_barrier_gold():
-    impl(True)
+    run_test(
+        'Comb_barrier_gold',
+        lambda: build_system(True),
+        checker,
+        sim_threshold=200,
+        idle_threshold=200,
+        random=True
+    )
 
 if __name__ == '__main__':
     test_barrier()

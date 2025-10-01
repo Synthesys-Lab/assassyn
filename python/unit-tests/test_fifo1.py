@@ -1,7 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
+from assassyn.test import run_test
 
 class Adder(Module):
 
@@ -41,7 +39,15 @@ class Driver(Module):
             call = adder.async_called(a = cnt[0], b = cnt[0])
         return call
 
-def check_raw(raw):
+def top():
+    adder = Adder()
+    adder.build()
+
+    driver = Driver()
+    call = driver.build(adder)
+    call.bind.set_fifo_depth(a=1, b=1)
+
+def checker(raw):
     cnt = 0
     for i in raw.split('\n'):
         if 'Adder:' in i:
@@ -53,34 +59,15 @@ def check_raw(raw):
             cnt += 1
     assert cnt == 100, f'cnt: {cnt} != 100'
 
-
 def test_async_call():
-    sys = SysBuilder('fifo1')
-    with sys:
-        adder = Adder()
-        adder.build()
-
-        driver = Driver()
-        call = driver.build(adder)
-        call.bind.set_fifo_depth(a=1, b=1)
-
-    print(sys)
-
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=200,
-            idle_threshold=200,
-            random=True)
-
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_raw(raw)
-
+    run_test(
+        'fifo1',
+        top,
+        checker,
+        sim_threshold=200,
+        idle_threshold=200,
+        random=True
+    )
 
 if __name__ == '__main__':
     test_async_call()

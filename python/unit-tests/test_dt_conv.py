@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 
 class Driver(Module):
@@ -26,25 +25,21 @@ class Driver(Module):
         log("Cast: {} {} {}", b32_array[0], i64z_array[0], i64s_array[0]);
 
 
-def check(raw: str):
+def top():
+    driver = Driver()
+    driver.build()
+
+
+def checker(raw: str):
     cnt = 0
     for i in raw.splitlines():
         cnt += 'Cast:' in i
-    assert cnt == 100 - 1
+    assert cnt == 100
+
 
 def test_dt_conv():
+    run_test('dt_conv', top, checker)
 
-    sys = SysBuilder('dt_conv')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
 
 if __name__ == '__main__':
     test_dt_conv()

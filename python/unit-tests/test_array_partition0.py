@@ -1,7 +1,7 @@
 import pytest
 
 from assassyn import utils
-from assassyn.backend import elaborate
+from assassyn.test import run_test
 from assassyn.frontend import *
 
 class Driver(Module):
@@ -22,7 +22,12 @@ class Driver(Module):
         a_sum = a[0][0] + a[1][0] + a[2][0] + a[3][0]
         log("sum(a[:]) = {}", a_sum)
 
-def check(raw, parser):
+def top():
+    driver = Driver()
+    driver.build()
+
+def checker(raw):
+    parser = utils.parse_simulator_cycle if 'cycle' in raw.lower() else utils.parse_verilator_cycle
     for i in raw.split('\n'):
         if 'sum(a[:])' in i:
             line_toks = i.split()
@@ -31,19 +36,7 @@ def check(raw, parser):
             assert max(cycle - 2, 0) * 4 == int(line_toks[-1])
 
 def test_array_partition0():
-    sys = SysBuilder('array_partition0')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw, utils.parse_simulator_cycle)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw, utils.parse_verilator_cycle)
+    run_test('array_partition0', top, checker)
 
 
 if __name__ == '__main__':

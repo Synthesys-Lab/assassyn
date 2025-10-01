@@ -1,8 +1,7 @@
 # Test the experimental frontend by replicating ./test_driver.py
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 from assassyn.experimental.frontend import pipeline
 
 
@@ -25,20 +24,7 @@ def check(raw):
 
 
 def test_exp_fe_driver():
-    sys = SysBuilder('driver')
-    with sys:
-        driver_factory()
-
-    print(sys)
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('driver_exp', driver_factory, check)
 
 
 if __name__ == '__main__':

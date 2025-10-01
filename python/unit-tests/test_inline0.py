@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 
 def adder(a, b):
@@ -22,6 +21,10 @@ class Driver(Module):
         (cnt & self)[0] <= v
         adder(v, v)
 
+def top():
+    driver = Driver()
+    driver.build()
+
 def check(raw):
     for i in raw.split('\n'):
         if f'adder:' in i:
@@ -32,19 +35,7 @@ def check(raw):
             assert int(a) + int(b) == int(c)
 
 def test_inline0():
-    sys = SysBuilder('inline0')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('inline0', top, check)
 
 
 if __name__ == '__main__':

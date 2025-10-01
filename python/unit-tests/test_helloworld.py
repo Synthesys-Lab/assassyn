@@ -1,8 +1,7 @@
 import pytest
 
-from assassyn.backend import elaborate
 from assassyn.frontend import *
-from assassyn import utils
+from assassyn.test import run_test
 
 class Driver(Module):
 
@@ -24,21 +23,10 @@ def check_raw(raw):
 
 
 def test_helloworld():
+    def top():
+        Driver().build()
 
-    sys = SysBuilder('helloworld')
-
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    simulator_path, verilog_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-
-    if verilog_path:
-        raw = utils.run_verilator(verilog_path)
-        check_raw(raw)
+    run_test('helloworld', top, check_raw)
 
 
 if __name__ == '__main__':

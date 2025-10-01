@@ -3,6 +3,7 @@
 from assassyn.frontend import SysBuilder
 from assassyn.backend import elaborate
 from assassyn import utils
+import inspect
 
 def run_test(name: str, top: callable, checker: callable, **config):
     """
@@ -10,14 +11,19 @@ def run_test(name: str, top: callable, checker: callable, **config):
 
     Args:
         name: System name (must be unique across testcases)
-        top: Callable that builds the system (receives no args, uses sys context)
+        top: Callable that builds the system (receives no args or sys, uses sys context)
         checker: Callable that validates simulator output (receives raw string)
         **config: Additional config passed to elaborate()
             (e.g., sim_threshold, idle_threshold, random)
     """
     sys = SysBuilder(name)
     with sys:
-        top()
+        # Check if top() accepts a parameter
+        sig = inspect.signature(top)
+        if len(sig.parameters) > 0:
+            top(sys)
+        else:
+            top()
 
     # Set defaults, allow overrides
     cfg = {'verilog': utils.has_verilator()}

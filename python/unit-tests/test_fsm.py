@@ -1,7 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
+from assassyn.test import run_test
 
 
 class FSM_m(Module):
@@ -64,9 +62,7 @@ class Driver(Module):
 
 
 def test_fsm():
-    sys = SysBuilder('FSM')
-    with sys:
-
+    def top():
         state = RegArray(Bits(2), 1 , initializer=[0])
 
         adder1 = FSM_m()
@@ -75,19 +71,13 @@ def test_fsm():
         driver = Driver()
         driver.build(adder1)
 
-    print(sys)
+    def checker(raw):
+        assert raw is not None
 
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=200,
-            idle_threshold=200,
-            random=True)
-
-    simulator_path, verilator_path  = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
+    run_test('FSM', top, checker,
+             sim_threshold=200,
+             idle_threshold=200,
+             random=True)
 
 
 

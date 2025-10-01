@@ -1,6 +1,6 @@
 import assassyn
 from assassyn.frontend import *
-from assassyn import backend
+from assassyn.test import run_test
 from assassyn import utils
 from assassyn.ir.module.downstream import Downstream, combinational
 
@@ -55,35 +55,34 @@ def check(raw):
             assert c == a + b, f'{a} + {b} = {c}'
 
 
-def impl(sys_name, width, init_file, resource_base):
-    sys = SysBuilder(sys_name)
-    with sys:
-        user = MemUser(width)
-        user.build()
-        # Build the driver
-        driver = Driver()
-        driver.build(width, init_file, user)
-
-    config = backend.config(sim_threshold=200, idle_threshold=200, resource_base=resource_base, verilog=utils.has_verilator())
-
-    simulator_path, verilator_path = backend.elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
-
-
 def test_memory():
-    impl('memory', 32, None, None)
+    def top():
+        user = MemUser(32)
+        user.build()
+        driver = Driver()
+        driver.build(32, None, user)
+
+    run_test('memory', top, check, sim_threshold=200, idle_threshold=200)
 
 def test_memory_init():
-    impl('memory_init', 32, 'init_1.hex', f'{utils.repo_path()}/python/unit-tests/resources')
+    def top():
+        user = MemUser(32)
+        user.build()
+        driver = Driver()
+        driver.build(32, 'init_1.hex', user)
+
+    run_test('memory_init', top, check,
+             sim_threshold=200, idle_threshold=200,
+             resource_base=f'{utils.repo_path()}/python/unit-tests/resources')
 
 def test_memory_wide():
-    impl('memory_wide', 256, None, None)
+    def top():
+        user = MemUser(256)
+        user.build()
+        driver = Driver()
+        driver.build(256, None, user)
+
+    run_test('memory_wide', top, check, sim_threshold=200, idle_threshold=200)
 
 if __name__ == "__main__":
     test_memory()

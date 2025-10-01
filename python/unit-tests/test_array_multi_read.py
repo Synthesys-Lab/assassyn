@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class ModA(Module):
 
@@ -63,6 +62,22 @@ class Driver(Module):
         mod_c.async_called(a = v)
 
 
+def build_system():
+    arr = RegArray(Int(32), 1)
+
+    mod_a = ModA()
+    mod_a.build(arr)
+
+    mod_b = ModB()
+    mod_b.build(arr)
+
+    mod_c = ModC()
+    mod_c.build(arr)
+
+    driver = Driver()
+    driver.build(mod_a, mod_b, mod_c)
+
+
 def check(raw):
     for i in raw.split('\n'):
         if 'a =' in i and 'arr =' in i:
@@ -75,31 +90,7 @@ def check(raw):
             assert int(arr) == (int(a) - 1)
 
 def test_array_multi_read():
-
-    sys = SysBuilder('array_multi_read')
-    with sys:
-        arr = RegArray(Int(32), 1)
-
-        mod_a = ModA()
-        mod_a.build(arr)
-
-        mod_b = ModB()
-        mod_b.build(arr)
-
-        mod_c = ModC()
-        mod_c.build(arr)
-
-        driver = Driver()
-        driver.build(mod_a, mod_b, mod_c)
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('array_multi_read', build_system, check)
 
 
 if __name__ == '__main__':

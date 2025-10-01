@@ -1,9 +1,7 @@
 import pytest
 
-import assassyn
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 
 class Adder(Module):
@@ -54,24 +52,16 @@ def check(raw):
     assert cnt == 100, f'cnt: {cnt} != 100 - 1'
 
 
+def top():
+    adder = Adder()
+    adder.build()
+
+    driver = Driver()
+    driver.build(adder)
+
+
 def test_cond_cse():
-    sys = SysBuilder('cond_cse')
-    with sys:
-        adder = Adder()
-        adder.build()
-
-        driver = Driver()
-        driver.build(adder)
-
-    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog=utils.has_verilator())
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('cond_cse', top, check, sim_threshold=200, idle_threshold=200)
 
 
 if __name__ == '__main__':
