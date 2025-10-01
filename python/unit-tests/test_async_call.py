@@ -1,5 +1,5 @@
 from assassyn.frontend import *
-from assassyn.test import test_sys
+from assassyn.test import run_test
 
 class Adder(Module):
 
@@ -65,7 +65,7 @@ def test_async_call():
         driver = Driver()
         driver.build(adder)
 
-    test_sys('async_call', top, check_raw,
+    run_test('async_call', top, check_raw,
              sim_threshold=200, idle_threshold=200, random=True)
 
 

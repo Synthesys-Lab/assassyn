@@ -6,7 +6,7 @@ This module provides utility functions for unit tests.
 Users can just plug in their top and checker functions to `test_sys()`.
 
 ````python
-def test_sys(name: str, top: callable, check: callable, config: dict):
+def run_test(name: str, top: callable, check: callable, config: dict):
     # update the config
     # ...
 

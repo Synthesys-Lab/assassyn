@@ -1,5 +1,5 @@
 from assassyn.frontend import *
-from assassyn.test import test_sys
+from assassyn.test import run_test
 
 class Driver(Module):
 
@@ -26,7 +26,7 @@ def test_driver():
         driver = Driver()
         driver.build()
 
-    test_sys('driver', top, check)
+    run_test('driver', top, check)
 
 
 if __name__ == '__main__':

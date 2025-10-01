@@ -2,7 +2,7 @@ from assassyn.frontend import SysBuilder
 from assassyn.backend import elaborate
 from assassyn import utils
 
-def test_sys(name: str, top: callable, checker: callable, **config):
+def run_test(name: str, top: callable, checker: callable, **config):
     """
     Lightweight test utility for assassyn systems.
 
