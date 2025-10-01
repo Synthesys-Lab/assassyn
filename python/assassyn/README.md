@@ -8,4 +8,9 @@ This includes:
 - `experimental/`: Experimental features. Currently, it is the experimental functional frontend.
 - `backend/`: The backend invoker utilities, including the helper functions to call the codegen, and
   the configuration of the backends.
-- `codegen/': The code generation, including a Rust simulator backend, and a Verilog backend.
+- `codegen/`: The code generation, including a Rust simulator backend, and a Verilog backend.
+
+Ideally, each `*.py` file shall have a corresponding `*.md` file that documents the exposed interface
+and internal implementation details. It is prefered to read this markdown file to develop.
+
+> NOTE: This is still working in progress, and the documentation is not complete yet.

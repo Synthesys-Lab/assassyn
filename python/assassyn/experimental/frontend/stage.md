@@ -34,7 +34,7 @@ If `self.bind` is `None`, this operator calls `self.m.bind(**kwargs)` to create 
 This operator overloads the `<<` operator to bind arguments to the stage.
 - If the `args` is a single `Value` or `Tuple[Value]`, it pushes value bindings
   to unbound ports in order. This can be done by traversing `self.bind.pushes`
-  (declared in [bind.py](../../ir/expr/bind.py)).
+  (declared in [call.py](../../ir/expr/call.py)).
 - If the `args` is a dictionary mapping port names to `Value` objects, it
   binds the values to the corresponding ports.
 

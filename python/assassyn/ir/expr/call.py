@@ -1,5 +1,7 @@
 '''The module for function-call related operations'''
 
+from __future__ import annotations
+
 import typing
 
 from ...builder import ir_builder
@@ -7,7 +9,6 @@ from .expr import Expr
 
 if typing.TYPE_CHECKING:
     from ..module import Module, Port
-    from .expr import Expr
 
 class FIFOPush(Expr):
     '''The class for FIFO push operation'''
@@ -73,8 +74,6 @@ class Bind(Expr):
     @ir_builder
     def async_called(self, **kwargs):
         '''The exposed frontend function to instantiate an async call operation'''
-        # Import here to avoid circular dependency
-        from .expr import AsyncCall
         self._push(**kwargs)
         return AsyncCall(self)
 
