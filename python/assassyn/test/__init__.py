@@ -1,3 +1,5 @@
+"""Test utilities for assassyn systems."""
+
 from assassyn.frontend import SysBuilder
 from assassyn.backend import elaborate
 from assassyn import utils
@@ -10,7 +12,8 @@ def run_test(name: str, top: callable, checker: callable, **config):
         name: System name (must be unique across testcases)
         top: Callable that builds the system (receives no args, uses sys context)
         checker: Callable that validates simulator output (receives raw string)
-        **config: Additional config passed to elaborate() (e.g., sim_threshold, idle_threshold, random)
+        **config: Additional config passed to elaborate()
+            (e.g., sim_threshold, idle_threshold, random)
     """
     sys = SysBuilder(name)
     with sys:
