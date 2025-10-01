@@ -61,6 +61,7 @@ class Expr(Value):
         from ..dtype import RecordValue
         from ...builder import Singleton
         from ..module.downstream import Downstream
+        from .call import Bind
         self.opcode = opcode
         self.loc = self.parent = None
         self.source_name = None
