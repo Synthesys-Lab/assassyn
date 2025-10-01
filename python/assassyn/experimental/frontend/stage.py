@@ -5,7 +5,6 @@ for binding arguments and making async calls.
 """
 
 from assassyn.ir.module import Module, Port
-from assassyn.ir.expr import Bind
 
 
 class Stage:
@@ -57,7 +56,10 @@ class Stage:
             unbound_ports = [name for name in all_port_names if name not in bound_port_names]
 
             if len(args) > len(unbound_ports):
-                raise ValueError(f"Too many arguments: {len(args)} provided but only {len(unbound_ports)} ports unbound")
+                raise ValueError(
+                    f"Too many arguments: {len(args)} provided "
+                    f"but only {len(unbound_ports)} ports unbound"
+                )
 
             # Map positional args to unbound ports
             kwargs = dict(zip(unbound_ports[:len(args)], args))

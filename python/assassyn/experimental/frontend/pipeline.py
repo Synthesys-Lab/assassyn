@@ -7,7 +7,7 @@ to be a pipeline stage factory.
 import inspect
 import functools
 from typing import get_type_hints, get_args
-from assassyn.ir.module import Module, Port
+from assassyn.ir.module import Port
 from assassyn.ir.dtype import DType
 from assassyn.builder import Singleton
 from .stage import Stage
@@ -79,7 +79,7 @@ def factory(func):
 
         # Build ports dictionary
         ports = {}
-        for param_name, param in inner_sig.parameters.items():
+        for param_name in inner_sig.parameters:
             # Check that all parameters have type annotations
             if param_name not in inner_hints:
                 raise TypeError(
@@ -154,8 +154,7 @@ def factory(func):
         try:
             with stage.m.body:
                 # Call inner function with the ports as arguments
-                port_args = {name: port for name, port in ports.items()}
-                inner_func(**port_args)
+                inner_func(**dict(ports))
         finally:
             Singleton.builder.exit_context_of('module')
 
