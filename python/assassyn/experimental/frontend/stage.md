@@ -26,13 +26,17 @@ Then, it renames the module name to the given name.
 --------
 
 ````python
-    def __lshift__(self, args: tuple | dict);
+    def __lshift__(self, args: tuple[Value] | dict[str, Value] | Value);
 ````
 
+If `self.bind` is `None`, this operator calls `self.m.bind(**kwargs)` to create a new `Bind`.
+
 This operator overloads the `<<` operator to bind arguments to the stage.
-It takes either a tuple or a dictionary as input.
-If the bind node is `None`, it creates a new `Bind` node upon first call and put it in `self.bind`.
-If the bind already exists, the created value bind will be updated to the `self.bind` node.
+- If the `args` is a single `Value` or `Tuple[Value]`, it pushes value bindings
+  to unbound ports in order. This can be done by traversing `self.bind.pushes`
+  (declared in [bind.py](../../ir/expr/bind.py)).
+- If the `args` is a dictionary mapping port names to `Value` objects, it
+  binds the values to the corresponding ports.
 
 --------
 

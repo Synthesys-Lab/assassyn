@@ -36,13 +36,8 @@ class Stage:
         Args:
             args: Either a tuple (positional args) or dict (named args)
         """
-        if self.bind is None:
-            # Create a new Bind node on first call
-            self.bind = Bind(self.m, args)
-        else:
-            # Update the existing bind with new arguments
-            self.bind.update_value(args)
-        return self
+        # TODO
+        pass
 
     def __call__(self):
         """Create an async call to the bind.
@@ -50,10 +45,5 @@ class Stage:
         This serves a similar purpose to Module.async_called in the old frontend.
         Calls are always void argument as arguments are fed by bindings.
         """
-        if self.bind is None:
-            raise RuntimeError(
-                f"Cannot call stage '{self.m.name}' without binding arguments first. "
-                f"Use 'stage << args' to bind arguments before calling."
-            )
-        # Create async call to the bind
-        self.m.async_called(self.bind)
+        # TODO
+        pass
