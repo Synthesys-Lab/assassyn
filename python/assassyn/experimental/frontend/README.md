@@ -8,7 +8,7 @@ for a more function-like programming style.
 
 ````python
 @pipeline.factory
-def driver_factory(adder: PipelineStage) -> PipelineState:
+def driver_factory(adder: pipeline.Stage) -> pipeline.Stage:
     def driver():
         cnt = RegArray(UInt(32), 1)
         cnt[0] = cnt[0] + UInt(32)(1)
@@ -28,7 +28,7 @@ def driver_factory(adder: PipelineStage) -> PipelineState:
     return driver
 
 @pipeline.factory
-def adder_factory() -> PipelineStage:
+def adder_factory() -> pipeline.Stage:
     def adder(a: Port[UInt(32)], b: Port[UInt(32)]):
         a, b = pipeline.pop_all(True)
         c = a + b
@@ -53,3 +53,10 @@ AST tree. The overloaded operators will be appended to the existing block.
        implicitly calling this returned function to grow the AST.
        It is analogous to calling `build` in the old frontend.
        Refer to [../../unit-test/test_async_call.py] for an example.
+     - The returned value is not the `Module` object itself,
+       but a `Stage` object that wraps the `Module` object.
+
+## Implementation
+
+- `@pipeline.factory` decorator is implemented in [pipeline.py](./pipeline.py).
+- `Stage` is implemented in [stage.py](./stage.py).
