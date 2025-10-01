@@ -2,24 +2,22 @@
 
 ## Exposed Interface
 
-This module provides utility functions for unit tests.
-Users can just plug in their top and checker functions to `test_sys()`.
+This module provides `run_test()` for simplified unit testing of assassyn systems.
 
-````python
-def run_test(name: str, top: callable, check: callable, config: dict):
-    # update the config
-    # ...
+### Usage
 
-    # Build the given system
-    with SysBuilder(name) as sys:
-        top()
-    # Elaborate the system
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-    # Check the simulator output
-    raw = utils.run_simulator(simulator_path)
-    checker(raw)
-    # Check the verilator output when available 
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        checker(raw)
-````
+```python
+run_test(name: str, top: callable, checker: callable, **config)
+```
+
+**Arguments:**
+- `name`: System name (must be unique across testcases)
+- `top`: Callable that builds the system (receives no args or sys parameter)
+- `checker`: Callable that validates simulator output (receives raw string)
+- `**config`: Additional config passed to elaborate() (e.g., sim_threshold, idle_threshold, random)
+
+**What it does:**
+1. Builds the system using SysBuilder with the provided top function
+2. Elaborates the system with default config (verilog enabled if verilator available)
+3. Runs the simulator and validates output with the checker function
+4. If verilator is available, runs verilator and validates its output too
