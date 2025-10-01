@@ -1,11 +1,12 @@
 """Test utilities for assassyn systems."""
 
-from assassyn.frontend import SysBuilder
-from assassyn.backend import elaborate
-from assassyn import utils
 import inspect
 
-def run_test(name: str, top: callable, checker: callable, **config):
+from assassyn.frontend import SysBuilder
+from assassyn.backend import elaborate, config
+from assassyn import utils
+
+def run_test(name: str, top: callable, checker: callable, **kwargs):
     """
     Lightweight test utility for assassyn systems.
 
@@ -26,14 +27,16 @@ def run_test(name: str, top: callable, checker: callable, **config):
             top()
 
     # Set defaults, allow overrides
-    cfg = {'verilog': utils.has_verilator()}
-    cfg.update(config)
+    if 'verilog' not in kwargs:
+        kwargs['verilog'] = utils.has_verilator()
+    cfg = config()
+    cfg.update(kwargs)
 
     simulator_path, verilator_path = elaborate(sys, **cfg)
 
     raw = utils.run_simulator(simulator_path)
     checker(raw)
 
-    if verilator_path:
+    if verilator_path and cfg['verilog']:
         raw = utils.run_verilator(verilator_path)
         checker(raw)
