@@ -1,0 +1,19 @@
+{
+  "ignore": [
+    "node_modules/**",
+    ".git/**",
+    "dist/**",
+    "build/**",
+    ".venv/**",
+    "venv/**",
+    "__pycache__/**",
+    "*.pyc",
+    ".pytest_cache/**",
+    ".mypy_cache/**",
+    "*.egg-info/**"
+  ],
+  "bash": {
+    "shell": "zsh",
+    "setupScript": "setup.sh"
+  }
+}

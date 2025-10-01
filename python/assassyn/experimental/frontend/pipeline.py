@@ -141,8 +141,10 @@ def factory(func):
                 f"factory name '{expected_inner_name}' (derived from '{func.__name__}')"
             )
 
-        # Step 5: Create Stage object
-        stage = Stage(ports, inner_func.__name__)
+        # Step 5: Create Stage object with capitalized module name
+        # Special case: 'driver' becomes 'Driver' for backward compatibility
+        module_name = inner_func.__name__.capitalize()
+        stage = Stage(ports, module_name)
 
         # Step 6: Set up module context and call inner function to grow AST
         from assassyn.ir.block import Block
