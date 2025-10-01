@@ -8,6 +8,7 @@ import inspect
 import functools
 from typing import get_type_hints
 from assassyn.ir.module import Port
+from assassyn.ir.block import Block
 from assassyn.builder import Singleton
 from .stage import Stage
 
@@ -125,7 +126,6 @@ def factory(func):
         stage = Stage(ports, module_name)
 
         # Step 6: Set up module context and call inner function to grow AST
-        from assassyn.ir.block import Block
         stage.m.body = Block(Block.MODULE_ROOT)
         Singleton.builder.enter_context_of('module', stage.m)
 

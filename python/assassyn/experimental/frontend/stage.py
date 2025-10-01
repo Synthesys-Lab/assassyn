@@ -5,6 +5,7 @@ for binding arguments and making async calls.
 """
 
 from assassyn.ir.module import Module, Port
+from assassyn.ir.value import Value
 
 
 class Stage:
@@ -35,8 +36,6 @@ class Stage:
         Args:
             args: Either a tuple (positional args) or dict (named args)
         """
-        from assassyn.ir.value import Value
-
         # Convert single Value to tuple
         if isinstance(args, Value):
             args = (args,)
