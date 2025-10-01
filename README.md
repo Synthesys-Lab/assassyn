@@ -26,10 +26,12 @@ sudo apt-get update
 3. This commands rips of the Docker container build command to install all the dependent packages.
 ````sh
 sudo apt-get install -y $(
-  sed -n '/apt-get install/,/apt-get clean/p' Dockerfile \
+  awk '/apt-get install/,/apt-get clean/' Dockerfile \
   | tail -n+2 | head -n-1 \
-  | sed -e 's/\r$//' -e 's/\\$//' -e 's/^[[:space:]]*//' \
-  | grep -v '^[[:space:]]*$'
+  | tr -d '\r' \
+  | sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+  | grep -v '^$' \
+  | tr '\n' ' '
 )
 ````
 
