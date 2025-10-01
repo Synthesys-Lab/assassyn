@@ -29,12 +29,15 @@ Then, it renames the module name to the given name.
     def __lshift__(self, args: tuple[Value] | dict[str, Value] | Value);
 ````
 
-If `self.bind` is `None`, this operator calls `self.m.bind(**kwargs)` to create a new `Bind`.
-
-This operator overloads the `<<` operator to bind arguments to the stage.
-- If the `args` is a single `Value` or `Tuple[Value]`, it pushes value bindings
-  to unbound ports in order. This can be done by traversing `self.bind.pushes`
-  (declared in [call.py](../../ir/expr/call.py)).
+If `self.bind` is `None`, this operator calls `self.m.bind()` to create an empty first `Bind`.
+Then, then operator overloads the `<<` operator to bind arguments to the stage.
+- A single `Value` bind is converted to a single-element tuple bind (see below).
+- If the `args` is `Tuple[Value]`, it pushes value bindings to unbound ports in order.
+  This should be done by converting positional to kw arguments, because `self.bind` provides
+  onlyy `**kwargs` interface:
+    1. traversing `self.bind.pushes` (declared in [call.py](../../ir/expr/call.py))
+    to find all unbound ports.
+    2. map the first `len(args)` unbound ports to the given `args`.
 - If the `args` is a dictionary mapping port names to `Value` objects, it
   binds the values to the corresponding ports.
 
@@ -44,6 +47,5 @@ This operator overloads the `<<` operator to bind arguments to the stage.
     def __call__(self);
 ````
 
-This operator creates a async call to the bind, which serves as the similar purpose as
-`Module.async_called` in the old frontend. Call is always `void` argument, as arguments
-are fed by bindings.
+This operator creates a async call to the bind by calling `self.bind.async_called()` in the old frontend.
+Call is always `void` argument, as arguments are fed by bindings.

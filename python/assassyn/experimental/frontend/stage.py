@@ -36,8 +36,36 @@ class Stage:
         Args:
             args: Either a tuple (positional args) or dict (named args)
         """
-        # TODO
-        pass
+        from assassyn.ir.value import Value
+
+        # Convert single Value to tuple
+        if isinstance(args, Value):
+            args = (args,)
+
+        # Create empty bind if it doesn't exist
+        if self.bind is None:
+            self.bind = self.m.bind()
+
+        # Convert args to kwargs
+        if isinstance(args, dict):
+            kwargs = args
+        else:
+            # Tuple binding - convert positional to keyword args
+            # Find unbound ports by traversing self.bind.pushes
+            all_port_names = [port.name for port in self.m.ports]
+            bound_port_names = set(push.fifo.name for push in self.bind.pushes)
+            unbound_ports = [name for name in all_port_names if name not in bound_port_names]
+
+            if len(args) > len(unbound_ports):
+                raise ValueError(f"Too many arguments: {len(args)} provided but only {len(unbound_ports)} ports unbound")
+
+            # Map positional args to unbound ports
+            kwargs = dict(zip(unbound_ports[:len(args)], args))
+
+        # Bind the arguments
+        self.bind.bind(**kwargs)
+
+        return self
 
     def __call__(self):
         """Create an async call to the bind.
@@ -45,5 +73,7 @@ class Stage:
         This serves a similar purpose to Module.async_called in the old frontend.
         Calls are always void argument as arguments are fed by bindings.
         """
-        # TODO
-        pass
+        if self.bind is None:
+            raise ValueError("Cannot call stage without binding arguments first")
+
+        return self.bind.async_called()
