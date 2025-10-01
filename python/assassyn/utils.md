@@ -1,6 +1,7 @@
 # Utils Module
 
 This module provides utility functions for the assassyn project, supporting object identification, path management, sim>
+
 ---
 
 ## Exposed Interfaces
@@ -33,6 +34,7 @@ def namify(name: str) -> str
 
 **`identifierize(obj)`** generates a short 4-character hexadecimal identifier for any Python object based on its memory>
 **`unwrap_operand(node)`** extracts the value from an `Operand` node in the IR. If the node is an `Operand` instance (f>
+
 ---
 
 ## Simulation Helpers
@@ -48,14 +50,16 @@ Returns the testbench output.
 
 **`parse_verilator_cycle(toks)`** and **`parse_simulator_cycle(toks)`** extract cycle counts from simulation output tok>
 **`has_verilator()`** checks if Verilator is available by verifying that the `VERILATOR_ROOT` environment variable exis>
+
 ---
 
 ## Code Patching
 
 **`patch_fifo(file_path)`** patches Verilog files by normalizing FIFO instantiations. It uses regex pattern `r'fifo_\d+>
+
 ---
 
 ## File System and Naming Utilities
 
-**`create_and_clean_dir(dir_path)`** creates a directory and all necessary parent directories using `os.makedirs(dir_pa>
-**`namify(name)`** converts an arbitrary string to a valid identifier by replacing all non-alphanumeric characters (exc>
+**`create_and_clean_dir(dir_path)`** creates a directory and all necessary parent directories using `os.makedirs(dir_path, exist_ok=True)`. Note that despite the function name suggesting "clean", it does not clear existing directory contents—it only ensures the directory exists.
+**`namify(name)`** converts an arbitrary string to a valid identifier by replacing all non-alphanumeric characters (except underscore) with underscores. This matches the Rust implementation in `src/backend/simulator/utils.rs` and ensures consistency across language boundaries.
