@@ -53,3 +53,12 @@ def pop_all(validate: bool = False);
 
 This function is a syntactical sugar to pop all the `Port`,
 as a helper to call `Module.pop_all_ports`.
+
+--------
+
+````python
+def this() -> Module;
+````
+
+This function returns the current module being built, which is
+`Singleton.builder.current_module()`.

@@ -27,6 +27,15 @@ def pop_all(validate=True):
     return module.pop_all_ports(validate)
 
 
+def this():
+    """Return the current module being built.
+
+    Returns:
+        The current Module object from Singleton.builder.current_module().
+    """
+    return Singleton.builder.current_module()
+
+
 def factory(func):
     """Decorator to create a pipeline stage factory.
 

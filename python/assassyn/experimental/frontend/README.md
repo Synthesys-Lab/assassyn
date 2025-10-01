@@ -55,8 +55,11 @@ AST tree. The overloaded operators will be appended to the existing block.
        Refer to [../../unit-test/test_async_call.py] for an example.
      - The returned value is not the `Module` object itself,
        but a `Stage` object that wraps the `Module` object.
+- `if_` is the same as `Condition` implemented in [block.py](../../ir/block.py).
+  Using `if_` better reminds developers that this is a conditional block.
 
 ## Implementation
 
 - `@pipeline.factory` decorator is implemented in [pipeline.py](./pipeline.py).
 - `Stage` is implemented in [stage.py](./stage.py).
+- For now, we put `if_` in `__init__.py` as a wrapper to `Condition`.
