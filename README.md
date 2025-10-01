@@ -27,9 +27,7 @@ sudo apt-get update
 ````sh
 sudo apt-get install -y $(
   awk '/apt-get install/,/apt-get clean/' Dockerfile \
-  | tail -n+2 | head -n-1 \
-  | tr -d '\r' \
-  | sed -e 's/\\$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+  | sed '1d;$d; s/[\\[:space:]]*$//; s/^[[:space:]]*//' \
   | grep -v '^$' \
   | tr '\n' ' '
 )
