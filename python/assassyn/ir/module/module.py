@@ -177,6 +177,11 @@ class Port:
         self.name = self.module = None
         self._users = []
 
+    def __class_getitem__(cls, item):
+        '''Make Port subscriptable for type annotations like Port[UInt(32)].'''
+        # Return an actual Port instance with the dtype
+        return cls(item)
+
     @property
     def users(self):
         '''Get the users of the port.'''

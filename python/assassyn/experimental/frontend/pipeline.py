@@ -6,9 +6,8 @@ to be a pipeline stage factory.
 
 import inspect
 import functools
-from typing import get_type_hints, get_args
+from typing import get_type_hints
 from assassyn.ir.module import Port
-from assassyn.ir.dtype import DType
 from assassyn.builder import Singleton
 from .stage import Stage
 
@@ -22,7 +21,7 @@ def pop_all(validate=True):
     Returns:
         The popped values from all ports.
     """
-    module = Singleton.builder.get_context_of('module')
+    module = Singleton.builder.current_module
     assert module is not None, "pop_all must be called within a module context"
     return module.pop_all_ports(validate)
 
@@ -54,7 +53,7 @@ def factory(func):
     """
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, **kwargs):  # pylint: disable=too-many-locals
         # Step 1: Type check all arguments to the factory function
         sig = inspect.signature(func)
         bound_args = sig.bind(*args, **kwargs)
@@ -98,45 +97,15 @@ def factory(func):
 
             param_type = inner_hints[param_name]
 
-            # Check if it's Port[<some-type>]
-            # Port is a generic-like usage here, need to extract the inner type
-            if not (hasattr(param_type, '__origin__') and
-                    param_type.__origin__ is Port):
-                # Alternative: Check if it's annotated as Port[...]
-                # In the codebase, it seems Port[UInt(32)] is used
-                # We need to handle this syntax
+            # Check if the annotation is already a Port instance (from Port[UInt(32)])
+            if isinstance(param_type, Port):
+                # Port.__class_getitem__ already created the Port instance for us
+                ports[param_name] = param_type
+            else:
                 raise TypeError(
                     f"Parameter '{param_name}' must be annotated as Port[<DataType>], "
                     f"got {param_type}"
                 )
-
-            # Extract the dtype from Port[dtype]
-            dtype_args = get_args(param_type)
-            if not dtype_args:
-                raise TypeError(
-                    f"Port annotation for '{param_name}' must specify a data type"
-                )
-
-            dtype = dtype_args[0]
-
-            # Validate that dtype is a DType subclass or instance
-            if not (isinstance(dtype, type) and issubclass(dtype, DType)) and \
-               not isinstance(dtype, DType):
-                raise TypeError(
-                    f"Port data type for '{param_name}' must be a DType subclass or instance, "
-                    f"got {dtype}"
-                )
-
-            # Create Port object
-            # If dtype is a type, we need an instance
-            if isinstance(dtype, type):
-                # This shouldn't happen in practice based on the examples
-                # Port[UInt(32)] passes an instance, not a class
-                raise TypeError(
-                    f"Port[{dtype}] should use an instance like UInt(32), not the class"
-                )
-
-            ports[param_name] = Port(dtype)
 
         # Step 4: Verify naming convention
         # Inner function name should match factory name with '_factory' suffix removed
