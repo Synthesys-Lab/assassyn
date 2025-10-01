@@ -54,7 +54,7 @@ class Expr(Value):
 
     def __init__(self, opcode, operands: list):
         '''Initialize the expression with an opcode'''
-        #pylint: disable=import-outside-toplevel
+        #pylint: disable=import-outside-toplevel,too-many-locals
         from ..array import Array
         from ..const import Const
         from ..module import Port, Wire, Module
