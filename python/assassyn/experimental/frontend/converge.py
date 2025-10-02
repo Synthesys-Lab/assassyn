@@ -4,6 +4,8 @@ This module provides the @converge decorator to create downstream
 combinational logic that converges across multiple modules.
 """
 
+# pylint: disable=duplicate-code
+
 import inspect
 import functools
 from assassyn.ir.module.downstream import Downstream

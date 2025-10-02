@@ -4,6 +4,8 @@ This module provides the @pipeline.factory decorator to wrap a function
 to be a pipeline stage factory.
 """
 
+# pylint: disable=duplicate-code
+
 import inspect
 import functools
 from typing import get_type_hints
@@ -13,7 +15,7 @@ from assassyn.builder import Singleton
 from .stage import Stage
 
 
-class StageFactory:
+class StageFactory:  # pylint: disable=too-few-public-methods
     """A factory that builds a Stage object.
 
     This class wraps the inner function returned by a factory and provides
@@ -101,7 +103,7 @@ def factory(func):
     """
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):  # pylint: disable=too-many-locals
+    def wrapper(*args, **kwargs):  # pylint: disable=too-many-locals,too-many-branches
         # Step 1: Type check and unwrap arguments to the factory function
         sig = inspect.signature(func)
         bound_args = sig.bind(*args, **kwargs)
