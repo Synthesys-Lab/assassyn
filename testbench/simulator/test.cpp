@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <random> 
 
-// This file should output the same result as the assassyn/python/unit-tests/test_dram.py
+// This file should output the same result as the assassyn/python/ci-tests/test_dram.py
 int main() {
     MyWrapper wrapper;
 

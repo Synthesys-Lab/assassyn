@@ -270,11 +270,11 @@ You can only pass POD and compound to the parameter of `template`
 
 After reading the basic explanation above, you now have a fundamental understanding of this language paradigm. Let’s proceed with the given example and explain the syntax in more detail step by step
 
-> **Note**: Files that have not been assigned a location are in the  directory "python/unit-tests".
+> **Note**: Files that have not been assigned a location are in the  directory "python/ci-tests".
 
 ### More basic grammar explanations
 
-You can find the detail information in [python/unit-tests/README.md](../python/unit-tests/README.md)
+You can find the detail information in [python/ci-tests/README.md](../python/ci-tests/README.md)
 
 > By this point, the basic syntax has been fully listed out.
 

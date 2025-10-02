@@ -4,4 +4,4 @@
 # before checking anything in.
 
 pylint --rcfile $ASSASSYN_HOME/python/.pylintrc $ASSASSYN_HOME/python/assassyn
-pytest -n 8 $ASSASSYN_HOME/python/unit-tests
+pytest -n 8 $ASSASSYN_HOME/python/ci-tests

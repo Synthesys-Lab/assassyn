@@ -35,7 +35,7 @@ class ExternalMultiplier(ExternalSV):
 
     def __init__(self, **in_wire_connections):
         super().__init__(
-            file_path="python/unit-tests/resources/mul_pipe_simple.sv",
+            file_path="python/ci-tests/resources/mul_pipe_simple.sv",
             module_name="mul_pipe_simple",
             has_clock=True,
             has_reset=True,

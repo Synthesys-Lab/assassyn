@@ -73,7 +73,7 @@ def test_memory_init():
 
     run_test('memory_init', top, check,
              sim_threshold=200, idle_threshold=200,
-             resource_base=f'{utils.repo_path()}/python/unit-tests/resources')
+             resource_base=f'{utils.repo_path()}/python/ci-tests/resources')
 
 def test_memory_wide():
     def top():

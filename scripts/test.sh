@@ -12,12 +12,12 @@ function test_case {
   fi
 }
 
-# Go to the unit-test directory
+# Go to the ci-test directory
 cd `dirname $0`
 REPO_DIR=`git rev-parse --show-toplevel`
 
-# Test unit tests
-cd $REPO_DIR/python/unit-tests
+# Test CI tests
+cd $REPO_DIR/python/ci-tests
 test_case "pytest -n 8 -x"
 
 # Test examples
