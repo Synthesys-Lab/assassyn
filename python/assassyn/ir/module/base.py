@@ -45,7 +45,6 @@ class ModuleBase:
             if isinstance(value, (Array, Module)):
                 is_external = True
             if isinstance(value, Expr):
-                print("the value is: ", value)
                 is_external = value.parent.module != self
             if is_external:
                 if value not in self._externals:

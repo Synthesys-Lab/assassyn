@@ -6,11 +6,14 @@ to be a pipeline stage factory.
 
 import inspect
 import functools
-from typing import get_type_hints
+from typing import get_type_hints, Callable
 from assassyn.ir.module import Port
 from assassyn.ir.block import Block
 from assassyn.builder import Singleton
 from .stage import Stage
+
+# Type alias for the stage factory callable
+StageFactory = Callable[[], Stage]
 
 
 def pop_all(validate=True):
@@ -31,9 +34,9 @@ def this():
     """Return the current module being built.
 
     Returns:
-        The current Module object from Singleton.builder.current_module().
+        The current Module object from Singleton.builder.current_module.
     """
-    return Singleton.builder.current_module()
+    return Singleton.builder.current_module
 
 
 def factory(func):
@@ -42,15 +45,18 @@ def factory(func):
     This decorator:
     1. Enforces type checking on factory function arguments
     2. Validates the returned inner function is callable
-    3. Extracts Port[<type>] arguments from inner function
-    4. Creates a Stage wrapping a Module with those ports
-    5. Calls the inner function to grow the AST
+    3. Returns the inner function wrapped to create a Stage when called
+
+    The returned inner function, when called, will:
+    1. Extract Port[<type>] arguments from inner function signature
+    2. Create a Stage wrapping a Module with those ports
+    3. Call the inner function to grow the AST
 
     Args:
         func: The factory function to decorate. Must return a callable.
 
     Returns:
-        A wrapper function that creates and returns a Stage object.
+        A wrapper function that returns the inner function (StageFactory).
     """
 
     @functools.wraps(func)
@@ -120,22 +126,27 @@ def factory(func):
                 f"factory name '{expected_inner_name}' (derived from '{func.__name__}')"
             )
 
-        # Step 5: Create Stage object with capitalized module name
-        # Special case: 'driver' becomes 'Driver' for backward compatibility
+        # Step 5: Create a callable that builds the stage when invoked
         module_name = inner_func.__name__.capitalize()
-        stage = Stage(ports, module_name)
 
-        # Step 6: Set up module context and call inner function to grow AST
-        stage.m.body = Block(Block.MODULE_ROOT)
-        Singleton.builder.enter_context_of('module', stage.m)
+        def stage_builder():
+            """Build and return the Stage by calling the inner function."""
+            # Create Stage object with capitalized module name
+            stage = Stage(ports, module_name)
 
-        try:
-            with stage.m.body:
-                # Call inner function with the ports as arguments
-                inner_func(**dict(ports))
-        finally:
-            Singleton.builder.exit_context_of('module')
+            # Set up module context and call inner function to grow AST
+            stage.m.body = Block(Block.MODULE_ROOT)
+            Singleton.builder.enter_context_of('module', stage.m)
 
-        return stage
+            try:
+                with stage.m.body:
+                    # Call inner function with the ports as arguments
+                    inner_func(**dict(ports))
+            finally:
+                Singleton.builder.exit_context_of('module')
+
+            return stage
+
+        return stage_builder
 
     return wrapper

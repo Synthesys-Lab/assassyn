@@ -6,6 +6,16 @@ for binding arguments and making async calls.
 
 from assassyn.ir.module import Module, Port
 from assassyn.ir.value import Value
+from assassyn.builder import Singleton
+
+
+def this():
+    """Return the current module being built.
+
+    Returns:
+        The current Module object from Singleton.builder.current_module.
+    """
+    return Singleton.builder.current_module
 
 
 class Stage:

@@ -5,6 +5,43 @@ A `Stage` is a pipeline stage that wraps a `Module` object declared in
 
 ## Exposed Interface
 
+### StageFactory
+
+````python
+class StageBuilder:
+    stage: Stage
+
+    def _build(*args, **kwargs);
+
+    def __call__(*args, **kwargs);
+````
+
+We have one more layer of abstraction `StageFactory` to build a `Stage` object.
+
+````python
+@pipeline.factory
+def adder_factory() -> pipeline.StageFactory:
+    def adder(a: Port[UInt(32)], b: Port[UInt(32)]):
+        a, b = pipeline.pop_all(True)
+        c = a + b
+        log("Adder: {} + {} = {}", a, b, c)
+        return stage.this()
+    return adder
+````
+
+- **Constructor:** This module creates an empty `Module` object with ports declared in the inner function,
+  and wraps it in a `Stage` object (see below).
+
+- **_build:** The inner function is set as the `build` method of the `StageFactory` object.
+  When calling the returned inner function (`build` method),
+  it grows the AST of the module body, and returns the `Stage` object.
+
+- **__call__:** This is a wrapper to the `_build` method, to pretend we are a "higher-order function".
+
+--------
+
+### Stage
+
 ````python
 class Stage:
     m: Module # The wrapped module

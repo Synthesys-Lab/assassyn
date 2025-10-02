@@ -13,8 +13,9 @@ Key components:
 from assassyn.ir.block import Condition
 from . import pipeline
 from .stage import Stage
+from .converge import converge
 
 # Wrapper to Condition for better readability
 if_ = Condition
 
-__all__ = ['pipeline', 'Stage', 'if_']
+__all__ = ['pipeline', 'Stage', 'if_', 'converge']

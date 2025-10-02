@@ -8,7 +8,7 @@ for a more function-like programming style.
 
 ````python
 @pipeline.factory
-def driver_factory(adder: pipeline.Stage) -> pipeline.Stage:
+def driver_factory(adder: pipeline.Stage) -> pipeline.StageFactory:
     def driver():
         cnt = RegArray(UInt(32), 1)
         cnt[0] = cnt[0] + UInt(32)(1)
@@ -28,17 +28,19 @@ def driver_factory(adder: pipeline.Stage) -> pipeline.Stage:
     return driver
 
 @pipeline.factory
-def adder_factory() -> pipeline.Stage:
+def adder_factory() -> pipeline.StageFactory:
     def adder(a: Port[UInt(32)], b: Port[UInt(32)]):
         a, b = pipeline.pop_all(True)
         c = a + b
         log("Adder: {} + {} = {}", a, b, c)
+        return stage.this()
     return adder
 
 sys = SysBuilder('driver')
 with sys:
-    adder = adder_factory()
-    driver_factory(adder)
+    adder = adder_factory() # Factory w/ empty Stage body
+    adder = adder()         # Stage w/ filled Stage body
+    driver_factory(adder)()
 ````
 
 To explain, the new frontend still adopts the concept of trace-based
@@ -61,5 +63,6 @@ AST tree. The overloaded operators will be appended to the existing block.
 ## Implementation
 
 - `@pipeline.factory` decorator is implemented in [pipeline.py](./pipeline.py).
+- `@converge.downstream` is implemented in [converge.py](./converge.py).
 - `Stage` is implemented in [stage.py](./stage.py).
 - For now, we put `if_` in `__init__.py` as a wrapper to `Condition`.

@@ -13,6 +13,10 @@ def my_stage_factory(...) -> PipelineStage:
     def my_stage(...):
         ...
     return my_stage
+
+def top():
+    stage = my_stage_factory(...)
+    stage(...)  # Call the stage 
 ````
 
 This decorator first enforces all the arguments fed to the decorated function
@@ -37,12 +41,17 @@ declared in [module.py](../../ir/module/module.py).
    - Because `Driver` module is reserved in the old frontend to be the top module,
      so a factory function named `driver_factory` should create a module named `Driver`.
      For now, we make this compromise to keep compatibility.
-5. Call the inner function to grow the AST of the module.
-   - Just like the usage of `build()` in the old frontend.
-     For now, refer to an example in [test_async_call.py](../../../unit-tests/test_async_call.py).
+5. Return the inner function to grow the AST of the module.
+   - Refer to an example in [test_async_call.py](../../../unit-tests/test_async_call.py).
+     This returned inner function is like the constructing an empty `Module`.
+
+This returned inner function will be called by "top function" to grow the AST of insertion.
+   - Calling the returned inner function is just like the usage of `build()` in the old frontend
+     to fill in the AST body. For now, refer to an example in
+     [test_async_call.py](../../../unit-tests/test_async_call.py).
    - The key point is that when calling the inner function.
      The inner function shall capture all the arguments passed to the outer factory function by closure.
-   - It relies on a `module.combinational` decorator to set the current insert point
+   - Old frontend relies on a `module.combinational` decorator to set the current insert point
      to grow the AST.
 
 --------
