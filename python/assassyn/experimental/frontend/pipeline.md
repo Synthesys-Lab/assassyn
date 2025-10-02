@@ -29,6 +29,8 @@ declared in [module.py](../../ir/module/module.py).
 
 1. First, it extracts all the arguments in the returned inner function signature.
    - It checks that all the arguments have type annotations.
+     - If a `StageFactory` is passed as an argument expecting `Stage`,
+       the underlying `stage` attribute is unwrapped to the factory function.
    - It checks that all the argument types are `Port[<some-type>]`.
    - `<some-type>` must be a subclass of `DataType` declared in [dtype.py](../../ir/dtype.py).
 2. Then it creates `Port` objects for each argument, with the same name and type, and put them

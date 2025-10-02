@@ -33,8 +33,8 @@ def adder_factory() -> pipeline.StageFactory:
   and wraps it in a `Stage` object (see below).
 
 - **_build:** The inner function is set as the `build` method of the `StageFactory` object.
-  When calling the returned inner function (`build` method),
-  it grows the AST of the module body, and returns the `Stage` object.
+  When calling the returned inner function (`build` method), it grows the AST of the module body.
+  The original return values of the inner function should be respected.
 
 - **__call__:** This is a wrapper to the `_build` method, to pretend we are a "higher-order function".
 

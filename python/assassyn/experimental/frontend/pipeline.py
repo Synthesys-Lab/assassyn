@@ -6,15 +6,56 @@ to be a pipeline stage factory.
 
 import inspect
 import functools
-from typing import get_type_hints, Callable
+from typing import get_type_hints
 from assassyn.ir.module import Port
 from assassyn.ir.block import Block
 from assassyn.builder import Singleton
 from .stage import Stage
 
-# Type alias for the stage factory callable
-StageFactory = Callable[[], Stage]
 
+class StageFactory:
+    """A factory that builds a Stage object.
+
+    This class wraps the inner function returned by a factory and provides
+    a callable interface to build the Stage by growing its AST.
+
+    Attributes:
+        stage: The Stage object being built
+    """
+
+    def __init__(self, inner_func, ports, module_name):
+        """Initialize the StageFactory.
+
+        Args:
+            inner_func: The inner function that grows the AST
+            ports: Dictionary mapping port names to Port objects
+            module_name: Name for the module
+        """
+        self._inner_func = inner_func
+        self._ports = ports
+        self._module_name = module_name
+        # Create Stage object immediately so it can be accessed via .stage attribute
+        self.stage = Stage(self._ports, self._module_name)
+
+    def _build(self):
+        """Build the Stage by calling the inner function and return its result."""
+        # Set up module context and call inner function to grow AST
+        self.stage.m.body = Block(Block.MODULE_ROOT)
+        Singleton.builder.enter_context_of('module', self.stage.m)
+
+        try:
+            with self.stage.m.body:
+                # Call inner function with the ports as arguments
+                # Return whatever the inner function returns
+                result = self._inner_func(**dict(self._ports))
+        finally:
+            Singleton.builder.exit_context_of('module')
+
+        return result
+
+    def __call__(self):
+        """Callable wrapper to _build method."""
+        return self._build()
 
 def pop_all(validate=True):
     """Pop all ports from the current module.
@@ -45,9 +86,9 @@ def factory(func):
     This decorator:
     1. Enforces type checking on factory function arguments
     2. Validates the returned inner function is callable
-    3. Returns the inner function wrapped to create a Stage when called
+    3. Returns a StageFactory that builds a Stage when called
 
-    The returned inner function, when called, will:
+    The returned StageFactory, when called, will:
     1. Extract Port[<type>] arguments from inner function signature
     2. Create a Stage wrapping a Module with those ports
     3. Call the inner function to grow the AST
@@ -56,12 +97,12 @@ def factory(func):
         func: The factory function to decorate. Must return a callable.
 
     Returns:
-        A wrapper function that returns the inner function (StageFactory).
+        A wrapper function that returns a StageFactory instance.
     """
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):  # pylint: disable=too-many-locals
-        # Step 1: Type check all arguments to the factory function
+        # Step 1: Type check and unwrap arguments to the factory function
         sig = inspect.signature(func)
         bound_args = sig.bind(*args, **kwargs)
         bound_args.apply_defaults()
@@ -69,18 +110,28 @@ def factory(func):
         # Get type hints for the factory function
         type_hints = get_type_hints(func)
 
-        # Check each argument against its type annotation
+        # Check each argument against its type annotation and unwrap StageFactory to Stage
+        unwrapped_args = {}
         for param_name, param_value in bound_args.arguments.items():
+            # Unwrap StageFactory to Stage if needed
+            if isinstance(param_value, StageFactory):
+                unwrapped_value = param_value.stage
+            else:
+                unwrapped_value = param_value
+
+            # Type check the unwrapped value
             if param_name in type_hints:
                 expected_type = type_hints[param_name]
-                if not isinstance(param_value, expected_type):
+                if not isinstance(unwrapped_value, expected_type):
                     raise TypeError(
                         f"Argument '{param_name}' must be of type {expected_type}, "
-                        f"got {type(param_value)}"
+                        f"got {type(unwrapped_value)}"
                     )
 
-        # Step 2: Call the factory function to get the inner function
-        inner_func = func(*args, **kwargs)
+            unwrapped_args[param_name] = unwrapped_value
+
+        # Step 2: Call the factory function with unwrapped arguments to get the inner function
+        inner_func = func(**unwrapped_args)
 
         if not callable(inner_func):
             raise TypeError(
@@ -126,27 +177,11 @@ def factory(func):
                 f"factory name '{expected_inner_name}' (derived from '{func.__name__}')"
             )
 
-        # Step 5: Create a callable that builds the stage when invoked
+        # Step 5: Create and return StageFactory instance
         module_name = inner_func.__name__.capitalize()
-
-        def stage_builder():
-            """Build and return the Stage by calling the inner function."""
-            # Create Stage object with capitalized module name
-            stage = Stage(ports, module_name)
-
-            # Set up module context and call inner function to grow AST
-            stage.m.body = Block(Block.MODULE_ROOT)
-            Singleton.builder.enter_context_of('module', stage.m)
-
-            try:
-                with stage.m.body:
-                    # Call inner function with the ports as arguments
-                    inner_func(**dict(ports))
-            finally:
-                Singleton.builder.exit_context_of('module')
-
-            return stage
-
-        return stage_builder
+        return StageFactory(inner_func, ports, module_name)
 
     return wrapper
+
+
+__all__ = ['StageFactory', 'factory', 'pop_all', 'this', 'Stage']
