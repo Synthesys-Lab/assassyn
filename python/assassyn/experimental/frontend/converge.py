@@ -73,8 +73,8 @@ def converge(func):
             )
 
         # Step 4: Create Downstream object
-        # Create a custom Downstream class with the appropriate name
-        downstream_class_name = inner_func.__name__.capitalize()
+        # Use naming manager to generate unique module name for multiple instantiations
+        downstream_class_name = Singleton.naming_manager.get_module_name(inner_func.__name__)
 
         # Dynamically create a Downstream subclass
         downstream_class = type(downstream_class_name, (Downstream,), {})

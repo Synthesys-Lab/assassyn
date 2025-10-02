@@ -258,10 +258,32 @@ class NamingStrategy:
 class NamingManager:
     """Optimized naming manager with global name tracking"""
 
+    strategy: NamingStrategy
+    line_name_cache: typing.Dict[typing.Tuple[int, int], typing.List[str]]
+    generated_names_global: typing.Set[str]  # Track all generated names globally
+    module_cache: typing.Dict[str, int]  # Track the number of modules instantiated
+
     def __init__(self):
         self.strategy = NamingStrategy()
         self.line_name_cache = {}
         self.generated_names_global = set()  # Track all generated names
+        self.module_cache = {}
+
+    def get_module_name(self, base_name: str) -> str:
+        """Get unique module name with instance count"""
+        base_name = base_name.capitalize()
+        if base_name == 'Driver':
+            assert base_name not in self.module_cache, "Driver module can only be instantiated once"
+            self.module_cache[base_name] = 1
+            return 'Driver'
+        if base_name not in self.module_cache:
+            self.module_cache[base_name] = 0
+        cnt = self.module_cache[base_name]
+        res = f"{base_name}"
+        if cnt > 0:
+            res = f"{res}_{cnt}"
+        self.module_cache[base_name] += 1
+        return res
 
     def generate_source_names(self, lineno: int, target_ast_node: ast.AST) -> typing.List[str]:
         """Generate optimized source names with caching"""

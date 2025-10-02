@@ -24,8 +24,9 @@ Similar as the `@pipeline.factory` decorator, the `@comb.downstream` decorator
 has the following constraints:
 - The inner function has to have the same name as the outer function
   with `_factory` suffix removed.
-  - This instantiates a `Downstream` object with the same name as the
-    factory function prefix.
+   - To avoid name collision, it uses `Singleton.naming_manager.get_module_name(inner.__name__)`.
+     The inner function name is given to `get_module_name` to generate a unique name
+     by increasing a counter of instantiations of each function.
 - The inner function should be returned by the outer function.
   - This is required because the outer function is called to grow the AST
     when the factory function is called.

@@ -183,7 +183,8 @@ def factory(func):
             )
 
         # Step 5: Create and return StageFactory instance
-        module_name = inner_func.__name__.capitalize()
+        # Use naming manager to generate unique module name for multiple instantiations
+        module_name = Singleton.naming_manager.get_module_name(inner_func.__name__)
         return StageFactory(inner_func, ports, module_name)
 
     return wrapper

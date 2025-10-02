@@ -43,6 +43,9 @@ declared in [module.py](../../ir/module/module.py).
    - Because `Driver` module is reserved in the old frontend to be the top module,
      so a factory function named `driver_factory` should create a module named `Driver`.
      For now, we make this compromise to keep compatibility.
+   - To avoid name collision, it uses `Singleton.naming_manager.get_module_name(inner.__name__)`.
+     The inner function name is given to `get_module_name` to generate a unique name
+     by increasing a counter of instantiations of each function.
 5. Return the inner function to grow the AST of the module.
    - Refer to an example in [test_async_call.py](../../../unit-tests/test_async_call.py).
      This returned inner function is like the constructing an empty `Module`.
