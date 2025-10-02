@@ -83,11 +83,12 @@ def converge(func):
         downstream_instance = downstream_class()
 
         # Step 5: Set up module context and call inner function to grow AST
-        downstream_instance.body = Block(Block.MODULE_ROOT)
+        body = Block(Block.MODULE_ROOT)
+        downstream_instance.body = body
         Singleton.builder.enter_context_of('module', downstream_instance)
 
         try:
-            with downstream_instance.body:
+            with body:
                 # Call inner function to grow the AST
                 inner_func()
         finally:
