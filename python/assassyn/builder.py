@@ -8,7 +8,7 @@ import typing
 import site
 import inspect
 import ast
-from decorator import decorator
+import functools
 from .namify import NamingManager
 
 if typing.TYPE_CHECKING:
@@ -79,9 +79,9 @@ def process_naming(expr, line_of_code: str, lineno: int) -> typing.Dict[str, typ
 def _apply_ir_builder(func):
     """Wrap the given function with IR builder behaviour."""
 
-    @decorator
-    def _wrapper(wrapped, *args, **kwargs):
-        res = wrapped(*args, **kwargs)
+    @functools.wraps(func)
+    def _wrapper(*args, **kwargs):
+        res = func(*args, **kwargs)
 
         # This indicates this res is handled somewhere else, so we do not need to rehandle it
         if res is None:
@@ -128,7 +128,7 @@ def _apply_ir_builder(func):
         assert hasattr(res, 'loc')
         return res
 
-    return _wrapper(func)
+    return _wrapper
 
 
 def ir_builder(func=None, *, node_type=None):

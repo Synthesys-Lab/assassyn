@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import typing
-from decorator import decorator
+import functools
 from ...builder import Singleton, ir_builder
 from ..block import Block
 from ..dtype import DType
@@ -214,22 +214,21 @@ class Port:
         '''Dump the port as a right-hand side reference.'''
         return f'{self.module.as_operand()}.{self.name}'
 
-@decorator
 #pylint: disable=keyword-arg-before-vararg
-def combinational(
-        func,
-        *args,
-        **kwargs):
+def combinational(func):
     '''A decorator for marking a function as combinational logic description.'''
-    module_self = args[0]
-    assert isinstance(module_self, Module)
-    module_self.body = Block(Block.MODULE_ROOT)
-    Singleton.builder.enter_context_of('module', module_self)
-    # TODO(@were): Make implicit pop more robust.
-    with module_self.body:
-        res = func(*args, **kwargs)
-    Singleton.builder.exit_context_of('module')
-    return res
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        module_self = args[0]
+        assert isinstance(module_self, Module)
+        module_self.body = Block(Block.MODULE_ROOT)
+        Singleton.builder.enter_context_of('module', module_self)
+        # TODO(@were): Make implicit pop more robust.
+        with module_self.body:
+            res = func(*args, **kwargs)
+        Singleton.builder.exit_context_of('module')
+        return res
+    return wrapper
 
 
 class Wire:
