@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Peeker(Module):
 
@@ -39,22 +38,14 @@ def check(raw):
                 f"peek: {line_toks[-3]}, pop: {line_toks[-1]}"
 
 def test_peek():
-    sys = SysBuilder("peek")
-    with sys:
+    def top():
         peeker = Peeker()
         peeker.build()
 
         driver = Driver()
         driver.build(peeker)
 
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test("peek", top, check)
 
 if __name__ == '__main__':
     test_peek()

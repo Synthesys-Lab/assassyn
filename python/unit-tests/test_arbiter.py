@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 
 class Squarer(Module):
@@ -82,6 +81,16 @@ class Driver(Module):
                 arb.async_called(a0 = even)
                 arb.async_called(a1 = odd)
 
+def build_system():
+    sqr = Squarer()
+    sqr.build()
+
+    arb = Arbiter()
+    arb.build(sqr)
+
+    driver = Driver()
+    driver.build(arb)
+
 def check(raw):
     last_grant = None
     for i in raw.split('\n'):
@@ -94,28 +103,7 @@ def check(raw):
 
 
 def test_arbiter():
-    sys = SysBuilder('arbiter')
-    with sys:
-        sqr = Squarer()
-        sqr.build()
-
-        arb = Arbiter()
-        arb.build(sqr)
-
-        driver = Driver()
-        driver.build(arb)
-
-    print(sys)
-
-    simulator_path, verilog_path = elaborate(sys, sim_threshold=200, idle_threshold=200, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilog_path:
-        raw = utils.run_verilator(verilog_path)
-        print(raw)
-        check(raw)
+    run_test('arbiter', build_system, check, sim_threshold=200, idle_threshold=200)
 
 if __name__ == '__main__':
     test_arbiter()

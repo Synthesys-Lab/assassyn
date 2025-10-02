@@ -1,7 +1,5 @@
-import assassyn
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 
 class Driver(Module):
@@ -54,34 +52,19 @@ def check_raw(raw):
             cnt += 1
     assert cnt == 99, f'cnt: {cnt} != 99'
 
+def build_system():
+    driver = Driver()
+    lhs = ForwardData()
+    rhs = ForwardData()
+    a = lhs.build()
+    b = rhs.build()
+    adder = Adder()
+
+    driver.build(lhs, rhs)
+    adder.build(a, b)
+
 def test_downstream():
-    sys = SysBuilder('downstream')
-    with sys:
-        driver = Driver()
-        lhs = ForwardData()
-        rhs = ForwardData()
-        a = lhs.build()
-        b = rhs.build()
-        adder = Adder()
-
-        driver.build(lhs, rhs)
-        adder.build(a, b)
-
-    print(sys)
-
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=100,
-            idle_threshold=100)
-
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_raw(raw)
+    run_test('downstream', build_system, check_raw, sim_threshold=100, idle_threshold=100)
 
 if __name__ == '__main__':
     test_downstream()

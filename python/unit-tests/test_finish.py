@@ -1,6 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Driver(Module):
 
@@ -17,6 +16,10 @@ class Driver(Module):
         with Condition(cnt[0] >= Int(32)(50)):
             finish()
 
+def build_top():
+    driver = Driver()
+    driver.build()
+
 def check(raw):
     expected = 0
     for i in raw.split('\n'):
@@ -26,22 +29,7 @@ def check(raw):
     assert expected == 50 or expected == 51, f'{expected} not in [50, 51]'
 
 def test_finish():
-    sys = SysBuilder('finish')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    print(sys)
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
-
+    run_test('finish', build_top, check)
 
 if __name__ == '__main__':
     test_finish()

@@ -1,7 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
+from assassyn.test import run_test
 from assassyn import utils
 
 class Driver(Module):
@@ -31,9 +31,20 @@ class Driver(Module):
                     log("a[idx0][0] + a[idx1][0] = {}", a_sum)
 
 
-def check(raw, parse_cycle):
+def top():
+    driver = Driver()
+    driver.build()
+
+
+def checker(raw):
     print(raw)
     a = [1, 2, 3, 4]
+    # Determine which parse function to use based on output format
+    if "cycle:" in raw.lower():
+        parse_cycle = utils.parse_verilator_cycle
+    else:
+        parse_cycle = utils.parse_simulator_cycle
+
     for i in raw.split('\n'):
         if "a[idx0] + a[idx1]" in i:
             line_toks = i.split()
@@ -45,22 +56,9 @@ def check(raw, parse_cycle):
             a[idx0] = cycle * cycle
             a[idx1] = (cycle + 1) * 2
 
+
 def test_array_partition1():
-    sys = SysBuilder('array_partition1')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    print(sys)
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw, utils.parse_simulator_cycle)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw, utils.parse_verilator_cycle)
+    run_test('array_partition1', top, checker)
 
 
 if __name__ == '__main__':

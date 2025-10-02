@@ -1,6 +1,5 @@
-import assassyn
 from assassyn.frontend import *
-from assassyn.backend import elaborate
+from assassyn.test import run_test
 from assassyn import utils
 
 
@@ -57,48 +56,34 @@ def check_raw(raw):
                 assert int(a) == int(b)
     assert cnt == 297, f'cnt: {cnt} != 297'
 
+def build_system():
+    driver = Driver()
+    hs1 = ForwardData()
+    hs2 = ForwardData()
+    hs3 = ForwardData()
+    hs4 = ForwardData()
+
+    a = hs1.build()
+    b = hs2.build()
+    c = hs3.build()
+    d = hs4.build()
+
+    adder1 = Adder()
+    adder1.name = 'adder1'
+    adder2 = Adder()
+    adder2.name = 'adder2'
+    adder3 = Adder()
+    adder3.name = 'adder3'
+
+    driver.build(hs1, hs2)
+
+    c = adder1.build(a, b, "c")
+    d = adder2.build(a, b, "d")
+    adder3.build(c, d, "e")
+
 def test_toposort():
-    sys = SysBuilder('topo_sort')
-    with sys:
-        driver = Driver()
-        hs1 = ForwardData()
-        hs2 = ForwardData()
-        hs3 = ForwardData()
-        hs4 = ForwardData()
-
-        a = hs1.build()
-        b = hs2.build()
-        c = hs3.build()
-        d = hs4.build()
-
-        adder1 = Adder()
-        adder1.name = 'adder1'
-        adder2 = Adder()
-        adder2.name = 'adder2'
-        adder3 = Adder()
-        adder3.name = 'adder3'
-
-        driver.build(hs1, hs2)
-
-        c = adder1.build(a, b, "c")
-        d = adder2.build(a, b, "d")
-        adder3.build(c, d, "e")
-
-    print(sys)
-
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=100,
-            idle_threshold=100)
-
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_raw(raw)
+    run_test('topo_sort', build_system, check_raw,
+             sim_threshold=100, idle_threshold=100)
 
 if __name__ == '__main__':
     test_toposort()

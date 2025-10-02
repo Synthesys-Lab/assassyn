@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 def ae(a, b):
     c = a + b
@@ -38,21 +37,12 @@ def check(raw):
             c = line_toks[-1]
             assert bool(c) == (a == b)
 
+def top():
+    driver = Driver()
+    driver.build()
+
 def test_inline1():
-    sys = SysBuilder('inline1')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
-
+    run_test('inline1', top, check)
 
 if __name__ == '__main__':
     test_inline1()

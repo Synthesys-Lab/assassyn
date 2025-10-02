@@ -1,7 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
+from assassyn.test import run_test
 
 class Adder2(Module):
 
@@ -68,12 +66,8 @@ class Driver(Module):
             adder.async_called(a = cnt_div2, b = cnt_div2 , c = cnt_div2)
 
 
-def impl(is_gold):
-    if is_gold:
-        sys = SysBuilder('Comb_block_barrier_gold')
-    else :
-        sys = SysBuilder('Comb_block_barrier')
-    with sys:
+def build_system(is_gold):
+    def top():
         adder2 = Adder2()
         res = adder2.build()
 
@@ -82,27 +76,31 @@ def impl(is_gold):
 
         driver = Driver()
         driver.build(adder1)
+    return top
 
-    print(sys)
-
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=200,
-            idle_threshold=200,
-            random=True)
-
-
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
+def checker(raw):
+    # Checker just validates that the test runs without errors
+    pass
 
 def test_block_barrier():
-    impl(False)
+    run_test(
+        'Comb_block_barrier',
+        build_system(False),
+        checker,
+        sim_threshold=200,
+        idle_threshold=200,
+        random=True
+    )
 
 def test_block_barrier_gold():
-    impl(True)
+    run_test(
+        'Comb_block_barrier_gold',
+        build_system(True),
+        checker,
+        sim_threshold=200,
+        idle_threshold=200,
+        random=True
+    )
 
 if __name__ == '__main__':
     test_block_barrier()

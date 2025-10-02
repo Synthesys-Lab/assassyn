@@ -1,7 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
+from assassyn.test import run_test
 
 
 class FSM_m(Module):
@@ -54,31 +52,30 @@ class Driver(Module):
 
 
 
+def build_system():
+    state = RegArray(UInt(2), 1 , initializer=[0])
+
+    adder1 = FSM_m()
+    adder1.build(state)
+
+    driver = Driver()
+    driver.build(adder1)
+
+
+def checker(raw):
+    # Basic validation that simulation ran
+    assert raw is not None, "Simulator output is None"
+
+
 def test_fsm_gold():
-    sys = SysBuilder('FSM_gold')
-    with sys:
-
-        state = RegArray(UInt(2), 1 , initializer=[0])
-
-        adder1 = FSM_m()
-        adder1.build(state)
-
-        driver = Driver()
-        driver.build(adder1)
-
-    print(sys)
-
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=200,
-            idle_threshold=200,
-            random=True)
-
-    simulator_path, verilator_path  = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
+    run_test(
+        name='FSM_gold',
+        top=build_system,
+        checker=checker,
+        sim_threshold=200,
+        idle_threshold=200,
+        random=True
+    )
 
 
 if __name__ == '__main__':

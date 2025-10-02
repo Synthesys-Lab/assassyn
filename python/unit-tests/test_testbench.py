@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Testbench(Module):
 
@@ -29,19 +28,11 @@ def check(raw):
     assert expected == 3, f'{expected} != 3'
 
 def test_testbench():
-    sys = SysBuilder('testbench')
-    with sys:
+    def top():
         testbench = Testbench()
         testbench.build()
 
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('testbench', top, check)
 
 
 if __name__ == '__main__':

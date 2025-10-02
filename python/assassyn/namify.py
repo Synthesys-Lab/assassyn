@@ -22,27 +22,6 @@ class NamingContext:
 class NamingStrategy:
     """Optimized naming strategy with semantic awareness"""
 
-    # Common patterns for hardware/CPU operations
-    SEMANTIC_PATTERNS = {
-        # Register bypass patterns
-        ('exec_bypass_reg', 'mem_bypass_reg'): 'bypass_check',
-        ('rs1', 'rs2', 'rd'): 'reg',
-        ('on_write', 'RShift'): 'write_mask',
-
-        # ALU patterns
-        ('ALU_', 'result'): 'alu_out',
-        ('signals', 'alu'): 'alu_op',
-        ('signals', 'cond'): 'branch_cond',
-
-        # Memory patterns
-        ('memory', 'read'): 'mem_rd',
-        ('memory', 'write'): 'mem_wr',
-
-        # PC patterns
-        ('fetch_addr', 'Add', '4'): 'pc_next',
-        ('is_offset_br', 'is_pc_calc'): 'branch_type',
-    }
-
     # Shortened operation names
     OP_ABBREVIATIONS = {
         ast.Add: 'add', ast.Sub: 'sub', ast.Mult: 'mul',
@@ -111,17 +90,6 @@ class NamingStrategy:
 
         return name
 
-    def _detect_semantic_pattern(self, node: ast.AST) -> typing.Optional[str]:
-        """Detect semantic patterns for better naming"""
-        node_str = ast.dump(node)
-
-        # Check for known patterns
-        for pattern_keys, pattern_name in self.SEMANTIC_PATTERNS.items():
-            if all(key in node_str for key in pattern_keys):
-                return pattern_name
-
-        return None
-
     def _extract_name_from_node(self, node: ast.AST, depth: int = 0) -> str:
         """Extract name with depth limit to prevent overly long names"""
         if depth > 2:  # Limit recursion depth
@@ -131,12 +99,6 @@ class NamingStrategy:
         node_repr = ast.dump(node)
         if node_repr in self.name_cache:
             return self.name_cache[node_repr]
-
-        # Check for semantic patterns
-        semantic_name = self._detect_semantic_pattern(node)
-        if semantic_name:
-            self.name_cache[node_repr] = semantic_name
-            return semantic_name
 
         name = self._extract_name_impl(node, depth)
         self.name_cache[node_repr] = name
@@ -296,10 +258,32 @@ class NamingStrategy:
 class NamingManager:
     """Optimized naming manager with global name tracking"""
 
+    strategy: NamingStrategy
+    line_name_cache: typing.Dict[typing.Tuple[int, int], typing.List[str]]
+    generated_names_global: typing.Set[str]  # Track all generated names globally
+    module_cache: typing.Dict[str, int]  # Track the number of modules instantiated
+
     def __init__(self):
         self.strategy = NamingStrategy()
         self.line_name_cache = {}
         self.generated_names_global = set()  # Track all generated names
+        self.module_cache = {}
+
+    def get_module_name(self, base_name: str) -> str:
+        """Get unique module name with instance count"""
+        base_name = base_name.capitalize()
+        if base_name == 'Driver':
+            assert base_name not in self.module_cache, "Driver module can only be instantiated once"
+            self.module_cache[base_name] = 1
+            return 'Driver'
+        if base_name not in self.module_cache:
+            self.module_cache[base_name] = 0
+        cnt = self.module_cache[base_name]
+        res = f"{base_name}"
+        if cnt > 0:
+            res = f"{res}_{cnt}"
+        self.module_cache[base_name] += 1
+        return res
 
     def generate_source_names(self, lineno: int, target_ast_node: ast.AST) -> typing.List[str]:
         """Generate optimized source names with caching"""

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import typing
 from decorator import decorator
-
 from ...builder import Singleton, ir_builder
 from ..block import Block
 from ..dtype import DType
@@ -177,6 +176,11 @@ class Port:
         self.dtype = dtype
         self.name = self.module = None
         self._users = []
+
+    def __class_getitem__(cls, item):
+        '''Make Port subscriptable for type annotations like Port[UInt(32)].'''
+        # Return an actual Port instance with the dtype
+        return cls(item)
 
     @property
     def users(self):

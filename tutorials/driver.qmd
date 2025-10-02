@@ -1,0 +1,229 @@
+
+# 教程：使用 assassyn 创建并验证一个简单的硬件计数器
+
+> **作者：** Yao Wentao  
+> **日期：** 2025.9.30  
+> 
+
+## 简介
+
+欢迎来到本教程！在这里，我们将学习如何使用硬件描述库 `assassyn` 来设计一个简单的计数器。
+
+**学习目标:**
+
+* 了解 `assassyn` 的基本组件：`Module`, `RegArray`, `UInt`。
+    -  `Module`: 每一个模块对应一级流水线
+    -  `RegArray` : 寄存器数组
+    -  `[U]Int` : 数据类型
+* 编写一个简单的硬件计数器模块。
+* 构建系统、执行仿真并使用 Verilator 进行验证。
+
+---
+
+# 2. 核心代码讲解
+
+我们的项目由三部分组成：硬件模块定义、结果验证函数和主执行函数。
+
+## 2.0 环境基本配置
+
+让我们首先设置基本环境：<br>
+导入assassyn库，以及基本库。其中run_quietly是用于运行时rust编译带来的系统输出
+```{python}
+#| code-fold: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import sys
+import os
+import io
+import contextlib
+from typing import Tuple, Optional
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname("driver.qmd"), '../python/'))
+sys.path.append(lib_path)
+from function_t import run_quietly
+
+from assassyn.frontend import *
+from assassyn.backend import elaborate
+from assassyn import utils
+
+print("✅ 环境设置完成")
+```
+
+## 2.1 硬件模块定义 (`Driver`)
+
+这是我们硬件设计的核心。我们定义一个名为 `Driver` 的模块，它内部包含一个32位的寄存器 `cnt`，并在每个时钟周期（组合逻辑的每次评估）自增1。<br>
+
+接下来，让我们定义计数器模块。我们将创建一个名为 `Driver` 的类，它继承自 `Module` <br>
+
+`Module` 是我们构建的**基本单元**，它也可以视为一个函数，或者基本块。我们在一个Module里面可以编写**一级流水线**，即一个时钟周期内需要执行的组合逻辑<br>
+```{python}
+#| code-fold: false
+class Driver(Module):
+    def __init__(self):
+        super().__init__(ports={})
+
+    @module.combinational
+    def build(self):
+        cnt = RegArray(UInt(32), 1)
+
+        v = cnt[0] + UInt(32)(1)
+        (cnt & self)[0] <= v
+
+        log('cnt: {}', cnt[0])
+
+print("✅ 计数器模块定义完成")
+```
+
+我们可以看到，这个模块：<br>
+1. 创建了一个32位的寄存器数组 `cnt` <br>
+2. 在每个时钟周期，将 `cnt[0]` 的值加1 <br>
+3. 使用 `log` 函数在仿真时打印当前值 <br>
+
+  * `class Driver(Module)`: 所有硬件模块都继承自 `Module`。
+    * `Driver`是一个**相当特殊**的模块，相当于一个程序的入口, main函数 - 每个Cycle这个模块都会被无条件拉高执行里面的代码段
+  * `RegArray(UInt(32), 1)`: 创建了一个寄存器数组。这里它只有一个元素，类型是32位无符号整数 (`UInt(32)`)。
+  * `v = ...` : 这是组合逻辑的表达方式，这里的执行可以认为，在物理电路上是立即执行的，与时序那种并非立即执行的行为相对应（我们也将在后续的教程中解释“时序”这个行为）
+  * `(cnt & self)[0] <= ...`: 这是 `assassyn` 中更新寄存器值的语法，即时序逻辑的表达方式。它表示在下一个时钟沿，`cnt[0]` 的值将被更新为右侧表达式的结果。
+  * 所有的assassyn里面的寄存器赋值，都默认是”异步“的。考虑下面的代码块:
+    ```{python}
+    #| eval: false 
+    old_value = cnt[0]
+    (cnt & self)[0] <= new_value 
+    read_again = cnt[0]
+    ```
+
+    在上面的代码中，old_value和read_again的值是一样的。新值的写入会在下一次Driver被唤起的时候才能看见。
+  * `log('cnt: {}', cnt[0])`: 这是一个仿真原语，类似于verilog里面的`$display`可以在仿真的时候把值打印在屏幕上。 我们可以看见，它会在仿真过程中打印出 `cnt[0]` 的值，方便我们调试和验证。
+  
+### 2.1.1 组合逻辑 & 时序逻辑 
+  * 时钟沿：即时钟信号从低电平跳变到高电平(上升沿)或从高电平跳变到低电平(下降沿)的那一瞬间。
+  * 组合逻辑：输出随输入立即变化,不依赖时钟沿,像普通开关一样即时响应。（对应阻塞赋值`=`）
+  * 时序逻辑：只在时钟沿到来时才更新输出和内部状态,像一个定时拍照的相机,只在按快门(时钟沿)的瞬间记录当前输入。(对应非阻塞赋值`<=`)
+  * 当然我们也可以把组合逻辑和时序逻辑合并为一个非阻塞赋值语句，就比如说，在这个case中，我们可以将核心的两个赋值语句合并成`(cnt & self)[0] <= cnt[0] + UInt(32)(1)`
+
+## 2.2 验证逻辑 (`check`)
+
+为了确保我们的计数器正常工作，我们编写了一个 `check` 函数。它会解析仿真器输出的文本，检查计数器的值是否从 0 开始正确地递增到了 99。
+
+现在，我们定义一个验证函数来检查计数器的输出是否符合预期：
+
+```{python}
+def check(raw):
+    expected = 0
+    for i in raw.split('\n'):
+        if 'cnt:' in i:
+            val = int(i.split()[-1])
+            assert val == expected, f"预期值 {expected}，实际值 {val}"
+            expected += 1
+    assert expected == 100, f"预期运行 100 个周期，实际运行了 {expected} 个周期"
+    print(f"✅ 验证通过！计数器按预期工作：从 0 计数到 {expected-1}")
+
+print("✅ 验证函数定义完成")
+```
+
+这个验证函数会：
+
+1.  解析模拟器的输出日志 
+2.  检查计数器是否从0开始正确递增 
+3.  确保总共执行了100个周期 
+
+## 2.3 系统构建与仿真 (`test_driver`)
+
+这个函数将所有部分串联起来：
+
+1.  用 `SysBuilder` 创建一个系统。
+2.  实例化我们的 `Driver` 模块。
+3.  调用 `elaborate` 将我们的 Python 设计转换成RTL模型。
+4.  调用 `run_simulator` 和 `run_verilator` 运行仿真。
+5.  将仿真输出传递给 `check` 函数进行验证。
+
+-----
+
+# 3\. 完整代码与执行
+
+
+现在，我们来构建系统、生成仿真器并运行验证。
+
+```{python}
+#| output-fold: true
+print("开始构建和仿真...")
+
+# 1. 构建系统
+sys = SysBuilder('driver')
+with sys:
+    driver = Driver()
+    driver.build()
+print(sys)
+# 2. 生成仿真器
+def generate_simulator():
+    return elaborate(sys, verilog=utils.has_verilator())
+
+(simulator_path, verilator_path), _, _ = run_quietly(generate_simulator)
+print("✅ 仿真器生成完成")
+
+# 3. 运行仿真器
+def run_sim():
+    return utils.run_simulator(simulator_path)
+
+raw, _, _ = run_quietly(run_sim)
+
+print("\n=== 模拟器输出 ===")
+# 只显示计数器的值
+for line in raw.split('\n'):
+    if 'cnt:' in line:
+        print(line.strip())
+
+# 验证输出
+check(raw)
+
+# 如果有 Verilator，也运行 Verilator 验证
+if verilator_path:
+    print("\n=== Verilator 验证 ===")
+
+    def run_verilator():
+        return utils.run_verilator(verilator_path)
+
+    raw_verilator, _, _ = run_quietly(run_verilator)
+
+    # 显示 Verilator 的计数器输出
+    for line in raw_verilator.split('\n'):
+        if 'cnt:' in line:
+            print(line.strip())
+
+    # 验证 Verilator 的输出
+    check(raw_verilator)
+else:
+    print("⚠️ Verilator 未安装，跳过 Verilator 验证")
+```
+
+## 结果分析
+
+现在我们已经完成了：<br>
+
+1. ✅ 定义了计数器模块 <br>
+   
+2. ✅ 构建了系统 <br>
+   
+3. ✅ 生成了仿真器 <br>
+   
+4. ✅ 运行了仿真并验证了结果 
+
+从输出可以看到，我们的计数器按预期工作：
+
+* 从0开始计数
+* 每个时钟周期加1
+* 成功运行了100个周期
+
+这证明了我们的硬件设计是正确的。
+
+## 4.1 结果分析
+
+当上面的代码块执行后，您应该能看到类似下面的输出：
+
+  * **系统描述**: `assassyn` 库打印出的模块结构。
+  * **仿真器输出**: 一系列 `cnt: 0`, `cnt: 1`, `cnt: 2`, ... 直到 `cnt: 9` 的日志。
+  * **验证结果**: 打印 "✅ 验证成功！" 的信息。
+
+如果所有步骤都正确，这意味着我们的硬件设计、仿真和验证都按预期工作了。

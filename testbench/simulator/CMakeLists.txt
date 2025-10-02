@@ -69,5 +69,10 @@ target_link_libraries(wrapper ${RAMULATOR_LIBRARY})
 # Add main executable
 add_executable(main main.cpp)
 
+# Add test executable
+add_executable(test test.cpp)
+
 # Link against the wrapper and ramulator libraries
 target_link_libraries(main wrapper ${RAMULATOR_LIBRARY})
+target_link_libraries(test wrapper ${RAMULATOR_LIBRARY})
+

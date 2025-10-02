@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Driver(Module):
 
@@ -44,20 +43,13 @@ def check(raw: str):
             assert max(int(a), int(b)) == int(c)
 
 
+def top():
+    driver = Driver()
+    driver.build()
+
+
 def test_select():
-    sys = SysBuilder('select')
-    with sys:
-        driver = Driver()
-        driver.build()
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('select', top, check)
 
 
 if __name__ == '__main__':

@@ -3,3 +3,4 @@
 from .module import Module, combinational, Port, Wire
 from .downstream import Downstream, combinational as downstream_combinational
 from .sram import SRAM
+from .dram import DRAM

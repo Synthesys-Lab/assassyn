@@ -308,7 +308,7 @@ impl <T: Sized + Cycled>XEQ<T> {
   }
 
   pub fn pop(&mut self, current: usize) -> Option<T> {
-    if self.q.first_key_value().map_or(false, |(cycle, _)| *cycle >= current) {
+    if self.q.first_key_value().map_or(false, |(cycle, _)| *cycle <= current) {
       self.q.pop_first().map(|(_, event)| event)
     } else {
       None

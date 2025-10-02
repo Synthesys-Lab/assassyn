@@ -1,6 +1,5 @@
-import assassyn
 from assassyn.frontend import *
-from assassyn.backend import elaborate
+from assassyn.test import run_test
 from assassyn import utils
 
 class Squarer(Module):
@@ -47,46 +46,35 @@ class Driver(Module):
             log('flip to {}', flip)
             (lock&self)[0] <= flip
 
-def parse_simulator_log(toks):
-    cycle = utils.parse_simulator_cycle(toks)
-    return cycle, int(toks[-5]), int(toks[-1])
+def build_system():
+    sqr = Squarer()
+    sqr.build()
 
-def parse_verilator_log(toks):
-    cycle = utils.parse_verilator_cycle(toks)
-    return cycle, int(toks[-5]), int(toks[-1])
+    lock = RegArray(Bits(1), 1)
 
-def check(raw, cycle_parser):
+    agent = Agent()
+    agent.build(lock, sqr)
+
+    driver = Driver()
+    driver.build(agent, lock)
+
+def check_output(raw):
     for i in raw.splitlines():
         if 'Multiplier' in i:
             toks = i.split()
-            cycle, value, res = cycle_parser(toks)
+            # Try parsing as simulator log first
+            try:
+                cycle = utils.parse_simulator_cycle(toks)
+            except:
+                cycle = utils.parse_verilator_cycle(toks)
+            value = int(toks[-5])
+            res = int(toks[-1])
             assert (cycle - 1) % 4 in [2, 3], cycle
             assert res == value * value
 
 def test_wait_until():
-    sys = SysBuilder('wait_until')
-    with sys:
-        sqr = Squarer()
-        sqr.build()
-
-        lock = RegArray(Bits(1), 1)
-
-        agent = Agent()
-        agent.build(lock, sqr)
-
-        driver = Driver()
-        driver.build(agent, lock)
-
-
-    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog=utils.has_verilator())
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw, parse_simulator_log)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw, parse_verilator_log)
+    run_test('wait_until', build_system, check_output,
+             sim_threshold=200, idle_threshold=200)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Driver(Module):
 
@@ -14,6 +13,7 @@ class Driver(Module):
         log('cnt: {}', cnt[0]);
 
 def check(raw):
+    print(raw)
     expected = 0
     for i in raw.split('\n'):
         if 'cnt:' in i:
@@ -22,21 +22,11 @@ def check(raw):
     assert expected == 100, f'{expected} != 100'
 
 def test_driver():
-    sys = SysBuilder('driver')
-    with sys:
+    def top():
         driver = Driver()
         driver.build()
 
-    print(sys)
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('driver', top, check)
 
 
 if __name__ == '__main__':

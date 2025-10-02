@@ -1,4 +1,3 @@
-import assassyn
 from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
@@ -6,7 +5,7 @@ from assassyn.ir.module.external import ExternalSV
 
 
 class Driver(Module):
- 
+
     def __init__(self):
         super().__init__(ports={})
 
@@ -23,7 +22,7 @@ class ForwardData(Module):
     def __init__(self):
         super().__init__(
             ports={'data': Port(UInt(32))},
-        ) 
+        )
 
     @module.combinational
     def build(self):
@@ -32,7 +31,7 @@ class ForwardData(Module):
 
 class ExternalAdder(ExternalSV):
     '''External SystemVerilog adder module.'''
-    
+
     def __init__(self, **in_wire_connections):
         super().__init__(
             file_path="python/unit-tests/resources/adder.sv",
@@ -46,7 +45,7 @@ class ExternalAdder(ExternalSV):
             },
             **in_wire_connections
         )
-    
+
     def __getattr__(self, name):
         # Allow accessing output wires as attributes
         if hasattr(self, 'out_wires') and name in self.out_wires:
@@ -79,26 +78,25 @@ def test_easy_external():
         rhs = ForwardData()
         a = lhs.build()
         b = rhs.build()
-        
+
         ext_adder = ExternalAdder()
         adder = Adder()
 
         driver.build(lhs, rhs)
-        adder.build(a, b,ext_adder)
+        adder.build(a, b, ext_adder)
 
-    print(sys)
+    config = {
+        'verilog': utils.has_verilator(),
+        'simulator': False,
+        'sim_threshold': 100,
+        'idle_threshold': 100
+    }
 
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            simulator=False,
-            sim_threshold=100,
-            idle_threshold=100)
-
-    simulator_path, verilator_path = elaborate(sys, **config )
-
+    simulator_path, verilator_path = elaborate(sys, **config)
 
     if verilator_path:
         raw = utils.run_verilator(verilator_path)
+        assert "downstream:" in raw, "Expected log output not found"
 
 
 if __name__ == '__main__':

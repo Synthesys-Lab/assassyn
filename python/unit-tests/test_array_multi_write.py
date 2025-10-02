@@ -1,8 +1,7 @@
 import pytest
 
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 
 class ModA(Module):
@@ -47,9 +46,7 @@ class Driver(Module):
 
 
 def test_array_multi_write():
-    sys =  SysBuilder('array_multi_write')
-    with sys:
-
+    def top():
         arr = RegArray(Int(32), 1)
 
         mod_a = ModA()
@@ -61,12 +58,11 @@ def test_array_multi_write():
         driver = Driver()
         driver.build(mod_a, mod_c)
 
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
+    def checker(output):
+        # Basic check that the test ran without errors
+        assert output is not None
 
-    utils.run_simulator(simulator_path)
-
-    if verilator_path:
-        utils.run_verilator(verilator_path)
+    run_test('array_multi_write', top, checker)
 
 if __name__ == '__main__':
     test_array_multi_write()

@@ -37,6 +37,7 @@ class Downstream(ModuleBase):
         Singleton.builder.downstreams.append(self)
 
     def _repr_impl(self, head):
+        Singleton.repr_ident = 2
         var_id = self.as_operand()
         body = repr(self.body) if self.body is not None else ''
         ext = self._dump_externals()

@@ -1,8 +1,7 @@
 import pytest
 
-import assassyn
 from assassyn.frontend import *
-from assassyn.backend import elaborate
+from assassyn.test import run_test
 from assassyn import utils
 
 
@@ -47,23 +46,20 @@ def check_concat(raw):
     assert cnt == 200 - 1, f'cnt:{cnt} != 200 - 1'
 
 def test_concat():
-    sys = SysBuilder('concat')
-    with sys:
+    def top():
         adder = Adder()
         adder.build()
 
         driver = Driver()
         driver.build(adder)
 
-    config = assassyn.backend.config(sim_threshold=200, idle_threshold=200, verilog=utils.has_verilator())
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-    raw = utils.run_simulator(simulator_path)
-    check_concat(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_concat(raw)
+    run_test(
+        'concat',
+        top=top,
+        checker=check_concat,
+        sim_threshold=200,
+        idle_threshold=200
+    )
 
 
 if __name__ == '__main__':

@@ -1,6 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
+from assassyn.test import run_test
 
 class Sub(Module):
 
@@ -61,6 +60,19 @@ class Driver(Module):
         call_rhs = rhs.async_called(rhs_b = cnt[0])
         call_rhs.bind.set_fifo_depth(rhs_b = 1)
 
+def build_system():
+    sub = Sub()
+    sub.build()
+
+    lhs = Lhs()
+    aa_lhs = lhs.build(sub)
+
+    rhs = Rhs()
+    rhs.build(aa_lhs)
+
+    driver = Driver()
+    driver.build(lhs, rhs)
+
 def check_raw(raw):
     cnt = 0
     for i in raw.split('\n'):
@@ -74,28 +86,7 @@ def check_raw(raw):
     assert cnt == 100 - 2, f'cnt: {cnt} != 98'
 
 def test_bind():
-    sys =  SysBuilder('bind')
-    with sys:
-        sub = Sub()
-        sub.build()
-
-        lhs = Lhs()
-        aa_lhs = lhs.build(sub)
-
-        rhs = Rhs()
-        rhs.build(aa_lhs)
-
-        driver = Driver()
-        driver.build(lhs, rhs)
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_raw(raw)
+    run_test('bind', build_system, check_raw)
 
 
 if __name__ == '__main__':

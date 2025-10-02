@@ -1,7 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
+from assassyn.test import run_test
 
 class Adder(Module):
 
@@ -55,8 +53,7 @@ def check_raw(raw):
 
 
 def test_async_call():
-    sys = SysBuilder('Comb_expose')
-    with sys:
+    def top(sys):
         adder = Adder()
         c = adder.build()
 
@@ -65,23 +62,10 @@ def test_async_call():
 
         sys.expose_on_top(c, kind='Inout')
 
-    print(sys)
-
-    config = assassyn.backend.config(
-            verilog=utils.has_verilator(),
-            sim_threshold=200,
-            idle_threshold=200,
-            random=True)
-
-    simulator_path, verilator_path = elaborate(sys, **config)
-
-
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_raw(raw)
+    run_test('Comb_expose', top, check_raw,
+             sim_threshold=200,
+             idle_threshold=200,
+             random=True)
 
 
 if __name__ == '__main__':

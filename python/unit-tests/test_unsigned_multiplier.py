@@ -1,8 +1,5 @@
 from assassyn.frontend import *
-from assassyn.backend import elaborate
-from assassyn import utils
-import assassyn
-import pytest
+from assassyn.test import run_test
 import random
 
 # AIM: unsigned 32 bit multiplier: 32b*32b=64b
@@ -91,8 +88,22 @@ class Driver(Module):
             mulstage3.async_called(cnt=cnt[0], a=input_a, b=input_b)
 
 
+def build_system():
+    stage1_reg = RegArray(Int(64), 1)
+    stage2_reg = RegArray(Int(64), 1)
+    stage3_reg = RegArray(Int(64), 1)
+
+    mulstage1 = MulStage1()
+    mulstage1.build(stage1_reg)
+    mulstage2 = MulStage2()
+    mulstage2.build(stage1_reg, stage2_reg)
+    mulstage3 = MulStage3()
+    mulstage3.build(stage2_reg, stage3_reg)
+    driver = Driver()
+    driver.build(mulstage1, mulstage2, mulstage3)
+
+
 def check_raw(raw):
-    cnt = 0
     for i in raw.split('\n'):
         if 'Final' in i:
             line_toks = i.split()
@@ -103,32 +114,7 @@ def check_raw(raw):
 
 
 def test_multiplier():
-    sys = SysBuilder('multiplier_test')
-
-    with sys:
-        stage1_reg = RegArray(Int(64), 1)
-        stage2_reg = RegArray(Int(64), 1)
-        stage3_reg = RegArray(Int(64), 1)
-
-        mulstage1 = MulStage1()
-        mulstage1.build(stage1_reg)
-        mulstage2 = MulStage2()
-        mulstage2.build(stage1_reg, stage2_reg)
-        mulstage3 = MulStage3()
-        mulstage3.build(stage2_reg, stage3_reg)
-        driver = Driver()
-        driver.build(mulstage1, mulstage2, mulstage3)
-
-    print(sys)
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check_raw(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check_raw(raw)
+    run_test('multiplier_test', build_system, check_raw)
 
 
 if __name__ == '__main__':

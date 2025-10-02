@@ -46,6 +46,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     """
     # Write imports
     fd.write("use std::collections::VecDeque;\n")
+    fd.write("use std::collections::HashMap;\n")
     fd.write("use super::runtime::*;\n")
     fd.write("use super::ramulator::*;\n")
     platform_os = platform.system().lower()
@@ -65,6 +66,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     # Begin simulator struct definition
     fd.write("pub struct Simulator { pub stamp: usize, ")
     fd.write("pub mem_interface: MemoryInterface,\n")
+    fd.write("pub request_stamp_map_table: HashMap<i64, usize>,\n")
     home = repo_path()
     # Add array fields to simulator struct
     for array in sys.arrays:
@@ -142,6 +144,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write('MemoryInterface::new(lib.into()).expect("Failed to create MemoryInterface") };')
     fd.write("    Simulator {\n")
     fd.write("      stamp: 0,\n")
+    fd.write("      request_stamp_map_table: HashMap::new(),\n")
     for init in simulator_init:
         fd.write(f"      {init}\n")
     fd.write("      mem_interface: mem,\n")

@@ -120,7 +120,7 @@ In the combinational logic, all the operations are described. The operations inv
 objects are overloaded. These overloaded operations will transistively build the IR representation.
 These IR nodes will be implicitly pushed into the module by the `module.combinational` decorator.
 
-````Python
+````python
 class Adder(Module):
     @module.constructor
     def __init__(self):
@@ -149,7 +149,7 @@ A Driver module is a special module, like a `main` function in software programm
 
 Such a described module should be instantiated under the scope of a `SysBuilder`, which is like the top function in RTL programming.
 
-````Python
+````python
 with sys:
     adder = Adder()
     driver = Driver()

@@ -1,8 +1,7 @@
 import pytest
 
-from assassyn.backend import elaborate
 from assassyn.frontend import *
-from assassyn import utils
+from assassyn.test import run_test
 
 class Sub(Module):
     def __init__(self):
@@ -60,27 +59,18 @@ def check(raw):
             cnt += 1
     assert cnt == 100 - 2, f'cnt: {cnt} != 100'
 
+def top():
+    sub = Sub()
+    sub.build()
+
+    lhs = Lhs()
+    rhs = lhs.build(sub)
+
+    driver = Driver()
+    driver.build(lhs, rhs)
+
 def test_imbalance():
-    sys =  SysBuilder('imbalance')
-    with sys:
-        sub = Sub()
-        sub.build()
-
-        lhs = Lhs()
-        rhs = lhs.build(sub)
-
-        driver = Driver()
-        driver.build(lhs, rhs)
-
-
-    simulator_path, verilator_path = elaborate(sys, verilog=utils.has_verilator())
-
-    raw = utils.run_simulator(simulator_path)
-    check(raw)
-
-    if verilator_path:
-        raw = utils.run_verilator(verilator_path)
-        check(raw)
+    run_test('imbalance', top, check)
 
 
 if __name__ == '__main__':
