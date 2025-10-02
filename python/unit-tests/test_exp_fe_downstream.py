@@ -50,7 +50,7 @@ def test_exp_fe_downstream():
         lhs = forward_data_factory()
         rhs = forward_data_factory()
         # Driver pushes data to both lhs and rhs
-        driver_factory(lhs.stage, rhs.stage)()
+        driver_factory(lhs, rhs)()
         adder_factory(lhs(), rhs())
 
     run_test('exp_fe_downstream', top, check_raw,

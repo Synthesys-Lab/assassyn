@@ -113,20 +113,25 @@ def factory(func):
         # Check each argument against its type annotation and unwrap StageFactory to Stage
         unwrapped_args = {}
         for param_name, param_value in bound_args.arguments.items():
-            # Unwrap StageFactory to Stage if needed
-            if isinstance(param_value, StageFactory):
-                unwrapped_value = param_value.stage
-            else:
-                unwrapped_value = param_value
-
-            # Type check the unwrapped value
+            # Type check first, then unwrap if necessary
             if param_name in type_hints:
                 expected_type = type_hints[param_name]
-                if not isinstance(unwrapped_value, expected_type):
-                    raise TypeError(
-                        f"Argument '{param_name}' must be of type {expected_type}, "
-                        f"got {type(unwrapped_value)}"
-                    )
+                # If type check fails, try to unwrap StageFactory to Stage
+                if not isinstance(param_value, expected_type):
+                    if isinstance(param_value, StageFactory) and expected_type == Stage:
+                        unwrapped_value = param_value.stage
+                        assert isinstance(unwrapped_value, Stage), (
+                            f"StageFactory.stage must be a Stage, got {type(unwrapped_value)}"
+                        )
+                    else:
+                        raise TypeError(
+                            f"Argument '{param_name}' must be of type {expected_type}, "
+                            f"got {type(param_value)}"
+                        )
+                else:
+                    unwrapped_value = param_value
+            else:
+                unwrapped_value = param_value
 
             unwrapped_args[param_name] = unwrapped_value
 
