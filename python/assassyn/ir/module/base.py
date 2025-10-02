@@ -68,7 +68,8 @@ class ModuleBase:
         return res
 
 def combinational_for(module_type):
-    '''A parameterizable decorator factory for marking a function as combinational logic description.
+    '''A parameterizable decorator factory for marking a function as combinationa
+      logic description.
 
     Args:
         module_type: The expected module type (Module or Downstream class).
