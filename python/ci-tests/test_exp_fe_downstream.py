@@ -1,18 +1,18 @@
-from assassyn.experimental.frontend import pipeline, if_, converge
-from assassyn.frontend import RegArray, Port, UInt, log
+from assassyn.experimental.frontend import factory, module, pin, Downstream, Module, Factory, Value
+from assassyn.frontend import Port, UInt, log, RegArray
 from assassyn.test import run_test
 
 
-@pipeline.factory
-def forward_data_factory() -> pipeline.Stage:
+@factory(Module)
+def forward_data_factory() -> Factory[Module]:
     def forward_data(data: Port[UInt(32)]):
-        data = pipeline.pop_all(True)
-        return data
+        data = module.pop_all(True)
+        pin(data)
     return forward_data
 
 
-@converge
-def adder_factory(a, b):
+@factory(Downstream)
+def adder_factory(a: Value, b: Value) -> Factory[Downstream]:
     def adder():
         a_val = a.optional(UInt(32)(1))
         b_val = b.optional(UInt(32)(1))
@@ -21,14 +21,14 @@ def adder_factory(a, b):
     return adder
 
 
-@pipeline.factory
-def driver_factory(lhs: pipeline.Stage, rhs: pipeline.Stage) -> pipeline.StageFactory:
+@factory(Module)
+def driver_factory(lhs: Factory[Module], rhs: Factory[Module]) -> Factory[Module]:
     def driver():
         cnt = RegArray(UInt(32), 1)
         v = cnt[0]
         cnt[0] = cnt[0] + UInt(32)(1)
-        (lhs << v)()
-        (rhs << v)()
+        (lhs << {'data': v})()
+        (rhs << {'data': v})()
     return driver
 
 
@@ -50,8 +50,8 @@ def test_exp_fe_downstream():
         lhs = forward_data_factory()
         rhs = forward_data_factory()
         # Driver pushes data to both lhs and rhs
-        driver_factory(lhs, rhs)()
-        adder_factory(lhs(), rhs())
+        driver_factory(lhs, rhs)
+        adder_factory(lhs.pins[0], rhs.pins[0])
 
     run_test('exp_fe_downstream', top, check_raw,
              sim_threshold=100, idle_threshold=100)

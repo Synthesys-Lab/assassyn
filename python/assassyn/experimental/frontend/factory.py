@@ -31,7 +31,8 @@ class Factory(Generic[ModuleLike]):
 
     def __init__(self, module: ModuleLike):
         self.module = module
-        self.pins: Optional[list[Value]] = None
+        # Copy pins from module if they were set during construction
+        self.pins: Optional[list[Value]] = getattr(module, 'pins', None)
 
     def expose(self, *pins: Value) -> 'Factory[ModuleLike]':
         """Expose combinational pins to upstream modules."""
@@ -51,6 +52,16 @@ class Factory(Generic[ModuleLike]):
 def this():
     """Return the module currently being constructed."""
     return Singleton.builder.current_module
+
+
+def pin(*pins: Value) -> None:
+    """Expose combinational pins from the current module being constructed."""
+    module = Singleton.builder.current_module
+    if module is None:
+        raise RuntimeError("pin() must be called within an active module context")
+    if not hasattr(module, 'pins') or module.pins is None:
+        module.pins = []
+    module.pins.extend(pins)
 
 
 def _validate_outer_arguments(func: Callable[..., Any], args: tuple, kwargs: dict) -> Dict[str, Any]:
@@ -196,4 +207,4 @@ def factory(module_type: Any) -> Callable[[Callable[..., Callable[..., Any]]], C
     return decorator
 
 
-__all__ = ['Factory', 'factory', 'this']
+__all__ = ['Factory', 'factory', 'this', 'pin']

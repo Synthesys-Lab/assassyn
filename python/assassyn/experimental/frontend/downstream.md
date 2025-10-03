@@ -58,7 +58,7 @@ def forwarder_factory() -> Factory[Module]:
 @factory(Module)
 def driver_factory(lhs: Factory[Module], rhs: Factory[Module]) -> Factory[Module]:
     def driver():
-        cnt = Reg(UInt(32), 1)
+        cnt = RegArray(UInt(32), 1)
         cnt[0] = cnt[0] + UInt(32)(1)
         # cnt[0] is passed to lhs and rhs in sequntial logic
         (lhs << {'x': cnt[0]})()
