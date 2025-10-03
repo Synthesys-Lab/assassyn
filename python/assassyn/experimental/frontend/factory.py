@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import functools
 import inspect
-from typing import Any, Callable, Dict, Generic, Optional, Tuple, Type, TypeVar, Union, get_args, get_origin, get_type_hints
+from typing import (
+    Any, Callable, Dict, Generic, Optional, Type, TypeVar, Union,
+    get_args, get_origin, get_type_hints
+)
 
 from assassyn.builder import Singleton
 from assassyn.ir.block import Block
@@ -19,7 +22,7 @@ from assassyn.ir.value import Value
 ModuleLike = TypeVar('ModuleLike')
 
 
-class Factory(Generic[ModuleLike]):
+class Factory(Generic[ModuleLike]):  # pylint: disable=too-few-public-methods
     """Generic wrapper returned by `@factory` decorated functions.
 
     Attributes:
@@ -64,7 +67,9 @@ def pin(*pins: Value) -> None:
     module.pins.extend(pins)
 
 
-def _validate_outer_arguments(func: Callable[..., Any], args: tuple, kwargs: dict) -> Dict[str, Any]:
+def _validate_outer_arguments(
+    func: Callable[..., Any], args: tuple, kwargs: dict
+) -> Dict[str, Any]:
     """Validate arguments passed to the outer factory function.
 
     Ensures runtime types align with annotations before proceeding to build
@@ -147,7 +152,9 @@ def _exit_module_context() -> None:
     Singleton.builder.exit_context_of('module')
 
 
-def factory(module_type: Any) -> Callable[[Callable[..., Callable[..., Any]]], Callable[..., Factory[Any]]]:
+def factory(
+    module_type: Any
+) -> Callable[[Callable[..., Callable[..., Any]]], Callable[..., Factory[Any]]]:
     """Universal factory decorator.
 
     The supplied `module_type` must provide `factory_check_signature(inner)` and

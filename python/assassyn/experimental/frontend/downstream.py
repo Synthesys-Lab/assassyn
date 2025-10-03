@@ -20,7 +20,7 @@ def factory_check_signature(inner: Callable[..., Any]) -> bool:
     return True
 
 
-def factory_create(inner: Callable[..., Any], args: bool) -> Downstream:
+def factory_create(_inner: Callable[..., Any], _args: bool) -> Downstream:
     """Instantiate a Downstream module."""
 
     module = Downstream()

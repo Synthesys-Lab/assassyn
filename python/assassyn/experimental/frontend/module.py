@@ -31,7 +31,8 @@ def factory_check_signature(inner: Callable[..., Any]) -> Dict[str, Port]:
             )
         if not isinstance(annotation, Port):
             raise TypeError(
-                f"Parameter '{param_name}' must be annotated as Port[<DataType>], got {annotation!r}"
+                f"Parameter '{param_name}' must be annotated as "
+                f"Port[<DataType>], got {annotation!r}"
             )
         if not isinstance(annotation.dtype, DType):
             raise TypeError(
@@ -42,7 +43,9 @@ def factory_check_signature(inner: Callable[..., Any]) -> Dict[str, Port]:
     return ports
 
 
-def factory_create(inner: Callable[..., Any], args: Dict[str, Port]) -> Tuple[Module, Dict[str, Port]]:
+def factory_create(
+    _inner: Callable[..., Any], args: Dict[str, Port]
+) -> Tuple[Module, Dict[str, Port]]:
     """Instantiate a Module and prepare kwargs for the inner builder."""
 
     module = Module(args)
@@ -103,7 +106,7 @@ class ModuleFactory(Factory[Module]):
         return self.bind.async_called()
 
 
-Factory._specialisations[Module] = ModuleFactory
+Factory._specialisations[Module] = ModuleFactory  # pylint: disable=protected-access
 
 
 __all__ = ['ModuleFactory', 'factory_check_signature', 'factory_create', 'pop_all']
