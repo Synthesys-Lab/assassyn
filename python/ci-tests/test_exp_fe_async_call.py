@@ -4,16 +4,15 @@ from assassyn.frontend import RegArray, Port, UInt, log
 from assassyn.test import run_test
 
 @pipeline.factory
-def adder_factory() -> pipeline.StageFactory:
-    def adder(a: Port[UInt(32)], b: Port[UInt(32)]) -> pipeline.Stage:
+def adder_factory() -> pipeline.Stage:
+    def adder(a: Port[UInt(32)], b: Port[UInt(32)]):
         a, b = pipeline.pop_all(True)
         c = a + b
         log("Adder: {} + {} = {}", a, b, c)
-        return stage.this()
     return adder
 
 @pipeline.factory
-def driver_factory(adder: pipeline.Stage) -> pipeline.StageFactory:
+def driver_factory(adder: pipeline.Stage) -> pipeline.Stage:
     def driver():
         cnt = RegArray(UInt(32), 1)
         cnt[0] = cnt[0] + UInt(32)(1)
@@ -23,8 +22,10 @@ def driver_factory(adder: pipeline.Stage) -> pipeline.StageFactory:
     return driver
 
 def top():
+    # Return a function that creates the adder function
     adder = adder_factory()
-    adder()  # Build the adder stage body
+    # Fill in the adder stage body
+    adder()
     driver_factory(adder)()
 
 def check_raw(raw):
