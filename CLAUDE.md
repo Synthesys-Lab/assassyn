@@ -1,3 +1,4 @@
+- If not set, use `source setup.sh` to set up the environment.
 - When staging and committing:
   - Follow the rule in ./docs/developer/github.md.
   - This rule also applies to pull requests.

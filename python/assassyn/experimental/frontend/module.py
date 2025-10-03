@@ -50,6 +50,11 @@ def factory_create(inner: Callable[..., Any], args: Dict[str, Port]) -> Tuple[Mo
     return module, inner_kwargs
 
 
+# Register the special factory hooks on Module so the generic decorator can call them.
+Module.factory_check_signature = staticmethod(factory_check_signature)
+Module.factory_create = staticmethod(factory_create)
+
+
 def pop_all(validate: bool = False):
     """Pop all ports from the current module under construction."""
 
