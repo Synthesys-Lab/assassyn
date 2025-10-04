@@ -14,3 +14,4 @@ tutorials/*
 .sim-runtime-cache
 workspace/*
 **/.claude/settings.local.json
+Cargo.lock
