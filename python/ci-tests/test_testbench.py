@@ -5,6 +5,8 @@ from assassyn.test import run_test
 
 class Testbench(Module):
 
+    __test__ = False
+
     def __init__(self):
             super().__init__(ports={})
 

@@ -50,12 +50,12 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("use std::collections::HashMap;\n")
     platform_os = platform.system().lower()
     if platform_os == 'darwin':
-        fd.write("use libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n")
+        fd.write("use sim_runtime::libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n")
     else:
-        fd.write("use libloading::Library;\n")
+        fd.write("use sim_runtime::libloading::Library;\n")
     fd.write("use std::sync::Arc;\n")
-    fd.write("use num_bigint::{BigInt, BigUint};\n")
-    fd.write("use rand::seq::SliceRandom;\n\n")
+    fd.write("use sim_runtime::num_bigint::{BigInt, BigUint};\n")
+    fd.write("use sim_runtime::rand::seq::SliceRandom;\n\n")
 
     # Initialize data structures
     simulator_init = []

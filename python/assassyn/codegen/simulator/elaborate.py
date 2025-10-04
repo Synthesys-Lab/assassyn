@@ -25,8 +25,8 @@ def dump_modules(sys: SysBuilder, fd):
 use sim_runtime::*;
 use super::simulator::Simulator;
 use std::collections::VecDeque;
-use num_bigint::{BigInt, BigUint};
-use libloading::{Library, Symbol};
+use sim_runtime::num_bigint::{BigInt, BigUint};
+use sim_runtime::libloading::{Library, Symbol};
 use std::ffi::{CString, c_char, c_float, c_longlong, c_void};
 use std::sync::Arc;
     """)
@@ -91,10 +91,6 @@ def elaborate_impl(sys, config):
         cargo.write('version = "0.1.0"\n')
         cargo.write('edition = "2021"\n')
         cargo.write('[dependencies]\n')
-        cargo.write('num-bigint = "0.4"\n')
-        cargo.write('num-traits = "0.2"\n')
-        cargo.write('rand = "0.8"\n')
-        cargo.write('libloading = "0.7"\n')
         cargo.write(f'sim-runtime = {{ path = "{runtime_path}" }}\n')
 
     # Create rustfmt.toml if available
