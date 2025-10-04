@@ -92,7 +92,7 @@ def build_mux_chain(dumper, writes, dtype):
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements,too-many-nested-blocks
 def cleanup_post_generation(dumper):
-    """genearting signals for connecting modules"""
+    """generating signals for connecting modules"""
     dumper.append_code('')
 
     exec_conditions = []
