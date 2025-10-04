@@ -32,7 +32,7 @@ from ...ir.expr import (
     AsyncCall,
     WireRead
 )
-from .expr import codegen_expr
+from ._expr import codegen_expr
 from .cleanup import cleanup_post_generation
 from .rval import dump_rval as dump_rval_impl
 from .module import generate_module_ports
