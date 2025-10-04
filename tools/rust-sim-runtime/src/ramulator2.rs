@@ -1,6 +1,6 @@
 use libloading::os::unix::{Library, Symbol};
 use std::error::Error;
-use std::ffi::{c_char, c_float, c_longlong, c_void, CString};
+use std::ffi::{c_char, c_void, CString};
 
 #[repr(C)]
 pub struct Request {

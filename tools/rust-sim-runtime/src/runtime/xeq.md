@@ -18,6 +18,8 @@ pub trait Cycled {
   which cycle this event belongs.
 - The `pusher` function indicates which module pushes this event, which is useful for debugging.
 
+## Entry
+
 ````rust
 pub struct ArrayWrite<T: Sized + Default + Clone> {
   cycle: usize,
@@ -26,4 +28,26 @@ pub struct ArrayWrite<T: Sized + Default + Clone> {
   pusher: &'static str,
   port_id: usize, // Unique identifier for the write port
 }
+
+pub struct Array<T: Sized + Default + Clone> {
+  pub payload: Vec<T>,
+  pub write_port: PortXEQ<T>,
+}
 ````
+
+`ArrayWrite` is used to model register array writes.
+Each register file can have multiple different ports,
+differentiated by the `port_id`.
+
+- `tick` commits all the pending writes to the register array payload.
+
+## XEQ
+
+````rust
+pub struct XEQ<T: Sized + Cycled> {
+  q: BTreeMap<usize, T>,
+}
+````
+
+- When pushing to `XEQ`, if there is already an event for the same cycle,
+  an error will be raised.
