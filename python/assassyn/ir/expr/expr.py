@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-from functools import reduce
 import typing
 
 from ...builder import ir_builder
@@ -489,12 +488,3 @@ class WireRead(Expr):
 def wire_read(wire):
     '''Create a wire read expression.'''
     return WireRead(wire)
-
-def concat(*args: typing.List[Value]):
-    """
-    Concatenate multiple arguments using the existing concat method.
-    This function translates concat(a, b, c) into a.concat(b).concat(c).
-    """
-    if len(args) < 2:
-        raise ValueError("concat requires at least two arguments")
-    return reduce(lambda x, y: x.concat(y), args)

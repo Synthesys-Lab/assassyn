@@ -1,7 +1,7 @@
 '''Data type module for assassyn frontend'''
 
 from .value import Value
-from .expr import concat
+from .expr.comm import concat
 
 #pylint: disable=too-few-public-methods,useless-parent-delegation,cyclic-import,unused-argument
 
