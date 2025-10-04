@@ -124,6 +124,7 @@ class Expr(Value):
         # pylint: disable=import-outside-toplevel
         from .intrinsic import PureIntrinsic
         from .array import ArrayRead
+        from ..array import Slice
         valued = (
             PureIntrinsic,
             FIFOPop,
@@ -180,50 +181,6 @@ class Log(Expr):
     def __repr__(self):
         fmt = repr(self.args[0])
         return f'log({fmt}, {", ".join(i.as_operand() for i in self.args[1:])})'
-
-class Slice(Expr):
-    '''The class for slice operation, where x[l:r] as a right value'''
-
-    SLICE = 700
-
-    def __init__(self, x, l: int, r: int):
-        assert isinstance(l, int), f'Only int literal can slice, but got {type(l)}'
-        assert isinstance(r, int), f'Only int literal can slice, but got {type(r)}'
-        assert isinstance(x, Value), f'{type(x)} is not a Value!'
-        from ..dtype import to_uint
-        l = to_uint(l)
-        r = to_uint(r)
-        super().__init__(Slice.SLICE, [x, l, r])
-
-    @property
-    def x(self) -> Value:
-        '''Get the value to slice'''
-        return self._operands[0]
-
-    @property
-    def l(self) -> int:
-        '''Get the value to slice'''
-        return self._operands[1]
-
-    @property
-    def r(self) -> int:
-        '''Get the value to slice'''
-        return self._operands[2]
-
-    @property
-    def dtype(self) -> DType:
-        '''Get the data type of the sliced value'''
-        # pylint: disable=import-outside-toplevel
-        from ..dtype import Bits
-        from ..const import Const
-        assert isinstance(self.l.value, Const)
-        assert isinstance(self.r.value, Const)
-        return Bits(self.r.value.value - self.l.value.value + 1)
-
-    def __repr__(self):
-        l = self.l.as_operand()
-        r = self.r.as_operand()
-        return f'{self.as_operand()} = {self.x.as_operand()}[{l}:{r}]'
 
 class Concat(Expr):
     '''The class for concatenation operation, where {msb, lsb} as a right value'''

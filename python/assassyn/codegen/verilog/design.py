@@ -22,7 +22,7 @@ from ...builder import SysBuilder
 from ...ir.visitor import Visitor
 from ...ir.block import Block, CondBlock,CycledBlock
 from ...ir.const import Const
-from ...ir.array import Array
+from ...ir.array import Array, Slice
 from ...ir.dtype import Int, Bits, Record,RecordValue
 from ...utils import namify, unwrap_operand
 from ...analysis import get_upstreams
@@ -36,7 +36,6 @@ from ...ir.expr import (
     ArrayWrite,
     FIFOPush,
     AsyncCall,
-    Slice,
     Concat,
     Cast,
     Select,

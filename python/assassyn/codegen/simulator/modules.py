@@ -9,6 +9,7 @@ import typing
 from ...ir.visitor import Visitor
 from ...ir.block import Block, CondBlock, CycledBlock
 from ...ir.dtype import RecordValue
+from ...ir.array import Slice
 from ...ir.expr import (
         Expr,
         BinaryOp,
@@ -24,7 +25,6 @@ from ...ir.expr import (
         Log,
         Select,
         Select1Hot,
-        Slice,
         Concat,
 )
 from ...ir.expr.intrinsic import PureIntrinsic

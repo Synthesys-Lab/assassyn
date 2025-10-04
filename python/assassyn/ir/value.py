@@ -41,7 +41,7 @@ class Value:
 
     @ir_builder
     def __getitem__(self, x):
-        from .expr import Slice
+        from .array import Slice
         if isinstance(x, slice):
             return Slice(self, int(x.start), int(x.stop))
         assert False, "Expecting a slice object"
