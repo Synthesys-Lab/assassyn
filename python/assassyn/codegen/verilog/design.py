@@ -4,7 +4,6 @@
 
 from typing import List, Dict, Tuple
 from collections import defaultdict, deque
-from string import Formatter
 
 from .utils import (
     HEADER,
@@ -23,29 +22,21 @@ from ...ir.visitor import Visitor
 from ...ir.block import Block, CondBlock,CycledBlock
 from ...ir.const import Const
 from ...ir.array import Array, Slice
-from ...ir.dtype import Int, Bits, Record,RecordValue
+from ...ir.dtype import Record,RecordValue
 from ...utils import namify, unwrap_operand
 from ...analysis import get_upstreams
 from ...ir.expr import (
     Expr,
-    BinaryOp,
-    UnaryOp,
     FIFOPop,
     Log,
     ArrayRead,
     ArrayWrite,
     FIFOPush,
     AsyncCall,
-    Concat,
-    Cast,
-    Select,
     Bind,
-    Select1Hot,
     Intrinsic,
-    WireAssign,
     WireRead
 )
-from ...ir.expr.intrinsic import PureIntrinsic
 from .expr import codegen_expr
 
 

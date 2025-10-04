@@ -27,11 +27,12 @@ from ...ir.expr.intrinsic import PureIntrinsic, Intrinsic
 from ...ir.expr.call import Bind
 from ...ir.array import Slice
 from ...ir.const import Const
-from ...ir.dtype import Int, Record
+from ...ir.dtype import Int, Record, Bits
 from ...ir.block import CondBlock, CycledBlock
+from ...ir.module import Downstream, SRAM
 from ...ir.module.external import ExternalSV
 from ...utils import unwrap_operand, namify
-from .utils import dump_type, dump_type_cast, ensure_bits
+from .utils import dump_type, dump_type_cast
 
 
 def codegen_binary_op(dumper, expr: BinaryOp) -> Optional[str]:
@@ -97,7 +98,6 @@ def codegen_binary_op(dumper, expr: BinaryOp) -> Optional[str]:
     if expr.lhs.dtype != expr.rhs.dtype:
         b = f"{b}.{dump_type_cast(expr.lhs.dtype)}"
     if op_str == "&":
-        from ...ir.dtype import Bits
         if expr.rhs.dtype != Bits:
             b = f"{b}.as_bits()"
     op_body = f"(({a} {op_str} {b}).{dump_type_cast(dtype)})"
@@ -117,6 +117,7 @@ def codegen_unary_op(dumper, expr: UnaryOp) -> Optional[str]:
     return f'{rval} = ({body}).{target_cast_str}'
 
 
+# pylint: disable=too-many-locals,too-many-statements
 def codegen_log(dumper, expr: Log) -> Optional[str]:
     """Generate code for log operations."""
     formatter_str = expr.operands[0].value
@@ -214,16 +215,11 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
     else:
         dumper.logs.append(f'print({final_print_string})')
 
-    return None
-
 
 def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
     """Generate code for array read operations."""
     array_ref = expr.array
     is_sram_payload = False
-
-    # Import SRAM here to avoid circular imports
-    from ...ir.module import SRAM
 
     if isinstance(dumper.current_module, SRAM):
         if array_ref == dumper.current_module.payload:
@@ -239,7 +235,6 @@ def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
         array_idx = (dumper.dump_rval(array_idx, False)
                     if not isinstance(array_idx, Const) else array_idx.value)
         index_bits = array_ref.index_bits if array_ref.index_bits > 0 else 1
-        from ...ir.dtype import Bits
         if dump_type(expr.idx.dtype) != Bits and not isinstance(array_idx, int):
             array_idx = f"{array_idx}.as_bits({index_bits})"
 
@@ -257,13 +252,11 @@ def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
 def codegen_array_write(dumper, expr: ArrayWrite) -> Optional[str]:
     """Generate code for array write operations."""
     dumper.expose('array', expr)
-    return None
 
 
 def codegen_fifo_push(dumper, expr: FIFOPush) -> Optional[str]:
     """Generate code for FIFO push operations."""
     dumper.expose('fifo', expr)
-    return None
 
 
 def codegen_fifo_pop(dumper, expr: FIFOPop) -> Optional[str]:
@@ -287,22 +280,19 @@ def codegen_pure_intrinsic(dumper, expr: PureIntrinsic) -> Optional[str]:
             return f'{rval} = self.{fifo_name}'
         if intrinsic == PureIntrinsic.FIFO_VALID:
             return f'{rval} = self.{fifo_name}_valid'
-    elif intrinsic == PureIntrinsic.VALUE_VALID:
+    if intrinsic == PureIntrinsic.VALUE_VALID:
         value_expr = expr.operands[0].value
         if value_expr.parent.module != expr.parent.module:
             port_name = dumper.get_external_port_name(value_expr)
             return f"{rval} = self.{port_name}_valid"
         return f"{rval} = self.executed"
-    else:
-        raise ValueError(f"Unknown intrinsic: {expr}")
 
-    return None
+    raise ValueError(f"Unknown intrinsic: {expr}")
 
 
 def codegen_async_call(dumper, expr: AsyncCall) -> Optional[str]:
     """Generate code for async call operations."""
     dumper.expose('trigger', expr)
-    return None
 
 
 def codegen_slice(dumper, expr: Slice) -> Optional[str]:
@@ -359,9 +349,11 @@ def codegen_select(dumper, expr: Select) -> Optional[str]:
     return f'{rval} = Mux({cond}, {false_value}, {true_value})'
 
 
-def codegen_bind(dumper, expr: Bind) -> Optional[str]:
-    """Generate code for bind operations."""
-    return None
+def codegen_bind(_dumper, _expr: Bind) -> Optional[str]:
+    """Generate code for bind operations.
+
+    Bind operations don't generate any code, they just represent bindings.
+    """
 
 
 def codegen_select1hot(dumper, expr: Select1Hot) -> Optional[str]:
@@ -400,25 +392,23 @@ def codegen_intrinsic(dumper, expr: Intrinsic) -> Optional[str]:
         predicate_signal = dumper.get_pred()
         dumper.finish_conditions.append((predicate_signal, "executed_wire"))
         return None
-    elif intrinsic == Intrinsic.ASSERT:
+    if intrinsic == Intrinsic.ASSERT:
         dumper.expose('expr', expr.args[0])
         return None
-    elif intrinsic == Intrinsic.WAIT_UNTIL:
+    if intrinsic == Intrinsic.WAIT_UNTIL:
         cond = dumper.dump_rval(expr.args[0], False)
         final_cond = cond
         dumper.wait_until = final_cond
         return None
-    elif intrinsic == Intrinsic.BARRIER:
+    if intrinsic == Intrinsic.BARRIER:
         return None
-    else:
-        raise ValueError(f"Unknown block intrinsic: {expr}")
+
+    raise ValueError(f"Unknown block intrinsic: {expr}")
 
 
 def codegen_wire_assign(dumper, expr: WireAssign) -> Optional[str]:
     """Generate code for wire assign operations."""
     # Annotate external wire assigns so they show up in the generated script
-    from ...ir.module import Downstream
-
     if isinstance(dumper.current_module, Downstream):
         wire = expr.wire
         value = expr.value
