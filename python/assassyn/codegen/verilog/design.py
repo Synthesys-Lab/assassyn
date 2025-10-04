@@ -14,7 +14,7 @@ from .utils import (
 )
 
 from ...analysis import expr_externally_used
-from ...ir.module import Module, Downstream, Port,SRAM, Wire
+from ...ir.module import Module, Downstream, SRAM
 from ...ir.module.external import ExternalSV
 from ...builder import SysBuilder
 from ...ir.visitor import Visitor
@@ -38,6 +38,7 @@ from ...ir.expr import (
 from .expr import codegen_expr
 from .top import generate_top_harness
 from .cleanup import cleanup_post_generation
+from .rval import dump_rval as dump_rval_impl
 
 
 class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-many-statements
@@ -120,66 +121,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         return attrs is not None and Module.ATTR_EXTERNAL in attrs
 
 
-    # pylint: disable=too-many-return-statements,too-many-branches
-    def dump_rval(self,node, with_namespace: bool,module_name:str=None) -> str:
+    def dump_rval(self, node, with_namespace: bool, module_name: str = None) -> str:
         """Dump a reference to a node with options."""
-
-        node = unwrap_operand(node)
-        if (
-            isinstance(node, Expr)
-            and self.current_module is not None
-            and hasattr(self.current_module, 'externals')
-            and node in self.current_module.externals
-            and not self.is_top_generation
-        ):
-            return f"self.{self.get_external_port_name(node)}"
-        if isinstance(node, Module):
-            return namify(node.name)
-        if isinstance(node, Array):
-            array = node
-            return namify(array.name)
-        if isinstance(node, Port):
-            return namify(node.name)
-        if isinstance(node, FIFOPop):
-            if not with_namespace:
-                return f'self.{namify(node.fifo.name)}'
-            return namify(node.fifo.module.name) + "_" + namify(node.fifo.name)
-        if isinstance(node, Const):
-            int_imm = node
-            value = int_imm.value
-            ty = dump_type(int_imm.dtype)
-            return f"{ty}({value})"
-        if isinstance(node, str):
-            value = node
-            return f'"{value}"'
-        if isinstance(node, Expr):
-            if node not in self.expr_to_name:
-                base_name = namify(node.as_operand())
-                # Handle anonymous expressions which namify to '_' or an empty string.
-                if not base_name or base_name == '_':
-                    base_name = 'tmp'
-
-                count = self.name_counters[base_name]
-                unique_name = f"{base_name}_{count}" if count > 0 else base_name
-                self.name_counters[base_name] += 1
-                self.expr_to_name[node] = unique_name
-
-            unique_name = self.expr_to_name[node]
-
-            if with_namespace:
-                owner_module_name = namify(node.parent.module.name)
-                if owner_module_name is None:
-                    owner_module_name = module_name
-                return f"{owner_module_name}_{unique_name}"
-            return unique_name
-
-        if isinstance(node, RecordValue):
-            return self.dump_rval(node.value(), with_namespace, module_name)
-        if isinstance(node, Wire):
-            # For wires, we use their name directly
-            return namify(node.name)
-
-        raise ValueError(f"Unknown node of kind {type(node).__name__}")
+        return dump_rval_impl(self, node, with_namespace, module_name)
 
     def append_code(self, code: str):
         """Append code with proper indentation."""
