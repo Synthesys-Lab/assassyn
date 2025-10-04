@@ -8,7 +8,6 @@ from collections import defaultdict
 from .utils import (
     HEADER,
     dump_type,
-    get_sram_info,
     extract_sram_params,
     ensure_bits,
 )
@@ -32,13 +31,13 @@ from ...ir.expr import (
     ArrayWrite,
     FIFOPush,
     AsyncCall,
-    Bind,
     WireRead
 )
 from .expr import codegen_expr
 from .top import generate_top_harness
 from .cleanup import cleanup_post_generation
 from .rval import dump_rval as dump_rval_impl
+from .module import generate_module_ports
 
 
 class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-many-statements
@@ -251,118 +250,10 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.append_code(f'class {namify(node.name)}(Module):')
         self.indent += 4
 
-        self.append_code('clk = Clock()')
-        self.append_code('rst = Reset()')
-        self.append_code('executed = Output(Bits(1))')
-        self.append_code('cycle_count = Input(UInt(64))')
-        self.append_code('finish = Output(Bits(1))')
-
-        if is_downstream:
-            if node in self.downstream_dependencies:
-                for dep_mod in self.downstream_dependencies[node]:
-                    self.append_code(f'{namify(dep_mod.name)}_executed = Input(Bits(1))')
-            for ext_val in node.externals:
-                if isinstance(ext_val,Bind) or isinstance(unwrap_operand(ext_val), Const):
-                    continue
-                port_name = self.get_external_port_name(ext_val)
-                port_type = dump_type(ext_val.dtype)
-                self.append_code(f'{port_name} = Input({port_type})')
-                self.append_code(f'{port_name}_valid = Input(Bits(1))')
-            if is_sram:
-                sram_info = get_sram_info(node)
-                if sram_info:
-                    sram_array = sram_info['array']
-                    self.append_code(f'mem_dataout = Input({dump_type(sram_array.scalar_ty)})')
-                    index_bits = sram_array.index_bits if sram_array.index_bits > 0 else 1
-                    self.append_code(f'mem_address = Output(Bits({index_bits}))')
-                    self.append_code(f'mem_write_data = Output({dump_type(sram_array.scalar_ty)})')
-                    self.append_code('mem_write_enable = Output(Bits(1))')
-                    self.append_code('mem_read_enable = Output(Bits(1))')
-
-        elif is_driver or node in self.async_callees:
-            self.append_code('trigger_counter_pop_valid = Input(Bits(1))')
-
-        if not is_downstream and not self._is_external_module(node):
-            for i in node.ports:
-                name = namify(i.name)
-                self.append_code(f'{name} = Input({dump_type(i.dtype)})')
-                self.append_code(f'{name}_valid = Input(Bits(1))')
-                has_pop = any(
-                    isinstance(e, FIFOPop) and e.fifo == i
-                    for e in self._walk_expressions(node.body)
-                )
-                if has_pop:
-                    self.append_code(f'{name}_pop_ready = Output(Bits(1))')
-
         pushes = [e for e in self._walk_expressions(node.body) if isinstance(e, FIFOPush)]
         calls = [e for e in self._walk_expressions(node.body) if isinstance(e, AsyncCall)]
 
-        unique_push_handshake_targets = {(p.fifo.module, p.fifo.name) for p in pushes}
-        unique_call_handshake_targets = {c.bind.callee for c in calls}
-        unique_output_push_ports = {p.fifo for p in pushes}
-
-        # Skip external modules for handshake targets
-        filtered_push_targets = set()
-        for module, fifo_name in unique_push_handshake_targets:
-            if not self._is_external_module(module):
-                filtered_push_targets.add((module, fifo_name))
-
-        filtered_call_targets = set()
-        for callee in unique_call_handshake_targets:
-            if not self._is_external_module(callee):
-                filtered_call_targets.add(callee)
-
-        for module, fifo_name in filtered_push_targets:
-            port_name = f'fifo_{namify(module.name)}_{namify(fifo_name)}_push_ready'
-            self.append_code(f'{port_name} = Input(Bits(1))')
-        for callee in filtered_call_targets:
-            port_name = f'{namify(callee.name)}_trigger_counter_delta_ready'
-            self.append_code(f'{port_name} = Input(Bits(1))')
-
-        # Skip external modules for output push ports
-        filtered_output_push_ports = set()
-        for fifo_port in unique_output_push_ports:
-            if not self._is_external_module(fifo_port.module):
-                filtered_output_push_ports.add(fifo_port)
-
-        for fifo_port in filtered_output_push_ports:
-            port_prefix = f"{namify(fifo_port.module.name)}_{namify(fifo_port.name)}"
-            self.append_code(f'{port_prefix}_push_valid = Output(Bits(1))')
-            dtype = fifo_port.dtype
-            self.append_code(f'{port_prefix}_push_data = Output({dump_type(dtype)})')
-        for callee in filtered_call_targets:
-            self.append_code(f'{namify(callee.name)}_trigger = Output(UInt(8))')
-        # pylint: disable=too-many-nested-blocks
-        for arr_container in self.sys.arrays:
-            arr = arr_container
-            if is_sram:
-                sram_info = get_sram_info(node)
-                if sram_info and arr == sram_info['array']:
-                    continue
-            if node in self.array_users.get(arr, []):
-                self.append_code(
-                    f"{namify(arr.name)}_q_in = "
-                    f"Input(dim({dump_type(arr.scalar_ty)}, {arr.size}))"
-                )
-                port_mapping = self.array_write_port_mapping.get(arr, {})
-                for module_key, port_idx in port_mapping.items():
-                    if module_key == node:
-                        port_suffix = f"_port{port_idx}"
-                        self.append_code( \
-                            f'{namify(arr.name)}_w{port_suffix} = Output(Bits(1))')
-                        self.append_code(
-                            f'{namify(arr.name)}_wdata{port_suffix} ='
-                            f' Output({dump_type(arr.scalar_ty)})'
-                        )
-                        idx_type = arr.index_bits if arr.index_bits > 0 else 1
-                        self.append_code(
-                            f'{namify(arr.name)}_widx{port_suffix} ='
-                            f' Output(Bits({idx_type}))'
-                        )
-
-
-        for port_code in self.exposed_ports_to_add:
-            self.append_code(port_code)
+        generate_module_ports(self, node, is_downstream, is_sram, is_driver, pushes, calls)
 
         self.append_code('')
         self.append_code('@generator')
