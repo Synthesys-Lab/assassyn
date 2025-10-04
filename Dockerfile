@@ -28,11 +28,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ninja-build \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN pip install \
+    pytest==7.4.3 \
+    pylint==3.2.3 \
+    pytest-xdist==3.6.1 \
+    --break-system-packages
+
 # Set default shell to zsh
 SHELL ["/bin/zsh", "-c"]
 
 # You can use the following command instead
-RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+# RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # Set build environment variables
 ENV CC="ccache gcc"
