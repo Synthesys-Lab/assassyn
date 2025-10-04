@@ -35,7 +35,6 @@ from ...ir.expr import (
     ArrayRead,
     ArrayWrite,
     FIFOPush,
-    PureIntrinsic,
     AsyncCall,
     Slice,
     Concat,
@@ -47,6 +46,7 @@ from ...ir.expr import (
     WireAssign,
     WireRead
 )
+from ...ir.expr.intrinsic import PureIntrinsic
 
 
 class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-many-statements

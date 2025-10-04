@@ -163,5 +163,5 @@ class Value:
     def valid(self):
         '''The frontend API to check if this value is valid.
         NOTE: This operation is only usable in downstream modules.'''
-        from .expr import PureIntrinsic
+        from .expr.intrinsic import PureIntrinsic
         return PureIntrinsic(PureIntrinsic.VALUE_VALID, self)

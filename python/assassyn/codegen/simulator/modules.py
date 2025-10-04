@@ -17,7 +17,6 @@ from ...ir.expr import (
         ArrayWrite,
         Cast,
         Intrinsic,
-        PureIntrinsic,
         Bind,
         AsyncCall,
         FIFOPop,
@@ -28,6 +27,7 @@ from ...ir.expr import (
         Slice,
         Concat,
 )
+from ...ir.expr.intrinsic import PureIntrinsic
 from .utils import dtype_to_rust_type, fifo_name
 from ...utils import namify
 from .node_dumper import dump_rval_ref

@@ -6,7 +6,7 @@ from ...ir.expr import Expr
 from ...ir.array import Array
 from ...ir.const import Const
 from ...ir.module import Module, Port
-from ...ir.expr import PureIntrinsic
+from ...ir.expr.intrinsic import PureIntrinsic
 
 def dump_rval_ref( # pylint: disable=too-many-branches, too-many-return-statements
         module_ctx, _, node):
