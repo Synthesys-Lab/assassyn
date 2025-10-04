@@ -50,7 +50,8 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("use std::collections::HashMap;\n")
     platform_os = platform.system().lower()
     if platform_os == 'darwin':
-        fd.write("use sim_runtime::libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n")
+        x = "use sim_runtime::libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n"
+        fd.write(x)
     else:
         fd.write("use sim_runtime::libloading::Library;\n")
     fd.write("use std::sync::Arc;\n")
