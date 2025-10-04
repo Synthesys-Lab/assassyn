@@ -29,6 +29,9 @@ if [ -d "$REPO_PATH/3rd-party/circt/frontends/PyCDE/dist/lib" ]; then
   export PYTHONPATH="$REPO_PATH/3rd-party/circt/frontends/PyCDE/dist/lib:$PYTHONPATH"
 fi
 
+# Set up Rust simulator runtime cache directory
+export CARGO_TARGET_DIR=$REPO_PATH/.sim-runtime-cache
+
 if [ "$NO_VERILATOR" = false ]; then
   echo "In-repo verilator found, setting VERILATOR_ROOT to $REPO_PATH/verilator"
   export VERILATOR_ROOT=$REPO_PATH/3rd-party/verilator

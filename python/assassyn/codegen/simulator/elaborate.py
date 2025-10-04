@@ -9,7 +9,7 @@ import typing
 from pathlib import Path
 from .modules import ElaborateModule
 from .simulator import dump_simulator, dump_main
-from .runtime import dump_runtime, dump_ramulator
+from ...utils import repo_path
 
 if typing.TYPE_CHECKING:
     from ...builder import SysBuilder
@@ -22,12 +22,11 @@ def dump_modules(sys: SysBuilder, fd):
     """
     # Add imports
     fd.write("""
-use super::runtime::*;
-use super::ramulator::*;
+use sim_runtime::*;
 use super::simulator::Simulator;
 use std::collections::VecDeque;
-use num_bigint::{BigInt, BigUint};
-use libloading::{Library, Symbol};
+use sim_runtime::num_bigint::{BigInt, BigUint};
+use sim_runtime::libloading::{Library, Symbol};
 use std::ffi::{CString, c_char, c_float, c_longlong, c_void};
 use std::sync::Arc;
     """)
@@ -40,23 +39,22 @@ use std::sync::Arc;
     required_keys = ["memory", "store", "MemUser_rdata"]
     if all(dict_modules_callback.get(k) is not None for k in required_keys):
         fd.write(f"""
-extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
-    unsafe {{
-        let req = &*req;
-        let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
-        let cycles = (req.depart - req.arrive) as usize;
-        let stamp = sim.request_stamp_map_table
-            .remove(&req.addr)
-            .unwrap_or_else(|| sim.stamp);;
-        sim.{dict_modules_callback.get("MemUser_rdata")}.push.push(FIFOPush::new(
-            stamp + 100 * cycles,
-            sim.{dict_modules_callback.
-                 get("store")}.payload[req.addr as usize].clone().try_into().unwrap(),
-            "{dict_modules_callback.get("memory")}",
-        ));
-    }}
-}}
-        """)
+    extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
+        unsafe {{
+            let req = &*req;
+            let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
+            let cycles = (req.depart - req.arrive) as usize;
+            let stamp = sim.request_stamp_map_table
+                .remove(&req.addr)
+                .unwrap_or_else(|| sim.stamp);;
+            sim.{dict_modules_callback.get("MemUser_rdata")}.push.push(FIFOPush::new(
+                stamp + 100 * cycles,
+                sim.{dict_modules_callback.
+                     get("store")}.payload[req.addr as usize].clone().try_into().unwrap(),
+                "{dict_modules_callback.get("memory")}",
+            ));
+        }}
+    }}""")
     for module in sys.modules[:] + sys.downstreams[:]:
         # Then, second time dump for real visit modules
         module_code = em.visit_module(module)
@@ -86,16 +84,14 @@ def elaborate_impl(sys, config):
 
     # Create Cargo.toml
     manifest_path = simulator_path / "Cargo.toml"
+    runtime_path = Path(repo_path()) / "tools" / "rust-sim-runtime"
     with open(manifest_path, 'w', encoding="utf-8") as cargo:
         cargo.write("[package]\n")
         cargo.write(f'name = "{sys.name}_simulator"\n')
         cargo.write('version = "0.1.0"\n')
         cargo.write('edition = "2021"\n')
         cargo.write('[dependencies]\n')
-        cargo.write('num-bigint = "0.4"\n')
-        cargo.write('num-traits = "0.2"\n')
-        cargo.write('rand = "0.8"\n')
-        cargo.write('libloading = "0.7"\n')
+        cargo.write(f'sim-runtime = {{ path = "{runtime_path}" }}\n')
 
     # Create rustfmt.toml if available
     rustfmt_src = None
@@ -115,14 +111,6 @@ def elaborate_impl(sys, config):
     # Generate modules.rs
     with open(simulator_path / "src/modules.rs", 'w', encoding="utf-8") as fd:
         dump_modules(sys, fd)
-
-    # Generate runtime.rs
-    with open(simulator_path / "src/runtime.rs", 'w', encoding='utf-8') as fd:
-        dump_runtime(fd)
-
-    # Generate memory.rs
-    with open(simulator_path / "src/ramulator.rs", 'w', encoding='utf-8') as fd:
-        dump_ramulator(fd)
 
     # Generate simulator.rs
     with open(simulator_path / "src/simulator.rs", 'w', encoding='utf-8') as fd:

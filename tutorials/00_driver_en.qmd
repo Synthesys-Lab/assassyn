@@ -1,0 +1,229 @@
+
+# Tutorial: Creating and Verifying a Simple Hardware Counter with assassyn
+
+> **Author:** Yao Wentao
+> **Date:** 2025.9.30
+>
+
+## Introduction
+
+Welcome to this tutorial! Here, we will learn how to use the hardware description library `assassyn` to design a simple counter.
+
+**Learning Objectives:**
+
+* Understand the basic components of `assassyn`: `Module`, `RegArray`, `UInt`.
+    -  `Module`: Each module corresponds to a pipeline stage
+    -  `RegArray`: Register array
+    -  `[U]Int`: Data types
+* Write a simple hardware counter module.
+* Build the system, execute simulation, and verify using Verilator.
+
+---
+
+# 2. Core Code Explanation
+
+Our project consists of three parts: hardware module definition, result verification function, and main execution function.
+
+## 2.0 Basic Environment Configuration
+
+Let's first set up the basic environment:<br>
+Import the assassyn library and basic libraries. `run_quietly` is used to suppress system output from rust compilation during runtime.
+```{python}
+#| code-fold: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import sys
+import os
+import io
+import contextlib
+from typing import Tuple, Optional
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname("driver.qmd"), '../python/'))
+sys.path.append(lib_path)
+from function_t import run_quietly
+
+from assassyn.frontend import *
+from assassyn.backend import elaborate
+from assassyn import utils
+
+print("✅ Environment setup completed")
+```
+
+## 2.1 Hardware Module Definition (`Driver`)
+
+This is the core of our hardware design. We define a module named `Driver`, which internally contains a 32-bit register `cnt`, and increments by 1 at each clock cycle.<br>
+
+Next, let's define the counter module. We will create a class named `Driver` that inherits from `Module`.<br>
+
+`Module` is the **basic unit** we build, and it can also be viewed as a function or basic block. Within a Module, we can write **a single pipeline stage**, which is the combinational logic that needs to be executed within one clock cycle.<br>
+```{python}
+#| code-fold: false
+class Driver(Module):
+    def __init__(self):
+        super().__init__(ports={})
+
+    @module.combinational
+    def build(self):
+        cnt = RegArray(UInt(32), 1)
+
+        v = cnt[0] + UInt(32)(1)
+        (cnt & self)[0] <= v
+
+        log('cnt: {}', cnt[0])
+
+print("✅ Counter module definition completed")
+```
+
+We can see that this module:<br>
+1. Creates a 32-bit register array `cnt` <br>
+2. At each clock cycle, increments the value of `cnt[0]` by 1 <br>
+3. Uses the `log` function to print the current value during simulation <br>
+
+  * `class Driver(Module)`: All hardware modules inherit from `Module`.
+    * `Driver` is a **very special** module, equivalent to a program's entry point, like the `main` function - each cycle, this module will be unconditionally triggered to execute the code segment within it
+  * `RegArray(UInt(32), 1)`: Creates a register array. Here it has only one element, with type 32-bit unsigned integer (`UInt(32)`).
+  * `v = ...`: This is how combinational logic is expressed. The execution here can be considered as happening immediately on the physical circuit, corresponding to the non-immediate execution behavior of sequential logic (we will also explain the "sequential" behavior in subsequent tutorials).
+  * `(cnt & self)[0] <= ...`: This is the syntax in `assassyn` for updating register values, i.e., expressing sequential logic. It indicates that at the next clock edge, the value of `cnt[0]` will be updated to the result of the right-hand expression.
+  * All register assignments in assassyn are "asynchronous" by default. Consider the following code block:
+    ```{python}
+    #| eval: false
+    old_value = cnt[0]
+    (cnt & self)[0] <= new_value
+    read_again = cnt[0]
+    ```
+
+    In the above code, the values of old_value and read_again are the same. The new value write will only be visible the next time Driver is woken up.
+  * `log('cnt: {}', cnt[0])`: This is a simulation primitive, similar to `$display` in Verilog, which can print values to the screen during simulation. We can see that it will print the value of `cnt[0]` during the simulation process, making it convenient for us to debug and verify.
+
+### 2.1.1 Combinational Logic & Sequential Logic
+  * Clock edge: The moment when the clock signal transitions from low to high (rising edge) or from high to low (falling edge).
+  * Combinational logic: Output changes immediately with input, does not depend on clock edges, responds instantly like an ordinary switch. (Corresponds to blocking assignment `=`)
+  * Sequential logic: Only updates output and internal state when the clock edge arrives, like a timed camera, only recording the current input at the moment of pressing the shutter (clock edge). (Corresponds to non-blocking assignment `<=`)
+  * Of course, we can also merge combinational logic and sequential logic into a single non-blocking assignment statement. For example, in this case, we can merge the two core assignment statements into `(cnt & self)[0] <= cnt[0] + UInt(32)(1)`
+
+## 2.2 Verification Logic (`check`)
+
+To ensure our counter works properly, we write a `check` function. It parses the text output by the simulator and checks whether the counter value correctly increments from 0 to 99.
+
+Now, we define a verification function to check whether the counter output meets expectations:
+
+```{python}
+def check(raw):
+    expected = 0
+    for i in raw.split('\n'):
+        if 'cnt:' in i:
+            val = int(i.split()[-1])
+            assert val == expected, f"Expected {expected}, got {val}"
+            expected += 1
+    assert expected == 100, f"Expected to run 100 cycles, actually ran {expected} cycles"
+    print(f"✅ Verification passed! Counter works as expected: counted from 0 to {expected-1}")
+
+print("✅ Verification function definition completed")
+```
+
+This verification function will:
+
+1.  Parse the simulator's output log
+2.  Check if the counter correctly increments from 0
+3.  Ensure a total of 100 cycles were executed
+
+## 2.3 System Building and Simulation (`test_driver`)
+
+This function chains all parts together:
+
+1.  Create a system with `SysBuilder`.
+2.  Instantiate our `Driver` module.
+3.  Call `elaborate` to convert our Python design into an RTL model.
+4.  Call `run_simulator` and `run_verilator` to run the simulation.
+5.  Pass the simulation output to the `check` function for verification.
+
+-----
+
+# 3\. Complete Code and Execution
+
+
+Now, let's build the system, generate the simulator, and run the verification.
+
+```{python}
+#| output-fold: true
+print("Starting build and simulation...")
+
+# 1. Build system
+sys = SysBuilder('driver')
+with sys:
+    driver = Driver()
+    driver.build()
+print(sys)
+# 2. Generate simulator
+def generate_simulator():
+    return elaborate(sys, verilog=utils.has_verilator())
+
+(simulator_path, verilator_path), _, _ = run_quietly(generate_simulator)
+print("✅ Simulator generation completed")
+
+# 3. Run simulator
+def run_sim():
+    return utils.run_simulator(simulator_path)
+
+raw, _, _ = run_quietly(run_sim)
+
+print("\n=== Simulator Output ===")
+# Only display counter values
+for line in raw.split('\n'):
+    if 'cnt:' in line:
+        print(line.strip())
+
+# Verify output
+check(raw)
+
+# If Verilator is available, also run Verilator verification
+if verilator_path:
+    print("\n=== Verilator Verification ===")
+
+    def run_verilator():
+        return utils.run_verilator(verilator_path)
+
+    raw_verilator, _, _ = run_quietly(run_verilator)
+
+    # Display Verilator's counter output
+    for line in raw_verilator.split('\n'):
+        if 'cnt:' in line:
+            print(line.strip())
+
+    # Verify Verilator's output
+    check(raw_verilator)
+else:
+    print("⚠️ Verilator not installed, skipping Verilator verification")
+```
+
+## Result Analysis
+
+Now we have completed:<br>
+
+1. ✅ Defined the counter module <br>
+
+2. ✅ Built the system <br>
+
+3. ✅ Generated the simulator <br>
+
+4. ✅ Ran the simulation and verified the results
+
+From the output, we can see that our counter works as expected:
+
+* Counts from 0
+* Increments by 1 at each clock cycle
+* Successfully ran for 100 cycles
+
+This proves that our hardware design is correct.
+
+## 4.1 Result Analysis
+
+After executing the above code block, you should see output similar to the following:
+
+  * **System description**: The module structure printed by the `assassyn` library.
+  * **Simulator output**: A series of logs from `cnt: 0`, `cnt: 1`, `cnt: 2`, ... up to `cnt: 9`.
+  * **Verification result**: A message printing "✅ Verification successful!".
+
+If all steps are correct, this means our hardware design, simulation, and verification all worked as expected.

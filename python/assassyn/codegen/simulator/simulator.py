@@ -45,18 +45,18 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         fd: File descriptor to write to
     """
     # Write imports
+    fd.write("use sim_runtime::*;\n")
     fd.write("use std::collections::VecDeque;\n")
     fd.write("use std::collections::HashMap;\n")
-    fd.write("use super::runtime::*;\n")
-    fd.write("use super::ramulator::*;\n")
     platform_os = platform.system().lower()
     if platform_os == 'darwin':
-        fd.write("use libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n")
+        x = "use sim_runtime::libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n"
+        fd.write(x)
     else:
-        fd.write("use libloading::Library;\n")
+        fd.write("use sim_runtime::libloading::Library;\n")
     fd.write("use std::sync::Arc;\n")
-    fd.write("use num_bigint::{BigInt, BigUint};\n")
-    fd.write("use rand::seq::SliceRandom;\n\n")
+    fd.write("use sim_runtime::num_bigint::{BigInt, BigUint};\n")
+    fd.write("use sim_runtime::rand::seq::SliceRandom;\n\n")
 
     # Initialize data structures
     simulator_init = []
@@ -347,63 +347,11 @@ def dump_main(fd):
     This matches the Rust function in src/backend/simulator/elaborate.rs
     """
     fd.write("""
-mod runtime;
 mod modules;
 mod simulator;
-mod ramulator;
 
 fn main() {
   simulator::simulate();
 }
     """)
-    return True
-
-def dump_build(fd):
-    """Generate the build.rs file.
-
-    """
-    home = repo_path()
-    fd.write(f"""\
-use std::path::Path;
-
-fn main() {{
-    let wrapper_path = "{home}/testbench/simulator/build/lib";
-    let ramulator_path = "{home}/3rd-party/ramulator2";
-
-    // Verify library files exist
-    assert!(
-        Path::new(&format!("{{}}/libwrapper{dynamiclib_suffix()}", wrapper_path)).exists(),
-        "libwrapper{dynamiclib_suffix()} not found"
-    );
-    assert!(
-        Path::new(&format!("{{}}/libramulator{dynamiclib_suffix()}", ramulator_path)).exists(),
-        "libramulator{dynamiclib_suffix()} not found"
-    );
-
-    // Set library search paths
-    println!("cargo:rustc-link-search=all={{}}", wrapper_path);
-    println!("cargo:rustc-link-search=all={{}}", ramulator_path);
-
-    // Set LD_LIBRARY_PATH for runtime
-    println!(
-        "cargo:rustc-env=LD_LIBRARY_PATH={{}}:{{}}:$LD_LIBRARY_PATH",
-        ramulator_path, wrapper_path
-    );
-
-    // Add rpath entries
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{{}}", ramulator_path);
-    println!("cargo:rustc-link-arg=-Wl,-rpath,{{}}", wrapper_path);
-
-    // Set DT_RUNPATH instead of DT_RPATH
-    // println!("cargo:rustc-link-arg=-Wl,--enable-new-dtags");
-
-    // Link against libraries
-    println!("cargo:rustc-link-lib=ramulator");
-    println!("cargo:rustc-link-lib=wrapper");
-
-    // Debug information
-    println!("cargo:warning=wrapper_path: {{}}", wrapper_path);
-    println!("cargo:warning=ramulator_path: {{}}", ramulator_path);
-}}
-""")
     return True

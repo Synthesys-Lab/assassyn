@@ -34,7 +34,7 @@ class ExternalAdder(ExternalSV):
 
     def __init__(self, **in_wire_connections):
         super().__init__(
-            file_path="python/unit-tests/resources/adder.sv",
+            file_path="python/ci-tests/resources/adder.sv",
             module_name="adder",
             in_wires={
                 'a': UInt(32),

@@ -1,21 +1,39 @@
 """New experimental frontend for Assassyn.
 
 This frontend provides a more function-like programming style as a wrapper
-to the old frontend. It uses the @pipeline.factory decorator to create
-pipeline stages with automatic AST building.
+to the old frontend. It uses the @factory decorator to create modules with
+automatic AST building.
 
 Key components:
-- pipeline: Module containing the factory decorator and utilities
-- Stage: Wrapper class for Module objects with convenient calling interface
+- factory: Universal factory decorator for creating modules
+- Factory: Generic wrapper class for module instances
+- Module: Standard sequential module type
+- Downstream: Combinational convergent module type
 - if_: Wrapper to Condition for conditional blocks
+- module: Module-specific utilities (pop_all)
+- pin: Function to expose combinational pins
 """
 
 from assassyn.ir.block import Condition
-from . import pipeline
-from .stage import Stage
-from .converge import converge
+from assassyn.ir.module import Module
+from assassyn.ir.module.downstream import Downstream
+from assassyn.ir.value import Value
+
+from .factory import Factory, factory, pin, this
+from . import module
+from . import downstream
 
 # Wrapper to Condition for better readability
 if_ = Condition
 
-__all__ = ['pipeline', 'Stage', 'if_', 'converge']
+__all__ = [
+    'factory',
+    'Factory',
+    'Module',
+    'Downstream',
+    'Value',
+    'module',
+    'pin',
+    'this',
+    'if_',
+]

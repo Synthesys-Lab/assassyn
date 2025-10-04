@@ -3,8 +3,10 @@
 from __future__ import annotations
 import typing
 
+from functools import wraps
+
 from ...utils import namify, unwrap_operand, identifierize
-from ...builder import ir_builder
+from ...builder import ir_builder, Singleton
 from ..expr import PureIntrinsic, Operand, Expr
 
 
@@ -64,3 +66,30 @@ class ModuleBase:
                 else:
                     res = res + f'  //  .usedby: condition::{operand.user.as_operand()}\n'
         return res
+
+def combinational_for(module_type):
+    '''A parameterizable decorator factory for marking a function as combinationa
+      logic description.
+
+    Args:
+        module_type: The expected module type (Module or Downstream class).
+
+    Returns:
+        A decorator function that enforces the module type.
+    '''
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # pylint: disable=import-outside-toplevel
+            from ..block import Block
+            module_self = args[0]
+            assert isinstance(module_self, module_type), \
+                f"Expected {module_type.__name__}, got {type(module_self).__name__}"
+            module_self.body = Block(Block.MODULE_ROOT)
+            Singleton.builder.enter_context_of('module', module_self)
+            with module_self.body:
+                res = func(*args, **kwargs)
+            Singleton.builder.exit_context_of('module')
+            return res
+        return wrapper
+    return decorator

@@ -7,7 +7,7 @@ External modules let Assassyn integrate pre-existing SystemVerilog blocks direct
 3. Verilog code generation that turns the recorded IR into concrete instantiations and wire hookups.
 4. TODO we could use verilator to convert external SV into dynamic link which can be used by our rust simulator. 
 
-This document explains first 3 layers and provides an end-to-end example based on `python/unit-tests/test_easy_external.py`.
+This document explains first 3 layers and provides an end-to-end example based on `python/ci-tests/test_easy_external.py`.
 
 ## IR Nodes for Wire Boundaries
 
@@ -45,14 +45,14 @@ The Verilog backend (`python/assassyn/codegen/verilog/design.py`) consumes those
 
 ## Example: `test_easy_external.py`
 
-`python/unit-tests/test_easy_external.py` demonstrates how to expose a SystemVerilog adder:
+`python/ci-tests/test_easy_external.py` demonstrates how to expose a SystemVerilog adder:
 
 1. **Define the external block**:
    ```python
    class ExternalAdder(ExternalModule):
        def __init__(self, **in_wire_connections):
            super().__init__(
-               file_path="python/unit-tests/resources/adder.sv",
+               file_path="python/ci-tests/resources/adder.sv",
                module_name="adder",
                in_wires={'a': UInt(32), 'b': UInt(32)},
                out_wires={'c': UInt(32)},

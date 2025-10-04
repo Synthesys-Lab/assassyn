@@ -86,7 +86,7 @@ jobs:
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/py-package.sh && python -m pylint --rcfile python/.pylintrc python/assassyn"
       - name: Python Frontend Unit Tests
         run: |
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && source scripts/init/py-package.sh && source scripts/init/circt.sh && python -m pytest -n 8 python/unit-tests"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && source scripts/init/py-package.sh && source scripts/init/circt.sh && python -m pytest -n 8 python/ci-tests"
       - name: Cleanup Containers
         run: |
           docker rm -f $(docker ps -a --filter ancestor=assassyn:latest -q) 2>/dev/null || true

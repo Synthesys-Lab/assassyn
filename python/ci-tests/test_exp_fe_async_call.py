@@ -1,31 +1,29 @@
-from assassyn.experimental.frontend import pipeline, if_
-from assassyn.experimental.frontend import stage
-from assassyn.frontend import RegArray, Port, UInt, log
+from assassyn.experimental.frontend import if_
+from assassyn.experimental.frontend.factory import Factory, factory
+from assassyn.experimental.frontend.module import pop_all
+from assassyn.frontend import Module, RegArray, Port, UInt, log
 from assassyn.test import run_test
 
-@pipeline.factory
-def adder_factory() -> pipeline.StageFactory:
-    def adder(a: Port[UInt(32)], b: Port[UInt(32)]) -> pipeline.Stage:
-        a, b = pipeline.pop_all(True)
+@factory(Module)
+def adder_factory() -> Factory[Module]:
+    def adder(a: Port[UInt(32)], b: Port[UInt(32)]):
+        a, b = pop_all(True)
         c = a + b
         log("Adder: {} + {} = {}", a, b, c)
-        return stage.this()
     return adder
 
-@pipeline.factory
-def driver_factory(adder: pipeline.Stage) -> pipeline.StageFactory:
+@factory(Module)
+def driver_factory(adder: Factory[Module]) -> Factory[Module]:
     def driver():
         cnt = RegArray(UInt(32), 1)
         cnt[0] = cnt[0] + UInt(32)(1)
         with if_(cnt[0] < UInt(32)(100)):
-            adder << (cnt[0], cnt[0])
-            adder()
+            (adder << (cnt[0], cnt[0]))()
     return driver
 
 def top():
     adder = adder_factory()
-    adder()  # Build the adder stage body
-    driver_factory(adder)()
+    driver_factory(adder)
 
 def check_raw(raw):
     cnt = 0

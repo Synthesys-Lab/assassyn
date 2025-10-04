@@ -1,0 +1,289 @@
+# 教程：使用 assassyn 实现模块间异步调用
+
+> **作者：** Yao Wentao
+> **日期：** 2025.10.3  
+> 
+
+## 简介
+
+欢迎来到本教程！在这里，我们将学习如何使用硬件描述库 `assassyn` 来实现模块间的异步调用。
+
+**学习目标:**
+
+* 了解 `assassyn` 中的模块通信机制。
+* 学习如何定义带有端口（Port）的模块。
+* 掌握异步调用（`async_called`）的使用方法。
+* 掌握`SysBuilder`的编写。
+* 通过一个加法器示例，实践模块间的交互。
+
+---
+
+# 2. 核心代码讲解
+
+我们的项目由四部分组成：加法器模块定义、驱动器模块定义、结果验证函数和主执行函数。
+
+## 2.0 环境基本配置
+
+让我们首先设置基本环境：
+```{python}
+#| code-fold: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import sys
+import os
+import io
+import contextlib
+from typing import Tuple, Optional
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname("async_call.qmd"), '../python/'))
+sys.path.append(lib_path)
+from function_t import run_quietly
+
+from assassyn.frontend import *
+from assassyn.backend import elaborate
+from assassyn import utils
+import assassyn
+
+print("✅ 环境设置完成")
+```
+
+## 2.1 加法器模块定义 (`Adder`)
+
+首先，我们定义一个简单的加法器模块。这个模块接收两个32位整数输入，并计算它们的和。<br>
+
+`Adder` 模块的特点：<br>
+1. 它有输入端口（ports），可以接收来自其他模块的数据<br>
+2. 它被动地等待其他模块调用<br>
+3. 它执行简单的加法运算并打印结果<br>
+
+```{python}
+#| code-fold: false
+class Adder(Module):
+    def __init__(self):
+        super().__init__(
+            ports={
+                'a': Port(Int(32)),
+                'b': Port(Int(32)),
+            },
+        )
+
+    @module.combinational
+    def build(self):
+        a, b = self.pop_all_ports(True)
+        c = a + b
+        log("Adder: {} + {} = {}", a, b, c)
+
+print("✅ 加法器模块定义完成")
+```
+
+  * `ports={'a': Port(Int(32)), 'b': Port(Int(32))}`: 定义了模块的输入端口。
+  * `Port`类是不区分输入和输出端口的，
+  * `pop_all_ports(True)`: 获取所有端口的值，参数 `True` 表示按照端口定义的顺序返回。
+
+## 2.2 驱动器模块定义 (`Driver`)
+
+接下来，我们定义驱动器模块。这个模块负责主动调用加法器模块。<br>
+
+```{python}
+#| code-fold: false
+class Driver(Module):
+    def __init__(self):
+        super().__init__(ports={})
+
+    @module.combinational
+    def build(self, adder: Adder):
+        cnt = RegArray(Int(32), 1)
+        (cnt & self)[0] <= cnt[0] + Int(32)(1)
+        cond = cnt[0] < Int(32)(100)
+        with Condition(cond):
+            adder.async_called(a = cnt[0], b = cnt[0])
+
+print("✅ 驱动器模块定义完成")
+```
+
+我们可以看到，这个模块：<br>
+1. 创建了一个32位的计数器 `cnt` <br>
+2. 每个周期将计数器加1 <br>
+3. 检查计数器是否小于100 <br>
+4. 如果条件满足，就异步调用加法器模块 <br>
+5. 经过这个`async_called`调用，Driver和adder模块被划分为两级流水线
+
+
+### 2.2.1 异步调用 (`async_called`)
+
+  * `adder.async_called(a = cnt[0], b = cnt[0])`: 这是异步调用的核心语法。
+  * 异步调用的特点：
+    - 被调用的模块（Adder）会在**下一个周期**执行Driver模块这一个周期传递的参数
+    - 调用时需要为所有端口提供值
+  * 在这个例子中，我们用计数器的当前值作为加法器的两个输入，其log出来的结果总是会晚一个时钟周期，因为Adder模块的运行总是晚一个时钟周期
+  
+## 2.3 验证逻辑 (`check_raw`)
+
+现在，我们定义一个验证函数来检查加法器的输出是否符合预期：
+
+```{python}
+def check_raw(raw):
+    cnt = 0
+    for i in raw.split('\n'):
+        if 'Adder:' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(a) + int(b) == int(c), f"加法错误: {a} + {b} != {c}"
+            cnt += 1
+    assert cnt == 100, f'预期运行 100 次，实际运行了 {cnt} 次'
+    print(f"✅ 验证通过！加法器正确执行了 {cnt} 次计算")
+
+print("✅ 验证函数定义完成")
+```
+
+这个验证函数会：
+
+1.  解析模拟器的输出日志
+2.  提取每次加法运算的输入和输出
+3.  验证 a + b = c 是否成立
+4.  确保总共执行了100次调用
+
+## 2.4 深入理解 SysBuilder
+
+在开始系统构建之前，让我们深入理解 SysBuilder 的工作原理和使用方法。
+
+### 2.4.1 SysBuilder 的作用
+
+SysBuilder 是 assassyn 中的一个核心组件，它负责：
+
+1.  系统组成：模块和arrays的基本组成单元
+2.  驱动器的角色：类似程序的`main`函数
+3.  执行机制：基于时钟周期的循环调用，即其在每个时钟上升沿调用
+4.  构建功能：作为IR构建器，用于生成硬件描述
+
+### 2.4.2 基本使用模式
+
+```python
+# 1. 创建系统构建器实例
+sys = SysBuilder('system_name')
+
+# 2. 使用上下文管理器进行系统构建
+with sys:
+    # 实例化模块
+    module1 = Module1()
+    module1.build()
+    
+    module2 = Module2()
+    module2.build(module1)  # 模块间的连接
+
+# 3. 系统配置和编译
+config = {
+    'verilog': True,       # 是否生成 Verilog
+    'sim_threshold': 200,  # 仿真周期上限
+    'idle_threshold': 200  # 空闲检测阈值
+}
+
+# 4. 生成仿真器
+simulator_path, verilator_path = elaborate(sys, **config)
+```
+
+## 2.5 系统构建与仿真 (`test_async_call`)
+
+这个函数将所有部分串联起来：
+
+1.  用 `SysBuilder` 创建一个系统。
+2.  实例化 `Adder` 和 `Driver` 模块。
+3.  建立模块之间的调用关系。
+4.  调用 `elaborate` 将我们的 Python 设计转换成RTL模型。
+5.  运行仿真器和 Verilator 进行验证。
+
+-----
+
+# 3\. 完整代码与执行
+
+
+现在，我们来构建系统、生成仿真器并运行验证。
+
+```{python}
+#| output-fold: true
+print("开始构建和仿真...")
+
+# 1. 构建系统
+sys = SysBuilder('async_call')
+with sys:
+    adder = Adder()
+    adder.build()
+
+    driver = Driver()
+    call = driver.build(adder)
+
+print(sys)
+
+# 2. 配置仿真参数
+config = assassyn.backend.config(
+        verilog=utils.has_verilator(),
+        sim_threshold=200,
+        idle_threshold=200,
+        random=True)
+
+# 3. 生成仿真器
+def generate_simulator():
+    return elaborate(sys, **config)
+
+(simulator_path, verilator_path), _, _ = run_quietly(generate_simulator)
+print("✅ 仿真器生成完成")
+
+# 4. 运行仿真器
+def run_sim():
+    return utils.run_simulator(simulator_path)
+
+raw, _, _ = run_quietly(run_sim)
+
+print("\n=== 模拟器输出（前10次调用）===")
+# 只显示前10次加法器的输出
+count = 0
+for line in raw.split('\n'):
+    if 'Adder:' in line:
+        print(line.strip())
+        count += 1
+        if count >= 10:
+            break
+
+# 验证输出
+check_raw(raw)
+
+# 如果有 Verilator，也运行 Verilator 验证
+if verilator_path:
+    print("\n=== Verilator 验证 ===")
+
+    def run_verilator():
+        return utils.run_verilator(verilator_path)
+
+    raw_verilator, _, _ = run_quietly(run_verilator)
+
+    # 显示 Verilator 的前10次输出
+    count = 0
+    for line in raw_verilator.split('\n'):
+        if 'Adder:' in line:
+            print(line.strip())
+            count += 1
+            if count >= 10:
+                break
+
+    # 验证 Verilator 的输出
+    check_raw(raw_verilator)
+else:
+    print("⚠️ Verilator 未安装，跳过 Verilator 验证")
+```
+
+## 结果分析
+
+从输出可以看到，我们的系统按预期工作：
+
+* 加法器接收两个相同的输入（都是计数器的值），计算它们的和
+* 总共执行了100次调用
+* 并且加法器输出的结果总是会晚一个时钟周期。
+
+这证明了我们的模块间通信和异步调用机制是正确的，并且async_call模块是一个具有两级流水线的模块
+
+
+
