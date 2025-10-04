@@ -6,7 +6,7 @@ This module contains helper functions to generate simulator code for different e
 # pylint: disable=too-many-return-statements, too-many-branches, too-many-statements
 # pylint: disable=unused-argument, too-many-locals, import-outside-toplevel
 
-from ...ir.expr import (
+from ....ir.expr import (
     BinaryOp,
     UnaryOp,
     ArrayRead,
@@ -20,11 +20,11 @@ from ...ir.expr import (
     Select1Hot,
     Concat,
 )
-from ...ir.expr.intrinsic import PureIntrinsic, Intrinsic
-from ...ir.expr.call import Bind
-from ...ir.array import Slice
-from .utils import dtype_to_rust_type
-from .node_dumper import dump_rval_ref
+from ....ir.expr.intrinsic import PureIntrinsic, Intrinsic
+from ....ir.expr.call import Bind
+from ....ir.array import Slice
+from ..utils import dtype_to_rust_type
+from ..node_dumper import dump_rval_ref
 from .array import codegen_array_read, codegen_array_write
 from .arith import codegen_binary_op, codegen_unary_op
 from .intrinsics import codegen_intrinsic, codegen_pure_intrinsic

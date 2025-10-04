@@ -6,11 +6,11 @@ including async calls, FIFO operations, and bindings.
 
 # pylint: disable=unused-argument
 
-from ...ir.expr import AsyncCall, FIFOPop, FIFOPush
-from ...ir.expr.call import Bind
-from ...utils import namify
-from .utils import fifo_name
-from .node_dumper import dump_rval_ref
+from ....ir.expr import AsyncCall, FIFOPop, FIFOPush
+from ....ir.expr.call import Bind
+from ....utils import namify
+from ..utils import fifo_name
+from ..node_dumper import dump_rval_ref
 
 
 def codegen_async_call(node: AsyncCall, module_ctx, sys):

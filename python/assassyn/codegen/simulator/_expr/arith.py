@@ -5,9 +5,9 @@ This module contains helper functions to generate simulator code for arithmetic 
 
 # pylint: disable=unused-argument
 
-from ...ir.expr import BinaryOp, UnaryOp
-from .utils import dtype_to_rust_type
-from .node_dumper import dump_rval_ref
+from ....ir.expr import BinaryOp, UnaryOp
+from ..utils import dtype_to_rust_type
+from ..node_dumper import dump_rval_ref
 
 
 def codegen_binary_op(node: BinaryOp, module_ctx, sys):

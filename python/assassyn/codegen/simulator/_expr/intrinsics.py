@@ -6,10 +6,10 @@ This module contains helper functions to generate simulator code for intrinsic o
 # pylint: disable=too-many-return-statements, too-many-locals, unused-argument
 # pylint: disable=import-outside-toplevel
 
-from ...ir.expr.intrinsic import PureIntrinsic, Intrinsic
-from .utils import fifo_name
-from ...utils import namify
-from .node_dumper import dump_rval_ref
+from ....ir.expr.intrinsic import PureIntrinsic, Intrinsic
+from ..utils import fifo_name
+from ....utils import namify
+from ..node_dumper import dump_rval_ref
 
 
 def codegen_pure_intrinsic(node: PureIntrinsic, module_ctx, sys):
@@ -25,7 +25,7 @@ def codegen_pure_intrinsic(node: PureIntrinsic, module_ctx, sys):
         return f"!sim.{port_self}.is_empty()"
 
     if intrinsic == PureIntrinsic.VALUE_VALID:
-        from ...ir.expr import Expr
+        from ....ir.expr import Expr
         assert isinstance(node.get_operand(0).value, Expr)
         value = node.get_operand(0).value
         value = namify(value.as_operand())
