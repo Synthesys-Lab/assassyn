@@ -116,7 +116,6 @@ class BinaryOp(Expr):
         return self.opcode in [BinaryOp.ILT, BinaryOp.IGT, BinaryOp.ILE, BinaryOp.IGE,
                                BinaryOp.EQ, BinaryOp.NEQ]
 
-
 class UnaryOp(Expr):
     '''The class for unary operations'''
 
