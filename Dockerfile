@@ -42,6 +42,7 @@ ENV PYTHONUSERBASE="/tmp/.local"
 
 # Set up Assassyn related environment variables
 ENV ASSASSYN_HOME="/app"
+ENV CARGO_TARGET_DIR="/app/.sim-runtime-cache/"
 ENV VERILATOR_ROOT="/app/3rd-party/verilator"
 ENV PYTHONPATH="/app/python"
 

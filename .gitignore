@@ -11,5 +11,6 @@ tutorials/*
 !tutorials/*.qmd
 !tutorials/*.py
 .cache
+.sim-runtime-cache
 workspace/*
 **/.claude/settings.local.json
