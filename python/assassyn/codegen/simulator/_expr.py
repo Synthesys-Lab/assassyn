@@ -26,6 +26,7 @@ from ...ir.array import Slice
 from .utils import dtype_to_rust_type, fifo_name
 from ...utils import namify
 from .node_dumper import dump_rval_ref
+from .array import codegen_array_read, codegen_array_write
 
 
 def codegen_binary_op(node: BinaryOp, module_ctx, sys):
@@ -62,36 +63,6 @@ def codegen_unary_op(node: UnaryOp, module_ctx, sys):
     operand = dump_rval_ref(module_ctx, sys, node.x)
     uniop = UnaryOp.OPERATORS[node.opcode]
     return f"{uniop}{operand}"
-
-
-def codegen_array_read(node: ArrayRead, module_ctx, sys):
-    """Generate code for array read operations."""
-    array = node.array
-    idx = node.idx
-    array_name = namify(array.name)
-    idx_val = dump_rval_ref(module_ctx, sys, idx)
-    return f"sim.{array_name}.payload[{idx_val} as usize].clone()"
-
-
-def codegen_array_write(node: ArrayWrite, module_ctx, sys, module_name):
-    """Generate code for array write operations."""
-    array = node.array
-    idx = node.idx
-    value = node.val
-    module = node.module
-
-    array_name = namify(array.name)
-    idx_val = dump_rval_ref(module_ctx, sys, idx)
-    value_val = dump_rval_ref(module_ctx, sys, value)
-    module_writer = namify(module.name)
-    port_id = id(module)  # Use module id as port identifier
-
-    return f"""{{
-              let stamp = sim.stamp - sim.stamp % 100 + 50;
-              sim.{array_name}.write_port.push(
-                ArrayWrite::new(stamp, {idx_val} as usize, \
-                      {value_val}.clone(), "{module_writer}", {port_id}));
-            }}"""
 
 
 def codegen_async_call(node: AsyncCall, module_ctx, sys):
