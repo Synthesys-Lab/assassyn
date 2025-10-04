@@ -51,3 +51,27 @@ If you encounter an error such as `Error 1 g++: fatal error: Killed signal termi
 python -c 'import assassyn' # import this module
 echo $? # 0 is expected
 ````
+
+## File Structure
+
+Our file structure is as follows:
+
+```
+- assassyn/          # The main assassyn package
+  |- python/         # All the Python-related code
+  |  |- assassyn/    # The assassyn Python package
+  |  `- ci-tests/    # Application-level tests for CI
+  |- 3rd-party/      # External depdendencies
+  |  |- circt/       # It relies on CIRCT for Verilog backend
+  |  |- ramulator2   # It relies on Ramulator2 for DRAM modeling
+  |  `- verilator    # It relies on Verilator for Verilog simulation
+  |- scripts/
+  |  |- *.patch      # Useful scripts for patching 3rd-party
+  |  |- pre-commit   # Git pre-commit hook
+  |  `- init/*.sh    # Initialization scripts to build the whole framework
+  |- docs/           # The chatter of this framework
+  |  |- developer/   # Developer guide
+  |  `- *.md         # Other documents
+  |- examples/       # Example applications
+  `- tutorials/      # Tutorials written in Quarto qmd
+```

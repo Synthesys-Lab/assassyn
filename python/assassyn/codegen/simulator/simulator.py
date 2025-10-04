@@ -45,10 +45,9 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         fd: File descriptor to write to
     """
     # Write imports
+    fd.write("use sim_runtime::*;\n")
     fd.write("use std::collections::VecDeque;\n")
     fd.write("use std::collections::HashMap;\n")
-    fd.write("use super::runtime::*;\n")
-    fd.write("use super::ramulator::*;\n")
     platform_os = platform.system().lower()
     if platform_os == 'darwin':
         fd.write("use libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n")
@@ -347,10 +346,8 @@ def dump_main(fd):
     This matches the Rust function in src/backend/simulator/elaborate.rs
     """
     fd.write("""
-mod runtime;
 mod modules;
 mod simulator;
-mod ramulator;
 
 fn main() {
   simulator::simulate();
