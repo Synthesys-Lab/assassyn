@@ -7,3 +7,5 @@
 - `pylint` is for `python/assassyn` only, and the rc file is `python/assassyn/.pylintrc`.
 - When it comes to "based on my modifications to something.md", use `git diff`
   to read the deltas.
+- When a task is finished, stage and commit the changes!
+   - If pre-commit on pytest phase fails after three attempts, stop and report!
