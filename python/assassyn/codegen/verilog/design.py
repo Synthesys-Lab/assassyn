@@ -22,7 +22,6 @@ from ...ir.const import Const
 from ...ir.array import Array
 from ...ir.dtype import RecordValue
 from ...utils import namify, unwrap_operand
-from ...analysis import get_upstreams
 from ...ir.expr import (
     Expr,
     FIFOPop,
@@ -34,10 +33,10 @@ from ...ir.expr import (
     WireRead
 )
 from .expr import codegen_expr
-from .top import generate_top_harness
 from .cleanup import cleanup_post_generation
 from .rval import dump_rval as dump_rval_impl
 from .module import generate_module_ports
+from .system import generate_system
 
 
 class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-many-statements
@@ -285,96 +284,8 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
     # pylint: disable=too-many-locals,R0912
     def visit_system(self, node: SysBuilder):
-        sys = node
-        self.sys = sys
-        for module in sys.downstreams:
-            if isinstance(module, SRAM) and hasattr(module, 'payload'):
-                self.sram_payload_arrays.add(module.payload)
-
-        # Collect external modules
-        self.external_modules = []
-        for module in sys.modules + sys.downstreams:
-            if self._is_external_module(module):
-                if module not in self.external_modules:
-                    self.external_modules.append(module)
-            # Also check for external modules used within downstream modules
-            for expr in self._walk_expressions(module.body):
-                if isinstance(expr, AsyncCall):
-                    callee = expr.bind.callee
-                    if self._is_external_module(callee):
-                        if callee not in self.external_modules:
-                            self.external_modules.append(callee)
-
-        # Generate PyCDE wrapper classes for external modules first
-        for ext_module in self.external_modules:
-            self._generate_external_module_wrapper(ext_module)
-
-        for arr_container in sys.arrays:
-            if arr_container in self.sram_payload_arrays:
-                continue
-            sub_array = arr_container
-            if sub_array not in self.array_write_port_mapping:
-                self.array_write_port_mapping[sub_array] = {}
-            sub_array_writers = sub_array.get_write_ports()
-            for module, _ in sub_array_writers.items():
-                if module not in self.array_write_port_mapping[sub_array]:
-                    port_idx = len(self.array_write_port_mapping[sub_array])
-                    self.array_write_port_mapping[sub_array][module] = port_idx
-
-        for arr_container in sys.arrays:
-            if arr_container not in self.sram_payload_arrays:
-                self.visit_array(arr_container)
-
-        expr_to_module = {}
-        for module in sys.modules + sys.downstreams:
-            for expr in self._walk_expressions(module.body):
-                if expr.is_valued():
-                    expr_to_module[expr] = module
-
-        for ds_module in sys.downstreams:
-            self.downstream_dependencies[ds_module] = get_upstreams(ds_module)
-
-        all_modules = self.sys.modules + self.sys.downstreams
-        for module in all_modules:
-            for expr in self._walk_expressions(module.body):
-                if isinstance(expr, AsyncCall):
-                    callee = expr.bind.callee
-                    if callee not in self.async_callees:
-                        self.async_callees[callee] = []
-
-                    if module not in self.async_callees[callee]:
-                        self.async_callees[callee].append(module)
-
-        self.array_users = {}
-        # pylint: disable=R1702
-        for arr_container in self.sys.arrays:
-            if arr_container in self.sram_payload_arrays:
-                continue
-            arr = arr_container
-            self.array_users[arr] = []
-            for mod in self.sys.modules + self.sys.downstreams:
-                if isinstance(mod, SRAM) and hasattr(mod, 'payload') and arr == mod.payload:
-                    continue
-                for expr in self._walk_expressions(mod.body):
-                    if isinstance(expr, (ArrayRead, ArrayWrite)) and expr.array == arr:
-                        if mod not in self.array_users[arr]:
-                            self.array_users[arr].append(mod)
-
-        # Process only non-external modules from sys.modules
-        for elem in sys.modules:
-            if self._is_external_module(elem):
-                continue
-
-            self.current_module = elem
-            self.visit_module(elem)
-        self.current_module = None
-        for elem in sys.downstreams:
-            self.current_module = elem
-            self.visit_module(elem)
-        self.current_module = None
-        self.is_top_generation = True
-        generate_top_harness(self)
-        self.is_top_generation = False
+        """Visit a system and generate code for all modules."""
+        generate_system(self, node)
 
     # pylint: disable=too-many-statements
     def visit_array(self, node: Array):
