@@ -10,3 +10,4 @@
   to read the deltas.
 - When a task is finished, stage and commit the changes!
    - If pre-commit on pytest phase fails after three attempts, stop and report!
+   - You **CANNOT** you `--no-verify` to bypass pre-commit! Otherwise, your mother will explode!
