@@ -1,7 +1,8 @@
 # pylint: disable=C0302
+# pylint: disable=protected-access
 """Top-level harness generation for Verilog designs."""
 
-from collections import defaultdict, deque
+from collections import defaultdict
 
 from .utils import (
     dump_type,
@@ -21,6 +22,7 @@ from ...ir.expr import (
 from ...ir.dtype import Record
 from ...utils import namify, unwrap_operand
 from ...ir.const import Const
+from ...analysis.topo import topological_sort
 
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -229,37 +231,6 @@ def generate_top_harness(dumper):
                     module_deps[module].add(producer)
             elif isinstance(ext_val, Bind):
                 continue
-
-    # Topological sort with proper dependency order
-    def topological_sort(modules, deps):
-        # Calculate in-degree (number of modules that depend on this module)
-        dependents = defaultdict(set)
-        for module, dependencies in deps.items():
-            for dep in dependencies:
-                dependents[dep].add(module)
-
-        in_degree = {m: len(deps.get(m, set())) for m in modules}
-
-        # Start with modules that have no dependencies
-        queue = deque([m for m in modules if in_degree[m] == 0])
-        sorted_modules = []
-
-        while queue:
-            module = queue.popleft()
-            sorted_modules.append(module)
-
-            # For each module that depends on this one
-            for dependent in dependents[module]:
-                in_degree[dependent] -= 1
-                if in_degree[dependent] == 0:
-                    queue.append(dependent)
-
-        # Handle any cycles by adding remaining modules
-        for m in modules:
-            if m not in sorted_modules:
-                sorted_modules.append(m)
-
-        return sorted_modules
 
     # Sort modules by dependencies
     sorted_modules = topological_sort(all_modules, module_deps)
