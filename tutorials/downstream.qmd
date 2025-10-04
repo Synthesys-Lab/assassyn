@@ -1,0 +1,86 @@
+---
+title: "Downstream 模块笔记"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+---
+
+# 教程：使用 downstream 模块
+
+> **作者：** Yangjia 
+> 
+> **日期：** 2025.10.04
+> 
+
+## 1. 背景
+
+`Downstream`（也被称为“下游模块”）用于承载**纯组合逻辑**，通常与上游 `Module` 的时序逻辑配合使用。它在 `docs/language.md` 的“More On Modules”章节里被描述为：上游模块收集寄存器态信号，下游模块负责在同一拍内完成组合处理。
+
+## 2. 核心定义
+
+- 继承基类：`class Foo(Downstream)`。
+- 构建函数：使用 `@downstream.combinational` 装饰器声明组合逻辑入口（`python/unit-tests/test_downstream.py:33`）。
+- 参数类型：主要以 `Value`、`Port`、其他下游模块的输出或外部模块接口为形参。
+- 返回值：可返回新的 `Value` ，等价于一个组合逻辑的 `Func` ，根据输入产生预设的输出。也可以只产生副作用（日志、触发调用等）， 例如改变某个 `Register` 的状态。
+- 使用机制：
+  1. 用于单个上游 `Module` ，组合逻辑过长，过于复杂，为了让逻辑更加简化明晰，可以让  `Module` 只负责时序逻辑，组合逻辑被拆分成多个子模块，分别由多个 `Downstream` 模块实现。
+  2. 逻辑复用。如果一个组合逻辑被多个地方使用，可以共用一段代码，降低代码长度。
+  3. 多个上游 `Module` 的输入需要进行一起处理，可以把输入都交给 `Downstream` 模块，实现预设的功能。
+
+## 3. 语法与机制
+
+### 绑定上游数据
+
+1. 上游 `Module` 负责在某个时序点调用 `async_called`，把寄存器值送入下游管线。例如 `Driver.build` 在 `test_downstream.py:11` 同时唤起两个 `ForwardData` 模块，再把它们的输出交给下游。
+2. 下游函数参数常常使用 `Value.optional(default)` 为缺省数据兜底（`test_downstream.py:38`）。这让组合逻辑在无驱动时仍有合法输入。出现无驱动的原因和上游触发场景是：
+   1. 上游正常运行，但是产生了default数据。例如 `with Condition` 的输出
+   2. 上游该周期没有被调用唤醒，输出自然为 `None` 状态
+
+### 数据操作
+
+- `Adder.build` 方法的通过形参获得需要的普通 `Value` 或者 `Register` 寄存器 （`test_downstream.py:37`）。
+- 下游组合逻辑里可以直接对 `Value` 做算术、逻辑变换，与 `Module` 裡的组合部分写法一致。
+
+### 与外部组件协作
+
+- 下游模块可以包装外部 SystemVerilog 单元，借助 `ExternalSV.in_assign` 完成端口映射。例如 `test_easy_external.py:63` 中的 `Adder.build` 通过外部 `adder` 模块得到输出后再记录日志。
+- 更复杂的例子是 `test_pipemul.py:71` 的 `Wrapper.build`，它向外部管线乘法器送入 `in_valid`、接收 `out_valid`，并在 `Condition` 块中将结果回推给另一个上游模块。
+
+### 控制流与同步
+
+- 可以在下游逻辑内使用 `async_called` ，在合适条件下触发其他模块的 `async_called` ，交由调度器安排执行（`test_pipemul.py:89`）。
+- 在 `test_toposort.py:33` 中，多个下游实例串联，返回的中间值可继续传给其他下游组合逻辑，形成**拓扑有向无环图**。
+
+### 实验性流水线接口
+
+- `test_exp_fe_downstream.py` 展示了实验前端 `pipeline`/`converge` API。`@converge` 生成的 `adder` 闭包本质上扮演下游角色：它对来自流水线阶段的 `Value` 做组合运算，再通过日志验证结果。
+
+## 4. 典型案例
+
+- **基础求和**（`python/unit-tests/test_downstream.py`）：
+  - 上游 `Driver` 每周期把寄存器计数值送给两个 `ForwardData`。
+  - `Adder(Downstream)` 读取两个 `Value`，用 `optional` 设置默认值，再执行加法并 `log`。
+  - 日志校验确保组合计算即时生效。
+
+- **多级拓扑**（`python/unit-tests/test_toposort.py`）：
+  - 三个下游 `Adder` 串联；前两个返回结果供第三个使用。
+  - 证明下游输出可以作为后续下游输入，形成 DAG 拓扑。
+
+- **对接外部 Verilog**（`python/unit-tests/test_easy_external.py` 与 `test_pipemul.py`）：
+  - `Downstream` 作为胶水逻辑，将 `Value` 转发到 `ExternalSV`，然后在同一拍内消费输出。
+  - 展示如何在组合域里包裹复杂 IP（加法器、带握手的乘法器）。
+
+- **流水线实验前端**（`python/unit-tests/test_exp_fe_downstream.py`）：
+  - `@converge`/`@pipeline.factory` 组合模拟下游处理阶段，强调“上游推送数据 + 下游即时加工”的模式在新 API 下仍成立。
+
+## 5. 实践提示
+
+- 在下游逻辑里不要直接声明新的寄存器；保持纯组合特性。
+- 若上游可能不提供输入，利用 `Value.optional` 或条件保护避免无驱动值。
+- 需要返回多个结果时，可以返回元组或结构体 `Value`，并在调用方拆解。
+- 与外部模块交互时，优先通过 `in_assign` 保持端口映射显式，必要时利用 `Condition` 管理有效信号。
+
+## 6. 结语
+
+`Downstream` 为 Assasyn 把“时序驱动 + 组合处理”拆分得更清晰：上游负责节拍控制和寄存器更新，下游专注在当拍的逻辑变换。掌握上述语法与模式，就能在现有单元测试和教程基础上快速扩展更复杂的硬件描述。
