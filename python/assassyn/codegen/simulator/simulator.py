@@ -339,19 +339,3 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("}\n")
 
     return True
-
-
-def dump_main(fd):
-    """Generate the main.rs file.
-
-    This matches the Rust function in src/backend/simulator/elaborate.rs
-    """
-    fd.write("""
-mod modules;
-mod simulator;
-
-fn main() {
-  simulator::simulate();
-}
-    """)
-    return True

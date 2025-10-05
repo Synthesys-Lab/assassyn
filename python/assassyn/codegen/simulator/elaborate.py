@@ -8,7 +8,7 @@ import subprocess
 import typing
 from pathlib import Path
 from .modules import ElaborateModule
-from .simulator import dump_simulator, dump_main
+from .simulator import dump_simulator
 from ...utils import repo_path
 
 if typing.TYPE_CHECKING:
@@ -114,8 +114,8 @@ def elaborate_impl(sys, config):
         dump_simulator(sys, config, fd)
 
     # Generate main.rs
-    with open(simulator_path / "src/main.rs", 'w', encoding='utf-8') as fd:
-        dump_main(fd)
+    template_main = Path(__file__).resolve().parent / "template" / "main.rs"
+    shutil.copy(template_main, simulator_path / "src/main.rs")
 
     return manifest_path
 
