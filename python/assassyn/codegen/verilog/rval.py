@@ -7,20 +7,6 @@ from ...ir.dtype import RecordValue
 from ...ir.expr import Expr, FIFOPop
 from ...utils import namify, unwrap_operand
 from .utils import dump_type
-
-
-def _dump_module(_dumper, node, _with_namespace: bool, _module_name: str = None) -> str:
-    return namify(node.name)
-
-
-def _dump_array(_dumper, node, _with_namespace: bool, _module_name: str = None) -> str:
-    return namify(node.name)
-
-
-def _dump_port(_dumper, node, _with_namespace: bool, _module_name: str = None) -> str:
-    return namify(node.name)
-
-
 def _dump_fifo_pop(_dumper, node, with_namespace: bool, _module_name: str = None) -> str:
     if not with_namespace:
         return f'self.{namify(node.fifo.name)}'
@@ -61,22 +47,16 @@ def _dump_expr(dumper, node, with_namespace: bool, module_name: str = None) -> s
 
 def _dump_record_value(dumper, node, with_namespace: bool, module_name: str = None) -> str:
     return dump_rval(dumper, node.value(), with_namespace, module_name)
-
-
-def _dump_wire(_dumper, node, _with_namespace: bool, _module_name: str = None) -> str:
-    return namify(node.name)
-
-
 # Dispatch table mapping node types to their dump functions
 _RVAL_DUMP_DISPATCH = {
-    Module: _dump_module,
-    Array: _dump_array,
-    Port: _dump_port,
+    Module: lambda _dumper, node, _with_namespace, _module_name=None: namify(node.name),
+    Array: lambda _dumper, node, _with_namespace, _module_name=None: namify(node.name),
+    Port: lambda _dumper, node, _with_namespace, _module_name=None: namify(node.name),
     FIFOPop: _dump_fifo_pop,
     Const: _dump_const,
     str: _dump_str,
     RecordValue: _dump_record_value,
-    Wire: _dump_wire,
+    Wire: lambda _dumper, node, _with_namespace, _module_name=None: namify(node.name),
 }
 
 
