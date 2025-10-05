@@ -1,4 +1,3 @@
-# pylint: disable=too-many-return-statements,too-many-branches
 """Verilog expression code generation.
 
 This module contains functions to generate Verilog code for different expression types.
@@ -53,6 +52,28 @@ from .intrinsics import (
     codegen_log,
 )
 
+# Dispatch table mapping expression types to their codegen functions
+_EXPR_CODEGEN_DISPATCH = {
+    BinaryOp: codegen_binary_op,
+    UnaryOp: codegen_unary_op,
+    Log: codegen_log,
+    ArrayRead: codegen_array_read,
+    ArrayWrite: codegen_array_write,
+    FIFOPush: codegen_fifo_push,
+    FIFOPop: codegen_fifo_pop,
+    PureIntrinsic: codegen_pure_intrinsic,
+    AsyncCall: codegen_async_call,
+    Slice: codegen_slice,
+    Concat: codegen_concat,
+    Cast: codegen_cast,
+    Select: codegen_select,
+    Bind: codegen_bind,
+    Select1Hot: codegen_select1hot,
+    Intrinsic: codegen_intrinsic,
+    WireAssign: codegen_wire_assign,
+    WireRead: codegen_wire_read,
+}
+
 
 def codegen_expr(dumper, expr) -> Optional[str]:
     """Generate code for an expression node.
@@ -67,58 +88,16 @@ def codegen_expr(dumper, expr) -> Optional[str]:
     Returns:
         Generated code string or None
     """
-    if isinstance(expr, BinaryOp):
-        return codegen_binary_op(dumper, expr)
+    expr_type = type(expr)
 
-    if isinstance(expr, UnaryOp):
-        return codegen_unary_op(dumper, expr)
+    # Try exact match first
+    codegen_func = _EXPR_CODEGEN_DISPATCH.get(expr_type)
+    if codegen_func is not None:
+        return codegen_func(dumper, expr)
 
-    if isinstance(expr, Log):
-        return codegen_log(dumper, expr)
+    # Fall back to isinstance check for subclasses
+    for base_type, func in _EXPR_CODEGEN_DISPATCH.items():
+        if isinstance(expr, base_type):
+            return func(dumper, expr)
 
-    if isinstance(expr, ArrayRead):
-        return codegen_array_read(dumper, expr)
-
-    if isinstance(expr, ArrayWrite):
-        return codegen_array_write(dumper, expr)
-
-    if isinstance(expr, FIFOPush):
-        return codegen_fifo_push(dumper, expr)
-
-    if isinstance(expr, FIFOPop):
-        return codegen_fifo_pop(dumper, expr)
-
-    if isinstance(expr, PureIntrinsic):
-        return codegen_pure_intrinsic(dumper, expr)
-
-    if isinstance(expr, AsyncCall):
-        return codegen_async_call(dumper, expr)
-
-    if isinstance(expr, Slice):
-        return codegen_slice(dumper, expr)
-
-    if isinstance(expr, Concat):
-        return codegen_concat(dumper, expr)
-
-    if isinstance(expr, Cast):
-        return codegen_cast(dumper, expr)
-
-    if isinstance(expr, Select):
-        return codegen_select(dumper, expr)
-
-    if isinstance(expr, Bind):
-        return codegen_bind(dumper, expr)
-
-    if isinstance(expr, Select1Hot):
-        return codegen_select1hot(dumper, expr)
-
-    if isinstance(expr, Intrinsic):
-        return codegen_intrinsic(dumper, expr)
-
-    if isinstance(expr, WireAssign):
-        return codegen_wire_assign(dumper, expr)
-
-    if isinstance(expr, WireRead):
-        return codegen_wire_read(dumper, expr)
-
-    raise ValueError(f"Unhandled expression type: {type(expr).__name__}")
+    raise ValueError(f"Unhandled expression type: {expr_type.__name__}")
