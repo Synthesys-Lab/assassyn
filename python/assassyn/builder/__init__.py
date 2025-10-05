@@ -9,13 +9,13 @@ import site
 import inspect
 import ast
 import functools
-from .namify import NamingManager
+from ..namify import NamingManager
 
 if typing.TYPE_CHECKING:
-    from .ir.module import Module
-    from .ir.array import Array
-    from .ir.dtype import DType
-    from .ir.value import Value
+    from ..ir.module import Module
+    from ..ir.array import Array
+    from ..ir.dtype import DType
+    from ..ir.value import Value
 
 def process_naming(expr, line_of_code: str, lineno: int) -> typing.Dict[str, typing.Any]:
     """Process naming for an expression based on line context"""
@@ -89,9 +89,9 @@ def ir_builder(func=None, *, node_type=None):
                 return res
 
             #pylint: disable=cyclic-import,import-outside-toplevel
-            from .ir.const import Const
-            from .utils import package_path
-            from .ir.expr import Expr
+            from ..ir.const import Const
+            from ..utils import package_path
+            from ..ir.expr import Expr
 
             if not isinstance(res, Const):
                 if isinstance(res, Expr):
@@ -169,7 +169,7 @@ class SysBuilder:
     def enter_context_of(self, ty, entry):
         '''Enter the context of the given type.'''
         #pylint: disable=import-outside-toplevel
-        from .ir.block import CondBlock
+        from ..ir.block import CondBlock
         if isinstance(entry, CondBlock):
             self.current_module.add_external(entry.cond)
         self._ctx_stack[ty].append(entry)
