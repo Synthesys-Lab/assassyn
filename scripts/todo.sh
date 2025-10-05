@@ -1,8 +1,14 @@
+#!/bin/zsh
+
 os=$(uname)
+
+cp $1 .$1.bak
 
 while [ -s $1 ]; do
 
   todo=$(head -n 1 $1)
+
+  echo "\nWorking on: $todo\n"
 
   claude -p $todo \
       --allowedTools "Bash,Read,Write,Edit,Create" \
