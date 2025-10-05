@@ -2,23 +2,6 @@
 
 The port mapper manages compile-time assignment of port indices for multi-port array writes in the simulator code generator.
 
-## Problem Statement
-
-In Assassyn, multiple modules can write to the same array concurrently. To support this safely, each writer needs a dedicated write port. Previously, port IDs were assigned using runtime Python object IDs (via `id(module)`), which resulted in:
-- Large, unpredictable hash values as port IDs
-- HashMap lookup overhead in the Rust runtime
-- No compile-time optimization opportunities
-
-## Solution
-
-The port mapper provides **compile-time port index assignment**:
-1. Analyze the entire system during elaboration to find all array writes
-2. Assign sequential port indices (0, 1, 2, ...) to each module-array pair
-3. Pre-allocate the exact number of ports needed for each array
-4. Use Vec-based storage with direct indexing in the Rust runtime
-
-## Architecture
-
 ### PortIndexManager
 
 The core class that tracks port assignments:
@@ -141,27 +124,6 @@ sim.array.write(1, write);  // ModuleB
 sim.array.write(2, write);  // ModuleC
 ```
 
-## Benefits
-
-1. **Optimal Performance**
-   - Sequential port IDs (0, 1, 2, ...) enable Vec-based storage
-   - Direct O(1) indexing instead of HashMap lookup
-   - Better cache locality with contiguous memory
-
-2. **Memory Efficiency**
-   - Pre-allocate exact number of ports needed
-   - No hash table overhead
-   - Compact integer indices instead of large hash values
-
-3. **Deterministic**
-   - Same system always generates same port assignments
-   - Reproducible builds
-   - Easier debugging
-
-4. **Compile-Time Optimization**
-   - All port assignments known before code generation
-   - Enables future optimizations (e.g., conflict detection)
-
 ## Special Cases
 
 ### DRAM Writes
@@ -172,28 +134,4 @@ manager.get_or_assign_port(array_name, "DRAM_CALLBACK")
 ```
 
 This ensures DRAM memory interface callbacks get dedicated ports separate from module writes.
-
-### Minimum Port Count
-
-Arrays always have at least 1 port, even if no writes are detected:
-```python
-def get_port_count(self, array_name: str) -> int:
-    return max(1, self.port_counts[array_name])
-```
-
-This maintains backwards compatibility and prevents zero-sized port vectors.
-
-## Integration with Rust Runtime
-
-The port mapper works in conjunction with the Rust runtime's Vec-based port storage (see `xeq.md`):
-
-**Python (compile-time):**
-- Assigns sequential port indices
-- Determines total port count
-- Generates code with correct port IDs
-
-**Rust (runtime):**
-- Pre-allocates Vec with exact port count
-- Uses direct indexing for writes
-- Maintains write ordering and conflict resolution
 
