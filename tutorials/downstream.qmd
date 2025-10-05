@@ -42,17 +42,22 @@ format:
 - `Adder.build` 方法的通过形参获得需要的普通 `Value` 或者 `Register` 寄存器 （`test_downstream.py:37`）。
 - 下游组合逻辑里可以直接对 `Value` 做算术、逻辑变换，与 `Module` 裡的组合部分写法一致。
 
-### 与外部组件协作
+
+### 更多的特性
+
+> 目前只是提出来，不给出代码分析，预期后期移植到另外一个 tutorial中展开
+
+#### 与外部组件协作
 
 - 下游模块可以包装外部 SystemVerilog 单元，借助 `ExternalSV.in_assign` 完成端口映射。例如 `test_easy_external.py:63` 中的 `Adder.build` 通过外部 `adder` 模块得到输出后再记录日志。
 - 更复杂的例子是 `test_pipemul.py:71` 的 `Wrapper.build`，它向外部管线乘法器送入 `in_valid`、接收 `out_valid`，并在 `Condition` 块中将结果回推给另一个上游模块。
 
-### 控制流与同步
+#### 控制流与同步
 
 - 可以在下游逻辑内使用 `async_called` ，在合适条件下触发其他模块的 `async_called` ，交由调度器安排执行（`test_pipemul.py:89`）。
 - 在 `test_toposort.py:33` 中，多个下游实例串联，返回的中间值可继续传给其他下游组合逻辑，形成**拓扑有向无环图**。
 
-### 实验性流水线接口
+#### 实验性流水线接口
 
 - `test_exp_fe_downstream.py` 展示了实验前端 `pipeline`/`converge` API。`@converge` 生成的 `adder` 闭包本质上扮演下游角色：它对来自流水线阶段的 `Value` 做组合运算，再通过日志验证结果。
 
@@ -73,6 +78,172 @@ format:
 
 - **流水线实验前端**（`python/unit-tests/test_exp_fe_downstream.py`）：
   - `@converge`/`@pipeline.factory` 组合模拟下游处理阶段，强调“上游推送数据 + 下游即时加工”的模式在新 API 下仍成立。
+
+### 案例核心代码讲解
+
+> 使用 `python/ci-tests/test_downstream.py` 代码进行 `Downstream` 功能的展示
+
+#### 驱动模块和 async_call 的实现
+
+前置文档已经介绍过 `driver` 模块和 `async_called` 的用法，这里不再赘述。核心代码如下：
+1. 设置基本环境
+
+```{python}
+#| code-fold: false
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import sys
+import os
+import io
+import contextlib
+from typing import Tuple, Optional
+
+lib_path = os.path.abspath(os.path.join(os.path.dirname("downstream.qmd"), '../python/'))
+sys.path.append(lib_path)
+from function_t import run_quietly
+
+from assassyn.frontend import *
+from assassyn.backend import elaborate
+from assassyn import utils
+from assassyn.test import run_test
+import assassyn
+
+print("✅ 环境设置完成")
+```
+
+2. 声明 `Driver` 模块
+
+```{python}
+class Driver(Module):
+
+    def __init__(self):
+        super().__init__(ports={})
+
+    @module.combinational
+    def build(self, lhs: Module, rhs: Module):
+        cnt = RegArray(UInt(32), 1)
+        v = cnt[0]
+        (cnt & self)[0] <= cnt[0] + UInt(32)(1)
+        lhs.async_called(data=v)
+        rhs.async_called(data=v)
+```
+
+3. 声明 `ForwardData` 模块
+   这里的 `ForwardData` 模块负责将上游模块的输出数据转发到下游模块。实际上，可以发现这里没有对数据进行**任何处理**！
+   原理上，被 `driver` 调用的 `async_called` 会触发 `ForwardData.build` 的执行，`data` 端口会被驱动为上游传入的值。
+
+```{python}
+class ForwardData(Module):
+    def __init__(self):
+        super().__init__(
+            ports={'data': Port(UInt(32))},
+        )
+
+    @module.combinational
+    def build(self):
+        data = self.pop_all_ports(True)
+        return data
+```
+
+#### Downstream 模块的实现
+
+`Adder` 模块继承自 `Downstream`，它的 `build` 方法被 `@downstream.combinational` 装饰，表示这是一个纯组合逻辑的入口。它接收两个 `Value` 类型的参数 `a` 和 `b`，并返回它们的和。
+
+同时还要特别再次强调，其的操作数来自于 `build` 函数的形参，而不是通过 `self.pop_all_ports` 获得。
+
+```{python}
+class Adder(Downstream):
+
+    def __init__(self):
+        super().__init__()
+
+    @downstream.combinational
+    def build(self, a: Value, b: Value):
+        a = a.optional(UInt(32)(1))
+        b = b.optional(UInt(32)(1))
+        c = a + b
+        log("downstream: {} + {} = {}", a, b, c)
+```
+
+#### 构建模块并且运行
+最后，我们把所有模块实例化，并且通过 `Driver` 模块的 `build` 方法把 `ForwardData` 和 `Adder` 连接起来。<br>
+
+```{python}
+
+def check_raw(raw):
+    cnt = 0
+    for i in raw.split('\n'):
+        if 'downstream:' in i:
+            line_toks = i.split()
+            c = line_toks[-1]
+            a = line_toks[-3]
+            b = line_toks[-5]
+            assert int(a) + int(b) == int(c)
+            cnt += 1
+    assert cnt == 99, f'cnt: {cnt} != 99'
+    print("✅ 输出验证通过, 总共{}次加法".format(cnt))
+
+
+print("开始构建和仿真...")
+
+# 1. 构建系统
+sys = SysBuilder('downstream')
+with sys:
+    driver = Driver()
+    lhs = ForwardData()
+    rhs = ForwardData()
+    a = lhs.build()
+    b = rhs.build()
+    adder = Adder()
+
+    driver.build(lhs, rhs)
+    adder.build(a, b)
+
+print(sys)
+
+# 2. 配置仿真参数
+config = assassyn.backend.config(
+        verilog=utils.has_verilator(),
+        sim_threshold=100,
+        idle_threshold=200,
+        random=True)
+
+# 3. 生成仿真器
+def generate_simulator():
+    return elaborate(sys, **config)
+
+(simulator_path, verilator_path), _, _ = run_quietly(generate_simulator)
+print("✅ 仿真器生成完成")
+
+# 4. 运行仿真器
+def run_sim():
+    return utils.run_simulator(simulator_path)
+
+raw, _, _ = run_quietly(run_sim)
+
+print("\n=== 模拟器输出（前100次调用）===")
+# 验证输出
+print(raw) # FIXME: 目前 Verilator 输出过长，可以选择不打印
+check_raw(raw)
+
+# 如果有 Verilator，也运行 Verilator 验证
+if verilator_path:
+    print("\n=== Verilator 验证 ===")
+
+    def run_verilator():
+        return utils.run_verilator(verilator_path)
+
+    raw_verilator, _, _ = run_quietly(run_verilator)
+
+
+    # 验证 Verilator 的输出
+    # print(raw_verilator) # FIXME: 目前 Verilator 输出过长，先不打印
+    check_raw(raw_verilator)
+else:
+    print("⚠️ Verilator 未安装，跳过 Verilator 验证")
+```
 
 ## 5. 实践提示
 
