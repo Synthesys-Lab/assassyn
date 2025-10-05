@@ -1,0 +1,1 @@
+/usr/bin/ccache  g++ -fPIC -shared -Wl,-soname,libwrapper.so -o lib/libwrapper.so CMakeFiles/wrapper.dir/CWrapper.cpp.o  -Wl,-rpath,/app/3rd-party/ramulator2 /app/3rd-party/ramulator2/libramulator.so 

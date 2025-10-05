@@ -68,7 +68,7 @@ impl MemoryInterface {
 
   pub unsafe fn finish(&self) {
     let my_finish: Symbol<unsafe extern "C" fn(MyWrapper)> =
-      self.lib.get(b"MyWrapper_finish").unwrap();
+      self.lib.get(b"finish").unwrap();
     my_finish(self.wrapper);
   }
 }

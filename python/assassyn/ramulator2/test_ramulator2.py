@@ -1,13 +1,12 @@
 import os
 import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from ramulator2 import PyRamulator, Request
 
 home = os.getenv('ASSASSYN_HOME', os.getcwd())
-sim = PyRamulator(f"{home}/testbench/simulator/configs/example_config.yaml")
-output_file = f"{home}/tools/python-sim-runtime/tests/test_ramulator2_output.txt"
-correct_output_file = f"{home}/tools/python-sim-runtime/tests/test_ramulator2_expected.txt"
+sim = PyRamulator(f"{home}/tools/cpp-sim-runtime/configs/example_config.yaml")
+output_file = f"{home}/python/assassyn/ramulator2/test_ramulator2_output.txt"
+correct_output_file = f"{home}/python/assassyn/ramulator2/test_ramulator2_expected.txt"
 if os.path.exists(output_file):
     os.remove(output_file)
 

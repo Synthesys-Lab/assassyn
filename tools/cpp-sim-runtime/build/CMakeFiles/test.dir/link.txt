@@ -1,0 +1,1 @@
+/usr/bin/ccache  g++ CMakeFiles/test.dir/test.cpp.o -o bin/test  -Wl,-rpath,/app/tools/cpp-sim-runtime/build/lib:/app/3rd-party/ramulator2 lib/libwrapper.so /app/3rd-party/ramulator2/libramulator.so 

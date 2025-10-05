@@ -1,7 +1,7 @@
 echo "Building Wrapper..."
 RESTORE="$(pwd)"
-mkdir -p "$ASSASSYN_HOME/testbench/simulator"
-cd "$ASSASSYN_HOME/testbench/simulator"
+mkdir -p "$ASSASSYN_HOME/tools/cpp-sim-runtime"
+cd "$ASSASSYN_HOME/tools/cpp-sim-runtime"
 mkdir -p build
 cd build
 cmake ..

@@ -133,7 +133,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     # Constructor
     fd.write("  pub fn new() -> Self {\n")
     fd.write("let mem = unsafe {")
-    midfix = '/testbench/simulator/build/lib/libwrapper'
+    midfix = '/tools/cpp-sim-runtime/build/lib/libwrapper'
     if platform_os == 'darwin':
         fd.write(f'let lib = Library::open(Some("{home}{midfix}{dynamiclib_suffix()}"), '
                  'RTLD_GLOBAL | RTLD_LAZY).unwrap();')
@@ -227,7 +227,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write(f"""
      unsafe {{
             sim.mem_interface
-                .init("{home}/testbench/simulator/configs/example_config.yaml");
+                .init("{home}/tools/cpp-sim-runtime/configs/example_config.yaml");
         }}
     """)
 
