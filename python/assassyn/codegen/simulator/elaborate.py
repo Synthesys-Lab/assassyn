@@ -95,10 +95,7 @@ def elaborate_impl(sys, config):
 
     # Create rustfmt.toml if available
     rustfmt_src = None
-    rustfmt_candidates = [
-        Path(__file__).parent.parent.parent.parent / "rustfmt.toml",  # repo root
-        Path("/Users/were/repos/assassyn-dev/rustfmt.toml")  # hardcoded path
-    ]
+    rustfmt_candidates = [simulator_path / "rustfmt.toml", Path(repo_path()) / "rustfmt.toml"]
 
     for candidate in rustfmt_candidates:
         if candidate.exists():
