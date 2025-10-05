@@ -7,7 +7,7 @@ This module provicdes a cache for unique name with a given prefix.
 ```python
 class UniqueNameCache:
 
-    def __init__(self):
+    def __init__(self)
         '''
         Initialize a UniqueNameCache.
         '''
