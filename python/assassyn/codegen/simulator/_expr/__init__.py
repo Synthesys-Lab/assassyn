@@ -3,7 +3,6 @@
 This module contains helper functions to generate simulator code for different expression types.
 """
 
-# pylint: disable=too-many-return-statements, too-many-branches, too-many-statements
 # pylint: disable=unused-argument, too-many-locals, import-outside-toplevel
 
 from ....ir.expr import (
@@ -123,58 +122,104 @@ def codegen_cast(node: Cast, module_ctx, sys):
     return None
 
 
+# Wrapper functions to adapt function signatures for dispatch table
+def _codegen_array_write_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_array_write(node, module_ctx, sys, module_name)
+
+
+def _codegen_fifo_pop_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_fifo_pop(node, module_ctx, sys, module_name)
+
+
+def _codegen_fifo_push_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_fifo_push(node, module_ctx, sys, module_name)
+
+
+def _codegen_log_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_log(node, module_ctx, sys, module_name)
+
+
+def _codegen_binary_op_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_binary_op(node, module_ctx, sys)
+
+
+def _codegen_unary_op_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_unary_op(node, module_ctx, sys)
+
+
+def _codegen_array_read_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_array_read(node, module_ctx, sys)
+
+
+def _codegen_async_call_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_async_call(node, module_ctx, sys)
+
+
+def _codegen_pure_intrinsic_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_pure_intrinsic(node, module_ctx, sys)
+
+
+def _codegen_slice_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_slice(node, module_ctx, sys)
+
+
+def _codegen_concat_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_concat(node, module_ctx, sys)
+
+
+def _codegen_select_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_select(node, module_ctx, sys)
+
+
+def _codegen_select1hot_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_select1hot(node, module_ctx, sys)
+
+
+def _codegen_cast_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_cast(node, module_ctx, sys)
+
+
+def _codegen_bind_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
+    return codegen_bind(node, module_ctx, sys)
+
+
+# Dispatch table mapping expression types to their codegen functions
+_EXPR_CODEGEN_DISPATCH = {
+    BinaryOp: _codegen_binary_op_wrapper,
+    UnaryOp: _codegen_unary_op_wrapper,
+    ArrayRead: _codegen_array_read_wrapper,
+    ArrayWrite: _codegen_array_write_wrapper,
+    AsyncCall: _codegen_async_call_wrapper,
+    FIFOPop: _codegen_fifo_pop_wrapper,
+    PureIntrinsic: _codegen_pure_intrinsic_wrapper,
+    FIFOPush: _codegen_fifo_push_wrapper,
+    Log: _codegen_log_wrapper,
+    Slice: _codegen_slice_wrapper,
+    Concat: _codegen_concat_wrapper,
+    Select: _codegen_select_wrapper,
+    Select1Hot: _codegen_select1hot_wrapper,
+    Cast: _codegen_cast_wrapper,
+    Bind: _codegen_bind_wrapper,
+    Intrinsic: codegen_intrinsic,
+}
+
+
 def codegen_expr(node, module_ctx, sys, module_name, modules_for_callback):
     """Generate code for an expression node.
 
     This is the main dispatcher function that delegates to specific codegen functions
     based on the expression type.
     """
-    if isinstance(node, BinaryOp):
-        return codegen_binary_op(node, module_ctx, sys)
+    node_type = type(node)
 
-    if isinstance(node, UnaryOp):
-        return codegen_unary_op(node, module_ctx, sys)
+    # Try exact match first
+    codegen_func = _EXPR_CODEGEN_DISPATCH.get(node_type)
+    if codegen_func is not None:
+        return codegen_func(node, module_ctx, sys, module_name, modules_for_callback)
 
-    if isinstance(node, ArrayRead):
-        return codegen_array_read(node, module_ctx, sys)
-
-    if isinstance(node, ArrayWrite):
-        return codegen_array_write(node, module_ctx, sys, module_name)
-
-    if isinstance(node, AsyncCall):
-        return codegen_async_call(node, module_ctx, sys)
-
-    if isinstance(node, FIFOPop):
-        return codegen_fifo_pop(node, module_ctx, sys, module_name)
-
-    if isinstance(node, PureIntrinsic):
-        return codegen_pure_intrinsic(node, module_ctx, sys)
-
-    if isinstance(node, FIFOPush):
-        return codegen_fifo_push(node, module_ctx, sys, module_name)
-
-    if isinstance(node, Log):
-        return codegen_log(node, module_ctx, sys, module_name)
-
-    if isinstance(node, Slice):
-        return codegen_slice(node, module_ctx, sys)
-
-    if isinstance(node, Concat):
-        return codegen_concat(node, module_ctx, sys)
-
-    if isinstance(node, Select):
-        return codegen_select(node, module_ctx, sys)
-
-    if isinstance(node, Select1Hot):
-        return codegen_select1hot(node, module_ctx, sys)
-
-    if isinstance(node, Cast):
-        return codegen_cast(node, module_ctx, sys)
-
-    if isinstance(node, Bind):
-        return codegen_bind(node, module_ctx, sys)
-
-    if isinstance(node, Intrinsic):
-        return codegen_intrinsic(node, module_ctx, sys, module_name, modules_for_callback)
+    # Fall back to isinstance check for subclasses
+    for base_type, func in _EXPR_CODEGEN_DISPATCH.items():
+        if isinstance(node, base_type):
+            return func(node, module_ctx, sys, module_name, modules_for_callback)
 
     return None
