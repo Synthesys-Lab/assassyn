@@ -38,10 +38,21 @@ pub struct Array<T: Sized + Default + Clone> {
 Each register file can have multiple different write ports managed through a `HashMap`,
 where the key is the port ID and the value is an XEQ for that port.
 
-- The `write` method takes a `port_id` parameter and creates ports on demand.
-- `tick` commits all the pending writes from all ports to the register array payload.
+### Port ID Assignment
+
+Port IDs are assigned at **compile time** using sequential integers (0, 1, 2, ...) for optimal performance:
+- The Python code generator analyzes the system during elaboration
+- Each module writing to an array gets a unique port index
+- Port IDs are small, predictable integers instead of large hash values
+- This provides O(1) HashMap access with minimal memory overhead
+
+### Runtime Behavior
+
+- The `write` method takes a `port_id` parameter and creates ports **on demand**
+- Ports are lazily instantiated only when first used
+- `tick` commits all pending writes from all ports to the register array payload
 - When multiple writes to the same address occur in the same cycle (from different ports),
-  the last write wins.
+  the last write wins
 
 ## XEQ
 
