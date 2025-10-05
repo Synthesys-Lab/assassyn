@@ -12,6 +12,7 @@ from .expr import Expr
 if typing.TYPE_CHECKING:
     from ..array import Array
     from ..dtype import DType
+    from ..module.base import ModuleBase
 
 
 class ArrayWrite(Expr):
@@ -19,8 +20,14 @@ class ArrayWrite(Expr):
 
     ARRAY_WRITE = 401
 
-    def __init__(self, arr, idx: Value, val: Value):
+    def __init__(self, arr, idx: Value, val: Value, module: 'ModuleBase' = None):
         super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val])
+        # Get module from Singleton if not provided
+        if module is None:
+            # pylint: disable=import-outside-toplevel
+            from ...builder import Singleton
+            module = Singleton.builder.current_module
+        self.module = module
 
     @property
     def array(self) -> Array:
@@ -38,7 +45,11 @@ class ArrayWrite(Expr):
         return self._operands[2]
 
     def __repr__(self):
-        return f'{self.array.as_operand()}[{self.idx.as_operand()}] = {self.val.as_operand()}'
+        module_info = f' /* {self.module.name} */' if self.module else ''
+        return (
+            f'{self.array.as_operand()}[{self.idx.as_operand()}]'
+            f' <= {self.val.as_operand()}{module_info}'
+        )
 
 
 class ArrayRead(Expr):

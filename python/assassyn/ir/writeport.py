@@ -67,7 +67,7 @@ class WritePort:
 
         @ir_builder
         def create_write():
-            return MultiPortArrayWrite(self.array, index, value, self.module)
+            return ArrayWrite(self.array, index, value, self.module)
 
         return create_write()
 
@@ -91,31 +91,3 @@ class IndexedWritePort:
         Overload <= operator for non-blocking assignment syntax.
         '''
         return self.write_port._create_write(self.index, value)
-
-class MultiPortArrayWrite(ArrayWrite):
-    '''
-    Array write operation that tracks which module performs the write.
-    This enables multiple modules to write to the same array in parallel.
-    '''
-
-    module: 'ModuleBase'
-
-    def __init__(self, arr: 'Array', idx: 'Value', val: 'Value', module: 'ModuleBase'):
-        '''
-        Initialize a multi-port array write.
-
-        Args:
-            arr: The array being written to
-            idx: The index to write at
-            val: The value to write
-            module: The module performing this write
-        '''
-        super().__init__(arr, idx, val)
-        self.module = module
-
-    def __repr__(self):
-        module_info = f' /* {self.module.name} */' if self.module else ''
-        return (
-            f'{self.array.as_operand()}[{self.idx.as_operand()}]'
-            f' <= {self.val.as_operand()}{module_info}'
-        )
