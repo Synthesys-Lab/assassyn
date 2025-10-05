@@ -139,6 +139,12 @@ def _codegen_mem_resp(node, module_ctx, sys, **_kwargs):
         return f"let {val} = 0"
     return f"let {val} = sim.{mem_rdata}.payload.front().unwrap().clone()"
 
+def hash_string(s: str) -> int:
+    """Generate a simple stable hash for a string."""
+    h = 0
+    for c in s:
+        h = (h * 31 + ord(c)) & 0xFFFFFFFF
+    return h
 
 def _codegen_mem_write(node, module_ctx, sys):
     """Generate code for MEM_WRITE intrinsic."""
@@ -149,13 +155,15 @@ def _codegen_mem_write(node, module_ctx, sys):
     array_name = namify(array.name)
     idx_val = dump_rval_ref(module_ctx, sys, idx)
     value_val = dump_rval_ref(module_ctx, sys, value)
-    port_id = id("DRAM")
+    modules_for_callback["memory"] = module_name
+    modules_for_callback["store"] = array_name
+    port_id = hash_string(module_name)
     return f"""{{
                     let stamp = sim.stamp - sim.stamp % 100 + 50;
-                    sim.{array_name}.write_port.push(
-                        ArrayWrite::new(stamp, {idx_val} as usize, {value_val}.clone(), "{module_name}", {port_id}));
+                    let write = ArrayWrite::new(stamp, {idx_val} as usize,
+                                               {value_val}.clone(), "{module_name}");
+                    sim.{array_name}.write({port_id}, write);
                 }}"""
-
 
 # Dispatch table for intrinsic operations
 _INTRINSIC_DISPATCH = {
