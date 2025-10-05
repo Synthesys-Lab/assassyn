@@ -25,6 +25,7 @@ format:
 - 返回值：可返回新的 `Value` ，等价于一个组合逻辑的 `Func` ，根据输入产生预设的输出。也可以只产生副作用（日志、触发调用等）， 例如改变某个 `Register` 的状态。
 - 使用机制：
   1. 用于单个上游 `Module` ，组合逻辑过长，过于复杂，为了让逻辑更加简化明晰，可以让  `Module` 只负责时序逻辑，组合逻辑被拆分成多个子模块，分别由多个 `Downstream` 模块实现。
+     + hint:  [`test_downstream`](https://github.com/Synthesys-Lab/assassyn/tree/master/python/ci-tests/test_downstream.py) 和 [`test_async_call`](https://github.com/Synthesys-Lab/assassyn/tree/master/python/ci-tests/test_async_call.py) 两份代码，正是体现了这样的情况。实质上，二者满足了图灵等价性。
   2. 逻辑复用。如果一个组合逻辑被多个地方使用，可以共用一段代码，降低代码长度。
   3. 多个上游 `Module` 的输入需要进行一起处理，可以把输入都交给 `Downstream` 模块，实现预设的功能。
 
