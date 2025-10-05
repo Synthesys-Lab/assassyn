@@ -14,6 +14,16 @@ cd `dirname $0`
 # Use the repository path to set the PYTHONPATH and ASSASSYN_HOME
 REPO_PATH=`git rev-parse --show-toplevel`
 
+ENV_JSON=""
+
+function append_env_json() {
+  if [ -z "$ENV_JSON" ]; then
+    ENV_JSON="{\"$1\":\"$2\"}"
+  else
+    ENV_JSON=$(echo $ENV_JSON | jq --arg k "$1" --arg v "$2" '. + {($k): $v}')
+  fi
+}
+
 echo "Adding $REPO_PATH/python to PYTHONPATH"
 export PYTHONPATH=$REPO_PATH/python:$PYTHONPATH
 echo "Setting ASSASSYN_HOME to $REPO_PATH"
@@ -42,5 +52,15 @@ if [ ! -f "$REPO_PATH/.git/hooks/pre-commit" ]; then
 else
   echo "Pre-commit hook already installed."
 fi
+
+append_env_json "PYTHONPATH" "$PYTHONPATH"
+append_env_json "ASSASSYN_HOME" "$ASSASSYN_HOME"
+append_env_json "CARGO_TARGET_DIR" "$CARGO_TARGET_DIR"
+append_env_json "VERILATOR_ROOT" "$VERILATOR_ROOT"
+append_env_json "PATH" "$PATH"
+
+echo "Put these environment variables to your .json config:"
+echo $ENV_JSON | jq .
+
 # Go back to the original directory
 cd $RESTORE_DIR

@@ -4,8 +4,12 @@ Assassyn is a project on next-generation hardware agile design and implementatio
 
 ## Development Guideline
 
-- Use `source setup.sh` to set up the environment before running any scripts.
-  - Even for `git commit`, because of pre-commit hooks.
+- Use `setup.sh` to set up the environment before running any scripts.
+  - Run it as `source setup.sh` when you need the environment in the current shell (even before `git commit` so pre-commit hooks work).
+- When staging and committing:
+  - Follow the rule in ./docs/developer/github.md.
+  - This rule also applies to pull requests.
+  - Claude Code, DO NOT claim your co-authorship in the commit message.
 - When it comes testing, do `pytest -n 8 -x python/ci-tests` to speedup and stop at first failure.
 - `pylint` is for `python/assassyn` only, and the rc file is `python/assassyn/.pylintrc`.
   - If some refactoring is made, first run `python/ci-tests/test_driver.py` as a sanity check.
