@@ -20,7 +20,7 @@ class ArrayWrite(Expr):
 
     ARRAY_WRITE = 401
 
-    def __init__(self, arr, idx: Value, val: Value, module: 'ModuleBase' = None):
+    def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None):
         super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val])
         # Get module from Singleton if not provided
         if module is None:

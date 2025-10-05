@@ -21,10 +21,10 @@ class WritePort:
     Created via the (array & module) syntax to enable multi-port writes.
     '''
 
-    array: 'Array'
-    module: 'ModuleBase'
+    array: Array
+    module: ModuleBase
 
-    def __init__(self, array: 'Array', module: 'ModuleBase'):
+    def __init__(self, array: Array, module: ModuleBase):
         '''
         Initialize a WritePort.
 
@@ -79,8 +79,8 @@ class IndexedWritePort:
     '''
     A proxy object returned by WritePort.__getitem__ to handle the <= assignment.
     '''
-    write_port: 'WritePort'
-    index: typing.Union[int, 'Value']
+    write_port: WritePort
+    index: typing.Union[int, Value]
 
     def __init__(self, write_port, index):
         self.write_port = write_port
