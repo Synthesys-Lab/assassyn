@@ -1,5 +1,0 @@
-/app/tools/cpp-sim-runtime/build/CMakeFiles/wrapper.dir
-/app/tools/cpp-sim-runtime/build/CMakeFiles/main.dir
-/app/tools/cpp-sim-runtime/build/CMakeFiles/test.dir
-/app/tools/cpp-sim-runtime/build/CMakeFiles/edit_cache.dir
-/app/tools/cpp-sim-runtime/build/CMakeFiles/rebuild_cache.dir
