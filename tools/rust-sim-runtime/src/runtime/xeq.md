@@ -40,11 +40,11 @@ where the index is the port ID and the value is an XEQ for that port.
 
 ### Port ID Assignment
 
-Port IDs are assigned at **compile time** using sequential integers (0, 1, 2, ...) for optimal performance:
+Port IDs are assigned at **compile time** using sequential integers for optimal performance:
 - The Python code generator analyzes the system during elaboration
 - Each module writing to an array gets a unique port index
 - Port IDs are small, predictable, sequential integers
-- Pre-allocated Vec provides direct O(1) indexing (faster than HashMap)
+- Pre-allocated Vec provides direct O(1) indexing
 
 ### Runtime Behavior
 
