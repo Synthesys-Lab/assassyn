@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque};
 
 pub trait Cycled {
   fn cycle(&self) -> usize;
@@ -34,39 +34,53 @@ impl<T: Sized + Default + Clone> Cycled for ArrayWrite<T> {
 
 pub struct Array<T: Sized + Default + Clone> {
   pub payload: Vec<T>,
-  // Use HashMap with port_id as key for simpler multi-port management
-  write_ports: HashMap<usize, XEQ<ArrayWrite<T>>>,
+  // Vec-based ports for optimal performance with compile-time port indices
+  write_ports: Vec<XEQ<ArrayWrite<T>>>,
 }
 
 impl<T: Sized + Default + Clone> Array<T> {
   pub fn new(n: usize) -> Self {
     Array {
       payload: vec![T::default(); n],
-      write_ports: HashMap::new(),
+      write_ports: vec![],
     }
   }
 
   pub fn new_with_init(payload: Vec<T>) -> Self {
     Array {
       payload,
-      write_ports: HashMap::new(),
+      write_ports: vec![],
     }
   }
 
-  // Write with port_id - creates port on demand
+  pub fn new_with_ports(n: usize, num_ports: usize) -> Self {
+    Array {
+      payload: vec![T::default(); n],
+      write_ports: (0..num_ports).map(|_| XEQ::new()).collect(),
+    }
+  }
+
+  pub fn new_with_init_and_ports(payload: Vec<T>, num_ports: usize) -> Self {
+    Array {
+      payload,
+      write_ports: (0..num_ports).map(|_| XEQ::new()).collect(),
+    }
+  }
+
+  // Write with port_id - direct Vec indexing for optimal performance
   pub fn write(&mut self, port_id: usize, write: ArrayWrite<T>) {
-    self
-      .write_ports
-      .entry(port_id)
-      .or_insert_with(XEQ::new)
-      .push(write);
+    // Grow vec if needed (for backwards compatibility with on-demand creation)
+    while port_id >= self.write_ports.len() {
+      self.write_ports.push(XEQ::new());
+    }
+    self.write_ports[port_id].push(write);
   }
 
   pub fn tick(&mut self, cycle: usize) {
     // Collect all writes from all ports
     let mut pending_writes = Vec::new();
 
-    for port in self.write_ports.values_mut() {
+    for port in self.write_ports.iter_mut() {
       while let Some(write) = port.pop(cycle) {
         pending_writes.push(write);
       }
