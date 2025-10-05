@@ -77,6 +77,9 @@ def elaborate(sys, **config):
     Returns:
         Path to the generated Cargo.toml file
     """
+    # pylint: disable=import-outside-toplevel
+    from .port_mapper import reset_port_manager
+    reset_port_manager()
 
     # Generate the simulator
     manifest_path = elaborate_impl(sys, config)

@@ -35,4 +35,3 @@ class MemoryBase: # pylint: disable=too-many-instance-attributes,too-few-public-
         self.addr = None
         self.wdata = None
         self.bound = None
-        
