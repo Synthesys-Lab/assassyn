@@ -6,8 +6,8 @@ import typing
 from ...builder import Singleton, ir_builder
 from ..block import Block
 from ..dtype import DType
-from ..expr import Bind, FIFOPop, PureIntrinsic, FIFOPush, AsyncCall, Expr
-from ..expr.intrinsic import wait_until
+from ..expr import Bind, FIFOPop, FIFOPush, AsyncCall, Expr
+from ..expr.intrinsic import wait_until, PureIntrinsic
 from .base import ModuleBase, combinational_for
 
 if typing.TYPE_CHECKING:

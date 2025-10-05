@@ -4,4 +4,12 @@
 # before checking anything in.
 
 pylint --rcfile $ASSASSYN_HOME/python/.pylintrc $ASSASSYN_HOME/python/assassyn
-pytest -n 8 $ASSASSYN_HOME/python/ci-tests
+if [ $? -ne 0 ]; then
+    echo "Pylint failed, please fix the issues before committing."
+    exit 1
+fi
+pytest -n 8 -x $ASSASSYN_HOME/python/ci-tests
+if [ $? -ne 0 ]; then
+    echo "Tests failed, please fix the issues before committing."
+    exit 1
+fi

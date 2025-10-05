@@ -41,7 +41,7 @@ class Value:
 
     @ir_builder
     def __getitem__(self, x):
-        from .expr import Slice
+        from .array import Slice
         if isinstance(x, slice):
             return Slice(self, int(x.start), int(x.stop))
         assert False, "Expecting a slice object"
@@ -163,5 +163,5 @@ class Value:
     def valid(self):
         '''The frontend API to check if this value is valid.
         NOTE: This operation is only usable in downstream modules.'''
-        from .expr import PureIntrinsic
+        from .expr.intrinsic import PureIntrinsic
         return PureIntrinsic(PureIntrinsic.VALUE_VALID, self)

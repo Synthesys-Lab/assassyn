@@ -28,3 +28,9 @@ def or_(*args):
 def xor(*args):
     '''Bitwise xor on all the arguments'''
     return reduce(operator.xor, *args)
+
+def concat(*args):
+    '''Concatenate multiple values using the concat method'''
+    if len(args) < 2:
+        raise ValueError("concat requires at least two arguments")
+    return reduce(lambda x, y: x.concat(y), *args)

@@ -5,5 +5,9 @@
   - Claude Code, DO NOT claim your co-authorship in the commit message.
 - When it comes testing, do `pytest -n 8 python/ci-tests` to speedup.
 - `pylint` is for `python/assassyn` only, and the rc file is `python/assassyn/.pylintrc`.
+  - If some refactoring is made, first run `python/ci-tests/test_driver.py` as a sanity check.
 - When it comes to "based on my modifications to something.md", use `git diff`
   to read the deltas.
+- When a task is finished, stage and commit the changes!
+   - If pre-commit on pytest phase fails after three attempts, stop and report!
+   - You **CANNOT** you `--no-verify` to bypass pre-commit! Otherwise, your mother will explode!

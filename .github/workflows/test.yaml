@@ -83,7 +83,7 @@ jobs:
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/wrapper.sh"
       - name: Run Python Lint
         run:
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/py-package.sh && python -m pylint --rcfile python/.pylintrc python/assassyn"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "python -m pylint --rcfile python/.pylintrc python/assassyn"
       - name: Python Frontend Unit Tests
         run: |
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && source scripts/init/py-package.sh && source scripts/init/circt.sh && python -m pytest -n 8 python/ci-tests"

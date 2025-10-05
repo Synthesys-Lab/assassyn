@@ -6,44 +6,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #### External libraries ####
-include(FetchContent)
-set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL "Skip updating the external dependencies after populating them for the first time")
+# Reuse libraries already fetched by ramulator2
+set(RAMULATOR_EXT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../3rd-party/ramulator2/ext)
 
-message("Configuring yaml-cpp...")
-option(YAML_CPP_BUILD_CONTRIB "Enable yaml-cpp contrib in library" OFF)
-option(YAML_CPP_BUILD_TOOLS "Enable parse tools" OFF)
-option(YAML_BUILD_SHARED_LIBS "Build yaml-cpp as a shared library" OFF)
-FetchContent_Declare(
-  yaml-cpp                             
-  GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-  GIT_TAG        yaml-cpp-0.7.0                        
-  SOURCE_DIR     ${CMAKE_SOURCE_DIR}/ext/yaml-cpp
-)
-FetchContent_MakeAvailable(yaml-cpp)
-include_directories(${yaml-cpp_SOURCE_DIR}/include)
-message("Done configuring yaml-cpp.")
+message("Using yaml-cpp from ${RAMULATOR_EXT_DIR}/yaml-cpp...")
+include_directories(${RAMULATOR_EXT_DIR}/yaml-cpp/include)
 
-message("Configuring spdlog...")
-FetchContent_Declare(
-  spdlog                             
-  GIT_REPOSITORY https://github.com/gabime/spdlog.git
-  GIT_TAG        v1.11.0     
-  SOURCE_DIR     ${CMAKE_SOURCE_DIR}/ext/spdlog
-)
-FetchContent_MakeAvailable(spdlog)
-include_directories(${spdlog_SOURCE_DIR}/include)
-message("Done configuring spdlog.")
+message("Using spdlog from ${RAMULATOR_EXT_DIR}/spdlog...")
+include_directories(${RAMULATOR_EXT_DIR}/spdlog/include)
 
-message("Configuring argparse...")
-FetchContent_Declare(
-    argparse
-    GIT_REPOSITORY https://github.com/p-ranav/argparse.git
-    GIT_TAG        v2.9     
-    SOURCE_DIR     ${CMAKE_SOURCE_DIR}/ext/argparse
-)
-FetchContent_MakeAvailable(argparse)
-include_directories(${argparse_SOURCE_DIR}/include)
-message("Done configuring argparse.")
+message("Using argparse from ${RAMULATOR_EXT_DIR}/argparse...")
+include_directories(${RAMULATOR_EXT_DIR}/argparse/include)
 ##################################
 
 # Set output directories

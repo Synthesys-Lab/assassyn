@@ -7,7 +7,8 @@ from functools import wraps
 
 from ...utils import namify, unwrap_operand, identifierize
 from ...builder import ir_builder, Singleton
-from ..expr import PureIntrinsic, Operand, Expr
+from ..expr import Operand, Expr
+from ..expr.intrinsic import PureIntrinsic
 
 
 # pylint: disable=too-few-public-methods, cyclic-import

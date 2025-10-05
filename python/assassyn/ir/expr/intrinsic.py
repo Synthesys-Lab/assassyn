@@ -132,4 +132,64 @@ def mem_resp(memory):
 def use_dram(dram):
     '''Use a DRAM module.'''
     return Intrinsic(Intrinsic.USE_DRAM, dram)
-    
+
+class PureIntrinsic(Expr):
+    '''The class for accessing FIFO fields, valid, and peek'''
+
+    # FIFO operations
+    FIFO_VALID = 300
+    FIFO_PEEK  = 303
+    MODULE_TRIGGERED = 304
+    VALUE_VALID = 305
+
+    OPERATORS = {
+        FIFO_VALID: 'valid',
+        FIFO_PEEK: 'peek',
+        MODULE_TRIGGERED: 'triggered',
+        VALUE_VALID: 'valid',
+    }
+
+    def __init__(self, opcode, *args):
+        operands = list(args)
+        super().__init__(opcode, operands)
+
+    @property
+    def args(self):
+        '''Get the arguments of this intrinsic'''
+        return self._operands
+
+    @property
+    def dtype(self):
+        '''Get the data type of this intrinsic'''
+        # pylint: disable=import-outside-toplevel
+        from ..dtype import Bits
+
+        if self.opcode == PureIntrinsic.FIFO_PEEK:
+            # pylint: disable=import-outside-toplevel
+            from ..module import Port
+            fifo = self.args[0]
+            assert isinstance(fifo, Port)
+            return fifo.dtype
+
+        if self.opcode in [PureIntrinsic.FIFO_VALID, PureIntrinsic.MODULE_TRIGGERED,
+                           PureIntrinsic.VALUE_VALID]:
+            return Bits(1)
+
+        raise NotImplementedError(f'Unsupported intrinsic operation {self.opcode}')
+
+    def __repr__(self):
+        if self.opcode in [PureIntrinsic.FIFO_PEEK, PureIntrinsic.FIFO_VALID,
+                           PureIntrinsic.MODULE_TRIGGERED, PureIntrinsic.VALUE_VALID]:
+            fifo = self.args[0].as_operand()
+            return f'{self.as_operand()} = {fifo}.{self.OPERATORS[self.opcode]}()'
+        raise NotImplementedError
+
+    def __getattr__(self, name):
+        if self.opcode == PureIntrinsic.FIFO_PEEK:
+            port = self.args[0]
+            # pylint: disable=import-outside-toplevel
+            from ..module import Port
+            assert isinstance(port, Port)
+            return port.dtype.attributize(self, name)
+
+        assert False, f"Cannot access attribute {name} on {self}"
