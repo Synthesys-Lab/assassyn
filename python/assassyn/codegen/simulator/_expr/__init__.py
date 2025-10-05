@@ -121,85 +121,53 @@ def codegen_cast(node: Cast, module_ctx, sys):
 
     return None
 
-
-# Wrapper functions to adapt function signatures for dispatch table
-def _codegen_array_write_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_array_write(node, module_ctx, sys, module_name)
-
-
-def _codegen_fifo_pop_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_fifo_pop(node, module_ctx, sys, module_name)
-
-
-def _codegen_fifo_push_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_fifo_push(node, module_ctx, sys, module_name)
-
-
-def _codegen_log_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_log(node, module_ctx, sys, module_name)
-
-
-def _codegen_binary_op_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_binary_op(node, module_ctx, sys)
-
-
-def _codegen_unary_op_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_unary_op(node, module_ctx, sys)
-
-
-def _codegen_array_read_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_array_read(node, module_ctx, sys)
-
-
-def _codegen_async_call_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_async_call(node, module_ctx, sys)
-
-
-def _codegen_pure_intrinsic_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_pure_intrinsic(node, module_ctx, sys)
-
-
-def _codegen_slice_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_slice(node, module_ctx, sys)
-
-
-def _codegen_concat_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_concat(node, module_ctx, sys)
-
-
-def _codegen_select_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_select(node, module_ctx, sys)
-
-
-def _codegen_select1hot_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_select1hot(node, module_ctx, sys)
-
-
-def _codegen_cast_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_cast(node, module_ctx, sys)
-
-
-def _codegen_bind_wrapper(node, module_ctx, sys, module_name, modules_for_callback):
-    return codegen_bind(node, module_ctx, sys)
-
-
 # Dispatch table mapping expression types to their codegen functions
 _EXPR_CODEGEN_DISPATCH = {
-    BinaryOp: _codegen_binary_op_wrapper,
-    UnaryOp: _codegen_unary_op_wrapper,
-    ArrayRead: _codegen_array_read_wrapper,
-    ArrayWrite: _codegen_array_write_wrapper,
-    AsyncCall: _codegen_async_call_wrapper,
-    FIFOPop: _codegen_fifo_pop_wrapper,
-    PureIntrinsic: _codegen_pure_intrinsic_wrapper,
-    FIFOPush: _codegen_fifo_push_wrapper,
-    Log: _codegen_log_wrapper,
-    Slice: _codegen_slice_wrapper,
-    Concat: _codegen_concat_wrapper,
-    Select: _codegen_select_wrapper,
-    Select1Hot: _codegen_select1hot_wrapper,
-    Cast: _codegen_cast_wrapper,
-    Bind: _codegen_bind_wrapper,
+    BinaryOp: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_binary_op(node, module_ctx, sys)
+    ),
+    UnaryOp: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_unary_op(node, module_ctx, sys)
+    ),
+    ArrayRead: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_array_read(node, module_ctx, sys)
+    ),
+    ArrayWrite: lambda node, module_ctx, sys, module_name, _modules_for_callback: (
+        codegen_array_write(node, module_ctx, sys, module_name)
+    ),
+    AsyncCall: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_async_call(node, module_ctx, sys)
+    ),
+    FIFOPop: lambda node, module_ctx, sys, module_name, _modules_for_callback: (
+        codegen_fifo_pop(node, module_ctx, sys, module_name)
+    ),
+    PureIntrinsic: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_pure_intrinsic(node, module_ctx, sys)
+    ),
+    FIFOPush: lambda node, module_ctx, sys, module_name, _modules_for_callback: (
+        codegen_fifo_push(node, module_ctx, sys, module_name)
+    ),
+    Log: lambda node, module_ctx, sys, module_name, _modules_for_callback: (
+        codegen_log(node, module_ctx, sys, module_name)
+    ),
+    Slice: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_slice(node, module_ctx, sys)
+    ),
+    Concat: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_concat(node, module_ctx, sys)
+    ),
+    Select: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_select(node, module_ctx, sys)
+    ),
+    Select1Hot: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_select1hot(node, module_ctx, sys)
+    ),
+    Cast: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_cast(node, module_ctx, sys)
+    ),
+    Bind: lambda node, module_ctx, sys, _module_name, _modules_for_callback: (
+        codegen_bind(node, module_ctx, sys)
+    ),
     Intrinsic: codegen_intrinsic,
 }
 
