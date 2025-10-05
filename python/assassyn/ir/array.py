@@ -9,7 +9,7 @@ from .dtype import to_uint, RecordValue
 from .expr import ArrayRead, Expr,BinaryOp
 from .value import Value
 from ..utils import identifierize
-from .writeport import WritePort
+from .expr.writeport import WritePort
 
 if typing.TYPE_CHECKING:
     from .dtype import DType

@@ -7,14 +7,14 @@ To support the (array & module)[index] <= value syntax.
 from __future__ import annotations
 import typing
 
-from ..builder import ir_builder
-from .expr import ArrayWrite
-from .dtype import to_uint, RecordValue
-from .value import Value
+from ...builder import ir_builder
+from .array import ArrayWrite
+from ..dtype import to_uint, RecordValue
+from ..value import Value
 
 if typing.TYPE_CHECKING:
-    from .array import Array
-    from .module.base import ModuleBase
+    from ..array import Array
+    from ..module.base import ModuleBase
 
 class WritePort:
     '''
