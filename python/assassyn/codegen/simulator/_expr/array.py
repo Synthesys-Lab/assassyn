@@ -26,11 +26,12 @@ def codegen_array_write(node, module_ctx, sys, module_name):
     idx_val = dump_rval_ref(module_ctx, sys, idx)
     value_val = dump_rval_ref(module_ctx, sys, value)
     module_writer = namify(module.name)
-    port_id = id(module)  # Use module id as port identifier
+
+    port_id = id(module)
 
     return f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
-              sim.{array_name}.write_port.push(
-                ArrayWrite::new(stamp, {idx_val} as usize, \
-                      {value_val}.clone(), "{module_writer}", {port_id}));
+              let write = ArrayWrite::new(stamp, {idx_val} as usize,
+                                         {value_val}.clone(), "{module_writer}");
+              sim.{array_name}.write({port_id}, write);
             }}"""

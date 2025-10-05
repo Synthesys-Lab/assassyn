@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 pub trait Cycled {
   fn cycle(&self) -> usize;
@@ -11,96 +10,84 @@ pub struct ArrayWrite<T: Sized + Default + Clone> {
   addr: usize,
   data: T,
   pusher: &'static str,
-  port_id: usize, // Unique identifier for the write port
 }
 
 impl<T: Sized + Default + Clone> ArrayWrite<T> {
-  pub fn new(cycle: usize, addr: usize, data: T, pusher: &'static str, port_id: usize) -> Self {
+  pub fn new(cycle: usize, addr: usize, data: T, pusher: &'static str) -> Self {
     ArrayWrite {
       cycle,
       addr,
       data,
       pusher,
-      port_id,
     }
   }
 }
 
-// The write queue that can handle multiple writes per cycle
-pub struct PortXEQ<T: Sized + Default + Clone> {
-  // Map from cycle to list of writes for that cycle
-  q: BTreeMap<usize, Vec<ArrayWrite<T>>>,
-}
-
-impl<T: Sized + Default + Clone> PortXEQ<T> {
-  pub fn new() -> Self {
-    PortXEQ { q: BTreeMap::new() }
+impl<T: Sized + Default + Clone> Cycled for ArrayWrite<T> {
+  fn cycle(&self) -> usize {
+    self.cycle
   }
-
-  pub fn push(&mut self, event: ArrayWrite<T>) {
-    self
-      .q
-      .entry(event.cycle)
-      .or_insert_with(Vec::new)
-      .push(event);
-  }
-
-  pub fn pop_all(&mut self, current: usize) -> Vec<ArrayWrite<T>> {
-    let mut writes = Vec::new();
-
-    // Collect all writes up to current cycle
-    while let Some((&cycle, _)) = self.q.first_key_value() {
-      if cycle <= current {
-        if let Some((_, cycle_writes)) = self.q.pop_first() {
-          writes.extend(cycle_writes);
-        }
-      } else {
-        break;
-      }
-    }
-
-    writes
+  fn pusher(&self) -> &'static str {
+    self.pusher
   }
 }
 
 pub struct Array<T: Sized + Default + Clone> {
   pub payload: Vec<T>,
-  pub write_port: PortXEQ<T>,
+  // Use HashMap with port_id as key for simpler multi-port management
+  write_ports: HashMap<usize, XEQ<ArrayWrite<T>>>,
 }
 
 impl<T: Sized + Default + Clone> Array<T> {
   pub fn new(n: usize) -> Self {
     Array {
       payload: vec![T::default(); n],
-      write_port: PortXEQ::new(),
+      write_ports: HashMap::new(),
     }
   }
 
   pub fn new_with_init(payload: Vec<T>) -> Self {
     Array {
       payload,
-      write_port: PortXEQ::new(),
+      write_ports: HashMap::new(),
     }
   }
 
+  // Write with port_id - creates port on demand
+  pub fn write(&mut self, port_id: usize, write: ArrayWrite<T>) {
+    self
+      .write_ports
+      .entry(port_id)
+      .or_insert_with(XEQ::new)
+      .push(write);
+  }
+
   pub fn tick(&mut self, cycle: usize) {
-    let port_writes = self.write_port.pop_all(cycle);
+    // Collect all writes from all ports
+    let mut pending_writes = Vec::new();
 
-    // Apply writes with conflict resolution
-    // Strategy: Last write wins (could be changed to priority-based or other schemes)
-    let mut write_map: BTreeMap<usize, (T, &'static str, usize)> = BTreeMap::new();
-
-    for write in port_writes {
-      write_map.insert(write.addr, (write.data, write.pusher, write.port_id));
+    for port in self.write_ports.values_mut() {
+      while let Some(write) = port.pop(cycle) {
+        pending_writes.push(write);
+      }
     }
 
-    // Apply all writes
-    for (addr, (data, _, _)) in write_map {
-      self.payload[addr] = data;
+    // Apply writes - last write wins for conflicts
+    let mut write_map: BTreeMap<usize, T> = BTreeMap::new();
+
+    for write in pending_writes {
+      write_map.insert(write.addr, write.data);
+    }
+
+    for (addr, data) in write_map {
+      if addr < self.payload.len() {
+        self.payload[addr] = data;
+      }
     }
   }
 }
 
+// FIFO structures remain unchanged
 pub struct FIFOPush<T: Sized> {
   cycle: usize,
   data: T,
@@ -117,6 +104,15 @@ impl<T: Sized> FIFOPush<T> {
   }
 }
 
+impl<T: Sized> Cycled for FIFOPush<T> {
+  fn cycle(&self) -> usize {
+    self.cycle
+  }
+  fn pusher(&self) -> &'static str {
+    self.pusher
+  }
+}
+
 pub struct FIFOPop {
   cycle: usize,
   pusher: &'static str,
@@ -125,6 +121,15 @@ pub struct FIFOPop {
 impl FIFOPop {
   pub fn new(cycle: usize, pusher: &'static str) -> Self {
     FIFOPop { cycle, pusher }
+  }
+}
+
+impl Cycled for FIFOPop {
+  fn cycle(&self) -> usize {
+    self.cycle
+  }
+  fn pusher(&self) -> &'static str {
+    self.pusher
   }
 }
 
@@ -163,34 +168,7 @@ impl<T: Sized> FIFO<T> {
   }
 }
 
-impl<T: Sized + Default + Clone> Cycled for ArrayWrite<T> {
-  fn cycle(&self) -> usize {
-    self.cycle
-  }
-  fn pusher(&self) -> &'static str {
-    self.pusher
-  }
-}
-
-impl<T: Sized> Cycled for FIFOPush<T> {
-  fn cycle(&self) -> usize {
-    self.cycle
-  }
-  fn pusher(&self) -> &'static str {
-    self.pusher
-  }
-}
-
-impl Cycled for FIFOPop {
-  fn cycle(&self) -> usize {
-    self.cycle
-  }
-  fn pusher(&self) -> &'static str {
-    self.pusher
-  }
-}
-
-// Single-port write queue (kept for backward compatibility)
+// XEQ for exclusive events per cycle
 pub struct XEQ<T: Sized + Cycled> {
   q: BTreeMap<usize, T>,
 }
@@ -201,11 +179,11 @@ impl<T: Sized + Cycled> XEQ<T> {
   }
 
   pub fn push(&mut self, event: T) {
-    if let Some(a) = self.q.get(&event.cycle()) {
+    if let Some(existing) = self.q.get(&event.cycle()) {
       panic!(
         "{}: Already occupied by {}, cannot accept {}!",
-        super::utils::cyclize(a.cycle()),
-        a.pusher(),
+        super::utils::cyclize(existing.cycle()),
+        existing.pusher(),
         event.pusher()
       );
     } else {
