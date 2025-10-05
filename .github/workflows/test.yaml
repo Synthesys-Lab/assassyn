@@ -77,7 +77,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-wrapper-
       - name: Build and Install wrapper in Container #if cache miss
-        if: steps.cache-wrapper.outputs.cache-hit != 'true'
+        # if: steps.cache-wrapper.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building and installing wrapper"
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/wrapper.sh"
