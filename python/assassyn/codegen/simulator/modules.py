@@ -69,7 +69,6 @@ class ElaborateModule(Visitor):
         kwargs = {}
         if (self.callback_metadata and self.callback_metadata.memory and
                 self.callback_metadata.store):
-            kwargs['module_name'] = self.module_name
             kwargs['modules_for_callback'] = {
                 'memory': self.callback_metadata.memory,
                 'store': self.callback_metadata.store

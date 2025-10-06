@@ -146,7 +146,7 @@ def _codegen_mem_write(node, module_ctx, sys, **kwargs):
     # pylint: disable=import-outside-toplevel
     from ..port_mapper import get_port_manager
 
-    module_name = kwargs.get('module_name')
+    module_name = module_ctx.name
     modules_for_callback = kwargs.get('modules_for_callback')
     array = node.args[0]
     idx = node.args[1]
