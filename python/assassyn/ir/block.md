@@ -3,7 +3,7 @@ The `block.py` module defines the `Block` class hierarchy for representing contr
 
 ```python
 class Block:
-    kind: int                                         # Kind of block (MODULE_ROOT, CONDITIONAL, CYCLE, SRAM)
+    kind: int                                         # Kind of block (MODULE_ROOT, CONDITIONAL, CYCLE)
     _body: list[Expr]                                # List of instructions in the block
     parent: typing.Union[typing.Self, ModuleBase]    # Parent block
     module: typing.Optional[ModuleBase]              # Module of this block
@@ -14,7 +14,6 @@ The module defines several block kinds as class constants:
 - `MODULE_ROOT = 0` - Root block of a module
 - `CONDITIONAL = 1` - Conditional execution block
 - `CYCLE = 2` - Cycle-based block for testbench generation
-- `SRAM = 3` - SRAM-related block for memory block operations in hardware designs
 
 ## Exposed Interface
 The `block.py` module provides the `Condition` and `Cycle` functions for creating specialized blocks, along with block management methods.

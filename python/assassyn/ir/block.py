@@ -23,7 +23,6 @@ class Block:
     MODULE_ROOT = 0
     CONDITIONAL = 1
     CYCLE       = 2
-    SRAM        = 3
 
     def __init__(self, kind: int):
         self.kind = kind
