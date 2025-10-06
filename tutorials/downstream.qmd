@@ -40,7 +40,7 @@ format:
 
 ### 数据操作
 
-- `Adder.build` 方法的通过形参获得需要的普通 `Value` 或者 `Register` 寄存器 （`test_downstream.py:37`）。
+- `Adder.build` 方法通过形参获得需要的普通 `Value` 或者 `Register` 寄存器 （`test_downstream.py:37`）。
 - 下游组合逻辑里可以直接对 `Value` 做算术、逻辑变换，与 `Module` 裡的组合部分写法一致。
 
 
