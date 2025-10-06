@@ -138,48 +138,75 @@ class ElaborateModule(Visitor):
         return "".join(result)
 
 
-def dump_modules(sys: SysBuilder, fd):
-    """Generate the modules.rs file.
+def dump_modules(sys: SysBuilder, modules_dir):
+    """Generate individual module files in the modules/ directory.
 
-    This matches the Rust function in src/backend/simulator/elaborate.rs
+    This creates separate files for each module and a mod.rs file for declarations.
     """
-    # Add imports
-    fd.write("""
-use sim_runtime::*;
+    # Create modules directory
+    modules_dir.mkdir(exist_ok=True)
+
+    # Generate each module's implementation
+    callback_metadata = collect_callback_intrinsics(sys)
+    em = ElaborateModule(sys, callback_metadata)
+
+    # Create mod.rs file with imports and callback function
+    mod_rs_path = modules_dir / "mod.rs"
+    with open(mod_rs_path, 'w', encoding="utf-8") as mod_fd:
+        # Add imports
+        mod_fd.write("""use sim_runtime::*;
 use super::simulator::Simulator;
 use std::collections::VecDeque;
 use sim_runtime::num_bigint::{BigInt, BigUint};
 use sim_runtime::libloading::{Library, Symbol};
 use std::ffi::{CString, c_char, c_float, c_longlong, c_void};
-use std::sync::Arc;""")
+use std::sync::Arc;
 
-    # Generate each module's implementation
-    callback_metadata = collect_callback_intrinsics(sys)
-    em = ElaborateModule(sys, callback_metadata)
-    if (
-        callback_metadata.memory
-        and callback_metadata.store
-        and callback_metadata.mem_user_rdata
-    ):
-        fd.write(f"""
-    extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
-        unsafe {{
-            let req = &*req;
-            let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
-            let cycles = (req.depart - req.arrive) as usize;
-            let stamp = sim.request_stamp_map_table
-                .remove(&req.addr)
-                .unwrap_or_else(|| sim.stamp);
-            sim.{callback_metadata.mem_user_rdata}.push.push(FIFOPush::new(
-                stamp + 100 * cycles,
-                sim.{callback_metadata.store}.payload[req.addr as usize].clone().try_into().unwrap(),
-                "{callback_metadata.memory}",
-            ));
-        }}
-    }}""")
-    for module in sys.modules[:] + sys.downstreams[:]:
-        # Then, second time dump for real visit modules
-        module_code = em.visit_module(module)
-        fd.write(module_code)
+""")
+
+        # Add callback function if needed
+        if (
+            callback_metadata.memory
+            and callback_metadata.store
+            and callback_metadata.mem_user_rdata
+        ):
+            mod_fd.write(f"""extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
+    unsafe {{
+        let req = &*req;
+        let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
+        let cycles = (req.depart - req.arrive) as usize;
+        let stamp = sim.request_stamp_map_table
+            .remove(&req.addr)
+            .unwrap_or_else(|| sim.stamp);
+        sim.{callback_metadata.mem_user_rdata}.push.push(FIFOPush::new(
+            stamp + 100 * cycles,
+            sim.{callback_metadata.store}.payload[req.addr as usize].clone().try_into().unwrap(),
+            "{callback_metadata.memory}",
+        ));
+    }}
+}}
+
+""")
+
+        # Generate module declarations and individual files
+        for module in sys.modules[:] + sys.downstreams[:]:
+            module_name = namify(module.name)
+
+            # Add module declaration to mod.rs
+            mod_fd.write(f"pub mod {module_name};\n")
+
+            # Create individual module file
+            module_file_path = modules_dir / f"{module_name}.rs"
+            with open(module_file_path, 'w', encoding="utf-8") as module_fd:
+                # Add imports for the individual module
+                module_fd.write("""use sim_runtime::*;
+use sim_runtime::num_bigint::{BigInt, BigUint};
+use crate::simulator::Simulator;
+
+""")
+
+                # Generate module implementation
+                module_code = em.visit_module(module)
+                module_fd.write(module_code)
 
     return True

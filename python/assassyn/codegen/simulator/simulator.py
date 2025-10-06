@@ -97,6 +97,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("use sim_runtime::*;\n")
     fd.write("use std::collections::VecDeque;\n")
     fd.write("use std::collections::HashMap;\n")
+    fd.write("use crate::modules;\n")
     platform_os = platform.system().lower()
     if platform_os == 'darwin':
         x = "use sim_runtime::libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n"
@@ -248,7 +249,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
             fd.write(f"    if {conds} {{\n")
 
         # Call module function and handle result
-        fd.write(f"      let succ = super::modules::{module_name}(self);\n")
+        fd.write(f"      let succ = modules::{module_name}::{module_name}(self);\n")
 
         if not isinstance(module, Downstream):
             # Pop event on success

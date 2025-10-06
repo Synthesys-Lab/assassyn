@@ -48,9 +48,9 @@ def elaborate_impl(sys, config):
     # Create rustfmt for the generated project
     shutil.copy(Path(repo_path()) / "rustfmt.toml", simulator_path / "rustfmt.toml")
 
-    # Generate modules.rs
-    with open(simulator_path / "src/modules.rs", 'w', encoding="utf-8") as fd:
-        dump_modules(sys, fd)
+    # Generate modules directory and files
+    modules_dir = simulator_path / "src" / "modules"
+    dump_modules(sys, modules_dir)
 
     # Generate simulator.rs
     with open(simulator_path / "src/simulator.rs", 'w', encoding='utf-8') as fd:
