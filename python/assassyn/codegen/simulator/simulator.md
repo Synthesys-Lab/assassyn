@@ -88,7 +88,7 @@ move to the next cycle. See below for more details.
 There are a `MemoryInterface`, and a `request_stamp_map_table` to interact with the memory system.
 The memory interface is simulated by [ramulator2](../../../../3rd-party/ramulator2/)
 included in 3rd-party directory, and we developed a [C wrapper](../../../../tools/raumulator-c-wrapper/)
-for froeign function interface (FFI).
+for foreign function interface (FFI).
 
 ### Register Arrays
 
