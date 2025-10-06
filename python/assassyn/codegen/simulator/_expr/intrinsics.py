@@ -183,7 +183,7 @@ _INTRINSIC_DISPATCH = {
 }
 
 
-def codegen_intrinsic(node: Intrinsic, module_ctx, sys):
+def codegen_intrinsic(node: Intrinsic, module_ctx, sys, **kwargs):
     """Generate code for intrinsic operations."""
     intrinsic = node.opcode
     codegen_func = _INTRINSIC_DISPATCH.get(intrinsic)
@@ -192,5 +192,6 @@ def codegen_intrinsic(node: Intrinsic, module_ctx, sys):
             node,
             module_ctx,
             sys,
+            **kwargs
         )
     return None

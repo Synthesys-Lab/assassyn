@@ -66,7 +66,14 @@ class ElaborateModule(Visitor):
             id_and_exposure = (id_expr, need_exposure)
 
         # Generate code using the codegen_expr helper
-        code = codegen_expr(node, self.module_ctx, self.sys)
+        kwargs = {}
+        if self.callback_metadata and self.callback_metadata.memory and self.callback_metadata.store:
+            kwargs['module_name'] = self.module_name
+            kwargs['modules_for_callback'] = {
+                'memory': self.callback_metadata.memory,
+                'store': self.callback_metadata.store
+            }
+        code = codegen_expr(node, self.module_ctx, self.sys, **kwargs)
 
         # Format the result with proper indentation and variable assignment
         indent_str = " " * self.indent

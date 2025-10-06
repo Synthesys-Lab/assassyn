@@ -143,7 +143,7 @@ _EXPR_CODEGEN_DISPATCH = {
 }
 
 
-def codegen_expr(node, module_ctx, sys):
+def codegen_expr(node, module_ctx, sys, **kwargs):
     """Generate code for an expression node.
 
     This is the main dispatcher function that delegates to specific codegen functions
@@ -154,11 +154,19 @@ def codegen_expr(node, module_ctx, sys):
     # Try exact match first
     codegen_func = _EXPR_CODEGEN_DISPATCH.get(node_type)
     if codegen_func is not None:
+        if node_type == ArrayWrite:
+            return codegen_func(node, module_ctx, sys, module_ctx.name)
+        elif node_type == Intrinsic:
+            return codegen_func(node, module_ctx, sys, **kwargs)
         return codegen_func(node, module_ctx, sys)
 
     # Fall back to isinstance check for subclasses
     for base_type, func in _EXPR_CODEGEN_DISPATCH.items():
         if isinstance(node, base_type):
+            if base_type == ArrayWrite:
+                return func(node, module_ctx, sys, module_ctx.name)
+            elif base_type == Intrinsic:
+                return func(node, module_ctx, sys, **kwargs)
             return func(node, module_ctx, sys)
 
     return None
