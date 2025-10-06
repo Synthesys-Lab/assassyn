@@ -14,7 +14,7 @@ The module defines several block kinds as class constants:
 - `MODULE_ROOT = 0` - Root block of a module
 - `CONDITIONAL = 1` - Conditional execution block
 - `CYCLE = 2` - Cycle-based block for testbench generation
-- `SRAM = 3` - SRAM-related block
+- `SRAM = 3` - SRAM-related block for memory block operations in hardware designs
 
 ## Exposed Interface
 The `block.py` module provides the `Condition` and `Cycle` functions for creating specialized blocks, along with block management methods.
@@ -112,7 +112,7 @@ def iter(self)  # Iterate over the block
 ```python
 def __enter__(self) -> Block  # Designate the scope of entering the block
 ```
-- **Description:** Sets up the block context when entering a `with` statement, establishing parent-child relationships.
+- **Description:** Sets up the block context when entering a `with` statement. Establishes parent-child relationships by assigning the current block/module as parent, sets the module reference, and switches the builder context with assertions for safe nesting.
 - **Returns:** The block instance for use in the `with` statement.
 
 -------
@@ -136,6 +136,7 @@ def __repr__(self) -> str  # String representation with proper indentation
 -------
 
 ## CondBlock Class
+**Inherits from:** `Block`
 
 ### `__init__(self, cond)`
 ```python
@@ -157,6 +158,7 @@ def __repr__(self) -> str  # String representation of conditional block
 -------
 
 ## CycledBlock Class
+**Inherits from:** `Block`
 
 ### `__init__(self, cycle)`
 ```python
