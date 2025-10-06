@@ -9,7 +9,8 @@ from .utils import dtype_to_rust_type, int_imm_dumper_impl, fifo_name
 from ...builder import SysBuilder
 from ...ir.block import CycledBlock
 from ...ir.expr import Expr,Bind
-from ...ir.module import Downstream, Module, SRAM
+from ...ir.module import Downstream, Module
+from ...ir.memory.sram import SRAM
 from ...utils import namify, repo_path
 from .port_mapper import get_port_manager
 
@@ -309,7 +310,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         init_file_path = os.path.join(config.get('resource_base', '.'), sram.init_file)
         init_file_path = os.path.normpath(init_file_path)
         init_file_path = init_file_path.replace('//', '/')
-        array = sram.payload
+        array = sram._payload  # pylint: disable=protected-access
         array_name = namify(array.name)
         fd.write(f'  load_hex_file(&mut sim.{array_name}.payload, "{init_file_path}");\n')
 

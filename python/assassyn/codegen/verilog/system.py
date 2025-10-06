@@ -1,6 +1,6 @@
 """System-level code generation utilities."""
 
-from ...ir.module import SRAM
+from ...ir.memory.sram import SRAM
 from ...ir.expr import AsyncCall, ArrayRead, ArrayWrite
 from ...analysis import get_upstreams
 

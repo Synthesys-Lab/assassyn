@@ -10,7 +10,8 @@ from .utils import (
     get_sram_info,
 )
 
-from ...ir.module import Downstream, SRAM
+from ...ir.module import Downstream
+from ...ir.memory.sram import SRAM
 from ...ir.expr import (
     Expr,
     FIFOPush,
@@ -107,7 +108,7 @@ def generate_top_harness(dumper):
     for arr_container in dumper.sys.arrays:
         arr = arr_container
         is_sram_array = any(isinstance(m, SRAM) and
-                            m.payload == arr for m in dumper.sys.downstreams)
+                           m._payload == arr for m in dumper.sys.downstreams)  # pylint: disable=protected-access
         if is_sram_array:
             continue
         arr_name = namify(arr.name)

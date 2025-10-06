@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 from .testbench import generate_testbench
 from .design import generate_design
-from ...ir.module import SRAM
+from ...ir.memory.sram import SRAM
 from .utils import extract_sram_params
 
 from ...builder import SysBuilder

@@ -9,6 +9,6 @@
   - If some refactoring is made, first run `python/ci-tests/test_driver.py` as a sanity check.
 - When it comes to "based on my modifications to something.md", use `git diff`
   to read the deltas.
-- When a task is finished, stage and commit the changes!
+- If not specified, when a task is finished, stage and commit the changes!
    - If pre-commit on pytest phase fails after three attempts, stop and report!
    - You **CANNOT** you `--no-verify` to bypass pre-commit! Otherwise, your mother will explode!

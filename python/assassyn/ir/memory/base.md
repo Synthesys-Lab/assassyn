@@ -25,9 +25,12 @@ class MemoryBase(Downstream):
     addr_width: int # Width of the address in bits
 
     # The array payload as per the depth and width
-    payload: Array  # Array holding the memory contents
+    _payload: Array  # Array holding the memory contents
 ```
 
 The module provides a constructor, `__init__()`, which checks
 all the assumptions of the un-derived values, and derive the values.
-The payload array if from [ir/array.py](../array.py).
+The payload array if from [ir/array.py](../array.py), `RegArray(UInt(width), depth)`,
+to emulate the behavior of data array.
+A `_` should be added to `_payload` to make it private.
+As it is not intended for user direct access!

@@ -8,7 +8,7 @@ from typing import Optional
 from ....ir.expr import ArrayRead, ArrayWrite, FIFOPop, FIFOPush
 from ....ir.const import Const
 from ....ir.dtype import Record, Bits
-from ....ir.module import SRAM
+from ....ir.memory.sram import SRAM
 from ....utils import unwrap_operand, namify
 from ..utils import dump_type, dump_type_cast
 
@@ -19,7 +19,7 @@ def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
     is_sram_payload = False
 
     if isinstance(dumper.current_module, SRAM):
-        if array_ref == dumper.current_module.payload:
+        if array_ref == dumper.current_module._payload:  # pylint: disable=protected-access
             is_sram_payload = True
 
     rval = dumper.dump_rval(expr, False)

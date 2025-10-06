@@ -3,7 +3,6 @@
 from .downstream import Downstream
 from ..memory.base import MemoryBase
 from .downstream import combinational as downstream_combinational
-from .module import Module
 from .module import combinational as module_combinational
 from ..array import Array
 from ..block import Condition
@@ -12,7 +11,7 @@ from ..expr import Bind
 from ..value import Value
 from ..expr import mem_write, send_read_request, has_mem_resp, send_write_request, use_dram
 
-class DRAM(Module): # pylint: disable=too-many-instance-attributes, duplicate-code
+class DRAM(MemoryBase): # pylint: disable=too-many-instance-attributes, duplicate-code
     '''The DRAM module.'''
     #pylint: disable=duplicate-code
     width: int  # Width of the memory in bits
@@ -26,8 +25,7 @@ class DRAM(Module): # pylint: disable=too-many-instance-attributes, duplicate-co
     bound: Bind  # Bind handle
 
     def __init__(self, width, depth, init_file):
-        super().__init__(ports={})
-        MemoryBase.__init__(self, width, depth, init_file)
+        super().__init__(width, depth, init_file)
         self.bound = None
 
     @module_combinational
@@ -46,7 +44,7 @@ class DRAM(Module): # pylint: disable=too-many-instance-attributes, duplicate-co
         bound: Bind: The bound handle of the user module.
         '''
         dram_handler = DramHandler(self.width, handle_response, we, re)
-        self.bound = dram_handler.build(self.payload, addr, wdata)
+        self.bound = dram_handler.build(self._payload, addr, wdata)
         return self.bound
 
     def __repr__(self):

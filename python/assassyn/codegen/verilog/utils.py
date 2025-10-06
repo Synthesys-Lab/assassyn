@@ -2,15 +2,16 @@
 import re
 from typing import Optional
 
-from ...ir.module import Module,SRAM
+from ...ir.module import Module
+from ...ir.memory.sram import SRAM
 from ...ir.expr import Intrinsic
 from ...ir.dtype import Int, UInt, Bits, DType, Record
 from ...utils import namify
 
 def get_sram_info(node: SRAM) -> dict:
     """Extract SRAM-specific information."""
-    return {
-        'array': node.payload,
+    return {  # pylint: disable=protected-access
+        'array': node._payload,
         'init_file': node.init_file,
         'width': node.width,
         'depth': node.depth

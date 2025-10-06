@@ -6,7 +6,8 @@ from .utils import (
     get_sram_info,
 )
 
-from ...ir.module import Downstream, SRAM, Module, Port, Wire
+from ...ir.module import Downstream, Module, Port, Wire
+from ...ir.memory.sram import SRAM
 from ...ir.array import Array, Slice
 from ...ir.const import Const
 from ...ir.expr import (

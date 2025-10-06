@@ -2,7 +2,6 @@
 
 from .module import Module, Port, Wire, combinational
 from .downstream import Downstream
-from .sram import SRAM
 from .dram import DRAM
 
 # For backward compatibility, downstream_combinational is the same as combinational

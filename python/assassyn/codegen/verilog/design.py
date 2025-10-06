@@ -13,7 +13,8 @@ from .utils import (
 )
 
 from ...analysis import expr_externally_used
-from ...ir.module import Module, Downstream, SRAM
+from ...ir.module import Module, Downstream
+from ...ir.memory.sram import SRAM
 from ...ir.module.external import ExternalSV
 from ...builder import SysBuilder
 from ...ir.visitor import Visitor
