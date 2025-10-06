@@ -190,12 +190,9 @@
         fd.write(f'  load_hex_file(&mut sim.{array_name}.payload, "{init_file_path}");\n')
 
     # In elaborate.py - include both modules and downstreams when generating code
-    em = ElaborateModule(sys)
+    dict_modules_callback = collect_callback_intrinsics(sys)
+    em = ElaborateModule(sys, dict_modules_callback)
     for module in sys.modules[:] + sys.downstreams[:]:
-        dict_modules_callback = em.visit_module_for_callback(module)
-    # ... later ...
-    for module in sys.modules[:] + sys.downstreams[:]:
-        # Then, second time dump
         module_code = em.visit_module(module)
         fd.write(module_code)
     ```

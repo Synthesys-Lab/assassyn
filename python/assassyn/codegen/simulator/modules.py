@@ -13,6 +13,7 @@ from ...ir.expr import Expr
 from ...utils import namify
 from .node_dumper import dump_rval_ref
 from ...analysis import expr_externally_used
+from .callback_collector import collect_callback_intrinsics
 
 if typing.TYPE_CHECKING:
     from ...ir.module import Module
@@ -21,21 +22,14 @@ if typing.TYPE_CHECKING:
 class ElaborateModule(Visitor):
     """Visitor for elaborating modules with multi-port write support."""
 
-    def __init__(self, sys):
+    def __init__(self, sys, modules_for_callback=None):
         """Initialize the module elaborator."""
         super().__init__()
         self.sys = sys
         self.indent = 0
         self.module_name = ""
         self.module_ctx = None
-        self.modules_for_callback = {}
-
-    def visit_module_for_callback(self, node: Module):
-        """Visit a module to collect module names for callback."""
-        self.module_name = node.name
-        self.module_ctx = node
-        self.visit_block(node.body)
-        return self.modules_for_callback
+        self.modules_for_callback = modules_for_callback or {}
 
     def visit_module(self, node: Module):
         """Visit a module and generate its implementation."""
@@ -156,10 +150,8 @@ use std::ffi::{CString, c_char, c_float, c_longlong, c_void};
 use std::sync::Arc;""")
 
     # Generate each module's implementation
-    dict_modules_callback = {}
-    em = ElaborateModule(sys)
-    for module in sys.modules[:] + sys.downstreams[:]:
-        dict_modules_callback = em.visit_module_for_callback(module)
+    dict_modules_callback = collect_callback_intrinsics(sys)
+    em = ElaborateModule(sys, dict_modules_callback)
     required_keys = ["memory", "store", "MemUser_rdata"]
     if all(dict_modules_callback.get(k) is not None for k in required_keys):
         fd.write(f"""
