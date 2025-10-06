@@ -13,7 +13,7 @@ from ...ir.expr import Expr
 from ...utils import namify
 from .node_dumper import dump_rval_ref
 from ...analysis import expr_externally_used
-from .callback_collector import collect_callback_intrinsics
+from .callback_collector import collect_callback_intrinsics, CallbackMetadata
 
 if typing.TYPE_CHECKING:
     from ...ir.module import Module
@@ -22,14 +22,14 @@ if typing.TYPE_CHECKING:
 class ElaborateModule(Visitor):
     """Visitor for elaborating modules with multi-port write support."""
 
-    def __init__(self, sys, modules_for_callback=None):
+    def __init__(self, sys, callback_metadata: CallbackMetadata | None = None):
         """Initialize the module elaborator."""
         super().__init__()
         self.sys = sys
         self.indent = 0
         self.module_name = ""
         self.module_ctx = None
-        self.modules_for_callback = modules_for_callback or {}
+        self.callback_metadata = callback_metadata
 
     def visit_module(self, node: Module):
         """Visit a module and generate its implementation."""
@@ -66,8 +66,7 @@ class ElaborateModule(Visitor):
             id_and_exposure = (id_expr, need_exposure)
 
         # Generate code using the codegen_expr helper
-        code = codegen_expr(node, self.module_ctx, self.sys, self.module_name,
-                           self.modules_for_callback)
+        code = codegen_expr(node, self.module_ctx, self.sys, self.module_name)
 
         # Format the result with proper indentation and variable assignment
         indent_str = " " * self.indent
@@ -150,10 +149,13 @@ use std::ffi::{CString, c_char, c_float, c_longlong, c_void};
 use std::sync::Arc;""")
 
     # Generate each module's implementation
-    dict_modules_callback = collect_callback_intrinsics(sys)
-    em = ElaborateModule(sys, dict_modules_callback)
-    required_keys = ["memory", "store", "MemUser_rdata"]
-    if all(dict_modules_callback.get(k) is not None for k in required_keys):
+    callback_metadata = collect_callback_intrinsics(sys)
+    em = ElaborateModule(sys, callback_metadata)
+    if (
+        callback_metadata.memory
+        and callback_metadata.store
+        and callback_metadata.mem_user_rdata
+    ):
         fd.write(f"""
     extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
         unsafe {{
@@ -163,11 +165,10 @@ use std::sync::Arc;""")
             let stamp = sim.request_stamp_map_table
                 .remove(&req.addr)
                 .unwrap_or_else(|| sim.stamp);
-            sim.{dict_modules_callback.get("MemUser_rdata")}.push.push(FIFOPush::new(
+            sim.{callback_metadata.mem_user_rdata}.push.push(FIFOPush::new(
                 stamp + 100 * cycles,
-                sim.{dict_modules_callback.
-                     get("store")}.payload[req.addr as usize].clone().try_into().unwrap(),
-                "{dict_modules_callback.get("memory")}",
+                sim.{callback_metadata.store}.payload[req.addr as usize].clone().try_into().unwrap(),
+                "{callback_metadata.memory}",
             ));
         }}
     }}""")

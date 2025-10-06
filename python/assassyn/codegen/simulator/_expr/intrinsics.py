@@ -7,8 +7,8 @@ This module contains helper functions to generate simulator code for intrinsic o
 # pylint: disable=import-outside-toplevel
 
 from ....ir.expr.intrinsic import PureIntrinsic, Intrinsic
-from ..utils import fifo_name
 from ....utils import namify
+from ..callback_collector import get_current_callback_metadata
 from ..node_dumper import dump_rval_ref
 
 
@@ -115,46 +115,40 @@ def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
                 """
 
 
-def _codegen_use_dram(node, module_ctx, sys, **kwargs):
-    """Generate code for USE_DRAM intrinsic."""
-    modules_for_callback = kwargs.get('modules_for_callback')
-    fifo = node.args[0]
-    fifo_id = fifo_name(fifo)
-    modules_for_callback["MemUser_rdata"] = fifo_id
+def _codegen_use_dram(node, module_ctx, sys, **_kwargs):
+    """Generate code for USE_DRAM intrinsic (metadata handled elsewhere)."""
+    return None
 
 
-def _codegen_has_mem_resp(node, module_ctx, sys, **kwargs):
+def _codegen_has_mem_resp(node, module_ctx, sys, **_kwargs):
     """Generate code for HAS_MEM_RESP intrinsic."""
-    modules_for_callback = kwargs.get('modules_for_callback')
+    metadata = get_current_callback_metadata()
     val = dump_rval_ref(module_ctx, sys, node)
-    if not modules_for_callback.get("MemUser_rdata"):
+    mem_rdata = metadata.mem_user_rdata
+    if not mem_rdata:
         return f"let {val} = false"
-    mem_rdata = modules_for_callback["MemUser_rdata"]
     return f"let {val} = sim.{mem_rdata}.payload.is_empty() == false"
 
 
-def _codegen_mem_resp(node, module_ctx, sys, **kwargs):
+def _codegen_mem_resp(node, module_ctx, sys, **_kwargs):
     """Generate code for MEM_RESP intrinsic."""
-    modules_for_callback = kwargs.get('modules_for_callback')
+    metadata = get_current_callback_metadata()
     val = dump_rval_ref(module_ctx, sys, node)
-    if not modules_for_callback.get("MemUser_rdata"):
+    mem_rdata = metadata.mem_user_rdata
+    if not mem_rdata:
         return f"let {val} = 0"
-    mem_rdata = modules_for_callback["MemUser_rdata"]
     return f"let {val} = sim.{mem_rdata}.payload.front().unwrap().clone()"
 
 
 def _codegen_mem_write(node, module_ctx, sys, **kwargs):
     """Generate code for MEM_WRITE intrinsic."""
     module_name = kwargs.get('module_name')
-    modules_for_callback = kwargs.get('modules_for_callback')
     array = node.args[0]
     idx = node.args[1]
     value = node.args[2]
     array_name = namify(array.name)
     idx_val = dump_rval_ref(module_ctx, sys, idx)
     value_val = dump_rval_ref(module_ctx, sys, value)
-    modules_for_callback["memory"] = module_name
-    modules_for_callback["store"] = array_name
     port_id = id("DRAM")
     return f"""{{
                     let stamp = sim.stamp - sim.stamp % 100 + 50;
@@ -178,7 +172,7 @@ _INTRINSIC_DISPATCH = {
 }
 
 
-def codegen_intrinsic(node: Intrinsic, module_ctx, sys, module_name, modules_for_callback):
+def codegen_intrinsic(node: Intrinsic, module_ctx, sys, module_name):
     """Generate code for intrinsic operations."""
     intrinsic = node.opcode
     codegen_func = _INTRINSIC_DISPATCH.get(intrinsic)
@@ -188,6 +182,5 @@ def codegen_intrinsic(node: Intrinsic, module_ctx, sys, module_name, modules_for
             module_ctx,
             sys,
             module_name=module_name,
-            modules_for_callback=modules_for_callback
         )
     return None
