@@ -146,7 +146,7 @@ time stamp is smaller the current global time stamp, `self.stamp`. If so, the mo
   pub fn reset_downstream(&mut self);
 ```
 
-- As downstreams aceept purely combinational logic, all their values are volatile, so all the values in the exposed
+- As downstreams accept purely combinational logic, all their values are volatile, so all the values in the exposed
   value shall be reset to `None` at the beginning of each cycle by this function.
 - As downstreams are driven by upper stream pipeline stages, if a downstream is triggered is determined by
   its upstream stage triggers. Thus, all the `<module_name>_triggered` flags are reset to `false` at the beginning of each cycle.
