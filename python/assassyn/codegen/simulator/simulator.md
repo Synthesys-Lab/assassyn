@@ -1,0 +1,296 @@
+# Rust Simulator Dumper
+
+This module dumps the simulator code.
+All dumped simulators is the strucuture as following:
+
+## Exposed Interface
+
+```rust
+def dump_simulator(sys: SysBuilder, config, fd);
+```
+
+- `sys`: The pipelined system to be simulated.
+- `config`: The configuration of the simulation, including the cycle limit, and randomization.
+- `fd`: The file descriptor to write the simulator code.
+
+The dumped simulator code will be explained in the following sections.
+
+## Header
+
+```rust
+// use sim_runtime::libloading::os::unix::{Library, Symbol, RTLD_GLOBAL, RTLD_LAZY};
+use sim_runtime::num_bigint::{BigInt, BigUint};
+use sim_runtime::rand::seq::SliceRandom;
+use sim_runtime::*;
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::sync::Arc;
+```
+
+To reduce the redundant compilation, all the external libraries are re-exported in
+[sim_runtime](../../../../tools/rust-sim-runtime/) crate.
+
+The first line of libloading is commented, because it is platform dependent.
+MacOS and Linux have different behaviors of loading dynamic libraries linked
+with other dynamic libraries.
+
+```rust
+// MacOS
+use sim_runtime::libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};
+// Linux
+use sim_runtime::libloading::Library;
+```
+
+To handle this, we also have a helper function to get `.so` or `.dylib` suffix to dump.
+```python
+def dynamiclib_suffix()
+```
+
+## Simulator Context Fields
+
+```rust
+pub struct Simulator {
+  pub stamp: usize,
+  pub mem_interface: MemoryInterface,
+  pub request_stamp_map_table: HashMap<i64, usize>,
+  /* RegArray's */
+  /* Stage Bookkeeping */
+}
+
+impl Simulator {
+  pub fn new() -> Self {
+    let mem = unsafe {
+      // MacOS
+      let lib = Library::open(Some("/path/to/libwrapper" /*suffix*/), RTLD_GLOBAL | RTLD_LAZY,).unwrap();
+      MemoryInterface::new(lib.into()).expect("Failed to create MemoryInterface")
+    };
+    Simulator {
+      stamp: 0,
+      request_stamp_map_table: HashMap::new(),
+      /* Reg Array's initialization */
+      /* Module bookkeeping initialization */
+      /* Values exposed to external modules. */
+    }
+  }
+}
+```
+
+### Common Fields
+
+The simulator context contains a global time `stamp`, to record the current cycle
+of simulation. The time `stamp` is incremented by 25, 25, 50 in each cycle, to simulate
+pipeline stage module, downstream module, and register arrays, respectively, and then
+move to the next cycle. See below for more details.
+
+> TODO: Move this memory system to declaration-oriented code generation, too.
+
+There are a `MemoryInterface`, and a `request_stamp_map_table` to interact with the memory system.
+The memory interface is simulated by [ramulator2](../../../../3rd-party/ramulator2/)
+included in 3rd-party directory, and we developed a [C wrapper](../../../../tools/raumulator-c-wrapper/)
+for froeign function interface (FFI).
+
+### Register Arrays
+
+Our code generator traverses all arrays in the system to gather all their identifiers, types,
+and initial values to fill in the `Simulator` fields, and the constructor, `new()`, function.
+Each array is instantiated as a `Array<T>` struct defined in `sim_runtime` crate, which
+includes its data payload, and associated methods to write.
+
+### Module Bookkeeping
+
+As per [module](../../ir/module/), we have two kinds of modules, [pipeline stage module](../../ir/module/module.py),
+and [downstream module](../../ir/module/downstream.py) driven by pipeline stages.
+
+For each module, several field appended to the `Simulator` struct:
+
+- A boolean flag named `<module_name>_triggered: bool` to indicate whether the module is properly triggered in the current cycle,
+  A properly triggered module returns true to `simulator` host, and the host will pop the front event in the event queue.
+  If the module has a `wait_until` intrinsic, and the wait condition is not satisfied, the module returns `false`.
+
+Additionally, each pipeline stage module has:
+
+- An event queue named `<module_name>_event: Vec<usize>` to store the time stamps when the module is asynchronously triggered.
+- Stage ports are instantiated as `FIFO<T>` defined in `sim_runtime` crate, named `<module_name>_<port_name>`.
+  Port FIFOs are more general stage registers, which can buffer multiple ongoing data.
+
+> These fields are flattened in the `Simulator` struct, instead of being grouped in a sub-struct, for easier access and management.
+  As modules may access FIFOs of other modules to asynchronously trigger each other, grouping them in sub-structs would complicate
+  the access patterns.
+
+### Exposed Values
+
+For each value externally referenced in a `Downstream` module, we expose it as a field in the `Simulator` struct.
+This value is `<module_name>_<value_name>: Option<type> field. This value will be reset to `None` at the beginning
+of each cycle, and the code path to which this value belongs will set it to `Some(value)` when the value is produced.
+See below for more details on resetting each cycle.
+See [per module generation](./modules.py) for more details on value generation.
+
+## Simulator Methods
+
+### Common Methods
+
+The simulator helper methods to manage the simulation.
+
+```rust
+  // \param event: The event queue of the module.
+  fn event_valid(&self, event: &VecDeque<usize>) -> bool;
+```
+
+This method accepts an event queue of a module, `i.e. <module_name>_event`, and checks if the front event
+time stamp is smaller the current global time stamp, `self.stamp`. If so, the module is eligible to be triggered.
+
+--------
+
+```rust
+  pub fn reset_downstream(&mut self);
+```
+
+- As downstreams aceept purely combinational logic, all their values are volatile, so all the values in the exposed
+  value shall be reset to `None` at the beginning of each cycle by this function.
+- As downstreams are driven by upper stream pipeline stages, if a downstream is triggered is determined by
+  its upstream stage triggers. Thus, all the `<module_name>_triggered` flags are reset to `false` at the beginning of each cycle.
+
+--------
+
+```rust
+  pub fn tick_registers(&mut self);
+```
+
+All the register arrays are edge-triggered in hardware. To simulate this behavior, we adopt a half "cycle tick" mechanism.
+After simulating all the pipeline stage modules, we increment the global time stamp by 25.
+Then we simulate all the downstream modules, and increment the global time stamp by another 25.
+At this "half cycle", we tick all the registers to commit the writes to the registers.
+It calls the `tick` method of each `Array<T>` instance with the current "half cycle" time stamp.
+
+--------
+
+
+### Per Module Invoker
+
+For each module, a `simulate_<module_name>` function is generated to invoke the module simulation kernel
+generated by [per module generation](./modules.py).
+Each module simulation kernel is named `<module_name>` function in `modules` sub-module.
+
+For pipeline stage modules, the simulation checks if the module has an event earlier than the current time stamp.
+If so, it invokes the module simulation kernel. The simulation kernel returns a boolean flag to indicate
+whether the module is properly triggered. If proper, the front event in the event queue is popped,
+and the `<module_name>_triggered` flag is set to `true`.
+
+```rust
+  fn simulate_<module_name>(&mut self) {
+    if self.event_valid(&self.<module_name>_event) {
+      let succ = super::modules::<module_name>(self);
+      if succ {
+        self.<module_name>_event.pop_front();
+      } // close if
+      self.<module_name>_triggered = succ;
+    } // close event
+  } // close function
+```
+
+For downstream modules, as they are driven by upstream pipeline stages,
+it checks if any of its upstream modules is triggered in the current cycle.
+If so, it invokes the module simulation kernel.
+
+```rust
+  fn simulate_<downstream_name>(&mut self) {
+    if <upstream_module1>_triggered || <upstream_module2>_triggered || ... {
+      let succ = super::modules::<module_name>(self);
+      self.<module_name>_triggered = succ;
+    } // close if
+  } // close function
+```
+
+Further, `upstream` can either be a pipeline stage module, or another downstream module,
+as downstream modules can be chained.
+
+## Simulator Host
+
+The simulator host function, `simulate()`, is the entry point of the simulator.
+The function:
+1. instantiates a `Simulator` instance, initializes the memory interface with the given configuration file path.
+
+```rust
+pub fn simulate() {
+  let mut sim = Simulator::new();
+
+  unsafe {
+    sim
+      .mem_interface
+      .init("/path/to/example_config.yaml");
+  }
+```
+
+2. gathers all the pipeline stage module invokers put them in a vector, `simulators`.
+   - Pipeline stages are fully concurrent, so the order of invoking them does not matter.
+   - TODO: Make this multi-threaded in the future.
+
+```rust
+  let simulators: Vec<fn(&mut Simulator)> = vec![ /* simulate_<module> */ ];
+```
+
+3. gathers all the downstream module invokers put them in a vector, `downstreams`.
+   - Note: Because downstream modules are purely combinational, there should be a topolocial order among them.
+     We have `topo_downstream_modules` in [analysis](../../analysis/topo.py) implemented.
+
+```rust
+  let downstreams: Vec<fn(&mut Simulator)> = vec![ /* simulate_<downstream> */];
+```
+
+4. pushes events to `driver` module to kick off the simulation, and set `idle_count` to 0.
+   - The number of events is from `config['sim_threashold']`.
+   - The idle count is from `config['idle_threashold']`.
+
+```rust
+  for i in 1..=200 {
+    sim.Driver_event.push_back(i * 100);
+  }
+  let mut idle_count = 0;
+```
+
+5. runs the simulation loop until reaching the cycle limit, or idle threshold. In each cycle:
+   - The simulation granularity is at half cycles, so we time the current cycle by 100, to have a fixed point fraction.
+   - Then it resets all the downstream exposed values to `None`, and all the `<module_name>_triggered` flags to `false`.
+   - Then it invokes all the pipeline stage module invokers in `simulators`.
+   - Then it invokes all the downstream module invokers in `downstreams`.
+   - Then it checks if any module is triggered in this cycle. If not, it increments an `idle_count`.
+     If `idle_count` reaches a threshold, e.g., 200, the simulation stops.
+     If any module is triggered, `idle_count` is reset to 0.
+   - Then it increments the global time stamp by 50 to simulate register arrays, and ticks all the registers.
+   - Finally, it ticks the memory interface.
+
+```rust
+  for i in 1..=200 {
+    sim.stamp = i * 100;
+    sim.reset_downstream();
+
+    for simulate in simulators.iter() {
+      simulate(&mut sim);
+    }
+
+    for simulate in downstreams.iter() {
+      simulate(&mut sim);
+    }
+
+    let any_module_triggered = /* check all <module_name>_triggered flags */ ;
+
+    // Handle idle threshold
+    if !any_module_triggered {
+      idle_count += 1;
+      if idle_count >= /* idle_threashold */ {
+        println!("Simulation stopped due to reaching idle threshold of 200");
+        break;
+      }
+    } else {
+      idle_count = 0;
+    }
+
+    sim.stamp += 50;
+    sim.tick_registers();
+    unsafe {
+      sim.mem_interface.frontend_tick();
+      sim.mem_interface.memory_tick();
+    }
+  }
+}
+```
