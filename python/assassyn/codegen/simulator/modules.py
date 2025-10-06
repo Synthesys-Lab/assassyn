@@ -67,7 +67,8 @@ class ElaborateModule(Visitor):
 
         # Generate code using the codegen_expr helper
         kwargs = {}
-        if self.callback_metadata and self.callback_metadata.memory and self.callback_metadata.store:
+        if (self.callback_metadata and self.callback_metadata.memory and
+                self.callback_metadata.store):
             kwargs['module_name'] = self.module_name
             kwargs['modules_for_callback'] = {
                 'memory': self.callback_metadata.memory,
