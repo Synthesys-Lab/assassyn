@@ -20,7 +20,7 @@ format:
 ## 2. 核心定义
 
 - 继承基类：`class Foo(Downstream)`。
-- 构建函数：使用 `@downstream.combinational` 装饰器声明组合逻辑入口（`python/unit-tests/test_downstream.py:33`）。
+- 构建函数：使用 `@downstream.combinational` 装饰器声明组合逻辑入口（`python/ci-tests/test_downstream.py:33`）。
 - 参数类型：主要以 `Value`、`Port`、其他下游模块的输出或外部模块接口为形参。
 - 返回值：可返回新的 `Value` ，等价于一个组合逻辑的 `Func` ，根据输入产生预设的输出。也可以只产生副作用（日志、触发调用等）， 例如改变某个 `Register` 的状态。
 - 使用机制：
