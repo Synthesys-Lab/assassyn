@@ -1,7 +1,7 @@
 '''Memory module, a special and subclass of Module.'''
 
 from .downstream import Downstream
-from .memorybase import MemoryBase
+from ..memory.base import MemoryBase
 from .downstream import combinational as downstream_combinational
 from .module import Module
 from .module import combinational as module_combinational

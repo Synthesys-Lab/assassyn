@@ -5,7 +5,7 @@ from ..array import Array
 from ..block import Condition
 from ..expr import Bind
 from ..value import Value
-from .memorybase import MemoryBase
+from ..memory.base import MemoryBase
 
 
 class SRAM(Downstream): # pylint: disable=too-many-instance-attributes, duplicate-code
