@@ -18,7 +18,7 @@ class MemoryBase(Downstream):
     addr: Value     # Address signal
     wdata: Value    # Write data signal
 
-    # Dervied Values
+    # Derived Values
 
     # Depth is required to be a power of 2
     # Width is the log2 of depth
