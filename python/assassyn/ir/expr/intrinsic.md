@@ -1,13 +1,25 @@
-# intrinsic function description
+# Intrinsic Functions
+
+This module declares each intrinsic, and implements their frontend builders with `@ir_builder` annotated.
 
 ---
 
-## DRAM related intrinsic functions
-1. `send_read_request(addr)`: Send read request with the address argument to memory system.
-2. `send_write_request(addr, we)`: Send write request with the address and write enable signal to memory system.
-3. `mem_write(payload, addr, wdata)`: If write request sent successfully, the data will be written into payload[addr].
-4. `has_mem_resp(memory)`: Check if we have a memory response, this is used to check that we have completed some memory read requests.
-5. `mem_resp(memory)`: Get the memory response data. We pass the memory module argument so that we can get the `width` or other information in the module.
-6. `use_dram(dram)`: Tell the system that we need to use `DRAM` memory system so that it will generate related modules.
+## DRAM Intrinsics
+
+1. `send_read_request(mem, addr)`: Send read request with the address argument to the given `mem`ory system.
+2. `read_request_succ(mem)`: It returns the combinational pin indicates if the read request sent in this cycle succeeds. If not send, return false.
+3. `send_write_request(mem, addr, data)`: Send write request with the address and write enable signal to the given `mem`ory system, and returns if this request is successful in combinational pin.
+4. `write_request_succ(mem)`: It returns the combinational pin indicates if the write request sent in this cycle succeeds. If not send, return false.
+5. `has_mem_resp(mem)`: This is a purely combinational pin that checks if the given memory has response.
+6. `get_mem_resp(mem)`: Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.
+
+2 & 4 are designed to work against the constraint of "scope". Consider the code below:
+```python
+with Condition(we):
+    x = send_write_request(self)
+# We cannot get x here, as x is outside the scope.
+```
+
+Thus, we develop separate intrinsics to check if the memory request send is successful.
 
 ---

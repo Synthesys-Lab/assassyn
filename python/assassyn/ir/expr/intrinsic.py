@@ -12,10 +12,13 @@ INTRIN_INFO = {
     903: ('barrier', 1, False, True),
     904: ('has_mem_resp', 1, False, True),
     905: ('mem_write', 3, False, True),
-    906: ('send_read_request', 1, False, True),
+    906: ('send_read_request', 2, False, True),
     907: ('mem_resp', 1, True, False),
-    908: ('send_write_request', 2, False, True),
+    908: ('send_write_request', 3, False, True),
     909: ('use_dram', 1, False, True),
+    910: ('read_request_succ', 1, False, True),
+    911: ('write_request_succ', 1, False, True),
+    912: ('get_mem_resp', 1, True, False),
 }
 
 class Intrinsic(Expr):
@@ -31,6 +34,9 @@ class Intrinsic(Expr):
     MEM_RESP = 907
     SEND_WRITE_REQUEST = 908
     USE_DRAM = 909
+    READ_REQUEST_SUCC = 910
+    WRITE_REQUEST_SUCC = 911
+    GET_MEM_RESP = 912
 
     opcode: int  # Operation code for this intrinsic
 
@@ -50,9 +56,9 @@ class Intrinsic(Expr):
         #pylint: disable=import-outside-toplevel
         from ..dtype import Bits
         if self.opcode in [Intrinsic.HAS_MEM_RESP, Intrinsic.SEND_READ_REQUEST,
-        Intrinsic.SEND_WRITE_REQUEST]:
+        Intrinsic.SEND_WRITE_REQUEST, Intrinsic.READ_REQUEST_SUCC, Intrinsic.WRITE_REQUEST_SUCC]:
             return Bits(1)
-        if self.opcode == Intrinsic.MEM_RESP:
+        if self.opcode in [Intrinsic.MEM_RESP, Intrinsic.GET_MEM_RESP]:
             return Bits(self.args[0].width)
         return Bits(1)
 
@@ -114,14 +120,14 @@ def mem_write(payload, addr, wdata):
     return Intrinsic(Intrinsic.MEM_WRITE, payload, addr, wdata)
 
 @ir_builder
-def send_read_request(addr):
-    '''Send a read request with address.'''
-    return Intrinsic(Intrinsic.SEND_READ_REQUEST, addr)
+def send_read_request(mem, addr):
+    '''Send a read request with address to the given memory system.'''
+    return Intrinsic(Intrinsic.SEND_READ_REQUEST, mem, addr)
 
 @ir_builder
-def send_write_request(addr, we):
-    '''Send a write request with address.'''
-    return Intrinsic(Intrinsic.SEND_WRITE_REQUEST, addr, we)
+def send_write_request(mem, addr, data):
+    '''Send a write request with address and data to the given memory system.'''
+    return Intrinsic(Intrinsic.SEND_WRITE_REQUEST, mem, addr, data)
 
 @ir_builder
 def mem_resp(memory):
@@ -132,6 +138,21 @@ def mem_resp(memory):
 def use_dram(dram):
     '''Use a DRAM module.'''
     return Intrinsic(Intrinsic.USE_DRAM, dram)
+
+@ir_builder
+def read_request_succ(mem):
+    '''Check if the read request sent in this cycle succeeds.'''
+    return Intrinsic(Intrinsic.READ_REQUEST_SUCC, mem)
+
+@ir_builder
+def write_request_succ(mem):
+    '''Check if the write request sent in this cycle succeeds.'''
+    return Intrinsic(Intrinsic.WRITE_REQUEST_SUCC, mem)
+
+@ir_builder
+def get_mem_resp(mem):
+    '''Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.'''
+    return Intrinsic(Intrinsic.GET_MEM_RESP, mem)
 
 class PureIntrinsic(Expr):
     '''The class for accessing FIFO fields, valid, and peek'''
