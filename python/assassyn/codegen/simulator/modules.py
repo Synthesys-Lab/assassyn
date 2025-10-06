@@ -16,6 +16,7 @@ from ...analysis import expr_externally_used
 
 if typing.TYPE_CHECKING:
     from ...ir.module import Module
+    from ...builder import SysBuilder
 
 class ElaborateModule(Visitor):
     """Visitor for elaborating modules with multi-port write support."""
@@ -137,3 +138,50 @@ class ElaborateModule(Visitor):
             result.append(f"{' ' * self.indent}}}\n")
 
         return "".join(result)
+
+
+def dump_modules(sys: SysBuilder, fd):
+    """Generate the modules.rs file.
+
+    This matches the Rust function in src/backend/simulator/elaborate.rs
+    """
+    # Add imports
+    fd.write("""
+use sim_runtime::*;
+use super::simulator::Simulator;
+use std::collections::VecDeque;
+use sim_runtime::num_bigint::{BigInt, BigUint};
+use sim_runtime::libloading::{Library, Symbol};
+use std::ffi::{CString, c_char, c_float, c_longlong, c_void};
+use std::sync::Arc;""")
+
+    # Generate each module's implementation
+    dict_modules_callback = {}
+    em = ElaborateModule(sys)
+    for module in sys.modules[:] + sys.downstreams[:]:
+        dict_modules_callback = em.visit_module_for_callback(module)
+    required_keys = ["memory", "store", "MemUser_rdata"]
+    if all(dict_modules_callback.get(k) is not None for k in required_keys):
+        fd.write(f"""
+    extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
+        unsafe {{
+            let req = &*req;
+            let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
+            let cycles = (req.depart - req.arrive) as usize;
+            let stamp = sim.request_stamp_map_table
+                .remove(&req.addr)
+                .unwrap_or_else(|| sim.stamp);
+            sim.{dict_modules_callback.get("MemUser_rdata")}.push.push(FIFOPush::new(
+                stamp + 100 * cycles,
+                sim.{dict_modules_callback.
+                     get("store")}.payload[req.addr as usize].clone().try_into().unwrap(),
+                "{dict_modules_callback.get("memory")}",
+            ));
+        }}
+    }}""")
+    for module in sys.modules[:] + sys.downstreams[:]:
+        # Then, second time dump for real visit modules
+        module_code = em.visit_module(module)
+        fd.write(module_code)
+
+    return True
