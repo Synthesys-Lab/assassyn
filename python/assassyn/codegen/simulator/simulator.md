@@ -238,7 +238,7 @@ pub fn simulate() {
 ```
 
 3. gathers all the downstream module invokers put them in a vector, `downstreams`.
-   - Note: Because downstream modules are purely combinational, there should be a topolocial order among them.
+   - Note: Because downstream modules are purely combinational, there should be a topological order among them.
      We have `topo_downstream_modules` in [analysis](../../analysis/topo.py) implemented.
 
 ```rust
