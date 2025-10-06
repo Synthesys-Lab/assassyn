@@ -290,9 +290,13 @@ def generate_top_harness(dumper):
 
         for arr, users in dumper.array_users.items():
             if module in users:
-                port_map.append(
-                    f"{namify(arr.name)}_q_in = array_writer_{namify(arr.name)}.q_out"
-                )
+                # Skip SRAM arrays as they don't have array_writer instances
+                is_sram_array = any(isinstance(m, SRAM) and
+                                   m._payload == arr for m in dumper.sys.downstreams)
+                if not is_sram_array:
+                    port_map.append(
+                        f"{namify(arr.name)}_q_in = array_writer_{namify(arr.name)}.q_out"
+                    )
 
         pushes = [e for e in dumper._walk_expressions(module.body) if isinstance(e, FIFOPush)]
         calls = [e for e in dumper._walk_expressions(module.body) if isinstance(e, AsyncCall)]
