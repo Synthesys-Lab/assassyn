@@ -1,4 +1,4 @@
-# Memroy Base
+# Memory Base
 
 This module implements the base interface for a memory:
 
