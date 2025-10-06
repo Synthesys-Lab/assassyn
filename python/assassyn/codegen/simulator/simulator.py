@@ -168,9 +168,6 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         fd.write(f"    self.{reg}.tick(self.stamp);\n")
     fd.write("  }\n\n")
 
-    # Critical path analysis
-    # TODO(@derui): Implement critical path analysis equivalent to Rust
-
     # Get topological order for downstream modules
     downstreams = topo_downstream_modules(sys)
 
@@ -251,6 +248,8 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("];\n")
     all_modules = sys.modules[:] + sys.downstreams[:]
     # Initialize memory from files if needed
+    # TODO(@derui): Make SRAM a subclass of Downstream and make all SRAM payload
+    #               initialization RegArray initialization.
     for sram in [m for m in all_modules if isinstance(m, SRAM)]:
         if not sram.init_file:
             continue

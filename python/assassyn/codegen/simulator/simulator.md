@@ -1,7 +1,7 @@
 # Rust Simulator Dumper
 
 This module dumps the simulator code.
-All dumped simulators is the strucuture as following:
+All dumped simulators is the structure as following:
 
 ## Exposed Interface
 
@@ -11,6 +11,7 @@ def dump_simulator(sys: SysBuilder, config, fd);
 
 - `sys`: The pipelined system to be simulated.
 - `config`: The configuration of the simulation, including the cycle limit, and randomization.
+  - This configuration is from [backend.py](../../backend.py). The effects on simulator generation will be explained below.
 - `fd`: The file descriptor to write the simulator code.
 
 The dumped simulator code will be explained in the following sections.
@@ -182,6 +183,8 @@ and the `<module_name>_triggered` flag is set to `true`.
       let succ = super::modules::<module_name>(self);
       if succ {
         self.<module_name>_event.pop_front();
+      } else {
+        self.<exposed>_value = None;
       } // close if
       self.<module_name>_triggered = succ;
     } // close event
@@ -197,12 +200,17 @@ If so, it invokes the module simulation kernel.
     if <upstream_module1>_triggered || <upstream_module2>_triggered || ... {
       let succ = super::modules::<module_name>(self);
       self.<module_name>_triggered = succ;
+    } else {
+      self.<exposed>_value = None;
     } // close if
   } // close function
 ```
 
 Further, `upstream` can either be a pipeline stage module, or another downstream module,
 as downstream modules can be chained.
+
+Also, if either a pipeline stage module or downstream module is not triggered in the current cycle,
+their exposed values are set to `None`.
 
 ## Simulator Host
 
@@ -240,19 +248,24 @@ pub fn simulate() {
 4. pushes events to `driver` module to kick off the simulation, and set `idle_count` to 0.
    - The number of events is from `config['sim_threashold']`.
    - The idle count is from `config['idle_threashold']`.
+   - Then it initializes testbench specific events by finding `Testbench` module, and works on all it cycled-blocks.
+     - All the cycled-blocks' (as declared in [block.py](../../ir/block.py)) corresponding cycle will be pushed to the event queue of `Testbench` module.
 
 ```rust
-  for i in 1..=200 {
+  for i in 1..=/* sim_threashold */ {
     sim.Driver_event.push_back(i * 100);
   }
+  /* Testbench event initialization */
   let mut idle_count = 0;
 ```
 
-5. runs the simulation loop until reaching the cycle limit, or idle threshold. In each cycle:
+1. runs the simulation loop until reaching the cycle limit, or idle threshold. In each cycle:
    - The simulation granularity is at half cycles, so we time the current cycle by 100, to have a fixed point fraction.
    - Then it resets all the downstream exposed values to `None`, and all the `<module_name>_triggered` flags to `false`.
    - Then it invokes all the pipeline stage module invokers in `simulators`.
    - Then it invokes all the downstream module invokers in `downstreams`.
+   - Then it initializes all the SRAMs from files if needed, by invoking `load_hex_file` from `sim_runtime`.
+     - TODO: Make SRAM a subclass of Downstream and make all SRAM payload initialization RegArray initialization.
    - Then it checks if any module is triggered in this cycle. If not, it increments an `idle_count`.
      If `idle_count` reaches a threshold, e.g., 200, the simulation stops.
      If any module is triggered, `idle_count` is reset to 0.
@@ -271,6 +284,8 @@ pub fn simulate() {
     for simulate in downstreams.iter() {
       simulate(&mut sim);
     }
+
+    /* Initialize all the SRAM */
 
     let any_module_triggered = /* check all <module_name>_triggered flags */ ;
 
