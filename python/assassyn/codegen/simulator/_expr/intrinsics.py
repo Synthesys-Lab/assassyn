@@ -140,9 +140,9 @@ def _codegen_mem_resp(node, module_ctx, sys, **_kwargs):
     return f"let {val} = sim.{mem_rdata}.payload.front().unwrap().clone()"
 
 
-def _codegen_mem_write(node, module_ctx, sys, **kwargs):
+def _codegen_mem_write(node, module_ctx, sys):
     """Generate code for MEM_WRITE intrinsic."""
-    module_name = kwargs.get('module_name')
+    module_name = module_ctx.name
     array = node.args[0]
     idx = node.args[1]
     value = node.args[2]
@@ -172,7 +172,7 @@ _INTRINSIC_DISPATCH = {
 }
 
 
-def codegen_intrinsic(node: Intrinsic, module_ctx, sys, module_name):
+def codegen_intrinsic(node: Intrinsic, module_ctx, sys):
     """Generate code for intrinsic operations."""
     intrinsic = node.opcode
     codegen_func = _INTRINSIC_DISPATCH.get(intrinsic)
@@ -181,6 +181,5 @@ def codegen_intrinsic(node: Intrinsic, module_ctx, sys, module_name):
             node,
             module_ctx,
             sys,
-            module_name=module_name,
         )
     return None

@@ -23,10 +23,11 @@ def codegen_async_call(node: AsyncCall, module_ctx, sys):
             }}"""
 
 
-def codegen_fifo_pop(node: FIFOPop, module_ctx, sys, module_name):
+def codegen_fifo_pop(node: FIFOPop, module_ctx, sys):
     """Generate code for FIFO pop operations."""
     fifo = node.fifo
     fifo_id = fifo_name(fifo)
+    module_name = module_ctx.name
 
     return f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
@@ -38,11 +39,12 @@ def codegen_fifo_pop(node: FIFOPop, module_ctx, sys, module_name):
             }}"""
 
 
-def codegen_fifo_push(node: FIFOPush, module_ctx, sys, module_name):
+def codegen_fifo_push(node: FIFOPush, module_ctx, sys):
     """Generate code for FIFO push operations."""
     fifo = node.fifo
     fifo_id = fifo_name(fifo)
     value = dump_rval_ref(module_ctx, sys, node.val)
+    module_name = module_ctx.name
 
     return f"""{{
               let stamp = sim.stamp;

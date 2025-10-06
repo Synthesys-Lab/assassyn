@@ -66,7 +66,7 @@ class ElaborateModule(Visitor):
             id_and_exposure = (id_expr, need_exposure)
 
         # Generate code using the codegen_expr helper
-        code = codegen_expr(node, self.module_ctx, self.sys, self.module_name)
+        code = codegen_expr(node, self.module_ctx, self.sys)
 
         # Format the result with proper indentation and variable assignment
         indent_str = " " * self.indent

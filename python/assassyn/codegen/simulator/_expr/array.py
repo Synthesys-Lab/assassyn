@@ -15,7 +15,7 @@ def codegen_array_read(node, module_ctx, sys):
     return f"sim.{array_name}.payload[{idx_val} as usize].clone()"
 
 
-def codegen_array_write(node, module_ctx, sys, module_name):
+def codegen_array_write(node, module_ctx, sys):
     """Generate code for array write operations."""
     array = node.array
     idx = node.idx

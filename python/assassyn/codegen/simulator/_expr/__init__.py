@@ -5,8 +5,6 @@ This module contains helper functions to generate simulator code for different e
 
 # pylint: disable=unused-argument, too-many-locals, import-outside-toplevel
 
-from functools import partial
-
 from ....ir.expr import (
     BinaryOp,
     UnaryOp,
@@ -32,12 +30,9 @@ from .intrinsics import codegen_intrinsic, codegen_pure_intrinsic
 from .call import codegen_async_call, codegen_fifo_pop, codegen_fifo_push, codegen_bind
 
 
-def _invoke_without_module(fn, node, module_ctx, sys, _module_name):
-    return fn(node, module_ctx, sys)
-
-
-def codegen_log(node: Log, module_ctx, sys, module_name):
+def codegen_log(node: Log, module_ctx, sys):
     """Generate code for log operations."""
+    module_name = module_ctx.name
     result = [f'print!("@line:{{:<5}} {{:<10}}: [{module_name}]\\t", line!(), cyclize(sim.stamp));']
     result.append("println!(")
     result.append(f"{dump_rval_ref(module_ctx, sys, node.operands[0])}, ")
@@ -129,26 +124,26 @@ def codegen_cast(node: Cast, module_ctx, sys):
 
 # Dispatch table mapping expression types to their codegen functions
 _EXPR_CODEGEN_DISPATCH = {
-    BinaryOp: partial(_invoke_without_module, codegen_binary_op),
-    UnaryOp: partial(_invoke_without_module, codegen_unary_op),
-    ArrayRead: partial(_invoke_without_module, codegen_array_read),
+    BinaryOp: codegen_binary_op,
+    UnaryOp: codegen_unary_op,
+    ArrayRead: codegen_array_read,
     ArrayWrite: codegen_array_write,
-    AsyncCall: partial(_invoke_without_module, codegen_async_call),
+    AsyncCall: codegen_async_call,
     FIFOPop: codegen_fifo_pop,
-    PureIntrinsic: partial(_invoke_without_module, codegen_pure_intrinsic),
+    PureIntrinsic: codegen_pure_intrinsic,
     FIFOPush: codegen_fifo_push,
     Log: codegen_log,
-    Slice: partial(_invoke_without_module, codegen_slice),
-    Concat: partial(_invoke_without_module, codegen_concat),
-    Select: partial(_invoke_without_module, codegen_select),
-    Select1Hot: partial(_invoke_without_module, codegen_select1hot),
-    Cast: partial(_invoke_without_module, codegen_cast),
-    Bind: partial(_invoke_without_module, codegen_bind),
+    Slice: codegen_slice,
+    Concat: codegen_concat,
+    Select: codegen_select,
+    Select1Hot: codegen_select1hot,
+    Cast: codegen_cast,
+    Bind: codegen_bind,
     Intrinsic: codegen_intrinsic,
 }
 
 
-def codegen_expr(node, module_ctx, sys, module_name):
+def codegen_expr(node, module_ctx, sys):
     """Generate code for an expression node.
 
     This is the main dispatcher function that delegates to specific codegen functions
@@ -159,11 +154,11 @@ def codegen_expr(node, module_ctx, sys, module_name):
     # Try exact match first
     codegen_func = _EXPR_CODEGEN_DISPATCH.get(node_type)
     if codegen_func is not None:
-        return codegen_func(node, module_ctx, sys, module_name)
+        return codegen_func(node, module_ctx, sys)
 
     # Fall back to isinstance check for subclasses
     for base_type, func in _EXPR_CODEGEN_DISPATCH.items():
         if isinstance(node, base_type):
-            return func(node, module_ctx, sys, module_name)
+            return func(node, module_ctx, sys)
 
     return None
