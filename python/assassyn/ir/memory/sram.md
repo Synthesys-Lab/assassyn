@@ -1,7 +1,7 @@
 # SRAM Module
 
 This module provides all the needed SRAM implementation and modeling.
-SRAM is a module inherented from `MemoryBase` in `base.py`, which extends
+SRAM is a module inherited from `MemoryBase` in `base.py`, which extends
 one additional field and one method.
 
 ```python
