@@ -28,8 +28,7 @@ use std::collections::VecDeque;
 use sim_runtime::num_bigint::{BigInt, BigUint};
 use sim_runtime::libloading::{Library, Symbol};
 use std::ffi::{CString, c_char, c_float, c_longlong, c_void};
-use std::sync::Arc;
-    """)
+use std::sync::Arc;""")
 
     # Generate each module's implementation
     dict_modules_callback = {}
@@ -46,7 +45,7 @@ use std::sync::Arc;
             let cycles = (req.depart - req.arrive) as usize;
             let stamp = sim.request_stamp_map_table
                 .remove(&req.addr)
-                .unwrap_or_else(|| sim.stamp);;
+                .unwrap_or_else(|| sim.stamp);
             sim.{dict_modules_callback.get("MemUser_rdata")}.push.push(FIFOPush::new(
                 stamp + 100 * cycles,
                 sim.{dict_modules_callback.
@@ -93,17 +92,8 @@ def elaborate_impl(sys, config):
         cargo.write('[dependencies]\n')
         cargo.write(f'sim-runtime = {{ path = "{runtime_path}" }}\n')
 
-    # Create rustfmt.toml if available
-    rustfmt_src = None
-    rustfmt_candidates = [simulator_path / "rustfmt.toml", Path(repo_path()) / "rustfmt.toml"]
-
-    for candidate in rustfmt_candidates:
-        if candidate.exists():
-            rustfmt_src = candidate
-            break
-
-    if rustfmt_src:
-        shutil.copy(rustfmt_src, simulator_path / "rustfmt.toml")
+    # Create rustfmt for the generated project
+    shutil.copy(Path(repo_path()) / "rustfmt.toml", simulator_path / "rustfmt.toml")
 
     # Generate modules.rs
     with open(simulator_path / "src/modules.rs", 'w', encoding="utf-8") as fd:
