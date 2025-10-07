@@ -1,14 +1,10 @@
 - Use `source setup.sh` to set up the environment before running any scripts.
   - Even for `git commit`, because of pre-commit hooks.
-- When staging and committing:
-  - Follow the rule in ./docs/developer/github.md.
-  - This rule also applies to pull requests.
-  - Claude Code, DO NOT claim your co-authorship in the commit message.
 - When it comes testing, do `pytest -n 8 -x python/ci-tests` to speedup and stop at first failure.
 - `pylint` is for `python/assassyn` only, and the rc file is `python/assassyn/.pylintrc`.
   - If some refactoring is made, first run `python/ci-tests/test_driver.py` as a sanity check.
-- When it comes to "based on my modifications to something.md", use `git diff`
-  to read the deltas.
-- If not specified, when a task is finished, stage and commit the changes!
-   - If pre-commit on pytest phase fails after three attempts, stop and report!
-   - You **CANNOT** you `--no-verify` to bypass pre-commit! Otherwise, your mother will explode!
+- When told act on `TODO-something.md`, refer to the flow in
+  [development workflow](./docs/developer/flow.md) to work on it accordingly.
+  - This clarifies some cases you can use `git commit --no-verify`.
+- For most general cases, after finishing a feature, stage and commit it with a message
+  discribed in [github.md](./docs/developer/github.md).
