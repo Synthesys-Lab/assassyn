@@ -9,7 +9,7 @@ from ..value import Value
 
 class MemoryBase(Downstream):
     '''Base class for memory modules.'''
-    
+
     # Builtin property of a memory
     width: int      # Width of the memory in bits
     depth: int      # Depth of the memory in words
