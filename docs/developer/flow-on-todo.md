@@ -16,25 +16,9 @@ the action items into your understanding of the codebase.
 
 ## 3. Act on Action Items
 
-Follow the action items in the `TODO-xxx.md` file step by step. For each action item,
-it shall be two sub-steps:
-1. Create new tests as per the new design.
-   - For this step, you may need to carefully read the design documents and the existing
-     tests, as well as the developer's test document (if exists) to understand how to
-     write the tests.
-   - After writing the tests, run them to make sure: 1) they do not have syntax errors;
-     2) they fail as expected.
-   - Commit the new tests with a message like "Add new test for xxx feature/bug fix".
-     Remember to use `--no-verify` to skip pre-commit hooks. Currently, this is the
-     ONLY STEP allowed to skip pre-commit hooks.
-2. Implement the changes as per the new design.
-   - For this step, you may need to carefully read the design documents and the existing
-     code to understand how to implement the changes.
-   - After implementing the changes, run all the tests to make sure they pass.
-   - Commit the changes with a message like "Implement xxx feature/bug fix in `<related files>`".
-   - Commit should have pre-commit hooks triggerred hooks to ensure code quality in both linting and testing.
-   - If the commit fails due to pre-commit hooks, fix the issues and try again.
-3. Repeat the above two sub-steps for each action item in the `TODO-xxx.md` file.
+Follow the action items in the `TODO-xxx.md` file step by step. Faithfully implement the changes
+and improvements as described in the action items. Faithfully use `git commit` with or wihtout
+`--no-verify` flag as described in the action items.
 
 ## 4. Checklist & Summary
 
