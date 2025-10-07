@@ -19,4 +19,5 @@ def __assassyn_assignment__(name: str, value: Any) -> Any;
 ```
 
 This function takes the identifier name and the value to be assigned,
-and returns the value itself.
+delegates to the active naming manager (when present) to perform naming, and
+returns the value (supporting chained assignments).

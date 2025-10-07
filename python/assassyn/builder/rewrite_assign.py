@@ -7,22 +7,27 @@ to use a custom assignment function that can be hooked for tracing or other purp
 
 import ast
 from typing import Any
+from .naming_manager import get_naming_manager  # pylint: disable=cyclic-import,import-outside-toplevel
 
 
-def __assassyn_assignment__(name: str, value: Any) -> Any:  # pylint: disable=unused-argument
+def __assassyn_assignment__(name: str, value: Any) -> Any:
     """
-    Custom assignment function that returns the assigned value.
-    
-    This function is used to replace normal Python assignments so that
-    assignment behavior can be hooked or traced.
-    
+    Assignment function invoked by rewritten assignments.
+
+    Delegates to the active NamingManager (if any) to process assignment-based
+    naming, then returns the value. When no manager is active, it simply
+    returns the value unchanged.
+
     Args:
-        name: The name of the identifier being assigned to (reserved for future use)
+        name: Identifier name being assigned to
         value: The value being assigned
-        
+
     Returns:
-        The value itself (to support chained assignments)
+        The assigned value (to support chained assignments)
     """
+    manager = get_naming_manager()
+    if manager:
+        return manager.process_assignment(name, value)
     return value
 
 

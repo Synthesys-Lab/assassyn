@@ -127,16 +127,6 @@ def set_naming_manager(manager: Optional[NamingManager]):
     _global_naming_manager = manager
 
 
-def assassyn_assignment_hook(name: str, value: Any) -> Any:
-    """
-    Hook called by rewritten assignments to process naming.
-    """
-    manager = get_naming_manager()
-    if manager:
-        return manager.process_assignment(name, value)
-    return value
-
-
 def name_ir_node(node: Any, hint: Optional[str] = None,
                  namer: Optional[TypeOrientedNamer] = None) -> str:
     """Convenience function for direct node naming."""

@@ -15,7 +15,6 @@ from .assignment_tracker import AssignmentTracker, PendingValue
 from .integrate import combinational_for, initialize_naming_system, install_decorators, sys_builder
 from .naming_manager import (
     NamingManager,
-    assassyn_assignment_hook,
     get_naming_manager,
     name_ir_node,
     set_naming_manager,
@@ -41,7 +40,6 @@ __all__ = [
     # Global functions
     'get_naming_manager',
     'set_naming_manager',
-    'assassyn_assignment_hook',
     'name_ir_node',
 
     # Integration

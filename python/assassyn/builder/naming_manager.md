@@ -53,10 +53,11 @@ Returns the process-global naming manager instance if one has been registered.
 Registers or clears the global naming manager reference used by decorators and
 assignment hooks.
 
-### `assassyn_assignment_hook(name: str, value: Any) -> Any`
-Entry point invoked by rewritten assignments. When a manager is active it calls
-`process_assignment` and returns the processed value; otherwise it simply
-returns the value unchanged.
+### `__assassyn_assignment__(name: str, value: Any) -> Any`
+Entry point invoked by rewritten assignments. Implemented in
+`rewrite_assign.py`, it queries the active naming manager (via
+`get_naming_manager`) to run `process_assignment` and returns the processed
+value. When no manager is active it simply returns the value unchanged.
 
 ### `name_ir_node(node: Any, hint: Optional[str] = None, namer: Optional[TypeOrientedNamer] = None) -> str`
 Convenience helper that names an IR node using the supplied (or freshly created)

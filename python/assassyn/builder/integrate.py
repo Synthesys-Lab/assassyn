@@ -11,11 +11,10 @@ import inspect
 import textwrap
 
 from .naming_manager import (
-    assassyn_assignment_hook,
     set_naming_manager,
     get_naming_manager
 )
-from .rewrite_assign import rewrite_assign
+from .rewrite_assign import rewrite_assign, __assassyn_assignment__ as _assignment_fn
 
 
 def ir_builder(func=None, *, node_type=None):
@@ -116,7 +115,7 @@ def combinational_for(module_class):
             namespace = func.__globals__
             had_assignment_hook = '__assassyn_assignment__' in namespace
             previous_hook = namespace.get('__assassyn_assignment__')
-            namespace['__assassyn_assignment__'] = assassyn_assignment_hook
+            namespace['__assassyn_assignment__'] = _assignment_fn
 
             # Compile and execute to get the new function
             code = compile(tree, func.__code__.co_filename, 'exec')
