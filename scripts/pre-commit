@@ -3,6 +3,13 @@
 # It is highly recommended to put this to your git pre-commit hook, to format your code
 # before checking anything in.
 
+# Ensure ramulator2 is built and patched
+source $ASSASSYN_HOME/scripts/init/ramulator2.sh
+if [ $? -ne 0 ]; then
+    echo "Ramulator2 build failed, please fix the issues before committing."
+    exit 1
+fi
+
 pylint --rcfile $ASSASSYN_HOME/python/.pylintrc $ASSASSYN_HOME/python/assassyn
 if [ $? -ne 0 ]; then
     echo "Pylint failed, please fix the issues before committing."
