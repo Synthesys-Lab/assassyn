@@ -6,16 +6,9 @@ an assignment happens.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
 from typing import List, Any
 
 from .unique_name import UniqueNameCache
-
-
-@dataclass
-class PendingValue:
-    """Represents a value waiting to be named."""
-    value: Any
 
 
 class AssignmentTracker:
@@ -25,7 +18,7 @@ class AssignmentTracker:
     """
 
     def __init__(self):
-        self._pending_stack: List[PendingValue] = []
+        self._pending_stack: List[Any] = []
         self._name_cache = UniqueNameCache()
         self._enabled = True
 
@@ -34,7 +27,7 @@ class AssignmentTracker:
         if not self._enabled:
             return
 
-        self._pending_stack.append(PendingValue(value))
+        self._pending_stack.append(value)
 
     def clear_and_assign(self, assigned_name: str) -> List[Any]:
         """
@@ -48,42 +41,18 @@ class AssignmentTracker:
 
         # Process all pending values
         while self._pending_stack:
-            pending = self._pending_stack.pop(0)
-
-            # Generate appropriate name based on type
-            name = self._generate_name(pending.value, assigned_name)
-
-            # Assign the name to the value if it exposes a name attribute.
-            value = pending.value
-            value_dict = getattr(value, '__dict__', None)
-
-            if value_dict is not None and '_name' in value_dict:
-                value._name = name  # pylint: disable=protected-access
-            elif value_dict is not None and 'name' in value_dict:
-                value.name = name
-            else:
-                # Best effort: try setting common attributes without triggering __getattr__
-                for attr in ('_name', 'name'):
-                    try:
-                        setattr(value, attr, name)
-                        break
-                    except (AttributeError, AssertionError, TypeError):
-                        continue
-
-            named_values.append((name, pending.value))
+            value = self._pending_stack.pop(0)
+            name = self._generate_name(value, assigned_name)
+            named_values.append((name, value))
 
         return named_values
 
     def _generate_name(self, value: Any, assigned_name: str) -> str:
         """Generate an appropriate name for a value."""
         # Use assigned name if available, otherwise generate from type prefix
-        base_name = assigned_name or self._get_type_prefix(value)
+        del value  # Value unused: kept for future enhancements
+        base_name = assigned_name
         return self._name_cache.get_unique_name(base_name)
-
-    def _get_type_prefix(self, value: Any) -> str:  # pylint: disable=unused-argument
-        """Get a type-appropriate prefix for naming."""
-        # This will be implemented by TypeOrientedNamer
-        return "val"
 
     def disable(self):
         """Temporarily disable tracking."""

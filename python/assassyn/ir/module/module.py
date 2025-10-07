@@ -60,9 +60,17 @@ class Module(ModuleBase):
         '''
         super().__init__()
         self.body = None
-        self.name = type(self).__name__
-        if not _reserved_module_name(self.name):
-            self.name = self.name + self.as_operand()
+        base_name = type(self).__name__
+        manager = getattr(Singleton, 'naming_manager', None)
+        if _reserved_module_name(base_name):
+            self.name = base_name
+            if manager is not None:
+                manager.assign_name(self, base_name)
+        else:
+            if manager is not None:
+                self.name = manager.assign_name(self)
+            else:
+                self.name = base_name + self.as_operand()
 
         self._attrs = {}
         if no_arbiter:

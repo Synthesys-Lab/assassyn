@@ -8,7 +8,7 @@ from ..builder import ir_builder, Singleton
 from .dtype import to_uint, RecordValue
 from .expr import ArrayRead, Expr,BinaryOp
 from .value import Value
-from ..utils import identifierize
+from ..utils import identifierize, namify
 from .expr.writeport import WritePort
 
 if typing.TYPE_CHECKING:
@@ -84,6 +84,11 @@ def RegArray( #pylint: disable=invalid-name,too-many-arguments
     if name is not None:
         res.name = name
 
+    manager = getattr(Singleton, 'naming_manager', None)
+    if manager is not None:
+        hint = res._name if res._name is not None else None  # pylint: disable=protected-access
+        manager.assign_name(res, hint)
+
     Singleton.builder.arrays.append(res)
 
     return res
@@ -107,12 +112,21 @@ class Array:  #pylint: disable=too-many-instance-attributes
     @property
     def name(self):
         '''The name of the array. If not set, a default name is generated.'''
-        prefix = self._name if self._name is not None else 'array'
-        return f'{prefix}_{identifierize(self)}'
+        semantic = getattr(self, '__assassyn_semantic_name__', None)
+        if isinstance(semantic, str) and semantic:
+            return semantic
+        if self._name is not None:
+            return self._name
+        return f'array_{identifierize(self)}'
 
     @name.setter
     def name(self, name):
-        self._name = name
+        sanitized = namify(name)
+        self._name = sanitized
+        try:
+            setattr(self, '__assassyn_semantic_name__', sanitized)
+        except (AttributeError, TypeError):
+            pass
 
     def __init__(self, scalar_ty: DType, size: int, initializer: list):
         #pylint: disable=import-outside-toplevel

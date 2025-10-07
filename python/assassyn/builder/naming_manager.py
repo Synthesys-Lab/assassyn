@@ -84,6 +84,17 @@ class NamingManager:
             # Some Python builtins (e.g. list) cannot be annotated - ignore silently
             pass
 
+    def assign_name(self, value: Any, hint: Optional[str] = None) -> str:
+        """
+        Public helper to assign a semantic name to any value-like object.
+
+        Useful for non-expression objects (arrays, modules, etc.) that still
+        participate in textual IR dumps.
+        """
+        name = self._namer.name_value(value, hint)
+        self._apply_name(value, name)
+        return name
+
     def reset(self):
         """Reset all naming state."""
         self._tracker = AssignmentTracker()
