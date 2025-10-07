@@ -86,10 +86,17 @@ def _codegen_send_read_request(node, module_ctx, sys, **_kwargs):
     return f"""{{
                     unsafe {{
                         let mem_interface = &sim.mem_interface;
-                        let success = mem_interface.send_request({idx_val} as i64,
-                            false, rust_callback, sim as *const _ as *mut _,);
+                        let success = mem_interface.send_request(
+                            {idx_val} as i64,
+                            false,
+                            rust_callback,
+                            sim as *const _ as *mut _,
+                        );
                         if success {{
-                            sim.request_stamp_map_table.insert({idx_val} as i64, sim.stamp);
+                            sim.request_stamp_map_table.insert(
+                                {idx_val} as i64,
+                                sim.stamp,
+                            );
                         }}
                         success
                     }}
@@ -107,8 +114,12 @@ def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
                     let {val} = unsafe {{
                         if {we_val} {{
                             let mem_interface = &sim.mem_interface;
-                            let success = mem_interface.send_request({idx_val} as i64,
-                                true, rust_callback, sim as *const _ as *mut _,);
+                            let success = mem_interface.send_request(
+                                {idx_val} as i64,
+                                true,
+                                rust_callback,
+                                sim as *const _ as *mut _,
+                            );
                             success
                         }} else {{
                             false
@@ -163,9 +174,15 @@ def _codegen_mem_write(node, module_ctx, sys, **kwargs):
 
     return f"""{{
                     let stamp = sim.stamp - sim.stamp % 100 + 50;
-                    let write = ArrayWrite::new(stamp, {idx_val} as usize,
-                                               {value_val}.clone(), "{module_name}");
-                    sim.{array_name}.write({port_idx}, write);
+                    sim.{array_name}.write_port.push(
+                        ArrayWrite::new(
+                            stamp,
+                            {idx_val} as usize,
+                            {value_val}.clone(),
+                            "{module_name}",
+                            {port_idx},
+                        ),
+                    );
                 }}"""
 
 # Dispatch table for intrinsic operations

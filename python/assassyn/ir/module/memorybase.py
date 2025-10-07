@@ -20,7 +20,7 @@ class MemoryBase: # pylint: disable=too-many-instance-attributes,too-few-public-
 
     def __init__(self, width, depth, init_file):
         """Initialize memory base class.
-        
+
         Args:
             width: Width of memory in bits
             depth: Depth of memory in words
