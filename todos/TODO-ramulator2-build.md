@@ -30,4 +30,22 @@
 
 # Checklist
 
-Summarize your changes here.
+## Completed Changes
+
+1. **Made ramulator2.sh idempotent**: Updated the build script to properly detect when patches are already applied by checking both git reverse apply and file content verification.
+
+2. **Updated ramulator2-template.patch**: Created a new patch file that includes:
+   - Added `*.dylib` to `.gitignore` for macOS compatibility
+   - Added `template` keyword to `param.h` for C++ standard compliance
+   - Implemented write hook in `generic_dram_controller.cpp` to properly handle write request callbacks
+
+3. **Added ramulator2 build check to pre-commit hooks**: The pre-commit script now ensures ramulator2 is built and patched before every commit, providing early detection of build issues.
+
+## Summary
+
+All three action items have been completed successfully:
+- ✅ ramulator2.sh is now idempotent and can be run multiple times safely
+- ✅ ramulator2-template.patch has been updated with the write hook fix
+- ✅ Pre-commit hooks now include ramulator2 build verification
+
+The changes ensure consistent build environment across development and resolve the write transaction issue mentioned in the ramulator2 GitHub issue #30.
