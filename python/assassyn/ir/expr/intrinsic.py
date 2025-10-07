@@ -151,7 +151,8 @@ def write_request_succ(mem):
 
 @ir_builder
 def get_mem_resp(mem):
-    '''Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.'''
+    '''Get the memory response data. The lsb are the data payload,
+    and the msb are the corresponding request address.'''
     return Intrinsic(Intrinsic.GET_MEM_RESP, mem)
 
 class PureIntrinsic(Expr):
