@@ -20,11 +20,17 @@ if [ -f "$PATCH_FILE" ]; then
     echo "Ramulator2 patch already applied — skipping patch step."
   else
     echo "Applying ramulator2 patch..."
-    git apply "$PATCH_FILE"
+    git apply "$PATCH_FILE" 2>/dev/null
     if [ $? -ne 0 ]; then
-      echo "Failed to apply ramulator2 patch."
-      cd "$RESTORE"
-      return 1
+      # Check if the patch failed because changes are already applied
+      # by checking if the expected changes exist in the files
+      if grep -q "template as<T>" src/base/param.h 2>/dev/null && grep -q "*.dylib" .gitignore 2>/dev/null; then
+        echo "Ramulator2 patch changes already present — skipping patch step."
+      else
+        echo "Failed to apply ramulator2 patch."
+        cd "$RESTORE"
+        return 1
+      fi
     fi
   fi
 else
