@@ -23,6 +23,9 @@ and improvements as described in the action items. Faithfully use `git commit` w
 ## 4. Checklist & Summary
 
 After all action items are down, a summary checklist should be listed as per the `TODO-xxx.md` file.
+Dump all the summary below to `dones/DONE-xxx.md` file, where `xxx` is the same as in `TODO-xxx.md`.
+  - If `dones` folder does not exist, create it.
+
 The summary should include two parts:
 1. Check all the checklist items in the `TODO-xxx.md` file are done.
 2. Summarize the changes made in the codebase, including:
@@ -36,6 +39,3 @@ The summary should include two parts:
    - If a workaround for a bug in test case before this TODO, explain it and suggest a fundamental solution.
    - If a test case is skipped, explain why and suggest a plan to unskip it.
    - If an external dependency does not fulfill our need, explain why and suggest a plan to replace it.
-
-Dump all the summary above to `dones/DONE-xxx.md` file, where `xxx` is the same as in `TODO-xxx.md`.
-  - If `dones` folder does not exist, create it.
