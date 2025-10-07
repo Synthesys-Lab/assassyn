@@ -2,8 +2,6 @@
 # pylint: disable=protected-access
 """Top-level harness generation for Verilog designs."""
 
-from collections import defaultdict
-
 from .utils import (
     dump_type,
     dump_type_cast,
@@ -13,7 +11,6 @@ from .utils import (
 from ...ir.module import Downstream
 from ...ir.memory.sram import SRAM
 from ...ir.expr import (
-    Expr,
     FIFOPush,
     FIFOPop,
     AsyncCall,
@@ -23,8 +20,6 @@ from ...ir.expr import (
 from ...ir.dtype import Record
 from ...utils import namify, unwrap_operand
 from ...ir.const import Const
-from ...analysis.topo import topological_sort
-
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def generate_top_harness(dumper):
@@ -207,38 +202,13 @@ def generate_top_harness(dumper):
 
     dumper.append_code('\n# --- Module Instantiations and Connections ---')
 
-    module_deps = defaultdict(set)
     all_modules = dumper.sys.modules + dumper.sys.downstreams
+    instantiation_modules = [
+        module for module in all_modules if not dumper._is_external_module(module)
+    ]
+    module_connections = []
 
-    # Track which modules produce which expressions
-    expr_producers = {}
-    for module in all_modules:
-        for expr in dumper._walk_expressions(module.body):
-            if expr.is_valued():
-                expr_producers[expr] = module
-
-    # Build dependencies for all modules
-    for module in all_modules:
-        # Dependencies from downstream_dependencies
-        if module in dumper.downstream_dependencies:
-            for dep in dumper.downstream_dependencies[module]:
-                module_deps[module].add(dep)
-
-        # Dependencies from external values
-        for ext_val in getattr(module, 'externals', {}).keys():
-            if isinstance(ext_val, Expr) and ext_val in expr_producers:
-                producer = expr_producers[ext_val]
-                if producer != module:
-                    module_deps[module].add(producer)
-            elif isinstance(ext_val, Bind):
-                continue
-
-    # Sort modules by dependencies
-    sorted_modules = topological_sort(all_modules, module_deps)
-
-    for module in sorted_modules:
-        if dumper._is_external_module(module):
-            continue
+    for module in instantiation_modules:
         mod_name = namify(module.name)
         is_downstream = isinstance(module, Downstream)
         is_sram = isinstance(module, SRAM)
@@ -333,56 +303,66 @@ def generate_top_harness(dumper):
 
         dumper.append_code(f"inst_{mod_name} = {mod_name}({', '.join(port_map)})")
 
+        connection_lines = []
+
         if is_sram:
             sram_info = get_sram_info(module)
             array = sram_info['array']
             array_name = namify(array.name)
-            dumper.append_code(f'mem_{array_name}_address.assign(inst_{mod_name}.mem_address)')
-            dumper.append_code(
-                f'mem_{array_name}_write_data.assign(inst_{mod_name}.mem_write_data)'
-                )
-            dumper.append_code(
-                f'mem_{array_name}_write_enable.assign(inst_{mod_name}.mem_write_enable)'
-                )
-            dumper.append_code(
-                f'mem_{array_name}_read_enable.assign(inst_{mod_name}.mem_read_enable)'
-                )
+            connection_lines.extend([
+                f'mem_{array_name}_address.assign(inst_{mod_name}.mem_address)',
+                f'mem_{array_name}_write_data.assign(inst_{mod_name}.mem_write_data)',
+                f'mem_{array_name}_write_enable.assign(inst_{mod_name}.mem_write_enable)',
+                f'mem_{array_name}_read_enable.assign(inst_{mod_name}.mem_read_enable)',
+            ])
 
         module_ports = getattr(module, 'ports', [])
 
         if not is_downstream:
-            dumper.append_code(
+            connection_lines.append(
                 f"{mod_name}_trigger_counter_pop_ready.assign(inst_{mod_name}.executed)"
-                )
+            )
             for port in module_ports:
                 if any(isinstance(e, FIFOPop) and e.fifo == port
                        for e in dumper._walk_expressions(module.body)):
-                    dumper.append_code(
+                    connection_lines.append(
                         f"fifo_{mod_name}_{namify(port.name)}_pop_ready"
                         f".assign(inst_{mod_name}.{namify(port.name)}_pop_ready)"
-                        )
+                    )
         else:
             for port in module_ports:
                 fifo_name = f"fifo_{mod_name}_{namify(port.name)}"
-                dumper.append_code(
+                connection_lines.append(
                     f"{fifo_name}_pop_ready.assign(Bits(1)(1))"
                 )
 
         for (callee_mod, callee_port) in unique_push_targets:
             callee_mod_name = namify(callee_mod.name)
             callee_port_name = namify(callee_port.name)
-            dumper.append_code(
+            connection_lines.append(
                 f"fifo_{callee_mod_name}_{callee_port_name}_push_valid"
                 f".assign(inst_{mod_name}.{callee_mod_name}_{callee_port_name}_push_valid)"
-                )
-            dumper.append_code(
+            )
+            connection_lines.append(
                 f"fifo_{callee_mod_name}_{callee_port_name}_push_data"
                 f".assign(inst_{mod_name}.{callee_mod_name}_{callee_port_name}_push_data"
                 f".as_bits())"
-                )
+            )
+
+        if connection_lines:
+            module_connections.append((module, connection_lines))
+
+    if module_connections:
+        dumper.append_code('\n# --- Module Connections ---')
+        for idx, (module, lines) in enumerate(module_connections):
+            dumper.append_code(f'# Connections for {module.name}')
+            for line in lines:
+                dumper.append_code(line)
+            if idx != len(module_connections) - 1:
+                dumper.append_code('')
     dumper.append_code('\n# --- Global Finish Signal Collection ---')
     finish_signals = []
-    for module in sorted_modules:
+    for module in instantiation_modules:
         mod_name = namify(module.name)
         # Check if this module type has finish conditions
         if hasattr(module, 'body'):
