@@ -18,3 +18,6 @@ def foo_wrapper(a):
    twice, you have a chance to write it more times. If similar code is distributed everywhere, you need
    to modify it everywhere, which not only worsens the readability but also lengthens the contexts.
    - However, focus on one thing at a time. If you realize it is a over engineering, report it in a TODO summary.
+
+3. Focus on thing for each module. If a module is originally designed for a purpose, do not borrow its code
+   path for anything else, unless the addition is a part of feature extension closely related to this module.
