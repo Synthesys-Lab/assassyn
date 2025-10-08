@@ -96,7 +96,7 @@ class Driver(Module):
             reserve = Bits(cachesize)((1<<cachesize) - 1) >> offset
 
             sram = SRAM(width, sram_depth, init_file)
-            sram.build(UInt(1)(0), init, lineno, Bits(width)(0), user)
+            sram.build(UInt(1)(0), init, lineno, Bits(width)(0))
             
             sentinel = (Int(32)(end) <= row_end).select(Int(32)(end), row_end)
             nextrow = (Int(32)(end) <= row_end).select(UInt(1)(0), UInt(1)(1))
@@ -112,7 +112,7 @@ class Driver(Module):
             log("\t\tCALL: bitmask={:b}\tlineno={}", bitmask, lineno)
             
             user.bind(mask=bitmask, term=simu_term)
-            sram.bound.async_called()
+            user.async_called()
             
             with Condition(line_end >= sentinel):
                 # Read will go to next row.

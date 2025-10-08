@@ -194,7 +194,7 @@ class Driver(Module):
             log("\t\tCALL: bitmask={:b}\tlineno={}", bitmask, lineno)
             
             user.bind(mask=bitmask, term=simu_term)
-            sram.bound.async_called()
+            user.async_called()
             
             with Condition(line_end >= sentinel):
                 # Read will go to next row.

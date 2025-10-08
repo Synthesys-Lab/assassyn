@@ -66,7 +66,7 @@ class Driver(Module):
         super().__init__(no_arbiter=True, ports={})
 
     @module.combinational
-    def build(self, memory_R: SRAM, memory_C: SRAM, rd: Distributor, cd: Distributor):
+    def build(self, memory_R: SRAM, memory_C: SRAM):
         cnt = RegArray(Int(8), 1, initializer=[0])
         v = cnt[0]
         raddr = v[0:9]  
@@ -74,8 +74,8 @@ class Driver(Module):
         re = cnt[0] < Int(8)(4)
         compute = cnt[0] < Int(8)(8)
 
-        memory_R.build(Int(1)(0), re, addr, Bits(memory_R.width)(0), rd)
-        memory_C.build(Int(1)(0), re, addr, Bits(memory_C.width)(0), cd)
+        memory_R.build(Int(1)(0), re, addr, Bits(memory_R.width)(0))
+        memory_C.build(Int(1)(0), re, addr, Bits(memory_C.width)(0))
 
         cnt[0] = cnt[0] + Int(8)(1)
 
@@ -119,7 +119,7 @@ def mem_systolic_array(sys_name, init_file_row, init_file_col, resource_base):
 
         # Invoke the Distributor
         invoker = Invoker()
-        invoker.build(memory_R.bound, memory_C.bound, compute)
+        invoker.build(rd, cd, compute)
 
     config = backend.config(sim_threshold=20, idle_threshold=20, resource_base=resource_base)
 

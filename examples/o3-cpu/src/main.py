@@ -167,8 +167,8 @@ class Execution(Module):
               
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
-        dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
-        bound = dcache.bound.bind( index=sb_index )
+        dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr)
+        bound = memory.bind( index=sb_index )
         
         bound.async_called() 
 
@@ -307,10 +307,10 @@ class Dispatch(Downstream):
         icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         icache.name = 'icache'
           
-        icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0), decoder)
+        icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0))
         
         with Condition(real_fetch):
-            icache.bound.async_called(fetch_addr=to_fetch)
+            decoder.async_called(fetch_addr=to_fetch)
             pc_reg[0] = (to_fetch.bitcast(Int(32)) + Int(32)(4)).bitcast(Bits(32))
             
         with Condition(~real_fetch):

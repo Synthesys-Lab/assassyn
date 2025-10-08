@@ -140,8 +140,8 @@ class Driver(Module):
                 re = True # Read Enable Signal
                 we = False # Write Disable Signal
             
-            memory.build(we, re, raddr, Bits(memory.width)(0), distributor)
-            memory.bound.async_called()
+            memory.build(we, re, raddr, Bits(memory.width)(0))
+            distributor.async_called()
 
             with Condition(Int(32)(cnt_read[0]) == Int(32)(8)):
                 cnt_read[0] = Int(32)(0)               # Reset Read Counter

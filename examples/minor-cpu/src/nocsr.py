@@ -207,8 +207,8 @@ class Execution(Module):
 
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
-        dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr, user=memory)
-        bound = dcache.bound.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext)
+        dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr)
+        bound = memory.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext)
         bound.async_called()
         # with Condition(signals.csr_write):
         #     csr_f[csr_id] = csr_new
@@ -334,10 +334,10 @@ class Driver(Module):
         init_reg = RegArray(Int(1), 1, initializer=[1])
         init_cache = SRAM(width=32, depth=32, init_file=f"{workspace}/workload.init")
         init_cache.name = 'init_cache'
-        init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0), user=user)
+        init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0))
         # Initialze offset at first cycle
         with Condition(init_reg[0]==Int(1)(1)):
-            init_cache.bound.async_called()
+            user.async_called()
             init_reg[0] = Int(1)(0)
         # Async_call after first cycle
         with Condition(init_reg[0] == Int(1)(0)):
