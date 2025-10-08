@@ -5,10 +5,6 @@
 
 build-verilator:
 	@echo "Building Verilator..."
-	@if [ "$(NO_VERILATOR)" = "true" ]; then \
-		echo "Verilator is disabled by --no-verilator flag"; \
-		exit 0; \
-	fi
 	@echo "Installing Verilator by building it from source..."
 	@cd 3rd-party/verilator && \
 		autoconf && \
