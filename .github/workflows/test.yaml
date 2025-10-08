@@ -36,7 +36,7 @@ jobs:
             ${{ github.workspace }}/3rd-party/circt/frontends/PyCDE
             ${{ github.workspace }}/3rd-party/ramulator2/build
             ${{ github.workspace }}/tools/c-ramulator2-wrapper/build
-          key: ${{ runner.os }}-build-cache-${{ hashFiles('3rd-party/verilator/.git/HEAD') }}-${{ hashFiles('3rd-party/circt/.git/HEAD') }}-${{ hashFiles('3rd-party/ramulator2/.git/HEAD') }}-${{ hashFiles('tools/c-ramulator2-wrapper/.git/HEAD') }}
+          key: ${{ runner.os }}-build-cache-${{ hashFiles('Makefile') }}-${{ hashFiles('scripts/init/*.inc') }}-${{ hashFiles('python/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-build-cache-
 
