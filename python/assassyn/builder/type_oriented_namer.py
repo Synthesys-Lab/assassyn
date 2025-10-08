@@ -61,40 +61,12 @@ class TypeOrientedNamer:
         except (AttributeError, TypeError):
             return None
 
-    def _describe_dtype(self, dtype: Any) -> Optional[str]:
-        """Create a compact textual description for a dtype-like object."""
-        if dtype is None:
-            return None
-
-        type_name = dtype.__class__.__name__.lower()
-        bits = getattr(dtype, 'bits', None)
-        lanes = getattr(dtype, 'lanes', None)
-
-        suffix = None
-        if bits is not None and isinstance(bits, int):
-            suffix = f'{bits}'
-        elif hasattr(dtype, 'width'):
-            width = getattr(dtype, 'width')
-            if isinstance(width, int):
-                suffix = f'{width}'
-
-        if lanes:
-            suffix = f'{suffix}x{lanes}' if suffix else f'{lanes}'
-
-        if suffix:
-            return f'{type_name}{suffix}'
-
-        return type_name
-
     def _array_prefix(self, node: Any) -> str:
         """Generate a descriptive prefix for arrays."""
-        scalar = self._safe_getattr(node, 'scalar_ty')
+        _scalar = self._safe_getattr(node, 'scalar_ty')
         size = self._safe_getattr(node, 'size')
 
-        dtype_desc = self._describe_dtype(scalar)
         parts = ['array']
-        if dtype_desc:
-            parts.append(dtype_desc)
         if isinstance(size, int):
             parts.append(f'sz{size}')
         return self._sanitize('_'.join(parts))
@@ -136,22 +108,6 @@ class TypeOrientedNamer:
         if base in {'module', 'modulebase'}:
             base = 'module'
         return f'{base}_inst'
-
-    def _binary_op_prefix(self, node: Any, default: str) -> str:
-        """Attach dtype information to binary operator prefixes."""
-        dtype = getattr(node, 'dtype', None)
-        dtype_desc = self._describe_dtype(dtype)
-        if dtype_desc:
-            return f'{default}_{dtype_desc}'
-        return default
-
-    def _unary_op_prefix(self, node: Any, default: str) -> str:
-        """Attach dtype information to unary operator prefixes."""
-        dtype = getattr(node, 'dtype', None)
-        dtype_desc = self._describe_dtype(dtype)
-        if dtype_desc:
-            return f'{default}_{dtype_desc}'
-        return default
 
     def get_prefix_for_type(self, node: Any) -> str:  # pylint: disable=too-many-return-statements,too-many-branches,too-many-locals
         """Get the naming prefix for a given node type."""
@@ -202,15 +158,9 @@ class TypeOrientedNamer:
         if hasattr(node, 'opcode'):
             opcode = node.opcode
             if opcode in self._binary_ops:
-                return self._binary_op_prefix(node, self._binary_ops[opcode])
+                return self._binary_ops[opcode]
             if opcode in self._unary_ops:
-                return self._unary_op_prefix(node, self._unary_ops[opcode])
-
-        dtype = self._safe_getattr(node, 'dtype')
-        if dtype is not None:
-            dtype_desc = self._describe_dtype(dtype)
-            if dtype_desc:
-                return self._sanitize(dtype_desc)
+                return self._unary_ops[opcode]
 
         name_attr = self._safe_getattr(node, 'name')
         if isinstance(name_attr, str):
@@ -219,36 +169,18 @@ class TypeOrientedNamer:
         # Default fallback
         return 'val'
 
-    def _infer_context(self, value: Any) -> Optional[str]:
-        """Infer a naming context (usually module name) for the given value."""
-        module = self._safe_getattr(value, 'module')
-        module_name = self._entity_name(module)
-        if module_name:
-            return module_name
-
-        parent = self._safe_getattr(value, 'parent')
-        if parent is not None:
-            module = self._safe_getattr(parent, 'module')
-            module_name = self._entity_name(module)
-            if module_name:
-                return module_name
-
-        return None
 
     def name_value(self, value: Any, hint: Optional[str] = None) -> str:
         """Generate a unique name for a value based on its type."""
         # Clean the hint to be a valid identifier
         if hint:
             hint = self._sanitize(hint)
-            # Use the hint directly (cache will handle uniqueness)
-            context = self._infer_context(value)
-            return self._cache.get_unique_name(hint, context=context)
+            return self._cache.get_unique_name(hint)
 
         # Get type-based prefix if no hint
         prefix = self.get_prefix_for_type(value)
         prefix = self._sanitize(prefix)
-        context = self._infer_context(value)
-        return self._cache.get_unique_name(prefix, context=context)
+        return self._cache.get_unique_name(prefix)
 
     def reset(self):
         """Reset the internal name cache."""

@@ -24,7 +24,7 @@ class MulStage1(Module):
 
         with Condition(cnt < Int(32)(32)):# avoid overflow
             b_bit = ((b >> cnt) & Int(32)(1)).bitcast(Int(32))  # to get the cnt-th bit from the right
-            stage1_reg[0] = a * b_bit  # 'a' multiply b[cnt-1]
+            (stage1_reg & self)[0] <= a * b_bit  # 'a' multiply b[cnt-1]
             log("MulStage1: {:?} * {:?} = {:?}", a, b_bit, a * b_bit)
 
 
@@ -44,7 +44,8 @@ class MulStage2(Module):
         with Condition(cnt > Int(32)(0)):
             bit_num = cnt - Int(32)(1)   # avoid overflow
             with Condition(bit_num < Int(32)(32)):
-                stage2_reg[0] = stage1_reg[0] << bit_num  # left shift as multiplying weights
+                # left shift to multiply weight
+                (stage2_reg & self)[0] <= (stage1_reg[0] << bit_num).bitcast(Int(64))
                 log("MulStage2: {:?}", stage2_reg[0])
 
 
@@ -61,18 +62,19 @@ class MulStage3(Module):
     @module.combinational
     def build(self, stage2_reg: Array, stage3_reg: Array):
         cnt, a, b = self.pop_all_ports(True)
-        stage3_reg[0] = stage2_reg[0] + stage3_reg[0]
+        (stage3_reg & self)[0] <= stage2_reg[0] + stage3_reg[0]
+        log("MulStage3: {:?}", stage3_reg[0])
         log("Temp result {:?} of {:?} * {:?} = {:?}", cnt, a, b, stage3_reg[0])
 
         with Condition(cnt == Int(32)(34)):  # output final result
             log("Final result {:?} * {:?} = {:?}", a, b, stage3_reg[0])
 
 def multiply(a, b, cnt):
-    stage1_reg = RegArray(Int(64), 1)
-    stage2_reg = RegArray(Int(64), 1)
-    stage3_reg = RegArray(Int(64), 1)
+    stage1_reg = RegArray(Int(64), 1, name="stage1_reg")
+    stage2_reg = RegArray(Int(64), 1, name="stage2_reg")
+    stage3_reg = RegArray(Int(64), 1, name="stage3_reg")
 
-    cycle = RegArray(Int(32),1)
+    cycle = RegArray(Int(32), 1, name="cycle_reg")
     cycle[0]=cnt-Int(32)(1)
     cond = (cycle[0] < Int(32)(35))&(cnt>=Int(32)(2))
 
