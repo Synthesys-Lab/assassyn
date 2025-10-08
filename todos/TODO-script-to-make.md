@@ -4,10 +4,10 @@ Convert the current setup script `init.sh` to `Makefile`.
 
 # Action Items
 
-0. Update `pre-commit` hook to use Make targets instead of sourcing `wrapper.sh`.
+0. Update `pre-commit` hook to use Make target, `make test-all` instead of sourcing `wrapper.sh`.
 1. Create a `Makefile` at the root of this repo as master.
-  - Create an `all` target that exports all the environment variable by sourcing `setup.sh`.
-  - Create `build-all`, `test-all`, and `clean-all` that `all` depends on.
+  - Create an `env` target that exports all the environment variable by sourcing `setup.sh`.
+  - Create `build-all`, `test-all`, and `clean-all` that the `all` target depend on.
   - Link corresponding targets to `build-all` and `clean-all`:
     - `build-all` depends on: `install-py-package`, `build-verilator`, `build-ramulator2`, `build-wrapper`, `install-circt`
     - `clean-all` depends on: `clean-verilator`, `clean-ramulator2`, `clean-wrapper`, `clean-circt`
@@ -37,7 +37,10 @@ Convert the current setup script `init.sh` to `Makefile`.
     - `clean-wrapper`: Clean build artifacts in `tools/c-ramulator2-wrapper/build`
   - `make clean-wrapper clean-ramulator2` to clean both builds
   - Create two targets `build-wrapper` and `build-ramulator2` by analyzing the existing `wrapper.sh` script.
-    - `build-ramulator2`: git submodule update, apply patch, cmake, make in `3rd-party/ramulator2`
+    - **Use elegant Makefile patch management**: Create `3rd-party/ramulator2/.patch-applied` marker file to track patch state
+      - `3rd-party/ramulator2/.patch-applied`: Apply patch only if marker doesn't exist, then create marker
+      - `build-ramulator2`: Depends on `.patch-applied` marker, then git submodule update, cmake, make
+      - **Deprecate complex shell approach**: Replace the complicated `git apply --reverse --check` logic with simple file marker
     - `build-wrapper`: cmake, make in `tools/c-ramulator2-wrapper` (depends on `build-ramulator2`)
   - Make both build targets to make sure they build.
   - Make both build targets twice to make sure they are idempotent.
@@ -50,3 +53,7 @@ Convert the current setup script `init.sh` to `Makefile`.
   - Make `install-circt` to have the package installed.
      - Also, make sure it does not rebuild when twice called.
   - Stage and commit without verification.
+6. Link `test-all` to depend on `build-all`, and test below
+   - `pytest -n 8 -x python/unit-tests`.
+   - `pytest -n 8 -x python/ci-tests`.
+   - Stage and commit.
