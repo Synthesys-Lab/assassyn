@@ -68,7 +68,8 @@ jobs:
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make build-all"
       - name: Check Rust Code Quality
         run: |
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make rust-lint"
+          cargo fmt --manifest-path tools/rust-sim-runtime/Cargo.toml --all -- --check --config-path rustfmt.toml
+          cargo clippy --manifest-path tools/rust-sim-runtime/Cargo.toml --all-targets --all-features -- -D warnings
       
       - name: Check Python Code Quality
         run: |
