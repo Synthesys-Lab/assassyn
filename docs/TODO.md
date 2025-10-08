@@ -6,41 +6,6 @@
 
     ## Critical Fixes
 
-    ### 1. Downstream Module Dependency Resolution
-
-    **Issue**: Incorrect topological ordering of downstream modules causing data fetch errors.
-
-    **Impact**:
-    - Downstream modules could read stale or uninitialized values when dependencies were resolved incorrectly
-    - Potential simulation deadlocks or incorrect hardware behavior
-
-    **Fix Applied**:
-    ```python
-    # Proper dependency graph construction with correct initialization
-    downstreams = list(sys.downstreams) if hasattr(sys, 'downstreams') else []
-
-    graph = defaultdict(list)
-    in_degree = defaultdict(int)
-
-    # Initialize graph and in_degree for all downstream modules
-    for module in downstreams:
-        if module not in graph:
-            graph[module] = []
-        if module not in in_degree:
-            in_degree[module] = 0
-
-    # Build dependency graph with correct direction
-    for module in downstreams:
-        upstreams = get_upstreams(module)
-        for upstream in upstreams:
-            if upstream in downstreams:
-                graph[upstream].append(module)  # Correct direction: upstream -> module
-                in_degree[module] += 1
-
-    # Topological sort using deque for efficient queue operations
-    queue = deque([m for m in downstreams if in_degree[m] == 0])
-    ```
-
     ### 2. CondBlock External Usage Detection
 
     **Issue**: Expressions used within conditional blocks were not properly identified as externally used.
