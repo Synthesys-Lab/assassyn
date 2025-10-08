@@ -48,4 +48,8 @@ The summary should include two parts:
    - If an external dependency does not fulfill our need, explain why and suggest a plan to replace it.
 
 Remember to keep it precise, state the fact itself more, and use less adjacents and adverb to decorate.
-After makine all these changes above, stage and commit all the changes as per our git commit message guideline.
+
+After makine all these changes above, if:
+- There are unstaged changes, stage and commit all the changes as per our git commit message guideline, WITHOUT bypassing pre-commit!
+- There are no unstaged changes, use `git commit --no-edit --amend` to trigger pre-commit once!
+- This is required to not to finish a TODO!

@@ -11,7 +11,6 @@ build-verilator:
 	fi
 	@echo "Installing Verilator by building it from source..."
 	@cd 3rd-party/verilator && \
-		git submodule update --init && \
 		autoconf && \
 		./configure && \
 		make -j
