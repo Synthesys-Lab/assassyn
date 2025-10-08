@@ -38,13 +38,6 @@ specific intermediate steps. Each step should have a clear purpose achievable.
      implement the new feature or fix the bug. The action item should be like
      "as per new source.md, the existing source.py should be refactored as follow by
      adding/removing xxx".
-
-## Section 3: Checklist
-
-After all the intermediate steps are done, a final checklist should be created to
-ensure that the final goal is achieved. The checklist should include:
-
-- [ ] New interface implemented as per the new design.
-- [ ] All the usage sites are updated to use the new interface.
-- [ ] All the tests are passing.
-- [ ] A brief summary of the effects achieved. For example, if a new interface is adopted, show a typical code snippet before and after the change.
+3. It is related to a prior change, as per our [action flow](./act-on-todo.mdc), the prior TODO
+   will be located in a `dones` folder, so that refer to their changes.
+   - As per changes in `TODO-yyy.md`, `<what issue>` was introduced, we should fix all the related files by `<doing what>`.

@@ -33,12 +33,12 @@ After that, move `TODO-xxx.md` to `dones/DONE-xxx.md` where `xxx` is the same as
   - If `dones` folder does not exist, create it.
 
 The summary should include two parts:
-1. Check all the checklist items in the `TODO-xxx.md` file are done.
+1. Summarize all the action times in `TODO-xxx.md` you achieved as a checklist.
 2. Summarize the changes made in the codebase, including:
    - New features added
    - Bugs fixed
-   - Improvements made
-   - Any other relevant information
+   - Improvements made: This is some minor refactor that can be done along with this commit.
+   - Some interfaces you created that are not documented.
    - If an interface refactor happens more than 3 times, present a re-presentative simple before-after code snippet.
       - No need to present code snippets in other cases.
 3. Summarize the non-obvious technical decisions made during the implementation. This includes but is not limited to:
@@ -47,4 +47,5 @@ The summary should include two parts:
    - If a test case is skipped, explain why and suggest a plan to unskip it.
    - If an external dependency does not fulfill our need, explain why and suggest a plan to replace it.
 
+Remember to keep it precise, state the fact itself more, and use less adjacents and adverb to decorate.
 After makine all these changes above, stage and commit all the changes as per our git commit message guideline.

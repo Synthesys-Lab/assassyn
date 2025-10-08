@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+---
+
+# Write Good Code
+
+This document discusses several key rules of writing good code:
+
+1. When introducing a new wrapper like below, ask yourself do we really need such an indirection.
+   - Is it because our interface design is poor? If so, report it in a summary when acting on a TODO.
+
+```python
+def foo_wrapper(a):
+    foo(a, 0)
+```
+
+2. When writing a set of repeat code, consider to refine a unified interface. If you write a repeat code
+   twice, you have a chance to write it more times. If similar code is distributed everywhere, you need
+   to modify it everywhere, which not only worsens the readability but also lengthens the contexts.
+   - However, focus on one thing at a time. If you realize it is a over engineering, report it in a TODO summary.
