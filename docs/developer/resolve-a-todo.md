@@ -46,3 +46,5 @@ The summary should include two parts:
    - If a workaround for a bug in test case before this TODO, explain it and suggest a fundamental solution.
    - If a test case is skipped, explain why and suggest a plan to unskip it.
    - If an external dependency does not fulfill our need, explain why and suggest a plan to replace it.
+
+After makine all these changes above, stage and commit all the changes as per our git commit message guideline.
