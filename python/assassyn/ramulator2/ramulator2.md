@@ -18,6 +18,13 @@ The PyRamulator class encapsulates memory simulation functionality, allowing Pyt
 - Advance simulation time through ticking mechanisms
 - Handle request completion callbacks
 
+## Utility Method
+
+- `cwrapper_lib_path()`: This method reads the `.cwrapper-lib-path`, created by [wrapper build](../../../tools/c-ramulator2-wrapper/CMakeLists.txt), and return the content inside, which is the path to C-wrapper shared library.
+   - If not exist, raise an error.
+   - If read once, cache the result to avoid further file IO.
+- `ramulator2_lib_path()`: Similar as the above, by reading `.ramulator2-lib-path`.
+
 ## PyRamulator Class Methods
 
 ### `__init__(config_path: str)`
