@@ -7,10 +7,7 @@ for arg in "$@"; do
     break
   fi
 done
-# Restore the original directory
-RESTORE_DIR=`pwd`
-# Go to the setup.sh directory
-cd `dirname $0`
+
 # Use the repository path to set the PYTHONPATH and ASSASSYN_HOME
 REPO_PATH=`git rev-parse --show-toplevel`
 
@@ -61,6 +58,3 @@ append_env_json "PATH" "$PATH"
 
 echo "Put these environment variables to your .json config:"
 echo $ENV_JSON | jq .
-
-# Go back to the original directory
-cd $RESTORE_DIR

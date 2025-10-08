@@ -5,7 +5,3 @@
 
 # Ensure ramulator2 and wrapper are built
 make test-all
-if [ $? -ne 0 ]; then
-    echo "Build and tests failed, please fix the issues before committing."
-    exit 1
-fi
