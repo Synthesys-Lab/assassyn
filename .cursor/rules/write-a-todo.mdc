@@ -1,7 +1,12 @@
-# A TODO Document
+---
+alwaysApply: false
+description: Guideline to Write a TODO Document
+glob:
+---
 
-This document defines the structure of a TODO document to develop this project.
-A TODO document shall have the following sections:
+# TODO Document
+
+A TODO document is a driver to the development, which shall have the following sections:
 
 ## Section 1: Goal
 
