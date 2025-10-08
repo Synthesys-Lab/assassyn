@@ -11,6 +11,14 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Run clippy on rust-sim-runtime
+echo "Running cargo clippy for rust-sim-runtime..."
+cargo clippy --manifest-path tools/rust-sim-runtime/Cargo.toml --all-targets --all-features -- -D warnings
+if [ $? -ne 0 ]; then
+    echo "Error: Rust clippy check failed. Please fix the issues above."
+    exit 1
+fi
+
 # Run pylint on assassyn Python package
 echo "Running pylint on assassyn package..."
 pylint --rcfile=python/assassyn/.pylintrc python/assassyn/
