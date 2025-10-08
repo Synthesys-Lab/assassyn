@@ -16,5 +16,5 @@ workspace/*
 Cargo.lock
 
 # AI Workflows
-./todos/*
-./dones/*
+todos/*
+dones/*
