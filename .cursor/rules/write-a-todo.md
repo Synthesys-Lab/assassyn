@@ -8,13 +8,15 @@ glob:
 
 A TODO document is a driver to the development, which shall have the following sections:
 
-## Section 1: Goal
+## Section 1: Goal or Issue
 
 Focus on one thing at a time. Define the goal of the a TODO document specifically, briefly,
 and clearly. It should be as simple as replace a set of repeating code patterns with a unified
-interface, or fix a specific bug replicated.
+interface, fix a specific bug replicated, or make a improvement on a specific part of the code.
+Also, it is acceptable to state the issue itself without pointing out the goal, as goal is there implicitly.
 
-The granularity of a TODO document should be "test pass", which means all the `pre-commit` hooks should pass. At the end to a TODO, `pre-commit` should be triggered no matter there are unstaged changes or not!
+The granularity of a TODO document should be "test pass", which means all the `pre-commit` hooks should pass.
+At the end to a TODO, `pre-commit` should be triggered no matter there are unstaged changes or not!
 
 ## Section 2: Action Items
 

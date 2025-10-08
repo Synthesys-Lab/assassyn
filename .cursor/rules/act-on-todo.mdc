@@ -12,7 +12,7 @@ add new features, fix bugs, and improve the codebase, when a `TODO-xxx.md` as de
 
 ## 1. Understand the Goal
 
-Look at the `Goal` section in the `TODO-xxx.md` file. Make sure you understand what needs to be done.
+Look at the `Goal or Issue` section in the `TODO-xxx.md` file. Make sure you understand what needs to be done.
 
 ## 2. Analyze the Current State
 
@@ -33,14 +33,13 @@ After that, move `TODO-xxx.md` to `dones/DONE-xxx.md` where `xxx` is the same as
   - If `dones` folder does not exist, create it.
   - `dones` foleder is already in `.gitignore`, so `DONE-xxx.md` should not be committed.
 
-The summary should include two parts:
-1. Summarize all the action times in `TODO-xxx.md` you achieved as a checklist.
-2. Summarize the changes made in the codebase, including:
-   - New features added
-   - Bugs fixed
-   - Improvements made: This is some minor refactor that can be done along with this commit.
+The summary should include four parts:
+0. The goal achieved as per the TODO.
+1. All the action items in `TODO-xxx.md` you achieved as a checklist.
+2. All the changes made in the codebase, including:
+   - Improvements made: Some minor refactor that is be done along with this commit.
    - Some interfaces you created that are not documented.
-   - If an interface refactor happens more than 3 times, present a re-presentative simple before-after code snippet.
+   - If an interface refactor happens more than 3 times, present a representative simple before-after code snippet.
       - No need to present code snippets in other cases.
 3. Summarize the non-obvious technical decisions made during the implementation. This includes but is not limited to:
    - For example, if it is a short-term hack, explain this hack and suggest a fundamental solution.
