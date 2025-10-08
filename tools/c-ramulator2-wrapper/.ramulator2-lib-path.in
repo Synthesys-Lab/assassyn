@@ -1,0 +1,1 @@
+@CMAKE_CURRENT_SOURCE_DIR@/../../3rd-party/ramulator2/libramulator@CMAKE_SHARED_LIBRARY_SUFFIX@
