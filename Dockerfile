@@ -57,6 +57,10 @@ RUN pip install \
     pytest-xdist==3.6.1 \
     --break-system-packages
 
+# Install additional Python dependencies from requirements.txt
+COPY python/requirements.txt /app/python/requirements.txt
+RUN pip install -r /app/python/requirements.txt --break-system-packages
+
 # Ensure setup.sh is sourced on shell startup if it exists
 RUN echo '[ -f /app/setup.sh ] && source /app/setup.sh' >> /root/.zshrc
 

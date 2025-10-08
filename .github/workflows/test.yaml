@@ -27,6 +27,18 @@ jobs:
         run: |
           ${{ env.ASSASSYN_DOCKER }} git submodule update --init
 
+      - name: Restore Python Package Cache
+        id: cache-python
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ github.workspace }}/.sim-runtime-cache
+            ${{ github.workspace }}/.assassyn-venv
+            ${{ github.workspace }}/.local
+          key: ${{ runner.os }}-python-cache-${{ hashFiles('python/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-python-cache-
+
       - name: Restore Build Cache
         id: cache-build
         uses: actions/cache@v4
@@ -39,6 +51,12 @@ jobs:
           key: ${{ runner.os }}-build-cache-${{ hashFiles('Makefile') }}-${{ hashFiles('scripts/init/*.inc') }}-${{ hashFiles('python/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-build-cache-
+
+      - name: Install Python Packages
+        if: steps.cache-python.outputs.cache-hit != 'true'
+        run: |
+          echo "Python cache miss, installing packages"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "pip install -r python/requirements.txt --break-system-packages"
 
       - name: Build All Components
         if: steps.cache-build.outputs.cache-hit != 'true'
