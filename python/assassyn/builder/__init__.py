@@ -11,12 +11,10 @@ import os
 import site
 import typing
 
-from .assignment_tracker import AssignmentTracker
 from .integrate import combinational_for, initialize_naming_system, install_decorators, sys_builder
 from .naming_manager import (
     NamingManager,
     get_naming_manager,
-    name_ir_node,
     set_naming_manager,
 )
 from .rewrite_assign import rewrite_assign
@@ -32,14 +30,12 @@ if typing.TYPE_CHECKING:
 __all__ = [
     # Core components
     'UniqueNameCache',
-    'AssignmentTracker',
     'TypeOrientedNamer',
     'NamingManager',
 
     # Global functions
     'get_naming_manager',
     'set_naming_manager',
-    'name_ir_node',
 
     # Integration
     'initialize_naming_system',

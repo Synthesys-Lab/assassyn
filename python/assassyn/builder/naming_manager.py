@@ -1,14 +1,13 @@
 """
 Naming Manager for the Assassyn Naming System.
 
-Central coordinator for the entire naming system, managing assignment tracking,
-type-based naming, and AST rewriting.
+Central coordinator for the naming system, integrating type-based naming with
+the AST rewriting hooks.
 """
 
 from __future__ import annotations
-from typing import Optional, Any, List
+from typing import Optional, Any
 
-from .assignment_tracker import AssignmentTracker
 from .type_oriented_namer import TypeOrientedNamer
 from .unique_name import UniqueNameCache
 
@@ -16,21 +15,15 @@ from .unique_name import UniqueNameCache
 class NamingManager:
     """
     Manages the overall naming system for IR values.
-    Coordinates between assignment tracking, type-based naming, and AST rewriting.
+    Coordinates between type-based naming and AST rewriting.
     """
 
     def __init__(self):
-        self._tracker = AssignmentTracker()
         self._namer = TypeOrientedNamer()
-        self._pending_values: List[Any] = []
-        self._assignment_hook_enabled = False
         self._module_name_cache = UniqueNameCache()
 
     def push_value(self, value: Any):
         """Track a newly created IR value."""
-        if self._assignment_hook_enabled:
-            self._pending_values.append(value)
-
         # Always name Expr objects for better IR readability
         # Import Expr here to check instanceof
         try:
@@ -48,30 +41,14 @@ class NamingManager:
             # Silently fail if we can't name it
             pass
 
-        self._tracker.push_value(value)
-
     def process_assignment(self, name: str, value: Any) -> Any:
         """
-        Process an assignment, naming all pending values.
+        Process an assignment and name the assigned value.
         Called by the rewritten assignment hook.
         """
-        # Process all pending values
-        if self._pending_values:
-            # The last value is the one being assigned
-            for pending in self._pending_values[:-1]:
-                # Generate intermediate names
-                intermediate_name = self._namer.name_value(pending)
-                self._apply_name(pending, intermediate_name)
-
-            # Clear pending list
-            self._pending_values.clear()
-
         # Name the assigned value
         final_name = self._namer.name_value(value, name)
         self._apply_name(value, final_name)
-
-        # Clear the tracker
-        self._tracker.clear_and_assign(name)
 
         return value
 
@@ -95,20 +72,6 @@ class NamingManager:
         self._apply_name(value, name)
         return name
 
-    def reset(self):
-        """Reset all naming state."""
-        self._tracker = AssignmentTracker()
-        self._namer.reset()
-        self._pending_values.clear()
-
-    def enable_assignment_hook(self):
-        """Enable the assignment rewriting hook."""
-        self._assignment_hook_enabled = True
-
-    def disable_assignment_hook(self):
-        """Disable the assignment rewriting hook."""
-        self._assignment_hook_enabled = False
-
     def get_module_name(self, base_name: str) -> str:
         """
         Get a unique module name based on the given base name.
@@ -118,11 +81,6 @@ class NamingManager:
         """
         capitalized = base_name.capitalize()
         return self._module_name_cache.get_unique_name(capitalized)
-
-
-# ============================================================================
-# Global Integration Functions
-# ============================================================================
 
 _global_naming_manager: Optional[NamingManager] = None
 
@@ -136,11 +94,3 @@ def set_naming_manager(manager: Optional[NamingManager]):
     """Set the global naming manager."""
     global _global_naming_manager  # pylint: disable=global-statement
     _global_naming_manager = manager
-
-
-def name_ir_node(node: Any, hint: Optional[str] = None,
-                 namer: Optional[TypeOrientedNamer] = None) -> str:
-    """Convenience function for direct node naming."""
-    if namer is None:
-        namer = TypeOrientedNamer()
-    return namer.name_value(node, hint)

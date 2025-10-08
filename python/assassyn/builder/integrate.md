@@ -48,8 +48,8 @@ Factory returning a combinational decorator that understands the naming system.
 - Creates a fresh `Block` rooted at `Block.MODULE_ROOT`, attaches it to the
   module (`module.body.parent = module`, `module.body.module = module`), and
   manages the usual builder contexts.
-- Enables the naming manager's assignment hook while the rewritten function
-  runs, then disables it on exit (even if an exception occurs).
+- Binds the rewritten function's signature so `Array` arguments inherit the
+  corresponding parameter names for clearer IR dumps.
 - Marks the wrapper with `_is_combinational`, `_module_class`, and stores the
   rewritten function in `__assassyn_original__` for debugging/reference.
 
@@ -58,13 +58,6 @@ Factory returning a combinational decorator that understands the naming system.
 ### `install_decorators()`
 
 Monkey-patches Assassyn so every consumer sees the enhanced decorators.
-
-#### Updates
-1. Replaces `assassyn.builder.ir_builder`.
-2. Replaces `assassyn.ir.module.base.combinational_for`.
-3. Rebinds `assassyn.ir.module.Module.combinational` and
-   `assassyn.ir.module.Downstream.combinational` (plus their downstream exports)
-   to the new factory.
 
 ---
 
@@ -91,8 +84,8 @@ released afterwards, regardless of exceptions.
 
 ### `initialize_naming_system()`
 
-Convenience entry point that installs the decorators, patches `SysBuilder`, and
-prints a confirmation message so initialization can be traced at runtime.
+Convenience entry point that installs the decorators and patches `SysBuilder`
+so the naming manager is available while the builder is active.
 
 ---
 
@@ -103,9 +96,7 @@ The enhanced combinational decorator coordinates three layers simultaneously:
 ```python
 Singleton.builder.enter_context_of('module', module)
 Singleton.builder.enter_context_of('block', module.body)
-naming_manager.enable_assignment_hook()
-# execute rewritten function
-naming_manager.disable_assignment_hook()
+
 Singleton.builder.exit_context_of('block')
 Singleton.builder.exit_context_of('module')
 ```

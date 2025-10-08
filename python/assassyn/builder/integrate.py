@@ -137,15 +137,11 @@ def combinational_for(module_class):
             # pylint: disable=import-outside-toplevel,cyclic-import
             from assassyn.builder import Singleton
             from assassyn.ir.block import Block
+            from assassyn.ir.array import Array  # late import to avoid cycles
 
             # Enter module context
             module = self
             assert module is not None
-
-            # Set up naming context
-            naming_manager = Singleton.naming_manager
-            if naming_manager:
-                naming_manager.enable_assignment_hook()
 
             try:
                 # Enter block context
@@ -154,6 +150,21 @@ def combinational_for(module_class):
                 module.body.module = module
                 Singleton.builder.enter_context_of('module', module)
                 Singleton.builder.enter_context_of('block', module.body)
+
+                try:
+                    bound = inspect.signature(new_func).bind(self, *args, **kwargs)
+                    bound.apply_defaults()
+                except TypeError:
+                    bound = None
+
+                if bound is not None:
+                    for param_name, argument in bound.arguments.items():
+                        if param_name == 'self':
+                            continue
+
+                        # Assign semantic names to Array parameters so IR uses user-facing names.
+                        if isinstance(argument, Array):
+                            argument.name = param_name
 
                 # Execute the rewritten function
                 result = new_func(self, *args, **kwargs)
@@ -164,10 +175,6 @@ def combinational_for(module_class):
                 # Exit contexts
                 Singleton.builder.exit_context_of('block')
                 Singleton.builder.exit_context_of('module')
-
-                # Disable assignment hook
-                if naming_manager:
-                    naming_manager.disable_assignment_hook()
 
         # Mark as combinational
         wrapper._is_combinational = True  # pylint: disable=protected-access
