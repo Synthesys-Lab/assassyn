@@ -32,9 +32,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ github.workspace }}/.sim-runtime-cache
             ${{ github.workspace }}/.assassyn-venv
-            ${{ github.workspace }}/.local
           key: ${{ runner.os }}-python-cache-${{ hashFiles('python/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-python-cache-
