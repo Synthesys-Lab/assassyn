@@ -22,29 +22,6 @@ to mitigate this pain.
 
   # Checklist
 
-- [ ] **CMake Integration**
-  - [ ] Modify `tools/c-ramulator2-wrapper/CMakeLists.txt` to generate `.cwrapper-lib-path` file
-  - [ ] Modify `tools/c-ramulator2-wrapper/CMakeLists.txt` to generate `.ramulator2-lib-path` file
-  - [ ] Add `.cwrapper-lib-path` to `.gitignore`
-  - [ ] Add `.ramulator2-lib-path` to `.gitignore`
-
-- [ ] **Python Wrapper Refactoring**
-  - [ ] Implement `cwrapper_lib_path()` method in `python/assassyn/ramulator2/ramulator2.py`
-  - [ ] Implement `ramulator2_lib_path()` method in `python/assassyn/ramulator2/ramulator2.py`
-  - [ ] Add caching mechanism to avoid repeated file I/O
-  - [ ] Refactor `load_shared_library()` to use new utility methods
-  - [ ] Remove platform-specific suffix detection logic (`get_shared_lib_extension()`)
-
-- [ ] **Rust Integration Updates**
-  - [ ] Modify `tools/rust-sim-runtime/src/ramulator2.rs` to read from path files
-  - [ ] Update `tools/rust-sim-runtime/tests/test_ramulator2.rs` to use new path loading
-  - [ ] Replace hardcoded library paths with file-based path resolution
-
-- [ ] **Simulator Generator Updates**
-  - [ ] Modify `python/assassyn/codegen/simulator/simulator.py` to use utility methods
-  - [ ] Update `python/assassyn/codegen/simulator/simulator.md` documentation
-  - [ ] Remove hardcoded library paths from generated Rust code
-
 - [x] **Build and Test**
   - [x] Run `scripts/init/wrapper.sh` to rebuild wrapper
   - [x] Run `python/ci-tests/test_driver.py` as sanity check
