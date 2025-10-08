@@ -31,6 +31,7 @@ and improvements as described in the action items. Faithfully use `git commit` w
 After all action items are down, a summary checklist should be appended after the `TODO-xxx.md` file.
 After that, move `TODO-xxx.md` to `dones/DONE-xxx.md` where `xxx` is the same as `TODO-xxx`.
   - If `dones` folder does not exist, create it.
+  - `dones` foleder is already in `.gitignore`, so `DONE-xxx.md` should not be committed.
 
 The summary should include two parts:
 1. Summarize all the action times in `TODO-xxx.md` you achieved as a checklist.
