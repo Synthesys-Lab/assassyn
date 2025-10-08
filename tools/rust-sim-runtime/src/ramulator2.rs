@@ -77,7 +77,6 @@ pub struct Response {
 }
 type CRamualator2Wrapper = *mut c_void;
 pub type RequestCallback = extern "C" fn(*mut Request, *mut c_void);
-type ResponseCallback = extern "C" fn(*mut Response, *mut c_void);
 
 pub struct MemoryInterface {
   lib: Library,
@@ -85,6 +84,11 @@ pub struct MemoryInterface {
 }
 
 impl MemoryInterface {
+  /// Create a new MemoryInterface from a loaded library.
+  ///
+  /// # Safety
+  ///
+  /// The library must be valid and contain the required symbols.
   pub unsafe fn new(lib: Library) -> Result<Self, Box<dyn Error>> {
     let dram_new: Symbol<unsafe extern "C" fn() -> CRamualator2Wrapper> = lib.get(b"dram_new")?;
     let wrapper = dram_new();
@@ -92,6 +96,11 @@ impl MemoryInterface {
     Ok(Self { lib, wrapper })
   }
 
+  /// Initialize the memory interface with a configuration file.
+  ///
+  /// # Safety
+  ///
+  /// The config_path must be a valid null-terminated string.
   pub unsafe fn init(&self, config_path: &str) {
     let c_path = CString::new(config_path).unwrap();
     let dram_init: Symbol<unsafe extern "C" fn(CRamualator2Wrapper, *const c_char)> =
@@ -99,18 +108,33 @@ impl MemoryInterface {
     dram_init(self.wrapper, c_path.as_ptr());
   }
 
+  /// Advance the frontend by one tick.
+  ///
+  /// # Safety
+  ///
+  /// The wrapper must be in a valid state.
   pub unsafe fn frontend_tick(&self) {
     let frontend_tick: Symbol<unsafe extern "C" fn(CRamualator2Wrapper)> =
       self.lib.get(b"frontend_tick").unwrap();
     frontend_tick(self.wrapper);
   }
 
+  /// Advance the memory system by one tick.
+  ///
+  /// # Safety
+  ///
+  /// The wrapper must be in a valid state.
   pub unsafe fn memory_system_tick(&self) {
     let memory_system_tick: Symbol<unsafe extern "C" fn(CRamualator2Wrapper)> =
       self.lib.get(b"memory_system_tick").unwrap();
     memory_system_tick(self.wrapper);
   }
 
+  /// Get the memory clock period.
+  ///
+  /// # Safety
+  ///
+  /// The wrapper must be in a valid state.
   #[allow(non_snake_case)]
   pub unsafe fn get_memory_tCK(&self) -> f32 {
     let get_memory_tck: Symbol<unsafe extern "C" fn(CRamualator2Wrapper) -> f32> =
@@ -118,6 +142,11 @@ impl MemoryInterface {
     get_memory_tck(self.wrapper)
   }
 
+  /// Send a memory request.
+  ///
+  /// # Safety
+  ///
+  /// The callback and ctx must be valid for the duration of the request.
   pub unsafe fn send_request(
     &self,
     addr: i64,
@@ -131,6 +160,11 @@ impl MemoryInterface {
     send_request(self.wrapper, addr, is_write, callback, ctx)
   }
 
+  /// Finish the memory interface.
+  ///
+  /// # Safety
+  ///
+  /// The wrapper must be in a valid state.
   pub unsafe fn finish(&self) {
     let my_finish: Symbol<unsafe extern "C" fn(CRamualator2Wrapper)> =
       self.lib.get(b"finish").unwrap();

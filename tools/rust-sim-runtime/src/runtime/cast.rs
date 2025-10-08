@@ -6,7 +6,7 @@ pub trait ValueCastTo<T> {
 
 impl ValueCastTo<bool> for bool {
   fn cast(&self) -> bool {
-    self.clone()
+    *self
   }
 }
 impl ValueCastTo<BigInt> for BigInt {
@@ -98,15 +98,15 @@ impl ValueCastTo<u8> for BigUint {
   fn cast(&self) -> u8 {
     let data = self.to_u64_digits();
     if data.is_empty() {
-      return 0;
+      0
     } else {
-      return data[0] as u8;
+      data[0] as u8
     }
   }
 }
 impl ValueCastTo<u8> for u8 {
   fn cast(&self) -> u8 {
-    self.clone()
+    *self
   }
 }
 impl ValueCastTo<u16> for u8 {
@@ -185,9 +185,9 @@ impl ValueCastTo<u16> for BigUint {
   fn cast(&self) -> u16 {
     let data = self.to_u64_digits();
     if data.is_empty() {
-      return 0;
+      0
     } else {
-      return data[0] as u16;
+      data[0] as u16
     }
   }
 }
@@ -198,7 +198,7 @@ impl ValueCastTo<u8> for u16 {
 }
 impl ValueCastTo<u16> for u16 {
   fn cast(&self) -> u16 {
-    self.clone()
+    *self
   }
 }
 impl ValueCastTo<u32> for u16 {
@@ -272,9 +272,9 @@ impl ValueCastTo<u32> for BigUint {
   fn cast(&self) -> u32 {
     let data = self.to_u64_digits();
     if data.is_empty() {
-      return 0;
+      0
     } else {
-      return data[0] as u32;
+      data[0] as u32
     }
   }
 }
@@ -290,7 +290,7 @@ impl ValueCastTo<u16> for u32 {
 }
 impl ValueCastTo<u32> for u32 {
   fn cast(&self) -> u32 {
-    self.clone()
+    *self
   }
 }
 impl ValueCastTo<u64> for u32 {
@@ -349,9 +349,9 @@ impl ValueCastTo<u64> for BigInt {
       return 0;
     }
     match sign {
-      num_bigint::Sign::Plus => data[0] as u64,
-      num_bigint::Sign::Minus => ((!data[0] + 1) & (u64::MAX as u64)) as u64,
-      num_bigint::Sign::NoSign => data[0] as u64,
+      num_bigint::Sign::Plus => data[0],
+      num_bigint::Sign::Minus => (!data[0] + 1) & u64::MAX,
+      num_bigint::Sign::NoSign => data[0],
     }
   }
 }
@@ -359,9 +359,9 @@ impl ValueCastTo<u64> for BigUint {
   fn cast(&self) -> u64 {
     let data = self.to_u64_digits();
     if data.is_empty() {
-      return 0;
+      0
     } else {
-      return data[0] as u64;
+      data[0]
     }
   }
 }
@@ -382,7 +382,7 @@ impl ValueCastTo<u32> for u64 {
 }
 impl ValueCastTo<u64> for u64 {
   fn cast(&self) -> u64 {
-    self.clone()
+    *self
   }
 }
 impl ValueCastTo<i8> for u64 {
@@ -446,9 +446,9 @@ impl ValueCastTo<i8> for BigUint {
   fn cast(&self) -> i8 {
     let data = self.to_u64_digits();
     if data.is_empty() {
-      return 0;
+      0
     } else {
-      return data[0] as i8;
+      data[0] as i8
     }
   }
 }
@@ -474,7 +474,7 @@ impl ValueCastTo<u64> for i8 {
 }
 impl ValueCastTo<i8> for i8 {
   fn cast(&self) -> i8 {
-    self.clone()
+    *self
   }
 }
 impl ValueCastTo<i16> for i8 {
@@ -533,9 +533,9 @@ impl ValueCastTo<i16> for BigUint {
   fn cast(&self) -> i16 {
     let data = self.to_u64_digits();
     if data.is_empty() {
-      return 0;
+      0
     } else {
-      return data[0] as i16;
+      data[0] as i16
     }
   }
 }
@@ -566,7 +566,7 @@ impl ValueCastTo<i8> for i16 {
 }
 impl ValueCastTo<i16> for i16 {
   fn cast(&self) -> i16 {
-    self.clone()
+    *self
   }
 }
 impl ValueCastTo<i32> for i16 {
@@ -620,9 +620,9 @@ impl ValueCastTo<i32> for BigUint {
   fn cast(&self) -> i32 {
     let data = self.to_u64_digits();
     if data.is_empty() {
-      return 0;
+      0
     } else {
-      return data[0] as i32;
+      data[0] as i32
     }
   }
 }
@@ -658,7 +658,7 @@ impl ValueCastTo<i16> for i32 {
 }
 impl ValueCastTo<i32> for i32 {
   fn cast(&self) -> i32 {
-    self.clone()
+    *self
   }
 }
 impl ValueCastTo<i64> for i32 {
@@ -707,9 +707,9 @@ impl ValueCastTo<i64> for BigUint {
   fn cast(&self) -> i64 {
     let data = self.to_u64_digits();
     if data.is_empty() {
-      return 0;
+      0
     } else {
-      return data[0] as i64;
+      data[0] as i64
     }
   }
 }
@@ -750,6 +750,6 @@ impl ValueCastTo<i32> for i64 {
 }
 impl ValueCastTo<i64> for i64 {
   fn cast(&self) -> i64 {
-    self.clone()
+    *self
   }
 }

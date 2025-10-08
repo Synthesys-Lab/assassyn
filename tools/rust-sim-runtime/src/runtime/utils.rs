@@ -5,7 +5,7 @@ pub fn cyclize(stamp: usize) -> String {
   format!("Cycle @{}.{:02}", stamp / 100, stamp % 100)
 }
 
-pub fn load_hex_file<T: Num>(array: &mut Vec<T>, init_file: &str) {
+pub fn load_hex_file<T: Num>(array: &mut [T], init_file: &str) {
   let mut idx = 0;
   for line in read_to_string(init_file)
     .expect("can not open hex file")
@@ -16,12 +16,12 @@ pub fn load_hex_file<T: Num>(array: &mut Vec<T>, init_file: &str) {
     } else {
       line.trim()
     };
-    if line.len() == 0 {
+    if line.is_empty() {
       continue;
     }
     let line = line.replace("_", "");
-    if line.starts_with("@") {
-      let addr = usize::from_str_radix(&line[1..], 16).unwrap();
+    if let Some(stripped) = line.strip_prefix("@") {
+      let addr = usize::from_str_radix(stripped, 16).unwrap();
       idx = addr;
       continue;
     }

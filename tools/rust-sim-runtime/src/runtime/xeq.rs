@@ -153,6 +153,12 @@ pub struct FIFO<T: Sized> {
   pub pop: XEQ<FIFOPop>,
 }
 
+impl<T: Sized> Default for FIFO<T> {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl<T: Sized> FIFO<T> {
   pub fn new() -> Self {
     FIFO {
@@ -171,10 +177,8 @@ impl<T: Sized> FIFO<T> {
   }
 
   pub fn tick(&mut self, cycle: usize) {
-    if let Some(_) = self.pop.pop(cycle) {
-      if !self.payload.is_empty() {
-        self.payload.pop_front().unwrap();
-      }
+    if self.pop.pop(cycle).is_some() && !self.payload.is_empty() {
+      self.payload.pop_front().unwrap();
     }
     if let Some(event) = self.push.pop(cycle) {
       self.payload.push_back(event.data);
@@ -185,6 +189,12 @@ impl<T: Sized> FIFO<T> {
 // XEQ for exclusive events per cycle
 pub struct XEQ<T: Sized + Cycled> {
   q: BTreeMap<usize, T>,
+}
+
+impl<T: Sized + Cycled> Default for XEQ<T> {
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl<T: Sized + Cycled> XEQ<T> {
@@ -209,7 +219,7 @@ impl<T: Sized + Cycled> XEQ<T> {
     if self
       .q
       .first_key_value()
-      .map_or(false, |(cycle, _)| *cycle <= current)
+      .is_some_and(|(cycle, _)| *cycle <= current)
     {
       self.q.pop_first().map(|(_, event)| event)
     } else {
