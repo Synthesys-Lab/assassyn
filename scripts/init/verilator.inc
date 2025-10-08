@@ -14,10 +14,6 @@ build-verilator:
 		autoconf && \
 		./configure && \
 		make -j
-	@if [ $$? -ne 0 ]; then \
-		echo "Failed to configure Verilator build. Please check the configuration."; \
-		exit 1; \
-	fi
 	@echo "Verilator build completed successfully."
 
 clean-verilator:
