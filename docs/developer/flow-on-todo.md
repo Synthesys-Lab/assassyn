@@ -17,7 +17,7 @@ the action items into your understanding of the codebase.
 ## 3. Act on Action Items
 
 Follow the action items in the `TODO-xxx.md` file step by step. Faithfully implement the changes
-and improvements as described in the action items. Faithfully use `git commit` with or wihtout
+and improvements as described in the action items. Faithfully use `git commit` with or without
 `--no-verify` flag as described in the action items.
 
 ## 4. Checklist & Summary

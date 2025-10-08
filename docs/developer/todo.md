@@ -19,7 +19,7 @@ specific intermediate steps. Each step should have a clear purpose achievable.
    - If a new file need to be created as per the new design, it is highly recommended to and touch
      an empty file with the corresponding name with a single line of TODO comment inside so that
      when listing the action items, you have a file to refer to.
-   - When finalizing the design document, it is required to discuss with a "team meember",
+   - When finalizing the design document, it is required to discuss with a "team member",
      including but not limited to a human colleague or AI assistant, to ensure this design
      is clear and reasonable.
    - After the discussion, commit the design document with a message like

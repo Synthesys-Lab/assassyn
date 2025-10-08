@@ -1,7 +1,7 @@
 # DRAM Module
 
 This module simulates an off-chip DRAM module
-interacts with this the on-chip pipeline.
+interacts with the on-chip pipeline.
 
 This module extends `MemoryBase` in [base.py](./base.py)
 with a single build.
