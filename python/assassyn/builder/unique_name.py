@@ -11,19 +11,17 @@ class UniqueNameCache:  # pylint: disable=too-few-public-methods
         """Initialize a UniqueNameCache."""
         self._cache = {}
 
-    def get_unique_name(self, prefix: str, context: str | None = None) -> str:
+    def get_unique_name(self, prefix: str) -> str:
         """
         Get a unique name with the given prefix.
 
         Args:
             prefix: The prefix for the unique name.
-            context: Unused; kept for backward compatibility.
 
         Returns:
             A unique name. If the prefix hasn't been used, returns the prefix itself.
             Otherwise, appends a number to make it unique.
         """
-        del context  # context is currently unused, retained for compatibility
         if prefix not in self._cache:
             self._cache[prefix] = 0
             return prefix

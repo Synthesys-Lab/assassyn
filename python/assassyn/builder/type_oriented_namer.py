@@ -32,9 +32,9 @@ class TypeOrientedNamer:
 
         # Class-based prefixes
         self._class_prefixes = {
-            'ArrayRead': 'arr_rd',
-            'ArrayWrite': 'arr_wr',
-            'Array': 'array',
+            'ArrayRead': 'rd',
+            'ArrayWrite': 'wt',
+            'Array': 'arr',
             'FIFOPop': 'pop',
             'FIFOPush': 'push',
             'Bind': 'bind',
@@ -43,9 +43,7 @@ class TypeOrientedNamer:
             'Select': 'select',
             'Select1Hot': 'sel1h',
             'Slice': 'slice',
-            'Cast': 'cast',
-            'WireAssign': 'wire_assign',
-            'WireRead': 'wire_rd'
+            'Cast': 'cast'
         }
 
     @staticmethod
@@ -60,16 +58,6 @@ class TypeOrientedNamer:
             return object.__getattribute__(node, attr)
         except (AttributeError, TypeError):
             return None
-
-    def _array_prefix(self, node: Any) -> str:
-        """Generate a descriptive prefix for arrays."""
-        _scalar = self._safe_getattr(node, 'scalar_ty')
-        size = self._safe_getattr(node, 'size')
-
-        parts = ['array']
-        if isinstance(size, int):
-            parts.append(f'sz{size}')
-        return self._sanitize('_'.join(parts))
 
     def _entity_name(self, entity: Any) -> Optional[str]:
         """Extract a meaningful name from an entity."""
@@ -113,9 +101,6 @@ class TypeOrientedNamer:
         """Get the naming prefix for a given node type."""
         class_name = node.__class__.__name__
         mro_names = {base.__name__ for base in node.__class__.__mro__}
-
-        if 'Array' in mro_names:
-            return self._array_prefix(node)
 
         if 'ModuleBase' in mro_names:
             return self._module_prefix(node)
@@ -181,7 +166,3 @@ class TypeOrientedNamer:
         prefix = self.get_prefix_for_type(value)
         prefix = self._sanitize(prefix)
         return self._cache.get_unique_name(prefix)
-
-    def reset(self):
-        """Reset the internal name cache."""
-        self._cache = UniqueNameCache()

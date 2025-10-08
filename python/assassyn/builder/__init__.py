@@ -4,14 +4,11 @@
 
 from __future__ import annotations
 
-import ast
 import functools
 import inspect
 import os
 import site
 import typing
-
-from .integrate import combinational_for, initialize_naming_system, install_decorators, sys_builder
 from .naming_manager import (
     NamingManager,
     get_naming_manager,
@@ -36,12 +33,6 @@ __all__ = [
     # Global functions
     'get_naming_manager',
     'set_naming_manager',
-
-    # Integration
-    'initialize_naming_system',
-    'install_decorators',
-    'sys_builder',
-    'combinational_for',
 ]
 
 
@@ -181,6 +172,7 @@ class SysBuilder:
         Singleton.builder = self
         Singleton.line_expression_tracker = self.line_expression_tracker
         Singleton.naming_manager = self.naming_manager
+        set_naming_manager(self.naming_manager)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -189,6 +181,7 @@ class SysBuilder:
         Singleton.builder = None
         Singleton.line_expression_tracker = None
         Singleton.naming_manager = None
+        set_naming_manager(None)
 
     def __repr__(self):
         body = '\n\n'.join(map(repr, self.modules))

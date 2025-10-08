@@ -19,6 +19,10 @@ Implements the runtime side of rewritten assignments:
 1. The final value receives a name seeded with the Python assignment target.
 2. The original value is returned so Python assignment semantics are preserved.
 
+##### `assign_name(self, value: Any, hint: Optional[str] = None) -> str`
+Exposes semantic naming for non-expression objects (modules, arrays, etc.).
+Applies the hint when provided; otherwise falls back to type-based naming.
+
 ##### `_apply_name(self, value: Any, name: str)`
 Best-effort helper that writes the semantic name to the value using
 `setattr(value, "__assassyn_semantic_name__", name)` while ignoring types that

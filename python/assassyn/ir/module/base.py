@@ -1,12 +1,16 @@
 '''The base class for the module definition.'''
 
 from __future__ import annotations
+import ast
+import inspect
+import textwrap
 import typing
 
 from functools import wraps
 
 from ...utils import namify, unwrap_operand, identifierize
 from ...builder import ir_builder, Singleton
+from ...builder.rewrite_assign import rewrite_assign, __assassyn_assignment__ as _assignment_fn
 from ..expr import Operand, Expr
 from ..expr.intrinsic import PureIntrinsic
 
@@ -23,6 +27,9 @@ class ModuleBase:
 
     def as_operand(self):
         '''Dump the module as a right-hand side reference.'''
+        semantic = getattr(self, "__assassyn_semantic_name__", None)
+        if semantic:
+            return semantic
         return f'_{namify(identifierize(self))}'
 
     @ir_builder
@@ -69,28 +76,77 @@ class ModuleBase:
         return res
 
 def combinational_for(module_type):
-    '''A parameterizable decorator factory for marking a function as combinationa
-      logic description.
+    '''Decorator factory for combinational module build functions with naming support.'''
 
-    Args:
-        module_type: The expected module type (Module or Downstream class).
-
-    Returns:
-        A decorator function that enforces the module type.
-    '''
     def decorator(func):
+        try:
+            source = textwrap.dedent(inspect.getsource(func))
+            tree = ast.parse(source)
+            func_def = tree.body[0]
+
+            rewritten_func_def = rewrite_assign(func_def)
+            rewritten_func_def.decorator_list = []
+
+            tree.body[0] = rewritten_func_def
+            ast.fix_missing_locations(tree)
+
+            namespace = func.__globals__
+            had_assignment_hook = '__assassyn_assignment__' in namespace
+            previous_hook = namespace.get('__assassyn_assignment__')
+            namespace['__assassyn_assignment__'] = _assignment_fn
+
+            code = compile(tree, func.__code__.co_filename, 'exec')
+            exec(code, namespace)  # pylint: disable=exec-used
+            new_func = namespace[func.__name__]
+
+            if had_assignment_hook:
+                namespace['__assassyn_assignment__'] = previous_hook
+        except Exception as exc:  # pylint: disable=broad-except
+            # Fallback to original function if rewriting fails
+            # Deferred import to avoid cycles at module import time.
+            import sys  # pylint: disable=import-outside-toplevel
+            print(f"Warning: AST rewriting failed for {func.__name__}: {exc}", file=sys.stderr)
+            new_func = func
+
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # pylint: disable=import-outside-toplevel
+            # pylint: disable=import-outside-toplevel,cyclic-import
             from ..block import Block
+            from ..array import Array
+
             module_self = args[0]
             assert isinstance(module_self, module_type), \
                 f"Expected {module_type.__name__}, got {type(module_self).__name__}"
+
             module_self.body = Block(Block.MODULE_ROOT)
+            module_self.body.parent = module_self
+            module_self.body.module = module_self
             Singleton.builder.enter_context_of('module', module_self)
-            with module_self.body:
-                res = func(*args, **kwargs)
-            Singleton.builder.exit_context_of('module')
-            return res
+            Singleton.builder.enter_context_of('block', module_self.body)
+
+            try:
+                try:
+                    bound = inspect.signature(new_func).bind(*args, **kwargs)
+                    bound.apply_defaults()
+                except TypeError:
+                    bound = None
+
+                if bound is not None:
+                    for param_name, argument in bound.arguments.items():
+                        if param_name == 'self':
+                            continue
+                        if isinstance(argument, Array):
+                            argument.name = param_name
+
+                return new_func(*args, **kwargs)
+            finally:
+                Singleton.builder.exit_context_of('block')
+                Singleton.builder.exit_context_of('module')
+
+        wrapper._is_combinational = True  # pylint: disable=protected-access
+        wrapper._module_class = module_type  # pylint: disable=protected-access
+        wrapper.__assassyn_original__ = new_func
+
         return wrapper
+
     return decorator
