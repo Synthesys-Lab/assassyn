@@ -66,17 +66,13 @@ jobs:
         run: |
           echo "Cache miss, building all components"
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make build-all"
-      - name: Check Rust Code Formatting
+      - name: Check Rust Code Quality
         run: |
-          cargo fmt --manifest-path tools/rust-sim-runtime/Cargo.toml --all -- --check --config-path rustfmt.toml
-      
-      - name: Check Rust Code Quality with Clippy
-        run: |
-          cargo clippy --manifest-path tools/rust-sim-runtime/Cargo.toml --all-targets --all-features -- -D warnings
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make rust-lint"
       
       - name: Check Python Code Quality
         run: |
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && pylint --rcfile=python/assassyn/.pylintrc python/assassyn/"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make pylint"
       
       - name: Run All Tests
         run: |
