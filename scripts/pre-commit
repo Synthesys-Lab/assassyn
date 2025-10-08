@@ -3,10 +3,10 @@
 # It is highly recommended to put this to your git pre-commit hook, to format your code
 # before checking anything in.
 
-# Ensure ramulator2 is built and patched
-source $ASSASSYN_HOME/scripts/init/ramulator2.sh
+# Ensure ramulator2 and wrapper are built
+source $ASSASSYN_HOME/scripts/init/wrapper.sh
 if [ $? -ne 0 ]; then
-    echo "Ramulator2 build failed, please fix the issues before committing."
+    echo "Ramulator2 and wrapper build failed, please fix the issues before committing."
     exit 1
 fi
 

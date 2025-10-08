@@ -18,8 +18,13 @@ use libloading::{Library, Symbol};
 macro_rules! load_library {
     ($path:expr) => {
         {
-            let path_with_ext = format!("{}.dylib", $path);
-            unsafe { Library::open(Some(&path_with_ext), RTLD_GLOBAL | RTLD_LAZY)? }
+            let path_str = $path.to_string();
+            let lib_path = if path_str.ends_with(".dylib") {
+                path_str
+            } else {
+                format!("{}.dylib", $path)
+            };
+            unsafe { Library::open(Some(&lib_path), RTLD_GLOBAL | RTLD_LAZY)? }
         }
     };
 }
@@ -28,8 +33,13 @@ macro_rules! load_library {
 macro_rules! load_library {
     ($path:expr) => {
         {
-            let path_with_ext = format!("{}.so", $path);
-            unsafe { Library::new(&path_with_ext)? }
+            let path_str = $path.to_string();
+            let lib_path = if path_str.ends_with(".so") {
+                path_str
+            } else {
+                format!("{}.so", $path)
+            };
+            unsafe { Library::new(&lib_path)? }
         }
     };
 }
@@ -38,8 +48,13 @@ macro_rules! load_library {
 macro_rules! load_library {
     ($path:expr) => {
         {
-            let path_with_ext = format!("{}.dll", $path);
-            unsafe { Library::new(&path_with_ext)? }
+            let path_str = $path.to_string();
+            let lib_path = if path_str.ends_with(".dll") {
+                path_str
+            } else {
+                format!("{}.dll", $path)
+            };
+            unsafe { Library::new(&lib_path)? }
         }
     };
 }
@@ -153,7 +168,7 @@ fn read_lib_path_from_file(file_path: &str) -> Result<String, Box<dyn Error>> {
 pub fn cwrapper_lib_path() -> Result<String, Box<dyn Error>> {
     let home = std::env::var("ASSASSYN_HOME")
         .unwrap_or_else(|_| std::env::current_dir().unwrap().to_string_lossy().to_string());
-    let path_file = format!("{}/python/assassyn/ramulator2/.cwrapper-lib-path", home);
+    let path_file = format!("{}/tools/c-ramulator2-wrapper/build/.cwrapper-lib-path", home);
     read_lib_path_from_file(&path_file)
 }
 
@@ -161,7 +176,7 @@ pub fn cwrapper_lib_path() -> Result<String, Box<dyn Error>> {
 pub fn ramulator2_lib_path() -> Result<String, Box<dyn Error>> {
     let home = std::env::var("ASSASSYN_HOME")
         .unwrap_or_else(|_| std::env::current_dir().unwrap().to_string_lossy().to_string());
-    let path_file = format!("{}/python/assassyn/ramulator2/.ramulator2-lib-path", home);
+    let path_file = format!("{}/tools/c-ramulator2-wrapper/build/.ramulator2-lib-path", home);
     read_lib_path_from_file(&path_file)
 }
 

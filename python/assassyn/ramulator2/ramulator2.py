@@ -26,8 +26,12 @@ def cwrapper_lib_path():
     """
     global _CWRAPPER_LIB_PATH_CACHE  # pylint: disable=global-statement
     if _CWRAPPER_LIB_PATH_CACHE is None:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        path_file = os.path.join(current_dir, '.cwrapper-lib-path')
+        # Look for path file in wrapper build directory
+        assassyn_home = os.environ.get('ASSASSYN_HOME')
+        if not assassyn_home:
+            raise FileNotFoundError("ASSASSYN_HOME environment variable not set")
+        path_file = os.path.join(assassyn_home, 'tools', 'c-ramulator2-wrapper', 'build',
+                                  '.cwrapper-lib-path')
         if not os.path.exists(path_file):
             raise FileNotFoundError(f"C wrapper library path file not found: {path_file}")
         with open(path_file, 'r', encoding='utf-8') as f:
@@ -48,8 +52,12 @@ def ramulator2_lib_path():
     """
     global _RAMULATOR2_LIB_PATH_CACHE  # pylint: disable=global-statement
     if _RAMULATOR2_LIB_PATH_CACHE is None:
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        path_file = os.path.join(current_dir, '.ramulator2-lib-path')
+        # Look for path file in wrapper build directory
+        assassyn_home = os.environ.get('ASSASSYN_HOME')
+        if not assassyn_home:
+            raise FileNotFoundError("ASSASSYN_HOME environment variable not set")
+        path_file = os.path.join(assassyn_home, 'tools', 'c-ramulator2-wrapper', 'build',
+                                  '.ramulator2-lib-path')
         if not os.path.exists(path_file):
             raise FileNotFoundError(f"Ramulator2 library path file not found: {path_file}")
         with open(path_file, 'r', encoding='utf-8') as f:
@@ -62,6 +70,12 @@ def load_shared_library(lib_path):
     Uses RTLD_GLOBAL mode to handle recursive shared object dependencies
     as per simulator.md documentation for macOS compatibility.
     """
+    # Check if the path already has an extension
+    if os.path.exists(lib_path):
+        # Use RTLD_GLOBAL mode for macOS compatibility
+        if sys.platform.startswith('darwin'):
+            return ctypes.CDLL(lib_path, mode=ctypes.RTLD_GLOBAL)
+        return ctypes.CDLL(lib_path)
     # Try different extensions in order of preference
     extensions = ['.dylib', '.so', '.dll']  # macOS, Linux, Windows
 
