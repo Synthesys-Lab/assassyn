@@ -14,3 +14,5 @@ tutorials/*
 workspace/*
 **/.claude/settings.local.json
 Cargo.lock
+python/assassyn/ramulator2/.cwrapper-lib-path
+python/assassyn/ramulator2/.ramulator2-lib-path

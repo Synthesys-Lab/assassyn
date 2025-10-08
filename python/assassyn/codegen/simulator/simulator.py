@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import platform
 from ...analysis import topo_downstream_modules, get_upstreams
 from .utils import dtype_to_rust_type, int_imm_dumper_impl, fifo_name
 from ...builder import SysBuilder
@@ -13,21 +12,6 @@ from ...ir.module import Downstream, Module
 from ...ir.memory.sram import SRAM
 from ...utils import namify, repo_path
 from .port_mapper import get_port_manager
-
-
-def dynamiclib_suffix():
-    """Return the dynamic library suffix for the current platform.
-
-    Returns:
-        str: The dynamic library suffix (.dll for Windows, .dylib for macOS, .so for Linux)
-    """
-    system = platform.system().lower()
-    if system == "windows":
-        return ".dll"
-    if system == "darwin":
-        return ".dylib"
-    # Linux and other Unix-like systems
-    return ".so"
 
 
 def analyze_and_register_ports(sys):
@@ -98,12 +82,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("use std::collections::VecDeque;\n")
     fd.write("use std::collections::HashMap;\n")
     fd.write("use crate::modules;\n")
-    platform_os = platform.system().lower()
-    if platform_os == 'darwin':
-        x = "use sim_runtime::libloading::os::unix::{Library, Symbol, RTLD_LAZY, RTLD_GLOBAL};\n"
-        fd.write(x)
-    else:
-        fd.write("use sim_runtime::libloading::Library;\n")
+    # Platform-specific imports are no longer needed since we use the utility method
     fd.write("use std::sync::Arc;\n")
     fd.write("use sim_runtime::num_bigint::{BigInt, BigUint};\n")
     fd.write("use sim_runtime::rand::seq::SliceRandom;\n\n")
@@ -188,15 +167,8 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     # Constructor
     fd.write("  pub fn new() -> Self {\n")
     fd.write("let mem = unsafe {")
-    midfix = '/tools/c-ramulator2-wrapper/build/lib/libwrapper'
-    if platform_os == 'darwin':
-        fd.write(f'let lib = Library::open(Some("{home}{midfix}{dynamiclib_suffix()}"), '
-                 'RTLD_GLOBAL | RTLD_LAZY).unwrap();')
-    elif platform_os == 'windows':
-        raise NotImplementedError
-    else:
-        fd.write(f'let lib = Library::new("{home}{midfix}{dynamiclib_suffix()}").unwrap();')
-    fd.write('MemoryInterface::new(lib.into()).expect("Failed to create MemoryInterface") };')
+    fd.write('MemoryInterface::new_from_cwrapper_path()')
+    fd.write('.expect("Failed to create MemoryInterface") };')
     fd.write("    Simulator {\n")
     fd.write("      stamp: 0,\n")
     fd.write("      request_stamp_map_table: HashMap::new(),\n")

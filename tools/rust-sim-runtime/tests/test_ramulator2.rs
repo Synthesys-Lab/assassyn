@@ -23,8 +23,7 @@ fn test_ramulator2_outputs_match_cpp() -> Result<(), Box<dyn std::error::Error>>
   let config_path = format!("{}/tools/c-ramulator2-wrapper/configs/example_config.yaml", home);
   assert!(Path::new(&config_path).exists(), "Config file not found at {}", config_path);
 
-  let lib_path = format!("{}/tools/c-ramulator2-wrapper/build/lib/libwrapper", home);
-  let memory = MemoryInterface::new_from_path(&lib_path)?;
+  let memory = MemoryInterface::new_from_cwrapper_path()?;
 
   unsafe { memory.init(&config_path); }
 

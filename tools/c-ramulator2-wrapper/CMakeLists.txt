@@ -49,3 +49,16 @@ add_executable(test test.cpp)
 target_link_libraries(main wrapper ${RAMULATOR_LIBRARY})
 target_link_libraries(test wrapper ${RAMULATOR_LIBRARY})
 
+# Generate library path files for Python wrapper
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../python/assassyn/ramulator2/.cwrapper-lib-path.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../python/assassyn/ramulator2/.cwrapper-lib-path
+    @ONLY
+)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../python/assassyn/ramulator2/.ramulator2-lib-path.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../python/assassyn/ramulator2/.ramulator2-lib-path
+    @ONLY
+)
+
