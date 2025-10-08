@@ -18,7 +18,6 @@
 build-ramulator2: 3rd-party/ramulator2/.patch-applied
 	@echo "Building Ramulator2..."
 	@cd 3rd-party/ramulator2 && \
-		git submodule update --init && \
 		mkdir -p build && \
 		cd build && \
 		cmake .. && \
