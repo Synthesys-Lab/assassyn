@@ -42,19 +42,6 @@ jobs:
           echo "Cache miss, building and installing Verilator"
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/verilator.sh $@"
           
-      - name: Restore ramulator2 Cache
-        id: cache-ramulator
-        uses: actions/cache@v4
-        with: 
-          path: ${{ github.workspace }}/3rd-party/ramulator2
-          key: ${{ runner.os }}-ramulator-${{ hashFiles('ramulator2/.git/HEAD') }} 
-          restore-keys: |
-            ${{ runner.os }}-ramulator2- 
-      - name: Build and Install Ramulator in Container #if cache miss
-        if: steps.cache-ramulator.outputs.cache-hit != 'true'
-        run: |
-          echo "Cache miss, building and installing Ramulator2"
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/ramulator2.sh"
       - name: Restore circt Cache
         id: cache-circt
         uses: actions/cache@v4
@@ -68,18 +55,20 @@ jobs:
         run: |
           echo "Cache miss, building and installing circt"
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/circt.sh $@"
-      - name: Restore wrapper Cache
-        id: cache-wrapper
+      - name: Restore ramulator2 and wrapper Cache
+        id: cache-ramulator-wrapper
         uses: actions/cache@v4
         with:   
-          path: ${{ github.workspace }}/tools/c-ramulator2-wrapper/build
-          key: ${{ runner.os }}-wrapper-${{ hashFiles('tools/c-ramulator2-wrapper/.git/HEAD') }}
+          path: |
+            ${{ github.workspace }}/3rd-party/ramulator2
+            ${{ github.workspace }}/tools/c-ramulator2-wrapper/build
+          key: ${{ runner.os }}-ramulator-wrapper-${{ hashFiles('ramulator2/.git/HEAD') }}-${{ hashFiles('tools/c-ramulator2-wrapper/.git/HEAD') }}
           restore-keys: |
-            ${{ runner.os }}-wrapper-
-      - name: Build and Install wrapper in Container #if cache miss
-        if: steps.cache-wrapper.outputs.cache-hit != 'true'
+            ${{ runner.os }}-ramulator-wrapper-
+      - name: Build and Install ramulator2 and wrapper in Container #if cache miss
+        if: steps.cache-ramulator-wrapper.outputs.cache-hit != 'true'
         run: |
-          echo "Cache miss, building and installing wrapper"
+          echo "Cache miss, building and installing ramulator2 and wrapper"
           ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/wrapper.sh"
       - name: Run Python Lint
         run:
