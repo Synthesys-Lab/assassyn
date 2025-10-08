@@ -1,5 +1,5 @@
-use std::ffi::c_void;
 use std::env;
+use std::ffi::c_void;
 use std::path::Path;
 
 use sim_runtime::ramulator2::{MemoryInterface, Request};
@@ -19,13 +19,16 @@ extern "C" fn request_callback(req: *mut Request, ctx: *mut c_void) {
 
 #[test]
 fn test_ramulator2_outputs_match_cpp() -> Result<(), Box<dyn std::error::Error>> {
-  let home = env::var("ASSASSYN_HOME").unwrap_or_else(|_| env::current_dir().unwrap().to_string_lossy().to_string());
+  let home = env::var("ASSASSYN_HOME")
+    .unwrap_or_else(|_| env::current_dir().unwrap().to_string_lossy().to_string());
   let config_path = format!("{}/tools/c-ramulator2-wrapper/configs/example_config.yaml", home);
   assert!(Path::new(&config_path).exists(), "Config file not found at {}", config_path);
 
   let memory = MemoryInterface::new_from_cwrapper_path()?;
 
-  unsafe { memory.init(&config_path); }
+  unsafe {
+    memory.init(&config_path);
+  }
 
   let mut is_write = false;
   let mut v = 0i32;
@@ -62,8 +65,8 @@ fn test_ramulator2_outputs_match_cpp() -> Result<(), Box<dyn std::error::Error>>
     v = plused;
   }
 
-  unsafe { memory.finish(); }
+  unsafe {
+    memory.finish();
+  }
   Ok(())
 }
-
-

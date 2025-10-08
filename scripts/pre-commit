@@ -3,5 +3,21 @@
 # It is highly recommended to put this to your git pre-commit hook, to format your code
 # before checking anything in.
 
+# Format Rust code in rust-sim-runtime
+echo "Running cargo fmt for rust-sim-runtime..."
+cargo fmt --manifest-path tools/rust-sim-runtime/Cargo.toml --all -- --check --config-path rustfmt.toml
+if [ $? -ne 0 ]; then
+    echo "Error: Rust code formatting check failed. Please run 'cargo fmt' in tools/rust-sim-runtime/"
+    exit 1
+fi
+
+# Run pylint on assassyn Python package
+echo "Running pylint on assassyn package..."
+pylint --rcfile=python/assassyn/.pylintrc python/assassyn/
+if [ $? -ne 0 ]; then
+    echo "Error: pylint check failed. Please fix the issues above."
+    exit 1
+fi
+
 # Ensure ramulator2 and wrapper are built
 make test-all
