@@ -18,13 +18,10 @@ machine, or build it on your physical machine. The instructions below are Ubuntu
 git submodule update --init --recursive
 ````
 
-2. Have your packaged updated.
+2. Install dependences, assuming you are on Ubuntu.
+
 ````sh
 sudo apt-get update
-````
-
-3. This commands rips of the Docker container build command to install all the dependent packages.
-````sh
 sudo apt-get install -y $(
   awk '/apt-get install/,/apt-get clean/' Dockerfile \
   | sed '1d;$d; s/[\\[:space:]]*$//; s/^[[:space:]]*//' \
@@ -34,22 +31,19 @@ sudo apt-get install -y $(
 ````
 
 4. Have this repo built from source.
-> make sure you are using zsh
 ````sh
-zsh
-source setup.sh
-source init.sh
+source setup.sh  # Set up environment variables
+make build-all   # Build all components
 ````
 
-If you encounter an error such as `Error 1 g++: fatal error: Killed signal terminated program cc1plus compilation terminated.`, it likely means your machine is out of memory (OOM). In this case, try replacing all `make -j` commands in the scripts referenced by [`init.sh`](./init.sh) with `make -j4` or a lower parallelism value to reduce memory usage.
-
-
-
+If you do not have enough memory, a lower job number is recommended.
 
 5. Verify your installation.
 ````sh
 python -c 'import assassyn' # import this module
 echo $? # 0 is expected
+make test-all # Optional, runs all the tests.
+echo $?
 ````
 
 ## File Structure
@@ -57,21 +51,24 @@ echo $? # 0 is expected
 Our file structure is as follows:
 
 ```
-- assassyn/          # The main assassyn package
-  |- python/         # All the Python-related code
-  |  |- assassyn/    # The assassyn Python package
-  |  `- ci-tests/    # Application-level tests for CI
-  |- 3rd-party/      # External depdendencies
-  |  |- circt/       # It relies on CIRCT for Verilog backend
-  |  |- ramulator2   # It relies on Ramulator2 for DRAM modeling
-  |  `- verilator    # It relies on Verilator for Verilog simulation
+- assassyn/                 # The main assassyn package
+  |- python/                # All the Python-related code
+  |  |- assassyn/           # The assassyn Python package
+  |  `- ci-tests/           # Application-level tests for CI
+  |- 3rd-party/             # External depdendencies
+  |  |- circt/              # It relies on CIRCT for Verilog backend
+  |  |- ramulator2          # It relies on Ramulator2 for DRAM modeling
+  |  `- verilator           # It relies on Verilator for Verilog simulation
   |- scripts/
-  |  |- *.patch      # Useful scripts for patching 3rd-party
-  |  |- pre-commit   # Git pre-commit hook
-  |  `- init/*.sh    # Initialization scripts to build the whole framework
-  |- docs/           # The chatter of this framework
-  |  |- developer/   # Developer guide
-  |  `- *.md         # Other documents
-  |- examples/       # Example applications
-  `- tutorials/      # Tutorials written in Quarto qmd
+  |  |- *.patch             # Useful scripts for patching 3rd-party
+  |  |- pre-commit          # Git pre-commit hook
+  |  `- init/*.inc          # Makefile includes for building components
+  |- docs/                  # The chatter of this framework
+  |  |- developer/          # Developer guide
+  |  `- *.md                # Other documents
+  |- tools/                 # All the helper modules
+  |  |- c-ramulator-wrapper # Which wraps Ramulator2 in C for FFI access
+  |  `- rust-sim-runtime    # Which provides runtime support for Rust simulator, including Ramulator access
+  |- examples/              # Example applications
+  `- tutorials/             # Tutorials written in Quarto qmd
 ```

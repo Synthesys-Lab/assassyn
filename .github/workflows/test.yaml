@@ -27,61 +27,27 @@ jobs:
         run: |
           ${{ env.ASSASSYN_DOCKER }} git submodule update --init
 
-      - name: Restore Verilator Cache
-        id: cache-verilator 
+      - name: Restore Build Cache
+        id: cache-build
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/3rd-party/verilator/install 
-          key: ${{ runner.os }}-verilator-${{ hashFiles('verilator/.git/HEAD') }} 
-          restore-keys: |
-            ${{ runner.os }}-verilator- 
-
-      - name: Build and Install Verilator in Container #if cache miss
-        if: steps.cache-verilator.outputs.cache-hit != 'true'
-        run: |
-          echo "Cache miss, building and installing Verilator"
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/verilator.sh $@"
-          
-      - name: Restore circt Cache
-        id: cache-circt
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/3rd-party/circt/frontends/PyCDE
-          key: ${{ runner.os }}-circt-${{ hashFiles('circt/.git/HEAD') }} 
-          restore-keys: |
-            ${{ runner.os }}-circt- 
-      - name: Build and Install circt in Container #if cache miss
-        if: steps.cache-circt.outputs.cache-hit != 'true'
-        run: |
-          echo "Cache miss, building and installing circt"
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/circt.sh $@"
-      - name: Restore ramulator2 and wrapper Cache
-        id: cache-ramulator-wrapper
-        uses: actions/cache@v4
-        with:   
           path: |
+            ${{ github.workspace }}/3rd-party/verilator
+            ${{ github.workspace }}/3rd-party/circt/frontends/PyCDE
             ${{ github.workspace }}/3rd-party/ramulator2
             ${{ github.workspace }}/tools/c-ramulator2-wrapper/build
-          key: ${{ runner.os }}-ramulator-wrapper-${{ hashFiles('ramulator2/.git/HEAD') }}-${{ hashFiles('tools/c-ramulator2-wrapper/.git/HEAD') }}
+          key: ${{ runner.os }}-build-cache-${{ hashFiles('3rd-party/verilator/.git/HEAD') }}-${{ hashFiles('3rd-party/circt/.git/HEAD') }}-${{ hashFiles('3rd-party/ramulator2/.git/HEAD') }}-${{ hashFiles('tools/c-ramulator2-wrapper/.git/HEAD') }}
           restore-keys: |
-            ${{ runner.os }}-ramulator-wrapper-
-      - name: Build and Install ramulator2 and wrapper in Container #if cache miss
-        if: steps.cache-ramulator-wrapper.outputs.cache-hit != 'true'
+            ${{ runner.os }}-build-cache-
+
+      - name: Build All Components
+        if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
-          echo "Cache miss, building and installing ramulator2 and wrapper"
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source scripts/init/wrapper.sh"
-      - name: Run Python Lint
-        run:
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "python -m pylint --rcfile python/.pylintrc python/assassyn"
-      - name: Rust Wrapper Tests
+          echo "Cache miss, building all components"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make build-all"
+      - name: Run All Tests
         run: |
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && cd tools/rust-sim-runtime && cargo test"
-      - name: Python Unit Tests
-        run: |
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && python -m pytest -n 8 python/unit-tests"
-      - name: Python Frontend Unit Tests
-        run: |
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && source scripts/init/py-package.sh && source scripts/init/circt.sh && python -m pytest -n 8 python/ci-tests"
+          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make test-all"
       - name: Cleanup Containers
         run: |
           docker rm -f $(docker ps -a --filter ancestor=assassyn:latest -q) 2>/dev/null || true
