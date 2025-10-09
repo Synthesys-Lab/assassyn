@@ -35,6 +35,8 @@ class Driver(Module):
         # with Condition(cond):
         #     adder.async_called(a = v, b = v)
         cnt = RegArray(Int(32), 1)
+        # (array & module) -> 写口
+        # 写口[下标] <= 值
         (cnt & self)[0] <= cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(100)
         with Condition(cond):

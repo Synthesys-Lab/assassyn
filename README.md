@@ -10,7 +10,7 @@ and verfication.
 
 ## Getting Started
 
-You either refer to the [docker doc](./docs/docker.md) to use the framework in a virtual
+You either refer to the [docker doc](./docs/build/docker.md) to use the framework in a virtual
 machine, or build it on your physical machine. The instructions below are Ubuntu based:
 
 1. Make sure you have all the repos propoerly cloned.
@@ -63,9 +63,10 @@ Our file structure is as follows:
   |  |- *.patch             # Useful scripts for patching 3rd-party
   |  |- pre-commit          # Git pre-commit hook
   |  `- init/*.inc          # Makefile includes for building components
-  |- docs/                  # The chatter of this framework
-  |  |- developer/          # Developer guide
-  |  `- *.md                # Other documents
+  |- docs/                  # The chater document of this framework
+  |  |- developer/          # Developer guidelines
+  |  |- design/             # High-level design decisions of Assassyn
+  |  `- builder/            # Document to build and setup the project
   |- tools/                 # All the helper modules
   |  |- c-ramulator-wrapper # Which wraps Ramulator2 in C for FFI access
   |  `- rust-sim-runtime    # Which provides runtime support for Rust simulator, including Ramulator access
