@@ -57,26 +57,6 @@ def check_raw(raw):
     assert cnt == 100, f"cnt: {cnt} != 100"
 
 
-def test_module_naming_convention():
-    """Test that modules are named with 'Instance' suffix instead of '_inst'."""
-    def top():
-        adder = Adder()
-        adder.build()
-
-        driver = Driver()
-        driver.build(adder)
-
-    # Run the test to generate code
-    try:
-        run_test(
-            "async_call_naming", top, lambda x: None, sim_threshold=200, idle_threshold=200, random=True
-        )
-        # If we get here without exception, the test passed
-        print("✓ Module naming convention test passed - modules use 'Instance' suffix")
-    except Exception as e:
-        assert False, f"Module naming convention test failed: {e}"
-
-
 def test_async_call():
     def top():
         adder = Adder()
@@ -92,4 +72,3 @@ def test_async_call():
 
 if __name__ == "__main__":
     test_async_call()
-    test_module_naming_convention()

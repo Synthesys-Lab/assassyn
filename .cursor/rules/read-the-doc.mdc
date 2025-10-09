@@ -1,0 +1,19 @@
+---
+alwaysApply: true
+decription: Documentation Policy of this Project
+---
+
+# Read the Document
+
+If there is a `.md` file with the same prefix as the
+source file in the same folder e.g. `.py/.rs/.cpp/.cc`.
+This `.md` file is the design document of this module.
+Refer to this module to understand the implementation.
+
+If there is a `README.md` within a folder, and there
+is `mod.rs` or `__init__.py` in this folder, this
+document not only documents the methods in `__init__.py`
+but also describes the structure of this module.
+
+When asked to modify a module, incoperate the descriptions
+in this folder first.
