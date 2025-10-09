@@ -23,8 +23,8 @@ class SRAM(MemoryBase):  # pylint: disable=too-many-instance-attributes
             init_file: Path to initialization file (can be None)
         """
         super().__init__(width, depth, init_file)
-        # Create dout register buffer
-        self.dout = RegArray(UInt(width), 1)
+        # Create dout register buffer with instance-prefixed name
+        self.dout = RegArray(UInt(width), 1, name=f'{self.name}_rdata')
 
     @combinational
     def build(self, we, re, addr, wdata):  # pylint: disable=too-many-arguments

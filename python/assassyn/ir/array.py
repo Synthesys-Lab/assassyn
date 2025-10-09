@@ -87,6 +87,14 @@ def RegArray( #pylint: disable=invalid-name,too-many-arguments
     manager = getattr(Singleton, 'naming_manager', None)
     if manager is not None:
         hint = res._name if res._name is not None else None  # pylint: disable=protected-access
+
+        # If no explicit name and we're inside a module, prefix with module name
+        if hint is None:
+            context_prefix = manager.get_context_prefix()
+            if context_prefix:
+                # Use a generic 'array' suffix for unnamed arrays
+                hint = f"{context_prefix}_array"
+
         manager.assign_name(res, hint)
 
     Singleton.builder.arrays.append(res)
@@ -202,7 +210,16 @@ class Array:  #pylint: disable=too-many-instance-attributes
     def __getitem__(self, index: typing.Union[int, Value]):
         if isinstance(index, int):
             index = to_uint(index, self.index_bits)
+
+        builder = Singleton.builder
+        cache = builder.array_read_cache.setdefault(builder.current_block, {})
+        cache_key = (self, index)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         res = ArrayRead(self, index)
+        cache[cache_key] = res
         return res
 
     def get_flattened_size(self):

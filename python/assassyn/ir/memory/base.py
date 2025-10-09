@@ -54,8 +54,8 @@ class MemoryBase(Downstream):
         # Derive addr_width as log2 of depth
         self.addr_width = int(math.log2(depth))
         
-        # Create the payload array
-        self._payload = RegArray(Bits(width), depth, attr=[self])
+        # Create the payload array with instance-prefixed name
+        self._payload = RegArray(Bits(width), depth, attr=[self], name=f'{self.name}_val')
         
         # Initialize signal attributes to None
         self.we = None

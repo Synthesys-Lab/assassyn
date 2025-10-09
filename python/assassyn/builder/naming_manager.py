@@ -82,6 +82,23 @@ class NamingManager:
         capitalized = base_name.capitalize()
         return self._module_name_cache.get_unique_name(capitalized)
 
+    def get_context_prefix(self) -> Optional[str]:
+        """
+        Get the current naming context prefix from the active module.
+        Returns the module instance's name if inside a module, None otherwise.
+        """
+        # pylint: disable=import-outside-toplevel,cyclic-import
+        from ..builder import Singleton
+        builder = getattr(Singleton, 'builder', None)
+        if builder and builder.current_module:
+            module = builder.current_module
+            # Get the module's semantic name if available
+            module_name = getattr(module, '__assassyn_semantic_name__', None)
+            if not module_name and hasattr(module, 'name'):
+                module_name = module.name
+            return module_name
+        return None
+
 _global_naming_manager: Optional[NamingManager] = None
 
 

@@ -136,7 +136,17 @@ def combinational_for(module_type):
                         if param_name == 'self':
                             continue
                         if isinstance(argument, Array):
-                            argument.name = param_name
+                            # Only rename if doesn't have hierarchical name
+                            # Arrays with underscores are module-scoped
+                            current_name = getattr(argument, '_name', None)
+                            # Preserve hierarchical names (with underscores,
+                            # except 'array_xxxxx' pattern)
+                            has_hierarchical_name = (
+                                current_name and '_' in current_name
+                                and not current_name.startswith('array_')
+                            )
+                            if not has_hierarchical_name:
+                                argument.name = param_name
 
                 return new_func(*args, **kwargs)
             finally:

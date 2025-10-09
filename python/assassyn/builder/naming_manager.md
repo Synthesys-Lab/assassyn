@@ -32,6 +32,11 @@ cannot be annotated.
 Capitalises the supplied base name and feeds it through a `UniqueNameCache` to
 guarantee unique module identifiers for the experimental builder front-ends.
 
+##### `get_context_prefix(self) -> Optional[str]`
+Returns the current hierarchical naming context based on the active module stack.
+When inside a module's `build()` method, this returns the module instance's name
+to be used as a prefix for arrays and other entities created within that context.
+
 ---
 
 ## Global Functions

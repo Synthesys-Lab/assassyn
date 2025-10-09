@@ -54,15 +54,20 @@ def ir_builder(func=None, *, node_type=None):
             from ..ir.expr import Expr
 
             manager = get_naming_manager()
-            if manager and isinstance(res, Expr):
+            is_expr = isinstance(res, Expr)
+            builder = Singleton.builder
+            already_materialized = is_expr and getattr(res, 'parent', None) is not None
+
+            if manager and is_expr and not already_materialized:
                 manager.push_value(res)
 
             if not isinstance(res, Const):
-                if isinstance(res, Expr):
-                    res.parent = Singleton.builder.current_block
+                if is_expr and not already_materialized:
+                    res.parent = builder.current_block
                     for i in res.operands:
-                        Singleton.builder.current_module.add_external(i)
-                Singleton.builder.insert_point.append(res)
+                        builder.current_module.add_external(i)
+                if not already_materialized:
+                    builder.insert_point.append(res)
 
             package_dir = os.path.abspath(package_path())
 
@@ -128,10 +133,15 @@ class SysBuilder:
         if isinstance(entry, CondBlock):
             self.current_module.add_external(entry.cond)
         self._ctx_stack[ty].append(entry)
+        if ty == 'block':
+            self.array_read_cache.setdefault(entry, {})
 
     def exit_context_of(self, ty):
         '''Exit the context of the given type.'''
-        self._ctx_stack[ty].pop()
+        entry = self._ctx_stack[ty].pop()
+        if ty == 'block':
+            self.array_read_cache.pop(entry, None)
+        return entry
 
     def has_driver(self):
         '''Check if the system has a driver module.'''
@@ -156,6 +166,7 @@ class SysBuilder:
         self._exposes = {}
         self.line_expression_tracker = {}
         self.naming_manager = NamingManager()
+        self._reset_caches()
 
     def expose_on_top(self, node, kind=None):
         '''Expose the given node in the top function with the given kind.'''
@@ -166,12 +177,18 @@ class SysBuilder:
         '''Get the exposed nodes.'''
         return self._exposes
 
+    def _reset_caches(self):
+        '''Initialise or clear per-builder caches.'''
+        self.const_cache = {}
+        self.array_read_cache = {}
+
     def __enter__(self):
         '''Designate the scope of this system builder.'''
         assert Singleton.builder is None
         Singleton.builder = self
         Singleton.line_expression_tracker = self.line_expression_tracker
         Singleton.naming_manager = self.naming_manager
+        self._reset_caches()
         set_naming_manager(self.naming_manager)
         return self
 
@@ -181,6 +198,7 @@ class SysBuilder:
         Singleton.builder = None
         Singleton.line_expression_tracker = None
         Singleton.naming_manager = None
+        self._reset_caches()
         set_naming_manager(None)
 
     def __repr__(self):

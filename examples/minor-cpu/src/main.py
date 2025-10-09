@@ -2,6 +2,7 @@
 '''
 import os
 import shutil
+import subprocess
 
 from assassyn.frontend import *
 from assassyn.backend import *
@@ -40,9 +41,9 @@ class Execution(Module):
         wb_bypass_data: Array,
         reg_onwrite: Array,
         offset_reg: Array,
-        rf: Array, 
+        rf: Array,
         csr_f: Array,
-        memory: Module, 
+        memory: Module,
         data: str,
         depth_log: int,
         exec_br_dest: Array
@@ -233,7 +234,7 @@ class Execution(Module):
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
         dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr)
-        bound = memory.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext)
+        bound = memory.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext,is_mem_read = memory_read)
         bound.async_called()
         with Condition(signals.csr_write):
             csr_f[csr_id] = csr_new
@@ -241,20 +242,20 @@ class Execution(Module):
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
 
-        return  rd, ex_valid ,exec_br_jump
+        return  rd, ex_valid ,exec_br_jump,dcache
 
 class Decoder(Module):
     
     def __init__(self):
         super().__init__(ports={
-            'rdata': Port(Bits(32)),
             'fetch_addr': Port(Bits(32)),
         })
         self.name = 'D'
 
     @module.combinational
-    def build(self, executor: Module):
-        inst, fetch_addr = self.pop_all_ports(False)
+    def build(self, executor: Module,rdata:RegArray):
+        fetch_addr = self.pop_all_ports(False)
+        inst = rdata[0].bitcast(Bits(32))
 
         log("raw: 0x{:08x}  | addr: 0x{:05x} |", inst, fetch_addr)
 
@@ -294,12 +295,12 @@ class FetcherImpl(Downstream):
               pc_reg: Value,
               pc_addr: Value,
               decoder: Decoder,
-              data: str,
               depth_log: int,
               br_sm: Array,
               br_jump: Array,
               br_no_jump: Array,
               exec_br_jump: Value,
+              icache: SRAM,
 
               ):
 
@@ -323,8 +324,6 @@ class FetcherImpl(Downstream):
 
         jump_flag = br_jump[0] & br_no_jump[0]
 
-        icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
-        icache.name = 'icache'
 
         new_cnt = ongoing[0] - (ex_valid.optional(Bits(1)(0))).select(Int(8)(1), Int(8)(0))
         to_fetch = Bits(32)(0)
@@ -363,15 +362,14 @@ class Onwrite(Downstream):
         log("ownning: {:02}      | releasing: {:02}| reg_onwrite[0]: {:08x}", ex_rd, wb_rd, reg_onwrite[0])
 
 class MemUser(Module):
-    def __init__(self, width):
+    def __init__(self):
         super().__init__(
-            ports={'rdata': Port(Bits(width))}, 
+            ports={}
         )
     @module.combinational
-    def build(self):
-        width = self.rdata.dtype.bits
-        rdata = self.pop_all_ports(False)
-        rdata = rdata.bitcast(Int(width))
+    def build(self,rdata:RegArray):
+        width = rdata.scalar_ty.bits
+        rdata = rdata[0].bitcast(Int(width))
         offset_reg = RegArray(Bits(width), 1)
         offset_reg[0] = rdata.bitcast(Bits(width))
         return offset_reg
@@ -394,6 +392,7 @@ class Driver(Module):
         # Async_call after first cycle
         with Condition(init_reg[0] == UInt(1)(0)):
             d_call = fetcher.async_called()
+        return init_cache
 
 def build_cpu(depth_log):
     sys = SysBuilder('minor_cpu')
@@ -404,8 +403,7 @@ def build_cpu(depth_log):
         bits5   = Bits(5)
         bits32  = Bits(32)
 
-        user = MemUser(32)
-        offset_reg = user.build()
+        user = MemUser()
 
         fetcher = Fetcher()
         pc_reg, pc_addr = fetcher.build()
@@ -431,16 +429,21 @@ def build_cpu(depth_log):
         exec_br_jumped = RegArray(Bits(1), 1)
         mem_br_no_jump = RegArray(Bits(1), 1)
         d_br_buffer = RegArray(Bits(1), 1)
-
+        icache = SRAM(width=32, depth=1<<depth_log, init_file=f"{workspace}/workload.exe")
+        icache.name = 'icache'
 
         writeback = WriteBack()
         wb_rd = writeback.build(reg_file = reg_file)
 
         memory_access = MemoryAccess()
 
-        executor = Execution()
+        driver = Driver()
+        init_cache = driver.build(fetcher, user)
 
-        exec_rd, ex_valid, exec_br_jump = executor.build(
+        executor = Execution()
+        offset_reg = user.build(init_cache.dout)
+
+        exec_rd, ex_valid, exec_br_jump,dcache = executor.build(
             pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
             exec_bypass_data = exec_bypass_data,
@@ -453,8 +456,8 @@ def build_cpu(depth_log):
             rf = reg_file,
             csr_f = csr_file,
             memory = memory_access,
-            #writeback = writeback,
             data = f'{workspace}/workload.data',
+            #writeback = writeback,
             depth_log = depth_log,
             exec_br_dest = exec_br_dest,
 
@@ -467,21 +470,19 @@ def build_cpu(depth_log):
             mem_bypass_data=mem_bypass_data,
             wb_bypass_reg=wb_bypass_reg,
             wb_bypass_data=wb_bypass_data,
-            
+            rdata=dcache.dout,
         )
 
         decoder = Decoder()
-        on_br = decoder.build(executor=executor)
+        on_br = decoder.build(executor=executor,rdata=icache.dout)
 
         fetcher_impl.build(on_br, exec_br_dest, ex_valid, pc_reg,
-                            pc_addr, decoder, f'{workspace}/workload.exe',
-                              depth_log, d_br_buffer , exec_br_jumped , 
-                              mem_br_no_jump,exec_br_jump,)
+                            pc_addr, decoder, 
+                              depth_log, d_br_buffer , exec_br_jumped ,
+                              mem_br_no_jump,exec_br_jump,icache)
 
         onwrite_downstream = Onwrite()
 
-        driver = Driver()
-        driver.build(fetcher, user)
 
         onwrite_downstream.build(
             reg_onwrite=reg_onwrite,
@@ -528,7 +529,7 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
             value = value[2:]
             open(f'{workspace}/workload.init', 'w').write(value)
 
-    report = True
+    report = False
 
     if report:
         raw = utils.run_simulator(simulator_path, False)

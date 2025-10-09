@@ -23,6 +23,10 @@ class DType:
         '''Check if two data types are equal'''
         return self.__class__ == other.__class__ and self.bits == other.bits
 
+    def __hash__(self):
+        '''Hash consistent with equality for caching purposes'''
+        return hash((self.__class__, self.bits))
+
     def attributize(self, value, name):
         '''The syntax sugar for creating a port'''
 
