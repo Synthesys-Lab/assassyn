@@ -95,7 +95,7 @@ class TypeOrientedNamer:
         base = self._sanitize(class_name)
         if base in {'module', 'modulebase'}:
             base = 'module'
-        return f'{base}_inst'
+        return f'{base}Instance'
 
     def get_prefix_for_type(self, node: Any) -> str:  # pylint: disable=too-many-return-statements,too-many-branches,too-many-locals
         """Get the naming prefix for a given node type."""
