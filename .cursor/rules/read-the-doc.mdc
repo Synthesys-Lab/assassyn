@@ -1,6 +1,6 @@
 ---
 alwaysApply: true
-decription: Documentation Policy of this Project
+description: Documentation Policy of this Project
 ---
 
 # Read the Document
@@ -15,5 +15,5 @@ is `mod.rs` or `__init__.py` in this folder, this
 document not only documents the methods in `__init__.py`
 but also describes the structure of this module.
 
-When asked to modify a module, incoperate the descriptions
+When asked to modify a module, incorporate the descriptions
 in this folder first.
