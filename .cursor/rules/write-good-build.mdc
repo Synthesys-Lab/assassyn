@@ -10,4 +10,4 @@ description: How to write good build/initialization infrastructure
    - automatically fails when a command returns non-zero.
    - automatically manages dependence based concurrency.
    - automatically return to the original folder of invocation.
-2. `setup.sh` sourced in Makefile does not affect the host shell environment.
+2. Keep in mind that `source script.sh` in Makefile does not affect the host shell environment.
