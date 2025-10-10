@@ -37,6 +37,16 @@ Returns the current hierarchical naming context based on the active module stack
 When inside a module's `build()` method, this returns the module instance's name
 to be used as a prefix for arrays and other entities created within that context.
 
+-----
+
+## Context-aware array naming
+
+When arrays are created without an explicit name inside a module body, a hierarchical hint is applied so textual IR reflects structure:
+
+- arrays declared via `RegArray` receive a hint of the form `<module_name>_array` if no better hint is present
+- the hint is applied through `NamingManager.assign_name`, which writes a semantic name on the instance
+- explicit names always take precedence; names with underscores that indicate hierarchy are preserved
+
 ---
 
 ## Global Functions

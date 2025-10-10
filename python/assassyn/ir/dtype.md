@@ -222,3 +222,6 @@ All types automatically calculate their bit width:
 - **Record types:** Sum of all field bits (sequential) or max bit position + 1 (explicit)
 
 The type system ensures hardware realizability by tracking exact bit requirements for all composite structures.
+
+### Equality and hashing
+Types compare by class and bit width. A `Bits(8)` equals another `Bits(8)`, but not `UInt(8)`. Hashing follows the same rule so instances can serve as keys in caches.

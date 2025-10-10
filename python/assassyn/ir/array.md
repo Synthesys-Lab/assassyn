@@ -32,6 +32,11 @@ def RegArray(  # Frontend API to declare a register array
   my_array = RegArray(UInt(32), 16, name="register_file")  # 16-element array of 32-bit uints
   ```
 
+#### Naming behavior
+- If `name` is provided, it is sanitized and applied.
+- If no explicit name is given and a module context is active, a semantic name is assigned using the module name as a prefix (e.g. `<module>_array`).
+- Semantic names are stored on the instance and used by `as_operand()` and `__repr__`.
+
 -------
 
 ### `as_operand(self)`
