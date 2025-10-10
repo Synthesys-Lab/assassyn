@@ -7,7 +7,8 @@ from assassyn import utils
 from assassyn.ir.module.downstream import Downstream, combinational
 from assassyn.ir.expr.intrinsic import (
     send_read_request, send_write_request, 
-    has_mem_resp, get_mem_resp
+    has_mem_resp, get_mem_resp,
+    read_request_succ, write_request_succ
 )
 
 

@@ -43,10 +43,10 @@ class DRAM(MemoryBase):
         self.wdata = wdata
 
         # When re is enabled, call send_read_request
-        read_succ = send_read_request(self, addr)
+        read_succ = send_read_request(self, re, addr)
             
         # When we is enabled, call send_write_request
-        write_succ = send_write_request(self, addr, wdata)
+        write_succ = send_write_request(self, we, addr, wdata)
             
         # Return success signals for downstream modules to check
         # It is developers' duty to resend unsuccessful requests

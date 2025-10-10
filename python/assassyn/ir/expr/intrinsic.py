@@ -12,9 +12,9 @@ INTRIN_INFO = {
     903: ('barrier', 1, False, True),
     904: ('has_mem_resp', 1, False, True),
     905: ('mem_write', 3, False, True),
-    906: ('send_read_request', 2, True, True),
+    906: ('send_read_request', 3, True, True),
     907: ('mem_resp', 1, True, False),
-    908: ('send_write_request', 3, True, True),
+    908: ('send_write_request', 4, True, True),
     909: ('use_dram', 1, False, True),
     910: ('read_request_succ', 1, False, True),
     911: ('write_request_succ', 1, False, True),
@@ -120,14 +120,14 @@ def mem_write(payload, addr, wdata):
     return Intrinsic(Intrinsic.MEM_WRITE, payload, addr, wdata)
 
 @ir_builder
-def send_read_request(mem, addr):
+def send_read_request(mem, re, addr):
     '''Send a read request with address to the given memory system.'''
-    return Intrinsic(Intrinsic.SEND_READ_REQUEST, mem, addr)
+    return Intrinsic(Intrinsic.SEND_READ_REQUEST, mem, re, addr)
 
 @ir_builder
-def send_write_request(mem, addr, data):
+def send_write_request(mem, we, addr, data):
     '''Send a write request with address and data to the given memory system.'''
-    return Intrinsic(Intrinsic.SEND_WRITE_REQUEST, mem, addr, data)
+    return Intrinsic(Intrinsic.SEND_WRITE_REQUEST, mem, we, addr, data)
 
 @ir_builder
 def mem_resp(memory):

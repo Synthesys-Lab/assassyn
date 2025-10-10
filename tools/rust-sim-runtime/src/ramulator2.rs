@@ -1,8 +1,8 @@
+use std::collections::VecDeque;
 use std::error::Error;
 use std::ffi::{c_char, c_void, CString};
 use std::fs;
 use std::path::Path;
-use std::collections::VecDeque;
 
 // Platform-specific libloading imports
 #[cfg(target_os = "macos")]
@@ -98,8 +98,8 @@ impl MemoryInterface {
     let dram_new: Symbol<unsafe extern "C" fn() -> CRamualator2Wrapper> = lib.get(b"dram_new")?;
     let wrapper = dram_new();
 
-    Ok(Self { 
-      lib, 
+    Ok(Self {
+      lib,
       wrapper,
       write_buffer: VecDeque::new(),
     })

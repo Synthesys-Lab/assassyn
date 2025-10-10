@@ -8,7 +8,6 @@ This module contains helper functions to generate simulator code for intrinsic o
 
 from ....ir.expr.intrinsic import PureIntrinsic, Intrinsic
 from ....utils import namify
-from ..callback_collector import get_current_callback_metadata
 from ..node_dumper import dump_rval_ref
 
 
@@ -82,48 +81,60 @@ def _codegen_barrier(node, module_ctx, sys, **_kwargs):
 def _codegen_send_read_request(node, module_ctx, sys, **_kwargs):
     """Generate code for SEND_READ_REQUEST intrinsic."""
     dram_module = node.args[0]
-    addr = node.args[1]
+    re = node.args[1]
+    addr = node.args[2]
     dram_name = namify(dram_module.name)
+    re_val = dump_rval_ref(module_ctx, sys, re)
     addr_val = dump_rval_ref(module_ctx, sys, addr)
-    return f"""{{
-                    unsafe {{
-                        let mem_interface = &sim.mi_{dram_name};
-                        let success = mem_interface.send_request(
-                            {addr_val} as i64,
-                            false,
-                            callback_of_{dram_name},
-                            sim as *const _ as *mut _,
-                        );
-                        if success {{
-                            sim.request_stamp_map_table.insert(
+    val = dump_rval_ref(module_ctx, sys, node)
+    return f"""
+                    let {val} = if {re_val} {{
+                        unsafe {{
+                            let mem_interface = &sim.mi_{dram_name};
+                            let success = mem_interface.send_request(
                                 {addr_val} as i64,
-                                sim.stamp,
+                                false,
+                                callback_of_{dram_name},
+                                sim as *const _ as *mut _,
                             );
+                            if success {{
+                                sim.request_stamp_map_table.insert(
+                                    {addr_val} as i64,
+                                    sim.stamp,
+                                );
+                            }}
+                            success
                         }}
-                        success
-                    }}
-                }}"""
+                    }} else {{
+                        false
+                    }};
+                """
 
 
 def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
     """Generate code for SEND_WRITE_REQUEST intrinsic."""
     dram_module = node.args[0]
-    addr = node.args[1]
-    data = node.args[2]
+    we = node.args[1]
+    addr = node.args[2]
+    data = node.args[3]  # pylint: disable=unused-variable
     dram_name = namify(dram_module.name)
+    we_val = dump_rval_ref(module_ctx, sys, we)
     addr_val = dump_rval_ref(module_ctx, sys, addr)
-    data_val = dump_rval_ref(module_ctx, sys, data)
     val = dump_rval_ref(module_ctx, sys, node)
     return f"""
-                    let {val} = unsafe {{
-                        let mem_interface = &sim.mi_{dram_name};
-                        let success = mem_interface.send_request(
-                            {addr_val} as i64,
-                            true,
-                            callback_of_{dram_name},
-                            sim as *const _ as *mut _,
-                        );
-                        success
+                    let {val} = if {we_val} {{
+                        unsafe {{
+                            let mem_interface = &sim.mi_{dram_name};
+                            let success = mem_interface.send_request(
+                                {addr_val} as i64,
+                                true,
+                                callback_of_{dram_name},
+                                sim as *const _ as *mut _,
+                            );
+                            success
+                        }}
+                    }} else {{
+                        false
                     }};
                 """
 
@@ -137,40 +148,35 @@ def _codegen_has_mem_resp(node, module_ctx, sys, **_kwargs):
     """Generate code for HAS_MEM_RESP intrinsic."""
     dram_module = node.args[0]
     dram_name = namify(dram_module.name)
-    val = dump_rval_ref(module_ctx, sys, node)
-    return f"let {val} = sim.{dram_name}_response.valid"
+    return f"sim.{dram_name}_response.valid"
 
 
 def _codegen_mem_resp(node, module_ctx, sys, **_kwargs):
     """Generate code for MEM_RESP intrinsic."""
     dram_module = node.args[0]
     dram_name = namify(dram_module.name)
-    val = dump_rval_ref(module_ctx, sys, node)
-    return f"let {val} = sim.{dram_name}_response.data.clone()"
+    return f"sim.{dram_name}_response.data.clone()"
 
 
 def _codegen_read_request_succ(node, module_ctx, sys, **_kwargs):
     """Generate code for READ_REQUEST_SUCC intrinsic."""
     dram_module = node.args[0]
     dram_name = namify(dram_module.name)
-    val = dump_rval_ref(module_ctx, sys, node)
-    return f"let {val} = sim.{dram_name}_response.read_succ"
+    return f"sim.{dram_name}_response.read_succ"
 
 
 def _codegen_write_request_succ(node, module_ctx, sys, **_kwargs):
     """Generate code for WRITE_REQUEST_SUCC intrinsic."""
     dram_module = node.args[0]
     dram_name = namify(dram_module.name)
-    val = dump_rval_ref(module_ctx, sys, node)
-    return f"let {val} = sim.{dram_name}_response.write_succ"
+    return f"sim.{dram_name}_response.write_succ"
 
 
 def _codegen_get_mem_resp(node, module_ctx, sys, **_kwargs):
     """Generate code for GET_MEM_RESP intrinsic."""
     dram_module = node.args[0]
     dram_name = namify(dram_module.name)
-    val = dump_rval_ref(module_ctx, sys, node)
-    return f"let {val} = sim.{dram_name}_response.data.clone()"
+    return f"sim.{dram_name}_response.data.clone()"
 
 def _codegen_mem_write(node, module_ctx, sys, **kwargs):
     """Generate code for MEM_WRITE intrinsic."""
@@ -178,15 +184,12 @@ def _codegen_mem_write(node, module_ctx, sys, **kwargs):
     from ..port_mapper import get_port_manager
 
     module_name = module_ctx.name
-    modules_for_callback = kwargs.get('modules_for_callback')
     array = node.args[0]
     idx = node.args[1]
     value = node.args[2]
     array_name = namify(array.name)
     idx_val = dump_rval_ref(module_ctx, sys, idx)
     value_val = dump_rval_ref(module_ctx, sys, value)
-    modules_for_callback["memory"] = module_name
-    modules_for_callback["store"] = array_name
 
     # DRAM callback uses a reserved port
     manager = get_port_manager()

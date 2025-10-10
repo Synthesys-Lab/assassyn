@@ -59,18 +59,13 @@ class ElaborateModule(Visitor):
         id_and_exposure = None
         if node.is_valued():
             need_exposure = False
-            need_exposure = expr_externally_used(node, True)
+            need_exposure = expr_externally_used(  # noqa: E501
+                node, True)  # noqa: E501
             id_expr = namify(node.as_operand())
             id_and_exposure = (id_expr, need_exposure)
 
         # Generate code using the codegen_expr helper
         kwargs = {}
-        if (self.callback_metadata and self.callback_metadata.memory and
-                self.callback_metadata.store):
-            kwargs['modules_for_callback'] = {
-                'memory': self.callback_metadata.memory,
-                'store': self.callback_metadata.store
-            }
         code = codegen_expr(node, self.module_ctx, self.sys, **kwargs)
 
         # Format the result with proper indentation and variable assignment
@@ -171,7 +166,8 @@ use std::sync::Arc;
                 and dram_metadata.store
                 and dram_metadata.mem_user_rdata
             ):
-                mod_fd.write(f"""extern "C" fn callback_of_{dram_name}(req: *mut Request, ctx: *mut c_void) {{
+                mod_fd.write(f"""extern "C" fn callback_of_{dram_name}(  # noqa: E501
+                    req: *mut Request, ctx: *mut c_void) {{
     unsafe {{
         let req = &*req;
         let sim: &mut Simulator = &mut *(ctx as *mut Simulator);

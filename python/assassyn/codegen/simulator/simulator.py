@@ -103,13 +103,11 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     fd.write("pub struct Simulator { pub stamp: usize, ")
     fd.write("pub request_stamp_map_table: HashMap<i64, usize>,\n")
     home = repo_path()
-    
     # Add per-DRAM memory interfaces and response fields
     for dram in dram_modules:
         dram_name = namify(dram.name)
         fd.write(f"pub mi_{dram_name}: MemoryInterface,\n")
         fd.write(f"pub {dram_name}_response: Response,\n")
-    
     # Add array fields to simulator struct
     for array in sys.arrays:
         name = namify(array.name)
@@ -178,7 +176,6 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
 
     # Constructor
     fd.write("  pub fn new() -> Self {\n")
-    
     # Initialize per-DRAM memory interfaces
     for dram in dram_modules:
         dram_name = namify(dram.name)
@@ -186,8 +183,10 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         fd.write('MemoryInterface::new_from_cwrapper_path()')
         fd.write(f'.expect("Failed to create MemoryInterface for {dram_name}") }};\n')
         simulator_init.append(f"mi_{dram_name}: mi_{dram_name},")
-        simulator_init.append(f"{dram_name}_response: Response {{ valid: false, addr: 0, data: Vec::new(), read_succ: false, write_succ: false, is_write: false }},")
-    
+        simulator_init.append(  # noqa: E501
+            f"{dram_name}_response: Response {{ valid: false, addr: 0, "
+            f"data: Vec::new(), read_succ: false, write_succ: false, "
+            f"is_write: false }},")
     fd.write("    Simulator {\n")
     fd.write("      stamp: 0,\n")
     fd.write("      request_stamp_map_table: HashMap::new(),\n")
@@ -275,7 +274,6 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     # Generate simulate function
     fd.write("pub fn simulate() {\n")
     fd.write("  let mut sim = Simulator::new();\n")
-    
     # Initialize each DRAM with configuration
     for dram in dram_modules:
         dram_name = namify(dram.name)
@@ -284,7 +282,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
             sim.mi_{dram_name}
                 .init("{home}/tools/c-ramulator2-wrapper/configs/example_config.yaml");
         }}
-    """)
+    """)  # noqa: E501
 
     # Handle randomization if enabled
     if config.get('random', False):
@@ -389,14 +387,14 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         unsafe {{
             // Tick all DRAM memory interfaces
 """)
-    
+
     for dram in dram_modules:
         dram_name = namify(dram.name)
         fd.write(f"            sim.mi_{dram_name}.frontend_tick();\n")
         fd.write(f"            sim.mi_{dram_name}.memory_system_tick();\n")
-    
-    fd.write("        }}\n")
-    fd.write("      }}\n")
+
+    fd.write("        }\n")
+    fd.write("      }\n")
     fd.write("    ")
 
     # Close simulate function

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING, Dict, List
+from typing import Optional, TYPE_CHECKING, Dict
 
 from ...ir.visitor import Visitor
 from ...ir.expr.intrinsic import Intrinsic
-from ...ir.memory.dram import DRAM
 from ...utils import namify
 from .utils import fifo_name
 
@@ -89,10 +88,11 @@ class CallbackIntrinsicCollector(Visitor):
             array_name = getattr(payload, "name", None)
             if array_name is not None:
                 # Find which DRAM this array belongs to
-                dram_name = namify(array_name)  # Assuming array name matches DRAM name
+                dram_name = namify(array_name)  # Array name matches DRAM name
                 if dram_name not in self._metadata.dram_callbacks:
-                    self._metadata.dram_callbacks[dram_name] = DRAMCallbackMetadata(dram_name=dram_name)
-                self._metadata.dram_callbacks[dram_name].store = namify(array_name)
+                    self._metadata.dram_callbacks[dram_name] = DRAMCallbackMetadata(  # noqa: E501
+                        dram_name=dram_name)
+                self._metadata.dram_callbacks[dram_name].store = namify(array_name)  # noqa: E501
                 self._metadata.dram_callbacks[dram_name].memory = self.current_module.name
 
 
