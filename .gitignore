@@ -14,7 +14,3 @@ tutorials/*
 workspace/*
 **/.claude/settings.local.json
 Cargo.lock
-
-# AI Workflows
-todos/*
-dones/*
