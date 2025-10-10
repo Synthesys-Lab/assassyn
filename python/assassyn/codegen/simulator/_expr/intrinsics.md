@@ -39,7 +39,11 @@ def codegen_intrinsic(node: Intrinsic, module_ctx, sys, ...) -> str
   * **`ASSERT`**: Asserts a runtime condition, causing a panic if it's false.
       * **Generated Code**: `assert!(<condition>);`
   * **`BARRIER`**: A no-op in generated code, used as a hint for compilation.
-  * **`SEND_READ_REQUEST` / `SEND_WRITE_REQUEST`**: Send a read or write request to the main memory interface.
-  * **`USE_DRAM`**: A configuration command that links a specific FIFO to receive DRAM read responses.
-  * **`HAS_MEM_RESP` / `MEM_RESP`**: Check for and retrieve a pending data response from the DRAM-linked FIFO.
-  * **`MEM_WRITE`**: Performs an array write operation specifically for DRAM.
+
+
+  - `send_read_request(mem, addr)`: It calls the corresponding `mem`ory interface's `send_request` method with the given `address` and associated `callback_of_<mem>` discussed in [modules.md](../modules.md), and `is_write` set to false.
+  - `read_request_succ(mem)`: It reads the value from `sim.<mem>_response.read_succ` as declared in [simulator.md](../simulator.md).
+  - `send_write_request(mem, addr, data)`: It calls the corresponding `mem`ory interface's `send_request` method with the given `address` and associated `callback_of_<mem>` discussed in [modules.md](../modules.md), and `is_write` set to true.
+  - `write_request_succ(mem)`: It reads the value from `sim.<mem>_response.write_succ` as declared in [simulator.md](../simulator.md).
+  - `has_mem_resp(mem)`: It checks if `sim.<mem>_response.valid`.
+  - `get_mem_resp(mem)`: Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.

@@ -41,23 +41,20 @@ imports and manual path construction.
 ```rust
 pub struct Simulator {
   pub stamp: usize,
-  pub mem_interface: MemoryInterface,
-  pub request_stamp_map_table: HashMap<i64, usize>,
   /* RegArray's */
   /* Stage Bookkeeping */
+  /* Exposed Values */
+  /* DRAM Interface */
 }
 
 impl Simulator {
   pub fn new() -> Self {
-    let mem = unsafe {
-      MemoryInterface::new_from_cwrapper_path().expect("Failed to create MemoryInterface")
-    };
     Simulator {
       stamp: 0,
-      request_stamp_map_table: HashMap::new(),
       /* Reg Array's initialization */
       /* Module bookkeeping initialization */
       /* Values exposed to external modules. */
+      /* DRAM Interface */
     }
   }
 }
@@ -69,13 +66,6 @@ The simulator context contains a global time `stamp`, to record the current cycl
 of simulation. The time `stamp` is incremented by 25, 25, 50 in each cycle, to simulate
 pipeline stage module, downstream module, and register arrays, respectively, and then
 move to the next cycle. See below for more details.
-
-> TODO: Move this memory system to declaration-oriented code generation, too.
-
-There are a `MemoryInterface`, and a `request_stamp_map_table` to interact with the memory system.
-The memory interface is simulated by [ramulator2](../../../../3rd-party/ramulator2/)
-included in 3rd-party directory, and we developed a [C wrapper](../../../../tools/raumulator-c-wrapper/)
-for foreign function interface (FFI).
 
 ### Register Arrays
 
@@ -113,6 +103,15 @@ of each cycle, and the code path to which this value belongs will set it to `Som
 See below for more details on resetting each cycle.
 See [per module generation](./modules.py) for more details on value generation.
 
+### DRAM Simulation
+
+Each [DRAM](../../ir/memory/dram.py) instantitated should have a corresponding `MemoryInterface`
+to invoke [Ramulator2 Rust Wrapper](../../../../tools/rust-sim-runtime/src/ramulator2.md)
+to send and receive requests. Each `MemoryInterface` instance is named `mi_<dram_module>`.
+Associated with each `MemoryInterface`, we have an additional 
+`<dram_module>_response: Response` field to buffer the result of memory responses,
+including read and write.
+
 ## Simulator Methods
 
 ### Common Methods
@@ -140,6 +139,15 @@ time stamp is smaller the current global time stamp, `self.stamp`. If so, the mo
 
 --------
 
+````rust
+  pub fn tick_memory(&mut self);
+````
+This function calls `sim.mi_<mem>.frontend_tick();` and `sim.mi_<mem>.memory_tick();`
+for each DRAM module.
+
+
+--------
+
 ```rust
   pub fn tick_registers(&mut self);
 ```
@@ -152,6 +160,11 @@ It calls the `tick` method of each `Array<T>` instance with the current "half cy
 
 --------
 
+```rust
+  pub fn reset_dram(&mut self);
+```
+At the end of each cycle, it resets the status of each DRAM response.
+By setting `sim.<dram>_response`'s `valid`, `write_succ`, and `read_succ` to `false`.
 
 ### Per Module Invoker
 
@@ -263,6 +276,7 @@ pub fn simulate() {
   for i in 1..=200 {
     sim.stamp = i * 100;
     sim.reset_downstream();
+    sim.tick_memory();
 
     for simulate in simulators.iter() {
       simulate(&mut sim);
@@ -289,9 +303,8 @@ pub fn simulate() {
 
     sim.stamp += 50;
     sim.tick_registers();
+    sim.reset_dram();
     unsafe {
-      sim.mem_interface.frontend_tick();
-      sim.mem_interface.memory_tick();
     }
   }
 }

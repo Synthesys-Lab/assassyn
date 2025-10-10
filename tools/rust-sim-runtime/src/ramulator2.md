@@ -27,9 +27,12 @@ pub struct Request {
 }
 
 struct Response {
-    valid: bool,   // If it is a valid response
-    addr: usize,   // The address of memory request
-    data: BigUInt, // The data
+    valid: bool,    // If it is a valid response
+    addr: usize,    // The address of memory request
+    data: Vec<u8>,  // The data
+    read_succ: bool, // If the last read request in this cycle succeeds
+    write_succ: bool, // If the last write request in this cycle succeeds
+    is_write: bool, // Is write
 }
 ````
 
@@ -40,9 +43,12 @@ The `MemoryInterface` struct provides the main interface to interact with Ramula
 ````rust
 pub struct MemoryInterface {
     lib: Library,        // Dynamically loaded library handle
-    wrapper: MyWrapper,  // Opaque pointer to C++ wrapper object
+    wrapper: CRamulator2Wrapper,  // Opaque pointer to C++ wrapper object
+    write_buffer: VecDeq<(usize, Vec<u8>)>, 
 }
 ````
+
+- `write_buffer` holds data to be written to the memory. A queue is adopted to retained for now to cheat the mermoy order.
 
 ## Exposed Interface
 
@@ -99,7 +105,7 @@ pub unsafe fn send_request(
 ## Type Definitions
 
 ````rust
-type MyWrapper = *mut c_void;
+type CRamulator2Wrapper = *mut c_void;
 type RequestCallback = extern "C" fn(*mut Request, *mut c_void);
 type ResponseCallback = extern "C" fn(*mut Response, *mut c_void);
 ````

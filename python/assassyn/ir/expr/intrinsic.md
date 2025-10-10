@@ -1,6 +1,7 @@
 # Intrinsic Functions
 
 This module declares each intrinsic, and implements their frontend builders with `@ir_builder` annotated.
+Each intrinsic should have a corresponding `Intrinsic.UPPER_CASE_INTRINSIC` opcode.
 
 ---
 
