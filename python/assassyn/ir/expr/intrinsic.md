@@ -14,6 +14,8 @@ Each intrinsic should have a corresponding `Intrinsic.UPPER_CASE_INTRINSIC` opco
 5. `has_mem_resp(mem)`: This is a purely combinational pin that checks if the given memory has response.
 6. `get_mem_resp(mem)`: Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.
 
+The DRAM intrinsics now support per-DRAM-module memory interfaces with proper callback handling and response management, replacing the previous single global memory interface approach.
+
 2 & 4 are designed to work against the constraint of "scope". Consider the code below:
 ```python
 with Condition(we):

@@ -26,7 +26,8 @@ pub struct Request {
     pub m_payload: *mut c_void,       // Payload pointer
 }
 
-struct Response {
+#[repr(C)]
+pub struct Response {
     valid: bool,    // If it is a valid response
     addr: usize,    // The address of memory request
     data: Vec<u8>,  // The data
@@ -44,11 +45,11 @@ The `MemoryInterface` struct provides the main interface to interact with Ramula
 pub struct MemoryInterface {
     lib: Library,        // Dynamically loaded library handle
     wrapper: CRamulator2Wrapper,  // Opaque pointer to C++ wrapper object
-    write_buffer: VecDeq<(usize, Vec<u8>)>, 
+    write_buffer: VecDeque<(usize, Vec<u8>)>, 
 }
 ````
 
-- `write_buffer` holds data to be written to the memory. A queue is adopted to retained for now to cheat the mermoy order.
+- `write_buffer` holds data to be written to the memory. A queue is adopted to retain memory order for proper callback handling.
 
 ## Exposed Interface
 

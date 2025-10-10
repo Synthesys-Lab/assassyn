@@ -12,7 +12,7 @@ def dump_modules(sys: SysBuilder, fd):
 This function iterates over all the modules within the `sys`tem
 to the given `fd`.
 
-> TODO: All the memory related callbacks are currently a bad hack. Later implement them in a fundamental way.
+The DRAM callback system has been redesigned to support per-DRAM-module memory interfaces with proper callback handling and response management.
 
 This function instantiates `ElaborateModule`, which provides the key methods of dumping each module.
 

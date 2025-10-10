@@ -105,12 +105,13 @@ See [per module generation](./modules.py) for more details on value generation.
 
 ### DRAM Simulation
 
-Each [DRAM](../../ir/memory/dram.py) instantitated should have a corresponding `MemoryInterface`
+Each [DRAM](../../ir/memory/dram.py) instantiated should have a corresponding `MemoryInterface`
 to invoke [Ramulator2 Rust Wrapper](../../../../tools/rust-sim-runtime/src/ramulator2.md)
 to send and receive requests. Each `MemoryInterface` instance is named `mi_<dram_module>`.
 Associated with each `MemoryInterface`, we have an additional 
 `<dram_module>_response: Response` field to buffer the result of memory responses,
-including read and write.
+including read and write. This replaces the previous single global memory interface approach
+with per-DRAM-module interfaces for better isolation and callback management.
 
 ## Simulator Methods
 
@@ -142,7 +143,7 @@ time stamp is smaller the current global time stamp, `self.stamp`. If so, the mo
 ````rust
   pub fn tick_memory(&mut self);
 ````
-This function calls `sim.mi_<mem>.frontend_tick();` and `sim.mi_<mem>.memory_tick();`
+This function calls `sim.mi_<mem>.frontend_tick();` and `sim.mi_<mem>.memory_system_tick();`
 for each DRAM module.
 
 
