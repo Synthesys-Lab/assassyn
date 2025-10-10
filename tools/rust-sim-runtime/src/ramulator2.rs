@@ -2,6 +2,7 @@ use std::error::Error;
 use std::ffi::{c_char, c_void, CString};
 use std::fs;
 use std::path::Path;
+use std::collections::VecDeque;
 
 // Platform-specific libloading imports
 #[cfg(target_os = "macos")]
@@ -73,7 +74,10 @@ pub struct Request {
 pub struct Response {
   pub valid: bool,
   pub addr: usize,
-  pub data: *mut c_void, // Using pointer instead of BigUInt for C compatibility
+  pub data: Vec<u8>,
+  pub read_succ: bool,
+  pub write_succ: bool,
+  pub is_write: bool,
 }
 type CRamualator2Wrapper = *mut c_void;
 pub type RequestCallback = extern "C" fn(*mut Request, *mut c_void);
@@ -81,6 +85,7 @@ pub type RequestCallback = extern "C" fn(*mut Request, *mut c_void);
 pub struct MemoryInterface {
   lib: Library,
   wrapper: CRamualator2Wrapper,
+  pub write_buffer: VecDeque<(usize, Vec<u8>)>,
 }
 
 impl MemoryInterface {
@@ -93,7 +98,11 @@ impl MemoryInterface {
     let dram_new: Symbol<unsafe extern "C" fn() -> CRamualator2Wrapper> = lib.get(b"dram_new")?;
     let wrapper = dram_new();
 
-    Ok(Self { lib, wrapper })
+    Ok(Self { 
+      lib, 
+      wrapper,
+      write_buffer: VecDeque::new(),
+    })
   }
 
   /// Initialize the memory interface with a configuration file.
@@ -169,6 +178,25 @@ impl MemoryInterface {
     let my_finish: Symbol<unsafe extern "C" fn(CRamualator2Wrapper)> =
       self.lib.get(b"finish").unwrap();
     my_finish(self.wrapper);
+  }
+
+  /// Reset the write buffer and response state.
+  pub fn reset_state(&mut self) {
+    self.write_buffer.clear();
+  }
+
+  /// Add data to the write buffer for a write request.
+  pub fn add_write_data(&mut self, addr: usize, data: Vec<u8>) {
+    self.write_buffer.push_back((addr, data));
+  }
+
+  /// Get write data for a given address and remove it from the buffer.
+  pub fn get_write_data(&mut self, addr: usize) -> Option<Vec<u8>> {
+    if let Some(pos) = self.write_buffer.iter().position(|(a, _)| *a == addr) {
+      Some(self.write_buffer.remove(pos).unwrap().1)
+    } else {
+      None
+    }
   }
 }
 
