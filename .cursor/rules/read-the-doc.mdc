@@ -6,8 +6,9 @@ description: Documentation Policy of this Project
 # Read the Document
 
 If there is a `.md` file with the same prefix as the
-source file in the same folder e.g. `.py/.rs/.cpp/.cc`.
-This `.md` file is the design document of this module.
+source file in the same folder including but not limited to
+`.py/.rs/.cpp/.cc`. This `.md` file is the design
+document of this module.
 Refer to this module to understand the implementation.
 
 If there is a `README.md` within a folder, and there
@@ -16,4 +17,6 @@ document not only documents the methods in `__init__.py`
 but also describes the structure of this module.
 
 When asked to modify a module, incorporate the descriptions
-in this folder first.
+in the documents to see if there is any discrepency between
+the document and the code. If so, it indicates an ongoing
+development to implement.

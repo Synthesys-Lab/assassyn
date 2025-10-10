@@ -16,28 +16,44 @@ interface, or fix a specific bug replicated.
 
 ## Section 2: Action Items
 
-Instead of directly developing the solution, the goal should be broken down into smaller, and
-specific intermediate steps. Each step should have a clear purpose achievable.
+Before development, all the documents should be finalized for a clear and solid design.
 
-1. Before developement, the developer should update the design documents of the corresponding
+0. **Document Development:** the developer should update the design documents of the corresponding
    modules to the new desired design.
    - If a new file need to be created as per the new design, it is highly recommended to and touch
-     an empty file with the corresponding name with a single line of TODO comment inside so that
-     when listing the action items, you have a file to refer to.
+     an empty file with the same prefix name as the document `.md` with a single line
+     of `/*TODO*/` comment in it at the document development case
+     so that when listing the action items, you have a file to refer to.
    - When finalizing the design document, it is required to discuss with a "team member",
      including but not limited to a human colleague or AI assistant, to ensure this design
      is clear and reasonable.
    - After the discussion, commit the design document with a message like
      "Update design document for xxx feature/bug fix".
-2. Based on the updated design document, the TODO document is an action list. Each
-   action item should be typically separated into two sub-items:
-   - It starts with creating new tests. When developing a new feature, test-driven is a good practice
-     The action item should be like "as per new design doc, create a new test case for xxx feature
-     in the corresponding test file `unit-tests/xxx_test.py` or `ci-tests/xxx_tests`".
-   - Then, clearly state the "deltas" between the current design and the new desired design to
-     implement the new feature or fix the bug. The action item should be like
-     "as per new source.md, the existing source.py should be refactored as follow by
-     adding/removing xxx".
-3. It is related to a prior change, as per our [action flow](./act-on-todo.mdc), the prior TODO
-   will be located in a `dones` folder, so that refer to their changes.
+
+After having the document as the goal. Achieving the goal should be broken down into multiple
+smaller, and specific intermediate steps.
+
+1. **Coding Development:** Based on the committed design document,
+   the TODO document is an action list. Each action item should be broken down to several sub-steps.
+   - If it is developing code according to the updated document:
+     0. Each step is essentially resolving a discrepency between the source code and the design document,
+        so an action item should first summarize the "deltas" between the document and the code.
+     1. If it is a new feature, test case should be developed.
+        Test-driven is a good practice The action item should be like "as per new design doc,
+        create a new test case for xxx feature in the corresponding test file
+        `unit-tests/xxx_test.py` or `ci-tests/xxx_tests`".
+        - Adding new test case currently is the only case needed to skip pre-commit check.
+     2. If it is improving or refactoring existing implementation, no test case is need, but
+        we need to make sure all the existing tests pass.
+     3. Then, as per the "deltas" between the current design and the new desired design,
+        clearly state the modifications needed to implement the new feature or fix the bug.
+        This step of action item should be like
+        "as per new source.md, the existing source.py should be refactored as follow by adding/removing xxx".
+  - Each subsetp should have a commit message so that we can rollback when needed. For example,
+    sometimes some decisions are turned out to be bad after pacticing.
+  - After a sub-item is done, stage and commit the changes by triggering pre-commit checks, to make sure
+    it is successfully integrated.
+2. **Deal with Prior Changes:** If this TODO is related to a prior change,
+   as per our [action flow](./act-on-todo.mdc), the prior TODO should be located in a `dones` folder,
+   so that this TODO can  refer to their changes.
    - As per changes in `TODO-yyy.md`, `<what issue>` was introduced, we should fix all the related files by `<doing what>`.
