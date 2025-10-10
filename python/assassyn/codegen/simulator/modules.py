@@ -11,7 +11,6 @@ from ...ir.expr import Expr
 from ...utils import namify
 from .node_dumper import dump_rval_ref
 from ...analysis import expr_externally_used
-from .callback_collector import collect_callback_intrinsics, CallbackMetadata
 
 if typing.TYPE_CHECKING:
     from ...ir.module import Module
@@ -20,14 +19,13 @@ if typing.TYPE_CHECKING:
 class ElaborateModule(Visitor):
     """Visitor for elaborating modules with multi-port write support."""
 
-    def __init__(self, sys, callback_metadata: CallbackMetadata | None = None):
+    def __init__(self, sys):
         """Initialize the module elaborator."""
         super().__init__()
         self.sys = sys
         self.indent = 0
         self.module_name = ""
         self.module_ctx = None
-        self.callback_metadata = callback_metadata
 
     def visit_module(self, node: Module):
         """Visit a module and generate its implementation."""
@@ -149,8 +147,7 @@ def dump_modules(sys: SysBuilder, modules_dir):
     modules_dir.mkdir(exist_ok=True)
 
     # Generate each module's implementation
-    callback_metadata = collect_callback_intrinsics(sys)
-    em = ElaborateModule(sys, callback_metadata)
+    em = ElaborateModule(sys)
 
     # Create mod.rs file with imports and callback function
     mod_rs_path = modules_dir / "mod.rs"
@@ -166,72 +163,6 @@ use std::sync::Arc;
 
 """)
 
-        # Add callback functions for each DRAM module
-        for dram_name, dram_metadata in callback_metadata.dram_callbacks.items():
-            # Generate callback for new per-DRAM interface (without store)
-            if dram_metadata.memory and not dram_metadata.store:
-                mod_fd.write(f"""pub extern "C" fn callback_of_{dram_name}(
-                    req: *mut Request, ctx: *mut c_void) {{
-    unsafe {{
-        let req = &*req;
-        let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
-        let cycles = (req.depart - req.arrive) as usize;
-        let stamp = sim.request_stamp_map_table
-            .remove(&req.addr)
-            .unwrap_or_else(|| sim.stamp);
-        
-        if req.type_id == 0 {{
-            // Read response
-            sim.{dram_name}_response.valid = true;
-            sim.{dram_name}_response.addr = req.addr as usize;
-            sim.{dram_name}_response.data = vec![(req.addr as u8) & 0xFF, ((req.addr >> 8) as u8) & 0xFF, ((req.addr >> 16) as u8) & 0xFF, ((req.addr >> 24) as u8) & 0xFF];
-            sim.{dram_name}_response.read_succ = true;
-            sim.{dram_name}_response.is_write = false;
-        }} else {{
-            // Write response
-            sim.{dram_name}_response.valid = true;
-            sim.{dram_name}_response.addr = req.addr as usize;
-            sim.{dram_name}_response.write_succ = true;
-            sim.{dram_name}_response.is_write = true;
-        }}
-    }}
-}}
-
-""")
-            # Generate callback for old system (with store)
-            elif (
-                dram_metadata.memory
-                and dram_metadata.store
-                and dram_metadata.mem_user_rdata
-            ):
-                mod_fd.write(f"""pub extern "C" fn callback_of_{dram_name}(
-                    req: *mut Request, ctx: *mut c_void) {{
-    unsafe {{
-        let req = &*req;
-        let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
-        let cycles = (req.depart - req.arrive) as usize;
-        let stamp = sim.request_stamp_map_table
-            .remove(&req.addr)
-            .unwrap_or_else(|| sim.stamp);
-        
-        if req.type_id == 0 {{
-            // Read response
-            sim.{dram_name}_response.valid = true;
-            sim.{dram_name}_response.addr = req.addr as usize;
-            sim.{dram_name}_response.data = sim.{dram_metadata.store}.payload[req.addr as usize].clone();
-            sim.{dram_name}_response.read_succ = true;
-            sim.{dram_name}_response.is_write = false;
-        }} else {{
-            // Write response
-            sim.{dram_name}_response.valid = true;
-            sim.{dram_name}_response.addr = req.addr as usize;
-            sim.{dram_name}_response.write_succ = true;
-            sim.{dram_name}_response.is_write = true;
-        }}
-    }}
-}}
-
-""")
 
         # Generate module declarations and individual files
         for module in sys.modules[:] + sys.downstreams[:]:
@@ -247,12 +178,40 @@ use std::sync::Arc;
                 module_fd.write("""use sim_runtime::*;
 use sim_runtime::num_bigint::{BigInt, BigUint};
 use crate::simulator::Simulator;
+use std::ffi::c_void;
 
 """)
 
-                # Add callback function import for DRAM modules
+                # Add inline callback function for DRAM modules
                 if module_name.startswith('DRAM_'):
-                    module_fd.write(f"use crate::modules::callback_of_{module_name};\n\n")
+                    module_fd.write(f"""pub extern "C" fn callback_of_{module_name}(
+    req: *mut Request, ctx: *mut c_void) {{
+    unsafe {{
+        let req = &*req;
+        let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
+        let cycles = (req.depart - req.arrive) as usize;
+        let stamp = sim.request_stamp_map_table
+            .remove(&req.addr)
+            .unwrap_or_else(|| sim.stamp);
+        
+        if req.type_id == 0 {{
+            // Read response
+            sim.{module_name}_response.valid = true;
+            sim.{module_name}_response.addr = req.addr as usize;
+            sim.{module_name}_response.data = vec![(req.addr as u8) & 0xFF, ((req.addr >> 8) as u8) & 0xFF, ((req.addr >> 16) as u8) & 0xFF, ((req.addr >> 24) as u8) & 0xFF];
+            sim.{module_name}_response.read_succ = true;
+            sim.{module_name}_response.is_write = false;
+        }} else {{
+            // Write response
+            sim.{module_name}_response.valid = true;
+            sim.{module_name}_response.addr = req.addr as usize;
+            sim.{module_name}_response.write_succ = true;
+            sim.{module_name}_response.is_write = true;
+        }}
+    }}
+}}
+
+""")
 
                 # Generate module implementation
                 module_code = em.visit_module(module)

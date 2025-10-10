@@ -12,8 +12,12 @@ INTRIN_INFO = {
     903: ('barrier', 1, False, True),
     906: ('send_read_request', 3, True, True),
     908: ('send_write_request', 4, True, True),
-    904: ('has_mem_resp', 1, False, True),
-    912: ('get_mem_resp', 1, True, False),
+}
+
+PURE_INTRIN_INFO = {
+    # PureIntrinsic operations opcode: (mnemonic, num of args)
+    904: ('has_mem_resp', 1),
+    912: ('get_mem_resp', 1),
 }
 
 class Intrinsic(Expr):
@@ -23,10 +27,8 @@ class Intrinsic(Expr):
     FINISH = 901
     ASSERT = 902
     BARRIER = 903
-    HAS_MEM_RESP = 904
     SEND_READ_REQUEST = 906
     SEND_WRITE_REQUEST = 908
-    GET_MEM_RESP = 912
 
     opcode: int  # Operation code for this intrinsic
 
@@ -45,11 +47,8 @@ class Intrinsic(Expr):
         '''Get the data type of this intrinsic.'''
         #pylint: disable=import-outside-toplevel
         from ..dtype import Bits
-        if self.opcode in [Intrinsic.HAS_MEM_RESP, Intrinsic.SEND_READ_REQUEST,
-        Intrinsic.SEND_WRITE_REQUEST]:
+        if self.opcode in [Intrinsic.SEND_READ_REQUEST, Intrinsic.SEND_WRITE_REQUEST]:
             return Bits(1)
-        if self.opcode in [Intrinsic.GET_MEM_RESP]:
-            return Bits(self.args[0].width)
         return Bits(1)
 
     def __repr__(self):
@@ -102,7 +101,7 @@ def barrier(node):
 @ir_builder
 def has_mem_resp(memory):
     '''Check if there is a memory response.'''
-    return Intrinsic(Intrinsic.HAS_MEM_RESP, memory)
+    return PureIntrinsic(PureIntrinsic.HAS_MEM_RESP, memory)
 
 
 @ir_builder
@@ -121,7 +120,7 @@ def send_write_request(mem, we, addr, data):
 def get_mem_resp(mem):
     '''Get the memory response data. The lsb are the data payload,
     and the msb are the corresponding request address.'''
-    return Intrinsic(Intrinsic.GET_MEM_RESP, mem)
+    return PureIntrinsic(PureIntrinsic.GET_MEM_RESP, mem)
 
 class PureIntrinsic(Expr):
     '''The class for accessing FIFO fields, valid, and peek'''
@@ -131,6 +130,10 @@ class PureIntrinsic(Expr):
     FIFO_PEEK  = 303
     MODULE_TRIGGERED = 304
     VALUE_VALID = 305
+
+    # Memory response operations
+    HAS_MEM_RESP = 904
+    GET_MEM_RESP = 912
 
     OPERATORS = {
         FIFO_VALID: 'valid',
@@ -142,6 +145,11 @@ class PureIntrinsic(Expr):
     def __init__(self, opcode, *args):
         operands = list(args)
         super().__init__(opcode, operands)
+        # Validate arguments for memory response operations
+        if opcode in [PureIntrinsic.HAS_MEM_RESP, PureIntrinsic.GET_MEM_RESP]:
+            _, num_args = PURE_INTRIN_INFO[opcode]
+            if num_args is not None:
+                assert len(args) == num_args
 
     @property
     def args(self):
@@ -162,8 +170,11 @@ class PureIntrinsic(Expr):
             return fifo.dtype
 
         if self.opcode in [PureIntrinsic.FIFO_VALID, PureIntrinsic.MODULE_TRIGGERED,
-                           PureIntrinsic.VALUE_VALID]:
+                           PureIntrinsic.VALUE_VALID, PureIntrinsic.HAS_MEM_RESP]:
             return Bits(1)
+
+        if self.opcode == PureIntrinsic.GET_MEM_RESP:
+            return Bits(self.args[0].width)
 
         raise NotImplementedError(f'Unsupported intrinsic operation {self.opcode}')
 
@@ -172,6 +183,10 @@ class PureIntrinsic(Expr):
                            PureIntrinsic.MODULE_TRIGGERED, PureIntrinsic.VALUE_VALID]:
             fifo = self.args[0].as_operand()
             return f'{self.as_operand()} = {fifo}.{self.OPERATORS[self.opcode]}()'
+        if self.opcode in [PureIntrinsic.HAS_MEM_RESP, PureIntrinsic.GET_MEM_RESP]:
+            mn, _ = PURE_INTRIN_INFO[self.opcode]
+            args = ", ".join(i.as_operand() for i in self.args)
+            return f'{self.as_operand()} = pure_intrinsic.{mn}({args})'
         raise NotImplementedError
 
     def __getattr__(self, name):

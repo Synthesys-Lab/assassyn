@@ -1,7 +1,8 @@
 # Module Generation
 
 This module generates the simulation of each Assassyn [module](../../ir/module/),
-including [pipeline stage](../../ir/module/module.py) and [downstream](../../ir/module/downstream.py).
+including [pipeline stage](../../ir/module/module.py) and [downstream](../../ir/module/downstream.py)
+in the folder `modules/` of the generated code.
 
 ## Exposed Interface
 
@@ -11,9 +12,6 @@ def dump_modules(sys: SysBuilder, fd):
 
 This function iterates over all the modules within the `sys`tem
 to the given `fd`.
-
-The DRAM callback system has been redesigned to support per-DRAM-module memory interfaces with proper callback handling and response management.
-
 This function instantiates `ElaborateModule`, which provides the key methods of dumping each module.
 
 ## Generated Module
@@ -41,6 +39,9 @@ This callback function should act respectively to read and write responses:
   To find the data to be written, it matches the address from
   the `MemoryInterface` `write_buffer`. After writing it, the data
   is removed from the `write_buffer`.
+
+This callback function should be dumped in the same file as the DRAM module,
+to minimize the visibility of this function.
 
 ### Pipeline Stage & Downstream
 

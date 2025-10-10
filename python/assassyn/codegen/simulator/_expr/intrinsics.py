@@ -38,12 +38,29 @@ def _codegen_module_triggered(node, module_ctx, sys, **_kwargs):
     return f"sim.{port_self}_triggered"
 
 
+def _codegen_has_mem_resp(node, module_ctx, sys, **_kwargs):
+    """Generate code for HAS_MEM_RESP intrinsic."""
+    dram_module = node.args[0]
+    dram_name = namify(dram_module.name)
+    return f"sim.{dram_name}_response.valid"
+
+
+def _codegen_get_mem_resp(node, module_ctx, sys, **_kwargs):
+    """Generate code for GET_MEM_RESP intrinsic."""
+    dram_module = node.args[0]
+    dram_name = namify(dram_module.name)
+    # Convert Vec<u8> to BigUint using from_bytes_le as documented
+    return f"BigUint::from_bytes_le(&sim.{dram_name}_response.data)"
+
+
 # Dispatch table for pure intrinsic operations
 _PURE_INTRINSIC_DISPATCH = {
     PureIntrinsic.FIFO_PEEK: _codegen_fifo_peek,
     PureIntrinsic.FIFO_VALID: _codegen_fifo_valid,
     PureIntrinsic.VALUE_VALID: _codegen_value_valid,
     PureIntrinsic.MODULE_TRIGGERED: _codegen_module_triggered,
+    PureIntrinsic.HAS_MEM_RESP: _codegen_has_mem_resp,
+    PureIntrinsic.GET_MEM_RESP: _codegen_get_mem_resp,
 }
 
 
@@ -92,7 +109,7 @@ def _codegen_send_read_request(node, module_ctx, sys, **_kwargs):
                             let success = mem_interface.send_request(
                                 {addr_val} as i64,
                                 false,
-                                callback_of_{dram_name},
+                                crate::modules::{dram_name}::callback_of_{dram_name},
                                 sim as *const _ as *mut _,
                             );
                             if success {{
@@ -123,7 +140,7 @@ def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
                             let success = mem_interface.send_request(
                                 {addr_val} as i64,
                                 true,
-                                callback_of_{dram_name},
+                                crate::modules::{dram_name}::callback_of_{dram_name},
                                 sim as *const _ as *mut _,
                             );
                             success
@@ -135,22 +152,6 @@ def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
 
 
 
-def _codegen_has_mem_resp(node, module_ctx, sys, **_kwargs):
-    """Generate code for HAS_MEM_RESP intrinsic."""
-    dram_module = node.args[0]
-    dram_name = namify(dram_module.name)
-    return f"sim.{dram_name}_response.valid"
-
-
-
-
-
-
-def _codegen_get_mem_resp(node, module_ctx, sys, **_kwargs):
-    """Generate code for GET_MEM_RESP intrinsic."""
-    dram_module = node.args[0]
-    dram_name = namify(dram_module.name)
-    return f"sim.{dram_name}_response.data.clone()"
 
 
 # Dispatch table for intrinsic operations
@@ -161,8 +162,6 @@ _INTRINSIC_DISPATCH = {
     Intrinsic.BARRIER: _codegen_barrier,
     Intrinsic.SEND_READ_REQUEST: _codegen_send_read_request,
     Intrinsic.SEND_WRITE_REQUEST: _codegen_send_write_request,
-    Intrinsic.HAS_MEM_RESP: _codegen_has_mem_resp,
-    Intrinsic.GET_MEM_RESP: _codegen_get_mem_resp,
 }
 
 

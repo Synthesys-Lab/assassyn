@@ -1,7 +1,10 @@
 # Intrinsic Functions
 
 This module declares each intrinsic, and implements their frontend builders with `@ir_builder` annotated.
-Each intrinsic should have a corresponding `Intrinsic.UPPER_CASE_INTRINSIC` opcode.
+Each intrinsic should have a corresponding `{Intrinsic/PureIntrinsic}.UPPER_CASE_INTRINSIC` opcode.
+
+`Intrinsic` are for builtin calls with side effects --- results and behaviors may vary on different inputs,
+and vice versa for `PureIntrinsics`.
 
 ---
 
@@ -13,10 +16,13 @@ Each intrinsic should have a corresponding `Intrinsic.UPPER_CASE_INTRINSIC` opco
 3. `has_mem_resp(mem)`: This is a purely combinational pin that checks if the given memory has response.
 4. `get_mem_resp(mem)`: Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.
     - For the generality, the response data is in `Vec<8>`, while there is no direct convertion
-    from `Vec<u8>` to an integer. A `BigUint` versioned `to_le_byte_vec` should be invoked first,
-    and the convert to the numbers we need.
+    from `Vec<u8>` to an integer. It uses `BigUint::from_bytes_le` to convert the value to big Uint,
+    and then use `ValueCastTo<>` to cast the values to desired destination type.
 
-The DRAM intrinsics now support per-DRAM-module memory interfaces with proper callback handling and response management, replacing the previous single global memory interface approach.
+Both `send_{read/write}_request` are `Intrinsic` and `{has/get}_mem_resp` are `PureIntrinsic`.
+
+The DRAM intrinsics now support per-DRAM-module memory interfaces with proper callback handling and response management,
+replacing the previous single global memory interface approach.
 
 2 & 4 are designed to work against the constraint of "scope". Consider the code below:
 ```python
