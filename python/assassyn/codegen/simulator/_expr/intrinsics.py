@@ -81,20 +81,22 @@ def _codegen_barrier(node, module_ctx, sys, **_kwargs):
 
 def _codegen_send_read_request(node, module_ctx, sys, **_kwargs):
     """Generate code for SEND_READ_REQUEST intrinsic."""
-    idx = node.args[0]
-    idx_val = dump_rval_ref(module_ctx, sys, idx)
+    dram_module = node.args[0]
+    addr = node.args[1]
+    dram_name = namify(dram_module.name)
+    addr_val = dump_rval_ref(module_ctx, sys, addr)
     return f"""{{
                     unsafe {{
-                        let mem_interface = &sim.mem_interface;
+                        let mem_interface = &sim.mi_{dram_name};
                         let success = mem_interface.send_request(
-                            {idx_val} as i64,
+                            {addr_val} as i64,
                             false,
-                            rust_callback,
+                            callback_of_{dram_name},
                             sim as *const _ as *mut _,
                         );
                         if success {{
                             sim.request_stamp_map_table.insert(
-                                {idx_val} as i64,
+                                {addr_val} as i64,
                                 sim.stamp,
                             );
                         }}
@@ -105,25 +107,23 @@ def _codegen_send_read_request(node, module_ctx, sys, **_kwargs):
 
 def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
     """Generate code for SEND_WRITE_REQUEST intrinsic."""
-    idx = node.args[0]
-    we = node.args[1]
-    idx_val = dump_rval_ref(module_ctx, sys, idx)
-    we_val = dump_rval_ref(module_ctx, sys, we)
+    dram_module = node.args[0]
+    addr = node.args[1]
+    data = node.args[2]
+    dram_name = namify(dram_module.name)
+    addr_val = dump_rval_ref(module_ctx, sys, addr)
+    data_val = dump_rval_ref(module_ctx, sys, data)
     val = dump_rval_ref(module_ctx, sys, node)
     return f"""
                     let {val} = unsafe {{
-                        if {we_val} {{
-                            let mem_interface = &sim.mem_interface;
-                            let success = mem_interface.send_request(
-                                {idx_val} as i64,
-                                true,
-                                rust_callback,
-                                sim as *const _ as *mut _,
-                            );
-                            success
-                        }} else {{
-                            false
-                        }}
+                        let mem_interface = &sim.mi_{dram_name};
+                        let success = mem_interface.send_request(
+                            {addr_val} as i64,
+                            true,
+                            callback_of_{dram_name},
+                            sim as *const _ as *mut _,
+                        );
+                        success
                     }};
                 """
 
@@ -135,22 +135,42 @@ def _codegen_use_dram(node, module_ctx, sys, **_kwargs):
 
 def _codegen_has_mem_resp(node, module_ctx, sys, **_kwargs):
     """Generate code for HAS_MEM_RESP intrinsic."""
-    metadata = get_current_callback_metadata()
+    dram_module = node.args[0]
+    dram_name = namify(dram_module.name)
     val = dump_rval_ref(module_ctx, sys, node)
-    mem_rdata = metadata.mem_user_rdata
-    if not mem_rdata:
-        return f"let {val} = false"
-    return f"let {val} = sim.{mem_rdata}.payload.is_empty() == false"
+    return f"let {val} = sim.{dram_name}_response.valid"
 
 
 def _codegen_mem_resp(node, module_ctx, sys, **_kwargs):
     """Generate code for MEM_RESP intrinsic."""
-    metadata = get_current_callback_metadata()
+    dram_module = node.args[0]
+    dram_name = namify(dram_module.name)
     val = dump_rval_ref(module_ctx, sys, node)
-    mem_rdata = metadata.mem_user_rdata
-    if not mem_rdata:
-        return f"let {val} = 0"
-    return f"let {val} = sim.{mem_rdata}.payload.front().unwrap().clone()"
+    return f"let {val} = sim.{dram_name}_response.data.clone()"
+
+
+def _codegen_read_request_succ(node, module_ctx, sys, **_kwargs):
+    """Generate code for READ_REQUEST_SUCC intrinsic."""
+    dram_module = node.args[0]
+    dram_name = namify(dram_module.name)
+    val = dump_rval_ref(module_ctx, sys, node)
+    return f"let {val} = sim.{dram_name}_response.read_succ"
+
+
+def _codegen_write_request_succ(node, module_ctx, sys, **_kwargs):
+    """Generate code for WRITE_REQUEST_SUCC intrinsic."""
+    dram_module = node.args[0]
+    dram_name = namify(dram_module.name)
+    val = dump_rval_ref(module_ctx, sys, node)
+    return f"let {val} = sim.{dram_name}_response.write_succ"
+
+
+def _codegen_get_mem_resp(node, module_ctx, sys, **_kwargs):
+    """Generate code for GET_MEM_RESP intrinsic."""
+    dram_module = node.args[0]
+    dram_name = namify(dram_module.name)
+    val = dump_rval_ref(module_ctx, sys, node)
+    return f"let {val} = sim.{dram_name}_response.data.clone()"
 
 def _codegen_mem_write(node, module_ctx, sys, **kwargs):
     """Generate code for MEM_WRITE intrinsic."""
@@ -197,6 +217,9 @@ _INTRINSIC_DISPATCH = {
     Intrinsic.HAS_MEM_RESP: _codegen_has_mem_resp,
     Intrinsic.MEM_RESP: _codegen_mem_resp,
     Intrinsic.MEM_WRITE: _codegen_mem_write,
+    Intrinsic.READ_REQUEST_SUCC: _codegen_read_request_succ,
+    Intrinsic.WRITE_REQUEST_SUCC: _codegen_write_request_succ,
+    Intrinsic.GET_MEM_RESP: _codegen_get_mem_resp,
 }
 
 
