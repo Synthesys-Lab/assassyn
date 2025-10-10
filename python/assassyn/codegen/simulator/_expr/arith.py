@@ -20,8 +20,29 @@ def codegen_binary_op(node: BinaryOp, module_ctx, sys):
         rust_ty = node.dtype
 
     rust_ty = dtype_to_rust_type(rust_ty)
-    lhs = dump_rval_ref(module_ctx, sys, node.lhs)
-    rhs = dump_rval_ref(module_ctx, sys, node.rhs)
+
+    # Handle intrinsics properly in binary operations
+    # pylint: disable=import-outside-toplevel
+    from .intrinsics import codegen_intrinsic
+
+    # Check if operands are intrinsics and handle them specially
+    lhs_code = None
+    if hasattr(node.lhs, 'opcode') and hasattr(node.lhs, 'args'):
+        lhs_code = codegen_intrinsic(node.lhs, module_ctx, sys)
+
+    if lhs_code:
+        lhs = lhs_code
+    else:
+        lhs = dump_rval_ref(module_ctx, sys, node.lhs)
+
+    rhs_code = None
+    if hasattr(node.rhs, 'opcode') and hasattr(node.rhs, 'args'):
+        rhs_code = codegen_intrinsic(node.rhs, module_ctx, sys)
+
+    if rhs_code:
+        rhs = rhs_code
+    else:
+        rhs = dump_rval_ref(module_ctx, sys, node.rhs)
 
     # Special handling for shift operations with signed values
     if node.opcode == BinaryOp.SHR and node.lhs.dtype.is_signed():

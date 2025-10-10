@@ -59,10 +59,10 @@ def codegen_slice(node: Slice, module_ctx, sys):
 
     if l < 64 and r < 64:
         result_a = f'''let a = ValueCastTo::<u64>::cast(&{a});
-                               let mask = u64::from_str_radix("{mask_bits}", 2).unwrap();'''
+        let mask = u64::from_str_radix("{mask_bits}", 2).unwrap();'''
     else:
         result_a = f'''let a = ValueCastTo::<BigUint>::cast(&{a});
-let mask = BigUint::parse_bytes("{mask_bits}".as_bytes(), 2).unwrap();'''
+        let mask = BigUint::parse_bytes("{mask_bits}".as_bytes(), 2).unwrap();'''
 
     return f"""{{
                 {result_a}

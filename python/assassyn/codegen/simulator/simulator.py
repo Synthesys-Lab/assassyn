@@ -29,7 +29,6 @@ def analyze_and_register_ports(sys):
     """
     # pylint: disable=import-outside-toplevel
     from ...ir.expr.array import ArrayWrite
-    from ...ir.expr.intrinsic import Intrinsic
     from ...ir.visitor import Visitor
     from ...ir.memory.dram import DRAM
 
@@ -46,12 +45,7 @@ def analyze_and_register_ports(sys):
                 writer_name = namify(node.module.name)
                 manager.get_or_assign_port(array_name, writer_name)
 
-            # Check for DRAM writes (MEM_WRITE intrinsic)
-            elif isinstance(node, Intrinsic) and node.opcode == Intrinsic.MEM_WRITE:
-                array = node.args[0]
-                array_name = namify(array.name)
-                # DRAM callback gets its own port
-                manager.get_or_assign_port(array_name, "DRAM_CALLBACK")
+            # MEM_WRITE intrinsic was removed, so no need to handle it
 
         def visit_module(self, node):
             """Visit modules to collect DRAM instances."""

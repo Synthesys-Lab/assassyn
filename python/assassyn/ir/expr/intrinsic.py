@@ -10,14 +10,9 @@ INTRIN_INFO = {
     901: ('finish', 0, False, True),
     902: ('assert', 1, False, True),
     903: ('barrier', 1, False, True),
-    904: ('has_mem_resp', 1, False, True),
-    905: ('mem_write', 3, False, True),
     906: ('send_read_request', 3, True, True),
-    907: ('mem_resp', 1, True, False),
     908: ('send_write_request', 4, True, True),
-    909: ('use_dram', 1, False, True),
-    910: ('read_request_succ', 1, False, True),
-    911: ('write_request_succ', 1, False, True),
+    904: ('has_mem_resp', 1, False, True),
     912: ('get_mem_resp', 1, True, False),
 }
 
@@ -29,13 +24,8 @@ class Intrinsic(Expr):
     ASSERT = 902
     BARRIER = 903
     HAS_MEM_RESP = 904
-    MEM_WRITE = 905
     SEND_READ_REQUEST = 906
-    MEM_RESP = 907
     SEND_WRITE_REQUEST = 908
-    USE_DRAM = 909
-    READ_REQUEST_SUCC = 910
-    WRITE_REQUEST_SUCC = 911
     GET_MEM_RESP = 912
 
     opcode: int  # Operation code for this intrinsic
@@ -56,9 +46,9 @@ class Intrinsic(Expr):
         #pylint: disable=import-outside-toplevel
         from ..dtype import Bits
         if self.opcode in [Intrinsic.HAS_MEM_RESP, Intrinsic.SEND_READ_REQUEST,
-        Intrinsic.SEND_WRITE_REQUEST, Intrinsic.READ_REQUEST_SUCC, Intrinsic.WRITE_REQUEST_SUCC]:
+        Intrinsic.SEND_WRITE_REQUEST]:
             return Bits(1)
-        if self.opcode in [Intrinsic.MEM_RESP, Intrinsic.GET_MEM_RESP]:
+        if self.opcode in [Intrinsic.GET_MEM_RESP]:
             return Bits(self.args[0].width)
         return Bits(1)
 
@@ -114,10 +104,6 @@ def has_mem_resp(memory):
     '''Check if there is a memory response.'''
     return Intrinsic(Intrinsic.HAS_MEM_RESP, memory)
 
-@ir_builder
-def mem_write(payload, addr, wdata):
-    '''Memory write operation.'''
-    return Intrinsic(Intrinsic.MEM_WRITE, payload, addr, wdata)
 
 @ir_builder
 def send_read_request(mem, re, addr):
@@ -129,25 +115,7 @@ def send_write_request(mem, we, addr, data):
     '''Send a write request with address and data to the given memory system.'''
     return Intrinsic(Intrinsic.SEND_WRITE_REQUEST, mem, we, addr, data)
 
-@ir_builder
-def mem_resp(memory):
-    '''Get the memory response.'''
-    return Intrinsic(Intrinsic.MEM_RESP, memory)
 
-@ir_builder
-def use_dram(dram):
-    '''Use a DRAM module.'''
-    return Intrinsic(Intrinsic.USE_DRAM, dram)
-
-@ir_builder
-def read_request_succ(mem):
-    '''Check if the read request sent in this cycle succeeds.'''
-    return Intrinsic(Intrinsic.READ_REQUEST_SUCC, mem)
-
-@ir_builder
-def write_request_succ(mem):
-    '''Check if the write request sent in this cycle succeeds.'''
-    return Intrinsic(Intrinsic.WRITE_REQUEST_SUCC, mem)
 
 @ir_builder
 def get_mem_resp(mem):

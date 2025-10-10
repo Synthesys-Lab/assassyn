@@ -86,9 +86,7 @@ def _codegen_send_read_request(node, module_ctx, sys, **_kwargs):
     dram_name = namify(dram_module.name)
     re_val = dump_rval_ref(module_ctx, sys, re)
     addr_val = dump_rval_ref(module_ctx, sys, addr)
-    val = dump_rval_ref(module_ctx, sys, node)
-    return f"""
-                    let {val} = if {re_val} {{
+    return f"""if {re_val} {{
                         unsafe {{
                             let mem_interface = &sim.mi_{dram_name};
                             let success = mem_interface.send_request(
@@ -107,8 +105,7 @@ def _codegen_send_read_request(node, module_ctx, sys, **_kwargs):
                         }}
                     }} else {{
                         false
-                    }};
-                """
+                    }}"""
 
 
 def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
@@ -120,9 +117,7 @@ def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
     dram_name = namify(dram_module.name)
     we_val = dump_rval_ref(module_ctx, sys, we)
     addr_val = dump_rval_ref(module_ctx, sys, addr)
-    val = dump_rval_ref(module_ctx, sys, node)
-    return f"""
-                    let {val} = if {we_val} {{
+    return f"""if {we_val} {{
                         unsafe {{
                             let mem_interface = &sim.mi_{dram_name};
                             let success = mem_interface.send_request(
@@ -135,13 +130,9 @@ def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
                         }}
                     }} else {{
                         false
-                    }};
-                """
+                    }}"""
 
 
-def _codegen_use_dram(node, module_ctx, sys, **_kwargs):
-    """Generate code for USE_DRAM intrinsic (metadata handled elsewhere)."""
-    return None
 
 
 def _codegen_has_mem_resp(node, module_ctx, sys, **_kwargs):
@@ -151,25 +142,8 @@ def _codegen_has_mem_resp(node, module_ctx, sys, **_kwargs):
     return f"sim.{dram_name}_response.valid"
 
 
-def _codegen_mem_resp(node, module_ctx, sys, **_kwargs):
-    """Generate code for MEM_RESP intrinsic."""
-    dram_module = node.args[0]
-    dram_name = namify(dram_module.name)
-    return f"sim.{dram_name}_response.data.clone()"
 
 
-def _codegen_read_request_succ(node, module_ctx, sys, **_kwargs):
-    """Generate code for READ_REQUEST_SUCC intrinsic."""
-    dram_module = node.args[0]
-    dram_name = namify(dram_module.name)
-    return f"sim.{dram_name}_response.read_succ"
-
-
-def _codegen_write_request_succ(node, module_ctx, sys, **_kwargs):
-    """Generate code for WRITE_REQUEST_SUCC intrinsic."""
-    dram_module = node.args[0]
-    dram_name = namify(dram_module.name)
-    return f"sim.{dram_name}_response.write_succ"
 
 
 def _codegen_get_mem_resp(node, module_ctx, sys, **_kwargs):
@@ -178,35 +152,6 @@ def _codegen_get_mem_resp(node, module_ctx, sys, **_kwargs):
     dram_name = namify(dram_module.name)
     return f"sim.{dram_name}_response.data.clone()"
 
-def _codegen_mem_write(node, module_ctx, sys, **kwargs):
-    """Generate code for MEM_WRITE intrinsic."""
-    # pylint: disable=import-outside-toplevel
-    from ..port_mapper import get_port_manager
-
-    module_name = module_ctx.name
-    array = node.args[0]
-    idx = node.args[1]
-    value = node.args[2]
-    array_name = namify(array.name)
-    idx_val = dump_rval_ref(module_ctx, sys, idx)
-    value_val = dump_rval_ref(module_ctx, sys, value)
-
-    # DRAM callback uses a reserved port
-    manager = get_port_manager()
-    port_idx = manager.get_or_assign_port(array_name, "DRAM_CALLBACK")
-
-    return f"""{{
-                    let stamp = sim.stamp - sim.stamp % 100 + 50;
-                    sim.{array_name}.write_port.push(
-                        ArrayWrite::new(
-                            stamp,
-                            {idx_val} as usize,
-                            {value_val}.clone(),
-                            "{module_name}",
-                            {port_idx},
-                        ),
-                    );
-                }}"""
 
 # Dispatch table for intrinsic operations
 _INTRINSIC_DISPATCH = {
@@ -216,12 +161,7 @@ _INTRINSIC_DISPATCH = {
     Intrinsic.BARRIER: _codegen_barrier,
     Intrinsic.SEND_READ_REQUEST: _codegen_send_read_request,
     Intrinsic.SEND_WRITE_REQUEST: _codegen_send_write_request,
-    Intrinsic.USE_DRAM: _codegen_use_dram,
     Intrinsic.HAS_MEM_RESP: _codegen_has_mem_resp,
-    Intrinsic.MEM_RESP: _codegen_mem_resp,
-    Intrinsic.MEM_WRITE: _codegen_mem_write,
-    Intrinsic.READ_REQUEST_SUCC: _codegen_read_request_succ,
-    Intrinsic.WRITE_REQUEST_SUCC: _codegen_write_request_succ,
     Intrinsic.GET_MEM_RESP: _codegen_get_mem_resp,
 }
 

@@ -8,7 +8,6 @@ from typing import Optional, TYPE_CHECKING, Dict
 from ...ir.visitor import Visitor
 from ...ir.expr.intrinsic import Intrinsic
 from ...utils import namify
-from .utils import fifo_name
 
 if TYPE_CHECKING:
     from ...builder import SysBuilder
@@ -76,24 +75,16 @@ class CallbackIntrinsicCollector(Visitor):
             self._handle_intrinsic(node)
 
     def _handle_intrinsic(self, node: Intrinsic) -> None:
-        if node.opcode == Intrinsic.USE_DRAM:
+        if node.opcode in [Intrinsic.SEND_READ_REQUEST, Intrinsic.SEND_WRITE_REQUEST]:
+            # Register DRAM module for callback generation
             dram_module = node.args[0]
             dram_name = namify(dram_module.name)
             if dram_name not in self._metadata.dram_callbacks:
                 self._metadata.dram_callbacks[dram_name] = DRAMCallbackMetadata(dram_name=dram_name)
-            dram_port = node.args[0]
-            self._metadata.dram_callbacks[dram_name].mem_user_rdata = fifo_name(dram_port)
-        elif node.opcode == Intrinsic.MEM_WRITE and self.current_module is not None:
-            payload = node.args[0]
-            array_name = getattr(payload, "name", None)
-            if array_name is not None:
-                # Find which DRAM this array belongs to
-                dram_name = namify(array_name)  # Array name matches DRAM name
-                if dram_name not in self._metadata.dram_callbacks:
-                    self._metadata.dram_callbacks[dram_name] = DRAMCallbackMetadata(  # noqa: E501
-                        dram_name=dram_name)
-                self._metadata.dram_callbacks[dram_name].store = namify(array_name)  # noqa: E501
+            # Set the memory field to indicate this DRAM needs a callback
+            if self.current_module is not None:
                 self._metadata.dram_callbacks[dram_name].memory = self.current_module.name
+        # MEM_WRITE intrinsic was removed, so no need to handle it
 
 
 def collect_callback_intrinsics(sys: "SysBuilder") -> CallbackMetadata:

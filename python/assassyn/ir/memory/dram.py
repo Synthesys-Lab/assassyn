@@ -4,8 +4,7 @@ from .base import MemoryBase
 from ..module.downstream import combinational
 from ..block import Condition
 from ..expr.intrinsic import (
-    send_read_request, send_write_request, 
-    read_request_succ, write_request_succ
+    send_read_request, send_write_request
 )
 
 

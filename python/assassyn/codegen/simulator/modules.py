@@ -103,7 +103,14 @@ class ElaborateModule(Visitor):
         restore_indent = self.indent
 
         if isinstance(node, CondBlock):
-            cond = dump_rval_ref(self.module_ctx, self.sys, node.cond)
+            # Handle condition generation properly for intrinsics
+            # pylint: disable=import-outside-toplevel
+            from ._expr import codegen_expr
+            cond_code = codegen_expr(node.cond, self.module_ctx, self.sys)
+            if cond_code:
+                cond = cond_code
+            else:
+                cond = dump_rval_ref(self.module_ctx, self.sys, node.cond)
             result.append(f"if {cond} {{\n")
             self.indent += 2
         elif isinstance(node, CycledBlock):
@@ -161,12 +168,43 @@ use std::sync::Arc;
 
         # Add callback functions for each DRAM module
         for dram_name, dram_metadata in callback_metadata.dram_callbacks.items():
-            if (
+            # Generate callback for new per-DRAM interface (without store)
+            if dram_metadata.memory and not dram_metadata.store:
+                mod_fd.write(f"""pub extern "C" fn callback_of_{dram_name}(
+                    req: *mut Request, ctx: *mut c_void) {{
+    unsafe {{
+        let req = &*req;
+        let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
+        let cycles = (req.depart - req.arrive) as usize;
+        let stamp = sim.request_stamp_map_table
+            .remove(&req.addr)
+            .unwrap_or_else(|| sim.stamp);
+        
+        if req.type_id == 0 {{
+            // Read response
+            sim.{dram_name}_response.valid = true;
+            sim.{dram_name}_response.addr = req.addr as usize;
+            sim.{dram_name}_response.data = vec![(req.addr as u8) & 0xFF, ((req.addr >> 8) as u8) & 0xFF, ((req.addr >> 16) as u8) & 0xFF, ((req.addr >> 24) as u8) & 0xFF];
+            sim.{dram_name}_response.read_succ = true;
+            sim.{dram_name}_response.is_write = false;
+        }} else {{
+            // Write response
+            sim.{dram_name}_response.valid = true;
+            sim.{dram_name}_response.addr = req.addr as usize;
+            sim.{dram_name}_response.write_succ = true;
+            sim.{dram_name}_response.is_write = true;
+        }}
+    }}
+}}
+
+""")
+            # Generate callback for old system (with store)
+            elif (
                 dram_metadata.memory
                 and dram_metadata.store
                 and dram_metadata.mem_user_rdata
             ):
-                mod_fd.write(f"""extern "C" fn callback_of_{dram_name}(  # noqa: E501
+                mod_fd.write(f"""pub extern "C" fn callback_of_{dram_name}(
                     req: *mut Request, ctx: *mut c_void) {{
     unsafe {{
         let req = &*req;
@@ -211,6 +249,10 @@ use sim_runtime::num_bigint::{BigInt, BigUint};
 use crate::simulator::Simulator;
 
 """)
+
+                # Add callback function import for DRAM modules
+                if module_name.startswith('DRAM_'):
+                    module_fd.write(f"use crate::modules::callback_of_{module_name};\n\n")
 
                 # Generate module implementation
                 module_code = em.visit_module(module)

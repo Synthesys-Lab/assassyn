@@ -49,3 +49,4 @@ def codegen_intrinsic(node: Intrinsic, module_ctx, sys, ...) -> str
   which returns if this write request is successfully sent. If `we` is false, just give a `false`.
   - `has_mem_resp(mem)`: It checks if `sim.<mem>_response.valid`.
   - `get_mem_resp(mem)`: Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.
+    - As Ramulator2 only simulates the memory behavior without holding any data, the data should be retrieved from the associated `_payload` array from the corresponding `DRAM`.
