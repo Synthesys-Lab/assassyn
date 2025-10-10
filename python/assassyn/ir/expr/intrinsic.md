@@ -12,6 +12,9 @@ Each intrinsic should have a corresponding `Intrinsic.UPPER_CASE_INTRINSIC` opco
 2. `send_write_request(mem, we, addr, data)`: Send write request with the address and write enable signal to the given `mem`ory system, and returns if this request is successful in combinational pin.
 3. `has_mem_resp(mem)`: This is a purely combinational pin that checks if the given memory has response.
 4. `get_mem_resp(mem)`: Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.
+    - For the generality, the response data is in `Vec<8>`, while there is no direct convertion
+    from `Vec<u8>` to an integer. A `BigUint` versioned `to_le_byte_vec` should be invoked first,
+    and the convert to the numbers we need.
 
 The DRAM intrinsics now support per-DRAM-module memory interfaces with proper callback handling and response management, replacing the previous single global memory interface approach.
 

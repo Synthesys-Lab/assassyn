@@ -1,12 +1,15 @@
 ---
 alwaysApply: false
-description: Guideline to Write/Review/Draft a TODO Document
+description: Guideline to draft and review a TODO Document
 glob:
 ---
 
 # TODO Document
 
-A TODO document is a driver to the development, which shall have the following sections:
+A TODO document is a driver to the development, which shall have the following sections.
+NOTE that a TODO document is mainly a list of action items to achieve a goal. Focus on
+the goal and how to achieve it when drafting such a document. Postenial impact to this
+project should all be enforced by the test cases.
 
 ## Section 1: Goal
 

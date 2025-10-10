@@ -52,4 +52,8 @@ Remember to keep it precise, state the fact itself more, and use less adjacents 
 After making all these changes above, if:
 - There are unstaged changes, stage and commit all the changes as per our git commit message guideline, WITHOUT bypassing pre-commit!
 - There are no unstaged changes, use `git commit --no-edit --amend` to trigger pre-commit once!
-- This is required to finish a TODO!
+- If some of the test cases do not work, you can still commit it. However, you should comprehensively document it:
+  1. What are the test cases and what are the error behavior?
+  2. Do you have any suggestions on how to fix it?
+  3. Do you have any insights on what causes this issue?
+  4. What are the efforts you made to this?
