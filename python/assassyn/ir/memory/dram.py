@@ -43,16 +43,14 @@ class DRAM(MemoryBase):
         self.wdata = wdata
 
         # When re is enabled, call send_read_request
-        with Condition(re):
-            send_read_request(self, addr)
+        read_succ = send_read_request(self, addr)
             
         # When we is enabled, call send_write_request
-        with Condition(we):
-            send_write_request(self, addr, wdata)
+        write_succ = send_write_request(self, addr, wdata)
             
         # Return success signals for downstream modules to check
         # It is developers' duty to resend unsuccessful requests
-        return read_request_succ(self), write_request_succ(self)
+        return read_succ, write_succ
 
     def __repr__(self):
         return self._repr_impl('memory.DRAM')

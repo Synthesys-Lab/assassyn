@@ -46,3 +46,26 @@ The file defines numerous `Expr` subclasses to represent specific operations.
 ## Frontend Functions
 
 Helper functions like `log()`, `wire_read()`, and `wire_assign()` are provided to simplify IR construction. They use the `@ir_builder` decorator to automatically create the corresponding `Expr` node and insert it into the current IR block.
+
+## Location Information
+
+All `Expr` nodes include accurate source location information captured by the `@ir_builder` decorator. The location format is `filename:lineno:col` where:
+- `filename`: The Python source file where the expression was created
+- `lineno`: The line number in the source file
+- `col`: The accurate column position within the line
+
+This information is displayed in IR dumps as comments in the format `; <filename:lineno:col>` after each expression, providing precise debugging information for developers.
+
+## Core Method
+
+- `is_valued`: Which returns if this node is valued
+  - `PureIntrinsic`
+  - `FIFOPop`
+  - `ArrayRead`
+  - `Slice`
+  - `Cast`
+  - `Concat`
+  - `Select`
+  - `Select1Hot`
+  - `WireRead`
+  - `Intrinsic`: `send_write_request` and `send_read_request` may return if it succeeds.

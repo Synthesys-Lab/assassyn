@@ -123,9 +123,15 @@ class Expr(Value):
     def is_valued(self):
         '''If this operation has a return value'''
         # pylint: disable=import-outside-toplevel
-        from .intrinsic import PureIntrinsic
+        from .intrinsic import PureIntrinsic, Intrinsic
         from .array import ArrayRead
         from ..array import Slice
+        
+        # Check if it's a valued intrinsic
+        if isinstance(self, Intrinsic):
+            _, _, valued, _ = Intrinsic.INTRIN_INFO[self.opcode]
+            return valued
+            
         valued = (
             PureIntrinsic,
             FIFOPop,

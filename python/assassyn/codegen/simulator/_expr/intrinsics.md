@@ -40,10 +40,12 @@ def codegen_intrinsic(node: Intrinsic, module_ctx, sys, ...) -> str
       * **Generated Code**: `assert!(<condition>);`
   * **`BARRIER`**: A no-op in generated code, used as a hint for compilation.
 
-
-  - `send_read_request(mem, addr)`: It calls the corresponding `mi_<mem>` memory interface's `send_request` method with the given `address` and associated `callback_of_<mem>` discussed in [modules.md](../modules.md), and `is_write` set to false.
-  - `read_request_succ(mem)`: It reads the value from `sim.<mem>_response.read_succ` as declared in [simulator.md](../simulator.md).
-  - `send_write_request(mem, addr, data)`: It calls the corresponding `mi_<mem>` memory interface's `send_request` method with the given `address` and associated `callback_of_<mem>` discussed in [modules.md](../modules.md), and `is_write` set to true.
-  - `write_request_succ(mem)`: It reads the value from `sim.<mem>_response.write_succ` as declared in [simulator.md](../simulator.md).
+  - `send_read_request(mem, re, addr)`: if `re` is true, it calls
+  `mi_<mem>.send_request(addr=address, is_write=false, callback=callback_of_<mem>)` as
+  discussed in [modules.md](../modules.md), which returns
+  if this read request is successful. If `re` is false, just give a `false`.
+  - `send_write_request(mem, we, addr, data)`: Similar as above, it calls
+  `mi_<mem>.send_request(addr=address, is_write=true, callback=callback_of_<mem>)`,
+  which returns if this write request is successfully sent. If `we` is false, just give a `false`.
   - `has_mem_resp(mem)`: It checks if `sim.<mem>_response.valid`.
   - `get_mem_resp(mem)`: Get the memory response data. The lsb are the data payload, and the msb are the corresponding request address.
