@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Dict, List
 
 from ...ir.visitor import Visitor
 from ...ir.expr.intrinsic import Intrinsic
+from ...ir.memory.dram import DRAM
 from ...utils import namify
 from .utils import fifo_name
 
@@ -16,12 +17,24 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class CallbackMetadata:
-    """Metadata derived from DRAM-related intrinsic usage."""
+class DRAMCallbackMetadata:
+    """Metadata for a single DRAM module's callback."""
 
+    dram_name: str
     memory: Optional[str] = None
     store: Optional[str] = None
     mem_user_rdata: Optional[str] = None
+
+
+@dataclass
+class CallbackMetadata:
+    """Metadata derived from DRAM-related intrinsic usage."""
+
+    dram_callbacks: Dict[str, DRAMCallbackMetadata] = None
+
+    def __post_init__(self):
+        if self.dram_callbacks is None:
+            self.dram_callbacks = {}
 
 
 _METADATA_STORE = {"value": CallbackMetadata()}
@@ -65,14 +78,22 @@ class CallbackIntrinsicCollector(Visitor):
 
     def _handle_intrinsic(self, node: Intrinsic) -> None:
         if node.opcode == Intrinsic.USE_DRAM:
+            dram_module = node.args[0]
+            dram_name = namify(dram_module.name)
+            if dram_name not in self._metadata.dram_callbacks:
+                self._metadata.dram_callbacks[dram_name] = DRAMCallbackMetadata(dram_name=dram_name)
             dram_port = node.args[0]
-            self._metadata.mem_user_rdata = fifo_name(dram_port)
+            self._metadata.dram_callbacks[dram_name].mem_user_rdata = fifo_name(dram_port)
         elif node.opcode == Intrinsic.MEM_WRITE and self.current_module is not None:
             payload = node.args[0]
             array_name = getattr(payload, "name", None)
             if array_name is not None:
-                self._metadata.store = namify(array_name)
-            self._metadata.memory = self.current_module.name
+                # Find which DRAM this array belongs to
+                dram_name = namify(array_name)  # Assuming array name matches DRAM name
+                if dram_name not in self._metadata.dram_callbacks:
+                    self._metadata.dram_callbacks[dram_name] = DRAMCallbackMetadata(dram_name=dram_name)
+                self._metadata.dram_callbacks[dram_name].store = namify(array_name)
+                self._metadata.dram_callbacks[dram_name].memory = self.current_module.name
 
 
 def collect_callback_intrinsics(sys: "SysBuilder") -> CallbackMetadata:

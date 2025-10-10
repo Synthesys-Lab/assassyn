@@ -164,13 +164,14 @@ use std::sync::Arc;
 
 """)
 
-        # Add callback function if needed
-        if (
-            callback_metadata.memory
-            and callback_metadata.store
-            and callback_metadata.mem_user_rdata
-        ):
-            mod_fd.write(f"""extern "C" fn rust_callback(req: *mut Request, ctx: *mut c_void) {{
+        # Add callback functions for each DRAM module
+        for dram_name, dram_metadata in callback_metadata.dram_callbacks.items():
+            if (
+                dram_metadata.memory
+                and dram_metadata.store
+                and dram_metadata.mem_user_rdata
+            ):
+                mod_fd.write(f"""extern "C" fn callback_of_{dram_name}(req: *mut Request, ctx: *mut c_void) {{
     unsafe {{
         let req = &*req;
         let sim: &mut Simulator = &mut *(ctx as *mut Simulator);
@@ -178,11 +179,21 @@ use std::sync::Arc;
         let stamp = sim.request_stamp_map_table
             .remove(&req.addr)
             .unwrap_or_else(|| sim.stamp);
-        sim.{callback_metadata.mem_user_rdata}.push.push(FIFOPush::new(
-            stamp + 100 * cycles,
-            sim.{callback_metadata.store}.payload[req.addr as usize].clone().try_into().unwrap(),
-            "{callback_metadata.memory}",
-        ));
+        
+        if req.type_id == 0 {{
+            // Read response
+            sim.{dram_name}_response.valid = true;
+            sim.{dram_name}_response.addr = req.addr as usize;
+            sim.{dram_name}_response.data = sim.{dram_metadata.store}.payload[req.addr as usize].clone();
+            sim.{dram_name}_response.read_succ = true;
+            sim.{dram_name}_response.is_write = false;
+        }} else {{
+            // Write response
+            sim.{dram_name}_response.valid = true;
+            sim.{dram_name}_response.addr = req.addr as usize;
+            sim.{dram_name}_response.write_succ = true;
+            sim.{dram_name}_response.is_write = true;
+        }}
     }}
 }}
 
