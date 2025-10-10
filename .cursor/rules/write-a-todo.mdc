@@ -1,14 +1,15 @@
 ---
 alwaysApply: false
-description: Guideline to draft and review a TODO Document
+description: Guideline to draft and review a TODO list
 glob:
 ---
 
-# TODO Document
+# TODO List
 
 A TODO document is a driver to the development, which shall have the following sections.
-NOTE that a TODO document is mainly a list of action items to achieve a goal. Focus on
-the goal and how to achieve it when drafting such a document. Postenial impact to this
+NOTE that a TODO document is mainly a list of action items to achieve a goal. When
+asked to draft or review a TODO list, focus on the goal and how to achieve it
+when drafting such a document. Potential impact to this
 project should all be enforced by the test cases.
 
 ## Section 1: Goal
@@ -21,8 +22,8 @@ interface, or fix a specific bug replicated.
 
 Before development, all the documents should be finalized for a clear and solid design.
 
-0. **Document Development:** the developer should update the design documents of the corresponding
-   modules to the new desired design.
+- **Document Development:** the developer should provide updated the design
+  documents of the corresponding modules to the new desired design.
    - If a new file need to be created as per the new design, it is highly recommended to and touch
      an empty file with the same prefix name as the document `.md` with a single line
      of `/*TODO*/` comment in it at the document development case
@@ -36,7 +37,7 @@ Before development, all the documents should be finalized for a clear and solid 
 After having the document as the goal. Achieving the goal should be broken down into multiple
 smaller, and specific intermediate steps.
 
-1. **Coding Development:** Based on the committed design document,
+- **Coding Development:** Based on the committed design document,
    the TODO document is an action list. Each action item should be broken down to several sub-steps.
    - If it is developing code according to the updated document:
      0. Each step is essentially resolving a discrepency between the source code and the design document,
@@ -56,7 +57,8 @@ smaller, and specific intermediate steps.
     sometimes some decisions are turned out to be bad after pacticing.
   - After a sub-item is done, stage and commit the changes by triggering pre-commit checks, to make sure
     it is successfully integrated.
-2. **Deal with Prior Changes:** If this TODO is related to a prior change,
+
+- **Deal with Prior Changes:** If this TODO is related to a prior change,
    as per our [action flow](./act-on-todo.mdc), the prior TODO should be located in a `dones` folder,
    so that this TODO can  refer to their changes.
    - As per changes in `TODO-yyy.md`, `<what issue>` was introduced, we should fix all the related files by `<doing what>`.
