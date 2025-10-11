@@ -6,10 +6,9 @@
 
 ---
 
-## 1. TO CHECK (45 files) - Review existing documentation against new rules
+## 1. TO CHECK (44 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `utils.py` → `utils.md` (to check)
 - [ ] `analysis/external_usage.py` → `analysis/external_usage.md` (to check)
 - [ ] `analysis/topo.py` → `analysis/topo.md` (to check)
 - [ ] `builder/naming_manager.py` → `builder/naming_manager.md` (to check)
@@ -105,9 +104,10 @@
 
 ---
 
-## 3. DONE (0 files) - Completed documentation
+## 3. DONE (1 files) - Completed documentation
 
-*No files completed yet*
+### Leaf-level files (simple to complex)
+- [x] `utils.py` → `utils.md` (completed)
 
 ---
 
@@ -115,9 +115,9 @@
 
 ### Statistics
 - **Total Python files**: 75
-- **Files to check**: 45 (60%)
+- **Files to check**: 44 (59%)
 - **Files to document**: 30 (40%)
-- **Files completed**: 0 (0%)
+- **Files completed**: 1 (1%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex
