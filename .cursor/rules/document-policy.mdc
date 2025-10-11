@@ -19,9 +19,13 @@ Each source code file, including but not limited to `.py/.rs/.cpp/.cc`,
 shall have a `.md` file with the same prefix, in the same folder.
 
 If there is a `README.md` within a folder, and there
-is `mod.rs` or `__init__.py` in this folder, this
-document not only documents the methods in `__init__.py`
-but also describes the structure of this module.
+is `mod.rs` or `__init__.py` in this folder, these
+modules SHOULD NOT be documented by `README.md`.
+They should have their own `mod.md` and `__init__.md`
+to maintain a consistent naming correspondence.
+But still, it is not recommended to implement anything in
+these package initialization. These source units should only
+expose functions to external modules.
 
 ## Document File Structure
 
