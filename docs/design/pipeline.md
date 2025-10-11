@@ -34,8 +34,10 @@ The figure below illustrates the 2-stage architecture in [test_async_call.py](..
 
 **Event Counter:** Once `driver` calls `adder` it increases the counter of adder to indicate that `adder` has a pending function call to process.
 Once `adder` successfully executed once, it decreases its counter.
-By successfully, we mean the condition of `wait_until` is `true`. Refer to the `wait_until` intrinsic declared in
-[intrinsic.py](../../python/assassyn/ir/expr/intrinsic.py) and explained in [intrinsic.md](../../python/assassyn/ir/expr/intrinsic.md).
+By successfully, we mean the condition of `wait_until` is `true`.
+Refer to the `wait_until` intrinsic declared in
+[intrinsic.py](../../python/assassyn/ir/expr/intrinsic.py)
+and explained in [intrinsic.md](../../python/assassyn/ir/expr/intrinsic.md).
 This is especially useful, for designs like CPU decoder stage --- when the data is not valid yet, the decode call is not cleared
 to decode again next cycle.
 Each cycle, `adder` checks the counter to determine if this module should be activated.

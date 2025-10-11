@@ -11,7 +11,9 @@ Ramulator [as documented](../../scripts/init/patches/ramulator2-patch.md).
 
 ## Current Limitations
 
-**No LSQ Memory Order Enforcement**: The current implementation does not enforce memory ordering constraints that would typically be handled by a Load Store Queue (LSQ) in a real processor. This means:
+**No LSQ Memory Order Enforcement**: The current implementation does not
+enforce memory ordering constraints that would typically be handled by a
+Load Store Queue (LSQ) in a real processor. This means:
 
 - Memory operations may complete out of order
 - Write buffer management uses a simple queue without proper ordering guarantees
