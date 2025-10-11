@@ -8,7 +8,7 @@ globs:
   - docs/**/*.md
   - tools/**/**/*.md
   - tools/**/*.md
-description: Assassyn Source Code and Design Documents Conventions and Specifications
+description: How write documents and when to read documents
 ---
 
 # Documentation
@@ -53,10 +53,31 @@ shall follow the [function](#document-functions) and [document](#document-struct
 Each struct should have its own subsection, this subsection should describe
 - the purpose of each `struct/class`.
 - the meaning of each member field, and static member field.
-- the all the member methods documentation for both static and dynamic should be included in this section
-  follwing the [function documentation convention below](#document-functions).
+
+Each struct should have a subsection under this section named `struct StructID` to document.
+All the function memthod members should be included in this subsection, and 
+follow the [function documentation convention below](#document-functions).
 
 ### Document Functions
+
+Each function should have its own identifier, without parameters, as the section name.
+
+This section should first document the function signature,
+and brief the behavior of the API, just what they are in an
+language-embedded document. For example, Rust uses `///`,
+it is favored to use `Doxygen` style for C/C++,
+and Python has `'''` pair for docstring.
+
+```python
+def foo(a, b):
+  '''
+  Briefly talk about the behavior here
+
+  @param a The first parameter
+  @param b The 2nd parameter
+  @return If any, explain it.
+  '''
+```
 
 Different rules are imposed on functions with different levels of complexity:
 1. If a function is simple, it can be documented with a brief sentence of this function's behavior.
