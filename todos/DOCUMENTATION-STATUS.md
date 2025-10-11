@@ -6,10 +6,9 @@
 
 ---
 
-## 1. TO CHECK (43 files) - Review existing documentation against new rules
+## 1. TO CHECK (42 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `builder/naming_manager.py` → `builder/naming_manager.md` (to check)
 - [ ] `builder/rewrite_assign.py` → `builder/rewrite_assign.md` (to check)
 - [ ] `builder/type_oriented_namer.py` → `builder/type_oriented_namer.md` (to check)
 - [ ] `builder/unique_name.py` → `builder/unique_name.md` (to check)
@@ -107,6 +106,7 @@
 ### Leaf-level files (simple to complex)
 - [x] `analysis/external_usage.py` → `analysis/external_usage.md` (completed)
 - [x] `utils.py` → `utils.md` (completed)
+- [x] `builder/naming_manager.py` → `builder/naming_manager.md` (completed)
 
 ---
 
@@ -114,9 +114,9 @@
 
 ### Statistics
 - **Total Python files**: 74
-- **Files to check**: 42 (57%)
+- **Files to check**: 41 (55%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 2 (3%)
+- **Files completed**: 3 (4%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex
