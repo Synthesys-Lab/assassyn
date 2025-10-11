@@ -1,41 +1,47 @@
 ---
 alwaysApply: false
-description: How to act on a given TODO document for feature development
+description: Act on user's requirement, and write a report
 glob:
 ---
 
 # Developer Flow
 
 This document outlines the flow both a human and an agentic AI developer shall follow to
-add new features, fix bugs, and improve the codebase, when a `TODO-xxx.md` as described
-[here](./resolve-a-todo.mdc) is given.
+add new features, fix bugs, and improve the codebase, no matter 
+if a `TODO-xxx.md` as described[here](./resolve-a-todo.mdc) is given.
 
 ## 1. Understand the Goal
 
-Look at the `Goal or Issue` section in the `TODO-xxx.md` file. Make sure you understand what needs to be done.
+If a `TODO-xxx.md` is given look at the `Goal or Issue` section in the `TODO-xxx.md` file.
+Make sure you understand what needs to be done. If not, developer should clearly state
+the requirement.
 
 ## 2. Analyze the Current State
 
 It is supposed that all the design documents are updated to the desired state, but the
-code is still lagging when `TODO-xxx.md` is received. Review the design documents and incorperate
-the action items into your understanding of the codebase.
+code is still lagging when `TODO-xxx.md` is received.
+Review the design documents and incorperate the action items into
+your understanding of the codebase. In other words, if there is a discrepency
+between code and document, respect the document, and make the code as
+the document described.
 
 ## 3. Act on Action Items
 
-Follow the action items in the `TODO-xxx.md` file step by step. Faithfully implement the changes
-and improvements as described in the action items. Faithfully use `git commit` with or without
-`--no-verify` flag as described in the action items.
+If a TODO is given, follow the action items in it step by step. Faithfully implement the changes
+and improvements as described in the action items.
+Faithfully use `git commit` with or without `--no-verify` flag as described in the action items.
 
 ## 4. Checklist & Summary
 
 After all action items are down, a summary checklist should be appended after the `TODO-xxx.md` file.
-After that, move `TODO-xxx.md` to `dones/DONE-xxx.md` where `xxx` is the same as `TODO-xxx`.
+No matter if a TODO is given write a report in `dones/DONE-xxx.md` where `xxx` is the same as `TODO-xxx`,
+or summarize what you did this time.
   - If `dones` folder does not exist, create it.
   - `dones` foleder is already in `.gitignore`, so `DONE-xxx.md` should not be committed.
 
 The summary should include four parts:
-0. The goal achieved as per the TODO.
-1. All the action items in `TODO-xxx.md` you achieved as a checklist.
+0. The goal achieved as per the TODO or user's requirement.
+1. All the action items you achieved as a checklist.
 2. All the changes made in the codebase, including:
    - Improvements made: Some minor refactor that is be done along with this commit.
    - Some interfaces you created that are not documented.
@@ -52,7 +58,7 @@ Remember to keep it precise, state the fact itself more, and use less adjacents 
 After making all these changes above, if:
 - There are unstaged changes, stage and commit all the changes as per our git commit message guideline, WITHOUT bypassing pre-commit!
 - There are no unstaged changes, use `git commit --no-edit --amend` to trigger pre-commit once!
-- If some of the test cases do not work, you can still commit it. However, you should comprehensively document it:
+- If some of the test cases do not work, you can still commit it. However, you should comprehensively document it in the DONE document:
   1. What are the test cases and what are the error behavior?
   2. Do you have any suggestions on how to fix it?
   3. Do you have any insights on what causes this issue?
