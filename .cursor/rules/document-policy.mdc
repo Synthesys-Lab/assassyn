@@ -79,9 +79,8 @@ def foo(a, b):
   '''
 ```
 
-Different rules are imposed on functions with different levels of complexity:
-1. If a function is simple, it can be documented with a brief sentence of this function's behavior.
-   A function is considered simple, if:
+Different rules are imposed on functions with different levels of complexity. To determine:
+1. A function is considered simple, if:
    - This function is a short (< 5 lines) helper, or
    - this function only depends on its input to produce the output, and the behavior
      can be summarized accurately and briefly. No specific design decisions, definitions,
@@ -104,6 +103,18 @@ Different rules are imposed on functions with different levels of complexity:
      if this function requires them, refer to [reading document](#read-document) section
      for more details. If such knowledge is involved when developing this function,
      such knowledge should refer to the document it was initially discussed.
+   - No matter how many lines, if a function acts on a global variable declared outside
+     this source unit, we should pay extra attention to it. It is inevitable to track some
+     global states across the project, and for development experience purpose they are implicitly
+     referred singletons. A pointer to that file of declaration should be added.
+
+A simple function can be simply documented by the function signature and documentation
+strings embbed in comments. In addition to what simple functions already have, complicated
+functions should be followed by **Explanation** paragraph to explain
+1. Each step of the function;
+2. The project-specific knowledge required to understand this function, and point to the document;
+3. Dirty details that this function trying to handle;
+4. Technical decisions made by this function.
 
 ## Read Document
 
