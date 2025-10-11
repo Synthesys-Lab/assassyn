@@ -1,6 +1,6 @@
 ---
 alwaysApply: false
-description: How to act on a given TODO document
+description: How to act on a given TODO document for feature development
 glob:
 ---
 

@@ -62,11 +62,12 @@ follow the [function documentation convention below](#document-functions).
 
 Each function should have its own identifier, without parameters, as the section name.
 
-This section should first document the function signature,
-and brief the behavior of the API, just what they are in an
-language-embedded document. For example, Rust uses `///`,
+This section starts with the function signature with
+language-embedded documents For example, Rust uses `///`,
 it is favored to use `Doxygen` style for C/C++,
-and Python has `'''` pair for docstring.
+and Python has `'''` pair for docstring. These documents briefs
+the API behavior and each parameter, as well as the return (if any),
+like below:
 
 ```python
 def foo(a, b):
@@ -78,6 +79,11 @@ def foo(a, b):
   @return If any, explain it.
   '''
 ```
+
+A rule of thumb is that minimize the ambiguity of each aspect
+you document. For example, for `subprocess.check_output` in Python:
+- DO NOT SAY: "It returns the output of the subprocess" where output can be anything, even the return value.
+- SAY: "It returns the subprocess output to stdout." which is more specific.
 
 Different rules are imposed on functions with different levels of complexity. To determine:
 1. A function is considered simple, if:
@@ -113,14 +119,28 @@ strings embbed in comments. In addition to what simple functions already have, c
 functions should be followed by **Explanation** paragraph to explain
 1. Each step of the function;
 2. The project-specific knowledge required to understand this function, and point to the document;
-3. Dirty details that this function trying to handle;
-4. Technical decisions made by this function.
+3. When it comes to 2, TRY YOUR VERY BEST to find the specific file that documents
+   the knowledge or the source unit implements the function it relies on,
+   and put a Markdown link, `[knowledge](/lint/to/it)`, for it;
+4. Dirty details that this function trying to handle;
+5. Technical decisions made by this function.
+
+## Best Practice
+
+It is prefered that if the line length is around 120 characters
+you should have a new line, just like this document does.
+To maintain a LLM context friendly document length,
+if possible, keep the document length around 300-500 lines.
+It is acceptable to have a document up to 800 lines.
+You can temporarily allow a document file more than 800 lines,
+but in that case, leave a `TODO-breakdown-module-xxx.md` file
+for human intervention.
 
 ## Read Document
 
 When asked to modify a module, incorporate the descriptions
 in the documents for better understandings. Especially,
-remember to recursively read all the documents in `docs/`
+remember to recursively read all the documents in `docs/*`
 to learn the project-specific knowledge, including but
 not limited to:
 1. The purpose of this project;
