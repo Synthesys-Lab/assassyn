@@ -1,33 +1,184 @@
 # Array Operation IR Nodes
 
-This file defines the Intermediate Representation node classes for array read and write operations.
+This module defines the Intermediate Representation node classes for array read and write operations. These classes represent array access operations in the assassyn AST, providing support for both reading from and writing to array elements with proper module context tracking.
 
------
+---
 
-## Exposed Interfaces
+## Section 1. Exposed Interfaces
+
+### class ArrayWrite
+
+The IR node class for array write operations, representing `arr[idx] = val`.
+
+#### Static Constants
+
+- `ARRAY_WRITE = 401` - Array write operation opcode
+
+#### Attributes
+
+- `module: ModuleBase` - The module performing the write operation
+
+#### Methods
+
+#### `__init__(self, arr, idx: Value, val: Value, module: ModuleBase = None)`
 
 ```python
-class ArrayWrite(Expr): ...
-class ArrayRead(Expr): ...
+def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None):
+    super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val])
+    # Get module from Singleton if not provided
+    if module is None:
+        # pylint: disable=import-outside-toplevel
+        from ...builder import Singleton
+        module = Singleton.builder.current_module
+    self.module = module
 ```
 
------
+**Explanation:** Initializes an array write operation with the target array, index, value, and module context. If no module is provided, it retrieves the current module from the builder singleton. This module context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array.
 
-## ArrayWrite Class
+#### `array` (property)
 
-The `ArrayWrite` class is the IR node for an array write operation, representing `arr[idx] = val`.
+```python
+@property
+def array(self) -> Array:
+    '''Get the array to write to'''
+    return self._operands[0]
+```
 
-  * It stores the target array, index, and the value to be written as its operands. It also records which module is performing the write.
-  * **String Representation**: The node has a human-readable text format that includes the name of the writing module.
-      * **Example**: `_arr[_idx] <= _val /* module_name */`
+**Explanation:** Returns the target array for the write operation.
 
------
+#### `idx` (property)
 
-## ArrayRead Class
+```python
+@property
+def idx(self) -> Value:
+    '''Get the index to write at'''
+    return self._operands[1]
+```
 
-The `ArrayRead` class is the IR node for an array read operation, representing the value of `arr[idx]`.
+**Explanation:** Returns the index where the value will be written.
 
-  * The data type of the read value is the same as the array's element type.
-  * **Syntactic Sugar for Writes**: This class overloads the `<=` operator to provide a more intuitive syntax for array writes. An expression like `my_array[idx] <= value` is internally translated into an `ArrayWrite` operation.
-  * **String Representation**: The node has a human-readable text format.
-      * **Example**: `_res = _arr[_idx]`
+#### `val` (property)
+
+```python
+@property
+def val(self) -> Value:
+    '''Get the value to write'''
+    return self._operands[2]
+```
+
+**Explanation:** Returns the value to be written to the array.
+
+#### `__repr__(self)`
+
+```python
+def __repr__(self):
+    module_info = f' /* {self.module.name} */' if self.module else ''
+    return (
+        f'{self.array.as_operand()}[{self.idx.as_operand()}]'
+        f' <= {self.val.as_operand()}{module_info}'
+    )
+```
+
+**Explanation:** Returns a human-readable string representation of the array write operation in the format `array[index] <= value /* module_name */`, including the module context for debugging purposes.
+
+### class ArrayRead
+
+The IR node class for array read operations, representing the value of `arr[idx]`.
+
+#### Static Constants
+
+- `ARRAY_READ = 400` - Array read operation opcode
+
+#### Methods
+
+#### `__init__(self, arr: Array, idx: Value)`
+
+```python
+def __init__(self, arr: Array, idx: Value):
+    # pylint: disable=import-outside-toplevel
+    from ..array import Array
+    assert isinstance(arr, Array), f'{type(arr)} is not an Array!'
+    assert isinstance(idx, Value), f'{type(idx)} is not a Value!'
+    super().__init__(ArrayRead.ARRAY_READ, [arr, idx])
+```
+
+**Explanation:** Initializes an array read operation with the source array and index. Validates that the array is an Array instance and the index is a Value instance.
+
+#### `array` (property)
+
+```python
+@property
+def array(self) -> Array:
+    '''Get the array to read from'''
+    return self._operands[0]
+```
+
+**Explanation:** Returns the source array for the read operation.
+
+#### `idx` (property)
+
+```python
+@property
+def idx(self) -> Value:
+    '''Get the index to read at'''
+    return self._operands[1]
+```
+
+**Explanation:** Returns the index to read from.
+
+#### `dtype` (property)
+
+```python
+@property
+def dtype(self) -> DType:
+    '''Get the data type of the read value'''
+    return self.array.scalar_ty
+```
+
+**Explanation:** Returns the data type of the read value, which is the same as the array's element type.
+
+#### `__repr__(self)`
+
+```python
+def __repr__(self):
+    return f'{self.as_operand()} = {self.array.as_operand()}[{self.idx.as_operand()}]'
+```
+
+**Explanation:** Returns a human-readable string representation of the array read operation in the format `result = array[index]`.
+
+#### `__getattr__(self, name)`
+
+```python
+def __getattr__(self, name):
+    return self.dtype.attributize(self, name)
+```
+
+**Explanation:** Delegates attribute access to the data type's `attributize` method, enabling field access for structured data types.
+
+#### `__le__(self, value)`
+
+```python
+def __le__(self, value):
+    '''
+    Handle the <= operator for array writes.
+    '''
+    # pylint: disable=import-outside-toplevel
+    from ...builder import Singleton
+    from ..dtype import RecordValue
+
+    assert isinstance(value, (Value, RecordValue)), \
+        f"Value must be Value or RecordValue, got {type(value)}"
+
+    current_module = Singleton.builder.current_module
+
+    write_port = self.array & current_module
+    return write_port._create_write(self.idx.value, value)
+```
+
+**Explanation:** Implements the `<=` operator to provide syntactic sugar for array writes. When used as `array[index] <= value`, this method creates an `ArrayWrite` operation through the array's write port system. This enables the intuitive syntax while maintaining proper [multi-port write support](../../../docs/design/pipeline.md).
+
+---
+
+## Section 2. Internal Helpers
+
+This module contains no internal helper functions or data structures. All functionality is exposed through the ArrayWrite and ArrayRead classes.

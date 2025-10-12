@@ -6,20 +6,9 @@
 
 ---
 
-## 1. TO CHECK (35 files) - Review existing documentation against new rules
+## 1. TO CHECK (31 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `ir/const.py` → `ir/const.md` (to check)
-- [ ] `ir/dtype.py` → `ir/dtype.md` (to check)
-- [ ] `ir/value.py` → `ir/value.md` (to check)
-- [ ] `ir/visitor.py` → `ir/visitor.md` (to check)
-- [ ] `ir/expr/arith.py` → `ir/expr/arith.md` (to check)
-- [ ] `ir/expr/array.py` → `ir/expr/array.md` (to check)
-- [ ] `ir/expr/call.py` → `ir/expr/call.md` (to check)
-- [ ] `ir/expr/comm.py` → `ir/expr/comm.md` (to check)
-- [ ] `ir/expr/expr.py` → `ir/expr/expr.md` (to check)
-- [ ] `ir/expr/intrinsic.py` → `ir/expr/intrinsic.md` (to check)
-- [ ] `ir/expr/writeport.py` → `ir/expr/writeport.md` (to check)
 - [ ] `ir/memory/base.py` → `ir/memory/base.md` (to check)
 - [ ] `ir/memory/dram.py` → `ir/memory/dram.md` (to check)
 - [ ] `ir/memory/sram.py` → `ir/memory/sram.md` (to check)
@@ -91,9 +80,17 @@
 
 ---
 
-## 3. DONE (13 files) - Completed documentation
+## 3. DONE (16 files) - Completed documentation
 
 ### Leaf-level files (simple to complex)
+- [x] `ir/expr/expr.py` → `ir/expr/expr.md` (completed)
+- [x] `ir/expr/intrinsic.py` → `ir/expr/intrinsic.md` (completed)
+- [x] `ir/expr/writeport.py` → `ir/expr/writeport.md` (completed)
+- [x] `ir/visitor.py` → `ir/visitor.md` (completed)
+- [x] `ir/expr/arith.py` → `ir/expr/arith.md` (completed)
+- [x] `ir/expr/array.py` → `ir/expr/array.md` (completed)
+- [x] `ir/expr/call.py` → `ir/expr/call.md` (completed)
+- [x] `ir/expr/comm.py` → `ir/expr/comm.md` (completed)
 - [x] `analysis/external_usage.py` → `analysis/external_usage.md` (completed)
 - [x] `utils.py` → `utils.md` (completed)
 - [x] `builder/naming_manager.py` → `builder/naming_manager.md` (completed)
@@ -107,6 +104,9 @@
 - [x] `codegen/simulator/_expr/call.py` → `codegen/simulator/_expr/call.md` (completed)
 - [x] `ir/array.py` → `ir/array.md` (completed)
 - [x] `ir/block.py` → `ir/block.md` (completed)
+- [x] `ir/const.py` → `ir/const.md` (completed)
+- [x] `ir/dtype.py` → `ir/dtype.md` (completed)
+- [x] `ir/value.py` → `ir/value.md` (completed)
 
 ---
 
@@ -114,9 +114,9 @@
 
 ### Statistics
 - **Total Python files**: 74
-- **Files to check**: 33 (45%)
+- **Files to check**: 22 (30%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 13 (18%)
+- **Files completed**: 24 (32%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex

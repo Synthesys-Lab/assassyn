@@ -26,3 +26,7 @@ def foo_wrapper(a):
    its literal value.
    - Is is possible to make this value a constant variable and use this variable?
    - Is it possible to change it to a enum to avoid other mistakes?
+
+5. Low invasion. Every time you make a mofication, carefully control the files are affective.
+   Unless you are sure you are told to do an interface refactor, make sure all the modifications
+   should be inside the module and the interface exposed by the module.
