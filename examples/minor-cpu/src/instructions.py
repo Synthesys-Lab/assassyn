@@ -1,7 +1,7 @@
 from assassyn.frontend import *
 from opcodes import *
 
-# The @named decorator captures variable names in methods to improve IR readability
+# The @rewrite_assign decorator captures variable names in methods to improve IR readability
 
 class InstType:
 
@@ -50,7 +50,7 @@ class RInst(InstType):
     def __init__(self, value):
         super().__init__(True, True, True, True, True, {}, value)
 
-    @named
+    @rewrite_assign
     def decode(self, opcode, funct3, funct7, alu, ex_code=None):
         view = self.view()
         opcode = view.opcode == Bits(7)(opcode)
@@ -74,7 +74,7 @@ class IInst(InstType):
     def __init__(self, value):
         super().__init__(True, True, False, True, False, { (20, 31): ('imm', Bits) }, value)
 
-    @named
+    @rewrite_assign
     def imm(self, pad):
         raw = self.view().imm
         if pad:
@@ -83,7 +83,7 @@ class IInst(InstType):
             raw = concat(signal, raw)
         return raw
 
-    @named
+    @rewrite_assign
     def decode(self, opcode, funct3, alu, cond , ex_code ,ex_code2):
         view = self.view()
         opcode = view.opcode == Bits(7)(opcode)
@@ -110,7 +110,7 @@ class SInst(InstType):
         fields = { (25, 31): ('imm11_5', Bits), (7, 11): ('imm4_0', Bits) }
         super().__init__(False, True, True, True, False, fields, value)
 
-    @named
+    @rewrite_assign
     def decode(self, opcode, funct3, alu):
         view = self.view()
         opcode = view.opcode == Bits(7)(opcode)
@@ -118,7 +118,7 @@ class SInst(InstType):
         eq = opcode & funct3
         return InstSignal(eq, alu)
 
-    @named
+    @rewrite_assign
     def imm(self, pad):
         imm = self.view().imm11_5.concat(self.view().imm4_0)
         if pad:
@@ -134,13 +134,13 @@ class UInst(InstType):
     def __init__(self, value):
         super().__init__(True, False, False, False, False, { (12, 31): ('imm', Bits) }, value)
 
-    @named
+    @rewrite_assign
     def decode(self, opcode, alu):
         view = self.view()
         eq = view.opcode == Bits(7)(opcode)
         return InstSignal(eq, alu)
 
-    @named
+    @rewrite_assign
     def imm(self, pad):
         raw = self.view().imm
         if pad:
@@ -160,13 +160,13 @@ class JInst(InstType):
         }
         super().__init__(True, False, False, False, False, fields, value)
 
-    @named
+    @rewrite_assign
     def decode(self, opcode, alu, cond):
         view = self.view()
         eq = view.opcode == Bits(7)(opcode)
         return InstSignal(eq, alu, cond=cond)
 
-    @named
+    @rewrite_assign
     def imm(self, pad):
         view = self.view()
         imm = concat(view.imm20, view.imm19_12, view.imm11, view.imm10_1, Bits(1)(0))
@@ -189,7 +189,7 @@ class BInst(InstType):
         }
         super().__init__(False, True, True, True, False, fields, value)
 
-    @named
+    @rewrite_assign
     def decode(self, opcode, funct3, cmp, flip):
         view = self.view()
         opcode = view.opcode == Bits(7)(opcode)
@@ -197,7 +197,7 @@ class BInst(InstType):
         eq = opcode & funct3
         return InstSignal(eq, RV32I_ALU.ALU_ADD, cond=(cmp, flip))
 
-    @named
+    @rewrite_assign
     def imm(self, pad):
         imm = concat(self.view().imm12, self.view().imm11, self.view().imm10_5, self.view().imm4_1)
         imm = imm.concat(Bits(1)(0))

@@ -3,7 +3,7 @@ from assassyn.frontend import *
 from opcodes import *
 from instructions import *
 
-@named
+@rewrite_assign
 def decode_logic(inst):
 
     views = {i: i(inst) for i in supported_types}

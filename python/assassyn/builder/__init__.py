@@ -14,7 +14,7 @@ from .naming_manager import (
     get_naming_manager,
     set_naming_manager,
 )
-from .rewrite_assign import rewrite_assign,named
+from .rewrite_assign import rewrite_assign
 from .type_oriented_namer import TypeOrientedNamer
 from .unique_name import UniqueNameCache
 
@@ -34,7 +34,7 @@ __all__ = [
     'get_naming_manager',
     'set_naming_manager',
     # Decorators
-    'named',
+    'rewrite_assign',
 
 ]
 
