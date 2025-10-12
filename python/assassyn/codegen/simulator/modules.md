@@ -4,42 +4,134 @@ This module generates the simulation of each Assassyn [module](../../ir/module/)
 including [pipeline stage](../../ir/module/module.py) and [downstream](../../ir/module/downstream.py)
 in the folder `modules/` of the generated code.
 
-## Exposed Interface
+## Section 1. Exposed Interfaces
 
-```python
-def dump_modules(sys: SysBuilder, fd):
-```
+### `dump_modules(sys: SysBuilder, modules_dir: Path) -> bool`
 
-This function iterates over all the modules within the `sys`tem
-to the given `fd`.
-This function instantiates `ElaborateModule`, which provides the key methods of dumping each module.
+Generates individual module files in the modules/ directory for simulator code generation.
 
-## Generated Module
+This function creates separate files for each module and a mod.rs file for declarations.
+It iterates over all modules and downstreams in the system builder and generates
+corresponding Rust implementation files.
 
-### DRAM Module
+**Parameters:**
+- `sys`: The system builder containing all modules to be generated
+- `modules_dir`: Path to the modules directory where files will be created
 
-DRAM module is special because `Ramulator2` adopts a callback-based response interface.
-The callback function should have the signature like below:
+**Returns:**
+- `bool`: Always returns True upon successful completion
+
+**Explanation:**
+This function is the main entry point for module code generation. It creates the modules directory,
+generates a mod.rs file with imports and module declarations, and creates individual .rs files
+for each module. For DRAM modules, it also generates callback functions for Ramulator2 integration.
+The function is called by [elaborate.py](./elaborate.py) during the simulator generation process.
+
+## Section 2. Internal Helpers
+
+### `ElaborateModule` class
+
+Visitor class for elaborating modules with multi-port write support.
+
+#### `ElaborateModule.__init__(self, sys: SysBuilder)`
+
+Initialize the module elaborator.
+
+**Parameters:**
+- `sys`: The system builder containing modules to elaborate
+
+**Explanation:**
+Sets up the visitor with system context, initializes indentation tracking for code formatting,
+and prepares module context tracking for proper code generation.
+
+#### `ElaborateModule.visit_module(self, node: Module) -> str`
+
+Visit a module and generate its Rust implementation.
+
+**Parameters:**
+- `node`: The module to visit and generate code for
+
+**Returns:**
+- `str`: Complete Rust function implementation for the module
+
+**Explanation:**
+Generates a Rust function with signature `pub fn <module_name>(sim: &mut Simulator) -> bool`.
+The function traverses the module body using the visitor pattern and returns true to indicate
+successful execution. This function is called by `dump_modules` for each module in the system.
+
+#### `ElaborateModule.visit_expr(self, node: Expr) -> str`
+
+Visit an expression and generate its Rust implementation.
+
+**Parameters:**
+- `node`: The expression to visit and generate code for
+
+**Returns:**
+- `str`: Rust code for the expression with proper indentation
+
+**Explanation:**
+Delegates expression code generation to the [_expr](./_expr/) module using `codegen_expr`.
+If the expression is valued and externally used by other modules, it generates code to expose
+the value in the simulator context as `sim.<expr>_value = Some(value)`. This enables
+cross-module communication in the generated simulator.
+
+#### `ElaborateModule.visit_int_imm(self, int_imm) -> str`
+
+Visit an integer immediate value and generate its Rust representation.
+
+**Parameters:**
+- `int_imm`: The integer immediate value to convert
+
+**Returns:**
+- `str`: Rust code that casts the value to the appropriate type
+
+**Explanation:**
+Converts Python integer values to Rust with proper type casting using `ValueCastTo`.
+This handles the conversion from Python's arbitrary precision integers to Rust's
+typed integer system.
+
+#### `ElaborateModule.visit_block(self, node: Block) -> str`
+
+Visit a block and generate its Rust implementation.
+
+**Parameters:**
+- `node`: The block to visit (can be Block, CondBlock, or CycledBlock)
+
+**Returns:**
+- `str`: Rust code for the block with proper control flow
+
+**Explanation:**
+Handles different block types:
+- **CondBlock**: Generates `if <condition> { ... }` statements
+- **CycledBlock**: Generates `if sim.stamp / 100 == <cycle> { ... }` for time-based execution
+- **Regular Block**: Processes all elements sequentially
+
+The function maintains proper indentation and handles nested blocks correctly.
+It uses a visited set to avoid processing duplicate elements in the block.
+
+## Generated Code Structure
+
+### DRAM Module Callbacks
+
+DRAM modules are special because Ramulator2 uses a callback-based response interface.
+For each DRAM module, a callback function is generated:
 
 ```rust
-extern "C" fn callback_of_<dram>(req: *mut Request, sim: *mut c_void);
+pub extern "C" fn callback_of_<dram_name>(
+    req: *mut Request, ctx: *mut c_void) {
+    // Handle read/write responses based on req.type_id
+}
 ```
 
-- This callback function will be associated with the each `Request`'s
-  callback field sent to this memory module to hook the responses.
-  Refer to [ramulator.rs](../../../../tools/rust-sim-runtime/src/ramulator2.rs)
-  for more details on `Request`.
+**Explanation:**
+- `req.type_id == 0`: Read response - sets `read_succ = true` and populates data
+- `req.type_id == 1`: Write response - sets `write_succ = true`
+- The callback updates the corresponding `sim.<dram>_response` fields
+- Refer to [ramulator2.md](../../../../tools/rust-sim-runtime/src/ramulator2.md) for Request details
 
-This callback function should act respectively to read and write responses:
-- If `req.type_id == 0`, it is a read. Slice the data from `address * 8`,
-  in total `width` bits from the `sim._payload_<some-array>` array that is associated
-  with this DRAM.
-- If `req.type_id == 1`, it is a write. Write the data
-  to the slice the data from `address * 8` and in total `width` bits.
-  To find the data to be written, it matches the address from
-  the `MemoryInterface` `write_buffer`. After writing it, the data
-  is removed from the `write_buffer`.
+### Module Function Structure
 
+<<<<<<< HEAD
 This callback function should be dumped in the same file as the DRAM module,
 to minimize the visibility of this function.
 
@@ -56,35 +148,31 @@ it returns `false`.
 
 This function will be exposed in `super::modules::*` and
 invoked by `simulate_<module-name>` generated by [simulator.py](./simulator.py).
+=======
+Each generated module function follows this pattern:
+>>>>>>> 223fd96 (wip: i decide to document ir first)
 
 ```rust
-pub fn <module-name>(sim: &mut Simulator) -> bool {
+pub fn <module_name>(sim: &mut Simulator) -> bool {
+    // Generated module body
+    true
+}
 ```
 
-Then it traverses all the components of within the module to dump the code accordingly
-using the [visitor pattern](../../ir/visitor.py).
+**Explanation:**
+The function returns `true` for successful execution or `false` when blocked by
+`wait_until` intrinsics. This return value is used by the simulator host to
+determine whether to pop events from the module's event queue.
 
+### Expression Exposure
 
-### Block
-
-Block generation is done by `visit_block` of the visitor pattern.
-- Conditional block is an if-statement.
-- Cycled block is an `if sim.stamp / 100 == cycle`, as [simulator](./simulator.md)
-  adopts a fixed point number for time stamp.
-
-### Expression
-
-Expression generation is done by `visit_expr` in visitor pattern.
-The expression dumping are first dispatched to implementations in [_expr](./_expr/),
-and then after dumping the expression itself, it also generates
-the expression exposure --- if this expression is used by
-an external module, write it to the `sim` context by generating
+When expressions are used by external modules, they are exposed in the simulator context:
 
 ```rust
 sim.<expr>_value = Some(value);
 ```
 
-### IntImm
-
-It provides helper function to generate the leaf node, immediate constants
-in `visit_intimm`.
+**Explanation:**
+This mechanism enables cross-module communication by making computed values
+available to other modules through the shared simulator context. The exposure
+is determined by the [expr_externally_used](../../analysis/external_usage.py) analysis.

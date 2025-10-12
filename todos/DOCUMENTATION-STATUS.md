@@ -6,24 +6,19 @@
 
 ---
 
-## 1. TO CHECK (39 files) - Review existing documentation against new rules
+## 1. TO CHECK (37 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `codegen/simulator/modules.py` → `codegen/simulator/modules.md` (to check)
-- [ ] `codegen/simulator/port_mapper.py` → `codegen/simulator/port_mapper.md` (to check)
-- [ ] `codegen/simulator/_expr/arith.py` → `codegen/simulator/_expr/arith.md` (to check)
-- [ ] `codegen/simulator/_expr/array.py` → `codegen/simulator/_expr/array.md` (to check)
-- [ ] `codegen/simulator/_expr/call.py` → `codegen/simulator/_expr/call.md` (to check)
-- [ ] `codegen/simulator/_expr/intrinsics.py` → `codegen/simulator/_expr/intrinsics.md` (to check)
-- [ ] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (to check)
-- [ ] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (to check)
-- [ ] `experimental/frontend/module.py` → `experimental/frontend/module.md` (to check)
 - [ ] `ir/array.py` → `ir/array.md` (to check)
 - [ ] `ir/block.py` → `ir/block.md` (to check)
 - [ ] `ir/const.py` → `ir/const.md` (to check)
 - [ ] `ir/dtype.py` → `ir/dtype.md` (to check)
 - [ ] `ir/value.py` → `ir/value.md` (to check)
 - [ ] `ir/visitor.py` → `ir/visitor.md` (to check)
+- [ ] `codegen/simulator/_expr/intrinsics.py` → `codegen/simulator/_expr/intrinsics.md` (to check)
+- [ ] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (to check)
+- [ ] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (to check)
+- [ ] `experimental/frontend/module.py` → `experimental/frontend/module.md` (to check)
 - [ ] `ir/expr/arith.py` → `ir/expr/arith.md` (to check)
 - [ ] `ir/expr/array.py` → `ir/expr/array.md` (to check)
 - [ ] `ir/expr/call.py` → `ir/expr/call.md` (to check)
@@ -98,7 +93,7 @@
 
 ---
 
-## 3. DONE (6 files) - Completed documentation
+## 3. DONE (11 files) - Completed documentation
 
 ### Leaf-level files (simple to complex)
 - [x] `analysis/external_usage.py` → `analysis/external_usage.md` (completed)
@@ -107,6 +102,11 @@
 - [x] `builder/rewrite_assign.py` → `builder/rewrite_assign.md` (completed)
 - [x] `builder/type_oriented_namer.py` → `builder/type_oriented_namer.md` (completed)
 - [x] `builder/unique_name.py` → `builder/unique_name.md` (completed)
+- [x] `codegen/simulator/modules.py` → `codegen/simulator/modules.md` (completed)
+- [x] `codegen/simulator/port_mapper.py` → `codegen/simulator/port_mapper.md` (completed)
+- [x] `codegen/simulator/_expr/arith.py` → `codegen/simulator/_expr/arith.md` (completed)
+- [x] `codegen/simulator/_expr/array.py` → `codegen/simulator/_expr/array.md` (completed)
+- [x] `codegen/simulator/_expr/call.py` → `codegen/simulator/_expr/call.md` (completed)
 
 ---
 
@@ -114,9 +114,9 @@
 
 ### Statistics
 - **Total Python files**: 74
-- **Files to check**: 39 (53%)
+- **Files to check**: 35 (47%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 6 (8%)
+- **Files completed**: 11 (15%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex

@@ -1,5 +1,5 @@
 ---
-alwaysApply: true
+alwaysApply: false
 globs:
   - python/assassyn/*.md
   - python/assassyn/**/*.md
@@ -37,6 +37,13 @@ of each file in this folder, as well as the immediate sub-folder.
 
 When documenting a source code, such a document should be separated into
 the following sections.
+
+### Section 0. Summary
+
+Before documenting any interfaces, a brief summary is optional.
+If the documented module highly relies on project-specific knowledge,
+or the whole module is achieving one thing, this shall be briefly summarized
+in this section.
 
 ### Section 1. Exposed Interfaces
 
@@ -136,13 +143,3 @@ if possible, keep the document length around 300-500 lines.
 It is acceptable to have a document up to 800 lines.
 If a document is more than 500 lines, leave a `TODO-breakdown-module-xxx.md`
 file for human intervention.
-
-## Read Document
-
-When asked to modify a module, incorporate the descriptions
-in the documents for better understandings. Especially,
-remember to recursively read all the documents in `docs/*`
-to learn the project-specific knowledge, including but
-not limited to:
-1. The purpose of this project;
-2. The design decisions of core modules.

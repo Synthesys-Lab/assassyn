@@ -1,0 +1,14 @@
+---
+alwaysApply: false
+description: Read the high-level design documents
+---
+
+## Read Document
+
+When asked to modify a module or document,
+incorporate the descriptions in the documents for better understandings.
+Especially, remember to recursively read all the documents in `docs/design/*.md`
+to learn the project-specific knowledge, including but
+not limited to:
+1. The purpose of this project;
+2. The design decisions of core modules.
