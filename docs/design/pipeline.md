@@ -90,6 +90,16 @@ Data from `lhs` and `rhs` will arrive `add` in the same cycle.
 Thus, [test_downstream.py](../../python/ci-tests/test_downstream.py)
 is almost equivalent to [test_async_call.py](../../python/ci-tests/test_async_call.py).
 
+## Topological Order across Downstreams
+
+As downstreams are purely combinational logics, which assumes that all the operations
+have no cyclic dependences. Also, downstreams can be recursively a downstream module
+of a downstream. When code generation, we need to have a topological order
+across these modules to guarantee a correct order of execution.
+This topological order is sorted by `topo_downstream_modules` in
+[`__init__.py`](../../python/assassyn/analysis/__init__.py), and tested
+in the minimum case [test_toposort.py](../../python/ci-tests/test_toposort.py).
+
 # RegArray
 
 Register array tested in
