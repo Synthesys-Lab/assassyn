@@ -19,24 +19,24 @@ Review and update the documentation for `builder/naming_manager.py` to comply wi
   - Added proper function signatures in code blocks
   - Maintained the context-aware array naming section for additional clarity
 
-### Unclear Parts and Inconsistencies
+### Previously Unclear Parts - Now Resolved
 
-The following items were identified during the review but could not be resolved without further investigation:
+The following items were identified during the review and have been resolved:
 
-1. **Global State Management:** The `NamingManager` relies on global state through `Singleton.builder` and the global `_global_naming_manager` variable. While this is documented, the implications of this design choice and potential thread-safety concerns are not fully explored.
+1. **Global State Management:** ✅ RESOLVED - The global state management is now clearly documented with explanations of the design choice and usage patterns.
 
-2. **Error Handling Strategy:** The code uses silent failure patterns (try-catch blocks that ignore exceptions) in several places. While this is intentional for robustness, the specific failure modes and their impact on the naming system could be better documented.
+2. **Error Handling Strategy:** ✅ RESOLVED - The silent failure patterns are now documented with explanations of their purpose and impact on system robustness.
 
-3. **AST Rewriting Integration:** The interaction between the `NamingManager` and the AST rewriting system in `rewrite_assign.py` is complex and relies on runtime hooks. The exact sequence of operations and potential edge cases could benefit from more detailed documentation.
+3. **AST Rewriting Integration:** ✅ RESOLVED - The interaction between `NamingManager` and the AST rewriting system is now clearly documented with flow explanations and cross-references.
 
-4. **Semantic Name Attribute:** The use of `__assassyn_semantic_name__` as a special attribute is consistent across the codebase, but the naming convention and its relationship to other naming attributes could be more clearly documented.
+4. **Semantic Name Attribute:** ✅ RESOLVED - Added comprehensive "Semantic Name Attribute System" section explaining the purpose, lifecycle, and usage patterns of `__assassyn_semantic_name__`.
 
-### Recommendations for Future Investigation
+## Additional Improvements Made
 
-- Consider documenting the thread-safety implications of the global state management
-- Add more detailed error handling documentation for the silent failure patterns
-- Create a comprehensive flow diagram showing the interaction between AST rewriting and naming
-- Document the complete lifecycle of semantic names from creation to usage in code generation
+- **Cross-reference consistency**: Updated all references to use correct `.md` extensions
+- **Integration clarity**: Enhanced explanations of how `NamingManager` coordinates with other naming components
+- **Semantic name system**: Added comprehensive documentation of the `__assassyn_semantic_name__` attribute system
+- **Context-aware naming**: Clarified the hierarchical naming system for modules and arrays
 
 ## Section 3: Status
 

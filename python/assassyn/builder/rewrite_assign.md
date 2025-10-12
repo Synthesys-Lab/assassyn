@@ -32,7 +32,7 @@ Assignments to attributes (`obj.attr = val`) and subscripts (`arr[i] = val`) are
 **Returns:**
 - The transformed function definition AST node
 
-**Explanation:** This function is used by the module decorator system in [ir/module/base.py](../ir/module/base.py) to intercept assignments within module methods. The transformation allows the naming system to track and name IR values based on their assignment targets. The function uses the `AssignmentRewriter` class internally to perform the AST transformation.
+**Explanation:** This function is used by the module decorator system to intercept assignments within module methods. The transformation allows the naming system to track and name IR values based on their assignment targets. The function uses the `AssignmentRewriter` class internally to perform the AST transformation. The rewritten assignments call `__assassyn_assignment__` which delegates to the active [NamingManager](naming_manager.md) for processing.
 
 ### __assassyn_assignment__
 >>>>>>> 441bfdd (document)
@@ -81,7 +81,7 @@ Delegates to the active NamingManager (if any) to process assignment-based namin
 **Returns:**
 - The assigned value (to support chained assignments)
 
-**Explanation:** This function serves as the hook point for the AST rewriting system. When assignments like `x = some_expr` are rewritten to `x = __assassyn_assignment__("x", some_expr)`, this function processes the naming through the active [NamingManager](naming_manager.py). The function is injected into the namespace of rewritten functions and called during assignment execution.
+**Explanation:** This function serves as the hook point for the AST rewriting system. When assignments like `x = some_expr` are rewritten to `x = __assassyn_assignment__("x", some_expr)`, this function processes the naming through the active [NamingManager](naming_manager.md). The function is injected into the namespace of rewritten functions and called during assignment execution. It delegates to `NamingManager.process_assignment()` which applies semantic naming based on the assignment target.
 
 ## Section 2. Internal Helpers
 

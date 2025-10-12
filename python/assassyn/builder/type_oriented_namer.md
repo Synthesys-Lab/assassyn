@@ -211,3 +211,24 @@ Module instances follow PascalCase naming with "Instance" suffix to ensure compa
 - `Adder` module becomes `AdderInstance`
 - `Driver` module becomes `DriverInstance`  
 - Generic `Module` becomes `ModuleInstance`
+
+## Opcode Mapping System
+
+The `TypeOrientedNamer` uses hardcoded opcode mappings to generate semantic prefixes for operations:
+
+- **Binary Operations**: Mapped to descriptive tokens (e.g., 200→'add', 201→'sub', 202→'mul')
+- **Unary Operations**: Mapped to operation tokens (e.g., 100→'neg', 101→'not')
+- **Class-based Prefixes**: Direct mappings for specific IR classes (e.g., 'ArrayRead'→'rd', 'FIFOPop'→'pop')
+
+These opcodes are specific to the IR expression system and are used to generate meaningful names like `lhs_add_rhs` for binary operations or `neg_operand` for unary operations. The mappings ensure that generated names reflect the semantic meaning of operations rather than using generic identifiers.
+
+## Operand Wrapping System
+
+The naming system handles operand wrappers through the `_unwrap_operand` method:
+
+- **Purpose**: Some IR operands may be wrapped in special wrapper objects for type safety or other purposes
+- **Implementation**: The method attempts to import and use `assassyn.utils.unwrap_operand` to extract the underlying operand
+- **Fallback**: If the unwrapping utility is not available or fails, the original entity is returned unchanged
+- **Usage**: This ensures that naming works consistently whether operands are wrapped or unwrapped
+
+This system allows the naming infrastructure to work with both wrapped and unwrapped operands transparently, ensuring consistent name generation regardless of the operand representation.

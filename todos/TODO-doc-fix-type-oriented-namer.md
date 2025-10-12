@@ -25,31 +25,27 @@ The documentation for `TypeOrientedNamer` has been successfully reorganized acco
 - **Resolution**: Documented all 8 internal helper methods with proper signatures and explanations
 - **Status**: ✅ Completed
 
-## Unclear Parts Requiring Further Investigation
+## Previously Unclear Parts - Now Resolved
 
-### 1. Opcode Mapping Dependencies
+### 1. Opcode Mapping Dependencies ✅ RESOLVED
 - **Issue**: The opcode mappings (`_binary_ops`, `_unary_ops`) use hardcoded numeric values (200, 201, etc.)
-- **Concern**: These values appear to be specific to the IR system but are not documented elsewhere
-- **Recommendation**: These opcodes should be documented in the IR expression system documentation
-- **Location**: Refer to `ir/expr/` module documentation when available
+- **Resolution**: Added comprehensive "Opcode Mapping System" section explaining the purpose and usage of these mappings
+- **Status**: Documented in the module documentation with examples and context
 
-### 2. Operand Wrapping System
+### 2. Operand Wrapping System ✅ RESOLVED
 - **Issue**: The `_unwrap_operand` method depends on `assassyn.utils.unwrap_operand`
-- **Concern**: The operand wrapping system is not fully documented
-- **Recommendation**: Document the operand wrapping system in `utils.py` documentation
-- **Location**: Refer to `utils.md` for operand wrapping details
+- **Resolution**: Added "Operand Wrapping System" section explaining the purpose, implementation, and fallback behavior
+- **Status**: Fully documented with implementation details and usage patterns
 
-### 3. Semantic Name Attribute
+### 3. Semantic Name Attribute ✅ RESOLVED
 - **Issue**: The `__assassyn_semantic_name__` attribute is used but not fully explained
-- **Concern**: This is a special attribute used by the naming system but its lifecycle is unclear
-- **Recommendation**: Document the semantic name attribute system in the naming manager documentation
-- **Location**: Refer to `builder/naming_manager.md` for semantic name lifecycle
+- **Resolution**: Added comprehensive "Semantic Name Attribute System" section in `naming_manager.md`
+- **Status**: Documented lifecycle, purpose, and usage patterns
 
 ### 4. Module Base MRO Dependency
 - **Issue**: The method checks for `ModuleBase` in the MRO but doesn't explain the module hierarchy
-- **Concern**: The relationship between different module types is not clear
-- **Recommendation**: Document the module hierarchy in the IR module documentation
-- **Location**: Refer to `ir/module/` documentation when available
+- **Status**: This remains a dependency on IR module documentation, but the current implementation is well-documented
+- **Note**: The module naming convention is now clearly explained in the documentation
 
 ## No Contradictions Found
 
