@@ -6,11 +6,9 @@
 
 ---
 
-## 1. TO CHECK (37 files) - Review existing documentation against new rules
+## 1. TO CHECK (35 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `ir/array.py` → `ir/array.md` (to check)
-- [ ] `ir/block.py` → `ir/block.md` (to check)
 - [ ] `ir/const.py` → `ir/const.md` (to check)
 - [ ] `ir/dtype.py` → `ir/dtype.md` (to check)
 - [ ] `ir/value.py` → `ir/value.md` (to check)
@@ -93,7 +91,7 @@
 
 ---
 
-## 3. DONE (11 files) - Completed documentation
+## 3. DONE (13 files) - Completed documentation
 
 ### Leaf-level files (simple to complex)
 - [x] `analysis/external_usage.py` → `analysis/external_usage.md` (completed)
@@ -107,6 +105,8 @@
 - [x] `codegen/simulator/_expr/arith.py` → `codegen/simulator/_expr/arith.md` (completed)
 - [x] `codegen/simulator/_expr/array.py` → `codegen/simulator/_expr/array.md` (completed)
 - [x] `codegen/simulator/_expr/call.py` → `codegen/simulator/_expr/call.md` (completed)
+- [x] `ir/array.py` → `ir/array.md` (completed)
+- [x] `ir/block.py` → `ir/block.md` (completed)
 
 ---
 
@@ -114,9 +114,9 @@
 
 ### Statistics
 - **Total Python files**: 74
-- **Files to check**: 35 (47%)
+- **Files to check**: 33 (45%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 11 (15%)
+- **Files completed**: 13 (18%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex

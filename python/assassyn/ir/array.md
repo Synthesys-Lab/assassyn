@@ -6,6 +6,10 @@ The `array.py` module defines the `Array` class for representing register arrays
 
 This module provides the core infrastructure for register arrays in Assassyn's IR. Register arrays are used extensively throughout the system for storing stateful data, implementing memory structures, and managing pipeline stage registers. The module supports both single-port and multi-port access patterns through the `WritePort` mechanism, enabling multiple modules to write to the same array while maintaining proper hardware semantics.
 
+Register arrays in Assassyn follow a multi-port access model where each module that writes to an array gets its own dedicated write port. This is implemented through the syntactic sugar `(array & module)[index] <= value`, which creates a `WritePort` object that handles the write operation. The system automatically manages port conflicts and ensures proper hardware semantics during code generation.
+
+The module also provides the `Slice` class for bit-slicing operations, which is essential for extracting specific bit fields from wider values in hardware design.
+
 ## Exposed Interfaces
 
 The `array.py` module provides the `RegArray` function and `Array` class methods for creating and manipulating register arrays.
@@ -41,9 +45,18 @@ The naming behavior follows a hierarchical approach:
 - If no explicit name is given and a module context is active, a semantic name is assigned using the module name as a prefix (e.g., `<module>_array`)
 - Semantic names are stored on the instance and used by `as_operand()` and `__repr__` methods
 
-**Example:**
+The function automatically adds the created array to the builder's `arrays` list, which is used during code generation to emit array declarations and manage write ports. The `attr` parameter allows attaching metadata to arrays, which is commonly used to associate arrays with their parent modules (e.g., in memory modules).
+
+**Examples:**
 ```python
+# Basic array declaration
 my_array = RegArray(UInt(32), 16, name="register_file")  # 16-element array of 32-bit uints
+
+# Array with initial values
+counter = RegArray(Int(32), 1, initializer=[0])  # Single-element counter initialized to 0
+
+# Array with attributes (commonly used in memory modules)
+payload = RegArray(Bits(64), 1024, attr=[self], name=f'{self.name}_val')
 ```
 
 ## Internal Helpers
@@ -99,6 +112,8 @@ def name(self, name: str):
 
 The name property implements a hierarchical naming system that prioritizes semantic names over internal names. It first checks for a semantic name stored in `__assassyn_semantic_name__`, then falls back to the internal `_name` field, and finally generates a default name using [identifierize](../../utils.md#identifierize) if neither is available.
 
+This naming system is crucial for code generation, as the array name is used in both Verilog and Rust simulator output. The semantic name system allows the generated code to have meaningful, hierarchical names that reflect the module structure, making debugging and analysis easier.
+
 #### `users` Property
 
 ```python
@@ -128,7 +143,18 @@ def __and__(self, other) -> WritePort | BinaryOp:
 
 This method implements the multi-port write access pattern used throughout Assassyn. When combined with a `ModuleBase`, it creates or retrieves a `WritePort` that enables the syntactic sugar `(array & module)[index] <= value`. This pattern is essential for hardware design where multiple modules need to write to the same array while maintaining proper port semantics.
 
-The method also supports fallback to regular bitwise AND operations when the operand is a `Value`, maintaining compatibility with standard Python operations.
+The method maintains a dictionary `_write_ports` that maps each module to its dedicated `WritePort` instance. This ensures that each module gets its own write port, enabling proper multi-port access during code generation. The Verilog code generator uses this information to create separate write enable, write data, and write index signals for each port.
+
+The method also supports fallback to regular bitwise AND operations when the operand is a `Value`, maintaining compatibility with standard Python operations. This dual behavior allows the same operator to serve both hardware-specific multi-port access and general bitwise operations.
+
+**Usage Pattern:**
+```python
+# Multi-port write access
+(array & current_module)[index] <= value
+
+# Regular bitwise AND (fallback)
+result = array & some_value
+```
 
 #### `__repr__`
 
@@ -156,6 +182,10 @@ def index_bits(self) -> int:
 **Explanation:**
 
 This property calculates the minimum number of bits needed to index all elements in the array. It includes an optimization for power-of-2 sized arrays, where one less bit is needed due to the binary representation.
+
+The calculation uses the bit manipulation `self.size & (self.size - 1) == 0` to detect power-of-2 sizes. For power-of-2 arrays, the index width is `size.bit_length() - 1` (e.g., a 16-element array needs 4 bits, not 5). For non-power-of-2 arrays, it uses `size.bit_length()` to get the minimum bits needed.
+
+This property is crucial for code generation, as it determines the width of address signals in both Verilog and Rust simulator output. The Verilog code generator uses this to create properly sized address ports and internal signals.
 
 #### `index_type`
 
@@ -198,6 +228,10 @@ This method implements array read operations with caching to avoid duplicate rea
 
 The method automatically converts integer indices to `UInt` values using [to_uint](../dtype.md#to_uint) and creates `ArrayRead` expressions that represent the read operation in the IR.
 
+The caching mechanism is block-scoped, meaning that reads within the same block are deduplicated, but reads across different blocks are treated as separate operations. This is important for hardware semantics, as different blocks may represent different clock cycles or conditional execution paths.
+
+The cache key is a tuple of `(array, index)`, ensuring that different indices into the same array are treated as separate operations, while the same index access within a block is reused.
+
 #### `get_flattened_size`
 
 ```python
@@ -226,7 +260,18 @@ def __setitem__(self, index, value):
 
 This method implements array write operations by creating a write port for the current module and delegating to the write port's `_create_write` method. It automatically handles the conversion of integer indices to `Value` objects and ensures proper type checking for the value being written.
 
-The write operation uses the `&` operator internally to create or retrieve the appropriate `WritePort` for the current module context.
+The write operation uses the `&` operator internally to create or retrieve the appropriate `WritePort` for the current module context. This ensures that each module gets its own dedicated write port, enabling proper multi-port access semantics.
+
+The method supports both `Value` and `RecordValue` types for the value parameter, allowing writes of both scalar and structured data. The type checking ensures that the value being written is compatible with the array's element type.
+
+**Usage Pattern:**
+```python
+# Direct write using current module's write port
+array[index] = value
+
+# This is equivalent to:
+# (array & current_module)[index] <= value
+```
 
 ### `Slice` Class
 
@@ -256,6 +301,13 @@ def __init__(self, x, l: int, r: int):
 The `Slice` class represents bit-slicing operations in the IR, where `x[l:r]` extracts bits from position `l` to `r` (inclusive) from value `x`. This is commonly used in hardware design for extracting specific bit fields from wider values.
 
 The class enforces that both slice bounds must be integer literals at compile time, as hardware bit-slicing requires constant indices. The bounds are automatically converted to `UInt` values using [to_uint](../dtype.md#to_uint).
+
+The slice operation is fundamental in hardware design for:
+- Extracting control bits from wider values (e.g., `value[0:0]` for a single bit)
+- Accessing specific fields in packed data structures
+- Implementing bit-level operations and manipulations
+
+The class inherits from `Expr`, making it a first-class expression in the IR that can be used in arithmetic operations, assignments, and other expressions.
 
 #### `x` Property
 
@@ -308,6 +360,10 @@ def dtype(self) -> DType:
 **Explanation:**
 
 This property calculates the resulting data type of the slice operation. It creates a `Bits` type with width equal to `r - l + 1`, representing the number of bits extracted by the slice operation.
+
+The calculation assumes that both `l` and `r` are `Const` values (compile-time constants), which is enforced by the constructor. The resulting `Bits` type represents an unsigned bit vector of the extracted width, which is the standard representation for bit-sliced values in hardware.
+
+This property is used during IR construction to ensure type consistency and during code generation to determine the correct signal widths in the generated Verilog and Rust code.
 
 #### `__repr__`
 

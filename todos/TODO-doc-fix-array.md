@@ -2,75 +2,85 @@
 
 ## Goal
 
-Fix inconsistencies and implementation issues found in the `ir/array.py` module during documentation review, and ensure the `attr` parameter functionality is properly implemented or removed.
+Fix inconsistencies and unclear behaviors identified in the `ir/array.py` module during documentation review.
 
 ## Action Items
 
 ### Document Development
 
-- [x] **Update design document for array module**: The documentation has been reorganized according to new standards with proper Summary, Exposed Interfaces, and Internal Helpers sections. The missing `Slice` class has been documented.
+- **Issue Analysis**: During the documentation review of `ir/array.py`, several inconsistencies and unclear behaviors were identified that need to be addressed.
 
 ### Coding Development
 
-#### Issue 1: Inconsistent `attr` Parameter Handling
+#### 1. Fix Slice Class Property Inconsistencies
 
-**Problem**: The `RegArray` function accepts an `attr` parameter but it's never actually used. The parameter is processed (defaulted to empty list if None) but never passed to the `Array` constructor or used anywhere else in the code.
+**Problem**: The `Slice` class has inconsistent property documentation and type annotations:
 
-**Current State**:
-```python
-def RegArray(scalar_ty: DType, size: int, initializer: list = None, name: str = None, attr: list = None):
-    attr = attr if attr is not None else []  # Processed but never used
-    res = Array(scalar_ty, size, initializer)  # attr not passed
-    # ... rest of function
-```
+- `l` and `r` properties have incorrect docstrings ("Get the value to slice" instead of "Get the left/right bound")
+- Type annotations claim these properties return `int`, but they actually return `UInt` values stored in `_operands`
+- The `dtype` property assumes `l` and `r` are `Const` values, but they're actually `UInt` values
+
+**Root Cause**: The constructor converts `int` literals to `UInt` values using `to_uint()`, but the property type annotations and docstrings weren't updated to reflect this.
 
 **Required Changes**:
-1. **Option A - Remove unused parameter**: Remove the `attr` parameter from `RegArray` function signature and update all call sites
-2. **Option B - Implement functionality**: Modify `Array` constructor to accept and use the `attr` parameter
+1. Update `l` and `r` property docstrings to correctly describe their purpose
+2. Fix type annotations to reflect that they return `UInt` values, not `int`
+3. Update the `dtype` property implementation to handle `UInt` values correctly
+4. Consider whether the properties should return the raw `UInt` values or extract the integer values
 
-**Recommendation**: Choose Option A (remove unused parameter) as there's no evidence of `attr` being used anywhere in the codebase, and it adds unnecessary complexity.
+**Files to Modify**:
+- `python/assassyn/ir/array.py`: Fix property docstrings, type annotations, and `dtype` implementation
+- `python/assassyn/ir/array.md`: Update documentation to reflect the corrected behavior
 
-**Files to modify**:
-- `python/assassyn/ir/array.py` - Remove `attr` parameter from `RegArray` function
-- `python/assassyn/ir/array.md` - Update documentation to remove `attr` parameter references
-- Search and update any call sites that pass `attr` parameter (if any exist)
+#### 2. Clarify Array Write Port Semantics
 
-**Commit message**: "Remove unused attr parameter from RegArray function"
+**Problem**: The relationship between `Array.__setitem__` and the `WritePort` mechanism could be clearer in the implementation.
 
-#### Issue 2: Missing Array Constructor Documentation
-
-**Problem**: The `Array` class constructor is not documented in the current documentation structure.
+**Current Behavior**: `__setitem__` uses `self & current_module` to get a write port, but this creates a dependency on the current module context that may not be obvious to users.
 
 **Required Changes**:
-1. Add `__init__` method documentation to the `Array` class section in `ir/array.md`
-2. Document the constructor parameters and their purposes
-3. Explain the initialization process and default values
+1. Add more explicit error handling when no current module is available
+2. Consider adding a comment explaining the implicit write port creation
+3. Document the relationship between direct assignment (`array[index] = value`) and explicit write port usage (`(array & module)[index] <= value`)
 
-**Files to modify**:
-- `python/assassyn/ir/array.md` - Add `__init__` method documentation
+**Files to Modify**:
+- `python/assassyn/ir/array.py`: Add error handling and comments
+- `python/assassyn/ir/array.md`: Already documented, but could be enhanced
 
-**Commit message**: "Add Array constructor documentation"
+#### 3. Verify Array Read Caching Behavior
 
-### Testing
+**Problem**: The array read caching mechanism in `__getitem__` uses block-scoped caching, but the exact semantics of when cache entries are invalidated could be clearer.
 
-- [ ] **Run existing tests**: Ensure all existing tests pass after removing the `attr` parameter
-- [ ] **Verify functionality**: Test that array creation, naming, and write port functionality still works correctly
-- [ ] **Check for breaking changes**: Verify that no external code depends on the `attr` parameter
+**Current Behavior**: Cache is keyed by `(array, index)` within the current block, but it's unclear when the cache is cleared or if it persists across different execution contexts.
+
+**Required Investigation**:
+1. Verify that the caching behavior is correct for all use cases
+2. Document when cache entries are invalidated
+3. Consider whether the caching strategy is optimal for all scenarios
+
+**Files to Investigate**:
+- `python/assassyn/ir/array.py`: Review caching implementation
+- `python/assassyn/builder/`: Check how `array_read_cache` is managed
+
+### Testing Requirements
+
+- **Unit Tests**: Add tests for the corrected `Slice` class properties
+- **Integration Tests**: Verify that array read caching works correctly across different scenarios
+- **Regression Tests**: Ensure that existing array functionality continues to work after fixes
 
 ### Documentation Updates
 
-- [x] **Update array.md**: Documentation has been reorganized according to new standards
-- [ ] **Update any related documentation**: Check if other files reference the `attr` parameter and update accordingly
+- **Update array.md**: Reflect any changes made to the implementation
+- **Update related documentation**: Ensure consistency across all array-related documentation
 
 ## Notes
 
-- The `attr` parameter appears to be a legacy feature that was never fully implemented
-- No test cases or usage examples were found that actually use the `attr` parameter
-- The current implementation always initializes `attr` to an empty list in the `Array` constructor
-- Removing the unused parameter will simplify the API and eliminate confusion
+- The `Slice` class issues are the most critical as they involve incorrect type annotations and documentation
+- The array write port semantics are already well-documented but could benefit from clearer error handling
+- The caching behavior investigation is lower priority but should be addressed for completeness
 
 ## Dependencies
 
-- This change may affect any external code that passes the `attr` parameter to `RegArray`
-- Need to verify that the naming manager and builder integration still works correctly
-- Should coordinate with any ongoing work on array functionality
+- Requires understanding of the `UInt` and `Const` type system
+- Requires knowledge of the builder's block management system
+- May require coordination with other modules that use `Slice` operations
