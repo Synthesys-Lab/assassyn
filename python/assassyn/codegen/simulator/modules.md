@@ -43,6 +43,10 @@ This callback function should act respectively to read and write responses:
 This callback function should be dumped in the same file as the DRAM module,
 to minimize the visibility of this function.
 
+**Debug Support**: The module generation now includes source location tracking.
+When available, location comments are added as `// @<location>` to aid in debugging
+and tracing generated code back to the original source.
+
 ### Pipeline Stage & Downstream
 
 Each generated module looks like below, which returns if this module is properly executed.

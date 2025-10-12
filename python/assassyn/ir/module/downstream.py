@@ -8,13 +8,36 @@ from ...builder import Singleton
 class Downstream(ModuleBase):
     '''Downstream class implementation.'''
 
-    name: str  # Name of the downstream module
+    _name: str  # Internal name storage
     body: Block  # Body of the downstream module
+
+    @property
+    def name(self) -> str:
+        '''Get the name of the downstream module.'''
+        return self._name
+
+    @name.setter
+    def name(self, value: str):
+        '''Set the name and update the semantic name for IR generation.'''
+        self._name = value
+        # Update semantic name when name is explicitly set
+        try:
+            setattr(self, '__assassyn_semantic_name__', f'{value}Instance')
+        except (AttributeError, TypeError):
+            pass
 
     def __init__(self):
         super().__init__()
-        self.name = type(self).__name__
-        self.name = self.name + self.as_operand()
+        base_name = type(self).__name__
+
+        # Use naming manager if available for consistent naming
+        manager = getattr(Singleton, 'naming_manager', None)
+        if manager is not None:
+            assigned_name = manager.assign_name(self, base_name)
+            self._name = assigned_name
+        else:
+            self._name = base_name + self.as_operand()
+
         self.body = None
 
         Singleton.builder.downstreams.append(self)

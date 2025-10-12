@@ -1,16 +1,17 @@
 '''The base class for the module definition.'''
 
 from __future__ import annotations
-import ast
 import inspect
-import textwrap
 import typing
 
 from functools import wraps
 
 from ...utils import namify, unwrap_operand, identifierize
 from ...builder import ir_builder, Singleton
-from ...builder.rewrite_assign import rewrite_assign, __assassyn_assignment__ as _assignment_fn
+from ...builder.rewrite_assign import (
+    __assassyn_assignment__ as _assignment_fn,
+    parse_and_rewrite_function
+)
 from ..expr import Operand, Expr
 from ..expr.intrinsic import PureIntrinsic
 
@@ -75,20 +76,12 @@ class ModuleBase:
                     res = res + f'  //  .usedby: condition::{operand.user.as_operand()}\n'
         return res
 
-def combinational_for(module_type):
+def combinational_for(module_type):  # pylint: disable=too-many-statements
     '''Decorator factory for combinational module build functions with naming support.'''
 
-    def decorator(func):
+    def decorator(func):  # pylint: disable=too-many-locals,too-many-statements
         try:
-            source = textwrap.dedent(inspect.getsource(func))
-            tree = ast.parse(source)
-            func_def = tree.body[0]
-
-            rewritten_func_def = rewrite_assign(func_def)
-            rewritten_func_def.decorator_list = []
-
-            tree.body[0] = rewritten_func_def
-            ast.fix_missing_locations(tree)
+            tree, _ = parse_and_rewrite_function(func, adjust_lineno=True)
 
             namespace = func.__globals__
             had_assignment_hook = '__assassyn_assignment__' in namespace

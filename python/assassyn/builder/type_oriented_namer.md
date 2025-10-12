@@ -14,7 +14,7 @@ Extracts a descriptive base name by checking, in order:
 1. Whether the node looks like a module instance (`ModuleBase` in its MRO).
    Module instances are named with "Instance" suffix (e.g., `AdderInstance`, `DriverInstance`).
 2. FIFO helpers (`FIFOPop`, `FIFOPush`) where the FIFO's own semantic name is
-   re-used when available.
+   re-used when available. Supported for FIFO operations including `peek` and `valid`.
 3. Intrinsics that expose an opcode/argument pair (`PureIntrinsic`).
 4. Known IR classes mapped through `_class_prefixes` such as `ArrayRead`,
    `ArrayWrite`, `Array`, `Concat`, `Select`, `Select1Hot`, `Slice`, `Cast`,

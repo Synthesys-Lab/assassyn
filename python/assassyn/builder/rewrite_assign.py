@@ -7,6 +7,8 @@ to use a custom assignment function that can be hooked for tracing or other purp
 
 import ast
 from typing import Any
+import inspect
+import textwrap
 from .naming_manager import get_naming_manager  # pylint: disable=cyclic-import,import-outside-toplevel
 
 
@@ -84,3 +86,77 @@ def rewrite_assign(target: ast.FunctionDef) -> ast.FunctionDef:
     """
     rewriter = AssignmentRewriter()
     return rewriter.visit(target)
+
+
+def parse_and_rewrite_function(func, adjust_lineno: bool = False):
+    """
+    Parse a function's source and rewrite assignments with AST transformation.
+
+    This is a helper function that extracts the common pattern of:
+    1. Getting function source code
+    2. Parsing it into an AST
+    3. Rewriting assignments
+    4. Removing decorator list
+    5. Optionally adjusting line numbers to match original source location
+
+    Args:
+        func: The function to parse and rewrite
+        adjust_lineno: If True, adjust AST line numbers to match original source location
+
+    Returns:
+        A tuple of (rewritten_tree, original_lineno) where:
+        - rewritten_tree: The AST tree with rewritten function
+        - original_lineno: The original line number of the function (for reference)
+    """
+    source = textwrap.dedent(inspect.getsource(func))
+    original_lineno = func.__code__.co_firstlineno
+
+    tree = ast.parse(source)
+    func_def = tree.body[0]
+
+    rewritten_func_def = rewrite_assign(func_def)
+    rewritten_func_def.decorator_list = []
+
+    tree.body[0] = rewritten_func_def
+    ast.fix_missing_locations(tree)
+
+    # Adjust all line numbers in the AST to match original source location
+    if adjust_lineno:
+        line_offset = original_lineno - 1
+        for node in ast.walk(tree):
+            if hasattr(node, 'lineno'):
+                node.lineno += line_offset
+            if hasattr(node, 'end_lineno') and node.end_lineno is not None:
+                node.end_lineno += line_offset
+
+    return tree, original_lineno
+
+
+def named(func):
+    """
+    Decorator to enable semantic naming for assignments in standalone functions.
+    """
+    try:
+        tree, _ = parse_and_rewrite_function(func, adjust_lineno=False)
+
+        namespace = func.__globals__
+        namespace['__assassyn_assignment__'] = __assassyn_assignment__
+
+        # Compile and execute to get the rewritten function
+        code = compile(tree, func.__code__.co_filename, 'exec')
+        exec(code, namespace)  # pylint: disable=exec-used
+        new_func = namespace[func.__name__]
+
+        # Preserve function metadata
+        new_func.__name__ = func.__name__
+        new_func.__doc__ = func.__doc__
+        new_func.__module__ = func.__module__
+        new_func.__qualname__ = func.__qualname__
+
+        return new_func
+
+    except Exception as exc:  # pylint: disable=broad-except
+        # Fallback to original function if rewriting fails
+        import sys  # pylint: disable=import-outside-toplevel
+        print(f"Warning: AST rewriting failed for {func.__name__}: {exc}", file=sys.stderr)
+        return func

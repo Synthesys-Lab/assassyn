@@ -131,13 +131,26 @@ class TypeOrientedNamer:
             return self._module_prefix(node)
 
         if class_name == 'PureIntrinsic':
-            op_suffix = getattr(node, 'OPERATORS', {}).get(self._safe_getattr(node, 'opcode'))
-            if op_suffix:
-                args = self._safe_getattr(node, 'args') or ()
-                base_name = self._entity_name(args[0]) if args else None
+            opcode = self._safe_getattr(node, 'opcode')
+            op_suffix = getattr(node, 'OPERATORS', {}).get(opcode)
+            args = self._safe_getattr(node, 'args') or ()
+
+            # For FIFO operations (peek, valid), use just the port/fifo name
+            if op_suffix and args:
+                base_name = self._entity_name(args[0])
                 if base_name:
-                    return self._sanitize(f'{base_name}_{op_suffix}')
+                    # For FIFO_PEEK (303), use the base name with suffix for clarity
+                    if op_suffix in ('peek', 'valid'):
+                        return (
+                            self._combine_parts(base_name, op_suffix) or
+                            f'{base_name}_{op_suffix}'
+                        )
+                    return self._combine_parts(base_name, op_suffix) or f'{base_name}_{op_suffix}'
+
+            if op_suffix:
                 return self._sanitize(str(op_suffix))
+
+            return 'intrinsic'
 
         if class_name == 'Cast':
             source_desc = self._describe_operand(self._safe_getattr(node, 'x'))
@@ -150,6 +163,14 @@ class TypeOrientedNamer:
                 array_name = self._entity_name(self._safe_getattr(node, 'array'))
                 if array_name:
                     return self._combine_parts(array_name, prefix) or prefix
+            elif class_name == 'FIFOPop':
+                fifo_name = self._entity_name(self._safe_getattr(node, 'fifo'))
+                if fifo_name:
+                    return fifo_name
+            elif class_name == 'FIFOPush':
+                fifo_name = self._entity_name(self._safe_getattr(node, 'fifo'))
+                if fifo_name:
+                    return self._combine_parts(fifo_name, prefix) or prefix
             return prefix
 
         if 'BinaryOp' in mro_names:
@@ -173,7 +194,7 @@ class TypeOrientedNamer:
             lsb_desc = self._describe_operand(self._safe_getattr(node, 'lsb'))
             return self._combine_parts(msb_desc, 'cat', lsb_desc) or 'concat'
 
-        if class_name in ('Select' ,'Select1Hot'):
+        if class_name in ('Select', 'Select1Hot'):
             cond_desc = self._describe_operand(self._safe_getattr(node, 'cond'))
             return self._combine_parts(cond_desc, 'mux') or 'mux'
 

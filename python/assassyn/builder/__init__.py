@@ -14,7 +14,7 @@ from .naming_manager import (
     get_naming_manager,
     set_naming_manager,
 )
-from .rewrite_assign import rewrite_assign
+from .rewrite_assign import rewrite_assign,named
 from .type_oriented_namer import TypeOrientedNamer
 from .unique_name import UniqueNameCache
 
@@ -33,6 +33,9 @@ __all__ = [
     # Global functions
     'get_naming_manager',
     'set_naming_manager',
+    # Decorators
+    'named',
+
 ]
 
 
@@ -72,7 +75,7 @@ def ir_builder(func=None, *, node_type=None):
             package_dir = os.path.abspath(package_path())
 
             Singleton.initialize_dirs_to_exclude()
-            for i in inspect.stack()[2:]:  # pylint: disable=too-many-nested-blocks
+            for i in inspect.stack()[1:]:  # pylint: disable=too-many-nested-blocks
                 fname, lineno = i.filename, i.lineno
                 fname_abs = os.path.abspath(fname)
 
@@ -83,8 +86,6 @@ def ir_builder(func=None, *, node_type=None):
                     ):
                     res.loc = f'{fname}:{lineno}'
 
-                    # Previously extracted a best-effort naming hint here.
-                    # No longer needed as AST-rewrite provides exact names.
                     break
             assert hasattr(res, 'loc')
             return res

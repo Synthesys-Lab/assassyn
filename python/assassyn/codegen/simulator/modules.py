@@ -70,6 +70,10 @@ class ElaborateModule(Visitor):
         indent_str = " " * self.indent
         result = ""
 
+        # Add location comment if available
+        if hasattr(node, 'loc') and node.loc:
+            result += f"{indent_str}// @{node.loc}\n"
+
         if id_and_exposure:
             id_expr, need_exposure = id_and_exposure
             valid_update = ""
@@ -82,7 +86,7 @@ class ElaborateModule(Visitor):
                 result = ""
         else:
             if code:
-                result = f"{indent_str}{code};\n"
+                result += f"{indent_str}{code};\n"
 
         return result
 
@@ -183,7 +187,7 @@ use std::ffi::c_void;
 """)
 
                 # Add inline callback function for DRAM modules
-                if module_name.startswith('DRAM_'):
+                if module_name.startswith('DRAM'):
                     module_fd.write(f"""pub extern "C" fn callback_of_{module_name}(
     req: *mut Request, ctx: *mut c_void) {{
     unsafe {{
@@ -193,6 +197,7 @@ use std::ffi::c_void;
         let stamp = sim.request_stamp_map_table
             .remove(&req.addr)
             .unwrap_or_else(|| sim.stamp);
+
 
         if req.type_id == 0 {{
             // Read response

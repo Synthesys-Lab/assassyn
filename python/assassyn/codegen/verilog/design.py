@@ -198,6 +198,10 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     def visit_expr(self, expr: Expr):
         self.append_code(f'# {expr}')
 
+        # Add location comment if available
+        if hasattr(expr, 'loc') and expr.loc:
+            self.append_code(f'#{expr.loc}')
+
         # Delegate to the expression code generator
         body = codegen_expr(self, expr)
 
