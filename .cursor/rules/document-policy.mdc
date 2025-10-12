@@ -123,7 +123,7 @@ Different rules are imposed on functions with different levels of complexity. To
    - No matter how many lines, if a function acts on a global variable declared outside
      this source unit, we should pay extra attention to it. It is inevitable to track some
      global states across the project, and for development experience purpose they are implicitly
-     referred singletons. A pointer to that file of declaration should be added.
+     referred singletons. A pointer to that file of declaration should be added, especially from the `docs/design/*.md`.
 
 A simple function can be simply documented by the function signature and documentation
 strings embbed in comments. In addition to what simple functions already have, complicated

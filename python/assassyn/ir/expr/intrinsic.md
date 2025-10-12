@@ -64,7 +64,11 @@ Frontend API for creating a wait-until block.
 - `Intrinsic` - The wait-until intrinsic node
 
 **Explanation:**
-This intrinsic blocks execution until the given condition becomes true. It's commonly used in pipeline stages to wait for valid data before proceeding. The condition is evaluated each cycle until it becomes true.
+This intrinsic blocks execution until the given condition becomes true. It's commonly used in pipeline stages to wait for valid data before proceeding. The condition is evaluated each cycle until it becomes true. 
+
+**Credit System Integration:** The `wait_until` intrinsic is the mechanism by which modules **consume credits**. When a module executes `wait_until`, it decreases its credit counter, indicating that it has consumed one credit for this activation. The `driver` module has infinite credits and makes async calls that increase downstream module credits, while `wait_until` executions consume those credits.
+
+For the complete design and architecture of the credit-based flow control system, see [pipeline.md](../../../docs/design/pipeline.md).
 
 #### `def assume(cond) -> Intrinsic`
 
@@ -160,6 +164,14 @@ Get the memory response data.
 This pure intrinsic retrieves the response data from the specified memory module. The least significant bits contain the data payload, while the most significant bits contain the corresponding request address. For generality, the response data is in `Vec<8>` format.
 
 **Note on Memory Response Format:** The memory response data format is handled by the code generation system. In the Python implementation, the data is returned as a `Value` object that can be used in expressions. The actual data format conversion (e.g., from `Vec<8>` to `BigUint`) is handled during code generation to Rust.
+
+#### `MODULE_TRIGGERED` (PureIntrinsic)
+
+Check if a module was triggered this cycle (credit was decreased).
+
+**Credit System Integration:** This intrinsic indicates whether a module **was triggered this cycle**, meaning its credit counter was decreased. This happens when the module executed a `wait_until` intrinsic, consuming one credit. It's used internally by the credit-based flow control system to track module activation status.
+
+For the complete design and architecture of the credit-based flow control system, see [pipeline.md](../../../docs/design/pipeline.md).
 
 ### Helper Functions
 
