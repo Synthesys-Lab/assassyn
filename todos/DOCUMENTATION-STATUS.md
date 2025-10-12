@@ -15,10 +15,6 @@
 - [ ] `ir/dtype.py` → `ir/dtype.md` (to check)
 - [ ] `ir/value.py` → `ir/value.md` (to check)
 - [ ] `ir/visitor.py` → `ir/visitor.md` (to check)
-- [ ] `codegen/simulator/_expr/intrinsics.py` → `codegen/simulator/_expr/intrinsics.md` (to check)
-- [ ] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (to check)
-- [ ] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (to check)
-- [ ] `experimental/frontend/module.py` → `experimental/frontend/module.md` (to check)
 - [ ] `ir/expr/arith.py` → `ir/expr/arith.md` (to check)
 - [ ] `ir/expr/array.py` → `ir/expr/array.md` (to check)
 - [ ] `ir/expr/call.py` → `ir/expr/call.md` (to check)
@@ -35,6 +31,10 @@
 - [ ] `ir/module/fsm.py` → `ir/module/fsm.md` (to check)
 - [ ] `ir/module/memorybase.py` → `ir/module/memorybase.md` (to check)
 - [ ] `ir/module/module.py` → `ir/module/module.md` (to check)
+- [ ] `codegen/simulator/_expr/intrinsics.py` → `codegen/simulator/_expr/intrinsics.md` (to check)
+- [ ] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (to check)
+- [ ] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (to check)
+- [ ] `experimental/frontend/module.py` → `experimental/frontend/module.md` (to check)
 - [ ] `ramulator2/ramulator2.py` → `ramulator2/ramulator2.md` (to check)
 
 ### Module-level documentation

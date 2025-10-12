@@ -1,41 +1,76 @@
-# TODO: Documentation Fix for Array Code Generation
+# TODO: Fix Array Module Documentation and Implementation Issues
 
 ## Goal
 
-Fix documentation inconsistencies and improve clarity for the array code generation module (`codegen/simulator/_expr/array.py`) to align with the new documentation standards and provide accurate technical details.
+Fix inconsistencies and implementation issues found in the `ir/array.py` module during documentation review, and ensure the `attr` parameter functionality is properly implemented or removed.
 
 ## Action Items
 
 ### Document Development
 
-- [x] **Update array.md documentation structure** - Reorganized the documentation to follow the new standard structure with proper sections for Summary, Exposed Interfaces, and detailed function documentation with parameter descriptions and return value explanations.
+- [x] **Update design document for array module**: The documentation has been reorganized according to new standards with proper Summary, Exposed Interfaces, and Internal Helpers sections. The missing `Slice` class has been documented.
 
-- [x] **Fix generated code examples** - Corrected the `codegen_array_write` documentation to show the actual generated code using the `write()` method with port index instead of the incorrect `write_port.push()` method.
+### Coding Development
 
-- [x] **Add project-specific context** - Enhanced the documentation with references to the simulator architecture, half-cycle timing mechanism, and port-based write management system.
+#### Issue 1: Inconsistent `attr` Parameter Handling
 
-### Issues Identified and Resolved
+**Problem**: The `RegArray` function accepts an `attr` parameter but it's never actually used. The parameter is processed (defaulted to empty list if None) but never passed to the `Array` constructor or used anywhere else in the code.
 
-1. **Incorrect Generated Code Example**: The original documentation showed `sim.<array_name>.write_port.push(ArrayWrite::new(...))` but the actual implementation uses `sim.<array_name>.write(<port_idx>, write)`. This has been corrected.
+**Current State**:
+```python
+def RegArray(scalar_ty: DType, size: int, initializer: list = None, name: str = None, attr: list = None):
+    attr = attr if attr is not None else []  # Processed but never used
+    res = Array(scalar_ty, size, initializer)  # attr not passed
+    # ... rest of function
+```
 
-2. **Missing Function Documentation**: The functions lacked proper docstrings with parameter descriptions and return value explanations. Added comprehensive docstrings following the new documentation standards.
+**Required Changes**:
+1. **Option A - Remove unused parameter**: Remove the `attr` parameter from `RegArray` function signature and update all call sites
+2. **Option B - Implement functionality**: Modify `Array` constructor to accept and use the `attr` parameter
 
-3. **Lack of Context**: The documentation didn't explain the relationship to the simulator architecture, timing model, or port management system. Added references to relevant design documents and explained the half-cycle timing mechanism.
+**Recommendation**: Choose Option A (remove unused parameter) as there's no evidence of `attr` being used anywhere in the codebase, and it adds unnecessary complexity.
 
-4. **Documentation Structure**: The original documentation didn't follow the new standard structure. Reorganized into proper sections with detailed explanations.
+**Files to modify**:
+- `python/assassyn/ir/array.py` - Remove `attr` parameter from `RegArray` function
+- `python/assassyn/ir/array.md` - Update documentation to remove `attr` parameter references
+- Search and update any call sites that pass `attr` parameter (if any exist)
 
-### Technical Details Clarified
+**Commit message**: "Remove unused attr parameter from RegArray function"
 
-- **Half-cycle timing**: The timestamp calculation `sim.stamp - sim.stamp % 100 + 50` aligns writes to the half-cycle boundary for proper register update timing.
+#### Issue 2: Missing Array Constructor Documentation
 
-- **Port-based writes**: The system uses compile-time port indices assigned by the port manager for optimal performance with multi-writer arrays.
+**Problem**: The `Array` class constructor is not documented in the current documentation structure.
 
-- **Deferred writes**: Array writes are buffered and applied during the next half-cycle when `tick_registers()` is called, following the simulator's timing model.
+**Required Changes**:
+1. Add `__init__` method documentation to the `Array` class section in `ir/array.md`
+2. Document the constructor parameters and their purposes
+3. Explain the initialization process and default values
 
-### No Code Changes Required
+**Files to modify**:
+- `python/assassyn/ir/array.md` - Add `__init__` method documentation
 
-The implementation in `array.py` is correct and consistent with the documentation. No functional changes are needed as the code properly implements the array read/write operations according to the simulator architecture.
+**Commit message**: "Add Array constructor documentation"
 
-## Status
+### Testing
 
-✅ **Completed** - Documentation has been updated and moved to the DONE section in DOCUMENTATION-STATUS.md. The documentation now accurately reflects the implementation and provides comprehensive context for understanding the array code generation functions.
+- [ ] **Run existing tests**: Ensure all existing tests pass after removing the `attr` parameter
+- [ ] **Verify functionality**: Test that array creation, naming, and write port functionality still works correctly
+- [ ] **Check for breaking changes**: Verify that no external code depends on the `attr` parameter
+
+### Documentation Updates
+
+- [x] **Update array.md**: Documentation has been reorganized according to new standards
+- [ ] **Update any related documentation**: Check if other files reference the `attr` parameter and update accordingly
+
+## Notes
+
+- The `attr` parameter appears to be a legacy feature that was never fully implemented
+- No test cases or usage examples were found that actually use the `attr` parameter
+- The current implementation always initializes `attr` to an empty list in the `Array` constructor
+- Removing the unused parameter will simplify the API and eliminate confusion
+
+## Dependencies
+
+- This change may affect any external code that passes the `attr` parameter to `RegArray`
+- Need to verify that the naming manager and builder integration still works correctly
+- Should coordinate with any ongoing work on array functionality
