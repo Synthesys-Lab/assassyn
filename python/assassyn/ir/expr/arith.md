@@ -99,12 +99,14 @@ def dtype(self):
 ```
 
 **Explanation:** Calculates and returns the data type of the operation result based on the operation type and operand types. The type inference rules are:
-- Addition: Maximum bit width of operands (TODO: should be bits + 1 for carry)
+- Addition: Maximum bit width of operands (NOTE: Currently uses `max(bits)` but should be `bits + 1` for carry bit handling)
 - Subtraction, Division, Modulo: Same type as left operand
 - Multiplication: Sum of operand bit widths
 - Shifts: Same bit width as left operand
 - Comparisons: Single bit result
 - Bitwise operations: Maximum bit width of operands
+
+**Note on Addition Carry Handling:** The current implementation uses `max(self.lhs.dtype.bits, self.rhs.dtype.bits)` for addition operations, but there's a TODO comment indicating this should be `bits + 1` to account for carry bits. This is a known limitation that may be addressed in future versions.
 
 #### `__repr__(self)`
 

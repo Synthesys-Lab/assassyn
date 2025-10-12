@@ -35,6 +35,8 @@ def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None):
 
 **Explanation:** Initializes an array write operation with the target array, index, value, and module context. If no module is provided, it retrieves the current module from the builder singleton. This module context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array.
 
+**Note on Builder Context Dependency:** The `ArrayWrite` class depends on the global `Singleton.builder.current_module` when no module is explicitly provided. This creates an implicit dependency on the builder context that should be considered when using this class outside of normal builder contexts.
+
 #### `array` (property)
 
 ```python

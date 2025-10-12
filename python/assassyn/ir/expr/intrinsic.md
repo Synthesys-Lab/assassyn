@@ -159,6 +159,8 @@ Get the memory response data.
 **Explanation:**
 This pure intrinsic retrieves the response data from the specified memory module. The least significant bits contain the data payload, while the most significant bits contain the corresponding request address. For generality, the response data is in `Vec<8>` format.
 
+**Note on Memory Response Format:** The memory response data format is handled by the code generation system. In the Python implementation, the data is returned as a `Value` object that can be used in expressions. The actual data format conversion (e.g., from `Vec<8>` to `BigUint`) is handled during code generation to Rust.
+
 ### Helper Functions
 
 #### `def is_wait_until(expr) -> bool`
