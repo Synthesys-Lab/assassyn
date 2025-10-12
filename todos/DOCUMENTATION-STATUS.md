@@ -6,10 +6,9 @@
 
 ---
 
-## 1. TO CHECK (40 files) - Review existing documentation against new rules
+## 1. TO CHECK (39 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `builder/unique_name.py` → `builder/unique_name.md` (to check)
 - [ ] `codegen/simulator/modules.py` → `codegen/simulator/modules.md` (to check)
 - [ ] `codegen/simulator/port_mapper.py` → `codegen/simulator/port_mapper.md` (to check)
 - [ ] `codegen/simulator/_expr/arith.py` → `codegen/simulator/_expr/arith.md` (to check)
@@ -99,7 +98,7 @@
 
 ---
 
-## 3. DONE (5 files) - Completed documentation
+## 3. DONE (6 files) - Completed documentation
 
 ### Leaf-level files (simple to complex)
 - [x] `analysis/external_usage.py` → `analysis/external_usage.md` (completed)
@@ -107,6 +106,7 @@
 - [x] `builder/naming_manager.py` → `builder/naming_manager.md` (completed)
 - [x] `builder/rewrite_assign.py` → `builder/rewrite_assign.md` (completed)
 - [x] `builder/type_oriented_namer.py` → `builder/type_oriented_namer.md` (completed)
+- [x] `builder/unique_name.py` → `builder/unique_name.md` (completed)
 
 ---
 
@@ -116,7 +116,7 @@
 - **Total Python files**: 74
 - **Files to check**: 39 (53%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 5 (7%)
+- **Files completed**: 6 (8%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex
