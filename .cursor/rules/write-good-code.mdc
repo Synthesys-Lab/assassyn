@@ -21,3 +21,8 @@ def foo_wrapper(a):
 
 3. Focus on thing for each module. If a module is originally designed for a purpose, do not borrow its code
    path for anything else, unless the addition is a part of feature extension closely related to this module.
+
+4. DO NOT hard code. If you have a constant value defined for a specific purpose, when used do not hard code
+   its literal value.
+   - Is is possible to make this value a constant variable and use this variable?
+   - Is it possible to change it to a enum to avoid other mistakes?
