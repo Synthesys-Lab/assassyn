@@ -131,14 +131,11 @@ functions should be followed by **Explanation** paragraph to explain
 
 ## Best Practice
 
-It is prefered that if the line length is around 120 characters
-you should have a new line, just like this document does.
 To maintain a LLM context friendly document length,
 if possible, keep the document length around 300-500 lines.
 It is acceptable to have a document up to 800 lines.
-You can temporarily allow a document file more than 800 lines,
-but in that case, leave a `TODO-breakdown-module-xxx.md` file
-for human intervention.
+If a document is more than 500 lines, leave a `TODO-breakdown-module-xxx.md`
+file for human intervention.
 
 ## Read Document
 
