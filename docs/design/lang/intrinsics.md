@@ -1,6 +1,7 @@
 # Intrinsic Functions
 
-Intrinsic functions are built-in operations that provide hardware-specific functionality not expressible through regular expressions. They are essential for controlling execution flow, memory operations, and synchronization in Assassyn designs.
+Intrinsic functions are built-in operations that provide hardware-specific functionality not expressible through regular expressions.
+They are essential for controlling execution flow, memory operations, and synchronization in Assassyn designs.
 
 ## Categories
 
