@@ -2,13 +2,14 @@
 
 I am reluctant to call Assassyn a DSL. Though it is a DSL for
 hardware design and it provides specific abstractions to hardware designs
-discussed in [arch.md](../arch/arch.md), these designs are general enough
+discussed in [arch.md](../../arch/arch.md), these designs are general enough
 to cover a wide range of hardware designs.
 
 In this document, we mainly discuss how a credit-based pipeline stage is
 abstracted in Assassyn conceptually, since many other abstractions can
-hardly make sense without understainding the frontend implementation discussed
-in [trace.md](../trace/trace.md).
+hardly make sense without understanding the frontend implementation discussed
+in [trace.md](./trace.md). For the underlying architecture concepts, see
+[arch.md](../../arch/arch.md).
 
 ## Credited Pipeline Stage
 
@@ -32,19 +33,20 @@ shall guarantee the timing of data validity.
 stage.async_called(**args)
 ```
 
-A credited pipeline stage is treated as a asynchronous function.
+A credit-based pipeline stage is treated as an asynchronous function.
 All its inputs are passed as arguments, and calling this function
 increases a credit to this function, and successfully returning
 (see below for the definition of "success") from the function decreases a credit.
 If there is no credit available, this pipeline stage will not be activated at all.
 
-Just like `main` is an entrance to a software program, we have a special
+Just like `main` is an entry point to a software program, we have a special
 stage named `Driver` who has infinite credits. This stage is unconditionally
 activated in every cycle to drive the whole design.
 
 We introduce a `wait_until` primitive to define the success of a function.
 This primitive is useful for CPU decoders, which may need to wait for the
-validity of operands before sending data to the executor.
+validity of operands before sending data to the executor. For more details
+on intrinsics, see [intrinsics.md](./intrinsics.md).
 
 ````python
 # within a stage

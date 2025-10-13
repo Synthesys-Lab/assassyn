@@ -1,9 +1,13 @@
 # Memory System
 
+This document describes the memory system architecture in Assassyn.
+For the broader architectural context and execution model, see [arch.md](./arch.md).
+For Verilog implementation details, see [simulator.md](../internal/simulator.md).
+
 ## SRAM
 
 Assassyn emulates the behavior of an exclusive-single-read-write SRAM bank
-from ASAP7 like below:
+from ASAP7 as shown below:
 
 ````verilog
 // synchronous SRAM verilog
@@ -31,10 +35,10 @@ endmodule //
 ````
 
 Where all the inputs, `ADDRESS`, `wd`, `banksel`, `read`, and `write`, are combinational signals
-and the output `dataout` is a register. Thus, a key difference between a SRAM and a register file
-is to have 1 cycle read latency. Further, to fit in the
+and the output `dataout` is a register. Thus, a key difference between an SRAM and a register file
+is having 1 cycle read latency. Further, to fit in the
 [Assassyn architecture template](./arch.md),
-a SRAM is treated as a downstream module.
+an SRAM is treated as a downstream module.
 
 ## DRAM
 
@@ -49,7 +53,7 @@ The key difference is that DRAM has a variable latency,
 thus we provide two intrinsics, which will later be lowered to
 combinational signals, to check if the memory request is back:
 - `has_mem_resp(mem)`: returns true if there is a memory response back from the given DRAM `mem`.
-- `get_mem_resp(mem)`: returns the memory response from the given DRAM `mem`. The msb is the address, and the lsb is the data.
+- `get_mem_resp(mem)`: returns the memory response from the given DRAM `mem`. The MSB is the address, and the LSB is the data.
 
 Currently, we adopt a simple hack to add write response to
 Ramulator [as documented](../../scripts/init/patches/ramulator2-patch.md).
@@ -64,4 +68,4 @@ Load Store Queue (LSQ) in a real processor. This means:
 - Write buffer management uses a simple queue without proper ordering guarantees
 - This limitation is acceptable for the first version but should be addressed in future iterations
 
-> RFC: Is it a good long term design? Or later we design a better LSQ?
+> RFC: Is this a good long-term design? Or should we design a better LSQ later?

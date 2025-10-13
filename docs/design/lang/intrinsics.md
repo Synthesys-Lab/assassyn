@@ -3,6 +3,9 @@
 Intrinsic functions are built-in operations that provide hardware-specific functionality not expressible through regular expressions.
 They are essential for controlling execution flow, memory operations, and synchronization in Assassyn designs.
 
+For the broader context of how intrinsics fit into the DSL, see [dsl.md](./dsl.md).
+For implementation details, see [trace.md](./trace.md).
+
 ## Categories
 
 Intrinsics are divided into two categories:
