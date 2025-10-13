@@ -1,72 +1,229 @@
-# Factory
+# Unified Factory Decorator
 
-This module provides `@factory(type)` decorator to construct
-different types of modules, including `Module`, `Downstream`, and `Callback`.
+This module provides the `@factory(type)` decorator for constructing different types
+of modules in the experimental frontend, including `Module`, `Downstream`, and `Callback`.
+It implements a unified factory pattern that normalizes module construction across
+different module flavors while providing type-specific validation and construction.
 
-## Exposed Interface
+## Summary
 
-````python
-@factory(<type>)
-def my_module_factory(...) -> Factory[<type>]:
-    def my_module(...):
-        ...
-    return my_module
-````
+The factory decorator provides a higher-order function approach to module construction
+in Assassyn's experimental frontend. It enables a functional programming style where
+modules are constructed through factory functions that return inner module definitions.
+This approach provides better composability and type safety compared to the legacy
+frontend's imperative construction patterns.
 
-Before calling the decorated function, the `@factory` decorator
-first enforces all the arguments fed to the decorated function
-are the same types as annotated, by iterating over the arguments and checking
-their types in `__annotations__`, and then:
+The decorator handles shared plumbing across all module types while delegating
+type-specific validation and construction to specialized factory methods implemented
+by each module type.
 
-1. It extracts all the arguments in the returned inner function signature to
-   perform type-specific checks by invoking `type.factory_check_signature(inner)`.
-   - Refer to `module.md`, `downstream.md`, and `callback.md` for more details.
-2. Iit creates the corresponding module object by invoking
-   `type.factory_create(...)` with the extracted arguments.
-   - Also refer to `module.md`, `downstream.md`, and `callback.md` for more details.
-3. The module name will be renamed to the inner function name capitalized.
-   - Check the inner function's name are the same as the outer factory function's name
-     with the `_factory` suffix removed.
-   - Because `Driver` module is reserved in the old frontend to be the top module,
-     so a factory function named `driver_factory` should create a module named `Driver`.
-     For now, we make this compromise to keep compatibility.
-   - To avoid name collision, it uses `Singleton.naming_manager.get_module_name(inner.__name__)`.
-     The inner function name is given to `get_module_name` to generate a unique name
-     by increasing a counter of instantiations of each function.
-4. Call the inner function to grow the AST of the module, and wrap the returned module
-   in `Factory[...]` class (see below).
-   - To grow the AST, refer to `@combinational_for` decorator implemented in
-     [base.py](../../ir/module/base.py) to enter and exit the AST growing context.
+## Exposed Interfaces
 
-## Factory Class
+### factory
 
-The `Factory[...]` class is a generic wrapper of a module
-to construct `@factory`-decorated modules.
+```python
+def factory(module_type: Any) -> Callable[[Callable[..., Callable[..., Any]]], Callable[..., Factory[Any]]]:
+    """Universal factory decorator."""
+```
 
-````python
-class Factory:
-    module: Module | Downstream | Callback # The current underlying module
-    pins: list[Value] # Combinational pins exposed to external modules
+**Purpose**: Decorates factory functions to create modules of the specified type.
 
-    def __init__(self, module: Module | Downstream | Callback):
-        self.module = module
-        self.pins = None
+**Parameters**:
+- `module_type`: The type of module to create (e.g., `Module`, `Downstream`)
 
-    def expose(self, *pins: Value)
-        '''Expose combinational pins to external modules.
-        This method is typically called at the end of constructing a module.
-        '''
-    
-    def __cls_getitem__(cls, item: Module | Downstream | Callback) -> type:
-        '''A type annotation method to wrap different types of modules.
-        This method is called when using `Factory[<type>]` annotation,
-        which returns <type>Factory class, a subclass of Factory class.
-        '''
-````
+**Returns**: A decorator function that wraps factory functions
 
-## Singleton Wrapper
+**Explanation**: The decorator performs several key operations:
+1. **Argument Validation**: Validates that arguments passed to the outer factory function
+   match their type annotations using `_validate_outer_arguments()`
+2. **Type-specific Validation**: Calls `module_type.factory_check_signature(inner)` to
+   validate the inner function signature according to module type requirements
+3. **Module Creation**: Calls `module_type.factory_create(inner, args)` to instantiate
+   the module
+4. **Naming**: Assigns a unique, capitalized name using the naming manager
+5. **AST Construction**: Executes the inner function within the module context to build
+   the module's AST
+6. **Factory Wrapping**: Returns the module wrapped in a `Factory[module_type]` instance
 
-````python
-def this(): 
-    '''Returns the current module being constructed from `Singleton`.'''
-````
+The `module_type` must provide `factory_check_signature` and `factory_create` static methods
+for type-specific validation and construction.
+
+### Factory
+
+```python
+class Factory(Generic[ModuleLike]):
+    """Generic wrapper returned by `@factory` decorated functions."""
+```
+
+**Purpose**: Generic wrapper class that provides a unified interface for different
+module types returned by factory functions.
+
+**Attributes**:
+- `module`: The underlying module instance produced by the decorator
+- `pins`: Optional list of combinational pins exposed via `expose()`
+
+**Methods**:
+
+#### __init__
+
+```python
+def __init__(self, module: ModuleLike):
+    """Initialize the factory wrapper."""
+```
+
+**Purpose**: Creates a factory wrapper around a module instance.
+
+**Parameters**:
+- `module`: The module instance to wrap
+
+#### expose
+
+```python
+def expose(self, *pins: Value) -> 'Factory[ModuleLike]':
+    """Expose combinational pins to upstream modules."""
+```
+
+**Purpose**: Exposes combinational pins from the module for use by upstream modules.
+
+**Parameters**:
+- `*pins`: Variable number of `Value` objects to expose as pins
+
+**Returns**: Self for method chaining
+
+**Explanation**: This method is typically called at the end of module construction
+to expose internal values as combinational pins that can be accessed by other
+modules without stage boundaries.
+
+#### __class_getitem__
+
+```python
+def __class_getitem__(cls, item: Type[Any]) -> Type['Factory']:
+    """Return (and cache) a specialised Factory subclass for `item`."""
+```
+
+**Purpose**: Creates specialized factory subclasses for different module types.
+
+**Parameters**:
+- `item`: The module type to specialize for
+
+**Returns**: A specialized `Factory` subclass
+
+**Explanation**: This method enables type-safe factory creation using `Factory[ModuleType]`
+syntax. It creates and caches specialized subclasses for each module type.
+
+### this
+
+```python
+def this():
+    """Return the module currently being constructed."""
+```
+
+**Purpose**: Returns the module currently being constructed within the factory context.
+
+**Returns**: The current module instance from the singleton builder
+
+**Explanation**: This function provides access to the current module being constructed,
+enabling the inner function to reference its own module instance during construction.
+
+### pin
+
+```python
+def pin(*pins: Value) -> None:
+    """Expose combinational pins from the current module being constructed."""
+```
+
+**Purpose**: Exposes combinational pins from the current module being constructed.
+
+**Parameters**:
+- `*pins`: Variable number of `Value` objects to expose as pins
+
+**Raises**: `RuntimeError` if called outside an active module context
+
+**Explanation**: This function adds pins to the current module's pin list, making
+them available for combinational connections to other modules. It must be called
+within an active module construction context.
+
+## Internal Helpers
+
+### _validate_outer_arguments
+
+```python
+def _validate_outer_arguments(func: Callable[..., Any], args: tuple, kwargs: dict) -> Dict[str, Any]:
+    """Validate arguments passed to the outer factory function."""
+```
+
+**Purpose**: Validates that arguments passed to factory functions match their type annotations.
+
+**Parameters**:
+- `func`: The factory function being called
+- `args`: Positional arguments
+- `kwargs`: Keyword arguments
+
+**Returns**: Dictionary of validated arguments
+
+**Explanation**: This function performs runtime type checking on factory function arguments
+by comparing actual argument types against function annotations. It handles `Union` types
+(including `Optional`) and falls back to trusting the caller for complex annotations.
+
+### _verify_inner_name
+
+```python
+def _verify_inner_name(outer_name: str, inner_name: str) -> None:
+    """Ensure the inner function follows the `<name>[_factory]` convention."""
+```
+
+**Purpose**: Validates that inner function names follow the expected naming convention.
+
+**Parameters**:
+- `outer_name`: Name of the outer factory function
+- `inner_name`: Name of the inner function
+
+**Raises**: `ValueError` if naming convention is violated
+
+**Explanation**: Ensures inner functions are named consistently with their factory functions,
+removing the `_factory` suffix if present. This maintains naming consistency across
+the experimental frontend.
+
+### _rename_module
+
+```python
+def _rename_module(module: Any, inner_name: str) -> None:
+    """Assign a unique, capitalised module name derived from `inner_name`."""
+```
+
+**Purpose**: Assigns a unique, capitalized name to the module instance.
+
+**Parameters**:
+- `module`: The module instance to rename
+- `inner_name`: The inner function name to derive the module name from
+
+**Explanation**: Uses the naming manager to generate a unique, capitalized module name
+based on the inner function name, ensuring no naming conflicts across module instances.
+
+### _enter_module_context
+
+```python
+def _enter_module_context(module: Any) -> Block:
+    """Initialise a module body and enter the builder context."""
+```
+
+**Purpose**: Initializes the module's body and enters the builder context for AST construction.
+
+**Parameters**:
+- `module`: The module instance to initialize
+
+**Returns**: The module's body block
+
+**Explanation**: Creates a new `Block` for the module body and enters the builder context
+to enable AST construction within the module.
+
+### _exit_module_context
+
+```python
+def _exit_module_context() -> None:
+    """Exit the current module context."""
+```
+
+**Purpose**: Exits the current module construction context.
+
+**Explanation**: Cleans up the builder context after module construction is complete.

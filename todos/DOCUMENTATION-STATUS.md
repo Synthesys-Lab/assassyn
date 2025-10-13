@@ -6,13 +6,9 @@
 
 ---
 
-## 1. TO CHECK (27 files) - Review existing documentation against new rules
+## 1. TO CHECK (24 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `codegen/simulator/_expr/intrinsics.py` → `codegen/simulator/_expr/intrinsics.md` (to check)
-- [ ] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (to check)
-- [ ] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (to check)
-- [ ] `experimental/frontend/module.py` → `experimental/frontend/module.md` (to check)
 - [ ] `ramulator2/ramulator2.py` → `ramulator2/ramulator2.md` (to check)
 
 ### Module-level documentation
@@ -71,9 +67,13 @@
 
 ---
 
-## 3. DONE (20 files) - Completed documentation
+## 3. DONE (23 files) - Completed documentation
 
 ### Leaf-level files (simple to complex)
+- [x] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (completed)
+- [x] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (completed)
+- [x] `experimental/frontend/module.py` → `experimental/frontend/module.md` (completed)
+- [x] `codegen/simulator/_expr/intrinsics.py` → `codegen/simulator/_expr/intrinsics.md` (completed)
 - [x] `ir/module/base.py` → `ir/module/base.md` (completed)
 - [x] `ir/module/downstream.py` → `ir/module/downstream.md` (completed)
 - [x] `ir/module/external.py` → `ir/module/external.md` (completed)
@@ -113,9 +113,9 @@
 
 ### Statistics
 - **Total Python files**: 74
-- **Files to check**: 14 (19%)
+- **Files to check**: 10 (14%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 32 (43%)
+- **Files completed**: 36 (49%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex

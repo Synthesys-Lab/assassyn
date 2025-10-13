@@ -1,95 +1,150 @@
-# Module
+# Module Factory Support
 
-This module provides all the support and extentions
-to  `@factory(Module)` decorator.
+This module provides factory support functions for the `@factory(Module)` decorator
+in the experimental frontend. Module instances represent pipeline stages in
+Assassyn's credit-based pipeline architecture, implementing sequential logic
+with stage boundaries and async communication.
 
-## Exposed Interface
+## Summary
 
-````python
-def factory_check_signature(inner: Callable) -> bool:
-````
-- It checks that all the arguments have type annotations.
-  - If a `StageFactory` is passed as an argument expecting `Stage`,
-    the underlying `stage` attribute is unwrapped to the factory function.
-- It checks that all the argument types are `Port[<some-type>]`.
-- `<some-type>` must be a subclass of `DataType` declared in [dtype.py](../../ir/dtype.py).
+Module instances are the primary building blocks of Assassyn's credit-based pipeline
+architecture as described in [arch.md](../../../docs/design/arch/arch.md). Unlike
+`Downstream` modules that implement combinational logic, `Module` instances operate
+sequentially with explicit stage boundaries, enabling async communication between
+pipeline stages through the credit system.
 
---------
+Modules receive data through input ports and can make async calls to other modules,
+consuming credits in the process. This enables the credit-based flow control
+mechanism where modules wait for credits before executing.
 
-````python
-def factory_create(inner: Callable, args: dict[str, Port]) -> Factory[Module]:
-    '''Create a `Module` object from the inner function and arguments.'''
-````
-- It calls the constructor of the `Module` class declared in
-  [module.py](../../ir/module/module.py) to create a module object.
-- The name of this module will be renamed by `factory` decorator
-  later with unique and capitalized name.
+## Exposed Interfaces
 
-## Extensions
+### factory_check_signature
 
-````python
-class ModuleFactory(Factory):
-    bind: Bind | None # The bind from ir/expr.py
+```python
+def factory_check_signature(inner: Callable[..., Any]) -> Dict[str, Port]:
+    """Validate inner signature and synthesise module ports."""
+```
 
-    def __lshift__(self, args: tuple[Value] | dict[str, Value] | Value);
-````
+**Purpose**: Validates the inner function signature and creates port definitions
+for the module based on parameter annotations.
 
+**Parameters**:
+- `inner`: The inner function to validate
 
-**Usage:** This overload is both syntactical sugar and a syntactical salt to remind users
-that this function call is different from calling a normal Python function.
-We overload the `<<` operator to pass arguments to the function,
-and the `()` operator to invoke the function.
-Both kw-based and positional argument passing are supported.
+**Returns**: Dictionary mapping parameter names to `Port` instances
 
-````python
-# kw-based argument passing
-(adder << {'a': a, 'b': b})()
-# positional argument passing
-(adder << (a, b))()
-# continuous argument passing
-(adder << a << b)()
-````
+**Raises**: `TypeError` if parameters lack type annotations or have invalid types
 
-Even though the target stage has empty input ports, users are still required to
-first bind it emptily with `<< {}` and then invoking it with `()`.
+**Explanation**: This function validates that all parameters in the inner function
+have type annotations of the form `Port[DataType]`. It creates `Port` instances
+for each parameter, which will become the module's input ports. The ports enable
+the module to receive data from upstream stages through the credit-based pipeline
+system.
 
-````python
-# no argument passing
-(empty << {})()
-````
+### factory_create
 
-**Implementation:**
-If `self.bind` is `None`, this operator calls `self.m.bind()` to create an empty first `Bind`.
-Then, then operator overloads the `<<` operator to bind arguments to the stage.
-- A single `Value` bind is converted to a single-element tuple bind (see below).
-- If the `args` is `Tuple[Value]`, it pushes value bindings to unbound ports in order.
-  This should be done by converting positional to kw arguments, because `self.bind` provides
-  onlyy `**kwargs` interface:
-    1. traversing `self.bind.pushes` (declared in [call.py](../../ir/expr/call.py))
-    to find all unbound ports.
-    2. map the first `len(args)` unbound ports to the given `args`.
-- If the `args` is a dictionary mapping port names to `Value` objects, it
-  binds the values to the corresponding ports.
+```python
+def factory_create(_inner: Callable[..., Any], args: Dict[str, Port]) -> Tuple[Module, Dict[str, Port]]:
+    """Instantiate a Module and prepare kwargs for the inner builder."""
+```
 
+**Purpose**: Creates a new `Module` instance and prepares keyword arguments for
+the inner function execution.
 
---------
+**Parameters**:
+- `_inner`: The inner function (unused in module creation)
+- `args`: Dictionary of port definitions
 
-````python
-    def __call__(self);
-````
+**Returns**: Tuple of (module instance, keyword arguments for inner function)
 
-This operator creates a async call to the bind by calling `self.bind.async_called()` in the old frontend.
-Call is always `void` argument, as arguments are fed by bindings.
+**Explanation**: Creates a `Module` instance using the port definitions and
+prepares keyword arguments that map port names to their corresponding port
+objects. This enables the inner function to access its input ports by name
+during execution.
 
---------
+### pop_all
 
-````python
-# NOTE: This method is not a member of ModuleFactory
-def pop_all(validate: bool = False);
-````
+```python
+def pop_all(validate: bool = False):
+    """Pop all ports from the current module under construction."""
+```
 
-This function is a syntactical sugar to pop all the `Port`,
-as a helper to call `Module.pop_all_ports`.
+**Purpose**: Syntactic sugar for popping all input ports from the current module.
+
+**Parameters**:
+- `validate`: Whether to validate all ports have data before popping
+
+**Returns**: List of popped values (or single value if only one port)
+
+**Raises**: `RuntimeError` if called outside an active module context
+
+**Explanation**: This function provides convenient access to all input ports
+of the current module. When `validate=True`, it ensures all ports have valid
+data before popping, setting the module to backpressure timing mode.
+Otherwise, it uses systolic timing mode.
+
+## Internal Helpers
+
+### ModuleFactory
+
+```python
+class ModuleFactory(Factory[Module]):
+    """Wrapper around `Module` providing bind/call sugar."""
+```
+
+**Purpose**: Specialized factory wrapper for `Module` instances that provides
+syntactic sugar for binding arguments and making async calls.
+
+**Attributes**:
+- `bind`: Optional `Bind` instance for argument binding
+
+**Methods**:
+
+#### __lshift__
+
+```python
+def __lshift__(self, args):
+    """Bind arguments to the module using the << operator."""
+```
+
+**Purpose**: Provides syntactic sugar for binding arguments to module ports.
+
+**Parameters**:
+- `args`: Arguments to bind (Value, tuple, or dict)
+
+**Returns**: Self for method chaining
+
+**Raises**: `ValueError` if too many positional arguments provided
+**Raises**: `TypeError` if arguments are not Value, tuple, or dict
+
+**Explanation**: This operator overload enables convenient argument binding
+using the `<<` operator. It supports:
+- Single `Value` objects (converted to single-element tuples)
+- Tuples of `Value` objects (bound to unbound ports in order)
+- Dictionaries mapping port names to `Value` objects
+
+The operator creates a `Bind` instance if none exists and binds arguments
+to the module's ports. For positional arguments, it automatically maps
+to unbound ports in order.
+
+#### __call__
+
+```python
+def __call__(self):
+    """Make an async call to the bound module."""
+```
+
+**Purpose**: Executes an async call to the module using bound arguments.
+
+**Returns**: `AsyncCall` expression
+
+**Raises**: `ValueError` if no arguments have been bound
+
+**Explanation**: Creates an async call to the module using the arguments
+bound via the `<<` operator. This implements the credit-based communication
+pattern where the caller increases the callee's credit counter and the
+callee consumes credits when executing.
 
 ## Usage
 ````python

@@ -1,30 +1,65 @@
-# Convergent Downstream for Combinational Logic
+# Downstream Module Factory Support
 
-This module provides all the support and extentions
-to  `@factory(Downstream)` decorator.
+This module provides factory support functions for the `@factory(Downstream)` decorator
+in the experimental frontend. Downstream modules implement combinational logic that
+converges data from multiple pipeline stages without stage boundaries.
 
-The key difference between a `Module` and a `Downstream` is that
-inputs are sequential or combinational, respectively.
-`Downstream` converges combinational logics, so no async call
-happends. Its inner function signature is always empty-argument.
+## Summary
 
-## Exposed Interface
+Downstream modules are a special type of module in Assassyn's credit-based pipeline
+architecture. Unlike regular `Module` instances that operate sequentially with stage
+boundaries, `Downstream` modules implement pure combinational logic that can receive
+data from multiple sources in the same cycle. This enables efficient cross-stage
+communication patterns as described in the [architectural design](../../../docs/design/arch/arch.md).
 
-````python
-def factory_check_signature(inner: Callable) -> bool:
-````
-For downstream combinational logic, the inner function should not have any arguments.
-This function checks if the inner function signature is empty-argument.
+The key architectural difference is that `Downstream` modules have no input ports
+and their inner functions take no arguments, making them purely combinational.
 
---------
+## Exposed Interfaces
 
-````python
-def factory_create(inner: Callable, args: dict[str, Port]) -> Factory[Downstream]:
-    '''Create a `Downstream` object from the inner function and arguments.'''
-````
+### factory_check_signature
 
-- It calls the constructor of the `Downstream` class declared in
-  [downstream.py](../../ir/downstream/downstream.py) to create a module object.
+```python
+def factory_check_signature(inner: Callable[..., Any]) -> bool:
+    """Validate that the inner function has no arguments (empty signature)."""
+```
+
+**Purpose**: Validates that downstream module inner functions have empty signatures,
+as downstream modules are purely combinational and receive data through exposed pins
+rather than input ports.
+
+**Parameters**:
+- `inner`: The inner function to validate
+
+**Returns**: `True` if validation passes
+
+**Raises**: `TypeError` if the inner function has any parameters
+
+**Explanation**: Downstream modules implement combinational logic that converges data
+from multiple sources. Since they operate without stage boundaries, they cannot have
+input ports like regular modules. Instead, they receive data through combinational
+pins exposed by upstream modules using the `pin()` function. This validation ensures
+the inner function signature matches this architectural constraint.
+
+### factory_create
+
+```python
+def factory_create(_inner: Callable[..., Any], _args: bool) -> Downstream:
+    """Instantiate a Downstream module."""
+```
+
+**Purpose**: Creates a new `Downstream` module instance for the factory pattern.
+
+**Parameters**:
+- `_inner`: The inner function (unused in downstream creation)
+- `_args`: Arguments payload (unused for downstream modules)
+
+**Returns**: A new `Downstream` instance
+
+**Explanation**: Creates a `Downstream` module by calling the constructor of the
+`Downstream` class declared in [downstream.py](../../ir/module/downstream.py).
+The module name will be assigned by the factory decorator using the naming manager
+to ensure uniqueness.
 
 ## Usage
 
