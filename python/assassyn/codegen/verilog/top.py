@@ -20,6 +20,7 @@ from ...ir.expr import (
 from ...ir.dtype import Record
 from ...utils import namify, unwrap_operand
 from ...ir.const import Const
+from ...analysis import topo_downstream_modules
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def generate_top_harness(dumper):
@@ -202,7 +203,8 @@ def generate_top_harness(dumper):
 
     dumper.append_code('\n# --- Module Instantiations and Connections ---')
 
-    all_modules = dumper.sys.modules + dumper.sys.downstreams
+    sorted_downstreams = topo_downstream_modules(dumper.sys)
+    all_modules = dumper.sys.modules + sorted_downstreams
     instantiation_modules = [
         module for module in all_modules if not dumper._is_external_module(module)
     ]
