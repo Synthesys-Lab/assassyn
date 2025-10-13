@@ -1,46 +1,78 @@
-# Trace-based DSL Frontend Embedded in Python
+# Domain-specific Language Abstraction
 
-To save the excessive engineering effort of developing parser
-for this DSL, we adopt a trace based DSL. All the Assassyn
-[AST/IR nodes](../../python/assassyn/ir/) are overloaded.
-Everytime an operation is done, it is implicitly put into
-the IR current insert point maintained by the
-[builder singleton](../../python/assassyn/builder/__init__.py).
+I am reluctant to call Assassyn a DSL. Though it is a DSL for
+hardware design and it provides specific abstractions to hardware designs
+discussed in [arch.md](../arch/arch.md), these designs are general enough
+to cover a wide range of hardware designs.
 
-When building a module, either a [pipeline stage](../../python/assassyn/ir/module/module.py)
-or a [downstream](../../python/assassyn/ir/module/downstream.py),
-a `combinational` decorator is annotated to the entrance of tracing
-so that the singleton changes the current insert point to this module.
-Essentially, builder maintains a stack of inserting point, so that
-we can recursively build other modules when building a current module.
+In this document, we mainly discuss how a credit-based pipeline stage is
+abstracted in Assassyn conceptually, since many other abstractions can
+hardly make sense without understainding the frontend implementation discussed
+in [trace.md](../trace/trace.md).
 
-# Conditions
+## Credited Pipeline Stage
 
-If we use `Condition(xxx)` in trace-based DSL, it will inject a conditional block
-in AST. This `with` scope changes the current insert point to block when entering
-and pops the stack to the block before when exiting.
+### Retrieve Data from Stage Registers
 
-````python
-with Condition(xxx):
-    pass
-````
-
-Be careful, if you use `if` statement, it just changes the path of tracing:
+We provide a syntactical sugar to retrieve data from stage registers.
+As these registers are FIFOs, we provide `pop_all_ports(True/False)`.
 
 ```python
-if xxx:
-    # trace 1
-    pass
-else:
-    # trace 2
-    pass
+a, b = stage.pop_all_ports(True)
 ```
 
-This is similar to C/C++'s macro-based pre-processing:
-```C
-# if xxx
-// this will be compiled
-#else
-// other will be compiled
-#endif
+`True` is related to the `wait_until` primitive discussed below.
+When it is `True`, it implicitly waits until all the ports are valid.
+When `False`, it unconditionally pops all the ports, and the user
+shall guarantee the timing of data validity.
+
+### Activate a Stage
+
+```python
+stage.async_called(**args)
+```
+
+A credited pipeline stage is treated as a asynchronous function.
+All its inputs are passed as arguments, and calling this function
+increases a credit to this function, and successfully returning
+(see below for the definition of "success") from the function decreases a credit.
+If there is no credit available, this pipeline stage will not be activated at all.
+
+Just like `main` is an entrance to a software program, we have a special
+stage named `Driver` who has infinite credits. This stage is unconditionally
+activated in every cycle to drive the whole design.
+
+We introduce a `wait_until` primitive to define the success of a function.
+This primitive is useful for CPU decoders, which may need to wait for the
+validity of operands before sending data to the executor.
+
+````python
+# within a stage
+a = a.valid()
+b = b.valid()
+# wait until both a and b operands are valid
+wait_until(a & b)
+````
+
+> Note that all the expressions before `wait_until` are executed no matter successful or not.
+> But all the expressions after `wait_until` are only executed when the condition is met.
+
+## Data Divergence and Convergence
+
+A key difference between hardware and software is that when calling a function,
+all the arguments are in the scope of the caller and fed to the callee.
+However, in hardware, data may diverge and converge from different source to different destinations.
+
+```python
+bound = stage.bind(a=1)
+```
+
+The above binds the value `1` to the argument `a` of the stage `stage` and returns a handle to
+the bound stage. This is very similar to the `functools.partial` in Python.
+
+```python
+def foo(a, b):
+    return a + b
+goo = functools.partial(foo, 5)
+goo(3) # foo(5, 3) = 8
 ```
