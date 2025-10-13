@@ -1,70 +1,150 @@
-# External SystemVerilog Support
+# External SystemVerilog Module Integration
 
-External modules let Assassyn integrate pre-existing SystemVerilog blocks directly into a system. The integration is implemented in three layers:
+## Summary
 
-1. Intermediate Representation (IR) nodes that model wire assignments and reads.
-2. The `ExternalSV` frontend API that uses those IR nodes to describe the boundary of the foreign module.
-3. Verilog code generation that turns the recorded IR into concrete instantiations and wire hookups.
-4. TODO we could use verilator to convert external SV into dynamic link which can be used by our rust simulator. 
+The `ExternalSV` class enables integration of pre-existing SystemVerilog modules into Assassyn's credit-based pipeline architecture. This module provides a bridge between Assassyn's high-level IR and external SystemVerilog implementations, supporting both simulation and Verilog generation backends as described in the [pipeline design](../../../docs/design/internal/pipeline.md).
 
-This document explains first 3 layers and provides an end-to-end example based on `python/ci-tests/test_easy_external.py`.
+## Exposed Interfaces
 
-## IR Nodes for Wire Boundaries
+### ExternalSV Class
 
-Two expression types defined in `python/assassyn/ir/expr/expr.py` represent external wiring:
+```python
+class ExternalSV(Module):
+    def __init__(self, file_path, in_wires=None, out_wires=None, module_name=None, 
+                 no_arbiter=False, has_clock=False, has_reset=False, **wire_connections): ...
+    @property
+    def wires(self): ...
+    def __setitem__(self, key, value): ...
+    def __getitem__(self, key): ...
+    def in_assign(self, **kwargs): ...
+    def __repr__(self): ...
+```
 
-- **`WireAssign`** (`python/assassyn/ir/expr/expr.py:740`): stores "drive this wire with that value" relationships. It accepts a `Wire` object and the driving `Value`. These nodes are created through the `wire_assign(wire, value)` helper (decorated with `@ir_builder`) so they are inserted into the IR when builders run.
+### DirectionalWires Class
 
-- **`WireRead`** (`python/assassyn/ir/expr/expr.py:767`): represents "observe this external wire". The `wire_read(wire)` helper creates the node and preserves the data type carried by the wire, allowing the compiler to type-check downstream expressions.
+```python
+class DirectionalWires:
+    def __init__(self, ext_module, direction): ...
+    def __contains__(self, key): ...
+    def __iter__(self): ...
+    def __getitem__(self, key): ...
+    def __setitem__(self, key, value): ...
+    def keys(self): ...
+```
 
-Both expressions inherit from the general `Expr` base class, so the rest of the compiler can analyze them uniformly with other operations.
+## Internal Helpers
 
-## ExternalSV Frontend API
+### ExternalSV Class
 
-`ExternalSV` (`python/assassyn/ir/module/external.py`) extends the base `Module` with a thin façade over external SystemVerilog blocks:
+The `ExternalSV` class extends the base `Module` class to integrate external SystemVerilog modules into Assassyn's IR.
 
-- **Constructor surface**: Alongside the usual `file_path`, `module_name`, and optional `has_clock`/`has_reset` switches, callers spell out the boundary via explicit `in_wires`/`out_wires` dictionaries. Relative file paths are preserved until elaboration resolves them against the build tree.
+**Purpose:** Provides a seamless interface for incorporating pre-existing SystemVerilog modules into Assassyn designs, handling wire declarations, assignments, and code generation.
 
-- **Unified wire adapters**: Declared wires are stored in a single dictionary of `Wire` objects(`python/assassyn/ir/module/module.py`), and lightweight `DirectionalWires` views power both `self.in_wires` and `self.out_wires`. The adapter inspects its configured direction so one class cleanly handles input assignments and output reads.
+**Member Fields:**
+- `file_path: str` - Path to the SystemVerilog source file
+- `external_module_name: str` - Name of the module in the SystemVerilog file
+- `has_clock: bool` - Whether the external module requires clock signal
+- `has_reset: bool` - Whether the external module requires reset signal
+- `_wires: dict` - Dictionary of declared wires keyed by name
+- `in_wires: DirectionalWires` - Adapter for input wire access
+- `out_wires: DirectionalWires` - Adapter for output wire access
 
-- **IR integration hooks**: Driving an input—through `self.in_wires[name] = value`, the `in_assign()` helper, constructor keyword arguments, or even `module['a'] = value`—funnels through `wire_assign(...)`, producing a `WireAssign` IR node. Observing an output—by indexing `self.out_wires`, calling `module['c']`, using attribute-style access, or by capturing the return value of `in_assign()`—returns `wire_read(wire_obj)`, ensuring every observation becomes a `WireRead` node. `in_assign()` yields the external outputs in declaration order so callers can unpack them directly.
+**Methods:**
 
-- **Metadata for downstream stages**: The constructor tags the instance with `Module.ATTR_EXTERNAL` and retains the populated wire dictionary, giving later passes full type/direction information for code emission and validation.
+#### `__init__(self, file_path, in_wires=None, out_wires=None, module_name=None, no_arbiter=False, has_clock=False, has_reset=False, **wire_connections)`
 
-These helpers provide a convenient, side-effect-free API while guaranteeing the IR faithfully records how the external module is wired.
+**Explanation:**
+Constructs an external SystemVerilog module integration. The constructor:
 
-## Code Generation Pipeline
+1. **File Path Handling:** Stores the SystemVerilog file path, preserving relative paths for later resolution during elaboration
+2. **Module Identification:** Sets the external module name (defaults to class name if not specified)
+3. **Clock/Reset Configuration:** Records whether the external module requires clock and reset signals
+4. **Wire Registration:** Creates `Wire` objects for declared input and output wires, registering them with the module's port definitions
+5. **Directional Adapters:** Creates `DirectionalWires` adapters for convenient input/output access
+6. **External Marking:** Tags the module with `Module.ATTR_EXTERNAL` for special handling in code generation
+7. **Initial Connections:** Processes keyword arguments as initial wire assignments for declared input wires
 
-The Verilog backend (`python/assassyn/codegen/verilog/design.py`) consumes those IR breadcrumbs to materialize SystemVerilog instances:
+The method ensures that all declared wires are properly typed and accessible through both the adapter interfaces and direct module access.
 
-- **Collect input drivers**: As the `CIRCTDumper` walks each block, every `WireAssign` pointing at an `ExternalSV` input is stored in a `pending_external_inputs` table keyed by the owning module.
+#### `wires` property
 
-- **Describe the black box**: `_generate_external_module_wrapper` synthesizes a PyCDE wrapper class whose port list and directions come straight from the stored wire table, aligning the Verilog-facing interface with the frontend description.
+**Explanation:**
+Exposes the internal wire dictionary for use by helper adapters and code generation passes. Returns the `_wires` dictionary keyed by wire name.
 
-- **Instantiate on demand**: The first `WireRead` for a given `ExternalSV` triggers emission of the actual PyCDE instance. The dumper drains the pending input table, threads through optional `clk`/`rst` hookups, and remembers the created instance so subsequent reads simply reference signals like `ext_inst.c`.
+#### `__setitem__(self, key, value)`
 
-## Example: `test_easy_external.py`
+**Explanation:**
+Allows assignment to wires using bracket notation. Delegates to the appropriate directional adapter based on wire direction. Raises `KeyError` if the wire is not found.
 
-`python/ci-tests/test_easy_external.py` demonstrates how to expose a SystemVerilog adder:
+#### `__getitem__(self, key)`
 
-1. **Define the external block**:
-   ```python
-   class ExternalAdder(ExternalModule):
-       def __init__(self, **in_wire_connections):
-           super().__init__(
-               file_path="python/ci-tests/resources/adder.sv",
-               module_name="adder",
-               in_wires={'a': UInt(32), 'b': UInt(32)},
-               out_wires={'c': UInt(32)},
-               **in_wire_connections,
-           )
-   ```
-   The `in_wires`/`out_wires` dictionaries set up typed wires and enable the convenience accessors; the optional `**in_wire_connections` passes initial drivers that are turned into `WireAssign` nodes.
+**Explanation:**
+Allows access to wires using bracket notation. Checks output wires first, then input wires. Raises `KeyError` if the wire is not found.
 
-2. **Drive inputs and read outputs** inside a downstream module:
-   ```python
-   c = ext_adder.in_assign(a=a, b=b)
-   ```
-   `in_assign` records the two input connections via `WireAssign` and returns the single declared output (`WireRead`), making the value immediately usable.
+#### `in_assign(self, **kwargs)`
 
-3. **Integrate the external module** just like native modules. We assumed the external module must be instantiated inside the downstream module, which make sure the value align with the wire connection. The system builder instantiates `ExternalAdder()` and passes it into `Adder.build`, allowing the rest of the design to treat `c` as any other value.
+**Explanation:**
+Convenience method for assigning values to multiple input wires using keyword arguments. The method:
+1. Assigns each keyword argument to the corresponding input wire
+2. Collects all output wires
+3. Returns the single output if only one exists, or a tuple of all outputs
+
+This method is commonly used for connecting external modules to the rest of the design.
+
+#### `__repr__(self)`
+
+**Explanation:**
+Generates the string representation for IR dumps. The method:
+1. Formats port definitions
+2. Includes module attributes
+3. Adds external file information (file path and module name)
+4. Generates the module declaration with external-specific formatting
+
+The output follows Assassyn's IR format with additional external module metadata.
+
+### DirectionalWires Class
+
+The `DirectionalWires` class provides a convenient adapter for accessing wires based on their direction.
+
+**Purpose:** Simplifies wire access by providing direction-specific interfaces that handle the complexity of wire assignment and reading operations.
+
+**Member Fields:**
+- `_module: ExternalSV` - Reference to the owning external module
+- `_direction: str` - The wire direction this adapter handles ('input' or 'output')
+
+**Methods:**
+
+#### `__init__(self, ext_module, direction)`
+
+**Explanation:**
+Initializes the directional adapter with a reference to the external module and the specific direction it handles.
+
+#### `_get_wire(self, key)`
+
+**Explanation:**
+Internal helper that retrieves a wire by name and validates its direction. Raises `KeyError` if the wire doesn't exist or `ValueError` if the wire's direction doesn't match the adapter's direction.
+
+#### `__contains__(self, key)`
+
+**Explanation:**
+Checks if a wire exists and matches the adapter's direction. Returns `True` if the wire exists and has the correct direction.
+
+#### `__iter__(self)`
+
+**Explanation:**
+Returns an iterator over all wire names that match the adapter's direction.
+
+#### `__getitem__(self, key)`
+
+**Explanation:**
+Retrieves a wire value. For output wires, returns a `WireRead` expression. For input wires, returns the assigned value directly.
+
+#### `__setitem__(self, key, value)`
+
+**Explanation:**
+Assigns a value to an input wire. Creates a `WireAssign` expression and updates the wire's assigned value. Raises `ValueError` if attempting to assign to an output wire.
+
+#### `keys(self)`
+
+**Explanation:**
+Returns a list of all wire names that match the adapter's direction. Used for iteration and introspection.

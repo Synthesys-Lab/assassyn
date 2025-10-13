@@ -1,10 +1,12 @@
-# FSM (Finite State Machine) Helper
+# Finite State Machine Helper
 
-This file provides the `FSM` class, which is a helper for simplifying the creation of Finite State Machines within a module.
+## Summary
 
------
+The `FSM` class provides a declarative interface for creating finite state machines within Assassyn modules. It simplifies the implementation of state-based control logic by automatically generating the necessary combinational logic from a transition table and state-specific action functions, following Assassyn's credit-based pipeline architecture as described in the [architectural design](../../../docs/design/arch/arch.md).
 
 ## Exposed Interfaces
+
+### FSM Class
 
 ```python
 class FSM:
@@ -12,21 +14,52 @@ class FSM:
     def generate(self, func_dict: dict, mux_dict: dict = None): ...
 ```
 
------
+## Internal Helpers
 
-## FSM Class
+### FSM Class
 
-The `FSM` class constructs FSM logic from a declarative transition table and dictionaries of state-specific actions.
+The `FSM` class constructs finite state machine logic from declarative specifications.
 
-### Initialization (`__init__`)
+**Purpose:** Provides a high-level interface for implementing state-based control logic within modules, automatically handling state encoding, transition logic, and state-specific actions.
 
-The FSM is initialized with a state register (`Array`) and a transition table (`dict`). It automatically calculates the number of bits needed to encode the states and creates a mapping from state names to their corresponding bit values.
+**Member Fields:**
+- `state_reg: Array` - The state register storing the current state
+- `transition_table: dict` - Dictionary mapping states to their possible transitions
+- `state_bits: int` - Number of bits needed to encode all states
+- `state_map: dict` - Dictionary mapping state names to their bit representations
 
-### Logic Generation (`generate`)
+**Methods:**
 
-The `generate` method builds the FSM's combinational logic based on the provided tables and dictionaries.
+#### `__init__(self, state_reg, transition_table)`
 
-  * It creates a main conditional block for each state that activates when the `state_reg` matches that state's value.
-  * Within each state's block, it executes the corresponding action function provided in the `func_dict`.
-  * It generates nested conditional logic for all state transitions defined in the `transition_table`, assigning the next state's value to the `state_reg` when a condition is met.
-  * Optionally, if a `mux_dict` is provided, it also generates multiplexer logic using `select` operations to choose a value based on the current state.
+**Explanation:**
+Initializes a finite state machine with a state register and transition table. The constructor:
+
+1. **State Register Validation:** Ensures the provided state register is an `Array` object
+2. **Transition Table Storage:** Stores the transition table for later use in logic generation
+3. **State Bit Calculation:** Computes the minimum number of bits needed to encode all states using `math.floor(math.log2(len(transition_table)))`
+4. **State Mapping Creation:** Generates a mapping from state names to their corresponding bit values, starting from 0
+
+The method automatically handles state encoding, ensuring efficient hardware implementation with minimal state bits.
+
+#### `generate(self, func_dict, mux_dict=None)`
+
+**Explanation:**
+Generates the combinational logic for the finite state machine. This method:
+
+1. **State-Specific Logic:** For each state in the transition table, creates a conditional block that executes when `state_reg[0]` matches the state's encoded value
+2. **Action Execution:** Within each state's block, calls the corresponding action function from `func_dict` if provided
+3. **Transition Logic:** Generates nested conditional blocks for each possible transition from the current state, updating `state_reg[0]` to the next state's encoded value when the transition condition is met
+4. **Multiplexer Generation:** If `mux_dict` is provided, generates multiplexer logic using `select` operations to choose values based on the current state
+
+The method uses Assassyn's `Condition` context manager to create the necessary combinational logic blocks, ensuring proper integration with the IR system.
+
+**Parameters:**
+- `func_dict: dict` - Dictionary mapping state names to action functions
+- `mux_dict: dict, optional` - Dictionary for generating state-dependent multiplexer logic
+
+**Design Decisions:**
+- Uses `math.log2` for optimal state encoding, ensuring minimal hardware overhead
+- Employs `Condition` blocks for clean separation of state-specific logic
+- Supports optional multiplexer generation for state-dependent value selection
+- Prints debug information during construction and generation for development assistance

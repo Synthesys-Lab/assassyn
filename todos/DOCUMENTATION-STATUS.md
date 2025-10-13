@@ -6,15 +6,9 @@
 
 ---
 
-## 1. TO CHECK (31 files) - Review existing documentation against new rules
+## 1. TO CHECK (27 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `ir/module/base.py` → `ir/module/base.md` (to check)
-- [ ] `ir/module/downstream.py` → `ir/module/downstream.md` (to check)
-- [ ] `ir/module/external.py` → `ir/module/external.md` (to check)
-- [ ] `ir/module/fsm.py` → `ir/module/fsm.md` (to check)
-- [ ] `ir/module/memorybase.py` → `ir/module/memorybase.md` (to check)
-- [ ] `ir/module/module.py` → `ir/module/module.md` (to check)
 - [ ] `codegen/simulator/_expr/intrinsics.py` → `codegen/simulator/_expr/intrinsics.md` (to check)
 - [ ] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (to check)
 - [ ] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (to check)
@@ -77,9 +71,14 @@
 
 ---
 
-## 3. DONE (16 files) - Completed documentation
+## 3. DONE (20 files) - Completed documentation
 
 ### Leaf-level files (simple to complex)
+- [x] `ir/module/base.py` → `ir/module/base.md` (completed)
+- [x] `ir/module/downstream.py` → `ir/module/downstream.md` (completed)
+- [x] `ir/module/external.py` → `ir/module/external.md` (completed)
+- [x] `ir/module/fsm.py` → `ir/module/fsm.md` (completed)
+- [x] `ir/module/module.py` → `ir/module/module.md` (completed)
 - [x] `ir/expr/expr.py` → `ir/expr/expr.md` (completed)
 - [x] `ir/expr/intrinsic.py` → `ir/expr/intrinsic.md` (completed)
 - [x] `ir/expr/writeport.py` → `ir/expr/writeport.md` (completed)
@@ -114,9 +113,9 @@
 
 ### Statistics
 - **Total Python files**: 74
-- **Files to check**: 19 (26%)
+- **Files to check**: 14 (19%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 27 (36%)
+- **Files completed**: 32 (43%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex
