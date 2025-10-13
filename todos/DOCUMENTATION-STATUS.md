@@ -9,9 +9,6 @@
 ## 1. TO CHECK (31 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `ir/memory/base.py` → `ir/memory/base.md` (to check)
-- [ ] `ir/memory/dram.py` → `ir/memory/dram.md` (to check)
-- [ ] `ir/memory/sram.py` → `ir/memory/sram.md` (to check)
 - [ ] `ir/module/base.py` → `ir/module/base.md` (to check)
 - [ ] `ir/module/downstream.py` → `ir/module/downstream.md` (to check)
 - [ ] `ir/module/external.py` → `ir/module/external.md` (to check)
@@ -39,9 +36,14 @@
 ## 2. TO DOCUMENT (30 files) - Create new documentation
 
 ### Leaf-level files (simple to complex)
+- [ ] `frontend.py` → `frontend.md` (to write)
+- [ ] `backend.py` → `backend.md` (to write)
+- [ ] `codegen/simulator/elaborate.py` → `codegen/simulator/elaborate.md` (to write)
 - [ ] `ip/multiply.py` → `ip/multiply.md` (to write)
 - [ ] `codegen/simulator/node_dumper.py` → `codegen/simulator/node_dumper.md` (to write)
 - [ ] `codegen/simulator/utils.py` → `codegen/simulator/utils.md` (to write)
+- [ ] `codegen/simulator/simulator.py` → `codegen/simulator/simulator.md` (to write)
+- [ ] `codegen/impl.py` → `codegen/impl.md` (to write)
 - [ ] `codegen/verilog/cleanup.py` → `codegen/verilog/cleanup.md` (to write)
 - [ ] `codegen/verilog/rval.py` → `codegen/verilog/rval.md` (to write)
 - [ ] `codegen/verilog/utils.py` → `codegen/verilog/utils.md` (to write)
@@ -49,17 +51,12 @@
 - [ ] `codegen/verilog/_expr/array.py` → `codegen/verilog/_expr/array.md` (to write)
 - [ ] `codegen/verilog/_expr/call.py` → `codegen/verilog/_expr/call.md` (to write)
 - [ ] `codegen/verilog/_expr/intrinsics.py` → `codegen/verilog/_expr/intrinsics.md` (to write)
-- [ ] `codegen/simulator/elaborate.py` → `codegen/simulator/elaborate.md` (to write)
 - [ ] `codegen/verilog/design.py` → `codegen/verilog/design.md` (to write)
 - [ ] `codegen/verilog/module.py` → `codegen/verilog/module.md` (to write)
 - [ ] `codegen/verilog/system.py` → `codegen/verilog/system.md` (to write)
 - [ ] `codegen/verilog/testbench.py` → `codegen/verilog/testbench.md` (to write)
 - [ ] `codegen/verilog/top.py` → `codegen/verilog/top.md` (to write)
 - [ ] `codegen/verilog/elaborate.py` → `codegen/verilog/elaborate.md` (to write)
-- [ ] `codegen/simulator/simulator.py` → `codegen/simulator/simulator.md` (to write)
-- [ ] `codegen/impl.py` → `codegen/impl.md` (to write)
-- [ ] `frontend.py` → `frontend.md` (to write)
-- [ ] `backend.py` → `backend.md` (to write)
 
 ### Module initialization files (leaf to parent)
 - [ ] `codegen/simulator/_expr/__init__.py` → `codegen/simulator/_expr/__init__.md` (to write)
@@ -107,6 +104,9 @@
 - [x] `ir/const.py` → `ir/const.md` (completed)
 - [x] `ir/dtype.py` → `ir/dtype.md` (completed)
 - [x] `ir/value.py` → `ir/value.md` (completed)
+- [x] `ir/memory/base.py` → `ir/memory/base.md` (completed)
+- [x] `ir/memory/dram.py` → `ir/memory/dram.md` (completed)
+- [x] `ir/memory/sram.py` → `ir/memory/sram.md` (completed)
 
 ---
 
@@ -114,9 +114,9 @@
 
 ### Statistics
 - **Total Python files**: 74
-- **Files to check**: 22 (30%)
+- **Files to check**: 19 (26%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 24 (32%)
+- **Files completed**: 27 (36%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex
