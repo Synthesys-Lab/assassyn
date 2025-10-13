@@ -11,6 +11,11 @@ hardly make sense without understanding the frontend implementation discussed
 in [trace.md](./trace.md). For the underlying architecture concepts, see
 [arch.md](../../arch/arch.md).
 
+For practical usage examples and step-by-step tutorials, see the
+[tutorials](../../../tutorials/) folder, which serves as the language manual
+with hands-on examples covering basic module creation, inter-module communication,
+and advanced usage patterns.
+
 ## Credited Pipeline Stage
 
 ### Retrieve Data from Stage Registers
