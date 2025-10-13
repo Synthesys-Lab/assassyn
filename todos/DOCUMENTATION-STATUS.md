@@ -11,8 +11,8 @@
 ## 2. TO DOCUMENT (30 files) - Create new documentation
 
 ### Leaf-level files (simple to complex)
-- [ ] `frontend.py` → `frontend.md` (to write)
-- [ ] `backend.py` → `backend.md` (to write)
+- [x] `frontend.py` → `frontend.md` (completed)
+- [x] `backend.py` → `backend.md` (completed)
 - [ ] `codegen/simulator/elaborate.py` → `codegen/simulator/elaborate.md` (to write)
 - [ ] `ip/multiply.py` → `ip/multiply.md` (to write)
 - [ ] `codegen/simulator/node_dumper.py` → `codegen/simulator/node_dumper.md` (to write)
@@ -66,6 +66,8 @@
 ## 3. DONE (23 files) - Completed documentation
 
 ### Leaf-level files (simple to complex)
+- [x] `frontend.py` → `frontend.md` (completed)
+- [x] `backend.py` → `backend.md` (completed)
 - [x] `ramulator2/ramulator2.py` → `ramulator2/ramulator2.md` (completed)
 - [x] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (completed)
 - [x] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (completed)
@@ -111,8 +113,8 @@
 ### Statistics
 - **Total Python files**: 74
 - **Files to check**: 9 (12%)
-- **Files to document**: 30 (41%)
-- **Files completed**: 37 (50%)
+- **Files to document**: 28 (38%)
+- **Files completed**: 39 (53%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex
