@@ -8,21 +8,6 @@
 
 ## 1. TO CHECK (24 files) - Review existing documentation against new rules
 
-### Leaf-level files (simple to complex)
-- [x] `ramulator2/ramulator2.py` → `ramulator2/ramulator2.md` (completed)
-
-### Module-level documentation
-- [ ] `builder.md` (to check)
-- [ ] `codegen/verilog/README.md` (to check)
-- [ ] `experimental/frontend/README.md` (to check)
-- [ ] `experimental/README.md` (to check)
-- [ ] `ir/expr/README.md` (to check)
-- [ ] `ir/memory/README.md` (to check)
-- [ ] `test/README.md` (to check)
-- [ ] `README.md` (to check)
-
----
-
 ## 2. TO DOCUMENT (30 files) - Create new documentation
 
 ### Leaf-level files (simple to complex)
@@ -65,11 +50,23 @@
 - [ ] `codegen/__init__.py` → `codegen/__init__.md` (to write)
 - [ ] `__init__.py` → `__init__.md` (to write)
 
+## 2.5 Check Module Documentation When Modules Fully Documented
+
+- [ ] `builder.md` (to check)
+- [ ] `codegen/verilog/README.md` (to check)
+- [ ] `experimental/frontend/README.md` (to check)
+- [ ] `experimental/README.md` (to check)
+- [ ] `ir/expr/README.md` (to check)
+- [ ] `ir/memory/README.md` (to check)
+- [ ] `test/README.md` (to check)
+- [ ] `README.md` (to check)
+
 ---
 
 ## 3. DONE (23 files) - Completed documentation
 
 ### Leaf-level files (simple to complex)
+- [x] `ramulator2/ramulator2.py` → `ramulator2/ramulator2.md` (completed)
 - [x] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (completed)
 - [x] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (completed)
 - [x] `experimental/frontend/module.py` → `experimental/frontend/module.md` (completed)
