@@ -9,7 +9,7 @@
 ## 1. TO CHECK (24 files) - Review existing documentation against new rules
 
 ### Leaf-level files (simple to complex)
-- [ ] `ramulator2/ramulator2.py` → `ramulator2/ramulator2.md` (to check)
+- [x] `ramulator2/ramulator2.py` → `ramulator2/ramulator2.md` (completed)
 
 ### Module-level documentation
 - [ ] `builder.md` (to check)
@@ -113,9 +113,9 @@
 
 ### Statistics
 - **Total Python files**: 74
-- **Files to check**: 10 (14%)
+- **Files to check**: 9 (12%)
 - **Files to document**: 30 (41%)
-- **Files completed**: 36 (49%)
+- **Files completed**: 37 (50%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex
