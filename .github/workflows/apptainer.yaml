@@ -39,8 +39,8 @@ jobs:
 
       - name: Build Repository Container
         run: |
-          echo "Building container with repository snapshot"
-          make build-apptainer
+          echo "Building container with repository: ${{ github.repository }} at commit ${{ github.sha }}"
+          make build-apptainer REPO_URL=https://github.com/${{ github.repository }} REPO_TAG=${{ github.sha }}
 
       - name: Run Container Tests
         run: |
