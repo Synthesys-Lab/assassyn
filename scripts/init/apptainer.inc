@@ -17,8 +17,11 @@ $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 
 $(APPTAINER_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_DEF)
 	@echo "=== Building Assassyn Container ==="
+	@echo "Creating clean git archive snapshot..."
+	@git archive --format=tar.gz --prefix=assassyn-$(shell git describe --tags --always)/ HEAD > /tmp/assassyn-source.tar.gz
 	@echo "Creating containerized snapshot of current repository..."
-	@cd vm/apptainer && apptainer build --bind $(shell git rev-parse --show-toplevel):/workspace assassyn.sif assassyn.def
+	@cd vm/apptainer && apptainer build --bind /tmp/assassyn-source.tar.gz:/tmp/assassyn-source.tar.gz assassyn.sif assassyn.def
+	@rm -f /tmp/assassyn-source.tar.gz
 	@echo "=== Container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_IMAGE)"
 	@echo "Usage: apptainer exec --no-home $(APPTAINER_IMAGE) python your_script.py"
