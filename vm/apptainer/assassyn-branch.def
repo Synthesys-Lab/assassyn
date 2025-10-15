@@ -1,5 +1,5 @@
 Bootstrap: localimage
-From: assassyn-base.sif
+From: assassyn-base-{{ ASSASSYN_BRANCH }}.sif
 
 %post
     # Clone the specific branch
