@@ -20,7 +20,7 @@ export CARGO_TARGET_DIR=$REPO_PATH/.sim-runtime-cache
 # Activate virtual environment if it exists
 if [ -d "$REPO_PATH/.assassyn-venv" ]; then
   echo "Activating Python virtual environment..."
-  source "$REPO_PATH/.assassyn-venv/bin/activate"
+  . "$REPO_PATH/.assassyn-venv/bin/activate"
 else
   echo "No virtual environment found. Run 'make install-py-package' to create one."
 fi
