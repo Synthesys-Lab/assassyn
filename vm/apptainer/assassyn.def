@@ -6,9 +6,10 @@ From: assassyn-base.sif
     REPO_TAG=master
 
 %post
-    # Clone repository from specified URL and tag
-    git clone --depth 1 --branch {{ REPO_TAG }} {{ REPO_URL }} /app
+    # Clone repository from specified URL and tag/branch/commit
+    git clone --recursive {{ REPO_URL }} /app
     cd /app
+    git checkout {{ REPO_TAG }}
     
     # Remove unnecessary directories to reduce image size
     rm -rf examples/ docs/ tutorials/
