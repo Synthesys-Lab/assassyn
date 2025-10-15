@@ -2,17 +2,13 @@ Bootstrap: localimage
 From: assassyn-base.sif
 
 %post
-    # Set default values for build arguments if not provided
-    ASSASSYN_REPO=${ASSASSYN_REPO:-"https://github.com/Synthesys-Lab/assassyn.git"}
-    ASSASSYN_BRANCH=${ASSASSYN_BRANCH:-"master"}
-    
     # Clone the specific branch
     cd /
-    git clone --recursive ${ASSASSYN_REPO} app
+    git clone --recursive {{ ASSASSYN_REPO }} app
     cd /app
     
-    if [ -n "${ASSASSYN_BRANCH}" ]; then
-        git checkout ${ASSASSYN_BRANCH}
+    if [ -n "{{ ASSASSYN_BRANCH }}" ]; then
+        git checkout {{ ASSASSYN_BRANCH }}
     fi
     
     # Remove unnecessary directories
@@ -29,7 +25,6 @@ From: assassyn-base.sif
     PATH="$PATH:/app/.local/bin"
     
     cat >> $APPTAINER_ENVIRONMENT <<EOF
-export RUSTC_WRAPPER="$RUSTC_WRAPPER"
 export ASSASSYN_HOME="$ASSASSYN_HOME"
 export VERILATOR_ROOT="$VERILATOR_ROOT"
 export PYTHONPATH="$PYTHONPATH"
