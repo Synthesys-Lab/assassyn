@@ -9,27 +9,23 @@ From: assassyn-base.sif
     # Remove unnecessary directories to reduce image size
     rm -rf examples/ docs/ tutorials/
     
-    # Build the project from the repository snapshot
-    export PYTHONUSERBASE="/app/.local"
-    . setup.sh
-    make build-all
-    
     # Set up environment
     PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    PYTHONPATH="$PYTHONPATH:/app/.local/lib/python${PYTHON_VERSION}/site-packages"
-    PATH="$PATH:/app/.local/bin"
     
     cat >> $APPTAINER_ENVIRONMENT <<EOF
-export ASSASSYN_HOME="$ASSASSYN_HOME"
-export VERILATOR_ROOT="$VERILATOR_ROOT"
-export PYTHONPATH="$PYTHONPATH"
-export PATH="$PATH"
+export ASSASSYN_HOME="/app"
+export VERILATOR_ROOT="/app/3rd-party/verilator"
+export PYTHONPATH="/app/python:/app/.local/lib/python${PYTHON_VERSION}/site-packages:\$PYTHONPATH"
+export PATH="/app/3rd-party/verilator/bin:/app/.local/bin:\$PATH"
 export CC="ccache gcc"
 export CXX="ccache g++"
 export CCACHE_DIR="/tmp/ccache"
 export PYTHONUSERBASE="/app/.local"
 export CARGO_HOME="/tmp/cargo"
 EOF
+
+    # Build the project
+    make build-all
 
 %runscript
     exec "$@"
