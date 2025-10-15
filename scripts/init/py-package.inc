@@ -1,9 +1,25 @@
 # Python package installation targets
 # Converted from scripts/init/py-package.sh
 
-.PHONY: install-py-package
+.PHONY: install-py-package clean-python
+
+# Virtual environment directory
+VENV_DIR := .assassyn-venv
 
 install-py-package:
-	@echo "Installing Python dependencies..."
-	@pip install -r python/requirements.txt
-	@echo "Python dependencies installed successfully."
+	@echo "Setting up Python virtual environment..."
+	@if [ ! -d "$(VENV_DIR)" ]; then \
+		echo "Creating virtual environment..."; \
+		python3 -m venv $(VENV_DIR); \
+	else \
+		echo "Virtual environment already exists."; \
+	fi
+	@echo "Activating virtual environment and installing dependencies..."
+	@source $(VENV_DIR)/bin/activate && pip install --upgrade pip
+	@source $(VENV_DIR)/bin/activate && pip install -r python/requirements.txt
+	@echo "Python dependencies installed successfully in virtual environment."
+
+clean-python:
+	@echo "Cleaning Python virtual environment..."
+	@rm -rf $(VENV_DIR)
+	@echo "Python virtual environment cleaned successfully."

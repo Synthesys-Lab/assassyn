@@ -17,6 +17,14 @@ fi
 # Set up Rust simulator runtime cache directory
 export CARGO_TARGET_DIR=$REPO_PATH/.sim-runtime-cache
 
+# Activate virtual environment if it exists
+if [ -d "$REPO_PATH/.assassyn-venv" ]; then
+  echo "Activating Python virtual environment..."
+  source "$REPO_PATH/.assassyn-venv/bin/activate"
+else
+  echo "No virtual environment found. Run 'make install-py-package' to create one."
+fi
+
 echo "In-repo verilator found, setting VERILATOR_ROOT to $REPO_PATH/verilator"
 export VERILATOR_ROOT=$REPO_PATH/3rd-party/verilator
 export PATH=$VERILATOR_ROOT/bin:$PATH

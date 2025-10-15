@@ -14,5 +14,6 @@ tutorials/*
 workspace/*
 **/.claude/settings.local.json
 Cargo.lock
+.assassyn-venv
 
 *.sif

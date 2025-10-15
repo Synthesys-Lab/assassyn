@@ -40,6 +40,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
+            ${{ github.workspace }}/.assassyn-venv
             ${{ github.workspace }}/3rd-party/verilator
             ${{ github.workspace }}/3rd-party/circt/frontends/PyCDE
             ${{ github.workspace }}/3rd-party/ramulator2/build
@@ -48,29 +49,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-cache-
 
-      - name: Create Python Virtual Environment
-        run: |
-          echo "Creating fresh Python virtual environment"
-          python3 -m venv ${{ github.workspace }}/.assassyn-venv
-          source ${{ github.workspace }}/.assassyn-venv/bin/activate
-          pip install --upgrade pip
-
       - name: Build All Components
         if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building all components"
-          source ${{ github.workspace }}/.assassyn-venv/bin/activate
           source setup.sh && make build-all
       
       - name: Run All Tests
         run: |
-          source ${{ github.workspace }}/.assassyn-venv/bin/activate
           source setup.sh && make test-all
-      
-      - name: Cleanup Virtual Environment
-        if: always()
-        run: |
-          echo "Cleaning up Python virtual environment"
-          rm -rf ${{ github.workspace }}/.assassyn-venv
       
      

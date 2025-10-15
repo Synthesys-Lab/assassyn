@@ -20,7 +20,7 @@ patch-circt: 3rd-party/circt/.patch-applied
 
 install-circt: patch-circt
 	@echo "Installing PyCDE..."
-	@pip install --user pycde --break-system-packages || \
+	@pip install pycde || \
 		(echo "Failed to install CIRCT via pip. Fall back to building from source using PyCDE setup." && \
 		cd 3rd-party/circt/frontends/PyCDE && \
 		CIRCT_DIRECTORY="$$(pwd)/../../" CIRCT_EXTRA_CMAKE_ARGS="-DESI_RUNTIME=OFF -DZ3_DISABLE=ON -DOR_TOOLS_DISABLE=ON" python -m build && \
