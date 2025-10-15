@@ -11,7 +11,7 @@ From: assassyn-base.sif
     
     # Build the project from the repository snapshot
     export PYTHONUSERBASE="/app/.local"
-    source setup.sh
+    . setup.sh
     make build-all
     
     # Set up environment
