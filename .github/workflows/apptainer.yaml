@@ -30,8 +30,6 @@ jobs:
           path: |
             vm/apptainer/assassyn-base.sif
           key: ${{ runner.os }}-apptainer-base-container-${{ hashFiles('vm/apptainer/assassyn-base.def') }}
-          restore-keys: |
-            ${{ runner.os }}-apptainer-base-container-
 
       - name: Build Base Container
         if: steps.cache-base-container.outputs.cache-hit != 'true'
