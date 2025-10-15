@@ -39,8 +39,14 @@ jobs:
 
       - name: Build Repository Container
         run: |
-          echo "Building container with repository: ${{ github.repository }} at commit ${{ github.sha }}"
-          make build-apptainer REPO_URL=https://github.com/${{ github.repository }} REPO_TAG=${{ github.sha }}
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            REPO_NAME="${{ github.event.pull_request.head.repo.full_name }}"
+            echo "Building container with PR repository: $REPO_NAME at commit ${{ github.sha }}"
+          else
+            REPO_NAME="${{ github.repository }}"
+            echo "Building container with repository: $REPO_NAME at commit ${{ github.sha }}"
+          fi
+          make build-apptainer REPO_URL=https://github.com/$REPO_NAME REPO_TAG=${{ github.sha }}
 
       - name: Run Container Tests
         run: |
