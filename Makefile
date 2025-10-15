@@ -27,8 +27,8 @@ build-all: install-py-package build-verilator build-ramulator2 build-wrapper ins
 # Test all components
 test-all: build-all
 	@echo "Running all tests..."
-	@pytest -n 8 -x python/unit-tests
-	@pytest -n 8 -x python/ci-tests
+	@pytest -n 8 python/unit-tests
+	@pytest -n 8 python/ci-tests
 
 # Clean all components
 clean-all: clean-python clean-verilator clean-ramulator2 clean-wrapper clean-circt
