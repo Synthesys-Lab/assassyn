@@ -1,12 +1,8 @@
 Bootstrap: localimage
 From: assassyn-base.sif
 
-%arguments
-    ASSASSYN_REPO
-    ASSASSYN_BRANCH
-
 %post
-    # Set default values for arguments if not provided
+    # Set default values for build arguments if not provided
     ASSASSYN_REPO=${ASSASSYN_REPO:-"https://github.com/Synthesys-Lab/assassyn.git"}
     ASSASSYN_BRANCH=${ASSASSYN_BRANCH:-"master"}
     

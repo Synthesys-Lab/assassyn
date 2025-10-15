@@ -4,28 +4,68 @@ Assassyn can be run using [Apptainer](https://apptainer.org/) (formerly Singular
 
 ## Quick Start
 
-From the `vm/apptainer` directory:
+From the project root directory:
 
 ```sh
-# Build for a specific branch
-./build-assassyn.sh <branch-name>
+# Build container for master branch (default)
+make build-apptainer
 
-# Build for main branch (default)
-./build-assassyn.sh
+# Build container for a specific branch
+make build-apptainer APPTAINER_BRANCH=<branch-name>
+
+# Build container from a different repository
+make build-apptainer APPTAINER_REPO=https://github.com/user/fork.git
+
+# Clean all containers
+make clean-apptainer
 ```
 
 This creates a containerized Assassyn environment for the specified branch.
 
-## Manual Build Process
+## Available Makefile Targets
 
-If you prefer manual control over the build process:
+The Apptainer build system provides several targets for different use cases:
 
+### Primary Target
+- `make build-apptainer`: Build branch-specific container (alias for `build-apptainer-branch`)
+
+### Additional Targets
+- `make build-apptainer-base`: Build only the base container
+- `make build-apptainer-branch`: Build branch-specific container (requires base container)
+- `make clean-apptainer`: Remove all generated container files
+
+**Advanced Examples:**
 ```sh
-# Step 1: Build base image (one-time setup)
-apptainer build assassyn-base.sif assassyn-base.def
+# Build container for current development branch
+make build-apptainer-branch APPTAINER_BRANCH=vm-251015
 
-# Step 2: Build branch-specific image
-apptainer build --build-arg ASSASSYN_BRANCH=<branch-name> assassyn-<branch-name>.sif assassyn-branch.def
+# Build container from a different repository
+make build-apptainer-branch APPTAINER_BRANCH=feature-branch APPTAINER_REPO=https://github.com/user/fork.git
+
+# Build only the base container
+make build-apptainer-base
+
+# Clean up all containers
+make clean-apptainer
+```
+
+## Makefile Parameters
+
+The Apptainer build targets support the following parameters:
+
+- `APPTAINER_BRANCH`: Git branch name to build (default: `master`)
+- `APPTAINER_REPO`: Git repository URL (default: `https://github.com/Synthesys-Lab/assassyn.git`)
+
+**Parameter Examples:**
+```sh
+# Override both repository and branch
+make build-apptainer APPTAINER_BRANCH=feature-branch APPTAINER_REPO=https://github.com/user/fork.git
+
+# Use default repository with custom branch
+make build-apptainer APPTAINER_BRANCH=hotfix-123
+
+# Use custom repository with default branch
+make build-apptainer APPTAINER_REPO=https://github.com/user/fork.git
 ```
 
 ## Execute Commands
@@ -47,16 +87,21 @@ By default, Apptainer automatically binds the `$HOME` directory to the container
 
 - `assassyn-base.def`: Base container with system dependencies (Rust, Python, build tools)
 - `assassyn-branch.def`: Branch-specific container that builds Assassyn code
-- `build-assassyn.sh`: Automated build script
+- `scripts/init/apptainer.inc`: Makefile include with Apptainer build targets
 - `assassyn-base.sif`: Generated base image (cached for reuse)
 - `assassyn-<branch-name>.sif`: Generated branch-specific images
 
 ## Environment Variables and Defaults
 
-The container system uses environment variables with default fallbacks:
+The container system uses environment variables with default fallbacks. These can be controlled via Makefile parameters:
 
-- `ASSASSYN_REPO`: Git repository URL (default: `https://github.com/Synthesys-Lab/assassyn.git`)
-- `ASSASSYN_BRANCH`: Git branch name (default: `main`)
+### Makefile Parameters
+- `APPTAINER_REPO`: Git repository URL (default: `https://github.com/Synthesys-Lab/assassyn.git`)
+- `APPTAINER_BRANCH`: Git branch name (default: `master`)
+
+### Internal Container Variables
+- `ASSASSYN_REPO`: Git repository URL (passed from `APPTAINER_REPO`)
+- `ASSASSYN_BRANCH`: Git branch name (passed from `APPTAINER_BRANCH`)
 
 The `${VAR:-default}` syntax provides fallback values when environment variables are not set. This allows:
 - **Flexible builds**: Override repository or branch without modifying definition files
@@ -101,8 +146,17 @@ Each branch gets its own containerized environment ensuring:
 ### CI/CD Integration
 The design supports automated workflows:
 - Environment variables control repository and branch selection
-- Build scripts can be easily integrated into GitHub Actions
+- Makefile targets can be easily integrated into GitHub Actions
 - Containers can be built for any branch automatically
+- Unified build system with other project components
+
+### Integration with Main Build System
+The Apptainer build system is fully integrated with the main project Makefile:
+- **Unified Interface**: All build targets accessible via `make` commands
+- **Consistent Pattern**: Follows the same structure as other component builds (Verilator, Ramulator2, etc.)
+- **Dependency Management**: Automatically handles base container dependencies
+- **Error Handling**: Includes proper validation and error checking
+- **Clean Targets**: Provides cleanup functionality consistent with other components
 
 ### Usage Flexibility
 The container system supports multiple use cases:

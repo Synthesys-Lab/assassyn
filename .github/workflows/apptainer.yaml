@@ -39,14 +39,12 @@ jobs:
         if: steps.cache-base-container.outputs.cache-hit != 'true'
         run: |
           echo "Base container cache miss, building base container"
-          cd vm/apptainer
-          apptainer build assassyn-base.sif assassyn-base.def
+          make build-apptainer-base
 
       - name: Build Branch Container
         run: |
           echo "Building branch container for ${{ env.BRANCH_NAME }}"
-          cd vm/apptainer
-          apptainer build --build-arg ASSASSYN_REPO=https://github.com/Synthesys-Lab/assassyn.git --build-arg ASSASSYN_BRANCH=${{ env.BRANCH_NAME }} assassyn-${{ env.BRANCH_NAME }}.sif assassyn-branch.def
+          make build-apptainer-branch APPTAINER_BRANCH=${{ env.BRANCH_NAME }} APPTAINER_REPO=https://github.com/Synthesys-Lab/assassyn.git
 
       - name: Run Container Tests
         run: |
@@ -56,7 +54,6 @@ jobs:
       - name: Cleanup Containers
         if: always()
         run: |
-          cd vm/apptainer
-          # Clean up branch-specific container
-          rm -f assassyn-${{ env.BRANCH_NAME }}.sif
+          echo "Cleaning up branch-specific container"
+          rm -f vm/apptainer/assassyn-${{ env.BRANCH_NAME }}.sif
           echo "Cleaned up branch container"
