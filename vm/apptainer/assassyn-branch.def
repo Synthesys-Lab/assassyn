@@ -2,8 +2,8 @@ Bootstrap: localimage
 From: assassyn-base.sif
 
 %arguments
-    ASSASSYN_REPO https://github.com/Synthesys-Lab/assassyn.git
-    ASSASSYN_BRANCH main
+    ASSASSYN_REPO=https://github.com/Synthesys-Lab/assassyn.git
+    ASSASSYN_BRANCH=master
 
 %post
     # Clone the specific branch

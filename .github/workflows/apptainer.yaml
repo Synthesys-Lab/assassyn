@@ -15,6 +15,8 @@ jobs:
   test:
     name: Test (Apptainer)
     runs-on: self-hosted
+    env:
+      BRANCH_NAME: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -42,19 +44,19 @@ jobs:
 
       - name: Build Branch Container
         run: |
-          echo "Building branch container for ${{ github.ref_name }}"
+          echo "Building branch container for ${{ env.BRANCH_NAME }}"
           cd vm/apptainer
-          apptainer build --build-arg ASSASSYN_BRANCH=${{ github.ref_name }} assassyn-${{ github.ref_name }}.sif assassyn-branch.def
+          apptainer build --build-arg ASSASSYN_BRANCH=${{ env.BRANCH_NAME }} assassyn-${{ env.BRANCH_NAME }}.sif assassyn-branch.def
 
       - name: Run Container Tests
         run: |
           cd vm/apptainer
-          apptainer test assassyn-${{ github.ref_name }}.sif
+          apptainer test assassyn-${{ env.BRANCH_NAME }}.sif
 
       - name: Cleanup Containers
         if: always()
         run: |
           cd vm/apptainer
           # Clean up branch-specific container
-          rm -f assassyn-${{ github.ref_name }}.sif
+          rm -f assassyn-${{ env.BRANCH_NAME }}.sif
           echo "Cleaned up branch container"
