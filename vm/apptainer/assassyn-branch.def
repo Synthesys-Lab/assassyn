@@ -1,0 +1,58 @@
+Bootstrap: localimage
+From: assassyn-base.sif
+
+%arguments
+    ASSASSYN_REPO https://github.com/Synthesys-Lab/assassyn.git
+    ASSASSYN_BRANCH main
+
+%post
+    # Clone the specific branch
+    cd /
+    git clone --recursive ${ASSASSYN_REPO} app
+    cd /app
+    
+    if [ -n "${ASSASSYN_BRANCH}" ]; then
+        git checkout ${ASSASSYN_BRANCH}
+    fi
+    
+    # Remove unnecessary directories
+    rm -rf examples/ docs/ tutorials/
+    
+    # Build the project
+    export PYTHONUSERBASE="/app/.local"
+    source setup.sh
+    make build-all
+    
+    # Set up environment
+    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    PYTHONPATH="$PYTHONPATH:/app/.local/lib/python${PYTHON_VERSION}/site-packages"
+    PATH="$PATH:/app/.local/bin"
+    
+    cat >> $APPTAINER_ENVIRONMENT <<EOF
+export RUSTC_WRAPPER="$RUSTC_WRAPPER"
+export ASSASSYN_HOME="$ASSASSYN_HOME"
+export VERILATOR_ROOT="$VERILATOR_ROOT"
+export PYTHONPATH="$PYTHONPATH"
+export PATH="$PATH"
+export CC="ccache gcc"
+export CXX="ccache g++"
+export CCACHE_DIR="/tmp/ccache"
+export PYTHONUSERBASE="/app/.local"
+export CARGO_HOME="/tmp/cargo"
+EOF
+
+%runscript
+    exec "$@"
+
+%test
+    #!/bin/zsh
+    echo "=== Testing builds ==="
+    cd /app
+    python -c 'import assassyn' # import this module
+    echo "Import test: $?"
+    
+    # Run basic tests if available
+    if [ -f "Makefile" ] && grep -q "test" Makefile; then
+        make test-all
+        echo "Test suite: $?"
+    fi
