@@ -18,7 +18,7 @@ $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 $(APPTAINER_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_DEF)
 	@echo "=== Building Assassyn Container ==="
 	@echo "Creating containerized snapshot of current repository..."
-	@cd vm/apptainer && apptainer build --bind $(CURDIR):/workspace assassyn.sif assassyn.def
+	@cd vm/apptainer && apptainer build --bind $(shell git rev-parse --show-toplevel):/workspace assassyn.sif assassyn.def
 	@echo "=== Container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_IMAGE)"
 	@echo "Usage: apptainer exec --no-home $(APPTAINER_IMAGE) python your_script.py"
