@@ -6,9 +6,6 @@ on:
     branches:
       - master
 
-env:
-  ASSASSYN_DOCKER: docker run -v ${{ github.workspace }}:/app --user $(id -u):$(id -g) assassyn:latest
-
 name: Test
 
 jobs:
@@ -22,30 +19,15 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
           override: true
-      - name: Build Container
-        run: docker build -t assassyn:latest .
-      - name: Stop & Remove Existing Container
-        run: |
-          docker stop assassyn || true
-          docker container rm assassyn || true
+      
       - name: Apply Patches
         run: |
           make patch-all
       
-      - name: Initialize the Container
+      - name: Initialize Submodules
         run: |
-          ${{ env.ASSASSYN_DOCKER }} git submodule update --init --recursive
+          git submodule update --init --recursive
       
-      - name: Restore Python Package Cache
-        id: cache-python
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ github.workspace }}/.assassyn-venv
-          key: ${{ runner.os }}-python-cache-${{ hashFiles('python/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-python-cache-
-
       - name: Get Submodule Hashes
         id: submodule-hashes
         run: |
@@ -66,23 +48,30 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-cache-
 
-      - name: Install Python Packages
-        if: steps.cache-python.outputs.cache-hit != 'true'
+      - name: Create Python Virtual Environment
         run: |
-          echo "Python cache miss, installing packages"
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "pip install -r python/requirements.txt --break-system-packages"
+          echo "Creating fresh Python virtual environment"
+          python3 -m venv ${{ github.workspace }}/.assassyn-venv
+          source ${{ github.workspace }}/.assassyn-venv/bin/activate
+          pip install --upgrade pip
+          pip install -r python/requirements.txt
 
       - name: Build All Components
         if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
           echo "Cache miss, building all components"
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make build-all"
+          source ${{ github.workspace }}/.assassyn-venv/bin/activate
+          source setup.sh && make build-all
       
       - name: Run All Tests
         run: |
-          ${{ env.ASSASSYN_DOCKER }} /bin/zsh -c "source setup.sh && make test-all"
-      - name: Cleanup Containers
+          source ${{ github.workspace }}/.assassyn-venv/bin/activate
+          source setup.sh && make test-all
+      
+      - name: Cleanup Virtual Environment
+        if: always()
         run: |
-          docker rm -f $(docker ps -a --filter ancestor=assassyn:latest -q) 2>/dev/null || true
+          echo "Cleaning up Python virtual environment"
+          rm -rf ${{ github.workspace }}/.assassyn-venv
       
      
