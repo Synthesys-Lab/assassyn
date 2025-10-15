@@ -17,9 +17,6 @@ From: rust:1.82
     export PYTHONUSERBASE="/app/.local"
     export CCACHE_DIR="/tmp/ccache"
     export CARGO_HOME="/tmp/cargo"
-    
-    # Create app directory structure
-    mkdir -p /app/.local
 
 %environment
     export PYTHONUSERBASE="/app/.local"

@@ -1,20 +1,15 @@
 Bootstrap: localimage
-From: assassyn-base-{{ ASSASSYN_BRANCH }}.sif
+From: assassyn-base.sif
 
 %post
-    # Clone the specific branch
-    cd /
-    git clone --recursive {{ ASSASSYN_REPO }} app
+    # Copy the current repository snapshot to /app
+    cp -r /workspace /app
     cd /app
     
-    if [ -n "{{ ASSASSYN_BRANCH }}" ]; then
-        git checkout {{ ASSASSYN_BRANCH }}
-    fi
-    
-    # Remove unnecessary directories
+    # Remove unnecessary directories to reduce image size
     rm -rf examples/ docs/ tutorials/
     
-    # Build the project
+    # Build the project from the repository snapshot
     export PYTHONUSERBASE="/app/.local"
     source setup.sh
     make build-all
@@ -41,7 +36,7 @@ EOF
 
 %test
     #!/bin/zsh
-    echo "=== Testing builds ==="
+    echo "=== Testing repository snapshot build ==="
     cd /app
     python -c 'import assassyn' # import this module
     echo "Import test: $?"

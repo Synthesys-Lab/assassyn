@@ -1,84 +1,55 @@
 # Assassyn Apptainer Container
 
-Assassyn can be run using [Apptainer](https://apptainer.org/) (formerly Singularity) for containerized execution. This approach provides a portable, reproducible environment with all dependencies pre-installed.
+Assassyn can be run using [Apptainer](https://apptainer.org/) (formerly Singularity) for containerized execution. This approach provides a portable, reproducible environment that creates a snapshot of your current repository with all dependencies pre-installed.
 
 ## Quick Start
 
 From the project root directory:
 
 ```sh
-# Build container for master branch (default)
+# Build container (snapshots current repository state)
 make build-apptainer
-
-# Build container for a specific branch
-make build-apptainer APPTAINER_BRANCH=<branch-name>
-
-# Build container from a different repository
-make build-apptainer APPTAINER_REPO=https://github.com/user/fork.git
 
 # Clean all containers
 make clean-apptainer
 ```
 
-This creates a containerized Assassyn environment for the specified branch.
+This creates a containerized snapshot of your current Assassyn repository state.
 
 ## Available Makefile Targets
 
 The Apptainer build system provides several targets for different use cases:
 
 ### Primary Target
-- `make build-apptainer`: Build branch-specific container (alias for `build-apptainer-branch`)
+- `make build-apptainer`: Build container with current repository snapshot
 
 ### Additional Targets
-- `make build-apptainer-base`: Build only the base container
-- `make build-apptainer-branch`: Build branch-specific container (requires base container)
+- `make build-apptainer-base`: Build only the base container (system dependencies)
 - `make clean-apptainer`: Remove all generated container files
 
-**Advanced Examples:**
+**Examples:**
 ```sh
-# Build container for current development branch
-make build-apptainer-branch APPTAINER_BRANCH=vm-251015
+# Build container with current repo snapshot
+make build-apptainer
 
-# Build container from a different repository
-make build-apptainer-branch APPTAINER_BRANCH=feature-branch APPTAINER_REPO=https://github.com/user/fork.git
-
-# Build only the base container
+# Build only the base container (rarely needed)
 make build-apptainer-base
 
 # Clean up all containers
 make clean-apptainer
 ```
 
-## Makefile Parameters
-
-The Apptainer build targets support the following parameters:
-
-- `APPTAINER_BRANCH`: Git branch name to build (default: `master`)
-- `APPTAINER_REPO`: Git repository URL (default: `https://github.com/Synthesys-Lab/assassyn.git`)
-
-**Parameter Examples:**
-```sh
-# Override both repository and branch
-make build-apptainer APPTAINER_BRANCH=feature-branch APPTAINER_REPO=https://github.com/user/fork.git
-
-# Use default repository with custom branch
-make build-apptainer APPTAINER_BRANCH=hotfix-123
-
-# Use custom repository with default branch
-make build-apptainer APPTAINER_REPO=https://github.com/user/fork.git
-```
-
 ## Execute Commands
 
 ```sh
 # Run Python scripts
-apptainer exec --no-home assassyn-<branch-name>.sif python main.py
+apptainer exec --no-home assassyn.sif python main.py
 
 # Run with specific directory binding
-apptainer exec --bind /path/to/your/code assassyn-<branch-name>.sif python /path/to/your/code/main.py
+apptainer exec --bind /path/to/your/code assassyn.sif python /path/to/your/code/main.py
 
 # Interactive shell
-apptainer shell assassyn-<branch-name>.sif
+apptainer shell assassyn.sif
 ```
 
 By default, Apptainer automatically binds the `$HOME` directory to the container. Use `--no-home` to disable this binding.
@@ -86,31 +57,14 @@ By default, Apptainer automatically binds the `$HOME` directory to the container
 ## Container Files
 
 - `assassyn-base.def`: Base container with system dependencies (Rust, Python, build tools)
-- `assassyn-branch.def`: Branch-specific container that builds Assassyn code
+- `assassyn.def`: Main container definition that snapshots the current repository
 - `scripts/init/apptainer.inc`: Makefile include with Apptainer build targets
-- `assassyn-base.sif`: Generated base image (cached for reuse)
-- `assassyn-<branch-name>.sif`: Generated branch-specific images
+- `assassyn-base.sif`: Generated base image (shared across all builds)
+- `assassyn.sif`: Generated container image (contains current repository snapshot)
 
 ## Environment Variables and Defaults
 
-The container system uses environment variables with default fallbacks. These can be controlled via Makefile parameters:
-
-### Makefile Parameters
-- `APPTAINER_REPO`: Git repository URL (default: `https://github.com/Synthesys-Lab/assassyn.git`)
-- `APPTAINER_BRANCH`: Git branch name (default: `master`)
-
-### Internal Container Variables
-- `ASSASSYN_REPO`: Git repository URL (passed from `APPTAINER_REPO`)
-- `ASSASSYN_BRANCH`: Git branch name (passed from `APPTAINER_BRANCH`)
-
-The `${VAR:-default}` syntax provides fallback values when environment variables are not set. This allows:
-- **Flexible builds**: Override repository or branch without modifying definition files
-- **CI/CD integration**: Set variables in build environments
-- **Local development**: Use defaults for quick testing
-
-## Pre-configured Environment Variables
-
-The container includes these pre-configured environment variables:
+The container system uses the current local directory and includes these pre-configured environment variables:
 - `ASSASSYN_HOME`: Assassyn installation directory
 - `VERILATOR_ROOT`: Verilator installation path
 - `PYTHONPATH`: Python module search path
@@ -121,33 +75,33 @@ The container includes these pre-configured environment variables:
 
 This multi-stage container design addresses several key requirements:
 
-### Branch Neutrality
-The container system supports building images for any Git branch without modifying the definition files. This enables:
-- **Testing**: Build containers for feature branches and pull requests
-- **Release**: Build containers for stable releases and tags
-- **Development**: Build containers for development branches
+### Repository Snapshotting
+The container system creates a snapshot of your current repository state, enabling:
+- **Reproducible Builds**: Exact same environment across different systems
+- **Version Control**: Container reflects the exact state of your working directory
+- **Portability**: Move containers between systems with identical behavior
 
 ### Build Optimization
 The two-stage approach optimizes build times:
-- **Base Image**: Contains all system dependencies (Rust, Python, build tools) - built once
-- **Branch Image**: Contains only the Assassyn code for a specific branch - rebuilt as needed
+- **Base Image**: Contains all system dependencies (Rust, Python, build tools) - shared across all builds
+- **Repository Image**: Contains only the Assassyn code from your current working directory - rebuilt as needed
 
 This separation means:
 - Dependencies are cached in the base image
 - Only code changes require rebuilding
-- Significantly faster iteration for testing different branches
+- Significantly faster iteration for development
 
 ### Reproducible Environments
-Each branch gets its own containerized environment ensuring:
+Each container build creates a reproducible environment ensuring:
 - Consistent build environments across different systems
-- Isolated dependencies per branch
+- Isolated dependencies per repository state
 - Easy deployment and testing
 
 ### CI/CD Integration
 The design supports automated workflows:
-- Environment variables control repository and branch selection
+- Environment variables control repository state
 - Makefile targets can be easily integrated into GitHub Actions
-- Containers can be built for any branch automatically
+- Containers can be built for any repository state automatically
 - Unified build system with other project components
 
 ### Integration with Main Build System

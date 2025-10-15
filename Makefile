@@ -1,7 +1,7 @@
 # Master Makefile for Assassyn project
 # This Makefile provides a unified interface for building, testing, and cleaning the project
 
-.PHONY: all env env-source build-all test-all clean-all install-py-package build-verilator clean-verilator build-ramulator2 build-wrapper clean-ramulator2 clean-wrapper install-circt clean-circt rust-lint pylint build-apptainer-base build-apptainer-branch build-apptainer clean-apptainer
+.PHONY: all env env-source build-all test-all clean-all install-py-package build-verilator clean-verilator build-ramulator2 build-wrapper clean-ramulator2 clean-wrapper install-circt clean-circt rust-lint pylint build-apptainer-base build-apptainer clean-apptainer
 
 # Default target
 all: build-all test-all

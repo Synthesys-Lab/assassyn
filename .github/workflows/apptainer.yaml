@@ -7,7 +7,7 @@ on:
       - master
 
 env:
-  ASSASSYN_APPTAINER: apptainer exec --no-home --bind ${{ github.workspace }}:/workspace assassyn-${{ github.ref_name }}.sif
+  ASSASSYN_APPTAINER: apptainer exec --no-home --bind ${{ github.workspace }}:/workspace assassyn.sif
 
 name: Test (Apptainer)
 
@@ -15,8 +15,6 @@ jobs:
   test:
     name: Test (Apptainer)
     runs-on: self-hosted
-    env:
-      BRANCH_NAME: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -41,19 +39,19 @@ jobs:
           echo "Base container cache miss, building base container"
           make build-apptainer-base
 
-      - name: Build Branch Container
+      - name: Build Repository Container
         run: |
-          echo "Building branch container for ${{ env.BRANCH_NAME }}"
-          make build-apptainer-branch APPTAINER_BRANCH=${{ env.BRANCH_NAME }} APPTAINER_REPO=https://github.com/Synthesys-Lab/assassyn.git
+          echo "Building container with repository snapshot"
+          make build-apptainer
 
       - name: Run Container Tests
         run: |
           cd vm/apptainer
-          apptainer test assassyn-${{ env.BRANCH_NAME }}.sif
+          apptainer test assassyn.sif
 
       - name: Cleanup Containers
         if: always()
         run: |
-          echo "Cleaning up branch-specific container"
-          rm -f vm/apptainer/assassyn-${{ env.BRANCH_NAME }}.sif
-          echo "Cleaned up branch container"
+          echo "Cleaning up repository container"
+          rm -f vm/apptainer/assassyn.sif
+          echo "Cleaned up repository container"
