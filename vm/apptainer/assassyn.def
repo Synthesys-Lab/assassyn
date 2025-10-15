@@ -9,6 +9,9 @@ From: assassyn-base.sif
     # Remove unnecessary directories to reduce image size
     rm -rf examples/ docs/ tutorials/
     
+    # Make the entire /app directory writable for build processes
+    chmod -R u+w /app
+    
     # Set up environment
     PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     
