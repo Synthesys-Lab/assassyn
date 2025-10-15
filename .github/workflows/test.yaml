@@ -51,14 +51,12 @@ jobs:
 
       - name: Build All Components
         if: steps.cache-build.outputs.cache-hit != 'true'
-        shell: bash
         run: |
           echo "Cache miss, building all components"
-          source setup.sh && make build-all
+          . setup.sh && make build-all
       
       - name: Run All Tests
-        shell: bash
         run: |
-          source setup.sh && make test-all
+          . setup.sh && make test-all
       
      
