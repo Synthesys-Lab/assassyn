@@ -15,8 +15,8 @@ install-py-package:
 		echo "Virtual environment already exists."; \
 	fi
 	@echo "Installing dependencies using virtual environment Python..."
-	@. $(VENV_DIR)/bin/activate -m pip install --upgrade pip
-	@. $(VENV_DIR)/bin/activate -m pip install -r python/requirements.txt
+	@. $(VENV_DIR)/bin/activate && pip install --upgrade pip
+	@. $(VENV_DIR)/bin/activate && pip install -r python/requirements.txt
 	@echo "Python dependencies installed successfully in virtual environment."
 
 clean-python:
