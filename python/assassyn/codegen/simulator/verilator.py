@@ -8,6 +8,7 @@ import platform
 import shlex
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
@@ -120,17 +121,43 @@ def _dynamic_lib_suffix() -> str:
 
 
 def _compiler_command() -> List[str]:
+    """Detect and return the appropriate C++ compiler command."""
+    # First, check if CXX environment variable is set
     compiler_env = os.environ.get("CXX")
     if compiler_env:
         tokens = shlex.split(compiler_env)
         if tokens:
             return tokens
-    for candidate in ("clang++", "g++", "c++"):
+    
+    # Try to detect the system's default C++ compiler more intelligently
+    # Check for common compiler environment variables
+    for env_var in ["CXX", "CC"]:
+        if env_var in os.environ:
+            compiler_path = os.environ[env_var]
+            if compiler_path and shutil.which(compiler_path):
+                return [compiler_path]
+    
+    # Fallback to common C++ compilers, but try to be more system-appropriate
+    candidates = []
+    
+    # On macOS, prefer clang++ if available (it's the default)
+    if sys.platform == "darwin":
+        candidates = ["clang++", "g++", "c++"]
+    # On Linux, prefer c++ (generic) then g++, then clang++
+    elif sys.platform.startswith("linux"):
+        candidates = ["c++", "g++", "clang++"]
+    # On other systems, use a generic order
+    else:
+        candidates = ["c++", "g++", "clang++"]
+    
+    for candidate in candidates:
         path = shutil.which(candidate)
         if path:
             return [path]
+    
     raise RuntimeError(
-        "Unable to locate a C++ compiler. Set the CXX environment variable or install clang++/g++."
+        "Unable to locate a C++ compiler. Please set the CXX environment variable "
+        "or install a C++ compiler (g++, clang++, or c++)."
     )
 
 

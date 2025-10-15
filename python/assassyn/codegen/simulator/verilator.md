@@ -99,7 +99,7 @@ Runs the full native toolchain:
 ## Section 4. Environment and Failure Modes
 
 - Requires `VERILATOR_ROOT`; absence raises an early error.  
-- The C++ toolchain is probed via `CXX`, else `clang++`, `g++`, then `c++`; missing toolchains raise `RuntimeError`.  
+- The C++ toolchain is probed via `CXX` environment variable first, then system-appropriate defaults (clang++ on macOS, c++/g++ on Linux, c++ on other systems); missing toolchains raise `RuntimeError`.  
 - Ports wider than 64 bits and missing SystemVerilog sources fail fast.  
 - If a system contains no `ExternalSV` modules the Verilator workspace is removed and both `sys._external_ffi_specs` and `config["external_ffis"]` are cleared.
 
