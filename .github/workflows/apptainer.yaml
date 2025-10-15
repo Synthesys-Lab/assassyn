@@ -46,7 +46,7 @@ jobs:
         run: |
           echo "Building branch container for ${{ env.BRANCH_NAME }}"
           cd vm/apptainer
-          apptainer build --build-arg ASSASSYN_BRANCH=${{ env.BRANCH_NAME }} assassyn-${{ env.BRANCH_NAME }}.sif assassyn-branch.def
+          apptainer build --build-arg ASSASSYN_REPO=https://github.com/Synthesys-Lab/assassyn.git --build-arg ASSASSYN_BRANCH=${{ env.BRANCH_NAME }} assassyn-${{ env.BRANCH_NAME }}.sif assassyn-branch.def
 
       - name: Run Container Tests
         run: |

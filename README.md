@@ -10,15 +10,20 @@ and verfication.
 
 ## Getting Started
 
-You either refer to the [docker doc](./docs/build/docker.md) to use the framework in a virtual
-machine, or build it on your physical machine. The instructions below are Ubuntu based:
+### Virtual Machine
+You either refer to the [docker](./docs/vm/docker.md) or [apptainer](./docs/vm/apptainer.md)
+to use the framework in a virtual machine.
 
-1. Make sure you have all the repos propoerly cloned.
+
+### Physical Machine
+It can also be built on your physical machine. The instructions below are Ubuntu based:
+
+1. Make sure you have all the repos propoerly cloned:
 ````sh
 git submodule update --init --recursive
 ````
 
-2. Install dependences, assuming you are on Ubuntu.
+2. Install dependences:
 
 ````sh
 sudo apt-get update
@@ -30,7 +35,7 @@ sudo apt-get install -y $(
 )
 ````
 
-4. Have this repo built from source.
+4. Have this repo built from source:
 ````sh
 source setup.sh  # Set up environment variables
 make build-all   # Build all components
