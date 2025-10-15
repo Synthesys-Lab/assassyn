@@ -5,5 +5,5 @@
 
 install-py-package:
 	@echo "Installing Python dependencies..."
-	@pip install --user -r python/requirements.txt --break-system-packages
+	@pip install -r python/requirements.txt
 	@echo "Python dependencies installed successfully."

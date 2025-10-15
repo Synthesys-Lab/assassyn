@@ -54,7 +54,6 @@ jobs:
           python3 -m venv ${{ github.workspace }}/.assassyn-venv
           source ${{ github.workspace }}/.assassyn-venv/bin/activate
           pip install --upgrade pip
-          pip install -r python/requirements.txt
 
       - name: Build All Components
         if: steps.cache-build.outputs.cache-hit != 'true'
