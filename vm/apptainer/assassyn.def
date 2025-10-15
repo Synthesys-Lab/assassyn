@@ -9,9 +9,6 @@ From: assassyn-base.sif
     # Remove unnecessary directories to reduce image size
     rm -rf examples/ docs/ tutorials/
     
-    # Make the entire /app directory writable for build processes
-    chmod -R u+w /app
-    
     # Set up environment
     PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     
@@ -40,8 +37,4 @@ EOF
     python -c 'import assassyn' # import this module
     echo "Import test: $?"
     
-    # Run basic tests if available
-    if [ -f "Makefile" ] && grep -q "test" Makefile; then
-        make test-all
-        echo "Test suite: $?"
-    fi
+    make test-all
