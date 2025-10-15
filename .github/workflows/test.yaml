@@ -49,6 +49,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-cache-
 
+      - name: Clean CMake Cache
+        run: |
+          find . -name "CMakeCache.txt" -delete
+          find . -name "CMakeFiles" -type d -exec rm -rf {} + 2>/dev/null || true
+      
       - name: Build All Components
         if: steps.cache-build.outputs.cache-hit != 'true'
         run: |
