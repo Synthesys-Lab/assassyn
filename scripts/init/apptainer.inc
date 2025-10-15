@@ -15,8 +15,11 @@ $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 
 $(APPTAINER_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_DEF)
 	@echo "=== Building Assassyn Container ==="
-	@echo "Creating clean git archive snapshot..."
-	@git archive --format=tar.gz --prefix=assassyn-$(shell git describe --tags --always)/ HEAD > /tmp/assassyn-source.tar.gz
+	@echo "Creating clean git archive snapshot with submodules..."
+	@PREFIX="assassyn-$(shell git describe --tags --always)/" && \
+		git archive --format=tar --prefix="$$PREFIX" HEAD > /tmp/assassyn-source.tar && \
+		git submodule foreach --recursive 'git archive --format=tar --prefix="$$PREFIX$$sm_path/" HEAD >> /tmp/assassyn-source.tar' && \
+		gzip -f /tmp/assassyn-source.tar
 	@echo "Creating containerized snapshot of current repository..."
 	@cd vm/apptainer && apptainer build --bind /tmp/assassyn-source.tar.gz:/tmp/assassyn-source.tar.gz assassyn.sif assassyn.def
 	@rm -f /tmp/assassyn-source.tar.gz
