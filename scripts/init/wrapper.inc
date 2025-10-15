@@ -1,7 +1,10 @@
 # Ramulator2 and Wrapper build targets
 # Converted from scripts/init/wrapper.sh
 
-.PHONY: build-ramulator2 build-wrapper clean-ramulator2 clean-wrapper
+.PHONY: build-ramulator2 build-wrapper clean-ramulator2 clean-wrapper patch-ramulator2
+
+# Patch target for ramulator2
+patch-ramulator2: 3rd-party/ramulator2/.patch-applied
 
 # Marker file to track patch application
 3rd-party/ramulator2/.patch-applied:
@@ -15,7 +18,7 @@
 		fi && \
 		touch .patch-applied
 
-build-ramulator2: 3rd-party/ramulator2/.patch-applied
+build-ramulator2: patch-ramulator2
 	@echo "Building Ramulator2..."
 	@cd 3rd-party/ramulator2 && \
 		mkdir -p build && \

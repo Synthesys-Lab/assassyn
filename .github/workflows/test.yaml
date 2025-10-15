@@ -28,10 +28,14 @@ jobs:
         run: |
           docker stop assassyn || true
           docker container rm assassyn || true
+      - name: Apply Patches
+        run: |
+          make patch-all
+      
       - name: Initialize the Container
         run: |
-          ${{ env.ASSASSYN_DOCKER }} git submodule update --init
-
+          ${{ env.ASSASSYN_DOCKER }} git submodule update --init --recursive
+      
       - name: Restore Python Package Cache
         id: cache-python
         uses: actions/cache@v4

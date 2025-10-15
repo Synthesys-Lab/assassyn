@@ -1,7 +1,7 @@
 # Master Makefile for Assassyn project
 # This Makefile provides a unified interface for building, testing, and cleaning the project
 
-.PHONY: all env env-source build-all test-all clean-all install-py-package build-verilator clean-verilator build-ramulator2 build-wrapper clean-ramulator2 clean-wrapper install-circt clean-circt rust-lint pylint build-apptainer-base build-apptainer clean-apptainer
+.PHONY: all env env-source build-all test-all clean-all install-py-package build-verilator clean-verilator build-ramulator2 build-wrapper clean-ramulator2 clean-wrapper install-circt clean-circt rust-lint pylint build-apptainer-base build-apptainer clean-apptainer patch-all patch-ramulator2 patch-circt patch-verilator
 
 # Default target
 all: build-all test-all
@@ -17,6 +17,9 @@ env:
 # Environment source target - outputs the actual command
 env-source:
 	@echo "source setup.sh"
+
+# Apply all patches on physical machine before VM build
+patch-all: patch-ramulator2 patch-circt patch-verilator
 
 # Build all components
 build-all: install-py-package build-verilator build-ramulator2 build-wrapper install-circt
