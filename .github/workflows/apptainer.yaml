@@ -52,6 +52,7 @@ jobs:
       - name: Cleanup Containers
         if: always()
         run: |
-          echo "Cleaning up repository container"
+          echo "Cleaning up containers"
           rm -f vm/apptainer/assassyn.sif
-          echo "Cleaned up repository container"
+          rm -f vm/apptainer/assassyn-base.sif
+          echo "Cleaned up all containers"
