@@ -24,6 +24,9 @@ export PYTHONUSERBASE="/app/.local"
 export CARGO_HOME="/tmp/cargo"
 EOF
 
+    # Make repo write-able
+    chmod -R u+w /app
+
     # Build the project
     make build-all
 
