@@ -42,6 +42,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-python-cache-
 
+      - name: Get Submodule Hashes
+        id: submodule-hashes
+        run: |
+          echo "circt-hash=$(git rev-parse HEAD:3rd-party/circt)" >> $GITHUB_OUTPUT
+          echo "verilator-hash=$(git rev-parse HEAD:3rd-party/verilator)" >> $GITHUB_OUTPUT
+          echo "ramulator2-hash=$(git rev-parse HEAD:3rd-party/ramulator2)" >> $GITHUB_OUTPUT
+
       - name: Restore Build Cache
         id: cache-build
         uses: actions/cache@v4
@@ -51,7 +58,7 @@ jobs:
             ${{ github.workspace }}/3rd-party/circt/frontends/PyCDE
             ${{ github.workspace }}/3rd-party/ramulator2/build
             ${{ github.workspace }}/tools/c-ramulator2-wrapper/build
-          key: ${{ runner.os }}-build-cache-${{ hashFiles('Makefile') }}-${{ hashFiles('scripts/init/*.inc') }}-${{ hashFiles('python/requirements.txt') }}
+          key: ${{ runner.os }}-build-cache-${{ hashFiles('Makefile') }}-${{ hashFiles('scripts/init/*.inc') }}-${{ hashFiles('scripts/init/patches/*.patch') }}-${{ hashFiles('python/requirements.txt') }}-circt-${{ steps.submodule-hashes.outputs.circt-hash }}-verilator-${{ steps.submodule-hashes.outputs.verilator-hash }}-ramulator2-${{ steps.submodule-hashes.outputs.ramulator2-hash }}
           restore-keys: |
             ${{ runner.os }}-build-cache-
 
