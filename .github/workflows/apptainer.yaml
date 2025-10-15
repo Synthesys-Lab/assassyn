@@ -23,11 +23,6 @@ jobs:
           components: rustfmt, clippy
           override: true
 
-      - name: Check Rust Code Quality
-        run: |
-          cargo fmt --manifest-path tools/rust-sim-runtime/Cargo.toml --all -- --check --config-path rustfmt.toml
-          cargo clippy --manifest-path tools/rust-sim-runtime/Cargo.toml --all-targets --all-features -- -D warnings
-
       - name: Restore Base Container Cache
         id: cache-base-container
         uses: actions/cache@v4
