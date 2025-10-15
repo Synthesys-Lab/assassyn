@@ -24,6 +24,7 @@ export CXX="ccache g++"
 export CCACHE_DIR="/tmp/ccache"
 export PYTHONUSERBASE="/app/.local"
 export CARGO_HOME="/tmp/cargo"
+export CARGO_TARGET_DIR="/app/.sim-runtime-cache"
 EOF
 
     # Make repo write-able

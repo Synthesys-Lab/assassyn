@@ -1,8 +1,6 @@
 # Apptainer container build targets
 # Creates a containerized snapshot of the current Assassyn repository
 
-.PHONY: build-apptainer-base build-apptainer clean-apptainer
-
 # Default values for Apptainer builds
 APPTAINER_BASE_IMAGE ?= vm/apptainer/assassyn-base.sif
 APPTAINER_IMAGE ?= vm/apptainer/assassyn.sif
