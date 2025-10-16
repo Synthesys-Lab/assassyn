@@ -1,6 +1,6 @@
 ---
 alwaysApply: false
-description: Git Commit Message
+description: Stage and commit your changes
 glob:
 ---
 
@@ -16,3 +16,8 @@ Optionally, justify the changes you made.
 ````
 
 If the change is <=10 lines and 2 files, it is allowed to just have the 1st line.
+
+# Pre-commit Hooks
+
+If not specified, you CANNOT bypass the check using `--no-verify`.
+Finalizing your changes is very serious!
