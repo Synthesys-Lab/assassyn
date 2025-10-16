@@ -4,6 +4,25 @@ This module provides the foundational Abstract Syntax Tree data structures for e
 
 The expressions form a use-def graph where each `Expr` tracks its operands through `Operand` wrappers, enabling dataflow analysis and optimization.
 
+## Design Philosophy
+
+Assassyn's IR employs an intentionally **highly redundant** data structure design that pays the cost of redundancy during construction to enable fast, simple queries during all subsequent compiler passes. This design philosophy centers around **bidirectional use-def relationships** established through operand wrappers.
+
+### Bidirectional Use-Def Graph
+
+Every value in the IR maintains bidirectional relationships:
+- **Forward edge**: `Expr._operands` contains `Operand` wrappers pointing to the values used
+- **Backward edge**: Each value's `users` list accumulates the `Operand` wrappers that reference it
+
+This means **every value knows all of its consumers immediately after IR construction**, without requiring separate analysis passes.
+
+### Design Trade-off
+
+**Cost**: Additional memory for wrapper objects and users lists
+**Benefit**: Pay once during construction, then get O(1) queries forever
+
+This pattern is similar to SSA form in traditional compilers but applied more comprehensively across all IR nodes. The redundancy enables critical compiler operations like dead code elimination, dataflow analysis, and value lifetime analysis with simple, fast lookups.
+
 ---
 
 ## Exposed Interfaces
@@ -34,7 +53,17 @@ Internally, the constructor normalizes operands through `_prepare_operand`. Dire
 
 #### `class Operand`
 
-A wrapper that creates a directed link between a value and the `Expr` that consumes it. This is the core mechanism for tracking dataflow dependencies.
+A wrapper that creates a **bidirectional link** between a value and the `Expr` that consumes it. This is the core mechanism for tracking dataflow dependencies and enabling the highly redundant use-def graph.
+
+**Bidirectional Relationship:**
+- **Forward edge**: The `Operand` wrapper in `Expr._operands` points to the value being used
+- **Backward edge**: The value's `users` list contains this `Operand` wrapper, establishing the inverse relationship
+
+**Why Wrap Instead of Direct Storage:**
+Direct storage would only provide forward traversal (Expr → Value). The wrapper enables both directions:
+- Need to track the value AND establish the inverse relationship
+- The wrapper is what enables "all values know all their consumers immediately after construction"
+- This pattern is used consistently across expressions, blocks, arrays, ports, and wires
 
 **Fields:**
 - `_value: Value` - The value of this operand
@@ -206,10 +235,58 @@ This information is displayed in IR dumps as comments in the format `; <filename
 
 ### Use-Def Graph Construction
 
-The `Expr` constructor automatically builds the use-def graph by:
-1. Wrapping values in `Operand` objects to track dependencies
-2. Adding the current expression to the users list of each operand
-3. Handling special cases for different operand types (Array, Port, Wire, Module, Downstream)
+The `Expr` constructor automatically builds the bidirectional use-def graph through the `_prepare_operand` method:
+
+**For Expression Operands:**
+```python
+if isinstance(operand, Expr):
+    wrapped = Operand(operand, self)  # Create wrapper
+    operand.users.append(wrapped)     # Establish backward edge
+    return wrapped                    # Return wrapper for forward edge
+```
+
+**For Array/Port/Wire Operands:**
+```python
+if isinstance(operand, (Array, Port, Wire)):
+    operand.users.append(self)        # Direct backward edge
+    return operand                     # No wrapper needed
+```
+
+**Key Points:**
+- Expression operands are wrapped in `Operand` objects to establish bidirectional links
+- Array, Port, and Wire operands are stored directly but still register backward edges
+- The `operand.users.append(wrapped)` call is what establishes the backward edge
+- Different operand types have slightly different handling based on their nature
+- This automatic construction happens during IR creation, not in separate analysis passes
+
+### Benefits of Bidirectional Use-Def Graph
+
+The intentional redundancy in the use-def graph enables critical compiler operations:
+
+**Dataflow Analysis:**
+- Forward traversal: Follow `_operands` to see what values an expression uses
+- Backward traversal: Follow `users` to see what expressions use a value
+- Both directions available with O(1) lookups
+
+**Dead Code Elimination:**
+- Check `len(value.users) == 0` to identify unused values
+- No separate analysis pass needed—the information is already there
+- Immediate identification of dead code during IR construction
+
+**Value Lifetime Analysis:**
+- Each value knows exactly where it's consumed
+- Critical for register allocation and scheduling in hardware synthesis
+- Enables precise timing analysis for pipeline stages
+
+**Dependency Tracking:**
+- Essential for conditional blocks (`CondBlock`) and other control flow
+- The `CondBlock` wraps its condition in an `Operand` to track the dependency
+- Enables proper ordering of operations across different execution contexts
+
+**Multi-Port Write Tracking:**
+- Arrays track all their users to manage multiple write ports
+- Each module gets its own `WritePort` mapped through the `_write_ports` dictionary
+- Enables proper hardware semantics for concurrent access patterns
 
 ### Valued Operations
 
