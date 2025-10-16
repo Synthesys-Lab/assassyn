@@ -43,7 +43,6 @@ class ModuleBase:
         '''Expose the external interfaces of this module.'''
         return self._externals
 
-    @enforce_type
     def add_external(self, operand: Operand) -> None:
         '''Add an external operand to this module.'''
         # pylint: disable=import-outside-toplevel
