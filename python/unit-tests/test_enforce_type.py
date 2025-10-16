@@ -6,11 +6,11 @@ including type validation, error handling, and decorator behavior.
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'assassyn', 'type_utils'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'assassyn', 'utils'))
 
 import pytest
 from typing import List, Dict, Union, Optional, Any
-from enforce_type import enforce_type, validate_arguments, check_type
+from assassyn.utils.enforce_type import enforce_type, validate_arguments, check_type
 
 
 class TestEnforceTypeDecorator:

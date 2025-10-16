@@ -16,7 +16,7 @@ from typing import (
 from assassyn.builder import Singleton
 from assassyn.ir.block import Block
 from assassyn.ir.value import Value
-from assassyn.type_utils.enforce_type import validate_arguments
+from assassyn.utils.enforce_type import validate_arguments
 
 ModuleLike = TypeVar('ModuleLike')
 
