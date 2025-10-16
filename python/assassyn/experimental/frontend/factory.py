@@ -9,15 +9,14 @@ flavours (e.g. standard modules, downstream logic, callbacks).
 from __future__ import annotations
 
 import functools
-import inspect
 from typing import (
-    Any, Callable, Dict, Generic, Optional, Type, TypeVar, Union,
-    get_args, get_origin, get_type_hints
+    Any, Callable, Dict, Generic, Optional, Type, TypeVar
 )
 
 from assassyn.builder import Singleton
 from assassyn.ir.block import Block
 from assassyn.ir.value import Value
+from assassyn.type_utils.enforce_type import validate_arguments
 
 ModuleLike = TypeVar('ModuleLike')
 
@@ -76,47 +75,7 @@ def _validate_outer_arguments(
     the module. Returns a dictionary of validated arguments to feed into
     the outer function.
     """
-
-    signature = inspect.signature(func)
-    bound_arguments = signature.bind(*args, **kwargs)
-    bound_arguments.apply_defaults()
-    annotations = get_type_hints(func)
-
-    validated: Dict[str, Any] = {}
-    for name, value in bound_arguments.arguments.items():
-        expected = annotations.get(name)
-        if expected is None:
-            validated[name] = value
-            continue
-
-        origin = get_origin(expected)
-        if origin is Union:
-            args_hint = get_args(expected)
-            non_none = [arg for arg in args_hint if arg is not type(None)]
-            if len(non_none) == 1 and len(non_none) != len(args_hint):
-                if value is None:
-                    validated[name] = value
-                    continue
-                expected = non_none[0]
-                origin = get_origin(expected)
-
-        if expected is Any:
-            validated[name] = value
-            continue
-
-        if isinstance(expected, type):
-            if not isinstance(value, expected):
-                raise TypeError(
-                    f"Argument '{name}' must be of type {expected.__name__}, "
-                    f"got {type(value).__name__}"
-                )
-            validated[name] = value
-            continue
-
-        # Unsupported complex annotations fall back to trusting the caller.
-        validated[name] = value
-
-    return validated
+    return validate_arguments(func, args, kwargs)
 
 
 def _verify_inner_name(outer_name: str, inner_name: str) -> None:
