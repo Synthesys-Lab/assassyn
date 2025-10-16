@@ -2,6 +2,7 @@
 
 from .value import Value
 from .dtype import Bits, DType
+from ..type_utils.enforce_type import enforce_type
 
 class Const(Value):
     '''The AST node data structure for constant values.'''
@@ -9,7 +10,8 @@ class Const(Value):
     dtype: DType  # Data type of this constant
     value: int  # The actual value of this constant
 
-    def __init__(self, dtype, value):
+    @enforce_type
+    def __init__(self, dtype: DType, value: int):
         assert dtype.inrange(value), f"Value {value} is out of range for {dtype}"
         self.dtype = dtype
         self.value = value
@@ -21,8 +23,13 @@ class Const(Value):
         '''Dump the constant as an operand.'''
         return repr(self)
 
-    def __getitem__(self, x):
-        '''Override the value slicing operation.'''
+    @enforce_type
+    def __getitem__(self, x: slice) -> 'Const':
+        '''Override the value slicing operation.
+        
+        Note: Currently limited to 32 bits due to implementation constraints.
+        This is a known limitation documented in Phase 2.
+        '''
         bits = x.stop - x.start + 1
         assert 0 < bits <= 32, "TODO: Support more than 32 bits later"
         assert self.dtype.bits >= bits, f"Got {self.dtype.bits} bits, but {bits} bits are needed"
