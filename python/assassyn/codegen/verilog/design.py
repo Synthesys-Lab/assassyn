@@ -2,8 +2,9 @@
 # pylint: disable=no-member
 """Verilog design generation and code dumping."""
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Union
 from collections import defaultdict
+from pathlib import Path
 
 from .utils import (
     HEADER,
@@ -491,9 +492,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
 
 @enforce_type
-def generate_design(fname: str, sys: SysBuilder) -> None:
+def generate_design(fname: Union[str, Path], sys: SysBuilder) -> None:
     """Generate a complete Verilog design file for the system."""
-    with open(fname, 'w', encoding='utf-8') as fd:
+    with open(str(fname), 'w', encoding='utf-8') as fd:
         fd.write(HEADER)
 
         dumper = CIRCTDumper()

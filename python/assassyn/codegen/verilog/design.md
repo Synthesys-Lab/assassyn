@@ -63,7 +63,7 @@ These inconsistencies are documented as potential improvements for future refact
 ### `generate_design`
 
 ```python
-def generate_design(fname: str, sys: SysBuilder):
+def generate_design(fname: Union[str, Path], sys: SysBuilder):
     """Generate a complete Verilog design file for the system."""
 ```
 

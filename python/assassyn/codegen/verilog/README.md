@@ -15,9 +15,9 @@ def elaborate(sys: SysBuilder, **kwargs) -> Path
 Helper functions used by `elaborate`:
 
 ```python
-def generate_design(fname: str, sys: SysBuilder) -> list[str]
+def generate_design(fname: Union[str, Path], sys: SysBuilder) -> list[str]
 def generate_top_harness(dumper) -> None
-def generate_testbench(fname: str, sys: SysBuilder, sim_threshold: int,
+def generate_testbench(fname: Union[str, Path], sys: SysBuilder, sim_threshold: int,
                        dump_logger: list[str], external_files: list[str]) -> None
 def generate_sram_blackbox_files(sys, path, resource_base=None) -> None
 ```

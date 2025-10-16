@@ -11,7 +11,7 @@ The testbench generation module creates Python-based testbenches using the Cocot
 ### `generate_testbench`
 
 ```python
-def generate_testbench(fname: str, _sys: SysBuilder, sim_threshold: int,
+def generate_testbench(fname: Union[str, Path], _sys: SysBuilder, sim_threshold: int,
                        dump_logger: List[str], external_files: List[str]):
     """Generate a testbench file for the given system."""
 ```
