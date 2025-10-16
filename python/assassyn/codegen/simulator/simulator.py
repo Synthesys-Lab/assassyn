@@ -18,9 +18,11 @@ from .external import (
 )
 from ...utils import namify, repo_path
 from .port_mapper import get_port_manager
+from ...type_utils.enforce_type import enforce_type
 
 
-def analyze_and_register_ports(sys):
+@enforce_type
+def analyze_and_register_ports(sys: SysBuilder) -> None:
     """Analyze system and register all array write ports and DRAM modules.
 
     This function scans the entire system to find all array writes and DRAM modules,
@@ -65,6 +67,7 @@ def analyze_and_register_ports(sys):
 
 
 
+@enforce_type
 def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-many-statements
                    sys: SysBuilder, config, fd):
     """Generate the simulator module.
