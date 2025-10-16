@@ -12,7 +12,7 @@ from .utils import extract_sram_params
 from ...builder import SysBuilder
 from ...ir.module.external import ExternalSV
 
-from ...utils import create_and_clean_dir, repo_path
+from ...utils import create_dir, repo_path
 
 
 def generate_sram_blackbox_files(sys, path, resource_base=None):
@@ -100,7 +100,7 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
     path = kwargs.get('path', os.getcwd())
     path = Path(path) / "verilog"
 
-    create_and_clean_dir(path)
+    create_dir(path)
 
     external_sources = set()
     for module in sys.modules + sys.downstreams:

@@ -128,7 +128,6 @@ def _compiler_command() -> List[str]:
         tokens = shlex.split(compiler_env)
         if tokens:
             return tokens
-
     # Try to detect the system's default C++ compiler more intelligently
     # Check for common compiler environment variables
     for env_var in ["CXX", "CC"]:
@@ -136,10 +135,8 @@ def _compiler_command() -> List[str]:
             compiler_path = os.environ[env_var]
             if compiler_path and shutil.which(compiler_path):
                 return [compiler_path]
-
     # Fallback to common C++ compilers, but try to be more system-appropriate
     candidates = []
-
     # On macOS, prefer clang++ if available (it's the default)
     if sys.platform == "darwin":
         candidates = ["clang++", "g++", "c++"]
@@ -149,12 +146,10 @@ def _compiler_command() -> List[str]:
     # On other systems, use a generic order
     else:
         candidates = ["c++", "g++", "clang++"]
-
     for candidate in candidates:
         path = shutil.which(candidate)
         if path:
             return [path]
-
     raise RuntimeError(
         "Unable to locate a C++ compiler. Please set the CXX environment variable "
         "or install a C++ compiler (g++, clang++, or c++)."

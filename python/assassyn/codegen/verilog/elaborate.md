@@ -85,7 +85,7 @@ The generated wrappers provide a behavioural memory model suitable for simulatio
 The module uses several utility functions:
 
 - `extract_sram_params()` from [utils module](/python/assassyn/codegen/verilog/utils.md) for SRAM parameter extraction
-- `create_and_clean_dir()` from [utils module](/python/assassyn/utils.md) for directory management
+- `create_dir()` from [utils module](/python/assassyn/utils.md) for directory management
 - `repo_path()` from [utils module](/python/assassyn/utils.md) for repository path resolution
 - `generate_design()` from [design module](/python/assassyn/codegen/verilog/design.md) for main design generation
 - `generate_testbench()` from [testbench module](/python/assassyn/codegen/verilog/testbench.md) for testbench generation
