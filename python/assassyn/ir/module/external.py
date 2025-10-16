@@ -19,14 +19,6 @@ from .module import Module, Wire
 
 
 @dataclass(frozen=True)
-class _ExternalWireDecl:
-    '''Normalized wire declaration metadata for ExternalSV.'''
-
-    dtype: DType
-    kind: str = 'wire'
-
-
-@dataclass(frozen=True)
 class _ExternalConfig:
     '''Resolved configuration for an `ExternalSV` subclass.'''
 
@@ -35,8 +27,8 @@ class _ExternalConfig:
     has_clock: bool
     has_reset: bool
     no_arbiter: bool
-    in_wires: Dict[str, _ExternalWireDecl]
-    out_wires: Dict[str, _ExternalWireDecl]
+    in_wires: Dict[str, WireIn | WireOut | RegOut]
+    out_wires: Dict[str, WireOut | RegOut]
 
 
 class WireIn:
@@ -106,13 +98,13 @@ def external(cls):
 
     for name, annotation in annotations.items():
         if isinstance(annotation, WireIn):
-            in_wires[name] = _ExternalWireDecl(annotation.dtype, 'wire')
+            in_wires[name] = annotation
             _ensure_property(cls, name, 'input')
         elif isinstance(annotation, WireOut):
-            out_wires[name] = _ExternalWireDecl(annotation.dtype, 'wire')
+            out_wires[name] = annotation
             _ensure_property(cls, name, 'output')
         elif isinstance(annotation, RegOut):
-            out_wires[name] = _ExternalWireDecl(annotation.dtype, 'reg')
+            out_wires[name] = annotation
             _ensure_property(cls, name, 'output')
 
     file_path = getattr(cls, '__source__', None)
@@ -136,49 +128,6 @@ def external(cls):
 def _read_output_value(module: ExternalSV, wire: Wire):
     '''Deprecated helper retained for backward compatibility.'''
     return module.ensure_output_exposed(wire)
-
-
-def _as_external_decl(spec, default_kind='wire') -> _ExternalWireDecl:
-    '''Normalize user-provided wire declarations into `_ExternalWireDecl`.'''
-    if isinstance(spec, _ExternalWireDecl):
-        return spec
-    if isinstance(spec, WireIn):
-        return _ExternalWireDecl(spec.dtype, 'wire')
-    if isinstance(spec, WireOut):
-        return _ExternalWireDecl(spec.dtype, 'wire')
-    if isinstance(spec, RegOut):
-        return _ExternalWireDecl(spec.dtype, 'reg')
-
-    dtype = None
-    kind = default_kind
-
-    if isinstance(spec, dict):
-        dtype = spec.get('dtype')
-        kind = spec.get('kind', default_kind)
-    elif isinstance(spec, (tuple, list)):
-        if not spec:
-            raise ValueError("External wire declaration tuple cannot be empty")
-        dtype = spec[0]
-        if len(spec) > 1:
-            kind = spec[1]
-    else:
-        dtype = spec
-
-    if not isinstance(dtype, DType):
-        raise TypeError("ExternalSV wire declarations must use assassyn dtypes")
-    if kind not in ('wire', 'reg'):
-        raise ValueError(f"Unsupported ExternalSV wire kind '{kind}'")
-    return _ExternalWireDecl(dtype, kind)
-
-
-def _normalize_decl_map(wire_map, default_kind='wire'):
-    '''Normalize a mapping of wire declarations.'''
-    if not wire_map:
-        return {}
-    return {
-        name: _as_external_decl(spec, default_kind)
-        for name, spec in wire_map.items()
-    }
 
 
 class _ExternalWireReadCollector(Visitor):
@@ -358,8 +307,8 @@ class ExternalSV(Downstream):  # pylint: disable=too-many-instance-attributes
         self._wires = {}
         self._exposed_output_reads = {}
 
-        decl_in_wires = _normalize_decl_map(in_wires, 'wire')
-        decl_out_wires = _normalize_decl_map(out_wires, 'wire')
+        decl_in_wires = in_wires or {}
+        decl_out_wires = out_wires or {}
 
         def _register_wire(name, dtype, direction, kind):
             wire = Wire(dtype, direction, self, kind=kind)
@@ -370,9 +319,21 @@ class ExternalSV(Downstream):  # pylint: disable=too-many-instance-attributes
         self._declared_out_wires = decl_out_wires
 
         for wire_name, decl in decl_in_wires.items():
-            _register_wire(wire_name, decl.dtype, 'input', decl.kind)
+            if not isinstance(decl, (WireIn, WireOut, RegOut)):
+                raise TypeError(
+                    f"Wire '{wire_name}' must be declared with WireIn/WireOut/RegOut, "
+                    f"got {type(decl).__name__}"
+                )
+            kind = 'reg' if isinstance(decl, RegOut) else 'wire'
+            _register_wire(wire_name, decl.dtype, 'input', kind)
         for wire_name, decl in decl_out_wires.items():
-            _register_wire(wire_name, decl.dtype, 'output', decl.kind)
+            if not isinstance(decl, (WireOut, RegOut)):
+                raise TypeError(
+                    f"Output wire '{wire_name}' must be declared with WireOut/RegOut, "
+                    f"got {type(decl).__name__}"
+                )
+            kind = 'reg' if isinstance(decl, RegOut) else 'wire'
+            _register_wire(wire_name, decl.dtype, 'output', kind)
 
         self.in_wires = DirectionalWires(self, 'input')
         self.out_wires = DirectionalWires(self, 'output')
