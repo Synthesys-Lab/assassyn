@@ -80,7 +80,7 @@ This function dispatches to the appropriate code generation function based on th
 ### `codegen_intrinsic`
 
 ```python
-def codegen_intrinsic(node: Intrinsic, module_ctx, **kwargs) -> str
+def codegen_intrinsic(node: Intrinsic, module_ctx) -> str
 ```
 
 Generates Rust code for side-effecting intrinsic operations that control execution flow and perform memory operations.
@@ -88,13 +88,12 @@ Generates Rust code for side-effecting intrinsic operations that control executi
 **Parameters:**
 - `node: Intrinsic` - The intrinsic node to generate code for
 - `module_ctx` - Module context containing naming and type information
-- `**kwargs` - Additional keyword arguments passed to code generation functions
 
 **Returns:**
 - `str` - Generated Rust code string, or `None` if intrinsic is not supported
 
 **Explanation:**
-This function dispatches to the appropriate code generation function based on the intrinsic's opcode. Side-effecting intrinsics include execution control (`wait_until`, `finish`, `assert`), memory operations (`send_read_request`, `send_write_request`), and synchronization primitives (`barrier`). The generated code may modify simulator state or control execution flow. Handler functions receive the same `**kwargs` forwarded by the caller, allowing future extensions to thread additional context without changing the dispatch interface. If an opcode is not implemented the dispatcher returns `None`, signalling the caller to handle or report the unsupported intrinsic.
+This function dispatches to the appropriate code generation function based on the intrinsic's opcode. Side-effecting intrinsics include execution control (`wait_until`, `finish`, `assert`), memory operations (`send_read_request`, `send_write_request`), and synchronization primitives (`barrier`). The generated code may modify simulator state or control execution flow. If an opcode is not implemented the dispatcher returns `None`, signalling the caller to handle or report the unsupported intrinsic.
 
 ---
 
