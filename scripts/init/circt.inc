@@ -20,12 +20,28 @@ patch-circt: 3rd-party/circt/.patch-applied
 
 install-circt: patch-circt
 	@echo "Installing PyCDE..."
-	@pip install pycde || \
-		(echo "Failed to install CIRCT via pip. Fall back to building from source using PyCDE setup." && \
-		cd 3rd-party/circt/frontends/PyCDE && \
-		CIRCT_DIRECTORY="$$(pwd)/../../" CIRCT_EXTRA_CMAKE_ARGS="-DESI_RUNTIME=OFF -DZ3_DISABLE=ON -DOR_TOOLS_DISABLE=ON" python -m build && \
-		pip install ./dist/*.whl && \
-		echo "PyCDE built and installed successfully to local directory.")
+	@echo "Step 1: Checking if PyCDE is already installed..."
+	@if python -c "import pycde" 2>/dev/null; then \
+		echo "PyCDE is already installed — skipping installation."; \
+	else \
+		echo "PyCDE not found. Proceeding with installation..."; \
+		echo "Step 2: Attempting to install PyCDE via pip..."; \
+		if pip install pycde; then \
+			echo "PyCDE installed successfully via pip."; \
+		else \
+			echo "Failed to install PyCDE via pip. Proceeding to source installation..."; \
+			echo "Step 3: Building PyCDE from source..."; \
+			cd 3rd-party/circt/frontends/PyCDE && \
+			CIRCT_DIRECTORY="$$(pwd)/../../" CIRCT_EXTRA_CMAKE_ARGS="-DESI_RUNTIME=OFF -DZ3_DISABLE=ON -DOR_TOOLS_DISABLE=ON" python -m build && \
+			echo "Installing PyCDE wheel..."; \
+			if pip install ./dist/*.whl; then \
+				echo "PyCDE built and installed successfully from source."; \
+			else \
+				echo "Failed to install PyCDE from source. Please check the build logs."; \
+				exit 1; \
+			fi; \
+		fi; \
+	fi
 	@echo "CIRCT installation completed."
 
 clean-circt:
