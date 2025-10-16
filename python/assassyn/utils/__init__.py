@@ -1,13 +1,13 @@
 """Utility functions and decorators for Assassyn."""
 
-# Import type enforcement utilities from this package
-from .enforce_type import enforce_type, validate_arguments, check_type
-
-# import timeit
+# Standard library imports
 import os
 import subprocess
 import sys
 import re
+
+# Local imports
+from .enforce_type import enforce_type, validate_arguments, check_type
 
 def identifierize(obj):
     '''The helper function to get the identifier of the given object. You can change `id_slice`
