@@ -17,8 +17,16 @@ from typing import (
 
 def _check_simple_type(value: Any, expected_type: type) -> bool:
     """Check simple type (non-generic)."""
-    if not isinstance(value, expected_type):
-        raise TypeError(f"Expected {expected_type.__name__}, got {type(value).__name__}")
+    # Use exact type matching for built-in types to avoid bool/int confusion
+    if expected_type in (int, str, float, bool):
+        # For built-in types, we need exact type matching to avoid bool/int confusion
+        # pylint: disable=unidiomatic-typecheck
+        if type(value) is not expected_type:
+            raise TypeError(f"Expected {expected_type.__name__}, got {type(value).__name__}")
+    else:
+        # For custom types, use isinstance
+        if not isinstance(value, expected_type):
+            raise TypeError(f"Expected {expected_type.__name__}, got {type(value).__name__}")
     return True
 
 
@@ -134,7 +142,33 @@ def validate_arguments(func: Callable[..., Any], args: tuple, kwargs: dict) -> D
             continue
 
         # Validate the type
-        check_type(value, expected)
+        try:
+            check_type(value, expected)
+        except TypeError as exc:
+            # Re-raise with argument name context
+            # Handle Union types specially for better error messages
+            if get_origin(expected) is Union:
+                args_hint = get_args(expected)
+                # Special case for Optional (Union[T, None])
+                non_none = [arg for arg in args_hint if arg is not type(None)]
+                if len(non_none) == 1 and len(non_none) != len(args_hint):
+                    # This is Optional[T]
+                    type_str = non_none[0].__name__
+                else:
+                    # Regular Union
+                    variant_names = [getattr(arg, '__name__', str(arg)) for arg in args_hint]
+                    type_str = ' or '.join(variant_names)
+            elif get_origin(expected) in (list, List):
+                type_str = 'list'
+            elif get_origin(expected) in (dict, Dict):
+                type_str = 'dict'
+            elif get_origin(expected) in (tuple, tuple):
+                type_str = 'tuple'
+            else:
+                type_str = getattr(expected, '__name__', str(expected))
+            raise TypeError(
+                f"Argument '{name}' must be of type {type_str}, got {type(value).__name__}"
+            ) from exc
         validated[name] = value
 
     return validated
