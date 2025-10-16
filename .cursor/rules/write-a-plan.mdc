@@ -1,11 +1,16 @@
 ---
 alwaysApply: false
-description: Make a plan
+description: Make a plan for all modifications to the code base
 glob:
 ---
 
 When you are asked to make a plan:
 
+0. The order of a plan matters:
+   - Test-driven development is prefered. Thus, it is preferred to develop the test cases before the features.
+   - Documents should be updated before the feature, so that your trace of thinking is fixed their as a reference.
+      - Think carefully and deeply before doing any code modification. Follow our good code standard.
+   - It is OK to update the documents when you realize there is some issue for the design itself afterward.
 1. Make intermediate commits to have your half-way result commited.
    - If you are screwed you can also roll back more easily.
    - You should CAREFULLY consider, which intermediate commit should be checked, and which need not.
