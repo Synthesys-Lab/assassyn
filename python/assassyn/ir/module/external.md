@@ -30,7 +30,7 @@ result = ip.y  # or ip.y[0] for RegOut
 
 ## Descriptor Helpers
 
-  * `WireIn[...]`, `WireOut[...]`, `RegOut[...]` are lightweight descriptors (`_WireAnnotation`) used in class annotations. They capture the port direction, element type (`DType`), and whether the signal is treated as a wire or a registered output.
+  * `WireIn[...]`, `WireOut[...]`, `RegOut[...]` are wrapper classes used in class annotations. They encode the port direction and wire kind in their type identity (WireIn=input wire, WireOut=output wire, RegOut=output reg) and wrap the element type (`DType`).
   * `Input`/`Output` remain as deprecated aliases for backward compatibility.
   * During decoration each descriptor is normalized into `_ExternalWireDecl`, ensuring consumers downstream always observe typed `Wire` objects with consistent `kind` (`wire` or `reg`).
 

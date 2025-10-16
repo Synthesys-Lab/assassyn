@@ -16,13 +16,6 @@ from .downstream import Downstream
 from .module import Module, Wire
 
 
-@dataclass(frozen=True)
-class _WireAnnotation:
-    '''Descriptor returned by `WireIn[...]`/`WireOut[...]` annotations.'''
-
-    direction: str
-    dtype: DType
-    wire_kind: str = 'wire'
 
 
 @dataclass(frozen=True)
@@ -47,30 +40,42 @@ class _ExternalConfig:
 
 
 class WireIn:
-    '''Annotation helper for declaring ExternalSV wire inputs.'''
+    '''Wrapper class for declaring ExternalSV wire inputs.'''
 
-    def __class_getitem__(cls, dtype: DType) -> _WireAnnotation:
+    def __init__(self, dtype: DType):
         if not isinstance(dtype, DType):
-            raise TypeError("WireIn[...] expects an assassyn dtype instance")
-        return _WireAnnotation('input', dtype, 'wire')
+            raise TypeError("WireIn expects an assassyn dtype instance")
+        self.dtype = dtype
+
+    @classmethod
+    def __class_getitem__(cls, dtype: DType):
+        return cls(dtype)
 
 
 class WireOut:
-    '''Annotation helper for declaring ExternalSV combinational outputs.'''
+    '''Wrapper class for declaring ExternalSV combinational outputs.'''
 
-    def __class_getitem__(cls, dtype: DType) -> _WireAnnotation:
+    def __init__(self, dtype: DType):
         if not isinstance(dtype, DType):
-            raise TypeError("WireOut[...] expects an assassyn dtype instance")
-        return _WireAnnotation('output', dtype, 'wire')
+            raise TypeError("WireOut expects an assassyn dtype instance")
+        self.dtype = dtype
+
+    @classmethod
+    def __class_getitem__(cls, dtype: DType):
+        return cls(dtype)
 
 
 class RegOut:
-    '''Annotation helper for declaring ExternalSV registered outputs.'''
+    '''Wrapper class for declaring ExternalSV registered outputs.'''
 
-    def __class_getitem__(cls, dtype: DType) -> _WireAnnotation:
+    def __init__(self, dtype: DType):
         if not isinstance(dtype, DType):
-            raise TypeError("RegOut[...] expects an assassyn dtype instance")
-        return _WireAnnotation('output', dtype, 'reg')
+            raise TypeError("RegOut expects an assassyn dtype instance")
+        self.dtype = dtype
+
+    @classmethod
+    def __class_getitem__(cls, dtype: DType):
+        return cls(dtype)
 
 
 def _ensure_property(cls, name: str, direction: str):
@@ -100,12 +105,15 @@ def external(cls):
     out_wires: Dict[str, DType] = {}
 
     for name, annotation in annotations.items():
-        if isinstance(annotation, _WireAnnotation):
-            if annotation.direction == 'input':
-                in_wires[name] = _ExternalWireDecl(annotation.dtype, annotation.wire_kind)
-            else:
-                out_wires[name] = _ExternalWireDecl(annotation.dtype, annotation.wire_kind)
-            _ensure_property(cls, name, annotation.direction)
+        if isinstance(annotation, WireIn):
+            in_wires[name] = _ExternalWireDecl(annotation.dtype, 'wire')
+            _ensure_property(cls, name, 'input')
+        elif isinstance(annotation, WireOut):
+            out_wires[name] = _ExternalWireDecl(annotation.dtype, 'wire')
+            _ensure_property(cls, name, 'output')
+        elif isinstance(annotation, RegOut):
+            out_wires[name] = _ExternalWireDecl(annotation.dtype, 'reg')
+            _ensure_property(cls, name, 'output')
 
     file_path = getattr(cls, '__source__', None)
     module_name = getattr(cls, '__module_name__', None)
@@ -134,8 +142,12 @@ def _as_external_decl(spec, default_kind='wire') -> _ExternalWireDecl:
     '''Normalize user-provided wire declarations into `_ExternalWireDecl`.'''
     if isinstance(spec, _ExternalWireDecl):
         return spec
-    if isinstance(spec, _WireAnnotation):
-        return _ExternalWireDecl(spec.dtype, getattr(spec, 'wire_kind', default_kind))
+    if isinstance(spec, WireIn):
+        return _ExternalWireDecl(spec.dtype, 'wire')
+    if isinstance(spec, WireOut):
+        return _ExternalWireDecl(spec.dtype, 'wire')
+    if isinstance(spec, RegOut):
+        return _ExternalWireDecl(spec.dtype, 'reg')
 
     dtype = None
     kind = default_kind
