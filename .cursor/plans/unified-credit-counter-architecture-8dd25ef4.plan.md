@@ -1,4 +1,4 @@
-<!-- 8dd25ef4-531d-4d36-9832-a3fa21f63108 13e5ea53-9094-4cce-b389-d90cb1f3ffd9 -->
+<!-- 8dd25ef4-531d-4d36-9832-a3fa21f63108 3a6cb921-40f3-4a0b-aa07-a566e673e243 -->
 # Unified Credit Counter Architecture Refactoring
 
 ## Overview
@@ -435,11 +435,86 @@ Update any found references to use the unified activation interface.
 
 ### Phase 11: Update Documentation
 
-**Files to update**:
+This phase updates all documentation to reflect the unified credit counter architecture.
 
-- `python/assassyn/ip/credit.md` - Update API documentation to reflect register-only interface
-- `docs/design/arch/arch.md` - Update to reference CreditCounter IP instead of trigger_counter.sv
-- `docs/design/lang/intrinsics.md` - Update wait_until documentation to mention unified activation
+#### Phase 11.1: Update IP Module Documentation
+
+**File**: `python/assassyn/ip/credit.md`
+
+Update API documentation to reflect register-only interface:
+
+- Document that `count_reg` is exposed as `RegArray`
+- Document that `delta_ready()` and `pop_valid()` are computed functions
+- Add examples showing how Modules access the counter register
+- Remove any references to returning expression tuples
+
+#### Phase 11.2: Update Architecture Documentation
+
+**File**: `docs/design/arch/arch.md`
+
+Update credit-based pipeline architecture description:
+
+- Replace `trigger_counter.sv` references with `CreditCounter` IP module
+- Update diagram showing credit counter as a Downstream module
+- Clarify that credit counters are built into every Module
+- Document the unified activation interface for Module vs Downstream
+
+#### Phase 11.3: Update Intrinsics Documentation
+
+**File**: `docs/design/lang/intrinsics.md`
+
+Update wait_until documentation (around lines 19-62):
+
+- Document that `wait_until` combines activation condition with user condition
+- Explain Module activation: `credit_counter.pop_valid() & condition`
+- Explain Downstream activation: `upstream_executed & condition`
+- Update examples to show the unified activation pattern
+
+#### Phase 11.4: Update Verilog Backend Documentation
+
+**Files**:
+
+- `python/assassyn/codegen/verilog/README.md` (4 trigger_counter references)
+- `python/assassyn/codegen/verilog/module.md` (1 reference)
+- `python/assassyn/codegen/verilog/elaborate.md` (1 reference)
+
+Remove all mentions of `trigger_counter.sv` and update to describe:
+
+- Credit counters are now CreditCounter IP modules (Downstream)
+- No more special-cased SystemVerilog files
+- Activation logic uses unified interface
+- Remove TriggerCounter from port generation examples
+- Update resource file lists to remove trigger_counter.sv
+
+#### Phase 11.5: Update Simulator Documentation
+
+**File**: `docs/design/internal/simulator.md`
+
+Update to clarify the unified activation model:
+
+- Document that event queues ARE the credit mechanism for simulator
+- Clarify that `event_valid()` is equivalent to `pop_valid`
+- Document the parallel between Verilog (credit counter) and simulator (event queue)
+- Update module bookkeeping section to reference unified activation interface
+
+#### Phase 11.6: Update DONE Document
+
+**File**: `dones/DONE-credit-counter-ip.md`
+
+Add a note at the end documenting the migration to unified architecture:
+
+```markdown
+## Post-Implementation: Migration to Unified Architecture
+
+After initial implementation, the CreditCounter was integrated into the unified
+activation architecture (see unified-credit-counter-architecture.plan.md):
+- Refactored to expose only registers (count_reg as RegArray)
+- Integrated as built-in component of Module class
+- Replaced trigger_counter.sv across entire Verilog backend
+- Unified activation interface across Module and Downstream
+```
+
+**Testing**: Review all updated documentation for consistency and accuracy.
 
 ### Phase 12: Comprehensive Testing
 
