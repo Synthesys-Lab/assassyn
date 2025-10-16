@@ -99,7 +99,7 @@ _RVAL_HANDLER_DISPATCH = {
 }
 
 
-def dump_rval_ref(module_ctx, _, node):
+def dump_rval_ref(module_ctx, node):
     """Dispatch to appropriate handler based on node kind."""
     unwrapped = unwrap_operand(node)
     node_type = type(unwrapped)

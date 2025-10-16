@@ -33,7 +33,7 @@ def codegen_binary_op(node: BinaryOp, module_ctx, sys):
     if lhs_code:
         lhs = lhs_code
     else:
-        lhs = dump_rval_ref(module_ctx, sys, node.lhs)
+        lhs = dump_rval_ref(module_ctx, node.lhs)
 
     rhs_code = None
     if hasattr(node.rhs, 'opcode') and hasattr(node.rhs, 'args'):
@@ -42,7 +42,7 @@ def codegen_binary_op(node: BinaryOp, module_ctx, sys):
     if rhs_code:
         rhs = rhs_code
     else:
-        rhs = dump_rval_ref(module_ctx, sys, node.rhs)
+        rhs = dump_rval_ref(module_ctx, node.rhs)
 
     # Special handling for shift operations with signed values
     if node.opcode == BinaryOp.SHR and node.lhs.dtype.is_signed():
@@ -62,6 +62,6 @@ def codegen_binary_op(node: BinaryOp, module_ctx, sys):
 
 def codegen_unary_op(node: UnaryOp, module_ctx, sys):
     """Generate code for unary operations."""
-    operand = dump_rval_ref(module_ctx, sys, node.x)
+    operand = dump_rval_ref(module_ctx, node.x)
     uniop = UnaryOp.OPERATORS[node.opcode]
     return f"{uniop}{operand}"

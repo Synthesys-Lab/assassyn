@@ -24,7 +24,7 @@ The node dumper is a critical component of the simulator code generation pipelin
 ### dump_rval_ref
 
 ```python
-def dump_rval_ref(module_ctx, _, node):
+def dump_rval_ref(module_ctx, node):
     """Dispatch to appropriate handler based on node kind."""
 ```
 

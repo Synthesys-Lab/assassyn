@@ -13,13 +13,13 @@ from ..node_dumper import dump_rval_ref
 
 def _codegen_fifo_peek(node, module_ctx, sys, **_kwargs):
     """Generate code for FIFO_PEEK intrinsic."""
-    port_self = dump_rval_ref(module_ctx, sys, node.get_operand(0))
+    port_self = dump_rval_ref(module_ctx, node.get_operand(0))
     return f"sim.{port_self}.front().cloned()"
 
 
 def _codegen_fifo_valid(node, module_ctx, sys, **_kwargs):
     """Generate code for FIFO_VALID intrinsic."""
-    port_self = dump_rval_ref(module_ctx, sys, node.get_operand(0))
+    port_self = dump_rval_ref(module_ctx, node.get_operand(0))
     return f"!sim.{port_self}.is_empty()"
 
 
@@ -34,7 +34,7 @@ def _codegen_value_valid(node, module_ctx, sys, **_kwargs):
 
 def _codegen_module_triggered(node, module_ctx, sys, **_kwargs):
     """Generate code for MODULE_TRIGGERED intrinsic."""
-    port_self = dump_rval_ref(module_ctx, sys, node.get_operand(0))
+    port_self = dump_rval_ref(module_ctx, node.get_operand(0))
     return f"sim.{port_self}_triggered"
 
 
@@ -74,7 +74,7 @@ def codegen_pure_intrinsic(node: PureIntrinsic, module_ctx, sys):
 
 def _codegen_wait_until(node, module_ctx, sys, **_kwargs):
     """Generate code for WAIT_UNTIL intrinsic."""
-    value = dump_rval_ref(module_ctx, sys, node.args[0])
+    value = dump_rval_ref(module_ctx, node.args[0])
     return f"if !{value} {{ return false; }}"
 
 
@@ -85,7 +85,7 @@ def _codegen_finish(node, module_ctx, sys, **_kwargs):
 
 def _codegen_assert(node, module_ctx, sys, **_kwargs):
     """Generate code for ASSERT intrinsic."""
-    value = dump_rval_ref(module_ctx, sys, node.args[0])
+    value = dump_rval_ref(module_ctx, node.args[0])
     return f"assert!({value});"
 
 
@@ -100,8 +100,8 @@ def _codegen_send_read_request(node, module_ctx, sys, **_kwargs):
     re = node.args[1]
     addr = node.args[2]
     dram_name = namify(dram_module.name)
-    re_val = dump_rval_ref(module_ctx, sys, re)
-    addr_val = dump_rval_ref(module_ctx, sys, addr)
+    re_val = dump_rval_ref(module_ctx, re)
+    addr_val = dump_rval_ref(module_ctx, addr)
     return f"""if {re_val} {{
                         unsafe {{
                             let mem_interface = &sim.mi_{dram_name};
@@ -131,8 +131,8 @@ def _codegen_send_write_request(node, module_ctx, sys, **_kwargs):
     addr = node.args[2]
     data = node.args[3]  # pylint: disable=unused-variable
     dram_name = namify(dram_module.name)
-    we_val = dump_rval_ref(module_ctx, sys, we)
-    addr_val = dump_rval_ref(module_ctx, sys, addr)
+    we_val = dump_rval_ref(module_ctx, we)
+    addr_val = dump_rval_ref(module_ctx, addr)
     return f"""if {we_val} {{
                         unsafe {{
                             let mem_interface = &sim.mi_{dram_name};

@@ -65,7 +65,7 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
         from ._expr import codegen_expr  # pylint: disable=import-outside-toplevel
 
         if isinstance(node, WireAssign):
-            value_code = dump_rval_ref(self.module_ctx, self.sys, node.value)
+            value_code = dump_rval_ref(self.module_ctx, node.value)
             code = codegen_external_wire_assign(
                 node,
                 external_specs=self.external_specs,
@@ -144,7 +144,7 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
 
     def visit_int_imm(self, int_imm):
         """Render integer immediates as Rust ``ValueCastTo`` expressions."""
-        ty = dump_rval_ref(self.module_ctx, self.sys, int_imm.dtype)
+        ty = dump_rval_ref(self.module_ctx, int_imm.dtype)
         value = int_imm.value
         return f"ValueCastTo::<{ty}>::cast(&{value})"
 
@@ -159,7 +159,7 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
                 cond_code = self.visit_expr(node.cond)
                 if cond_code:
                     result.append(cond_code)
-            cond = dump_rval_ref(self.module_ctx, self.sys, node.cond)
+            cond = dump_rval_ref(self.module_ctx, node.cond)
             result.append(f"if {cond} {{\n")
             self.indent += 2
         elif isinstance(node, CycledBlock):

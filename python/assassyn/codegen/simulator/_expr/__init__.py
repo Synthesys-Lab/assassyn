@@ -35,10 +35,10 @@ def codegen_log(node: Log, module_ctx, sys):
     module_name = module_ctx.name
     result = [f'print!("@line:{{:<5}} {{:<10}}: [{module_name}]\\t", line!(), cyclize(sim.stamp));']
     result.append("println!(")
-    result.append(f"{dump_rval_ref(module_ctx, sys, node.operands[0])}, ")
+    result.append(f"{dump_rval_ref(module_ctx, node.operands[0])}, ")
 
     for elem in node.operands[1:]:
-        dump = dump_rval_ref(module_ctx, sys, elem)
+        dump = dump_rval_ref(module_ctx, elem)
         dtype = elem.dtype
         if dtype.bits == 1:
             dump = f"if {dump} {{ 1 }} else {{ 0 }}"
@@ -50,7 +50,7 @@ def codegen_log(node: Log, module_ctx, sys):
 
 def codegen_slice(node: Slice, module_ctx, sys):
     """Generate code for slice operations."""
-    a = dump_rval_ref(module_ctx, sys, node.x)
+    a = dump_rval_ref(module_ctx, node.x)
     l = node.l.value.value
     r = node.r.value.value
     dtype = node.dtype
@@ -74,8 +74,8 @@ def codegen_slice(node: Slice, module_ctx, sys):
 def codegen_concat(node: Concat, module_ctx, sys):
     """Generate code for concatenation operations."""
     dtype = node.dtype
-    a = dump_rval_ref(module_ctx, sys, node.msb)
-    b = dump_rval_ref(module_ctx, sys, node.lsb)
+    a = dump_rval_ref(module_ctx, node.msb)
+    b = dump_rval_ref(module_ctx, node.lsb)
     b_bits = node.lsb.dtype.bits
 
     return f"""{{
@@ -88,15 +88,15 @@ def codegen_concat(node: Concat, module_ctx, sys):
 
 def codegen_select(node: Select, module_ctx, sys):
     """Generate code for select operations."""
-    cond = dump_rval_ref(module_ctx, sys, node.cond)
-    true_value = dump_rval_ref(module_ctx, sys, node.true_value)
-    false_value = dump_rval_ref(module_ctx, sys, node.false_value)
+    cond = dump_rval_ref(module_ctx, node.cond)
+    true_value = dump_rval_ref(module_ctx, node.true_value)
+    false_value = dump_rval_ref(module_ctx, node.false_value)
     return f"if {cond} {{ {true_value} }} else {{ {false_value} }}"
 
 
 def codegen_select1hot(node: Select1Hot, module_ctx, sys):
     """Generate code for 1-hot select operations."""
-    cond = dump_rval_ref(module_ctx, sys, node.cond)
+    cond = dump_rval_ref(module_ctx, node.cond)
     target_type = dtype_to_rust_type(node.dtype)
     result = [f'''{{ let cond = {cond};
 assert!(cond.count_ones() == 1, "Select1Hot: condition is not 1-hot");''']
@@ -104,7 +104,7 @@ assert!(cond.count_ones() == 1, "Select1Hot: condition is not 1-hot");''']
     for i, value in enumerate(node.values):
         if i != 0:
             result.append(" else ")
-        value_ref = dump_rval_ref(module_ctx, sys, value)
+        value_ref = dump_rval_ref(module_ctx, value)
         result.append(f'''if cond >> {i} & 1 != 0
 {{ ValueCastTo::<{target_type}>::cast(&{value_ref}) }}''')
 
@@ -115,7 +115,7 @@ assert!(cond.count_ones() == 1, "Select1Hot: condition is not 1-hot");''']
 def codegen_cast(node: Cast, module_ctx, sys):
     """Generate code for cast operations."""
     dest_dtype = node.dtype
-    a = dump_rval_ref(module_ctx, sys, node.x)
+    a = dump_rval_ref(module_ctx, node.x)
 
     if node.opcode in [Cast.ZEXT, Cast.BITCAST, Cast.SEXT]:
         return f"ValueCastTo::<{dtype_to_rust_type(dest_dtype)}>::cast(&{a})"

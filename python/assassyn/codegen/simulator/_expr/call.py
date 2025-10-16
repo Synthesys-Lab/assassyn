@@ -43,7 +43,7 @@ def codegen_fifo_push(node: FIFOPush, module_ctx, sys):
     """Generate code for FIFO push operations."""
     fifo = node.fifo
     fifo_id = fifo_name(fifo)
-    value = dump_rval_ref(module_ctx, sys, node.val)
+    value = dump_rval_ref(module_ctx, node.val)
     module_name = module_ctx.name
 
     return f"""{{

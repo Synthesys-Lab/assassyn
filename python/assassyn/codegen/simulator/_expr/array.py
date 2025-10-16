@@ -12,7 +12,7 @@ def codegen_array_read(node, module_ctx, sys):
     array = node.array
     idx = node.idx
     array_name = namify(array.name)
-    idx_val = dump_rval_ref(module_ctx, sys, idx)
+    idx_val = dump_rval_ref(module_ctx, idx)
     return f"sim.{array_name}.payload[{idx_val} as usize].clone()"
 
 
@@ -24,8 +24,8 @@ def codegen_array_write(node, module_ctx, sys, module_name):
     module = node.module
 
     array_name = namify(array.name)
-    idx_val = dump_rval_ref(module_ctx, sys, idx)
-    value_val = dump_rval_ref(module_ctx, sys, value)
+    idx_val = dump_rval_ref(module_ctx, idx)
+    value_val = dump_rval_ref(module_ctx, value)
     module_writer = namify(module.name)
 
     manager = get_port_manager()
