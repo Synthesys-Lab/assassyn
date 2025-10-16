@@ -23,7 +23,7 @@ from ...ir.const import Const
 from ...ir.array import Array
 from ...ir.dtype import RecordValue
 from ...utils import namify, unwrap_operand
-from ...type_utils.enforce_type import enforce_type
+from ...utils.enforce_type import enforce_type
 from ...ir.expr import (
     Expr,
     FIFOPop,

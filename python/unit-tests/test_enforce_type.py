@@ -6,7 +6,7 @@ including type validation, error handling, and decorator behavior.
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'assassyn', 'utils'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
 from typing import List, Dict, Union, Optional, Any

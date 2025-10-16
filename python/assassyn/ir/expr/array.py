@@ -8,7 +8,7 @@ import typing
 
 from ..value import Value
 from .expr import Expr
-from ...type_utils.enforce_type import enforce_type
+from ...utils.enforce_type import enforce_type
 
 if typing.TYPE_CHECKING:
     from ..array import Array

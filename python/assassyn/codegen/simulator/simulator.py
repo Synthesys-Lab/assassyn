@@ -18,7 +18,7 @@ from .external import (
 )
 from ...utils import namify, repo_path
 from .port_mapper import get_port_manager
-from ...type_utils.enforce_type import enforce_type
+from ...utils.enforce_type import enforce_type
 
 
 @enforce_type

@@ -2,7 +2,7 @@
 
 from .value import Value
 from .dtype import Bits, DType
-from ..type_utils.enforce_type import enforce_type
+from ..utils.enforce_type import enforce_type
 
 class Const(Value):
     '''The AST node data structure for constant values.'''

@@ -11,7 +11,7 @@ from ...builder import ir_builder, Singleton
 from ...builder.rewrite_assign import rewrite_assign
 from ..expr import Operand, Expr
 from ..expr.intrinsic import PureIntrinsic
-from ...type_utils.enforce_type import enforce_type
+from ...utils.enforce_type import enforce_type
 
 
 # pylint: disable=too-few-public-methods, cyclic-import
