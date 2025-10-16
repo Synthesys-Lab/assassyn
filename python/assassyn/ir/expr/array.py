@@ -8,6 +8,7 @@ import typing
 
 from ..value import Value
 from .expr import Expr
+from ...type_utils.enforce_type import enforce_type
 
 if typing.TYPE_CHECKING:
     from ..array import Array
@@ -20,7 +21,8 @@ class ArrayWrite(Expr):
 
     ARRAY_WRITE = 401
 
-    def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None):
+    @enforce_type
+    def __init__(self, arr, idx: Value, val: Value, module: 'ModuleBase' = None):
         super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val])
         # Get module from Singleton if not provided
         if module is None:
@@ -57,7 +59,8 @@ class ArrayRead(Expr):
 
     ARRAY_READ = 400
 
-    def __init__(self, arr: Array, idx: Value):
+    @enforce_type
+    def __init__(self, arr: 'Array', idx: Value):
         # pylint: disable=import-outside-toplevel
         from ..array import Array
         assert isinstance(arr, Array), f'{type(arr)} is not an Array!'
