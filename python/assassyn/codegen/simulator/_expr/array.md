@@ -9,7 +9,7 @@ The generated code follows the [simulator architecture](../simulator.md) with ha
 ### codegen_array_read
 
 ```python
-def codegen_array_read(node, module_ctx, sys) -> str:
+def codegen_array_read(node, module_ctx) -> str:
     """Generate Rust code for array read operations.
     
     Generates a Rust expression that reads from an array's payload at a given index.
@@ -18,7 +18,6 @@ def codegen_array_read(node, module_ctx, sys) -> str:
     
     @param node: ArrayRead IR node containing the array and index to read from
     @param module_ctx: Current module context for variable resolution
-    @param sys: System builder context for type information
     @return: Rust expression string for reading from the array
     """
 ```
@@ -30,7 +29,7 @@ def codegen_array_read(node, module_ctx, sys) -> str:
 ### codegen_array_write
 
 ```python
-def codegen_array_write(node, module_ctx, sys, module_name) -> str:
+def codegen_array_write(node, module_ctx, module_name) -> str:
     """Generate Rust code for array write operations with port indexing.
     
     Generates a Rust code block that writes to an array using the port-based write system.
@@ -39,7 +38,6 @@ def codegen_array_write(node, module_ctx, sys, module_name) -> str:
     
     @param node: ArrayWrite IR node containing array, index, and value to write
     @param module_ctx: Current module context for variable resolution  
-    @param sys: System builder context for type information
     @param module_name: Name of the module performing the write (for port assignment)
     @return: Rust code block string for writing to the array
     """

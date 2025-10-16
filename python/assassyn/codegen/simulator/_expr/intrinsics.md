@@ -62,7 +62,7 @@ The module uses dispatch tables to map intrinsic opcodes to their corresponding 
 ### `codegen_pure_intrinsic`
 
 ```python
-def codegen_pure_intrinsic(node: PureIntrinsic, module_ctx, sys) -> str
+def codegen_pure_intrinsic(node: PureIntrinsic, module_ctx) -> str
 ```
 
 Generates Rust code for pure intrinsic operations that inspect simulator state without side effects.
@@ -70,7 +70,6 @@ Generates Rust code for pure intrinsic operations that inspect simulator state w
 **Parameters:**
 - `node: PureIntrinsic` - The pure intrinsic node to generate code for
 - `module_ctx` - Module context containing naming and type information
-- `sys` - System context for simulator state access
 
 **Returns:**
 - `str` - Generated Rust code string, or `None` if intrinsic is not supported
@@ -81,7 +80,7 @@ This function dispatches to the appropriate code generation function based on th
 ### `codegen_intrinsic`
 
 ```python
-def codegen_intrinsic(node: Intrinsic, module_ctx, sys, **kwargs) -> str
+def codegen_intrinsic(node: Intrinsic, module_ctx, **kwargs) -> str
 ```
 
 Generates Rust code for side-effecting intrinsic operations that control execution flow and perform memory operations.
@@ -89,7 +88,6 @@ Generates Rust code for side-effecting intrinsic operations that control executi
 **Parameters:**
 - `node: Intrinsic` - The intrinsic node to generate code for
 - `module_ctx` - Module context containing naming and type information
-- `sys` - System context for simulator state access
 - `**kwargs` - Additional keyword arguments passed to code generation functions
 
 **Returns:**
@@ -139,7 +137,7 @@ Maps side-effecting intrinsic opcodes to their corresponding code generation fun
 #### `_codegen_fifo_peek`
 
 ```python
-def _codegen_fifo_peek(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_fifo_peek(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to peek at the front value of a FIFO without removing it.
@@ -149,7 +147,7 @@ Generates code to peek at the front value of a FIFO without removing it.
 #### `_codegen_fifo_valid`
 
 ```python
-def _codegen_fifo_valid(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_fifo_valid(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to check if a FIFO is not empty.
@@ -161,7 +159,7 @@ Generates code to check if a FIFO is not empty.
 #### `_codegen_value_valid`
 
 ```python
-def _codegen_value_valid(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_value_valid(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to check if a signal's value is valid (Some).
@@ -171,7 +169,7 @@ Generates code to check if a signal's value is valid (Some).
 #### `_codegen_module_triggered`
 
 ```python
-def _codegen_module_triggered(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_module_triggered(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to check if a module was triggered in the current cycle.
@@ -183,7 +181,7 @@ Generates code to check if a module was triggered in the current cycle.
 #### `_codegen_has_mem_resp`
 
 ```python
-def _codegen_has_mem_resp(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_has_mem_resp(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to check if memory has a pending response.
@@ -193,7 +191,7 @@ Generates code to check if memory has a pending response.
 #### `_codegen_get_mem_resp`
 
 ```python
-def _codegen_get_mem_resp(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_get_mem_resp(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to get memory response data, converting Vec<u8> to BigUint.
@@ -205,7 +203,7 @@ Generates code to get memory response data, converting Vec<u8> to BigUint.
 #### `_codegen_wait_until`
 
 ```python
-def _codegen_wait_until(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_wait_until(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to pause execution until a condition is true.
@@ -218,7 +216,7 @@ This implements the credit-based pipeline mechanism where modules consume credit
 #### `_codegen_finish`
 
 ```python
-def _codegen_finish(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_finish(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to terminate the simulation.
@@ -228,7 +226,7 @@ Generates code to terminate the simulation.
 #### `_codegen_assert`
 
 ```python
-def _codegen_assert(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_assert(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to assert a runtime condition.
@@ -238,7 +236,7 @@ Generates code to assert a runtime condition.
 #### `_codegen_barrier`
 
 ```python
-def _codegen_barrier(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_barrier(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates a no-op barrier operation.
@@ -250,7 +248,7 @@ Generates a no-op barrier operation.
 #### `_codegen_send_read_request`
 
 ```python
-def _codegen_send_read_request(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_send_read_request(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to send a read request to memory.
@@ -285,7 +283,7 @@ This generates unsafe Rust code that interfaces with the Ramulator2 memory simul
 #### `_codegen_send_write_request`
 
 ```python
-def _codegen_send_write_request(node, module_ctx, sys, **_kwargs) -> str
+def _codegen_send_write_request(node, module_ctx, **_kwargs) -> str
 ```
 
 Generates code to send a write request to memory.

@@ -11,7 +11,7 @@ This module is part of the simulator code generation pipeline that converts Assa
 ### codegen_binary_op
 
 ```python
-def codegen_binary_op(node: BinaryOp, module_ctx, sys) -> str
+def codegen_binary_op(node: BinaryOp, module_ctx) -> str
 ```
 
 Generates Rust code for binary arithmetic and logical operations.
@@ -19,7 +19,6 @@ Generates Rust code for binary arithmetic and logical operations.
 **Parameters:**
 - `node`: The BinaryOp IR node containing the operation to generate code for
 - `module_ctx`: The module context containing module-specific information
-- `sys`: The system context for code generation
 
 **Returns:** A string containing the generated Rust expression
 
@@ -36,15 +35,14 @@ The function maps the node's opcode to the corresponding Rust operator (e.g., `+
 ### codegen_unary_op
 
 ```python
-def codegen_unary_op(node: UnaryOp, module_ctx, sys) -> str
+def codegen_unary_op(node: UnaryOp, module_ctx) -> str
 ```
 
 Generates Rust code for unary arithmetic and logical operations.
 
 **Parameters:**
 - `node`: The UnaryOp IR node containing the operation to generate code for
-- `module_ctx`: The module context containing module-specific information  
-- `sys`: The system context for code generation
+- `module_ctx`: The module context containing module-specific information
 
 **Returns:** A string containing the generated Rust expression
 

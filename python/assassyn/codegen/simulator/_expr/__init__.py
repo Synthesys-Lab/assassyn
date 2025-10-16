@@ -30,7 +30,7 @@ from .intrinsics import codegen_intrinsic, codegen_pure_intrinsic
 from .call import codegen_async_call, codegen_fifo_pop, codegen_fifo_push, codegen_bind
 
 
-def codegen_log(node: Log, module_ctx, sys):
+def codegen_log(node: Log, module_ctx):
     """Generate code for log operations."""
     module_name = module_ctx.name
     result = [f'print!("@line:{{:<5}} {{:<10}}: [{module_name}]\\t", line!(), cyclize(sim.stamp));']
@@ -48,7 +48,7 @@ def codegen_log(node: Log, module_ctx, sys):
     return "".join(result)
 
 
-def codegen_slice(node: Slice, module_ctx, sys):
+def codegen_slice(node: Slice, module_ctx):
     """Generate code for slice operations."""
     a = dump_rval_ref(module_ctx, node.x)
     l = node.l.value.value
@@ -71,7 +71,7 @@ def codegen_slice(node: Slice, module_ctx, sys):
             }}"""
 
 
-def codegen_concat(node: Concat, module_ctx, sys):
+def codegen_concat(node: Concat, module_ctx):
     """Generate code for concatenation operations."""
     dtype = node.dtype
     a = dump_rval_ref(module_ctx, node.msb)
@@ -86,7 +86,7 @@ def codegen_concat(node: Concat, module_ctx, sys):
             }}"""
 
 
-def codegen_select(node: Select, module_ctx, sys):
+def codegen_select(node: Select, module_ctx):
     """Generate code for select operations."""
     cond = dump_rval_ref(module_ctx, node.cond)
     true_value = dump_rval_ref(module_ctx, node.true_value)
@@ -94,7 +94,7 @@ def codegen_select(node: Select, module_ctx, sys):
     return f"if {cond} {{ {true_value} }} else {{ {false_value} }}"
 
 
-def codegen_select1hot(node: Select1Hot, module_ctx, sys):
+def codegen_select1hot(node: Select1Hot, module_ctx):
     """Generate code for 1-hot select operations."""
     cond = dump_rval_ref(module_ctx, node.cond)
     target_type = dtype_to_rust_type(node.dtype)
@@ -112,7 +112,7 @@ assert!(cond.count_ones() == 1, "Select1Hot: condition is not 1-hot");''']
     return "".join(result)
 
 
-def codegen_cast(node: Cast, module_ctx, sys):
+def codegen_cast(node: Cast, module_ctx):
     """Generate code for cast operations."""
     dest_dtype = node.dtype
     a = dump_rval_ref(module_ctx, node.x)
@@ -143,16 +143,16 @@ _EXPR_CODEGEN_DISPATCH = {
 }
 
 
-def _call_codegen_func(func, node, module_ctx, sys, **kwargs):
+def _call_codegen_func(func, node, module_ctx, **kwargs):
     """Helper function to call codegen functions with appropriate parameters."""
     if func.__name__ == 'codegen_array_write':
-        return func(node, module_ctx, sys, module_ctx.name)
+        return func(node, module_ctx, module_ctx.name)
     if func.__name__ == 'codegen_intrinsic':
-        return func(node, module_ctx, sys, **kwargs)
-    return func(node, module_ctx, sys)
+        return func(node, module_ctx, **kwargs)
+    return func(node, module_ctx)
 
 
-def codegen_expr(node, module_ctx, sys, **kwargs):
+def codegen_expr(node, module_ctx, **kwargs):
     """Generate code for an expression node.
 
     This is the main dispatcher function that delegates to specific codegen functions
@@ -163,11 +163,11 @@ def codegen_expr(node, module_ctx, sys, **kwargs):
     # Try exact match first
     codegen_func = _EXPR_CODEGEN_DISPATCH.get(node_type)
     if codegen_func is not None:
-        return _call_codegen_func(codegen_func, node, module_ctx, sys, **kwargs)
+        return _call_codegen_func(codegen_func, node, module_ctx, **kwargs)
 
     # Fall back to isinstance check for subclasses
     for base_type, func in _EXPR_CODEGEN_DISPATCH.items():
         if isinstance(node, base_type):
-            return _call_codegen_func(func, node, module_ctx, sys, **kwargs)
+            return _call_codegen_func(func, node, module_ctx, **kwargs)
 
     return None

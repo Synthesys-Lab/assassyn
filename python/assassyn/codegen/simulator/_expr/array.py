@@ -7,7 +7,7 @@ from ..node_dumper import dump_rval_ref
 from ..port_mapper import get_port_manager
 
 
-def codegen_array_read(node, module_ctx, sys):
+def codegen_array_read(node, module_ctx):
     """Generate code for array read operations."""
     array = node.array
     idx = node.idx
@@ -16,7 +16,7 @@ def codegen_array_read(node, module_ctx, sys):
     return f"sim.{array_name}.payload[{idx_val} as usize].clone()"
 
 
-def codegen_array_write(node, module_ctx, sys, module_name):
+def codegen_array_write(node, module_ctx, module_name):
     """Generate code for array write operations with port indexing."""
     array = node.array
     idx = node.idx

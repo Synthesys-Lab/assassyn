@@ -32,7 +32,6 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
 
     def __init__(self, sys, external_specs: dict[str, typing.Any] | None = None):
         super().__init__()
-        self.sys = sys
         self.indent = 0
         self.module_name = ""
         self.module_ctx = None
@@ -96,7 +95,6 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
             else codegen_expr(
                 node,
                 self.module_ctx,
-                self.sys,
             )
         )
 
