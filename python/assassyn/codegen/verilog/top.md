@@ -2,6 +2,20 @@
 
 This module provides top-level harness generation for Verilog designs, creating the complete system-level module that instantiates and connects all components including modules, arrays, FIFOs, trigger counters, and external modules.
 
+## Design Documents
+
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [External SystemVerilog Integration](../../../docs/design/external/ExternalSV_zh.md) - External module integration
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Verilog Design Generation](./design.md) - Core Verilog design generation
+- [Verilog Elaboration](./elaborate.md) - Main entry point for Verilog generation
+- [Simulator Generation](../simulator/simulator.md) - Simulator code generation
+- [Module Generation](../simulator/modules.md) - Module-to-Rust translation
+
 ## Summary
 
 The top-level harness generation module creates the complete system-level Verilog module that serves as the top-level of the design. It handles the instantiation and connection of all system components, including regular modules, downstream modules, SRAM modules, multi-port arrays, FIFOs, trigger counters, and external modules, while managing the complex interconnections required by the credit-based pipeline architecture.

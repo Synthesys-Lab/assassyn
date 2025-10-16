@@ -2,6 +2,18 @@
 
 This module provides helper functions for applying commutative operations across a variable number of arguments. These functions enable variadic operations that can take multiple operands and apply a single operation across all of them, which is useful for simplifying expressions with multiple operands.
 
+## Design Documents
+
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Type System Design](../../../docs/design/lang/type.md) - Type system architecture and data type definitions
+
+## Related Modules
+
+- [Expression Base](../expr.md) - Base expression classes and operand system
+- [Arithmetic Operations](../arith.md) - Binary and unary arithmetic operations
+- [Array Operations](../array.md) - Array read/write operations
+- [Intrinsic Operations](../intrinsic.md) - Intrinsic function operations
+
 ---
 
 ## Section 1. Exposed Interfaces
@@ -80,6 +92,11 @@ def concat(*args):
 ```
 
 **Explanation:** Variadic concatenation function that concatenates all provided arguments using their `.concat()` method. Requires at least two arguments and uses a lambda function to chain the concatenation operations. This is commonly used for [bit concatenation operations](../../../docs/design/pipeline.md) in hardware design.
+
+**Error Conditions:**
+- `ValueError`: Raised by `concat` if fewer than two arguments are provided
+- Type errors: May occur if operands don't support the required operations (add, mul, bitwise operations, concat)
+- Runtime errors: May occur if operands have incompatible types for the operation
 
 ---
 

@@ -1,5 +1,18 @@
 # DRAM Module
 
+## Design Documents
+
+- [Memory System Architecture](../../../docs/design/arch/memory.md) - Memory system design including DRAM integration
+- [Intrinsic Operations Design](../../../docs/design/lang/intrinsics.md) - Intrinsic operations architecture
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Memory Base](./base.md) - Base memory implementation
+- [Intrinsic Operations](../expr/intrinsic.md) - Intrinsic function operations
+- [Downstream Module](../module/downstream.md) - Downstream module implementation
+- [Ramulator2 Integration](../../ramulator2/ramulator2.md) - DRAM simulation backend
+
 ## Summary
 
 This module implements DRAM (Dynamic Random Access Memory) simulation for Assassyn's IR. Unlike SRAM, DRAM operates as an off-chip memory module that interacts with the on-chip pipeline through asynchronous request/response mechanisms. The module extends `MemoryBase` to provide DRAM-specific functionality using intrinsic functions for memory request handling, as described in the [intrinsics documentation](../expr/intrinsic.md).
@@ -48,6 +61,13 @@ This method implements the core DRAM functionality using the `@combinational` de
 3. **Write Request:** When `we` is enabled, calls `send_write_request(self, we, addr, wdata)` to initiate an asynchronous write operation
 4. **Success Indication:** Returns boolean values indicating whether each request was successfully sent
 
+**Note on Parameter Order:** The intrinsic functions use the parameter order `(self, enable, addr)` for read requests and `(self, enable, addr, data)` for write requests. This differs from some documentation that may show `(self, addr, enable)` - the implementation order is authoritative.
+
+**DRAM Integration with Ramulator2:** The DRAM module integrates with the Ramulator2 simulation backend through intrinsic functions:
+- **Request Handling**: Intrinsic functions interface with the Ramulator2 C++ library for realistic DRAM simulation
+- **Response Management**: Memory responses are handled through the intrinsic response system
+- **Callback Integration**: DRAM callbacks are managed through the simulator code generation system
+
 The success signals allow downstream modules to determine if requests need to be retried. This follows the asynchronous memory access pattern described in [arch.md](../../../docs/design/arch/arch.md) where memory operations may have variable latency and require proper flow control.
 
 **Technical Details:**
@@ -66,3 +86,13 @@ Provide string representation for debugging.
 
 **Explanation:**
 Returns a debug-friendly string representation using the internal `_repr_impl()` method with the identifier 'memory.DRAM' for clear module identification in logs and debugging output.
+
+## Performance Characteristics
+
+**DRAM Module Performance Notes:**
+- **Latency**: Variable latency depending on memory state and access patterns
+- **Throughput**: Lower throughput compared to SRAM due to request/response cycles
+- **Resource Usage**: Lower hardware resource usage compared to SRAM
+- **Power Consumption**: Lower power consumption compared to SRAM due to dynamic operation
+- **Timing Constraints**: Variable timing requires proper flow control and retry mechanisms
+- **Access Patterns**: Optimized for sequential access patterns with burst operations

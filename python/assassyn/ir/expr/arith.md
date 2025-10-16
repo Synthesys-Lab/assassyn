@@ -2,6 +2,19 @@
 
 This module defines the Intermediate Representation node classes for arithmetic and logical operations. These classes represent binary and unary operations in the assassyn AST, providing type inference and code generation support for arithmetic expressions.
 
+## Design Documents
+
+- [Type System Design](../../../docs/design/lang/type.md) - Type system architecture and data type definitions
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Intrinsic Operations](../../../docs/design/lang/intrinsics.md) - Intrinsic operations design
+
+## Related Modules
+
+- [Expression Base](../expr.md) - Base expression classes and operand system
+- [Array Operations](../array.md) - Array read/write operations
+- [Intrinsic Operations](../intrinsic.md) - Intrinsic function operations
+- [Commutative Operations](../comm.md) - Variadic arithmetic operations
+
 ---
 
 ## Section 1. Exposed Interfaces
@@ -107,6 +120,10 @@ def dtype(self):
 - Bitwise operations: Maximum bit width of operands
 
 **Note on Addition Carry Handling:** The current implementation uses `max(self.lhs.dtype.bits, self.rhs.dtype.bits)` for addition operations, but there's a TODO comment indicating this should be `bits + 1` to account for carry bits. This is a known limitation that may be addressed in future versions.
+
+**Error Conditions:**
+- `AssertionError`: Raised if `lhs` or `rhs` are not `Value` instances during initialization
+- `NotImplementedError`: Raised if the operation opcode is not supported in the `dtype` property
 
 #### `__repr__(self)`
 

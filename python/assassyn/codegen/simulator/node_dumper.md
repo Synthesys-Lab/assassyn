@@ -2,6 +2,19 @@
 
 This module provides functionality for converting Assassyn IR nodes into Rust code references during simulator generation. It implements a dispatch-based system that handles different types of nodes (arrays, ports, constants, modules, expressions) and generates appropriate Rust code for accessing their values in the simulator context, including the lazy evaluation logic needed to interact with dynamically loaded external SystemVerilog modules.
 
+## Design Documents
+
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Simulator Generation](./simulator.md) - Core simulator generation logic
+- [Simulator Elaboration](./elaborate.md) - Main entry point for simulator generation
+- [Module Generation](./modules.md) - Module-to-Rust translation
+- [Port Mapper](./port_mapper.md) - Multi-port array write support
+
 ## Section 0. Summary
 
 The node dumper is a critical component of the simulator code generation pipeline. It translates Assassyn IR nodes into Rust code that can access values in the simulator context. The module uses a dispatch table pattern to handle different node types efficiently, with special handling for cross-module references, FIFO operations, value cloning requirements, and external FFIs that must be polled through shared-object handles.

@@ -6,6 +6,20 @@ Intrinsics are divided into two categories:
 - **`Intrinsic`**: Operations with side effects that may vary based on inputs and system state
 - **`PureIntrinsic`**: Pure operations that always produce the same output for the same inputs
 
+## Design Documents
+
+- [Intrinsic Operations Design](../../../docs/design/lang/intrinsics.md) - Intrinsic operations architecture and design
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Type System Design](../../../docs/design/lang/type.md) - Type system architecture and data type definitions
+- [Memory System Architecture](../../../docs/design/arch/memory.md) - Memory system design including DRAM integration
+
+## Related Modules
+
+- [Expression Base](../expr.md) - Base expression classes and operand system
+- [Arithmetic Operations](../arith.md) - Arithmetic and logical operations
+- [Array Operations](../array.md) - Array read/write operations
+- [Call Operations](../call.md) - Async call operations
+
 ---
 
 ## Exposed Interfaces
@@ -164,6 +178,12 @@ Get the memory response data.
 This pure intrinsic retrieves the response data from the specified memory module. The least significant bits contain the data payload, while the most significant bits contain the corresponding request address. For generality, the response data is in `Vec<8>` format.
 
 **Note on Memory Response Format:** The memory response data format is handled by the code generation system. In the Python implementation, the data is returned as a `Value` object that can be used in expressions. The actual data format conversion (e.g., from `Vec<8>` to `BigUint`) is handled during code generation to Rust.
+
+**Error Conditions:**
+- Memory access errors: May occur if memory modules are not properly initialized
+- Credit system errors: May occur if `wait_until` is called without proper credit allocation
+- Assertion failures: May occur if conditions in `assume` intrinsics are false during simulation
+- Memory response errors: May occur if memory response data is accessed before it's available
 
 #### `MODULE_TRIGGERED` (PureIntrinsic)
 

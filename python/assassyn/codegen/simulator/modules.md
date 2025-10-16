@@ -4,9 +4,42 @@ This module generates the simulation of each Assassyn [module](../../ir/module/)
 including [pipeline stage](../../ir/module/module.py) and [downstream](../../ir/module/downstream.py)
 in the folder `modules/` of the generated code.
 
+## Design Documents
+
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Module Design](../../../docs/design/internal/module.md) - Module design and lifecycle
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Simulator Generation](./simulator.md) - Core simulator generation logic
+- [Simulator Elaboration](./elaborate.md) - Main entry point for simulator generation
+- [Node Dumper](./node_dumper.md) - IR node reference generation
+- [Port Mapper](./port_mapper.md) - Multi-port array write support
+
 ## Section 0. Summary
 
-The module generation system translates Assassyn IR modules into Rust simulation code. Each module (both pipeline stages and downstream modules) is converted into a Rust function that can be executed by the simulator host. In addition to the existing DRAM callback generation and cross-module exposure tracking, the generator now understands external SystemVerilog modules: it threads FFI handle specifications into every module, emits typed setters/getters for cross-language ports, and injects the glue that keeps external wires coherent with the simulator state.
+**DRAM Callback Implementation Details:** The module generation system implements DRAM callbacks with specific characteristics:
+
+1. **Hardcoded Data Extraction**: DRAM callbacks use hardcoded data extraction from the response buffer
+2. **Per-Module Callbacks**: Each DRAM module gets its own callback implementation
+3. **Response Buffer Integration**: Callbacks are integrated with the response buffer system
+4. **Memory Interface Coordination**: Callbacks coordinate with the memory interface for proper response handling
+
+**Cross-Module Communication Mechanism:** The module generation system implements cross-module communication through:
+
+1. **Expression Exposure Logic**: Complex logic for exposing expressions across module boundaries
+2. **FFI Handle Threading**: External FFI handles are threaded through all modules
+3. **Port Mapping**: Port mapping system for multi-port array writes
+4. **State Coherence**: External wires are kept coherent with simulator state
+
+**Module Context Management:** The module generation system manages module context through:
+
+1. **ElaborateModule Visitor**: Visitor pattern for generating module code
+2. **External FFI Specifications**: System-wide external FFI specifications
+3. **Module State Tracking**: Tracking of module state and dependencies
+4. **Code Generation Pipeline**: Integration with the overall code generation pipeline
 
 ## Section 1. Exposed Interfaces
 

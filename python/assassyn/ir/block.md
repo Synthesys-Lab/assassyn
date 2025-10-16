@@ -1,5 +1,18 @@
 # Block Module
 
+## Design Documents
+
+- [DSL Design](../../../docs/design/lang/dsl.md) - Trace-based DSL system and block-based control flow
+- [Module Design](../../../docs/design/internal/module.md) - Module generation and control flow
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and testbench generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+
+## Related Modules
+
+- [Builder Singleton](../../builder/__init__.md) - Builder context management system
+- [Expression Base](../expr.md) - Base expression classes
+- [Module Base](../module/base.md) - Base module functionality
+
 ## Section 0. Summary
 
 The `block.py` module defines the `Block` class hierarchy for representing control flow blocks in the Assassyn IR. This module implements the block-based control flow system that works with the [builder singleton](../../builder/__init__.py) to manage the current insertion point for IR nodes. Blocks serve as containers for expressions and provide context management through Python's `with` statement, enabling conditional execution and testbench cycle-based execution patterns as described in the [DSL design](../../../docs/design/dsl.md).
@@ -31,6 +44,16 @@ class Block:
 - `MODULE_ROOT = 0`: Constant for root blocks of modules
 - `CONDITIONAL = 1`: Constant for conditional execution blocks  
 - `CYCLE = 2`: Constant for cycle-based blocks used in testbench generation
+
+**Block Kind Usage Patterns:**
+
+1. **MODULE_ROOT (0)**: Used for the root block of each module. This block contains all the module's logic and serves as the top-level container for expressions. Created automatically when a module is instantiated.
+
+2. **CONDITIONAL (1)**: Used for conditional execution blocks created by the `Condition()` function. These blocks execute their contents only when the specified condition is true, implementing multiplexer-based conditional logic in the generated hardware.
+
+3. **CYCLE (2)**: Used for testbench generation blocks created by the `Cycle()` function. These blocks execute at specific simulation cycles, enabling precise timing control for testbench operations.
+
+**Note on Block Kind Constants:** These constants are currently defined as integer values. Consider using an enum for better type safety and maintainability in future versions.
 
 #### `CondBlock`
 ```python
@@ -176,6 +199,18 @@ def __enter__(self) -> Block
 
 **Explanation:** Implements the context manager protocol for blocks. Establishes parent-child relationships by assigning the current block/module as parent, sets the module reference from the builder singleton, and switches the builder context to this block. This enables the block to become the current insertion point for new IR nodes. The method includes assertions to ensure safe nesting of blocks.
 
+**Builder Context Management Integration:** The block system integrates with the builder singleton through a context stack mechanism:
+
+1. **Context Entry**: When entering a block via `__enter__()`, the block calls `Singleton.builder.enter_context_of('block', self)` to push itself onto the context stack
+2. **Context Exit**: When exiting a block via `__exit__()`, the block calls `Singleton.builder.exit_context_of('block')` to pop itself from the context stack
+3. **Nested Blocks**: The context stack allows for proper nesting of blocks, with each block maintaining its own insertion point
+4. **Error Handling**: The context management includes assertions to prevent invalid nesting scenarios and ensure proper cleanup
+
+**Error Conditions:**
+- `AssertionError`: Raised if block nesting depth exceeds safe limits
+- Context management errors: May occur if builder singleton is not properly initialized
+- Module reference errors: May occur if module context is not available when entering blocks
+
 #### `__exit__(self, exc_type, exc_value, traceback)`
 ```python
 def __exit__(self, exc_type, exc_value, traceback)
@@ -198,6 +233,17 @@ def __repr__(self) -> str
 
 **Explanation:** Creates a formatted string representation of the block for debugging and display purposes. Uses the `Singleton.repr_ident` to maintain proper indentation levels for nested blocks. The representation shows all expressions contained in the block's body.
 
+**Global State Management for String Representation:** The `__repr__` methods use `Singleton.repr_ident` for indentation, which creates a global state management pattern:
+
+1. **Global Indentation Counter**: All block types modify the global `Singleton.repr_ident` counter for indentation
+2. **Thread Safety Considerations**: This global state approach may not be thread-safe and could cause issues in multi-threaded environments
+3. **Nested Block Indentation**: The indentation system works correctly for nested blocks but relies on global state
+4. **Alternative Approaches**: Consider using a more localized approach or thread-local storage for better isolation
+
+**Error Conditions:**
+- Global state conflicts: May occur if multiple threads access the global indentation counter simultaneously
+- Indentation errors: May occur if the global state is not properly managed across nested blocks
+
 ### `CondBlock` Class Methods
 
 #### `__init__(self, cond)`
@@ -211,6 +257,17 @@ def __init__(self, cond: Value)
 - `cond`: `Value` representing the condition to evaluate
 
 **Explanation:** Initializes a conditional block by calling the parent constructor with `Block.CONDITIONAL` kind. Wraps the condition in an `Operand` object and establishes the user relationship if the condition is an expression. This ensures proper dependency tracking in the IR.
+
+**Operand Wrapping and User Relationship Management:** The `CondBlock.__init__` method implements a specific pattern for managing operand relationships:
+
+1. **Operand Wrapping**: The condition is wrapped in an `Operand` object using `Operand(cond, self)`, creating a directed link between the condition value and the block
+2. **User Relationship**: If the condition is an `Expr` object, the block is added to the condition's users list via `cond.users.append(self.cond)`
+3. **Dependency Tracking**: This pattern ensures that the IR maintains proper use-def relationships, enabling dataflow analysis and optimization
+4. **Consistency**: This pattern should be consistent across all block types that reference external values
+
+**Error Conditions:**
+- Type errors: May occur if the condition is not a valid `Value` object
+- Dependency tracking errors: May occur if user relationships are not properly established
 
 #### `__repr__(self)`
 ```python
@@ -236,6 +293,18 @@ def __init__(self, cycle: int)
 - `cycle`: Integer cycle number when the block should execute
 
 **Explanation:** Initializes a cycled block by calling the parent constructor with `Block.CYCLE` kind and stores the cycle number. This type of block is used specifically for testbench generation to schedule operations at precise timing points.
+
+**Testbench Integration:** The `CycledBlock` integrates with the testbench system for precise timing control:
+
+1. **Cycle-Based Execution**: The block executes at the specified cycle number during simulation
+2. **Testbench Coordination**: Used in conjunction with the [simulator design](../../../docs/design/internal/simulator.md) to coordinate testbench events
+3. **Timing Control**: Enables precise timing control for testbench operations, allowing operations to be scheduled at specific simulation cycles
+4. **Validation**: The cycle number should be non-negative and within reasonable bounds for the simulation
+
+**Error Conditions:**
+- Invalid cycle numbers: May occur if negative or extremely large cycle numbers are provided
+- Testbench coordination errors: May occur if the testbench system is not properly initialized
+- Timing conflicts: May occur if multiple blocks are scheduled for the same cycle without proper coordination
 
 #### `__repr__(self)`
 ```python

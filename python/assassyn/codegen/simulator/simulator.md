@@ -2,6 +2,20 @@
 
 This module generates Rust-based simulators from Assassyn systems. It implements the credit-based pipeline architecture described in the [simulator design document](../../../docs/design/internal/simulator.md) by translating Assassyn operations into corresponding Rust operations with proper handling of register writes, stage registers, and asynchronous calls.
 
+## Design Documents
+
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+- [Memory System Architecture](../../../docs/design/arch/memory.md) - Memory system design
+
+## Related Modules
+
+- [Simulator Elaboration](./elaborate.md) - Main entry point for simulator generation
+- [Module Generation](./modules.md) - Module-to-Rust translation
+- [Node Dumper](./node_dumper.md) - IR node reference generation
+- [Port Mapper](./port_mapper.md) - Multi-port array write support
+
 ## Section 0. Summary
 
 The simulator generation process creates a complete Rust project that faithfully executes the high-level execution model of Assassyn hardware designs. The generated simulator implements the credit-based pipeline architecture where pipeline stages communicate through event queues and FIFOs, while downstream modules execute as pure combinational logic driven by upstream stage triggers. Beyond array port arbitration and DRAM simulation, the generator now wires in external SystemVerilog FFIs: it tracks value exposures needed by external modules, carries per-module handle structs inside the simulator state, and knows how to tick externally clocked peripherals alongside the internal register model.
@@ -34,7 +48,28 @@ This function performs a comprehensive analysis of the Assassyn system to prepar
 
 2. **DRAM Module Collection**: It collects every `DRAM` instance so the generator can allocate per-DRAM `MemoryInterface`s and response buffers. The legacy `MEM_WRITE` intrinsic has been removed, so array writes are the only source of port registrations.
 
-The function returns both the port manager (with its assigned port counts) and the list of DRAM modules. `dump_simulator` consumes these results to shape the simulator struct and to initialise request/response bookkeeping for every memory device.
+**Port Allocation Strategy:** The simulator uses a compile-time port allocation strategy:
+
+1. **Port Registration**: All array write ports are registered during system analysis
+2. **Unique Port Indices**: Each writer gets a stable port index for compile-time allocation
+3. **Port Manager Integration**: The global port manager tracks all port assignments
+4. **Multi-Port Support**: Multiple modules can write to the same array through different ports
+5. **Port Guarantees**: Each port is guaranteed to be unique and conflict-free
+
+**Per-DRAM Memory Interface Approach:** The simulator implements per-DRAM memory interfaces:
+
+1. **Individual Interfaces**: Each DRAM module gets its own `MemoryInterface` instance
+2. **Response Buffers**: Each DRAM has dedicated response buffers for request/response handling
+3. **Callback Integration**: DRAM callbacks are managed per-module for proper response handling
+4. **Configuration Files**: Each DRAM interface is initialized with its own configuration file
+5. **Isolation**: DRAM modules operate independently without shared state
+
+**Half-Cycle Tick Mechanism:** The simulator implements a half-cycle tick mechanism:
+
+1. **Register Updates**: Registers are updated at the beginning of each cycle
+2. **External Clocking**: External SystemVerilog modules are clocked alongside internal registers
+3. **DRAM Advancement**: DRAM interfaces are advanced every iteration
+4. **Timing Coordination**: All timing is coordinated through the main simulation loop
 
 ### dump_simulator
 
@@ -86,6 +121,21 @@ This function generates the complete Rust simulator implementation by writing to
    - Builds vectors of stage and downstream simulation functions, optionally shuffling stage order when `config["random"]` is truthy
    - Seeds Driver/Testbench event queues, loads SRAM payloads from resource files, and honours `idle_threshold` when the design goes quiescent
    - Ticks registers, clocks external handles, and advances DRAM interfaces every iteration
+
+**Configuration Parameters:** The `config` dictionary supports the following parameters:
+
+- **`sim_threshold`**: Maximum number of simulation cycles before termination
+- **`idle_threshold`**: Number of consecutive idle cycles before considering the design quiescent
+- **`random`**: Boolean flag to randomize module execution order for better testing coverage
+- **`resource_base`**: Path to resource files (initialization files, configuration files)
+- **`fifo_depth`**: Default FIFO depth for pipeline stage communication
+- **`external_ffis`**: List of external SystemVerilog FFI specifications for co-simulation
+
+**Python-Rust Consistency Requirements:** The generated simulator must maintain consistency with the Python implementation:
+- **Data Type Mapping**: Assassyn data types are mapped to corresponding Rust types (UInt → u32/u64, Bits → bool, etc.)
+- **Memory Interface**: DRAM interfaces use the same request/response protocol as the Python implementation
+- **FIFO Naming**: FIFO names follow the same convention as the Python implementation
+- **Module Execution**: Module execution order and timing must match the Python simulation model
 
 Configuration parameters such as `sim_threshold`, `idle_threshold`, `random`, `resource_base`, `fifo_depth`, and `external_ffis` flow from the `config` dictionary. The generated simulator continues to implement the credit-based pipeline architecture documented in [simulator.md](../../../docs/design/internal/simulator.md) while adding first-class support for co-simulated external modules.
 

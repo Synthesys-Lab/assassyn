@@ -5,6 +5,19 @@ in the experimental frontend. Module instances represent pipeline stages in
 Assassyn's credit-based pipeline architecture, implementing sequential logic
 with stage boundaries and async communication.
 
+## Design Documents
+
+- [Experimental Frontend Design](../../../docs/design/lang/experimental_fe.md) - Experimental frontend architecture and Module/PipelineStage terminology
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Downstream Factory Support](./downstream.md) - Downstream module factory support
+- [Unified Factory Decorator](./factory.md) - Unified factory pattern implementation
+- [Module Implementation](../../ir/module/module.md) - Main module implementation
+- [Downstream Implementation](../../ir/module/downstream.md) - Downstream module implementation
+
 ## Summary
 
 Module instances are the primary building blocks of Assassyn's credit-based pipeline
@@ -12,6 +25,8 @@ architecture as described in [arch.md](../../../docs/design/arch/arch.md). Unlik
 `Downstream` modules that implement combinational logic, `Module` instances operate
 sequentially with explicit stage boundaries, enabling async communication between
 pipeline stages through the credit system.
+
+**Note on Terminology:** The term "Module" in this context refers to pipeline stages in the credit-based architecture. This is a legacy naming convention - the design documents refer to these as "pipeline stages" but the implementation uses "Module" as the class name. This terminology should be considered when reading design documents that use "pipeline stage" terminology.
 
 Modules receive data through input ports and can make async calls to other modules,
 consuming credits in the process. This enables the credit-based flow control
@@ -83,6 +98,14 @@ def pop_all(validate: bool = False):
 of the current module. When `validate=True`, it ensures all ports have valid
 data before popping, setting the module to backpressure timing mode.
 Otherwise, it uses systolic timing mode.
+
+**Timing Modes:** The `pop_all` function supports two timing modes:
+
+1. **Systolic Timing Mode** (`validate=False`): Data flows through the pipeline in a systolic manner, with each stage processing data as it becomes available. This mode provides higher throughput but may process incomplete data.
+
+2. **Backpressure Timing Mode** (`validate=True`): The module waits until all input ports have valid data before proceeding. This mode ensures data integrity but may reduce throughput due to backpressure.
+
+These timing modes are fundamental to the [credit-based pipeline architecture](../../../docs/design/internal/pipeline.md) and affect how modules coordinate their execution.
 
 ## Internal Helpers
 
@@ -168,6 +191,52 @@ This interface provides a more higher-order function flavor of programming.
 The example below shows a simple 2-stage pipeline.
 - The 1st stage is a self-incrementing counter.
 - The 2nd stage is a simple adder, which accepts two inputs from the 1st stage.
+
+## Usage Examples
+
+### Basic Module-to-Module Communication
+
+```python
+from assassyn.experimental import pipeline
+
+@pipeline.factory(Module)
+def counter_factory() -> Factory[Module]:
+    def counter():
+        cnt = RegArray(UInt(32), 1)
+        cnt[0] = cnt[0] + UInt(32)(1)
+        log("Counter: {}", cnt[0])
+    return counter
+
+@pipeline.factory(Module)
+def processor_factory() -> Factory[Module]:
+    def processor(data: Port[UInt(32)]):
+        data = module.pop_all(True)  # Backpressure timing mode
+        result = data * UInt(32)(2)
+        log("Processor: {} * 2 = {}", data, result)
+    return processor
+
+def top():
+    counter = counter_factory()
+    processor = processor_factory()
+    # Module-to-module communication through async calls
+    (processor << counter.pins[0])()
+```
+
+### Complex Factory Compositions
+
+```python
+@pipeline.factory(Module)
+def complex_factory(dependency: Factory[Module]) -> Factory[Module]:
+    def complex_module(input1: Port[UInt(32)], input2: Port[UInt(32)]):
+        input1, input2 = module.pop_all(True)
+        # Use dependency module
+        (dependency << input1)()
+        result = input1 + input2
+        log("Complex: {} + {} = {}", input1, input2, result)
+    return complex_module
+```
+
+## Legacy Usage
 
 ````python
 # [driver] --|-> [adder]

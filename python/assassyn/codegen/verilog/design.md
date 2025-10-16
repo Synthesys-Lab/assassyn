@@ -2,9 +2,61 @@
 
 This module provides the main Verilog design generation functionality, including the CIRCTDumper class that converts Assassyn IR into CIRCT-compatible Verilog code and the generate_design function that orchestrates the complete design generation process. The generator also accumulates the metadata required to stitch together external SystemVerilog modules and multi-port array writers.
 
+## Design Documents
+
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [External SystemVerilog Integration](../../../docs/design/external/ExternalSV_zh.md) - External module integration
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Verilog Top Generation](./top.md) - Top-level module generation
+- [Verilog Elaboration](./elaborate.md) - Main entry point for Verilog generation
+- [Simulator Generation](../simulator/simulator.md) - Simulator code generation
+- [Module Generation](../simulator/modules.md) - Module-to-Rust translation
+
 ## Summary
 
-The design generation module is the core of the Verilog backend, responsible for converting Assassyn intermediate representation into synthesizable Verilog code. It implements the credit-based pipeline architecture through the CIRCTDumper class, which now handles module generation, array management, external module integration, trigger counter plumbing, and the complete design synthesis process.
+**Multi-Port Array Architecture Design Decisions:** The Verilog design generation implements a multi-port array architecture with specific design decisions:
+
+1. **Port Arbitration**: Multiple modules can write to the same array through different ports
+2. **Port Indexing**: Each write port gets a unique index for compile-time allocation
+3. **Port Manager Integration**: Global port manager tracks all port assignments
+4. **Conflict Resolution**: Port conflicts are resolved at compile time
+5. **Port Metadata**: Port metadata is accumulated for external module integration
+
+**FIFO Handshaking Protocols:** The Verilog design generation implements FIFO handshaking protocols:
+
+1. **Credit-Based Flow Control**: FIFOs use credit-based flow control for backpressure
+2. **Valid/Ready Signals**: Standard valid/ready handshaking for data transfer
+3. **FIFO Depth Configuration**: FIFO depth is configurable per pipeline stage
+4. **FIFO Naming Convention**: FIFOs follow a consistent naming convention
+5. **FIFO Integration**: FIFOs are integrated with the credit-based pipeline architecture
+
+**External Module Integration Process:** The Verilog design generation integrates external SystemVerilog modules:
+
+1. **External Module Detection**: External modules are detected during system analysis
+2. **FFI Handle Generation**: FFI handles are generated for external module communication
+3. **Port Mapping**: External module ports are mapped to internal signals
+4. **Signal Routing**: External module signals are routed through the design
+5. **Co-simulation Support**: External modules are integrated for co-simulation
+
+**Credit-Based Pipeline Implementation Details:** The Verilog design generation implements the credit-based pipeline:
+
+1. **Pipeline Stage Communication**: Pipeline stages communicate through event queues
+2. **Credit Management**: Credits are managed for flow control
+3. **Trigger Counter Plumbing**: Trigger counters are plumbed through the design
+4. **Stage Register Management**: Stage registers are managed for pipeline state
+5. **Asynchronous Call Handling**: Asynchronous calls are handled through the pipeline
+
+**Function Name Inconsistencies (Documented as Potential Improvements):** The Verilog design generation has some function names that don't match their actual implementation:
+
+1. **`cleanup_post_generation`**: Actually generates signal routing, not cleanup
+2. **`generate_sram_blackbox_files`**: Generates both blackbox and regular modules
+3. **`dump_rval`**: Actually generates signal references, not just values
+
+These inconsistencies are documented as potential improvements for future refactoring.
 
 ## Exposed Interfaces
 

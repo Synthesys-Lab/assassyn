@@ -2,6 +2,20 @@
 
 This module provides the main elaboration function for Verilog code generation, orchestrating the complete process of converting Assassyn IR into synthesizable Verilog code with testbenches, external module integration, SRAM blackbox emission, and resource file management.
 
+## Design Documents
+
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [External SystemVerilog Integration](../../../docs/design/external/ExternalSV_zh.md) - External module integration
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Verilog Design Generation](./design.md) - Core Verilog design generation
+- [Verilog Top Generation](./top.md) - Top-level module generation
+- [Simulator Generation](../simulator/simulator.md) - Simulator code generation
+- [Module Generation](../simulator/modules.md) - Module-to-Rust translation
+
 ## Summary
 
 The Verilog elaboration module is the main entry point for Verilog code generation, coordinating the complete process of converting an Assassyn system into synthesizable Verilog code. It handles design generation, testbench creation, external module integration, SRAM blackbox generation, alias resource synthesis, and general resource file management.

@@ -2,6 +2,19 @@
 
 This module enables multi-ported register array access by defining classes that support the syntactic sugar `(array & module)[index] <= value` for array writes. This allows multiple modules to write to the same array while maintaining proper hardware semantics.
 
+## Design Documents
+
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system and multi-port write support
+- [Type System Design](../../../docs/design/lang/type.md) - Type system architecture and data type definitions
+- [Memory System Architecture](../../../docs/design/arch/memory.md) - Memory system design
+
+## Related Modules
+
+- [Expression Base](../expr.md) - Base expression classes and operand system
+- [Array Operations](../array.md) - Array read/write operations
+- [Arithmetic Operations](../arith.md) - Arithmetic and logical operations
+- [Intrinsic Operations](../intrinsic.md) - Intrinsic function operations
+
 ---
 
 ## Exposed Interfaces
@@ -72,3 +85,8 @@ The `_create_write` method performs type validation to ensure:
 ### IR Builder Integration
 
 The `_create_write` method uses the `@ir_builder` decorator to ensure that the `ArrayWrite` expression is properly inserted into the current IR block with correct source location information.
+
+**Error Conditions:**
+- Type validation errors: May occur if index is not an integer or `Value`, or if value is not a `Value` or `RecordValue`
+- Write port conflicts: May occur if multiple modules attempt to write to the same array without proper write port management
+- IR builder errors: May occur if the `@ir_builder` decorator fails to insert the expression into the current IR block

@@ -2,6 +2,19 @@
 
 This module defines the Intermediate Representation node classes for array read and write operations. These classes represent array access operations in the assassyn AST, providing support for both reading from and writing to array elements with proper module context tracking.
 
+## Design Documents
+
+- [Type System Design](../../../docs/design/lang/type.md) - Type system architecture and data type definitions
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system and multi-port write support
+- [Memory System Architecture](../../../docs/design/arch/memory.md) - Memory system design including SRAM and DRAM
+
+## Related Modules
+
+- [Expression Base](../expr.md) - Base expression classes and operand system
+- [Arithmetic Operations](../arith.md) - Arithmetic and logical operations
+- [Write Port Operations](../writeport.md) - Multi-port array write support
+- [Intrinsic Operations](../intrinsic.md) - Intrinsic function operations
+
 ---
 
 ## Section 1. Exposed Interfaces
@@ -36,6 +49,11 @@ def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None):
 **Explanation:** Initializes an array write operation with the target array, index, value, and module context. If no module is provided, it retrieves the current module from the builder singleton. This module context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array.
 
 **Note on Builder Context Dependency:** The `ArrayWrite` class depends on the global `Singleton.builder.current_module` when no module is explicitly provided. This creates an implicit dependency on the builder context that should be considered when using this class outside of normal builder contexts.
+
+**Error Conditions:**
+- `AssertionError`: Raised if `arr` is not an `Array` instance or `idx` is not a `Value` instance during `ArrayRead` initialization
+- `AssertionError`: Raised if `value` is not a `Value` or `RecordValue` instance during `__le__` operation
+- Context dependency: `ArrayWrite` operations may fail if no builder context is available and no module is explicitly provided
 
 #### `array` (property)
 

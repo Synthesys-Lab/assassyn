@@ -2,6 +2,19 @@
 
 This module defines the `FIFOPush`, `Bind`, and `AsyncCall` IR nodes, which represent function call operations in the assassyn AST. These classes implement the [async call mechanism](../../../docs/design/pipeline.md) for inter-stage communication, where modules can asynchronously invoke other modules through FIFO-based parameter passing.
 
+## Design Documents
+
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system and async call mechanism
+- [Type System Design](../../../docs/design/lang/type.md) - Type system architecture and data type definitions
+- [DSL Design](../../../docs/design/lang/dsl.md) - Trace-based DSL system
+
+## Related Modules
+
+- [Expression Base](../expr.md) - Base expression classes and operand system
+- [Arithmetic Operations](../arith.md) - Arithmetic and logical operations
+- [Intrinsic Operations](../intrinsic.md) - Intrinsic function operations
+- [Commutative Operations](../comm.md) - Variadic operations
+
 ---
 
 ## Section 1. Exposed Interfaces
@@ -174,6 +187,11 @@ def set_fifo_depth(self, **kwargs):
 ```
 
 **Explanation:** Sets the FIFO depth for specific ports using keyword arguments. Validates that the depth is an integer and that the FIFO name exists in the pushes list. This is used for [FIFO depth configuration](../../../docs/design/pipeline.md) in the generated hardware.
+
+**Error Conditions:**
+- `ValueError`: Raised if depth is not an integer in `set_fifo_depth`
+- `ValueError`: Raised if no push is found for the specified FIFO name in `set_fifo_depth`
+- FIFO configuration errors: May occur if FIFO depths are not properly configured before async calls
 
 #### `__repr__(self)`
 

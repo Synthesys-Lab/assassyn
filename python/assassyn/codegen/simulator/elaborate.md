@@ -2,9 +2,57 @@
 
 This module provides the main entry point for generating Rust-based simulators from Assassyn systems. It orchestrates the creation of a complete Rust project that can simulate the behavior of Assassyn hardware designs.
 
+## Design Documents
+
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+- [Build System](../../../docs/design/internal/build-system.md) - Build and elaboration system
+
+## Related Modules
+
+- [Simulator Generation](./simulator.md) - Core simulator generation logic
+- [Module Generation](./modules.md) - Module-to-Rust translation
+- [Node Dumper](./node_dumper.md) - IR node reference generation
+- [Port Mapper](./port_mapper.md) - Multi-port array write support
+
 ## Section 0. Summary
 
 The simulator elaboration process generates a complete Rust project that implements the credit-based pipeline architecture described in the [simulator design document](../../../docs/design/internal/simulator.md). Besides translating Assassyn operations into Rust with proper handling for register writes, pipeline stage scheduling, and asynchronous calls, the elaborator now understands external SystemVerilog FFIs. During elaboration we emit stub crates for every external SV binding, add them as workspace dependencies, and surface the FFI handles in the generated simulator so that Rust code can drive co-simulated peripherals.
+
+**Python-Rust Consistency Requirements:** The elaboration process ensures consistency between Python and Rust implementations:
+
+1. **Data Type Mapping**: Assassyn data types are mapped to corresponding Rust types:
+   - `UInt` → `u32` or `u64` (based on width)
+   - `Bits` → `bool`
+   - `Record` → Rust struct with named fields
+   - `Array` → Rust array or Vec
+
+2. **Memory Interface**: DRAM interfaces use the same request/response protocol as the Python implementation
+
+3. **FIFO Naming**: FIFO names follow the same convention as the Python implementation
+
+4. **Module Execution**: Module execution order and timing must match the Python simulation model
+
+5. **External FFI Integration**: External SystemVerilog modules are integrated consistently with the Python co-simulation approach
+
+**Code Generation Pipeline Dependencies:** The elaboration process follows a specific pipeline:
+
+1. **System Analysis**: Analyze the Assassyn system to identify modules, arrays, and external dependencies
+2. **Port Registration**: Register all array write ports with the port manager
+3. **DRAM Collection**: Collect all DRAM modules for memory interface generation
+4. **External FFI Processing**: Process external SystemVerilog FFI specifications
+5. **Rust Project Generation**: Generate the complete Rust project structure
+6. **Simulator Code Generation**: Generate the simulator implementation code
+7. **External Module Integration**: Integrate external SystemVerilog modules
+
+**Project-Specific Knowledge:** The elaboration process requires understanding of:
+
+1. **Bit Manipulation**: How Assassyn bit operations map to Rust bit operations
+2. **Cycle Counting**: How simulation cycles are tracked and managed
+3. **FIFO Naming**: The naming convention for FIFOs in the generated code
+4. **Assassyn-Rust Type Mapping**: How Assassyn types are mapped to Rust types
+5. **External Module Integration**: How external SystemVerilog modules are integrated
 
 ## Section 1. Exposed Interfaces
 

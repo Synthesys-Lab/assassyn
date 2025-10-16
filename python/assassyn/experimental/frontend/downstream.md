@@ -4,6 +4,19 @@ This module provides factory support functions for the `@factory(Downstream)` de
 in the experimental frontend. Downstream modules implement combinational logic that
 converges data from multiple pipeline stages without stage boundaries.
 
+## Design Documents
+
+- [Experimental Frontend Design](../../../docs/design/lang/experimental_fe.md) - Experimental frontend architecture
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Module Factory Support](./module.md) - Module factory support
+- [Unified Factory Decorator](./factory.md) - Unified factory pattern implementation
+- [Downstream Implementation](../../ir/module/downstream.md) - Downstream module implementation
+- [Module Implementation](../../ir/module/module.md) - Main module implementation
+
 ## Summary
 
 Downstream modules are a special type of module in Assassyn's credit-based pipeline
@@ -11,6 +24,10 @@ architecture. Unlike regular `Module` instances that operate sequentially with s
 boundaries, `Downstream` modules implement pure combinational logic that can receive
 data from multiple sources in the same cycle. This enables efficient cross-stage
 communication patterns as described in the [architectural design](../../../docs/design/arch/arch.md).
+
+**Port vs Pin Distinction:** In the experimental frontend, there's an important distinction between ports and pins:
+- **Ports**: Used for sequential communication between pipeline stages (Module instances). Ports have FIFO buffers and enable async communication with credit-based flow control.
+- **Pins**: Used for combinational communication without stage boundaries. Pins enable immediate data access across modules without FIFO buffering or credit management.
 
 The key architectural difference is that `Downstream` modules have no input ports
 and their inner functions take no arguments, making them purely combinational.

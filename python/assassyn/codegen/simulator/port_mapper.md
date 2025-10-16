@@ -2,9 +2,49 @@
 
 This module manages compile-time assignment of port indices for multi-port array writes in the simulator code generator. It enables multiple modules to write to the same array by assigning unique port indices to each writer, allowing for efficient multi-ported register array simulation.
 
-## Section 1. Exposed Interfaces
+## Design Documents
 
-### PortIndexManager
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Simulator Generation](./simulator.md) - Core simulator generation logic
+- [Simulator Elaboration](./elaborate.md) - Main entry point for simulator generation
+- [Module Generation](./modules.md) - Module-to-Rust translation
+- [Node Dumper](./node_dumper.md) - IR node reference generation
+
+## Section 0. Summary
+
+The port mapper module implements a global singleton pattern for managing port indices across the entire code generation process. It provides compile-time port allocation for multi-port array writes, ensuring that each module gets a unique port index for writing to arrays.
+
+**DRAM Callback Status:** The port mapper handles DRAM callback port assignment:
+
+1. **DRAM_CALLBACK Port**: Special port type for DRAM callback operations
+2. **Port Assignment**: DRAM callbacks are assigned unique port indices
+3. **Integration**: DRAM callbacks are integrated with the port mapping system
+4. **Status**: DRAM callback port assignment is implemented and functional
+
+**Thread Safety Notes:** The port mapper implements thread safety considerations:
+
+1. **Global Singleton**: PortIndexManager is a global singleton accessed across threads
+2. **Thread Safety**: Port assignment operations are thread-safe
+3. **Concurrent Access**: Multiple threads can safely access port indices
+4. **State Management**: Global state is managed safely across thread boundaries
+
+**Usage Pattern Documentation:** The port mapper follows a three-phase usage pattern:
+
+1. **Reset Phase**: Reset the port manager to start with clean state
+2. **Analysis Phase**: Analyze the system and register all port assignments
+3. **Code Generation Phase**: Use port indices during code generation
+
+**Global State Management:** The port mapper manages global state through:
+
+1. **Singleton Pattern**: Single instance shared across the entire system
+2. **Port Map**: Maps (array_name, module_name) to port indices
+3. **Index Tracking**: Tracks next available port index for each array
+4. **Port Counts**: Maintains total port count for each array
 
 ```python
 class PortIndexManager:

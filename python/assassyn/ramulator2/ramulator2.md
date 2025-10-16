@@ -1,8 +1,57 @@
 # PyRamulator - Python Wrapper for Ramulator2
 
+## Design Documents
+
+- [Memory System Architecture](../../../docs/design/arch/memory.md) - Memory system design
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Simulator Generation](../codegen/simulator/simulator.md) - Simulator code generation
+- [Module Generation](../codegen/simulator/modules.md) - Module-to-Rust translation
+- [Memory Modules](../ir/memory/) - Memory system IR modules
+
 ## Summary
 
 PyRamulator provides a Python interface to the Ramulator2 memory simulator through C++ wrapper libraries. This module enables Assassyn's simulator backend to integrate with external memory simulation capabilities, supporting the [Module](../ir/module/module.md) pipeline stage architecture described in the design documents. The wrapper handles cross-platform shared library loading and provides callback-based memory request handling for simulation coordination.
+
+**PyRamulator Integration with Assassyn Module Concept:** PyRamulator integrates with Assassyn's module system through:
+
+1. **Module Integration**: PyRamulator instances are integrated with Assassyn modules for memory simulation
+2. **Pipeline Stage Support**: Supports the credit-based pipeline architecture described in [pipeline.md](../../../docs/design/internal/pipeline.md)
+3. **Callback Integration**: Memory callbacks are integrated with the simulator's callback system
+4. **Memory Interface**: Provides a consistent memory interface for the simulator backend
+
+**Platform-Specific Details:** PyRamulator handles platform-specific requirements:
+
+1. **macOS RTLD_GLOBAL Mode**: On macOS, libraries are loaded with `RTLD_GLOBAL` mode for proper symbol resolution
+2. **Cross-Platform Library Loading**: Handles different library loading mechanisms across platforms
+3. **Library Fallback Mechanism**: Implements fallback mechanisms for library loading failures
+4. **Platform-Specific Error Handling**: Provides platform-specific error messages and handling
+
+**Callback Parameter Description:** The callback parameter is used for both read and write operations:
+
+1. **Read Operations**: Callback is called with read data when read requests complete
+2. **Write Operations**: Callback is called with write confirmation when write requests complete
+3. **Unified Interface**: Single callback interface handles both read and write operations
+4. **Request Tracking**: Callbacks are used to track request completion and data transfer
+
+**Request Structure Completion:** The Request structure includes all necessary fields for memory operations:
+
+1. **Address Field**: Memory address for the request
+2. **Data Field**: Data to be written (for write operations)
+3. **Request Type**: Type of request (read or write)
+4. **Callback Field**: Callback function for request completion
+5. **Request ID**: Unique identifier for request tracking
+
+**__del__ Method Conditional Cleanup Logic:** The `__del__` method implements conditional cleanup:
+
+1. **Instance Check**: Only performs cleanup if the instance exists
+2. **Resource Cleanup**: Cleans up allocated resources and handles
+3. **Error Handling**: Handles cleanup errors gracefully
+4. **Memory Management**: Ensures proper memory management during destruction
 
 ## Exposed Interfaces
 

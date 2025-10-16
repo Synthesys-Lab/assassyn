@@ -5,6 +5,19 @@ of modules in the experimental frontend, including `Module`, `Downstream`, and `
 It implements a unified factory pattern that normalizes module construction across
 different module flavors while providing type-specific validation and construction.
 
+## Design Documents
+
+- [Experimental Frontend Design](../../../docs/design/lang/experimental_fe.md) - Experimental frontend architecture
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Module Factory Support](./module.md) - Module factory support
+- [Downstream Factory Support](./downstream.md) - Downstream module factory support
+- [Naming Manager](../../builder/naming_manager.md) - Naming system
+- [Builder Singleton](../../builder/__init__.md) - Builder context management
+
 ## Summary
 
 The factory decorator provides a higher-order function approach to module construction
@@ -16,6 +29,14 @@ frontend's imperative construction patterns.
 The decorator handles shared plumbing across all module types while delegating
 type-specific validation and construction to specialized factory methods implemented
 by each module type.
+
+**Factory Pattern Singleton Usage:** The factory system integrates with the builder singleton for context management:
+- **Context Entry**: Factory functions enter the builder context to manage module construction
+- **AST Construction**: The inner function executes within the module context for proper AST building
+- **Context Exit**: Factory functions clean up the builder context after module construction
+- **Singleton Integration**: The factory pattern relies on the global builder singleton for context management
+
+This singleton pattern enables the factory decorator to manage module construction contexts while maintaining the functional programming style of the experimental frontend.
 
 ## Exposed Interfaces
 

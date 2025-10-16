@@ -4,6 +4,20 @@ This module generates Rust code for intrinsic operations in the simulator backen
 
 For the broader context of intrinsics in the DSL, see [intrinsics.md](../../../docs/design/lang/intrinsics.md). For the credit-based pipeline architecture, see [arch.md](../../../docs/design/arch/arch.md).
 
+## Design Documents
+
+- [Intrinsics Design](../../../docs/design/lang/intrinsics.md) - Intrinsic operations design
+- [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
+
+## Related Modules
+
+- [Simulator Generation](../simulator.md) - Core simulator generation logic
+- [Simulator Elaboration](../elaborate.md) - Main entry point for simulator generation
+- [Module Generation](../modules.md) - Module-to-Rust translation
+- [Node Dumper](../node_dumper.md) - IR node reference generation
+
 ## Summary
 
 This module handles code generation for two categories of intrinsic operations:
@@ -12,6 +26,34 @@ This module handles code generation for two categories of intrinsic operations:
 2. **Intrinsic**: Side-effecting operations that control execution flow and memory operations
 
 The module uses dispatch tables to map intrinsic opcodes to their corresponding code generation functions, translating high-level intrinsic operations into Rust code that interfaces with the simulator runtime.
+
+**Module Naming Clarification:** The intrinsic operations use specific naming conventions:
+
+1. **Legacy "Module" Naming**: Some intrinsics use legacy "Module" naming (e.g., `MEM_READ`, `MEM_WRITE`)
+2. **Credit System Context**: In the credit-based pipeline context, these are actually pipeline stages
+3. **Naming Consistency**: The naming should be consistent with the credit-based pipeline architecture
+4. **Future Refactoring**: Consider renaming to reflect pipeline stage terminology
+
+**Memory Response Data Format:** The intrinsic operations handle memory response data in specific formats:
+
+1. **Response Buffer Format**: Memory responses are stored in response buffers
+2. **Data Extraction**: Data is extracted from response buffers using specific patterns
+3. **Format Verification**: The format should be verified against the memory system design
+4. **Type Consistency**: Response data types should be consistent across operations
+
+**Unsafe Rust Code Generation:** The intrinsic operations generate unsafe Rust code:
+
+1. **Unsafe Blocks**: Some operations require unsafe Rust code blocks
+2. **Memory Safety**: Unsafe operations must maintain memory safety
+3. **Documentation**: Unsafe code patterns should be documented
+4. **Error Handling**: Unsafe operations require proper error handling
+
+**Error Handling Strategy:** The intrinsic operations implement error handling strategies:
+
+1. **Unsupported Intrinsics**: Unsupported intrinsics raise appropriate errors
+2. **Type Validation**: Type validation errors are handled gracefully
+3. **Runtime Errors**: Runtime errors are propagated appropriately
+4. **Recovery**: Error recovery strategies are implemented where possible
 
 ---
 
