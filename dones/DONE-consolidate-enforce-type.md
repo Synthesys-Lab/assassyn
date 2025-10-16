@@ -33,6 +33,9 @@ Successfully consolidated the duplicate `enforce_type.py` files and simplified t
 - `python/assassyn/type_utils/` - Entire package removed (was empty after consolidation)
 - `python/assassyn/utils.md` - Moved to `utils/README.md`
 
+### Files Restored
+- `python/assassyn/utils/@enforce_type.md` - Documentation restored from git history and moved to correct location
+
 ## Technical Insights
 
 ### Import Path Resolution
