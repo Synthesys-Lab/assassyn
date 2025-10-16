@@ -112,32 +112,68 @@ def generate_top_harness(dumper):
         if is_sram_array:
             continue
         arr_name = namify(arr.name)
-        index_bits = arr.index_bits if arr.index_bits > 0 else 1
+        index_bits = arr.index_bits
+        index_bits_type = index_bits if index_bits > 0 else 1
         port_mapping = dumper.array_write_port_mapping.get(arr, {})
-        num_ports = len(port_mapping)
-        dumper.append_code(f'# Multi-port array {arr_name} with {num_ports} write ports')
-        # Declare wires for each port
-        for port_idx in range(num_ports):
+        num_write_ports = len(port_mapping)
+        read_ports = dumper.array_read_ports.get(arr, [])
+        num_read_ports = len(read_ports)
+        dumper.append_code(
+            f'# Multi-port array {arr_name} with '
+            f'{num_write_ports} write ports and {num_read_ports} read ports'
+        )
+
+        # Declare wires for write ports
+        for port_idx in range(num_write_ports):
             port_suffix = f"_port{port_idx}"
             dumper.append_code(f'aw_{arr_name}_w{port_suffix} = Wire(Bits(1))')
             dumper.append_code(
                 f'aw_{arr_name}_wdata{port_suffix} = Wire({dump_type(arr.scalar_ty)})'
             )
             dumper.append_code(
-                f'aw_{arr_name}_widx{port_suffix} = Wire(Bits({index_bits}))'
+                f'aw_{arr_name}_widx{port_suffix} = Wire(Bits({index_bits_type}))'
             )
+        # Declare wires for read ports
+        if index_bits > 0:
+            for port_idx in range(num_read_ports):
+                port_suffix = f"_port{port_idx}"
+                dumper.append_code(
+                    f'aw_{arr_name}_ridx{port_suffix} = Wire(Bits({index_bits}))'
+                )
+                dumper.append_code(
+                    f'aw_{arr_name}_rdata{port_suffix} = Wire({dump_type(arr.scalar_ty)})'
+                )
+        else:
+            for port_idx in range(num_read_ports):
+                port_suffix = f"_port{port_idx}"
+                dumper.append_code(
+                    f'aw_{arr_name}_rdata{port_suffix} = Wire({dump_type(arr.scalar_ty)})'
+                )
+
         # Instantiate multi-port array
         port_connections = ['clk=self.clk', 'rst=self.rst']
-        for port_idx in range(num_ports):
+        for port_idx in range(num_write_ports):
             port_suffix = f"_port{port_idx}"
             port_connections.extend([
                 f'w{port_suffix}=aw_{arr_name}_w{port_suffix}',
                 f'wdata{port_suffix}=aw_{arr_name}_wdata{port_suffix}',
                 f'widx{port_suffix}=aw_{arr_name}_widx{port_suffix}'
             ])
+        if index_bits > 0:
+            for port_idx in range(num_read_ports):
+                port_suffix = f"_port{port_idx}"
+                port_connections.append(
+                    f'ridx{port_suffix}=aw_{arr_name}_ridx{port_suffix}'
+                )
         dumper.append_code(
             f'array_writer_{arr_name} = {arr_name}({", ".join(port_connections)})'
         )
+        for port_idx in range(num_read_ports):
+            port_suffix = f"_port{port_idx}"
+            dumper.append_code(
+                f'aw_{arr_name}_rdata{port_suffix}.assign('
+                f'array_writer_{arr_name}.rdata{port_suffix})'
+            )
 
     # --- 2. Hardware Instantiations (Generic) ---
     dumper.append_code('\n# --- Hardware Instantiations ---')
@@ -364,9 +400,13 @@ def generate_top_harness(dumper):
                 is_sram_array = any(isinstance(m, SRAM) and
                                    m._payload == arr for m in dumper.sys.downstreams)
                 if not is_sram_array:
-                    port_map.append(
-                        f"{namify(arr.name)}_q_in = array_writer_{namify(arr.name)}.q_out"
-                    )
+                    read_indices = dumper.array_read_port_mapping.get(arr, {}).get(module, [])
+                    arr_name = namify(arr.name)
+                    for port_idx in read_indices:
+                        port_suffix = f"_port{port_idx}"
+                        port_map.append(
+                            f"{arr_name}_rdata{port_suffix}=aw_{arr_name}_rdata{port_suffix}"
+                        )
 
         pushes = [e for e in dumper._walk_expressions(module.body) if isinstance(e, FIFOPush)]
         calls = [e for e in dumper._walk_expressions(module.body) if isinstance(e, AsyncCall)]

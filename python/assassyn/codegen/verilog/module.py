@@ -110,27 +110,49 @@ def generate_module_ports(dumper, node: Module, is_downstream: bool, is_sram: bo
             sram_info = get_sram_info(node)
             if sram_info and arr == sram_info['array']:
                 continue
-        if node in dumper.array_users.get(arr, []):
-            dumper.append_code(
-                f"{namify(arr.name)}_q_in = "
-                f"Input(dim({dump_type(arr.scalar_ty)}, {arr.size}))"
-            )
-            port_mapping = dumper.array_write_port_mapping.get(arr, {})
-            for module_key, port_idx in port_mapping.items():
-                if module_key == node:
-                    port_suffix = f"_port{port_idx}"
+        read_mapping = dumper.array_read_port_mapping.get(arr, {})
+        read_port_indices = read_mapping.get(node)
+        if read_port_indices is None:
+            for module_key, ports in read_mapping.items():
+                if module_key is node:
+                    read_port_indices = ports
+                    break
+        if read_port_indices is None:
+            read_port_indices = []
+
+        port_mapping = dumper.array_write_port_mapping.get(arr, {})
+        writes_idx = port_mapping.get(node)
+        if writes_idx is None:
+            for module_key, idx in port_mapping.items():
+                if module_key is node:
+                    writes_idx = idx
+                    break
+        if read_port_indices or writes_idx is not None:
+            index_bits = arr.index_bits
+            idx_type = index_bits if index_bits > 0 else 1
+            for port_idx in read_port_indices:
+                port_suffix = f"_port{port_idx}"
+                if index_bits > 0:
                     dumper.append_code(
-                        f'{namify(arr.name)}_w{port_suffix} = Output(Bits(1))'
+                        f'{namify(arr.name)}_ridx{port_suffix} = Output(Bits({idx_type}))'
                     )
-                    dumper.append_code(
-                        f'{namify(arr.name)}_wdata{port_suffix} ='
-                        f' Output({dump_type(arr.scalar_ty)})'
-                    )
-                    idx_type = arr.index_bits if arr.index_bits > 0 else 1
-                    dumper.append_code(
-                        f'{namify(arr.name)}_widx{port_suffix} ='
-                        f' Output(Bits({idx_type}))'
-                    )
+                dumper.append_code(
+                    f'{namify(arr.name)}_rdata{port_suffix} = '
+                    f'Input({dump_type(arr.scalar_ty)})'
+                )
+            if writes_idx is not None:
+                port_suffix = f"_port{writes_idx}"
+                dumper.append_code(
+                    f'{namify(arr.name)}_w{port_suffix} = Output(Bits(1))'
+                )
+                dumper.append_code(
+                    f'{namify(arr.name)}_wdata{port_suffix} ='
+                    f' Output({dump_type(arr.scalar_ty)})'
+                )
+                dumper.append_code(
+                    f'{namify(arr.name)}_widx{port_suffix} ='
+                    f' Output(Bits({idx_type}))'
+                )
 
     for port_code in dumper.exposed_ports_to_add:
         dumper.append_code(port_code)

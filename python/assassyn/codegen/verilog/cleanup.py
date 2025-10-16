@@ -144,6 +144,10 @@ def cleanup_post_generation(dumper):
                     (e, p) for e, p in exposes
                     if isinstance(e, ArrayWrite)
                 ]
+            array_reads = [
+                    (e, p) for e, p in exposes
+                    if isinstance(e, ArrayRead)
+                ]
             arr = key
             array_name = dumper.dump_rval(arr, False)
             array_dtype = arr.scalar_ty
@@ -189,6 +193,23 @@ def cleanup_post_generation(dumper):
                 dumper.append_code(
                     f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()'
                     )
+            if array_reads and arr.index_bits > 0:
+                assigned_read_ports = set()
+                index_bits = arr.index_bits
+                for expr, _ in array_reads:
+                    port_idx = dumper.array_read_expr_port.get(expr)
+                    if port_idx is None or port_idx in assigned_read_ports:
+                        continue
+                    idx_value = dumper.dump_rval(expr.idx, False)
+                    idx_dtype = expr.idx.dtype
+                    if idx_dtype.is_raw() and idx_dtype.bits == index_bits:
+                        cast_idx = idx_value
+                    else:
+                        cast_idx = f'{idx_value}.as_bits({index_bits})'
+                    dumper.append_code(
+                        f'self.{array_name}_ridx_port{port_idx} = {cast_idx}'
+                    )
+                    assigned_read_ports.add(port_idx)
 
         elif isinstance(key, Port):
             has_push = any(isinstance(e, FIFOPush) for e, p in exposes)

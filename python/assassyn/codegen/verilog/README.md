@@ -83,7 +83,7 @@ These map to `fifo.sv` and `trigger_counter.sv` shipped with the backend.
 
 `design.py` contains:
 
-- Array writers: one class per non‑SRAM array that collects all writers and outputs `q_out`.
+- Array writers: one class per array that stores the backing state, consumes write ports, and serves per-reader interfaces (`ridx_port<i>` / `rdata_port<i>`).
 - External wrappers: one class per `ExternalSV` with `module_name` and declared IO.
 - Module classes: one class per IR module. Common ports:
   - `clk: Clock`, `rst: Reset`, `cycle_count: Input(UInt(64))`
@@ -92,7 +92,7 @@ These map to `fifo.sv` and `trigger_counter.sv` shipped with the backend.
   - Per input port `<p>`: `<p>: Input(<ty>)`, `<p>_valid: Input(Bits(1))`, and if popped, `<p>_pop_ready: Output(Bits(1))`
   - Downstream externals: `<producer>_<value>: Input(<ty>)`, `<producer>_<value>_valid: Input(Bits(1))`
   - SRAM downstreams: `mem_address`, `mem_write_data`, `mem_write_enable`, `mem_read_enable`, `mem_dataout`
-  - Arrays: readers see `<a>_q_in`; writers get `<a>_w_port<i>`, `<a>_wdata_port<i>`, `<a>_widx_port<i>`
+  - Arrays: readers drive `<a>_ridx_port<i>` and consume `<a>_rdata_port<i>`; writers drive `<a>_w_port<i>`, `<a>_wdata_port<i>`, `<a>_widx_port<i>`
 
 ### CIRCTDumper Walkthrough
 
@@ -102,7 +102,7 @@ These map to `fifo.sv` and `trigger_counter.sv` shipped with the backend.
 
 ### Expression Lowering
 
-- Arrays/FIFOs: `ArrayRead` uses `<a>_q_in[...]` (or `mem_dataout` inside SRAM), `ArrayWrite` marks exposure, `FIFOPop` reads `self.<p>`, `FIFOPush` exposes callee push intent.
+- Arrays/FIFOs: `ArrayRead` produces a dedicated `rdata_port<i>` access (or `mem_dataout` inside SRAM), `ArrayWrite` marks exposure, `FIFOPop` reads `self.<p>`, `FIFOPush` exposes callee push intent.
 - Intrinsics: `WAIT_UNTIL` contributes to `executed_wire` (drivers), `FINISH` contributes to `finish`, `VALUE_VALID`/`FIFO_PEEK`/`FIFO_VALID` produce signals or use `expose_*` when crossing modules, `Log` appends cocotb prints.
 - Calls: `AsyncCall` exposes `<callee>_trigger` so callers can increment the callee’s trigger counter.
 
@@ -176,4 +176,3 @@ Common kwargs via `assassyn.backend.elaborate(sys, **kwargs)`:
 - Resets the DUT, then toggles `clk` with a fixed period.
 - Prints `Log(...)` messages using predicates translated from module conditions (`valid_*/expose_*` and cycled checks).
 - Stops when `dut.global_finish == 1` or `sim_threshold` is reached.
-

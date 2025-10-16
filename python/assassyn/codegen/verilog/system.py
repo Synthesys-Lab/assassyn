@@ -49,6 +49,29 @@ def generate_system(dumper, node):
                 port_idx = len(dumper.array_write_port_mapping[sub_array])
                 dumper.array_write_port_mapping[sub_array][module] = port_idx
 
+        # Record read port usage per array and module.
+        arr_reads = []
+        for module in sys.modules + sys.downstreams:
+            if module.body is None:
+                continue
+            reads = [
+                expr for expr in dumper._walk_expressions(module.body)
+                if isinstance(expr, ArrayRead) and expr.array == sub_array
+            ]
+            if reads:
+                arr_reads.append((module, reads))
+
+        dumper.array_read_port_mapping[sub_array] = {}
+        dumper.array_read_ports[sub_array] = []
+        port_counter = 0
+        for module, reads in arr_reads:
+            dumper.array_read_port_mapping[sub_array][module] = []
+            for read_expr in reads:
+                dumper.array_read_port_mapping[sub_array][module].append(port_counter)
+                dumper.array_read_ports[sub_array].append((module, read_expr))
+                dumper.array_read_expr_port[read_expr] = port_counter
+                port_counter += 1
+
     for arr_container in sys.arrays:
         if arr_container not in dumper.sram_payload_arrays:
             dumper.visit_array(arr_container)

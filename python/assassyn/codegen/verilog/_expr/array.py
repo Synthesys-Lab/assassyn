@@ -6,11 +6,8 @@ This module contains functions to generate Verilog code for array and FIFO opera
 from typing import Optional
 
 from ....ir.expr import ArrayRead, ArrayWrite, FIFOPop, FIFOPush
-from ....ir.const import Const
-from ....ir.dtype import Record, Bits
 from ....ir.memory.sram import SRAM
-from ....utils import unwrap_operand, namify
-from ..utils import dump_type, dump_type_cast
+from ....utils import namify
 
 
 def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
@@ -28,19 +25,11 @@ def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
         body = f'{rval} = self.mem_dataout'
         dumper.expose('array', expr)
     else:
-        array_idx = unwrap_operand(expr.idx)
-        array_idx = (dumper.dump_rval(array_idx, False)
-                    if not isinstance(array_idx, Const) else array_idx.value)
-        index_bits = array_ref.index_bits if array_ref.index_bits > 0 else 1
-        if dump_type(expr.idx.dtype) != Bits and not isinstance(array_idx, int):
-            array_idx = f"{array_idx}.as_bits({index_bits})"
-
         array_name = dumper.dump_rval(array_ref, False)
-        if isinstance(expr.dtype, Record):
-            body = f'{rval} = self.{array_name}_q_in[{array_idx}]'
-        else:
-            body = \
-            f'{rval} = self.{array_name}_q_in[{array_idx}].{dump_type_cast(expr.dtype)}'
+        port_idx = dumper.array_read_expr_port.get(expr)
+        if port_idx is None:
+            return None
+        body = f'{rval} = self.{array_name}_rdata_port{port_idx}'
         dumper.expose('array', expr)
 
     return body
