@@ -22,7 +22,7 @@ class ArrayWrite(Expr):
     ARRAY_WRITE = 401
 
     @enforce_type
-    def __init__(self, arr: 'Array', idx: Value, val: Value, module: 'ModuleBase' = None):
+    def __init__(self, arr: Array, idx: Value, val: Value, module: ModuleBase = None):
         super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val])
         # Get module from Singleton if not provided
         if module is None:
@@ -60,7 +60,7 @@ class ArrayRead(Expr):
     ARRAY_READ = 400
 
     @enforce_type
-    def __init__(self, arr: 'Array', idx: Value):
+    def __init__(self, arr: Array, idx: Value):
         # pylint: disable=import-outside-toplevel
         from ..array import Array
         assert isinstance(arr, Array), f'{type(arr)} is not an Array!'

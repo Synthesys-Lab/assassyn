@@ -131,13 +131,24 @@ def validate_arguments(func: Callable[..., Any], args: tuple, kwargs: dict) -> D
     signature = inspect.signature(func)
     bound_arguments = signature.bind(*args, **kwargs)
     bound_arguments.apply_defaults()
-    annotations = get_type_hints(func)
+
+    try:
+        annotations = get_type_hints(func)
+    except NameError:
+        # Forward references under TYPE_CHECKING can't be resolved at runtime
+        # Fall back to raw annotations (strings won't be validated)
+        annotations = getattr(func, '__annotations__', {})
 
     validated: Dict[str, Any] = {}
     for name, value in bound_arguments.arguments.items():
         expected = annotations.get(name)
         if expected is None:
             # No annotation - skip validation
+            validated[name] = value
+            continue
+
+        # Skip validation for unresolved forward references (strings)
+        if isinstance(expected, str):
             validated[name] = value
             continue
 
