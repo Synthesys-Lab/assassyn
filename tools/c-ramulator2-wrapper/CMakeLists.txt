@@ -49,16 +49,4 @@ add_executable(test test.cpp)
 target_link_libraries(main wrapper ${RAMULATOR_LIBRARY})
 target_link_libraries(test wrapper ${RAMULATOR_LIBRARY})
 
-# Generate library path files in build directory for proper cache invalidation
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/.cwrapper-lib-path.in
-    ${CMAKE_BINARY_DIR}/.cwrapper-lib-path
-    @ONLY
-)
-
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/.ramulator2-lib-path.in
-    ${CMAKE_BINARY_DIR}/.ramulator2-lib-path
-    @ONLY
-)
 
