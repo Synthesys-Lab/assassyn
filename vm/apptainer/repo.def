@@ -7,9 +7,9 @@ From: /tmp/base.sif
 
 %post
     cd /
-    git clone --recursive ${REPO_URL} app
+    git clone --recursive {{REPO_URL}} app
     cd /app
-    git checkout ${REPO_REF}
+    git checkout {{REPO_REF}}
     rm -rf examples/ docs/ tutorials/
 
 %runscript
