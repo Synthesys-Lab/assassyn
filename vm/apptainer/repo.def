@@ -1,0 +1,21 @@
+Bootstrap: localimage
+From: vm/apptainer/base.sif
+
+%post
+    cd /
+    git clone --recursive https://github.com/Synthesys-Lab/assassyn.git app
+    cd /app
+    rm -rf examples/ docs/ tutorials/
+
+%runscript
+    exec "\$@"
+
+%test
+    #!/bin/zsh
+    echo "=== Testing repo container ==="
+    cd /app
+    echo "Checking repository structure..."
+    ls -la
+    echo "Checking submodules..."
+    git submodule status
+    echo "Repo container test completed."
