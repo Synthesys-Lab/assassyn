@@ -16,4 +16,11 @@ workspace/*
 Cargo.lock
 .assassyn-venv
 
+# Build marker files for lightweight patch system
+**/.patch-applied
+**/.circt-built
+**/.verilator-built
+**/.ramulator2-built
+**/.wrapper-built
+
 *.sif

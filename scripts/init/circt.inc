@@ -10,40 +10,48 @@ patch-circt: 3rd-party/circt/.patch-applied
 3rd-party/circt/.patch-applied:
 	@echo "Checking circt patch status..."
 	@cd 3rd-party/circt && \
-		if git apply --reverse --check ../../scripts/init/patches/circt.patch 2>/dev/null; then \
+		if bash ../../scripts/patch-apply.sh check ../../scripts/init/patches/circt.patch 2>/dev/null; then \
 			echo "CIRCT patch already applied — skipping patch step."; \
 		else \
 			echo "Applying CIRCT patch..."; \
-			git apply ../../scripts/init/patches/circt.patch 2>/dev/null; \
+			bash ../../scripts/patch-apply.sh apply ../../scripts/init/patches/circt.patch; \
 		fi && \
 		touch .patch-applied
 
-install-circt: patch-circt
-	@echo "Installing PyCDE..."
-	@echo $(VENV_DIR)
-	@echo "Step 1: Checking if PyCDE is already installed..."
-	if . $(VENV_DIR)/bin/activate && python -c "import pycde" 2>/dev/null; then \
-		echo "PyCDE is already installed — skipping installation."; \
+install-circt: 3rd-party/circt/.circt-built
+
+# Marker file to track build completion
+3rd-party/circt/.circt-built: patch-circt
+	@if [ -f "$@" ]; then \
+		echo "CIRCT already built — skipping build step."; \
 	else \
-		echo "PyCDE not found. Proceeding with installation..."; \
-		echo "Step 2: Attempting to install PyCDE via pip..."; \
-		if . $(VENV_DIR)/bin/activate && pip install pycde; then \
-			echo "PyCDE installed successfully via pip."; \
+		echo "Installing PyCDE..."; \
+		echo $(VENV_DIR); \
+		echo "Step 1: Checking if PyCDE is already installed..."; \
+		if . $(VENV_DIR)/bin/activate && python -c "import pycde" 2>/dev/null; then \
+			echo "PyCDE is already installed — skipping installation."; \
 		else \
-			echo "Failed to install PyCDE via pip. Proceeding to source installation..."; \
-			echo "Step 3: Building PyCDE from source..."; \
-			cd 3rd-party/circt/frontends/PyCDE && \
-			CIRCT_DIRECTORY="$$(pwd)/../../" CIRCT_EXTRA_CMAKE_ARGS="-DESI_RUNTIME=OFF -DZ3_DISABLE=ON -DOR_TOOLS_DISABLE=ON" . $(VENV_DIR)/bin/activate && python -m build && \
-			echo "Installing PyCDE wheel..."; \
-			if . $(VENV_DIR)/bin/activate && pip install ./dist/*.whl; then \
-				echo "PyCDE built and installed successfully from source."; \
+			echo "PyCDE not found. Proceeding with installation..."; \
+			echo "Step 2: Attempting to install PyCDE via pip..."; \
+			if . $(VENV_DIR)/bin/activate && pip install pycde; then \
+				echo "PyCDE installed successfully via pip."; \
 			else \
-				echo "Failed to install PyCDE from source. Please check the build logs."; \
-				exit 1; \
+				echo "Failed to install PyCDE via pip. Proceeding to source installation..."; \
+				echo "Step 3: Building PyCDE from source..."; \
+				cd 3rd-party/circt/frontends/PyCDE && \
+				CIRCT_DIRECTORY="$$(pwd)/../../" CIRCT_EXTRA_CMAKE_ARGS="-DESI_RUNTIME=OFF -DZ3_DISABLE=ON -DOR_TOOLS_DISABLE=ON" . $(VENV_DIR)/bin/activate && python -m build && \
+				echo "Installing PyCDE wheel..."; \
+				if . $(VENV_DIR)/bin/activate && pip install ./dist/*.whl; then \
+					echo "PyCDE built and installed successfully from source."; \
+				else \
+					echo "Failed to install PyCDE from source. Please check the build logs."; \
+					exit 1; \
+				fi; \
 			fi; \
 		fi; \
+		echo "CIRCT installation completed."; \
+		touch $@; \
 	fi
-	@echo "CIRCT installation completed."
 
 clean-circt:
 	@echo "Cleaning CIRCT build artifacts and uninstalling PyCDE..."
@@ -52,6 +60,6 @@ clean-circt:
 	fi
 	@cd 3rd-party/circt && \
 		rm -rf dist build *.egg-info 2>/dev/null || true && \
-		git apply --reverse ../../scripts/init/patches/circt.patch 2>/dev/null || true && \
-		rm -f .patch-applied
+		bash ../../scripts/patch-apply.sh reverse ../../scripts/init/patches/circt.patch 2>/dev/null || true && \
+		rm -f .patch-applied .circt-built
 	@echo "CIRCT clean completed."

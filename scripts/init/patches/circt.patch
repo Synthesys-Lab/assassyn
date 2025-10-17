@@ -1,13 +1,3 @@
-diff --git a/frontends/PyCDE/setup.py b/frontends/PyCDE/setup.py
-index 697a6f1ba..a5540e0de 100644
---- a/frontends/PyCDE/setup.py
-+++ b/frontends/PyCDE/setup.py
-@@ -74,7 +74,7 @@ class CMakeBuild(build_py):
-     if os.name == "nt":
-       cmake_args += ["-DESI_RUNTIME=OFF"]
-     else:
+frontends/PyCDE/setup.py
 -      cmake_args += ["-DESI_RUNTIME=ON"]
 +      cmake_args += ["-DESI_RUNTIME=OFF"]
-     if "COMPILER_LAUNCHER" in os.environ:
-       cmake_args += [
-           f"-DCMAKE_C_COMPILER_LAUNCHER={os.environ['COMPILER_LAUNCHER']}",

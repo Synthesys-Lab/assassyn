@@ -1,19 +1,7 @@
-diff --git a/configure.ac b/configure.ac
-index 4f4fb6432..9057e4571 100644
---- a/configure.ac
-+++ b/configure.ac
-@@ -356,10 +356,10 @@ AC_SUBST(CFG_CXXFLAGS_PROFILE)
- # c++17 is the newest that Verilator is regularly tested to support
- # c++14 is the oldest that Verilator supports
- # gnu is required for Cygwin to compile verilated.h successfully
--#_MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=gnu++20)
--#_MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=c++20)
+configure.ac
 -_MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=gnu++17)
 -_MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=c++17)
 +_MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=gnu++20)
 +_MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=c++20)
 +#_MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=gnu++17)
 +#_MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=c++17)
- _MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=gnu++14)
- _MY_CXX_CHECK_SET(CFG_CXXFLAGS_STD_NEWEST,-std=c++14)
- AC_SUBST(CFG_CXXFLAGS_STD_NEWEST)

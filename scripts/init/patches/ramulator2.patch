@@ -1,40 +1,11 @@
-diff --git a/.gitignore b/.gitignore
-index 9cd09d6..e8aa182 100644
---- a/.gitignore
-+++ b/.gitignore
-@@ -3,4 +3,5 @@ build/
- ext/
- ramulator2
- *.so
-+*.dylib
- autobuild.sh
-diff --git a/src/base/param.h b/src/base/param.h
-index c626ee4..6df87a2 100644
---- a/src/base/param.h
-+++ b/src/base/param.h
-@@ -88,7 +88,7 @@ class _ParamChainer {
- 
-       if (_config[_name]) {
-         try {
+src/base/param.h
 -          return _config[_name].as<T>();
 +          return _config[_name].template as<T>();
-         } catch (const YAML::BadConversion& e) {
-           throw ConfigurationError("Failed to parse Param \"{}\" for implementation \"{}\".", _name_prefix + _name, _impl_name);
-         }
-diff --git a/src/dram_controller/impl/generic_dram_controller.cpp b/src/dram_controller/impl/generic_dram_controller.cpp
-index a1f9f9b..8844ced 100644
---- a/src/dram_controller/impl/generic_dram_controller.cpp
-+++ b/src/dram_controller/impl/generic_dram_controller.cpp
-@@ -209,7 +209,11 @@ class GenericDRAMController final : public IDRAMController, public Implementatio
-             req_it->depart = m_clk + m_dram->m_read_latency;
-             pending.push_back(*req_it);
-           } else if (req_it->type_id == Request::Type::Write) {
+
+src/dram_controller/impl/generic_dram_controller.cpp
 -            // TODO: Add code to update statistics
 +            // NEW: mirror read handling for writes
 +            // Prefer a dedicated write latency if your DRAM model exposes it; else reuse read latency for now.
 +            auto write_lat = m_dram->m_read_latency; // fallback for POC
 +            req_it->depart = m_clk + write_lat;
 +            pending.push_back(*req_it);
-           }
-           buffer->remove(req_it);
-         } else {
