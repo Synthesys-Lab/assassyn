@@ -33,13 +33,6 @@ if [ -d "/app/3rd-party/circt/frontends/PyCDE/dist/lib" ]; then
   export PYTHONPATH="/app/3rd-party/circt/frontends/PyCDE/dist/lib:\$PYTHONPATH"
 fi
 
-# Fix hardcoded paths in wrapper library path files
-if [ -f "/app/tools/c-ramulator2-wrapper/build/.cwrapper-lib-path" ]; then
-  echo "/app/tools/c-ramulator2-wrapper/build/lib/libwrapper" > /app/tools/c-ramulator2-wrapper/build/.cwrapper-lib-path
-fi
-if [ -f "/app/tools/c-ramulator2-wrapper/build/.ramulator2-lib-path" ]; then
-  echo "/app/tools/c-ramulator2-wrapper/build/lib/libramulator2" > /app/tools/c-ramulator2-wrapper/build/.ramulator2-lib-path
-fi
 
 cat >> \$APPTAINER_ENVIRONMENT <<EOF
 export RUSTC_WRAPPER="\$RUSTC_WRAPPER"
