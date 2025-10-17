@@ -26,22 +26,21 @@ install-circt: 3rd-party/circt/.circt-built
 		echo "CIRCT already built — skipping build step."; \
 	else \
 		echo "Installing PyCDE..."; \
-		echo $(VENV_DIR); \
 		echo "Step 1: Checking if PyCDE is already installed..."; \
-		if . $(VENV_DIR)/bin/activate && python -c "import pycde" 2>/dev/null; then \
+		if . .assassyn-venv/bin/activate && python -c "import pycde" 2>/dev/null; then \
 			echo "PyCDE is already installed — skipping installation."; \
 		else \
 			echo "PyCDE not found. Proceeding with installation..."; \
 			echo "Step 2: Attempting to install PyCDE via pip..."; \
-			if . $(VENV_DIR)/bin/activate && pip install pycde; then \
+			if . .assassyn-venv/bin/activate && pip install pycde; then \
 				echo "PyCDE installed successfully via pip."; \
 			else \
 				echo "Failed to install PyCDE via pip. Proceeding to source installation..."; \
 				echo "Step 3: Building PyCDE from source..."; \
 				cd 3rd-party/circt/frontends/PyCDE && \
-				CIRCT_DIRECTORY="$$(pwd)/../../" CIRCT_EXTRA_CMAKE_ARGS="-DESI_RUNTIME=OFF -DZ3_DISABLE=ON -DOR_TOOLS_DISABLE=ON" . $(VENV_DIR)/bin/activate && python -m build && \
+				CIRCT_DIRECTORY="$$(pwd)/../../" CIRCT_EXTRA_CMAKE_ARGS="-DESI_RUNTIME=OFF -DZ3_DISABLE=ON -DOR_TOOLS_DISABLE=ON" . $$(pwd)/../../../../.assassyn-venv/bin/activate && python -m build && \
 				echo "Installing PyCDE wheel..."; \
-				if . $(VENV_DIR)/bin/activate && pip install ./dist/*.whl; then \
+				if . $$(pwd)/../../../../.assassyn-venv/bin/activate && pip install ./dist/*.whl; then \
 					echo "PyCDE built and installed successfully from source."; \
 				else \
 					echo "Failed to install PyCDE from source. Please check the build logs."; \
@@ -55,8 +54,8 @@ install-circt: 3rd-party/circt/.circt-built
 
 clean-circt:
 	@echo "Cleaning CIRCT build artifacts and uninstalling PyCDE..."
-	@if [ -d "$(VENV_DIR)" ]; then \
-		. $(VENV_DIR)/bin/activate && pip uninstall -y pycde 2>/dev/null || true; \
+	@if [ -d ".assassyn-venv" ]; then \
+		. .assassyn-venv/bin/activate && pip uninstall -y pycde 2>/dev/null || true; \
 	fi
 	@cd 3rd-party/circt && \
 		rm -rf dist build *.egg-info 2>/dev/null || true && \
