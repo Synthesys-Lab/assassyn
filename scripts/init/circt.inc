@@ -20,8 +20,9 @@ patch-circt: 3rd-party/circt/.patch-applied
 
 install-circt: patch-circt
 	@echo "Installing PyCDE..."
+	@echo $(VENV_DIR)
 	@echo "Step 1: Checking if PyCDE is already installed..."
-	@if . $(VENV_DIR)/bin/activate && python -c "import pycde" 2>/dev/null; then \
+	if . $(VENV_DIR)/bin/activate && python -c "import pycde" 2>/dev/null; then \
 		echo "PyCDE is already installed — skipping installation."; \
 	else \
 		echo "PyCDE not found. Proceeding with installation..."; \
