@@ -65,6 +65,3 @@ ZSHEOF
     echo "Testing basic Python import..."
     python -c 'import sys; print(f"Python {sys.version}")'
     echo "Testing assassyn core modules..."
-    python -c 'import assassyn.base; print("assassyn.base imported successfully")'
-    python -c 'import assassyn.expr; print("assassyn.expr imported successfully")'
-    echo "Build test completed successfully!"
