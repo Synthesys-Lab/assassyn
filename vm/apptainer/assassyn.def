@@ -19,28 +19,25 @@ From: rust:1.82
 cd /app
 rm -rf examples/ docs/ tutorials/
 
-export PYTHONUSERBASE="/app/.local"
-
 source setup.sh
 make all
 
-PYTHON_VERSION=\$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-PYTHONPATH="\$PYTHONPATH:/app/.local/lib/python\${PYTHON_VERSION}/site-packages"
-PATH="\$PATH:/app/.local/bin"
-
+# Activate the virtual environment for subsequent operations
+source /app/.assassyn-venv/bin/activate
 
 cat >> \$APPTAINER_ENVIRONMENT <<EOF
 export RUSTC_WRAPPER="\$RUSTC_WRAPPER"
 export ASSASSYN_HOME="\$ASSASSYN_HOME"
 export VERILATOR_ROOT="\$VERILATOR_ROOT"
 export PYTHONPATH="\$PYTHONPATH"
-export PATH="\$PATH"
 export CC="ccache gcc"
 export CXX="ccache g++"
 export CCACHE_DIR="/tmp/ccache"
-export PYTHONUSERBASE="/app/.local"
 export CARGO_HOME="/tmp/cargo"
+export VIRTUAL_ENV="/app/.assassyn-venv"
+export PATH="/app/.assassyn-venv/bin:\$PATH"
 EOF
+ZSHEOF
 
 %runscript
     exec "\$@"

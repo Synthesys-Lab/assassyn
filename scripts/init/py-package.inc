@@ -3,9 +3,6 @@
 
 .PHONY: install-py-package clean-python
 
-# Virtual environment directory
-VENV_DIR := .assassyn-venv
-
 install-py-package:
 	@echo "Setting up Python virtual environment..."
 	@if [ ! -d "$(VENV_DIR)" ]; then \

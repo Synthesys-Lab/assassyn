@@ -21,7 +21,8 @@ patch-circt: 3rd-party/circt/.patch-applied
 install-circt: patch-circt
 	@echo "Installing PyCDE..."
 	@echo "Step 1: Checking if PyCDE is already installed..."
-	@if python -c "import pycde" 2>/dev/null; then \
+	@. $(VENV_DIR)/bin/activate && \
+	if python -c "import pycde" 2>/dev/null; then \
 		echo "PyCDE is already installed — skipping installation."; \
 	else \
 		echo "PyCDE not found. Proceeding with installation..."; \
@@ -46,7 +47,7 @@ install-circt: patch-circt
 
 clean-circt:
 	@echo "Cleaning CIRCT build artifacts and uninstalling PyCDE..."
-	@pip uninstall -y pycde 2>/dev/null || true
+	@. $(VENV_DIR)/bin/activate && pip uninstall -y pycde 2>/dev/null || true
 	@cd 3rd-party/circt && \
 		rm -rf dist build *.egg-info 2>/dev/null || true && \
 		git apply --reverse ../../scripts/init/patches/circt.patch 2>/dev/null || true && \
