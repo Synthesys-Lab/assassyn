@@ -208,14 +208,19 @@ impl Drop for MemoryInterface {
   }
 }
 
-/// Get library paths by constructing them directly from ASSASSYN_HOME
-pub fn get_library_paths() -> Result<(String, String), Box<dyn Error>> {
-  let home = std::env::var("ASSASSYN_HOME").unwrap_or_else(|_| {
+/// Get the ASSASSYN_HOME directory path
+fn get_assassyn_home() -> String {
+  std::env::var("ASSASSYN_HOME").unwrap_or_else(|_| {
     std::env::current_dir()
       .unwrap()
       .to_string_lossy()
       .to_string()
-  });
+  })
+}
+
+/// Get library paths by constructing them directly from ASSASSYN_HOME
+pub fn get_library_paths() -> Result<(String, String), Box<dyn Error>> {
+  let home = get_assassyn_home();
   let wrapper_lib_path = format!("{}/tools/c-ramulator2-wrapper/build/lib/libwrapper", home);
   let ramulator2_lib_path = format!("{}/3rd-party/ramulator2/libramulator", home);
   Ok((wrapper_lib_path, ramulator2_lib_path))
@@ -223,14 +228,16 @@ pub fn get_library_paths() -> Result<(String, String), Box<dyn Error>> {
 
 /// Get the C wrapper library path by constructing it directly from ASSASSYN_HOME
 pub fn cwrapper_lib_path() -> Result<String, Box<dyn Error>> {
-  let (wrapper_path, _) = get_library_paths()?;
-  Ok(wrapper_path)
+  let home = get_assassyn_home();
+  let lib_path = format!("{}/tools/c-ramulator2-wrapper/build/lib/libwrapper", home);
+  Ok(lib_path)
 }
 
 /// Get the Ramulator2 library path by constructing it directly from ASSASSYN_HOME
 pub fn ramulator2_lib_path() -> Result<String, Box<dyn Error>> {
-  let (_, ramulator2_path) = get_library_paths()?;
-  Ok(ramulator2_path)
+  let home = get_assassyn_home();
+  let lib_path = format!("{}/3rd-party/ramulator2/libramulator", home);
+  Ok(lib_path)
 }
 
 // Platform-independent constructor for MemoryInterface
