@@ -32,7 +32,7 @@ build-verilator: 3rd-party/verilator/.verilator-built
 			./configure && \
 			make -j; \
 		echo "Verilator build completed successfully."; \
-		touch $@; \
+		mkdir -p 3rd-party/verilator && touch $@; \
 	fi
 
 clean-verilator:
