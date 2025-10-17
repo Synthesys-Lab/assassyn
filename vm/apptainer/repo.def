@@ -1,15 +1,14 @@
 Bootstrap: localimage
 From: /tmp/base.sif
 
-%arguments
-    REPO_URL
-    REPO_REF
+%files
+    /tmp/repo.tar.gz /tmp/repo.tar.gz
 
 %post
     cd /
-    git clone --recursive {{REPO_URL}} app
+    tar -xzf /tmp/repo.tar.gz
+    rm /tmp/repo.tar.gz
     cd /app
-    git checkout {{REPO_REF}}
     rm -rf examples/ docs/ tutorials/
 
 %runscript
@@ -22,5 +21,11 @@ From: /tmp/base.sif
     echo "Checking repository structure..."
     ls -la
     echo "Checking submodules..."
-    git submodule status
+    ls -la 3rd-party/
+    echo "Checking circt submodule..."
+    ls -la 3rd-party/circt/ | head -10
+    echo "Checking verilator submodule..."
+    ls -la 3rd-party/verilator/ | head -10
+    echo "Checking ramulator2 submodule..."
+    ls -la 3rd-party/ramulator2/ | head -10
     echo "Repo container test completed."

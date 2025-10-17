@@ -21,14 +21,24 @@ $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 	@echo "=== Base container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_BASE_IMAGE)"
 
-# Phase 2: Build repo container with cloned repository
-$(APPTAINER_REPO_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_REPO_DEF)
+# Archive the repository with all submodules
+$(APPTAINER_OUTPUT_DIR)/repo.tar.gz:
+	@echo "=== Creating Repository Archive ==="
+	@echo "Archiving repository with all submodules..."
+	@mkdir -p $(APPTAINER_OUTPUT_DIR)/temp_archive
+	@cp -r . $(APPTAINER_OUTPUT_DIR)/temp_archive/app
+	@cd $(APPTAINER_OUTPUT_DIR)/temp_archive && \
+		tar --exclude='app/.git' --exclude='app/examples' --exclude='app/docs' --exclude='app/tutorials' \
+		-czf $(APPTAINER_OUTPUT_DIR)/repo.tar.gz app
+	@rm -rf $(APPTAINER_OUTPUT_DIR)/temp_archive
+	@echo "Archive created: $(APPTAINER_OUTPUT_DIR)/repo.tar.gz"
+
+# Phase 2: Build repo container with archived repository
+$(APPTAINER_REPO_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_REPO_DEF) $(APPTAINER_OUTPUT_DIR)/repo.tar.gz
 	@echo "=== Building Repository Container ==="
-	@echo "Building repository container with cloned repo and submodules..."
+	@echo "Building repository container with archived repo and submodules..."
 	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
-	@REPO_URL=$$(git remote get-url origin) && \
-	 REPO_REF=$$(git describe --tags --exact-match HEAD 2>/dev/null || git rev-parse --abbrev-ref HEAD) && \
-	 cd vm/apptainer && apptainer build --build-arg REPO_URL="$$REPO_URL" --build-arg REPO_REF="$$REPO_REF" $(APPTAINER_OUTPUT_DIR)/repo.sif repo.def
+	@cd vm/apptainer && apptainer build $(APPTAINER_OUTPUT_DIR)/repo.sif repo.def
 	@echo "=== Repository container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_REPO_IMAGE)"
 
@@ -59,10 +69,10 @@ clean-apptainer-base:
 
 clean-apptainer-repo:
 	@echo "Cleaning repository Apptainer container..."
-	@rm -f $(APPTAINER_OUTPUT_DIR)/repo.sif && \
-		echo "Repository Apptainer container cleaned."
+	@rm -f $(APPTAINER_OUTPUT_DIR)/repo.sif $(APPTAINER_OUTPUT_DIR)/repo.tar.gz && \
+		echo "Repository Apptainer container and archive cleaned."
 
 clean-apptainer:
 	@echo "Cleaning all Apptainer containers..."
-	@rm -f $(APPTAINER_OUTPUT_DIR)/base.sif $(APPTAINER_OUTPUT_DIR)/repo.sif $(APPTAINER_OUTPUT_DIR)/assassyn.sif && \
-		echo "All Apptainer containers cleaned."
+	@rm -f $(APPTAINER_OUTPUT_DIR)/base.sif $(APPTAINER_OUTPUT_DIR)/repo.sif $(APPTAINER_OUTPUT_DIR)/assassyn.sif $(APPTAINER_OUTPUT_DIR)/repo.tar.gz && \
+		echo "All Apptainer containers and archives cleaned."
