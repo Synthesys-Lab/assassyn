@@ -1,10 +1,15 @@
 Bootstrap: localimage
 From: /tmp/base.sif
 
+%arguments
+    REPO_URL
+    REPO_REF
+
 %post
     cd /
-    git clone --recursive https://github.com/Synthesys-Lab/assassyn.git app
+    git clone --recursive ${REPO_URL} app
     cd /app
+    git checkout ${REPO_REF}
     rm -rf examples/ docs/ tutorials/
 
 %runscript

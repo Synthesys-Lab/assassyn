@@ -1,5 +1,6 @@
 # Apptainer container build targets
 # Creates a containerized snapshot of the Assassyn repository
+# Note: The repository URL and branch/tag are configured in vm/apptainer/repo.def
 
 # Default values for Apptainer builds
 # Always use /tmp as the output directory
@@ -25,7 +26,9 @@ $(APPTAINER_REPO_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_REPO_DEF)
 	@echo "=== Building Repository Container ==="
 	@echo "Building repository container with cloned repo and submodules..."
 	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
-	@cd vm/apptainer && apptainer build $(APPTAINER_OUTPUT_DIR)/repo.sif repo.def
+	@REPO_URL=$$(git remote get-url origin) && \
+	 REPO_REF=$$(git describe --tags --exact-match HEAD 2>/dev/null || git rev-parse --abbrev-ref HEAD) && \
+	 cd vm/apptainer && apptainer build --build-arg REPO_URL="$$REPO_URL" --build-arg REPO_REF="$$REPO_REF" $(APPTAINER_OUTPUT_DIR)/repo.sif repo.def
 	@echo "=== Repository container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_REPO_IMAGE)"
 
