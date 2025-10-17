@@ -2,9 +2,11 @@
 # Creates a containerized snapshot of the Assassyn repository
 
 # Default values for Apptainer builds
-APPTAINER_BASE_IMAGE ?= vm/apptainer/base.sif
-APPTAINER_REPO_IMAGE ?= vm/apptainer/repo.sif
-APPTAINER_IMAGE ?= vm/apptainer/assassyn.sif
+# Use /tmp for lima environments with read-only file systems
+APPTAINER_OUTPUT_DIR ?= $(shell if [ -w vm/apptainer ]; then echo vm/apptainer; else echo /tmp; fi)
+APPTAINER_BASE_IMAGE ?= $(APPTAINER_OUTPUT_DIR)/base.sif
+APPTAINER_REPO_IMAGE ?= $(APPTAINER_OUTPUT_DIR)/repo.sif
+APPTAINER_IMAGE ?= $(APPTAINER_OUTPUT_DIR)/assassyn.sif
 APPTAINER_BASE_DEF ?= vm/apptainer/base.def
 APPTAINER_REPO_DEF ?= vm/apptainer/repo.def
 APPTAINER_DEF ?= vm/apptainer/assassyn.def
@@ -13,7 +15,13 @@ APPTAINER_DEF ?= vm/apptainer/assassyn.def
 $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 	@echo "=== Building Base Container ==="
 	@echo "Building base container with system dependencies..."
-	@cd vm/apptainer && apptainer build base.sif base.def
+	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
+	@cd vm/apptainer && apptainer build $(APPTAINER_OUTPUT_DIR)/base.sif base.def
+	@if [ "$(APPTAINER_OUTPUT_DIR)" != "vm/apptainer" ]; then \
+		echo "Creating symlink for base.sif..."; \
+		ln -sf $(APPTAINER_OUTPUT_DIR)/base.sif vm/apptainer/base.sif 2>/dev/null || \
+		echo "Note: Could not create symlink (read-only filesystem), container available at $(APPTAINER_OUTPUT_DIR)/base.sif"; \
+	fi
 	@echo "=== Base container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_BASE_IMAGE)"
 
@@ -21,7 +29,13 @@ $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 $(APPTAINER_REPO_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_REPO_DEF)
 	@echo "=== Building Repository Container ==="
 	@echo "Building repository container with cloned repo and submodules..."
-	@cd vm/apptainer && apptainer build repo.sif repo.def
+	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
+	@cd vm/apptainer && apptainer build $(APPTAINER_OUTPUT_DIR)/repo.sif repo.def
+	@if [ "$(APPTAINER_OUTPUT_DIR)" != "vm/apptainer" ]; then \
+		echo "Creating symlink for repo.sif..."; \
+		ln -sf $(APPTAINER_OUTPUT_DIR)/repo.sif vm/apptainer/repo.sif 2>/dev/null || \
+		echo "Note: Could not create symlink (read-only filesystem), container available at $(APPTAINER_OUTPUT_DIR)/repo.sif"; \
+	fi
 	@echo "=== Repository container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_REPO_IMAGE)"
 
@@ -29,7 +43,13 @@ $(APPTAINER_REPO_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_REPO_DEF)
 $(APPTAINER_IMAGE): $(APPTAINER_REPO_IMAGE) $(APPTAINER_DEF)
 	@echo "=== Building Assassyn Container ==="
 	@echo "Building final container (this may take a while)..."
-	@cd vm/apptainer && apptainer build assassyn.sif assassyn.def
+	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
+	@cd vm/apptainer && apptainer build $(APPTAINER_OUTPUT_DIR)/assassyn.sif assassyn.def
+	@if [ "$(APPTAINER_OUTPUT_DIR)" != "vm/apptainer" ]; then \
+		echo "Creating symlink for assassyn.sif..."; \
+		ln -sf $(APPTAINER_OUTPUT_DIR)/assassyn.sif vm/apptainer/assassyn.sif 2>/dev/null || \
+		echo "Note: Could not create symlink (read-only filesystem), container available at $(APPTAINER_OUTPUT_DIR)/assassyn.sif"; \
+	fi
 	@echo "=== Container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_IMAGE)"
 	@echo "Usage: apptainer exec --no-home $(APPTAINER_IMAGE) python your_script.py"
@@ -44,18 +64,16 @@ build-apptainer: $(APPTAINER_IMAGE)
 # Clean targets
 clean-apptainer-base:
 	@echo "Cleaning base Apptainer container..."
-	@cd vm/apptainer && \
-		rm -f base.sif && \
+	@rm -f $(APPTAINER_OUTPUT_DIR)/base.sif vm/apptainer/base.sif && \
 		echo "Base Apptainer container cleaned."
 
 clean-apptainer-repo:
 	@echo "Cleaning repository Apptainer container..."
-	@cd vm/apptainer && \
-		rm -f repo.sif && \
+	@rm -f $(APPTAINER_OUTPUT_DIR)/repo.sif vm/apptainer/repo.sif && \
 		echo "Repository Apptainer container cleaned."
 
 clean-apptainer:
 	@echo "Cleaning all Apptainer containers..."
-	@cd vm/apptainer && \
-		rm -f base.sif repo.sif assassyn.sif && \
+	@rm -f $(APPTAINER_OUTPUT_DIR)/base.sif $(APPTAINER_OUTPUT_DIR)/repo.sif $(APPTAINER_OUTPUT_DIR)/assassyn.sif && \
+		rm -f vm/apptainer/base.sif vm/apptainer/repo.sif vm/apptainer/assassyn.sif && \
 		echo "All Apptainer containers cleaned."
