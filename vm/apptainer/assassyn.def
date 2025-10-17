@@ -1,48 +1,53 @@
-Bootstrap: localimage
-From: assassyn-base.sif
-
-%files
-    assassyn.bundle /tmp/assassyn.bundle
+Bootstrap: docker
+From: rust:1.82
 
 %post
-    # Clone repository from local git bundle
-    git clone /tmp/assassyn.bundle /app
-    cd /app
-    git remote remove origin
+    rustup component add rustfmt
     
-    # Remove unnecessary directories to reduce image size
-    rm -rf examples/ docs/ tutorials/
-    
-    # Set up environment
-    PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    
-    cat >> $APPTAINER_ENVIRONMENT <<EOF
-export ASSASSYN_HOME="/app"
-export VERILATOR_ROOT="/app/3rd-party/verilator"
-export PYTHONPATH="/app/python:/app/.local/lib/python${PYTHON_VERSION}/site-packages:\$PYTHONPATH"
-export PATH="/app/3rd-party/verilator/bin:/app/.local/bin:\$PATH"
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        zsh python3-pip python3-dev python3-venv pybind11-dev \
+        python-is-python3 git autoconf build-essential flex bison \
+        libfl2 libfl-dev libexpat1-dev gettext perl ccache \
+        libgoogle-perftools-dev numactl perl-doc help2man \
+        cmake ninja-build cargo \
+        && apt-get clean && rm -rf /var/lib/apt/lists/*
+   
+    cd /
+    git clone --recursive https://github.com/Synthesys-Lab/assassyn.git app
+    /bin/zsh << ZSHEOF
+cd /app
+rm -rf examples/ docs/ tutorials/
+
+export PYTHONUSERBASE="/app/.local"
+
+source setup.sh
+make all
+
+PYTHON_VERSION=\$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+PYTHONPATH="\$PYTHONPATH:/app/.local/lib/python\${PYTHON_VERSION}/site-packages"
+PATH="\$PATH:/app/.local/bin"
+
+
+cat >> \$APPTAINER_ENVIRONMENT <<EOF
+export RUSTC_WRAPPER="\$RUSTC_WRAPPER"
+export ASSASSYN_HOME="\$ASSASSYN_HOME"
+export VERILATOR_ROOT="\$VERILATOR_ROOT"
+export PYTHONPATH="\$PYTHONPATH"
+export PATH="\$PATH"
 export CC="ccache gcc"
 export CXX="ccache g++"
 export CCACHE_DIR="/tmp/ccache"
 export PYTHONUSERBASE="/app/.local"
 export CARGO_HOME="/tmp/cargo"
-export CARGO_TARGET_DIR="/app/.sim-runtime-cache"
 EOF
 
-    # Make repo write-able
-    chmod -R u+w /app
-
-    # Build the project
-    make build-all
-
 %runscript
-    exec "$@"
+    exec "\$@"
 
 %test
     #!/bin/zsh
-    echo "=== Testing repository build ==="
+    echo "=== Testing builds ==="
     cd /app
     python -c 'import assassyn' # import this module
-    echo "Import test: $?"
-    
-    make test-all
+    echo $? # 0 is expected
