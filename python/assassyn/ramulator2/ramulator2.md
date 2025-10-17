@@ -153,12 +153,12 @@ The `Request` class represents a memory request with the following key fields:
 - `command` (int): Memory command type
 - `is_stat_updated` (bool): Whether statistics were updated
 
-### `get_library_paths() -> tuple[str, str]`
+### `get_library_paths() -> tuple`
 
 Gets the paths to both the wrapper and ramulator2 shared libraries by constructing them directly from ASSASSYN_HOME.
 
 **Returns:**
-- `tuple[str, str]`: Tuple containing (wrapper_lib_path, ramulator2_lib_path) both without extensions
+- `tuple`: Tuple containing (wrapper_lib_path, ramulator2_lib_path) both without extensions
 
 **Raises:**
 - `FileNotFoundError`: If the ASSASSYN_HOME environment variable is not set
@@ -168,7 +168,7 @@ This function constructs library paths directly from the ASSASSYN_HOME environme
 - Wrapper lib: `{ASSASSYN_HOME}/tools/c-ramulator2-wrapper/build/lib/libwrapper`
 - Ramulator2 lib: `{ASSASSYN_HOME}/3rd-party/ramulator2/libramulator`
 
-This unified approach reduces code duplication and provides a single source of truth for library path construction.
+This unified approach reduces code duplication and provides a single source of truth for library path construction. The function is used internally during module initialization to load the required shared libraries.
 
 ### `load_shared_library(lib_path: str) -> ctypes.CDLL`
 
@@ -189,6 +189,19 @@ This function handles cross-platform shared library loading with the following b
 2. Tries different extensions in order of preference: `.dylib` (macOS), `.so` (Linux), `.dll` (Windows)
 3. Uses `RTLD_GLOBAL` mode on macOS for compatibility with recursive shared object dependencies as documented in [simulator.md](../codegen/simulator/simulator.md)
 4. Raises a clear error message if no compatible library is found
+
+**Note:** This function is called automatically during module import to load the wrapper and ramulator2 libraries. The loaded libraries are stored in the module-level variables `wrapper` and `ramulator`.
+
+## Module Initialization
+
+When the `ramulator2` module is imported, it automatically:
+
+1. **Constructs Library Paths**: Calls `get_library_paths()` to determine the correct paths for both libraries
+2. **Loads Shared Libraries**: Uses `load_shared_library()` to load both the wrapper and ramulator2 libraries
+3. **Sets Up Function Bindings**: Configures the ctypes function signatures for all wrapper functions
+4. **Stores Library References**: Keeps references to the loaded libraries in module-level variables
+
+This initialization happens once per Python process and ensures that all PyRamulator instances can use the same loaded libraries efficiently.
 
 ## Usage Pattern
 
