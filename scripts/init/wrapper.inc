@@ -49,7 +49,7 @@ tools/c-ramulator2-wrapper/.wrapper-built: build-ramulator2
 			cmake .. && \
 			make -j; \
 		echo "Wrapper build completed."; \
-		mkdir -p tools/c-ramulator2-wrapper && touch $@; \
+		touch $@; \
 	fi
 
 clean-ramulator2:
