@@ -1,5 +1,5 @@
 Bootstrap: localimage
-From: vm/apptainer/repo.sif
+From: /tmp/repo.sif
 
 %post
     /bin/zsh << ZSHEOF

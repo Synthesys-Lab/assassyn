@@ -44,6 +44,10 @@ $(APPTAINER_IMAGE): $(APPTAINER_REPO_IMAGE) $(APPTAINER_DEF)
 	@echo "=== Building Assassyn Container ==="
 	@echo "Building final container (this may take a while)..."
 	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
+	@if [ "$(APPTAINER_OUTPUT_DIR)" != "vm/apptainer" ]; then \
+		echo "Copying repo.sif to vm/apptainer for bootstrap..."; \
+		cp $(APPTAINER_OUTPUT_DIR)/repo.sif vm/apptainer/repo.sif; \
+	fi
 	@cd vm/apptainer && apptainer build $(APPTAINER_OUTPUT_DIR)/assassyn.sif assassyn.def
 	@if [ "$(APPTAINER_OUTPUT_DIR)" != "vm/apptainer" ]; then \
 		echo "Creating symlink for assassyn.sif..."; \
