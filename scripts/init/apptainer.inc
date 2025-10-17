@@ -6,10 +6,12 @@ APPTAINER_BASE_IMAGE ?= vm/apptainer/assassyn-base.sif
 APPTAINER_IMAGE ?= vm/apptainer/assassyn.sif
 APPTAINER_BASE_DEF ?= vm/apptainer/assassyn-base.def
 APPTAINER_DEF ?= vm/apptainer/assassyn.def
+APPTAINER_BUNDLE ?= vm/apptainer/assassyn.bundle
 
-# Repository configuration with defaults
-REPO_URL ?= https://github.com/Synthesys-Lab/assassyn
-REPO_TAG ?= master
+$(APPTAINER_BUNDLE):
+	@echo "Creating git bundle..."
+	@git bundle create $(APPTAINER_BUNDLE) --all
+	@echo "Git bundle created: $(APPTAINER_BUNDLE)"
 
 $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 	@echo "=== Building Assassyn Base Container ==="
@@ -17,21 +19,22 @@ $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 	@cd vm/apptainer && apptainer build assassyn-base.sif assassyn-base.def
 	@echo "Base image built successfully!"
 
-$(APPTAINER_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_DEF)
+$(APPTAINER_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_DEF) $(APPTAINER_BUNDLE)
 	@echo "=== Building Assassyn Container ==="
-	@echo "Building container with repository: $(REPO_URL) at tag: $(REPO_TAG)"
-	@cd vm/apptainer && apptainer build --build-arg REPO_URL="$(REPO_URL)" --build-arg REPO_TAG="$(REPO_TAG)" assassyn.sif assassyn.def
+	@echo "Building container with local git bundle"
+	@cd vm/apptainer && apptainer build assassyn.sif assassyn.def
 	@echo "=== Container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_IMAGE)"
-	@echo "Repository: $(REPO_URL) at $(REPO_TAG)"
 	@echo "Usage: apptainer exec --no-home $(APPTAINER_IMAGE) python your_script.py"
 
 build-apptainer-base: $(APPTAINER_BASE_IMAGE)
+
+build-apptainer-bundle: $(APPTAINER_BUNDLE)
 
 build-apptainer: $(APPTAINER_IMAGE)
 
 clean-apptainer:
 	@echo "Cleaning Apptainer containers..."
 	@cd vm/apptainer && \
-		rm -f assassyn-base.sif assassyn.sif && \
+		rm -f assassyn-base.sif assassyn.sif assassyn.bundle && \
 		echo "Apptainer containers cleaned."

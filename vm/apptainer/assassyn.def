@@ -1,15 +1,14 @@
 Bootstrap: localimage
 From: assassyn-base.sif
 
-%arguments
-    REPO_URL=https://github.com/Synthesys-Lab/assassyn
-    REPO_TAG=master
+%files
+    assassyn.bundle /tmp/assassyn.bundle
 
 %post
-    # Clone repository from specified URL and tag/branch/commit
-    git clone --recursive {{ REPO_URL }} /app
+    # Clone repository from local git bundle
+    git clone /tmp/assassyn.bundle /app
     cd /app
-    git checkout {{ REPO_TAG }}
+    git remote remove origin
     
     # Remove unnecessary directories to reduce image size
     rm -rf examples/ docs/ tutorials/
@@ -42,7 +41,6 @@ EOF
 %test
     #!/bin/zsh
     echo "=== Testing repository build ==="
-    echo "Repository: {{ REPO_URL }} at {{ REPO_TAG }}"
     cd /app
     python -c 'import assassyn' # import this module
     echo "Import test: $?"
