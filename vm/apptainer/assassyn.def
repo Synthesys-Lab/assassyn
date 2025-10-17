@@ -1,10 +1,6 @@
 Bootstrap: localimage
 From: /tmp/repo.sif
 
-%arguments
-    REPO_URL=default
-    REPO_REF=default
-
 %post
     /bin/zsh << ZSHEOF
 cd /app
