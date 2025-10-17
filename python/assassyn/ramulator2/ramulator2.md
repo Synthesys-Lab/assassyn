@@ -168,6 +168,8 @@ This function constructs library paths directly from the ASSASSYN_HOME environme
 - Wrapper lib: `{ASSASSYN_HOME}/tools/c-ramulator2-wrapper/build/lib/libwrapper`
 - Ramulator2 lib: `{ASSASSYN_HOME}/3rd-party/ramulator2/libramulator`
 
+This unified approach reduces code duplication and provides a single source of truth for library path construction.
+
 ### `load_shared_library(lib_path: str) -> ctypes.CDLL`
 
 Loads a shared library with fallback for different extensions and platform-specific handling.
