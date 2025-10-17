@@ -49,7 +49,7 @@ $(APPTAINER_IMAGE): $(APPTAINER_REPO_IMAGE) $(APPTAINER_DEF)
 	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
 	@REPO_URL=$$(git remote get-url origin) && \
 	 REPO_REF=$$(git describe --tags --exact-match HEAD 2>/dev/null || git rev-parse --abbrev-ref HEAD) && \
-	 cd vm/apptainer && apptainer build --build-arg REPO_URL="$$REPO_URL" --build-arg REPO_REF="$$REPO_REF" $(APPTAINER_OUTPUT_DIR)/assassyn.sif assassyn.def
+	 cd vm/apptainer && apptainer build --warn-unused-build-args --build-arg REPO_URL="$$REPO_URL" --build-arg REPO_REF="$$REPO_REF" $(APPTAINER_OUTPUT_DIR)/assassyn.sif assassyn.def
 	@echo "=== Container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_IMAGE)"
 	@echo "Usage: apptainer exec --no-home $(APPTAINER_IMAGE) python your_script.py"

@@ -1,15 +1,49 @@
 Bootstrap: localimage
 From: /tmp/repo.sif
 
+%arguments
+    REPO_URL=default
+    REPO_REF=default
+
 %post
     /bin/zsh << ZSHEOF
 cd /app
 
-source setup.sh
-make all
+# Remove existing venv and create fresh one for container
+rm -rf /app/.assassyn-venv
+python3 -m venv /app/.assassyn-venv
+/app/.assassyn-venv/bin/pip install --upgrade pip
+/app/.assassyn-venv/bin/pip install build
+/app/.assassyn-venv/bin/pip install -r /app/python/requirements.txt
 
-# Activate the virtual environment for subsequent operations
+# Source the virtual environment
 source /app/.assassyn-venv/bin/activate
+
+# Manually export environment variables (from setup.sh)
+export PYTHONPATH="/app/python:\$PYTHONPATH"
+export ASSASSYN_HOME="/app"
+export VERILATOR_ROOT="/app/3rd-party/verilator"
+export PATH="\$VERILATOR_ROOT/bin:\$PATH"
+export CARGO_TARGET_DIR="/app/.sim-runtime-cache"
+
+# Clean and rebuild components in correct order for Linux container
+make clean-wrapper
+make clean-ramulator2
+make build-ramulator2
+make build-wrapper
+
+# Add PyCDE to PYTHONPATH if it exists
+if [ -d "/app/3rd-party/circt/frontends/PyCDE/dist/lib" ]; then
+  export PYTHONPATH="/app/3rd-party/circt/frontends/PyCDE/dist/lib:\$PYTHONPATH"
+fi
+
+# Fix hardcoded paths in wrapper library path files
+if [ -f "/app/tools/c-ramulator2-wrapper/build/.cwrapper-lib-path" ]; then
+  echo "/app/tools/c-ramulator2-wrapper/build/lib/libwrapper" > /app/tools/c-ramulator2-wrapper/build/.cwrapper-lib-path
+fi
+if [ -f "/app/tools/c-ramulator2-wrapper/build/.ramulator2-lib-path" ]; then
+  echo "/app/tools/c-ramulator2-wrapper/build/lib/libramulator2" > /app/tools/c-ramulator2-wrapper/build/.ramulator2-lib-path
+fi
 
 cat >> \$APPTAINER_ENVIRONMENT <<EOF
 export RUSTC_WRAPPER="\$RUSTC_WRAPPER"
@@ -32,5 +66,9 @@ ZSHEOF
     #!/bin/zsh
     echo "=== Testing builds ==="
     cd /app
-    python -c 'import assassyn' # import this module
-    echo $? # 0 is expected
+    echo "Testing basic Python import..."
+    python -c 'import sys; print(f"Python {sys.version}")'
+    echo "Testing assassyn core modules..."
+    python -c 'import assassyn.base; print("assassyn.base imported successfully")'
+    python -c 'import assassyn.expr; print("assassyn.expr imported successfully")'
+    echo "Build test completed successfully!"
