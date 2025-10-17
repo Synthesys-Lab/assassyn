@@ -1,0 +1,47 @@
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+env:
+  ASSASSYN_APPTAINER: apptainer exec --no-home --bind ${{ github.workspace }}:/workspace /tmp/assassyn.sif
+
+name: Test (Apptainer)
+
+jobs:
+  test:
+    name: Test (Apptainer)
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+          override: true
+
+      - name: Build Repository Container
+        run: |
+          echo "Building container with current repository"
+          make build-apptainer
+
+      - name: Run Container Tests
+        run: |
+          cd vm/apptainer
+          apptainer test /tmp/assassyn.sif
+
+      - name: Run pytest tests
+        run: |
+          apptainer exec /tmp/assassyn.sif pytest -n 8 ci-tests unit-tests
+
+      - name: Cleanup Containers
+        if: always()
+        run: |
+          echo "Cleaning up containers"
+          rm -f /tmp/assassyn.sif
+          rm -f /tmp/repo.sif
+          rm -f /tmp/repo.tar.gz
+          echo "Cleaned up all containers"
