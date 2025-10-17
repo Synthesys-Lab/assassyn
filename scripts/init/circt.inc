@@ -49,7 +49,7 @@ install-circt: 3rd-party/circt/.circt-built
 			fi; \
 		fi; \
 		echo "CIRCT installation completed."; \
-		mkdir -p 3rd-party/circt && touch $@; \
+		touch $@; \
 	fi
 
 clean-circt:

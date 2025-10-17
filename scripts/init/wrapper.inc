@@ -33,7 +33,7 @@ build-ramulator2: 3rd-party/ramulator2/.ramulator2-built
 		echo "Step 3: Building with make..."; \
 		make -C 3rd-party/ramulator2/build -j; \
 		echo "Ramulator2 build completed."; \
-		mkdir -p 3rd-party/ramulator2 && touch $@; \
+		touch $@; \
 	fi
 
 build-wrapper: tools/c-ramulator2-wrapper/.wrapper-built
