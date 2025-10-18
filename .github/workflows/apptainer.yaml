@@ -35,7 +35,7 @@ jobs:
 
       - name: Run pytest tests
         run: |
-          apptainer exec /tmp/assassyn.sif pytest -n 8 ci-tests unit-tests
+          apptainer exec /tmp/assassyn.sif pytest -n 8 python/ci-tests python/unit-tests
 
       - name: Cleanup Containers
         if: always()
