@@ -16,7 +16,7 @@ patch-ramulator2: 3rd-party/ramulator2/.patch-applied
 			echo "Applying ramulator2 patch..."; \
 			bash ../../scripts/patch-apply.sh apply ../../scripts/init/patches/ramulator2.patch; \
 		fi && \
-		touch .patch-applied
+		touch $(CURDIR)/3rd-party/ramulator2/.patch-applied
 
 build-ramulator2: 3rd-party/ramulator2/.ramulator2-built
 
@@ -33,7 +33,7 @@ build-ramulator2: 3rd-party/ramulator2/.ramulator2-built
 		echo "Step 3: Building with make..."; \
 		make -C 3rd-party/ramulator2/build -j; \
 		echo "Ramulator2 build completed."; \
-		touch $@; \
+		touch $(CURDIR)/$@; \
 	fi
 
 build-wrapper: tools/c-ramulator2-wrapper/.wrapper-built
@@ -49,7 +49,7 @@ tools/c-ramulator2-wrapper/.wrapper-built: build-ramulator2
 			cmake .. && \
 			make -j; \
 		echo "Wrapper build completed."; \
-		touch $@; \
+		touch $(CURDIR)/$@; \
 	fi
 
 clean-ramulator2:

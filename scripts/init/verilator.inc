@@ -16,7 +16,7 @@ patch-verilator: 3rd-party/verilator/.patch-applied
 			echo "Applying Verilator patch..."; \
 			bash ../../scripts/patch-apply.sh apply ../../scripts/init/patches/verilator.patch; \
 		fi && \
-		touch .patch-applied
+		touch $(CURDIR)/3rd-party/verilator/.patch-applied
 
 build-verilator: 3rd-party/verilator/.verilator-built
 
@@ -32,7 +32,7 @@ build-verilator: 3rd-party/verilator/.verilator-built
 			./configure && \
 			make -j; \
 		echo "Verilator build completed successfully."; \
-		touch $@; \
+		touch $(CURDIR)/$@; \
 	fi
 
 clean-verilator:

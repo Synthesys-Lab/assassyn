@@ -16,7 +16,7 @@ patch-circt: 3rd-party/circt/.patch-applied
 			echo "Applying CIRCT patch..."; \
 			bash ../../scripts/patch-apply.sh apply ../../scripts/init/patches/circt.patch; \
 		fi && \
-		touch .patch-applied
+		touch $(CURDIR)/3rd-party/circt/.patch-applied
 
 install-circt: 3rd-party/circt/.circt-built
 
@@ -49,7 +49,7 @@ install-circt: 3rd-party/circt/.circt-built
 			fi; \
 		fi; \
 		echo "CIRCT installation completed."; \
-		touch $@; \
+		touch $(CURDIR)/$@; \
 	fi
 
 clean-circt:
