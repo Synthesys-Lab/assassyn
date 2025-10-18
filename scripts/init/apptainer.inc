@@ -12,6 +12,22 @@ APPTAINER_BASE_DEF ?= vm/apptainer/base.def
 APPTAINER_REPO_DEF ?= vm/apptainer/repo.def
 APPTAINER_DEF ?= vm/apptainer/assassyn.def
 
+# Submodules to cache
+SUBMODULES := ramulator2 circt verilator
+
+# Compute hash for each submodule
+RAMULATOR2_HASH := $(shell git -C 3rd-party/ramulator2 rev-parse --short HEAD 2>/dev/null || echo "unknown")
+CIRCT_HASH := $(shell git -C 3rd-party/circt rev-parse --short HEAD 2>/dev/null || echo "unknown")
+VERILATOR_HASH := $(shell git -C 3rd-party/verilator rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+# Cached archive paths
+RAMULATOR2_ARCHIVE := $(APPTAINER_OUTPUT_DIR)/ramulator2-$(RAMULATOR2_HASH).tar.gz
+CIRCT_ARCHIVE := $(APPTAINER_OUTPUT_DIR)/circt-$(CIRCT_HASH).tar.gz
+VERILATOR_ARCHIVE := $(APPTAINER_OUTPUT_DIR)/verilator-$(VERILATOR_HASH).tar.gz
+
+# All submodule archives
+SUBMODULE_ARCHIVES := $(RAMULATOR2_ARCHIVE) $(CIRCT_ARCHIVE) $(VERILATOR_ARCHIVE)
+
 # Phase 1: Build base container with system dependencies
 $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 	@echo "=== Building Base Container ==="
@@ -21,12 +37,36 @@ $(APPTAINER_BASE_IMAGE): $(APPTAINER_BASE_DEF)
 	@echo "=== Base container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_BASE_IMAGE)"
 
-# Archive the repository with all submodules
-$(APPTAINER_OUTPUT_DIR)/repo.tar.gz:
+# Pattern rule to archive any submodule with hash-based caching
+$(APPTAINER_OUTPUT_DIR)/ramulator2-%.tar.gz: 3rd-party/ramulator2
+	@echo "=== Archiving ramulator2 ($*) ==="
+	@mkdir -p $(APPTAINER_OUTPUT_DIR)
+	@tar -czf $@ -C 3rd-party ramulator2
+	@echo "Archive created: $@"
+
+$(APPTAINER_OUTPUT_DIR)/circt-%.tar.gz: 3rd-party/circt
+	@echo "=== Archiving circt ($*) ==="
+	@mkdir -p $(APPTAINER_OUTPUT_DIR)
+	@tar -czf $@ -C 3rd-party circt
+	@echo "Archive created: $@"
+
+$(APPTAINER_OUTPUT_DIR)/verilator-%.tar.gz: 3rd-party/verilator
+	@echo "=== Archiving verilator ($*) ==="
+	@mkdir -p $(APPTAINER_OUTPUT_DIR)
+	@tar -czf $@ -C 3rd-party verilator
+	@echo "Archive created: $@"
+
+# Archive the repository with cached submodules
+$(APPTAINER_OUTPUT_DIR)/repo.tar.gz: $(SUBMODULE_ARCHIVES)
 	@echo "=== Creating Repository Archive ==="
-	@echo "Archiving repository with all submodules..."
-	@mkdir -p $(APPTAINER_OUTPUT_DIR)/temp_archive
+	@echo "Assembling repository with cached submodules..."
+	@mkdir -p $(APPTAINER_OUTPUT_DIR)/temp_archive/app/3rd-party
 	@cp -r . $(APPTAINER_OUTPUT_DIR)/temp_archive/app
+	@rm -rf $(APPTAINER_OUTPUT_DIR)/temp_archive/app/3rd-party/*
+	@cd $(APPTAINER_OUTPUT_DIR)/temp_archive/app/3rd-party && \
+		tar -xzf $(RAMULATOR2_ARCHIVE) && \
+		tar -xzf $(CIRCT_ARCHIVE) && \
+		tar -xzf $(VERILATOR_ARCHIVE)
 	@cd $(APPTAINER_OUTPUT_DIR)/temp_archive && \
 		tar --exclude='app/.git' --exclude='app/examples' --exclude='app/docs' --exclude='app/tutorials' \
 		-czf $(APPTAINER_OUTPUT_DIR)/repo.tar.gz app
@@ -72,5 +112,13 @@ clean-apptainer-repo:
 
 clean-apptainer:
 	@echo "Cleaning all Apptainer containers..."
-	@rm -f $(APPTAINER_OUTPUT_DIR)/base.sif $(APPTAINER_OUTPUT_DIR)/repo.sif $(APPTAINER_OUTPUT_DIR)/assassyn.sif $(APPTAINER_OUTPUT_DIR)/repo.tar.gz && \
-		echo "All Apptainer containers and archives cleaned."
+	@rm -f $(APPTAINER_OUTPUT_DIR)/base.sif $(APPTAINER_OUTPUT_DIR)/repo.sif \
+		$(APPTAINER_OUTPUT_DIR)/assassyn.sif $(APPTAINER_OUTPUT_DIR)/repo.tar.gz && \
+		echo "All Apptainer containers and main archive cleaned."
+
+ultraclean-apptainer: clean-apptainer
+	@echo "Cleaning cached submodule archives..."
+	@rm -f $(APPTAINER_OUTPUT_DIR)/ramulator2-*.tar.gz \
+		$(APPTAINER_OUTPUT_DIR)/circt-*.tar.gz \
+		$(APPTAINER_OUTPUT_DIR)/verilator-*.tar.gz && \
+		echo "All cached submodule archives cleaned."
