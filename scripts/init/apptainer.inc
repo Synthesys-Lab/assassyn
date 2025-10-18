@@ -97,7 +97,7 @@ $(APPTAINER_REPO_IMAGE): $(APPTAINER_BASE_IMAGE) $(APPTAINER_REPO_DEF) $(APPTAIN
 	@echo "=== Building Repository Container ==="
 	@echo "Building repository container with archived repo and submodules..."
 	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
-	@cd vm/apptainer && apptainer build $(APPTAINER_OUTPUT_DIR)/repo.sif repo.def
+	@cd vm/apptainer && apptainer build --force $(APPTAINER_OUTPUT_DIR)/repo.sif repo.def
 	@echo "=== Repository container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_REPO_IMAGE)"
 
@@ -106,7 +106,7 @@ $(APPTAINER_IMAGE): $(APPTAINER_REPO_IMAGE) $(APPTAINER_DEF)
 	@echo "=== Building Assassyn Container ==="
 	@echo "Building final container (this may take a while)..."
 	@echo "Output directory: $(APPTAINER_OUTPUT_DIR)"
-	cd vm/apptainer && apptainer build $(APPTAINER_OUTPUT_DIR)/assassyn.sif assassyn.def
+	cd vm/apptainer && apptainer build --force $(APPTAINER_OUTPUT_DIR)/assassyn.sif assassyn.def
 	@echo "=== Container build completed successfully! ==="
 	@echo "Container: $(APPTAINER_IMAGE)"
 	@echo "Usage: apptainer exec --no-home $(APPTAINER_IMAGE) python your_script.py"
