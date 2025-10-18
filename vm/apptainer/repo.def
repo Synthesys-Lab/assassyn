@@ -8,6 +8,20 @@ From: /tmp/base.sif
     cd /
     tar -xzf /tmp/repo.tar.gz
     cd /app
+    
+    # Extract assassyn main repo archive
+    tar -xzf assassyn-*.tar.gz --strip-components=1
+    
+    # Extract submodule archives
+    cd 3rd-party
+    tar -xzf ramulator2-*.tar.gz --strip-components=1
+    tar -xzf circt-*.tar.gz --strip-components=1  
+    tar -xzf verilator-*.tar.gz --strip-components=1
+    
+    # Clean up archive files
+    cd /app
+    rm -f assassyn-*.tar.gz
+    rm -f 3rd-party/*-*.tar.gz
     rm -rf examples/ docs/ tutorials/
 
 %runscript
