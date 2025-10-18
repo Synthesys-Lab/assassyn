@@ -61,8 +61,7 @@ $(APPTAINER_OUTPUT_DIR)/repo.tar.gz: $(SUBMODULE_ARCHIVES)
 	@echo "=== Creating Repository Archive ==="
 	@echo "Assembling repository with cached submodules..."
 	@mkdir -p $(APPTAINER_OUTPUT_DIR)/temp_archive/app/3rd-party
-	@cp -r . $(APPTAINER_OUTPUT_DIR)/temp_archive/app
-	@rm -rf $(APPTAINER_OUTPUT_DIR)/temp_archive/app/3rd-party/*
+	@rsync -a --exclude='3rd-party' . $(APPTAINER_OUTPUT_DIR)/temp_archive/app/
 	@cd $(APPTAINER_OUTPUT_DIR)/temp_archive/app/3rd-party && \
 		tar -xzf $(RAMULATOR2_ARCHIVE) && \
 		tar -xzf $(CIRCT_ARCHIVE) && \

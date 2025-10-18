@@ -7,7 +7,6 @@ From: /tmp/base.sif
 %post
     cd /
     tar -xzf /tmp/repo.tar.gz
-    rm /tmp/repo.tar.gz
     cd /app
     rm -rf examples/ docs/ tutorials/
 
