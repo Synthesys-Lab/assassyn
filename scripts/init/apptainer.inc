@@ -77,14 +77,16 @@ $(APPTAINER_OUTPUT_DIR)/verilator-%.tar.gz: 3rd-party/verilator
 	@echo "Archive created: $@"
 
 # Archive the repository with cached submodules
-$(APPTAINER_OUTPUT_DIR)/repo.tar.gz: $(ALL_ARCHIVES)
+$(APPTAINER_OUTPUT_DIR)/repo.tar.gz: $(ASSASSYN_ARCHIVE) $(RAMULATOR2_ARCHIVE) $(CIRCT_ARCHIVE) $(VERILATOR_ARCHIVE)
 	@echo "=== Creating Repository Archive Bundle ==="
 	@echo "Bundling repository archives with hash-based naming..."
 	@mkdir -p $(APPTAINER_OUTPUT_DIR)/temp_bundle/3rd-party
+	@echo "Copying archives..."
 	@cp $(ASSASSYN_ARCHIVE) $(APPTAINER_OUTPUT_DIR)/temp_bundle/
 	@cp $(RAMULATOR2_ARCHIVE) $(APPTAINER_OUTPUT_DIR)/temp_bundle/3rd-party/
 	@cp $(CIRCT_ARCHIVE) $(APPTAINER_OUTPUT_DIR)/temp_bundle/3rd-party/
 	@cp $(VERILATOR_ARCHIVE) $(APPTAINER_OUTPUT_DIR)/temp_bundle/3rd-party/
+	@echo "Creating final bundle..."
 	@cd $(APPTAINER_OUTPUT_DIR)/temp_bundle && \
 		tar -czf $(APPTAINER_OUTPUT_DIR)/repo.tar.gz .
 	@rm -rf $(APPTAINER_OUTPUT_DIR)/temp_bundle
