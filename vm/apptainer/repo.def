@@ -13,14 +13,12 @@ From: /tmp/base.sif
     # Extract assassyn main repo archive
     tar -xzf /assassyn-*.tar.gz --strip-components=1
     
-    # Extract submodule archives
-    cd 3rd-party
-    tar -xzf /3rd-party/ramulator2-*.tar.gz --strip-components=1
-    tar -xzf /3rd-party/circt-*.tar.gz --strip-components=1  
-    tar -xzf /3rd-party/verilator-*.tar.gz --strip-components=1
+    # Extract submodule archives to their correct locations
+    tar -xzf ../3rd-party/ramulator2-*.tar.gz -C 3rd-party/
+    tar -xzf ../3rd-party/circt-*.tar.gz -C 3rd-party/
+    tar -xzf ../3rd-party/verilator-*.tar.gz -C 3rd-party/
     
     # Clean up archive files
-    cd /app
     rm -f /assassyn-*.tar.gz
     rm -f /3rd-party/*-*.tar.gz
     rm -rf examples/ docs/ tutorials/
