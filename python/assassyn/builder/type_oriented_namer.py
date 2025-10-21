@@ -116,19 +116,17 @@ class TypeOrientedNamer:
 
     def _combine_parts(self, *parts: Optional[str]) -> Optional[str]:
         """Combine multiple name parts into a sanitized identifier."""
-        tokens = []
-        for part in parts:
-            if isinstance(part, str) and part:
-                segment = self._head_token_segment(self._sanitize(part))
-                if segment:
-                    tokens.append(segment)
+        # Filter out None/empty parts - callers already provide sanitized/segmented inputs
+        tokens = [part for part in parts if isinstance(part, str) and part]
         if not tokens:
             return None
+
         # Remove duplicate adjacent tokens for clarity
-        deduped = []
-        for token in tokens:
-            if not deduped or deduped[-1] != token:
+        deduped = [tokens[0]]
+        for token in tokens[1:]:
+            if deduped[-1] != token:
                 deduped.append(token)
+
         combined = '_'.join(deduped)
         # Keep identifiers reasonably sized to avoid unreadable dumps
         return combined[:25]
@@ -145,12 +143,11 @@ class TypeOrientedNamer:
         # pylint: disable=import-outside-toplevel
         from ..ir.expr.arith import BinaryOp
 
-        opcode = self._safe_getattr(node, 'opcode')
-        symbol = BinaryOp.OPERATORS.get(opcode)
+        symbol = BinaryOp.OPERATORS.get(node.opcode)
         if symbol:
             op_name = self._symbol_to_name().get(symbol, 'bin')
-            lhs_desc = self._describe_operand(self._safe_getattr(node, 'lhs'))
-            rhs_desc = self._describe_operand(self._safe_getattr(node, 'rhs'))
+            lhs_desc = self._describe_operand(node.lhs)
+            rhs_desc = self._describe_operand(node.rhs)
             return self._combine_parts(lhs_desc, op_name, rhs_desc) or op_name
         return 'bin'
 
@@ -159,11 +156,10 @@ class TypeOrientedNamer:
         # pylint: disable=import-outside-toplevel
         from ..ir.expr.arith import UnaryOp
 
-        opcode = self._safe_getattr(node, 'opcode')
-        symbol = UnaryOp.OPERATORS.get(opcode)
+        symbol = UnaryOp.OPERATORS.get(node.opcode)
         if symbol:
             op_name = self._symbol_to_name().get(symbol, 'unary')
-            operand_desc = self._describe_operand(self._safe_getattr(node, 'x'))
+            operand_desc = self._describe_operand(node.x)
             return self._combine_parts(op_name, operand_desc) or op_name
         return 'unary'
 
@@ -172,9 +168,8 @@ class TypeOrientedNamer:
         # pylint: disable=import-outside-toplevel
         from ..ir.expr.intrinsic import PureIntrinsic
 
-        opcode = self._safe_getattr(node, 'opcode')
-        op_suffix = PureIntrinsic.OPERATORS.get(opcode)
-        args = self._safe_getattr(node, 'args') or ()
+        op_suffix = PureIntrinsic.OPERATORS.get(node.opcode)
+        args = node.args or ()
 
         # For FIFO operations (peek, valid), use just the port/fifo name
         if op_suffix and args:

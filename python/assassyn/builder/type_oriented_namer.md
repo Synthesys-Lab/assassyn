@@ -101,7 +101,7 @@ Safely retrieves an attribute from a node without triggering `__getattr__` side 
 **Returns:**
 - The attribute value or `None` if not found or if an error occurs
 
-**Explanation:** This method uses `object.__getattribute__` directly to bypass any custom `__getattr__` methods that might have side effects. It catches `AttributeError` and `TypeError` exceptions and returns `None` in those cases, allowing the naming system to gracefully handle missing attributes.
+**Explanation:** This method uses `object.__getattribute__` directly to bypass any custom `__getattr__` methods that might have side effects. It catches `AttributeError` and `TypeError` exceptions and returns `None` in those cases, allowing the naming system to gracefully handle missing attributes. This method is used for dynamic or uncertain attribute access; well-defined IR classes like `BinaryOp`, `UnaryOp`, and `PureIntrinsic` have their attributes accessed directly since they use proper `@property` methods.
 
 ### `_entity_name`
 
@@ -181,7 +181,7 @@ Combines multiple name parts into a single sanitized identifier.
 **Returns:**
 - A combined identifier string or `None` if no valid parts are provided
 
-**Explanation:** This method takes multiple optional string parts, filters out `None` and empty strings, sanitizes each part, and combines them with underscores. It removes duplicate adjacent tokens for clarity and limits the result to 25 characters to avoid unreadable names. This is used to create descriptive names like `lhs_add_rhs` for binary operations.
+**Explanation:** This method takes multiple optional string parts, filters out `None` and empty strings, and combines them with underscores. It removes duplicate adjacent tokens for clarity and limits the result to 25 characters to avoid unreadable names. The method trusts that callers (via `_describe_operand` and `_entity_name`) have already provided sanitized and segmented inputs, eliminating redundant processing. This is used to create descriptive names like `lhs_add_rhs` for binary operations.
 
 ### `_head_token_segment`
 
@@ -228,7 +228,7 @@ Strategy function for binary operations that extracts naming information from Bi
 **Returns:**
 - A descriptive name combining operand descriptions with the operation name
 
-**Explanation:** This strategy function looks up the operation symbol in `BinaryOp.OPERATORS`, converts it to a descriptive name using `_symbol_to_name()`, and combines it with descriptions of the left and right operands to create names like `lhs_add_rhs`.
+**Explanation:** This strategy function looks up the operation symbol in `BinaryOp.OPERATORS`, converts it to a descriptive name using `_symbol_to_name()`, and combines it with descriptions of the left and right operands to create names like `lhs_add_rhs`. The method accesses `node.opcode`, `node.lhs`, and `node.rhs` directly since these are well-defined `@property` methods in the `BinaryOp` class.
 
 ### `_unary_op_strategy`
 
@@ -244,7 +244,7 @@ Strategy function for unary operations that extracts naming information from Una
 **Returns:**
 - A descriptive name combining the operation name with operand description
 
-**Explanation:** This strategy function looks up the operation symbol in `UnaryOp.OPERATORS`, converts it to a descriptive name using `_symbol_to_name()`, and combines it with the operand description to create names like `neg_operand`.
+**Explanation:** This strategy function looks up the operation symbol in `UnaryOp.OPERATORS`, converts it to a descriptive name using `_symbol_to_name()`, and combines it with the operand description to create names like `neg_operand`. The method accesses `node.opcode` and `node.x` directly since these are well-defined `@property` methods in the `UnaryOp` class.
 
 ### `_pure_intrinsic_strategy`
 
@@ -260,7 +260,7 @@ Strategy function for pure intrinsics that extracts naming information from Pure
 **Returns:**
 - A descriptive name based on the intrinsic operation and its arguments
 
-**Explanation:** This strategy function looks up the operation name in `PureIntrinsic.OPERATORS` and combines it with argument names when appropriate. For FIFO operations like 'peek' and 'valid', it creates names like `fifo_name_peek` or `fifo_name_valid`.
+**Explanation:** This strategy function looks up the operation name in `PureIntrinsic.OPERATORS` and combines it with argument names when appropriate. For FIFO operations like 'peek' and 'valid', it creates names like `fifo_name_peek` or `fifo_name_valid`. The method accesses `node.opcode` and `node.args` directly since these are well-defined `@property` methods in the `PureIntrinsic` class.
 
 ## Strategy Pattern System
 
