@@ -4,7 +4,7 @@ This module provides the `TypeOrientedNamer` class, which generates semantically
 
 ## Section 0. Summary
 
-The TypeOrientedNamer implements a sophisticated naming strategy that analyzes IR node types, operations, and operands to generate descriptive identifiers. It uses hardcoded opcode mappings for arithmetic and logic operations, class-based prefixes for specific IR constructs, and operand analysis to create meaningful names like `lhs_add_rhs` for binary operations or `neg_operand` for unary operations. The namer is designed to work with the broader naming system described in [naming_manager.md](naming_manager.md) and ensures compatibility with Rust naming conventions.
+The TypeOrientedNamer implements a sophisticated naming strategy that analyzes IR node types, operations, and operands to generate descriptive identifiers. It uses a unified strategy pattern with `{class: lambda node: ...}` mappings that dynamically extract naming information from IR expr classes using their OPERATORS dictionaries. This eliminates hard-coded opcode mappings and provides a maintainable, extensible naming system that works with the broader naming system described in [naming_manager.md](naming_manager.md) and ensures compatibility with Rust naming conventions.
 
 ## Section 1. Exposed Interfaces
 
@@ -22,12 +22,9 @@ The main class that provides type-aware naming for IR nodes.
 def __init__(self) -> None:
 ```
 
-Initializes a new `TypeOrientedNamer` instance with a `UniqueNameCache` and lookup tables for operation prefixes.
+Initializes a new `TypeOrientedNamer` instance with a `UniqueNameCache` and a unified naming strategies dictionary.
 
-**Explanation:** This constructor sets up the internal state needed for type-based naming. It creates a `UniqueNameCache` instance for generating unique names and initializes three lookup dictionaries:
-- `_binary_ops`: Maps binary operation opcodes to semantic prefixes (e.g., 200→'add', 201→'sub')
-- `_unary_ops`: Maps unary operation opcodes to semantic prefixes (e.g., 100→'neg', 101→'not')  
-- `_class_prefixes`: Maps IR class names to semantic prefixes (e.g., 'ArrayRead'→'rd', 'FIFOPop'→'pop')
+**Explanation:** This constructor sets up the internal state needed for type-based naming. It creates a `UniqueNameCache` instance for generating unique names and initializes a `_naming_strategies` dictionary that maps IR expr classes to lambda functions. Each lambda function extracts naming information dynamically from the node's OPERATORS dictionary and operand analysis, eliminating the need for hard-coded opcode mappings.
 
 #### `get_prefix_for_type`
 
@@ -35,7 +32,7 @@ Initializes a new `TypeOrientedNamer` instance with a `UniqueNameCache` and look
 def get_prefix_for_type(self, node: Any) -> str:
 ```
 
-Extracts a descriptive base name for a given IR node based on its type and structure.
+Extracts a descriptive base name for a given IR node using a unified strategy pattern.
 
 **Parameters:**
 - `node`: The IR node to generate a prefix for
@@ -43,16 +40,12 @@ Extracts a descriptive base name for a given IR node based on its type and struc
 **Returns:**
 - A sanitized string prefix that describes the node's type and operation
 
-**Explanation:** This method implements a hierarchical naming strategy that checks node types in order of specificity:
+**Explanation:** This method implements a streamlined naming strategy using the strategy pattern:
 
 1. **Module instances**: Nodes with `ModuleBase` in their MRO get "Instance" suffix (e.g., `AdderInstance`)
-2. **Pure intrinsics**: Uses the intrinsic's opcode and first argument name if available
-3. **Class-based mappings**: Uses predefined prefixes for specific IR classes like `ArrayRead`, `ArrayWrite`, `FIFOPop`, etc.
-4. **Binary operations**: Combines operand descriptions with operation tokens (e.g., `lhs_add_rhs`)
-5. **Unary operations**: Combines operation token with operand description (e.g., `neg_operand`)
-6. **Special operations**: Handles `Cast`, `Slice`, `Concat`, `Select`, `Select1Hot` with descriptive prefixes
-7. **Name attribute**: Falls back to the node's `name` attribute if present
-8. **Default fallback**: Returns `"val"` for unrecognized types
+2. **Strategy lookup**: Uses the `_naming_strategies` dictionary to find the appropriate lambda function for the node's class
+3. **Dynamic extraction**: Each strategy function dynamically extracts naming information from the node's OPERATORS dictionary and operand analysis
+4. **Fallback**: Falls back to the node's `name` attribute or `"val"` for unrecognized types
 
 The method uses `_safe_getattr` to avoid triggering `__getattr__` side effects and applies `_sanitize` to ensure valid identifiers.
 
@@ -207,15 +200,79 @@ Keeps at most the first two underscore-separated segments of a token for brevity
 
 **Explanation:** This static method splits the input token by underscores and keeps only the first two segments, rejoining them with underscores. This helps keep generated names concise while preserving the most important identifying information.
 
-## Opcode Mapping System
+### `_symbol_to_name`
 
-The `TypeOrientedNamer` uses hardcoded opcode mappings to generate semantic prefixes for operations:
+```python
+@staticmethod
+def _symbol_to_name():
+```
 
-- **Binary Operations**: Mapped to descriptive tokens (e.g., 200→'add', 201→'sub', 202→'mul')
-- **Unary Operations**: Mapped to operation tokens (e.g., 100→'neg', 101→'not')
-- **Class-based Prefixes**: Direct mappings for specific IR classes (e.g., 'ArrayRead'→'rd', 'FIFOPop'→'pop')
+Converts operator symbols to descriptive names for use in generated identifiers.
 
-These opcodes are specific to the IR expression system and are used to generate meaningful names like `lhs_add_rhs` for binary operations or `neg_operand` for unary operations. The mappings ensure that generated names reflect the semantic meaning of operations rather than using generic identifiers.
+**Returns:**
+- A dictionary mapping operator symbols to descriptive names
+
+**Explanation:** This static method provides a mapping from operator symbols (like '+', '&', '<') to descriptive names (like 'add', 'and', 'lt') that are suitable for use in generated identifiers. This allows the naming system to convert symbolic operators from the OPERATORS dictionaries into readable identifier components.
+
+### `_binary_op_strategy`
+
+```python
+def _binary_op_strategy(self, node: Any) -> str:
+```
+
+Strategy function for binary operations that extracts naming information from BinaryOp.OPERATORS.
+
+**Parameters:**
+- `node`: The binary operation node to name
+
+**Returns:**
+- A descriptive name combining operand descriptions with the operation name
+
+**Explanation:** This strategy function looks up the operation symbol in `BinaryOp.OPERATORS`, converts it to a descriptive name using `_symbol_to_name()`, and combines it with descriptions of the left and right operands to create names like `lhs_add_rhs`.
+
+### `_unary_op_strategy`
+
+```python
+def _unary_op_strategy(self, node: Any) -> str:
+```
+
+Strategy function for unary operations that extracts naming information from UnaryOp.OPERATORS.
+
+**Parameters:**
+- `node`: The unary operation node to name
+
+**Returns:**
+- A descriptive name combining the operation name with operand description
+
+**Explanation:** This strategy function looks up the operation symbol in `UnaryOp.OPERATORS`, converts it to a descriptive name using `_symbol_to_name()`, and combines it with the operand description to create names like `neg_operand`.
+
+### `_pure_intrinsic_strategy`
+
+```python
+def _pure_intrinsic_strategy(self, node: Any) -> str:
+```
+
+Strategy function for pure intrinsics that extracts naming information from PureIntrinsic.OPERATORS.
+
+**Parameters:**
+- `node`: The pure intrinsic node to name
+
+**Returns:**
+- A descriptive name based on the intrinsic operation and its arguments
+
+**Explanation:** This strategy function looks up the operation name in `PureIntrinsic.OPERATORS` and combines it with argument names when appropriate. For FIFO operations like 'peek' and 'valid', it creates names like `fifo_name_peek` or `fifo_name_valid`.
+
+## Strategy Pattern System
+
+The `TypeOrientedNamer` uses a unified strategy pattern with `{class: lambda node: str}` mappings to generate semantic prefixes for operations:
+
+- **Dynamic Extraction**: All opcode information is extracted from source classes using their OPERATORS dictionaries
+- **Unified Interface**: All naming strategies follow the same `{class: lambda node: str}` pattern
+- **Strategy Functions**: Specialized functions like `_binary_op_strategy`, `_unary_op_strategy`, and `_pure_intrinsic_strategy` handle operations with OPERATORS dictionaries
+- **Lambda Strategies**: Simple lambda functions handle classes without OPERATORS dictionaries (e.g., ArrayRead, FIFOPop)
+- **Symbol Conversion**: The `_symbol_to_name()` method converts operator symbols to descriptive names
+
+This approach eliminates hard-coded opcode mappings and provides a maintainable, extensible naming system where adding new expr types only requires adding one lambda to the strategies dictionary.
 
 ## Operand Wrapping System
 
