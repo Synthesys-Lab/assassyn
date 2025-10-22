@@ -44,9 +44,14 @@ def test_array_ops_dump():
         ArrayOpsTestModule().build()
     
     def checker(sys_repr):
-        # Verify array operations appear
-        assert "read_val = arr[" in sys_repr
-        assert "] <=" in sys_repr
+        # Verify new array representation format
+        assert "arr = [u8; 4];" in sys_repr
+        assert "|- Read  by:" in sys_repr
+        assert "|- Write by:" in sys_repr
+        assert "`- Write by:" in sys_repr
+        assert "in ArrayOpsTestModuleInstance" in sys_repr
+        assert "read_val = arr[read_index_1]" in sys_repr
+        assert "arr[write_index_1] <= write_val_1" in sys_repr
     
     dump_ir("array_ops_test", builder, checker)
 

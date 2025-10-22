@@ -6,7 +6,7 @@ import typing
 
 from ..builder import ir_builder, Singleton
 from .dtype import to_uint, RecordValue
-from .expr import ArrayRead, Expr,BinaryOp
+from .expr import ArrayRead, ArrayWrite, Expr,BinaryOp
 from .value import Value
 from ..utils import identifierize, namify
 from .expr.writeport import WritePort
@@ -170,25 +170,49 @@ class Array:  #pylint: disable=too-many-instance-attributes
         raise TypeError(f"Cannot AND Array with {type(other)}")
 
     def __repr__(self):
-        '''Enhanced repr to show write port information'''
-        res = f'array {self.name}[{self.scalar_ty}; {self.size}] ='
+        '''Enhanced repr to show read/write operations in tree format'''
+        # Start with array declaration
+        res = f'{self.name} = [{self.scalar_ty}; {self.size}];'
 
-        # Add write port information if any
-        if hasattr(self, '_write_ports') and self._write_ports:
-            port_info = f' /* {len(self._write_ports)} write ports: '
-            port_info += ', '.join(m.name for m in self._write_ports)
-            port_info += ' */'
-            res += port_info
+        # Collect read and write operations
+        read_ops = []
+        write_ops = []
 
-        res += ' [ '
-        res += '\n'
-        res += f'{self.name}, '
-        if self._write_ports:
-            res += f'write_ports: /* {len(self._write_ports)}: '
-            res += ', '.join(m.name for m in self._write_ports)
-            res += ' */'
+        for user in self._users:
+            if isinstance(user, ArrayRead):
+                read_ops.append(user)
+            elif isinstance(user, ArrayWrite):
+                write_ops.append(user)
 
-        return res + ' ]'
+        # Build tree structure
+        all_ops = []
+
+        # Add read operations
+        for read_op in read_ops:
+            module_name = getattr(read_op.parent, 'module', None)
+            module_str = getattr(module_name, 'name', 'Unknown') if module_name else 'Unknown'
+            all_ops.append(f'Read  by: {read_op} in {module_str}')
+
+        # Add write operations
+        for write_op in write_ops:
+            module_name = getattr(write_op.parent, 'module', None)
+            module_str = getattr(module_name, 'name', 'Unknown') if module_name else 'Unknown'
+            all_ops.append(f'Write by: {write_op} in {module_str}')
+
+        # Format tree structure
+        if all_ops:
+            res += '\n'
+            for i, op in enumerate(all_ops):
+                if i == len(all_ops) - 1:
+                    # Last item uses `-
+                    res += f'  `- {op}'
+                else:
+                    # Other items use |-
+                    res += f'  |- {op}'
+                if i < len(all_ops) - 1:
+                    res += '\n'
+
+        return res
 
     @property
     def index_bits(self):
