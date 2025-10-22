@@ -2,12 +2,19 @@
 alwaysApply: false
 globs:
   - python/assassyn/*.md
+  - python/assassyn/*.py
   - python/assassyn/**/*.md
+  - python/assassyn/**/*.py
   - python/assassyn/**/**/.md
+  - python/assassyn/**/**/.py
   - docs/*.md
   - docs/**/*.md
   - tools/**/**/*.md
+  - tools/**/**/*.rs
+  - tools/**/**/*.cpp
   - tools/**/*.md
+  - tools/**/*.rs
+  - tools/**/*.cpp
 description: How write documents and when to read documents
 ---
 

@@ -7,26 +7,62 @@ alwaysApply: true
 This document discusses several key rules of writing good code:
 
 1. When introducing a new wrapper like below, ask yourself do we really need such an indirection.
-   - Is it because our interface design is poor? If so, report it in a summary when acting on a TODO.
-
+   - These indirections including, but not limited to struct/class wrappers, and function wrappers.
+   - If you do a wrapper like below, carefully think if it is it because we designed a poor interface. before.
 ```python
 def foo_wrapper(a):
     foo(a, 0)
+```
+   - Do NOT even try to write a wrapper like below, which is totally redundant!
+```python
+def _foo_wrapper(a):
+   a.foo()
+
+class A:
+   a: int
+   b: int
+
+class AWrapper:
+   wrapped_a: int
+   wrapped_b: int
+
+a = A()
+wrapper = AWrapper(a)
 ```
 
 2. When writing a set of repeat code, consider to refine a unified interface. If you write a repeat code
    twice, you have a chance to write it more times. If similar code is distributed everywhere, you need
    to modify it everywhere, which not only worsens the readability but also lengthens the contexts.
-   - However, focus on one thing at a time. If you realize it is a over engineering, report it in a TODO summary.
+   - However, focus on one thing at a time. If you realize it is a over engineering, report it in the summary.
 
 3. Focus on thing for each module. If a module is originally designed for a purpose, do not borrow its code
    path for anything else, unless the addition is a part of feature extension closely related to this module.
+   - Do not reinvent infrastructures! If you need a handy helper for some usage. First check if
+     this is already available in the related data structures' member methods, and find if it is available
+     in `python/assassyn/analysis` and `python/assassyn/utils`.
+   - If not, carefully differentiate your requirements! If this is a common usage missing in the corresponding
+     struct, bravely add it! If this is a usage only limited to the module you are developing, keep this helper
+     private to this function!
 
-4. DO NOT hard code. If you have a constant value defined for a specific purpose, when used do not hard code
-   its literal value.
-   - Is is possible to make this value a constant variable and use this variable?
-   - Is it possible to change it to a enum to avoid other mistakes?
+4. DO NOT excessively try catch. Carefully inspect the data structure you are working on!
+   Even in some managed language with very flexible meta programming manipulation, it is not preferred to use
+   such language feature as it is error-prone!
+   - Every time, if you used try-catch, carefully think if you are making too conservative assumption on the code!
+   - If you want to access a member, `setattr` and `getattr` in Python is NOT preferred!
+     If it causes an error, carefully inspect if you are accessing a correct attribute first!
+   - All the Python class, if possible, should declare their members and types at the beginning of each type using
+     the similar style below:
+```python
+class Coord:
+   x: float
+   y: float
+```
 
-5. Low invasion. Every time you make a mofication, carefully control the files are affective.
+5. DO NOT hard code. If you have a constant value defined for a specific purpose, when used do not hard code
+   its literal value. Is is possible to:
+     - Make this value a constant variable and use this variable?
+     - Change it to a enum to avoid other mistakes?
+
+6. Low invasion. Every time you make a mofication, carefully control the files are affective.
    Unless you are sure you are told to do an interface refactor, make sure all the modifications
    should be inside the module and the interface exposed by the module.
