@@ -5,28 +5,14 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from assassyn.frontend import (
-    # Core types
-    Module, SysBuilder, UInt, Int, Bits, Record,
-    # Arrays and blocks
-    RegArray, Condition, Cycle,
-    # Intrinsics
-    wait_until, finish, assume, barrier,
-    # Logging
-    log,
-    # Module decorator
-    module,
-    # Ports and wires
-    Port, WireIn, WireOut,
-    # External modules
-    ExternalSV, external,
+    Module, SysBuilder, UInt, Port, log, module
 )
+from assassyn.test import dump_ir
 
 
 def test_comm_ops_dump():
     """Test communicative operations IR dump logging."""
-    sys_builder = SysBuilder('comm_ops_test')
-    
-    def test_func():
+    def builder(sys):
         class CommOpsTestModule(Module):
             def __init__(self):
                 super().__init__(ports={
@@ -55,20 +41,16 @@ def test_comm_ops_dump():
         
         CommOpsTestModule().build()
     
-    with sys_builder:
-        test_func()
+    def checker(sys_repr):
+        # Verify communicative operations appear
+        assert "add_result =" in sys_repr and "+" in sys_repr
+        assert "mul_result =" in sys_repr and "*" in sys_repr
+        assert "and_result =" in sys_repr and "&" in sys_repr
+        assert "or_result =" in sys_repr and "|" in sys_repr
+        assert "xor_result =" in sys_repr and "^" in sys_repr
+        assert "concat_result =" in sys_repr
     
-    sys_repr = repr(sys_builder)
-    print(f"\n=== Comm Ops Test IR Dump ===")
-    print(sys_repr)
-    
-    # Verify communicative operations appear
-    assert "add_result =" in sys_repr and "+" in sys_repr
-    assert "mul_result =" in sys_repr and "*" in sys_repr
-    assert "and_result =" in sys_repr and "&" in sys_repr
-    assert "or_result =" in sys_repr and "|" in sys_repr
-    assert "xor_result =" in sys_repr and "^" in sys_repr
-    assert "concat_result =" in sys_repr
+    dump_ir("comm_ops_test", builder, checker)
 
 
 if __name__ == '__main__':

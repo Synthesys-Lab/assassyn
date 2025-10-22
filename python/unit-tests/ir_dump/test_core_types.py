@@ -5,28 +5,15 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from assassyn.frontend import (
-    # Core types
     Module, SysBuilder, UInt, Int, Bits, Record,
-    # Arrays and blocks
-    RegArray, Condition, Cycle,
-    # Intrinsics
-    wait_until, finish, assume, barrier,
-    # Logging
-    log,
-    # Module decorator
-    module,
-    # Ports and wires
-    Port, WireIn, WireOut,
-    # External modules
-    ExternalSV, external,
+    RegArray, Port, log, module
 )
+from assassyn.test import dump_ir
 
 
 def test_const_dump():
     """Test constant value IR dump logging."""
-    sys_builder = SysBuilder('const_test')
-    
-    def test_func():
+    def builder(sys):
         class ConstTestModule(Module):
             def __init__(self):
                 super().__init__(ports={
@@ -49,23 +36,17 @@ def test_const_dump():
         
         ConstTestModule().build()
     
-    with sys_builder:
-        test_func()
+    def checker(sys_repr):
+        # Verify actual IR statements appear in the dump
+        assert "result1 =" in sys_repr and "uint_const" in sys_repr
+        assert "result2 =" in sys_repr and "bits_const" in sys_repr
     
-    sys_repr = repr(sys_builder)
-    print(f"\n=== Const Test IR Dump ===")
-    print(sys_repr)
-    
-    # Verify actual IR statements appear in the dump
-    assert "result1 =" in sys_repr and "uint_const" in sys_repr
-    assert "result2 =" in sys_repr and "bits_const" in sys_repr
+    dump_ir("const_test", builder, checker)
 
 
 def test_array_dump():
     """Test array and slicing IR dump logging."""
-    sys_builder = SysBuilder('array_test')
-    
-    def test_func():
+    def builder(sys):
         class ArrayTestModule(Module):
             def __init__(self):
                 super().__init__(ports={
@@ -93,23 +74,17 @@ def test_array_dump():
         
         ArrayTestModule().build()
     
-    with sys_builder:
-        test_func()
+    def checker(sys_repr):
+        # Verify array operations appear
+        assert "val = arr[" in sys_repr
+        assert "] <=" in sys_repr
     
-    sys_repr = repr(sys_builder)
-    print(f"\n=== Array Test IR Dump ===")
-    print(sys_repr)
-    
-    # Verify array operations appear
-    assert "val = arr[" in sys_repr
-    assert "] <=" in sys_repr
+    dump_ir("array_test", builder, checker)
 
 
 def test_record_dump():
     """Test record type IR dump logging."""
-    sys_builder = SysBuilder('record_test')
-    
-    def test_func():
+    def builder(sys):
         class RecordTestModule(Module):
             def __init__(self):
                 super().__init__(ports={
@@ -145,15 +120,11 @@ def test_record_dump():
         
         RecordTestModule().build()
     
-    with sys_builder:
-        test_func()
+    def checker(sys_repr):
+        # Verify record operations appear
+        assert "field_val = bitcast" in sys_repr
     
-    sys_repr = repr(sys_builder)
-    print(f"\n=== Record Test IR Dump ===")
-    print(sys_repr)
-    
-    # Verify record operations appear
-    assert "field_val = bitcast" in sys_repr
+    dump_ir("record_test", builder, checker)
 
 
 if __name__ == '__main__':

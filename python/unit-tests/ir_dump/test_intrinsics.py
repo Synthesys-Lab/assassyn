@@ -5,28 +5,15 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from assassyn.frontend import (
-    # Core types
-    Module, SysBuilder, UInt, Int, Bits, Record,
-    # Arrays and blocks
-    RegArray, Condition, Cycle,
-    # Intrinsics
-    wait_until, finish, assume, barrier,
-    # Logging
-    log,
-    # Module decorator
-    module,
-    # Ports and wires
-    Port, WireIn, WireOut,
-    # External modules
-    ExternalSV, external,
+    Module, SysBuilder, UInt, Port, log, module,
+    wait_until, finish, assume, barrier
 )
+from assassyn.test import dump_ir
 
 
 def test_intrinsics_dump():
     """Test intrinsic operations IR dump logging."""
-    sys_builder = SysBuilder('intrinsics_test')
-    
-    def test_func():
+    def builder(sys):
         class IntrinsicsTestModule(Module):
             def __init__(self):
                 super().__init__(ports={
@@ -49,18 +36,14 @@ def test_intrinsics_dump():
         
         IntrinsicsTestModule().build()
     
-    with sys_builder:
-        test_func()
+    def checker(sys_repr):
+        # Verify intrinsics appear
+        assert "intrinsic.wait_until" in sys_repr
+        assert "intrinsic.finish" in sys_repr
+        assert "intrinsic.assert" in sys_repr
+        assert "intrinsic.barrier" in sys_repr
     
-    sys_repr = repr(sys_builder)
-    print(f"\n=== Intrinsics Test IR Dump ===")
-    print(sys_repr)
-    
-    # Verify intrinsics appear
-    assert "intrinsic.wait_until" in sys_repr
-    assert "intrinsic.finish" in sys_repr
-    assert "intrinsic.assert" in sys_repr
-    assert "intrinsic.barrier" in sys_repr
+    dump_ir("intrinsics_test", builder, checker)
 
 
 if __name__ == '__main__':

@@ -5,28 +5,14 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from assassyn.frontend import (
-    # Core types
-    Module, SysBuilder, UInt, Int, Bits, Record,
-    # Arrays and blocks
-    RegArray, Condition, Cycle,
-    # Intrinsics
-    wait_until, finish, assume, barrier,
-    # Logging
-    log,
-    # Module decorator
-    module,
-    # Ports and wires
-    Port, WireIn, WireOut,
-    # External modules
-    ExternalSV, external,
+    Module, SysBuilder, UInt, Int, Bits, Port, log, module
 )
+from assassyn.test import dump_ir
 
 
 def test_cast_concat_select_dump():
     """Test cast, concat, and select IR dump logging."""
-    sys_builder = SysBuilder('cast_concat_select_test')
-    
-    def test_func():
+    def builder(sys):
         class CastConcatSelectTestModule(Module):
             def __init__(self):
                 super().__init__(ports={
@@ -65,26 +51,20 @@ def test_cast_concat_select_dump():
         
         CastConcatSelectTestModule().build()
     
-    with sys_builder:
-        test_func()
+    def checker(sys_repr):
+        # Verify operations appear
+        assert "bitcast_result =" in sys_repr and "bitcast" in sys_repr
+        assert "zext_result =" in sys_repr and "zext" in sys_repr
+        assert "sext_result =" in sys_repr and "sext" in sys_repr
+        assert "concat_result =" in sys_repr
+        assert "select_result =" in sys_repr
     
-    sys_repr = repr(sys_builder)
-    print(f"\n=== Cast/Concat/Select Test IR Dump ===")
-    print(sys_repr)
-    
-    # Verify operations appear
-    assert "bitcast_result =" in sys_repr and "bitcast" in sys_repr
-    assert "zext_result =" in sys_repr and "zext" in sys_repr
-    assert "sext_result =" in sys_repr and "sext" in sys_repr
-    assert "concat_result =" in sys_repr
-    assert "select_result =" in sys_repr
+    dump_ir("cast_concat_select_test", builder, checker)
 
 
 def test_log_dump():
     """Test log operation IR dump logging."""
-    sys_builder = SysBuilder('log_test')
-    
-    def test_func():
+    def builder(sys):
         class LogTestModule(Module):
             def __init__(self):
                 super().__init__(ports={
@@ -100,15 +80,11 @@ def test_log_dump():
         
         LogTestModule().build()
     
-    with sys_builder:
-        test_func()
+    def checker(sys_repr):
+        # Verify log operations appear
+        assert "log('Log test message'" in sys_repr
     
-    sys_repr = repr(sys_builder)
-    print(f"\n=== Log Test IR Dump ===")
-    print(sys_repr)
-    
-    # Verify log operations appear
-    assert "log('Log test message'" in sys_repr
+    dump_ir("log_test", builder, checker)
 
 
 if __name__ == '__main__':
