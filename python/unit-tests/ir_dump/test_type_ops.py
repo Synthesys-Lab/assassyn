@@ -29,14 +29,19 @@ def test_cast_concat_select_dump():
     def test_func():
         class CastConcatSelectTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'a': Port(UInt(8)),
+                    'b': Port(UInt(8)),
+                    'c': Port(UInt(4)),
+                    'cond': Port(UInt(1))
+                })
             
             @module.combinational
             def build(self):
-                a = UInt(8)(10)
-                b = UInt(8)(5)  # Make same width as a
-                c = UInt(4)(3)  # Different width for casting
-                cond = UInt(1)(1)
+                a = self.a.pop()
+                b = self.b.pop()
+                c = self.c.pop()
+                cond = self.cond.pop()
                 
                 # Test casting operations
                 bitcast_result = a.bitcast(Bits(8))
@@ -68,11 +73,11 @@ def test_cast_concat_select_dump():
     print(sys_repr)
     
     # Verify operations appear
-    assert "bitcast" in sys_repr or "BITCAST" in sys_repr
-    assert "zext" in sys_repr or "ZEXT" in sys_repr
-    assert "sext" in sys_repr or "SEXT" in sys_repr
-    assert "concat" in sys_repr or "CONCAT" in sys_repr
-    assert "?" in sys_repr or "SELECT" in sys_repr
+    assert "bitcast_result =" in sys_repr and "bitcast" in sys_repr
+    assert "zext_result =" in sys_repr and "zext" in sys_repr
+    assert "sext_result =" in sys_repr and "sext" in sys_repr
+    assert "concat_result =" in sys_repr
+    assert "select_result =" in sys_repr
 
 
 def test_log_dump():
@@ -82,13 +87,16 @@ def test_log_dump():
     def test_func():
         class LogTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'log_val': Port(UInt(8))
+                })
             
             @module.combinational
             def build(self):
                 # Test log operation
+                log_val = self.log_val.pop()
                 log("Log test message")
-                log("Log with value: {}", UInt(8)(42))
+                log("Log with value: {}", log_val)
         
         LogTestModule().build()
     
@@ -100,8 +108,7 @@ def test_log_dump():
     print(sys_repr)
     
     # Verify log operations appear
-    assert "log" in sys_repr or "Log" in sys_repr
-    assert "Log test message" in sys_repr
+    assert "log('Log test message'" in sys_repr
 
 
 if __name__ == '__main__':

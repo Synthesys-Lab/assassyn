@@ -29,14 +29,18 @@ def test_const_dump():
     def test_func():
         class ConstTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'uint_val': Port(UInt(8)),
+                    'int_val': Port(Int(16)),
+                    'bits_val': Port(Bits(4))
+                })
             
             @module.combinational
             def build(self):
-                # Test different constant types
-                uint_const = UInt(8)(42)
-                int_const = Int(16)(-100)
-                bits_const = Bits(4)(15)
+                # Test different constant types using port pop
+                uint_const = self.uint_val.pop()
+                int_const = self.int_val.pop()
+                bits_const = self.bits_val.pop()
                 
                 # Use them in operations to ensure they appear in IR dump
                 result1 = uint_const + int_const
@@ -52,10 +56,9 @@ def test_const_dump():
     print(f"\n=== Const Test IR Dump ===")
     print(sys_repr)
     
-    # Verify key elements appear in the dump
-    assert "42" in sys_repr or "u8" in sys_repr
-    assert "-100" in sys_repr or "i16" in sys_repr
-    assert "15" in sys_repr or "b4" in sys_repr or "Bits" in sys_repr
+    # Verify actual IR statements appear in the dump
+    assert "result1 =" in sys_repr and "uint_const" in sys_repr
+    assert "result2 =" in sys_repr and "bits_const" in sys_repr
 
 
 def test_array_dump():
@@ -65,18 +68,23 @@ def test_array_dump():
     def test_func():
         class ArrayTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'index': Port(UInt(2)),
+                    'write_val': Port(UInt(8))
+                })
             
             @module.combinational
             def build(self):
                 # Test RegArray creation
                 arr = RegArray(UInt(8), 4, name="test_array")
                 
-                # Test array read
-                val = arr[0]
+                # Test array read using port pop
+                index = self.index.pop()
+                val = arr[index]
                 
-                # Test array write
-                (arr & self)[0] <= UInt(8)(100)
+                # Test array write using port pop
+                write_val = self.write_val.pop()
+                (arr & self)[index] <= write_val
                 
                 # Test slicing
                 slice_val = val[3:0]  # 4-bit slice
@@ -93,9 +101,8 @@ def test_array_dump():
     print(sys_repr)
     
     # Verify array operations appear
-    assert "arr" in sys_repr or "test_array" in sys_repr
-    assert "ArrayRead" in sys_repr or "array" in sys_repr
-    assert "ArrayWrite" in sys_repr or "<=" in sys_repr
+    assert "val = arr[" in sys_repr
+    assert "] <=" in sys_repr
 
 
 def test_record_dump():
@@ -105,7 +112,11 @@ def test_record_dump():
     def test_func():
         class RecordTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'field1_val': Port(UInt(8)),
+                    'field2_val': Port(Bits(4)),
+                    'field3_val': Port(Int(16))
+                })
             
             @module.combinational
             def build(self):
@@ -116,11 +127,15 @@ def test_record_dump():
                     field3=Int(16)
                 )
                 
-                # Create record value
+                # Create record value using port pop
+                field1_val = self.field1_val.pop()
+                field2_val = self.field2_val.pop()
+                field3_val = self.field3_val.pop()
+                
                 record_val = record_type.bundle(
-                    field1=UInt(8)(42),
-                    field2=Bits(4)(15),
-                    field3=Int(16)(100)  # Use positive value to avoid range issues
+                    field1=field1_val,
+                    field2=field2_val,
+                    field3=field3_val
                 )
                 
                 # Access record fields
@@ -138,8 +153,7 @@ def test_record_dump():
     print(sys_repr)
     
     # Verify record operations appear
-    assert "Record" in sys_repr or "record" in sys_repr
-    assert "field1" in sys_repr or "field" in sys_repr
+    assert "field_val = bitcast" in sys_repr
 
 
 if __name__ == '__main__':

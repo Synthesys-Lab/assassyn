@@ -29,7 +29,10 @@ def test_wire_ops_dump():
     def test_func():
         class WireOpsTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'a': Port(UInt(8)),
+                    'b': Port(UInt(8))
+                })
             
             @module.combinational
             def build(self):
@@ -38,8 +41,8 @@ def test_wire_ops_dump():
                 # we'll test other operations that might involve similar IR nodes
                 
                 # Test basic value operations that might be used in wire contexts
-                a = UInt(8)(10)
-                b = UInt(8)(5)
+                a = self.a.pop()
+                b = self.b.pop()
                 
                 # Test operations that might be used in wire assignments
                 wire_like_result = a + b
@@ -56,7 +59,7 @@ def test_wire_ops_dump():
     print(sys_repr)
     
     # Verify basic operations appear (wire operations would be similar)
-    assert "+" in sys_repr or "ADD" in sys_repr
+    assert "wire_like_result =" in sys_repr and "+" in sys_repr
 
 
 if __name__ == '__main__':

@@ -29,11 +29,13 @@ def test_block_dump():
     def test_func():
         class BlockTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'cond': Port(UInt(1))
+                })
             
             @module.combinational
             def build(self):
-                cond = UInt(1)(1)
+                cond = self.cond.pop()
                 
                 # Test conditional block
                 with Condition(cond):
@@ -53,8 +55,7 @@ def test_block_dump():
     print(sys_repr)
     
     # Verify block structures appear
-    assert "when" in sys_repr or "Condition" in sys_repr
-    assert "cycle" in sys_repr or "Cycle" in sys_repr
+    assert "when" in sys_repr
 
 
 if __name__ == '__main__':

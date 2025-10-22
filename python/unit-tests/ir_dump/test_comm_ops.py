@@ -29,15 +29,19 @@ def test_comm_ops_dump():
     def test_func():
         class CommOpsTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'a': Port(UInt(8)),
+                    'b': Port(UInt(8)),
+                    'c': Port(UInt(8))
+                })
             
             @module.combinational
             def build(self):
                 from assassyn.ir.expr.comm import add, mul, and_, or_, xor, concat
                 
-                a = UInt(8)(10)
-                b = UInt(8)(5)
-                c = UInt(8)(3)
+                a = self.a.pop()
+                b = self.b.pop()
+                c = self.c.pop()
                 
                 # Test communicative operations
                 add_result = add(a, b, c)
@@ -59,13 +63,12 @@ def test_comm_ops_dump():
     print(sys_repr)
     
     # Verify communicative operations appear
-    assert "+" in sys_repr or "ADD" in sys_repr
-    assert "*" in sys_repr or "MUL" in sys_repr
-    assert "&" in sys_repr or "BITWISE_AND" in sys_repr
-    assert "|" in sys_repr or "BITWISE_OR" in sys_repr
-    assert "^" in sys_repr or "BITWISE_XOR" in sys_repr
-    # Concat operation produces a Bits(24) result, verify it appears
-    assert "b24" in sys_repr or "656643" in sys_repr
+    assert "add_result =" in sys_repr and "+" in sys_repr
+    assert "mul_result =" in sys_repr and "*" in sys_repr
+    assert "and_result =" in sys_repr and "&" in sys_repr
+    assert "or_result =" in sys_repr and "|" in sys_repr
+    assert "xor_result =" in sys_repr and "^" in sys_repr
+    assert "concat_result =" in sys_repr
 
 
 if __name__ == '__main__':

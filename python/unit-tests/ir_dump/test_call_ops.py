@@ -43,17 +43,22 @@ def test_call_ops_dump():
     def test_func():
         class CallOpsTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'bind_arg': Port(UInt(8)),
+                    'async_arg': Port(UInt(8))
+                })
             
             @module.combinational
             def build(self):
                 callee = CalleeModule()
                 
-                # Test bind operation
-                bind_result = callee.bind(input_port=UInt(8)(42))
+                # Test bind operation using port pop
+                bind_arg = self.bind_arg.pop()
+                bind_result = callee.bind(input_port=bind_arg)
                 
-                # Test async call
-                async_result = bind_result.async_called(input_port=UInt(8)(24))
+                # Test async call using port pop
+                async_arg = self.async_arg.pop()
+                async_result = bind_result.async_called(input_port=async_arg)
                 
                 log("Call ops test: {}", async_result)
         
@@ -67,8 +72,8 @@ def test_call_ops_dump():
     print(sys_repr)
     
     # Verify call operations appear
-    assert "bind" in sys_repr or "Bind" in sys_repr
-    assert "async_call" in sys_repr or "AsyncCall" in sys_repr
+    assert "bind_result =" in sys_repr and "bind" in sys_repr
+    assert "async_call" in sys_repr
 
 
 if __name__ == '__main__':

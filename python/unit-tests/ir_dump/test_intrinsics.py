@@ -29,17 +29,21 @@ def test_intrinsics_dump():
     def test_func():
         class IntrinsicsTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'cond': Port(UInt(1)),
+                    'barrier_val': Port(UInt(8))
+                })
             
             @module.combinational
             def build(self):
-                cond = UInt(1)(1)
+                cond = self.cond.pop()
+                barrier_val = self.barrier_val.pop()
                 
                 # Test intrinsic operations
                 wait_result = wait_until(cond)
                 finish_result = finish()
                 assert_result = assume(cond)
-                barrier_result = barrier(UInt(8)(0))
+                barrier_result = barrier(barrier_val)
                 
                 log("Intrinsics test")
         
@@ -53,10 +57,10 @@ def test_intrinsics_dump():
     print(sys_repr)
     
     # Verify intrinsics appear
-    assert "wait_until" in sys_repr or "WAIT_UNTIL" in sys_repr
-    assert "finish" in sys_repr or "FINISH" in sys_repr
-    assert "assert" in sys_repr or "ASSERT" in sys_repr  # assume shows as assert
-    assert "barrier" in sys_repr or "BARRIER" in sys_repr
+    assert "intrinsic.wait_until" in sys_repr
+    assert "intrinsic.finish" in sys_repr
+    assert "intrinsic.assert" in sys_repr
+    assert "intrinsic.barrier" in sys_repr
 
 
 if __name__ == '__main__':

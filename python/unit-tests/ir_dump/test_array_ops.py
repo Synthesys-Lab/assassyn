@@ -29,22 +29,29 @@ def test_array_ops_dump():
     def test_func():
         class ArrayOpsTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'read_index': Port(UInt(2)),
+                    'write_index': Port(UInt(2)),
+                    'write_val': Port(UInt(8))
+                })
             
             @module.combinational
             def build(self):
                 # Create array
                 arr = RegArray(UInt(8), 4, name="test_array")
                 
-                # Test array read
-                read_val = arr[0]
+                # Test array read using port pop
+                read_index = self.read_index.pop()
+                read_val = arr[read_index]
                 
-                # Test array write using WritePort syntax
+                # Test array write using WritePort syntax with port pop
+                write_index = self.write_index.pop()
+                write_val = self.write_val.pop()
                 write_port = arr & self
-                write_port[0] = UInt(8)(42)
+                write_port[write_index] = write_val
                 
                 # Alternative write syntax
-                (arr & self)[1] <= UInt(8)(24)
+                (arr & self)[write_index] <= write_val
                 
                 log("Array ops test: {}", read_val)
         
@@ -58,9 +65,8 @@ def test_array_ops_dump():
     print(sys_repr)
     
     # Verify array operations appear
-    assert "ArrayRead" in sys_repr or "array" in sys_repr
-    assert "ArrayWrite" in sys_repr or "<=" in sys_repr
-    assert "arr" in sys_repr  # Array name should appear
+    assert "read_val = arr[" in sys_repr
+    assert "] <=" in sys_repr
 
 
 if __name__ == '__main__':

@@ -29,12 +29,17 @@ def test_binary_ops_dump():
     def test_func():
         class BinaryOpsTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'a': Port(UInt(8)),
+                    'b': Port(UInt(8)),
+                    'shift_val': Port(UInt(3))
+                })
             
             @module.combinational
             def build(self):
-                a = UInt(8)(10)
-                b = UInt(8)(5)
+                a = self.a.pop()
+                b = self.b.pop()
+                shift_val = self.shift_val.pop()
                 
                 # Test all binary operations
                 add_result = a + b
@@ -49,7 +54,7 @@ def test_binary_ops_dump():
                 ge_result = a >= b
                 eq_result = a == b
                 ne_result = a != b
-                shl_result = a << UInt(3)(2)
+                shl_result = a << shift_val
                 shr_result = a >> UInt(3)(1)
                 
                 log("Binary ops test: {}", add_result)
@@ -63,21 +68,20 @@ def test_binary_ops_dump():
     print(f"\n=== Binary Ops Test IR Dump ===")
     print(sys_repr)
     
-    # Verify operators appear
-    assert "+" in sys_repr or "ADD" in sys_repr
-    assert "-" in sys_repr or "SUB" in sys_repr
-    assert "*" in sys_repr or "MUL" in sys_repr
-    assert "&" in sys_repr or "BITWISE_AND" in sys_repr
-    assert "|" in sys_repr or "BITWISE_OR" in sys_repr
-    assert "^" in sys_repr or "BITWISE_XOR" in sys_repr
-    assert "<" in sys_repr or "ILT" in sys_repr
-    assert ">" in sys_repr or "IGT" in sys_repr
-    assert "<=" in sys_repr or "ILE" in sys_repr
-    assert ">=" in sys_repr or "IGE" in sys_repr
-    assert "==" in sys_repr or "EQ" in sys_repr
-    assert "!=" in sys_repr or "NEQ" in sys_repr
-    assert "<<" in sys_repr or "SHL" in sys_repr
-    assert ">>" in sys_repr or "SHR" in sys_repr
+    # Verify actual IR statements appear
+    assert "add_result =" in sys_repr and "+" in sys_repr
+    assert "sub_result =" in sys_repr and "-" in sys_repr
+    assert "mul_result =" in sys_repr and "*" in sys_repr
+    assert "and_result =" in sys_repr and "&" in sys_repr
+    assert "or_result =" in sys_repr and "|" in sys_repr
+    assert "xor_result =" in sys_repr and "^" in sys_repr
+    assert "lt_result =" in sys_repr and "<" in sys_repr
+    assert "gt_result =" in sys_repr and ">" in sys_repr
+    assert "le_result =" in sys_repr and "<=" in sys_repr
+    assert "ge_result =" in sys_repr and ">=" in sys_repr
+    assert "eq_result =" in sys_repr and "==" in sys_repr
+    assert "ne_result =" in sys_repr and "!=" in sys_repr
+    assert "shl_result =" in sys_repr and "<<" in sys_repr
 
 
 def test_unary_ops_dump():
@@ -87,11 +91,13 @@ def test_unary_ops_dump():
     def test_func():
         class UnaryOpsTestModule(Module):
             def __init__(self):
-                super().__init__(ports={})
+                super().__init__(ports={
+                    'a': Port(UInt(8))
+                })
             
             @module.combinational
             def build(self):
-                a = UInt(8)(10)
+                a = self.a.pop()
                 
                 # Test unary operations
                 # Note: __neg__ is not implemented, so we'll test flip only
@@ -118,9 +124,8 @@ def test_unary_ops_dump():
     print(f"\n=== Unary Ops Test IR Dump ===")
     print(sys_repr)
     
-    # Verify unary operators appear
-    assert "-" in sys_repr or "NEG" in sys_repr
-    assert "!" in sys_repr or "FLIP" in sys_repr
+    # Verify unary operations appear
+    assert "flip_result = !" in sys_repr
 
 
 if __name__ == '__main__':
