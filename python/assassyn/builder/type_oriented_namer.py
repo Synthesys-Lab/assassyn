@@ -9,6 +9,7 @@ import re
 from typing import Optional, Any
 
 from .unique_name import UniqueNameCache
+from ..utils import unwrap_operand
 
 
 class TypeOrientedNamer:
@@ -77,7 +78,7 @@ class TypeOrientedNamer:
         if entity is None:
             return None
 
-        entity = self._unwrap_operand(entity)
+        entity = unwrap_operand(entity)
 
         semantic = self._safe_getattr(entity, '__assassyn_semantic_name__')
         if isinstance(semantic, str) and semantic:
@@ -96,16 +97,6 @@ class TypeOrientedNamer:
         if base in {'module', 'modulebase'}:
             base = 'module'
         return f'{base}Instance'
-
-    def _unwrap_operand(self, entity: Any) -> Any:
-        """Unwrap Operand wrappers when available."""
-        if entity is None:
-            return None
-        try:
-            from assassyn.utils import unwrap_operand  # pylint: disable=import-outside-toplevel
-            return unwrap_operand(entity)
-        except ImportError:
-            return entity
 
     def _describe_operand(self, operand: Any) -> Optional[str]:
         """Provide a descriptive token for an operand."""
