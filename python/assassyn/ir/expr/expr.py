@@ -55,6 +55,7 @@ class Expr(Value):
         #pylint: disable=import-outside-toplevel,too-many-locals
         self.opcode = opcode
         self.loc = self.parent = None
+        self.name = None  # Initialize name attribute
         # NOTE: We only wrap values in Operand, not Ports or Arrays
         self._operands = []
         for operand in operands:
@@ -134,11 +135,9 @@ class Expr(Value):
 
     def as_operand(self):
         '''Dump the expression as an operand'''
-        # Check if a meaningful name has been assigned by the naming system
-        # Use __dict__ directly to avoid triggering __getattr__
-        semantic_name_attr = '__assassyn_semantic_name__'
-        if semantic_name_attr in self.__dict__ and self.__dict__[semantic_name_attr] is not None:
-            return self.__dict__[semantic_name_attr]
+        # Use the name if assigned by the naming system
+        if self.name is not None:
+            return self.name
         return f'_{namify(identifierize(self))}'
 
     def is_binary(self):

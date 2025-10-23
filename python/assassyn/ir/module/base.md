@@ -45,7 +45,7 @@ def as_operand(self) -> str:
 
 Returns a unique string identifier for the module when it is referenced as an operand in expressions. This identifier is used throughout the IR for debugging and code generation purposes.
 
-**Explanation:** This method provides a consistent way to reference modules in the generated IR. It first checks for a semantic name (`__assassyn_semantic_name__`) and falls back to generating a unique identifier using the module's object identity. The generated name follows the pattern `_{namified_identifier}` to distinguish module references from other operands. This is essential for [Verilog code generation](../../../docs/design/internal/pipeline.md) where modules need unique identifiers for instantiation.
+**Explanation:** This method provides a consistent way to reference modules in the generated IR. It first checks for the module's `name` attribute and falls back to generating a unique identifier using the module's object identity. The generated name follows the pattern `_{namified_identifier}` to distinguish module references from other operands. This is essential for [Verilog code generation](../../../docs/design/internal/pipeline.md) where modules need unique identifiers for instantiation.
 
 #### `triggered`
 

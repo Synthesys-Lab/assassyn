@@ -65,13 +65,6 @@ class TypeOrientedNamer:
             '!': 'not',
         }
 
-    @staticmethod
-    def _safe_getattr(node: Any, attr: str) -> Optional[Any]:
-        """Safely fetch an attribute without triggering __getattr__ side-effects."""
-        try:
-            return object.__getattribute__(node, attr)
-        except (AttributeError, TypeError):
-            return None
 
     def _entity_name(self, entity: Any) -> Optional[str]:
         """Extract a meaningful name from an entity."""
@@ -80,11 +73,8 @@ class TypeOrientedNamer:
 
         entity = unwrap_operand(entity)
 
-        semantic = self._safe_getattr(entity, '__assassyn_semantic_name__')
-        if isinstance(semantic, str) and semantic:
-            return self._sanitize(semantic)
-
-        name_attr = self._safe_getattr(entity, 'name')
+        # Check for name attribute
+        name_attr = getattr(entity, 'name', None)
         if isinstance(name_attr, str) and name_attr:
             return self._sanitize(name_attr)
 
@@ -192,7 +182,7 @@ class TypeOrientedNamer:
             return self._naming_strategies[node_class](node)
 
         # Fallback to name attribute or 'val'
-        name_attr = self._safe_getattr(node, 'name')
+        name_attr = getattr(node, 'name', None)
         if isinstance(name_attr, str):
             return self._sanitize(name_attr)
 

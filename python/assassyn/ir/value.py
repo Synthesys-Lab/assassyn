@@ -7,7 +7,8 @@ from ..builder import ir_builder
 
 class Value:
     '''Base class for overloading arithmetic operations in the frontend'''
-    # Base class with no attributes of its own - all attributes are added by derived classes
+
+    name: str | None  # Name for this value (used for IR generation and debugging)
 
     @ir_builder
     def __add__(self, other):

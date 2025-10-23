@@ -30,11 +30,8 @@ class NamingManager:
             # pylint: disable=import-outside-toplevel,cyclic-import
             from assassyn.ir.expr import Expr
             if isinstance(value, Expr):
-                # Immediately name the value based on its type if it doesn't have a name yet
-                # Use __dict__ to avoid triggering __getattr__ on some Expr types
-                attr_name = '__assassyn_semantic_name__'
-                if attr_name not in getattr(value, '__dict__', {}) or \
-                        value.__dict__.get(attr_name) is None:
+                # Immediately name the value if it doesn't have a name yet
+                if value.name is None:
                     type_based_name = self._namer.name_value(value)
                     self._apply_name(value, type_based_name)
         except (ImportError, AttributeError):
@@ -54,11 +51,10 @@ class NamingManager:
 
     def _apply_name(self, value: Any, name: str):
         """Apply a name to a value."""
-        # Apply via a special attribute to avoid conflicts with existing _name usage
         try:
-            setattr(value, '__assassyn_semantic_name__', name)
+            setattr(value, 'name', name)
         except (AttributeError, TypeError):
-            # Some Python builtins (e.g. list) cannot be annotated - ignore silently
+            # Some Python builtins cannot be annotated - ignore silently
             pass
 
     def assign_name(self, value: Any, hint: Optional[str] = None) -> str:
@@ -92,9 +88,7 @@ class NamingManager:
         builder = Singleton.builder
         if builder and builder.current_module:
             module = builder.current_module
-            # Get the module's semantic name if available
-            module_name = getattr(module, '__assassyn_semantic_name__', None)
-            if not module_name and hasattr(module, 'name'):
-                module_name = module.name
+            # Get the module's name directly
+            module_name = getattr(module, 'name', None)
             return module_name
         return None

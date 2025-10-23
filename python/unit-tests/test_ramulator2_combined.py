@@ -11,6 +11,10 @@ import subprocess
 import shlex
 from typing import Dict, Tuple
 import pytest
+
+# Add the python directory to the path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from assassyn.utils import repo_path
 from assassyn.ramulator2 import PyRamulator, Request
 

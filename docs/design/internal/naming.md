@@ -64,7 +64,7 @@ The `TypeOrientedNamer` implements sophisticated naming strategies based on IR n
 7. **Fallback**: Uses `name` attribute or defaults to `"val"`
 
 **Operand Analysis:**
-- Extracts meaningful names from operands using `__assassyn_semantic_name__` or `name` attributes
+- Extracts meaningful names from operands using the unified `name` attribute
 - Unwraps operand wrappers when available
 - Combines multiple operand descriptions into concise identifiers
 - Limits identifier length to 25 characters for readability
@@ -96,17 +96,17 @@ The AST rewriting system enables semantic naming by transforming Python assignme
 - Preserves original assignment semantics
 - Supports chained assignments
 
-## Semantic Name Attribute System
+## Unified Name Attribute System
 
-The naming system uses a special attribute `__assassyn_semantic_name__` to store semantic names on IR objects:
+The naming system uses a unified `name` attribute on the `Value` base class to store semantic names on IR objects:
 
-**Purpose**: Provides a standardized way to attach human-readable names to IR values without conflicting with existing `name` attributes
+**Purpose**: Provides a standardized way to attach human-readable names to IR values with a consistent interface across all IR nodes
 
 **Lifecycle**: Names are assigned when objects are created or when assignments are processed
 
 **Usage**: The attribute is checked by `TypeOrientedNamer._entity_name()` to extract meaningful names for generating descriptive identifiers
 
-**Fallback**: If the semantic name is not available, the system falls back to regular `name` attributes or type-based naming
+**Fallback**: If the name is not available, the system falls back to type-based naming or generates default identifiers
 
 ## Context-Aware Naming
 
@@ -134,7 +134,7 @@ The naming system integrates deeply with the Assassyn builder system:
 
 ### Low Invasion
 The naming system is designed to be minimally invasive to existing code:
-- Uses special attributes (`__assassyn_semantic_name__`) to avoid conflicts
+- Uses unified `name` attribute to avoid conflicts with existing code
 - Graceful fallbacks when naming fails
 - Optional decorators that can be applied selectively
 
@@ -162,7 +162,7 @@ The naming system is designed to be robust and fail gracefully:
 
 **Import Safety**: Uses try-catch blocks around imports to handle missing dependencies
 
-**Attribute Safety**: Uses `_safe_getattr` to avoid triggering `__getattr__` side effects
+**Attribute Safety**: Uses direct attribute access since all `Value` subclasses now have a unified `name` attribute
 
 **Transformation Safety**: AST rewriting falls back to original function if transformation fails
 

@@ -110,9 +110,9 @@ def name(self, name: str):
 
 **Explanation:**
 
-The name property implements a hierarchical naming system that prioritizes semantic names over internal names. It first checks for a semantic name stored in `__assassyn_semantic_name__`, then falls back to the internal `_name` field, and finally generates a default name using [identifierize](../../utils.md#identifierize) if neither is available.
+The name property implements a simplified naming system that uses the internal `_name` field and generates a default name using [identifierize](../../utils.md#identifierize) if no name is set.
 
-This naming system is crucial for code generation, as the array name is used in both Verilog and Rust simulator output. The semantic name system allows the generated code to have meaningful, hierarchical names that reflect the module structure, making debugging and analysis easier.
+This naming system is crucial for code generation, as the array name is used in both Verilog and Rust simulator output. The unified naming system allows the generated code to have meaningful, hierarchical names that reflect the module structure, making debugging and analysis easier.
 
 #### `users` Property
 

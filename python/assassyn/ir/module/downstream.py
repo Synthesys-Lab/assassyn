@@ -18,13 +18,8 @@ class Downstream(ModuleBase):
 
     @name.setter
     def name(self, value: str):
-        '''Set the name and update the semantic name for IR generation.'''
+        '''Set the name for IR generation.'''
         self._name = value
-        # Update semantic name when name is explicitly set
-        try:
-            setattr(self, '__assassyn_semantic_name__', f'{value}Instance')
-        except (AttributeError, TypeError):
-            pass
 
     def __init__(self):
         super().__init__()

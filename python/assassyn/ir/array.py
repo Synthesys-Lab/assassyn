@@ -120,21 +120,13 @@ class Array:  #pylint: disable=too-many-instance-attributes
     @property
     def name(self):
         '''The name of the array. If not set, a default name is generated.'''
-        semantic = getattr(self, '__assassyn_semantic_name__', None)
-        if isinstance(semantic, str) and semantic:
-            return semantic
         if self._name is not None:
             return self._name
         return f'array_{identifierize(self)}'
 
     @name.setter
     def name(self, name):
-        sanitized = namify(name)
-        self._name = sanitized
-        try:
-            setattr(self, '__assassyn_semantic_name__', sanitized)
-        except (AttributeError, TypeError):
-            pass
+        self._name = namify(name)
 
     def __init__(self, scalar_ty: DType, size: int, initializer: list):
         #pylint: disable=import-outside-toplevel

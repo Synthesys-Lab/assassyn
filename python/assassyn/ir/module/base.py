@@ -25,9 +25,9 @@ class ModuleBase:
 
     def as_operand(self):
         '''Dump the module as a right-hand side reference.'''
-        semantic = getattr(self, "__assassyn_semantic_name__", None)
-        if semantic:
-            return semantic
+        name = getattr(self, 'name', None)
+        if name:
+            return name
         return f'_{namify(identifierize(self))}'
 
     @ir_builder

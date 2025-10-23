@@ -61,7 +61,7 @@ The naming follows Assassyn's naming conventions, with special handling for rese
 #### `name` property
 
 **Explanation:**
-Provides access to the module's name with automatic semantic name management. When the name is explicitly set, it updates the `__assassyn_semantic_name__` attribute to `{name}Instance` for IR generation consistency.
+Provides access to the module's name for IR generation. When the name is explicitly set, it stores the name in the internal `_name` field for consistent access.
 
 #### `_repr_impl(self, head)`
 

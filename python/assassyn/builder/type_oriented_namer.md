@@ -47,7 +47,7 @@ Extracts a descriptive base name for a given IR node using a unified strategy pa
 3. **Dynamic extraction**: Each strategy function dynamically extracts naming information from the node's OPERATORS dictionary and operand analysis
 4. **Fallback**: Falls back to the node's `name` attribute or `"val"` for unrecognized types
 
-The method uses `_safe_getattr` to avoid triggering `__getattr__` side effects and applies `_sanitize` to ensure valid identifiers.
+The method uses direct attribute access since all `Value` subclasses now have a unified `name` attribute and applies `_sanitize` to ensure valid identifiers.
 
 #### `name_value`
 
@@ -117,7 +117,7 @@ Extracts a meaningful name from an entity, checking for semantic names and regul
 **Returns:**
 - A sanitized name string or `None` if no name is found
 
-**Explanation:** This method first unwraps any operand wrappers using `_unwrap_operand`, then checks for the special `__assassyn_semantic_name__` attribute (used by the naming system), and falls back to a regular `name` attribute. All names are sanitized before being returned.
+**Explanation:** This method first unwraps any operand wrappers using `_unwrap_operand`, then checks for the unified `name` attribute. All names are sanitized before being returned.
 
 ### `_module_prefix`
 
