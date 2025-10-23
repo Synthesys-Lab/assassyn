@@ -91,7 +91,7 @@ def _verify_inner_name(outer_name: str, inner_name: str) -> None:
 def _rename_module(module: Any, inner_name: str) -> None:
     """Assign a unique, capitalised module name derived from `inner_name`."""
 
-    unique_name = Singleton.naming_manager.get_module_name(inner_name)
+    unique_name = Singleton.builder.naming_manager.get_module_name(inner_name)
     if hasattr(module, 'name'):
         setattr(module, 'name', unique_name)
 

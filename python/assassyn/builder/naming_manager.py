@@ -88,8 +88,8 @@ class NamingManager:
         Returns the module instance's name if inside a module, None otherwise.
         """
         # pylint: disable=import-outside-toplevel,cyclic-import
-        from ..builder import Singleton
-        builder = getattr(Singleton, 'builder', None)
+        from . import Singleton
+        builder = Singleton.builder
         if builder and builder.current_module:
             module = builder.current_module
             # Get the module's semantic name if available
@@ -98,16 +98,3 @@ class NamingManager:
                 module_name = module.name
             return module_name
         return None
-
-_global_naming_manager: Optional[NamingManager] = None
-
-
-def get_naming_manager() -> Optional[NamingManager]:
-    """Get the current global naming manager."""
-    return _global_naming_manager
-
-
-def set_naming_manager(manager: Optional[NamingManager]):
-    """Set the global naming manager."""
-    global _global_naming_manager  # pylint: disable=global-statement
-    _global_naming_manager = manager

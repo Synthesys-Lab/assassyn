@@ -10,7 +10,6 @@ from typing import Any
 import inspect
 import textwrap
 from functools import wraps
-from .naming_manager import get_naming_manager  # pylint: disable=cyclic-import,import-outside-toplevel
 
 
 def __assassyn_assignment__(name: str, value: Any) -> Any:
@@ -28,7 +27,9 @@ def __assassyn_assignment__(name: str, value: Any) -> Any:
     Returns:
         The assigned value (to support chained assignments)
     """
-    manager = get_naming_manager()
+    # Import here to avoid circular import
+    from . import Singleton  # pylint: disable=import-outside-toplevel,cyclic-import
+    manager = Singleton.builder.naming_manager if Singleton.builder else None
     if manager:
         return manager.process_assignment(name, value)
     return value

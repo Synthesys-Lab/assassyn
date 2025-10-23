@@ -11,8 +11,6 @@ import site
 import typing
 from .naming_manager import (
     NamingManager,
-    get_naming_manager,
-    set_naming_manager,
 )
 from .rewrite_assign import rewrite_assign
 from .type_oriented_namer import TypeOrientedNamer
@@ -30,9 +28,6 @@ __all__ = [
     'TypeOrientedNamer',
     'NamingManager',
 
-    # Global functions
-    'get_naming_manager',
-    'set_naming_manager',
     # Decorators
     'rewrite_assign',
 
@@ -56,7 +51,7 @@ def ir_builder(func=None, *, node_type=None):
             from ..utils import package_path
             from ..ir.expr import Expr
 
-            manager = get_naming_manager()
+            manager = Singleton.builder.naming_manager if Singleton.builder else None
             is_expr = isinstance(res, Expr)
             builder = Singleton.builder
             already_materialized = is_expr and getattr(res, 'parent', None) is not None
@@ -190,7 +185,6 @@ class SysBuilder:
         Singleton.line_expression_tracker = self.line_expression_tracker
         Singleton.naming_manager = self.naming_manager
         self._reset_caches()
-        set_naming_manager(self.naming_manager)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -200,7 +194,6 @@ class SysBuilder:
         Singleton.line_expression_tracker = None
         Singleton.naming_manager = None
         self._reset_caches()
-        set_naming_manager(None)
 
     def __repr__(self):
         body = '\n\n'.join(map(repr, self.modules))
