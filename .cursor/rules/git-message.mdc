@@ -1,6 +1,6 @@
 ---
 alwaysApply: false
-description: Stage and commit your changes
+description: Guidance to stage and commit your changes using git
 glob:
 ---
 
@@ -19,5 +19,5 @@ If the change is <=10 lines and 2 files, it is allowed to just have the 1st line
 
 # Pre-commit Hooks
 
-If not specified, you CANNOT bypass the check using `--no-verify`.
-Finalizing your changes is very serious!
+If you bypass git pre-commit hooks, this should be reflected at the end of
+the message: "This is not fully tested by pre-commit hooks."
