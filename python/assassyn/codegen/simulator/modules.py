@@ -8,6 +8,7 @@ from ...ir.visitor import Visitor
 from ...ir.block import Block, CondBlock, CycledBlock
 from ...ir.dtype import RecordValue
 from ...ir.expr import Expr
+from ...ir.memory.dram import DRAM
 from ...utils import namify
 from .node_dumper import dump_rval_ref
 from ...analysis import expr_externally_used
@@ -172,7 +173,7 @@ use std::ffi::c_void;
 
 """)
 
-                if module_name.startswith('DRAM'):
+                if isinstance(module, DRAM):
                     module_fd.write(f"""pub extern "C" fn callback_of_{module_name}(
     req: *mut Request, ctx: *mut c_void) {{
     unsafe {{
