@@ -1,7 +1,7 @@
 target
 .vim/*
 .DS_Store
-examples/*/__pycache__/
+__pycache__/*
 /.vscode
 *.log
 note/*
