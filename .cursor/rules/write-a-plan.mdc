@@ -4,7 +4,7 @@ description: Make a plan for all modifications to the code base
 glob:
 ---
 
-When you are asked to make a plan:
+When you are asked to make a plan, such a plan should follow these rules:
 
 0. The order of a plan matters:
    - Test-driven development is prefered. Thus, it is preferred to develop the test cases before the features.
