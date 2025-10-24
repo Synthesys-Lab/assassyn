@@ -77,10 +77,25 @@ Each `WritePort` instance is registered with its target array through the `_writ
 
 ### Type Validation
 
-The `_create_write` method performs type validation to ensure:
+The `_create_write` method performs comprehensive type validation to ensure:
 - The index is either an integer or a `Value` object
 - The value is either a `Value` or `RecordValue` object
 - Proper type conversion for integer indices using `to_uint()`
+- **Strict type checking**: The value's type must exactly match the array's `scalar_ty` using `type_eq()` method
+- **RecordValue handling**: RecordValue objects are automatically unwrapped to their underlying `Bits` representation before type checking and write creation
+- **Error reporting**: Type mismatches raise `TypeError` with detailed information about expected vs actual types
+
+**Type Checking Process:**
+1. Extract dtype from value (handling RecordValue specially)
+2. Perform strict type checking using `type_eq()` against array's `scalar_ty`
+3. Unwrap RecordValue to raw Bits before creating ArrayWrite
+4. Raise descriptive TypeError if types don't match
+
+**Error Messages:**
+Type mismatches produce detailed error messages in the format:
+```
+TypeError: Type mismatch in array write: array 'array_name' expects element type UInt(8), but got value of type UInt(16)
+```
 
 ### IR Builder Integration
 

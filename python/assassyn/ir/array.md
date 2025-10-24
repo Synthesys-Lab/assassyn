@@ -270,9 +270,11 @@ def get_flattened_size(self) -> int:
 def __setitem__(self, index, value):
     '''
     Write to array at specified index using current module's write port.
+    Enforces strict type checking between the written value and array's scalar_ty.
 
     @param index Integer or Value for the array index.
     @param value Value or RecordValue to write.
+    @raises TypeError If value type doesn't match array's scalar_ty.
     '''
 ```
 
@@ -280,9 +282,13 @@ def __setitem__(self, index, value):
 
 This method implements array write operations by creating a write port for the current module and delegating to the write port's `_create_write` method. It automatically handles the conversion of integer indices to `Value` objects and ensures proper type checking for the value being written.
 
-The write operation uses the `&` operator internally to create or retrieve the appropriate `WritePort` for the current module context. This ensures that each module gets its own dedicated write port, enabling proper multi-port access semantics.
+**Type Checking:** The method enforces strict type equality between the written value and the array's element type (`scalar_ty`). This includes:
 
-The method supports both `Value` and `RecordValue` types for the value parameter, allowing writes of both scalar and structured data. The type checking ensures that the value being written is compatible with the array's element type.
+- **Regular Values**: The value's `dtype` must exactly match the array's `scalar_ty` using `type_eq()` method
+- **RecordValue Handling**: RecordValue objects are automatically unwrapped to their underlying `Bits` representation before type checking and write creation
+- **Error Messages**: Type mismatches raise `TypeError` with detailed information about expected vs actual types
+
+The write operation uses the `&` operator internally to create or retrieve the appropriate `WritePort` for the current module context. This ensures that each module gets its own dedicated write port, enabling proper multi-port access semantics.
 
 **Usage Pattern:**
 ```python
@@ -291,6 +297,24 @@ array[index] = value
 
 # This is equivalent to:
 # (array & current_module)[index] <= value
+```
+
+**Type Checking Examples:**
+```python
+# Correct: matching types
+array = RegArray(UInt(8), 4)
+value = Const(UInt(8), 42)
+array[0] = value  # ✓ Succeeds
+
+# Error: type mismatch
+wrong_value = Const(UInt(16), 42)
+array[0] = wrong_value  # ✗ Raises TypeError
+
+# RecordValue: automatically unwrapped
+rec_type = Record(a=UInt(8), b=UInt(16))
+rec_array = RegArray(rec_type, 4)
+rec_value = RecordValue(rec_type, a=Const(UInt(8), 1), b=Const(UInt(16), 2))
+rec_array[0] = rec_value  # ✓ Succeeds, unwraps to Bits
 ```
 
 ### `Slice` Class

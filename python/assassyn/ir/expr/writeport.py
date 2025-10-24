@@ -57,6 +57,7 @@ class WritePort:
     def _create_write(self, index, value):
         '''
         Create an ArrayWrite operation with module information.
+        Enforces strict type checking between the written value and array's scalar_ty.
         '''
 
         if isinstance(index, int):
@@ -64,6 +65,26 @@ class WritePort:
         assert isinstance(index, Value), f"Index must be a Value, got {type(index)}"
         assert isinstance(value, (Value, RecordValue)), \
             f"Value must be a Value or RecordValue, got {type(value)}"
+
+        # Handle RecordValue: extract dtype and unwrap
+        if isinstance(value, RecordValue):
+            value_dtype = value.dtype
+            # Type check using type_eq before unwrapping
+            if not self.array.scalar_ty.type_eq(value_dtype):
+                raise TypeError(
+                    f"Type mismatch in array write: array '{self.array.name}' "
+                    f"expects element type {self.array.scalar_ty}, "
+                    f"but got value of type {value_dtype}"
+                )
+            value = value.value()  # Unwrap to raw Bits
+        else:
+            # Type check using type_eq for regular values
+            if not self.array.scalar_ty.type_eq(value.dtype):
+                raise TypeError(
+                    f"Type mismatch in array write: array '{self.array.name}' "
+                    f"expects element type {self.array.scalar_ty}, "
+                    f"but got value of type {value.dtype}"
+                )
 
         @ir_builder
         def create_write():

@@ -95,7 +95,9 @@ def RegArray( #pylint: disable=invalid-name,too-many-arguments
                 # Use a generic 'array' suffix for unnamed arrays
                 hint = f"{context_prefix}_array"
 
-        manager.assign_name(res, hint)
+        # Only assign name if no explicit name was provided
+        if name is None:
+            manager.assign_name(res, hint)
 
     Singleton.builder.arrays.append(res)
 
@@ -254,6 +256,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
             index = to_uint(index)
         assert isinstance(index, Value)
         assert isinstance(value, (Value, RecordValue)), type(value)
+
         current_module = Singleton.builder.current_module
         write_port = self & current_module
         return write_port._create_write(index, value)

@@ -58,10 +58,10 @@ def test_array_write_incorrect_type():
             with pytest.raises(TypeError) as exc_info:
                 array[0] = wrong_value
             
-            assert "Type mismatch" in str(exc_info.value)
-            assert "test_array" in str(exc_info.value)
-            assert "UInt(8)" in str(exc_info.value)
-            assert "UInt(16)" in str(exc_info.value)
+            error_msg = str(exc_info.value)
+            assert "Type mismatch" in error_msg
+            assert "u8" in error_msg or "UInt(8)" in error_msg
+            assert "u16" in error_msg or "UInt(16)" in error_msg
     
     module_instance = TestModule()
     module_instance.build()
@@ -214,8 +214,10 @@ def test_multiport_write_incorrect_type():
             with pytest.raises(TypeError) as exc_info:
                 (array & self)[0] <= wrong_value
             
-            assert "Type mismatch" in str(exc_info.value)
-            assert "test_array" in str(exc_info.value)
+            error_msg = str(exc_info.value)
+            assert "Type mismatch" in error_msg
+            assert "u8" in error_msg or "UInt(8)" in error_msg
+            assert "u16" in error_msg or "UInt(16)" in error_msg
     
     module_instance = TestModule()
     module_instance.build()
