@@ -1,14 +1,20 @@
 '''The base node module for the overloaded frontend'''
 
+from abc import ABC, abstractmethod
 
 from ..builder import ir_builder
 
 #pylint: disable=import-outside-toplevel,cyclic-import
 
-class Value:
+class Value(ABC):
     '''Base class for overloading arithmetic operations in the frontend'''
 
     name: str | None  # Name for this value (used for IR generation and debugging)
+
+    @property
+    @abstractmethod
+    def dtype(self):
+        '''Abstract property for data type. All Value subclasses must implement this.'''
 
     @ir_builder
     def __add__(self, other):

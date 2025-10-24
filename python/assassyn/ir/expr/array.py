@@ -46,6 +46,13 @@ class ArrayWrite(Expr):
         '''Get the value to write'''
         return self._operands[2]
 
+    @property
+    def dtype(self):
+        '''Get the data type of this operation (Void for side-effect operations)'''
+        #pylint: disable=import-outside-toplevel
+        from ..dtype import void
+        return void()
+
     def __repr__(self):
         module_info = f' /* {self.module.name} */' if self.module else ''
         return (

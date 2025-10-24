@@ -88,6 +88,18 @@ def val(self) -> Value:
 
 **Explanation:** Returns the value to be written to the array.
 
+#### `dtype` (property)
+
+```python
+@property
+def dtype(self):
+    '''Get the data type of this operation (Void for side-effect operations)'''
+    from ..dtype import void
+    return void()
+```
+
+**Explanation:** Returns `Void()` type since array write operations are side-effect operations that don't produce a value.
+
 #### `__repr__(self)`
 
 ```python

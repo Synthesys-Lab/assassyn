@@ -10,7 +10,7 @@ The `Value` class is the foundational base class for all IR value types in Assas
 
 ### class Value
 
-Base class for overloading arithmetic operations in the frontend. This class defines no attributes of its own - all attributes are added by derived classes.
+Abstract base class for overloading arithmetic operations in the frontend. This class defines an abstract `dtype` property that must be implemented by all subclasses. All Value subclasses must provide a data type, even if it's `Void()` for side-effect operations.
 
 #### `__add__`
 
@@ -388,3 +388,18 @@ def valid(self):
 ```
 
 **Explanation**: Creates a `PureIntrinsic` node with opcode VALUE_VALID to check if a value is valid. This operation is primarily meaningful in downstream modules for checking data flow validity. The `valid()` method is commonly used in conjunction with `optional()` to provide default values when data is not available.
+
+#### `dtype` (abstract property)
+
+```python
+@property
+@abstractmethod
+def dtype(self):
+    '''
+    Abstract property for data type. All Value subclasses must implement this.
+    
+    @return DType The data type of this value
+    '''
+```
+
+**Explanation**: Abstract property that must be implemented by all Value subclasses. This ensures that every value in the IR has a well-defined data type, eliminating the need for `hasattr(v, 'dtype')` checks throughout the codebase. Side-effect operations (like `Log`, `FIFOPush`, `Bind`, `AsyncCall`, `ArrayWrite`) return `Void()` type.

@@ -13,8 +13,18 @@ class Const(Value):
     @enforce_type
     def __init__(self, dtype: DType, value: int):
         assert dtype.inrange(value), f"Value {value} is out of range for {dtype}"
-        self.dtype = dtype
+        self._dtype = dtype
         self.value = value
+
+    @property
+    def dtype(self):
+        '''Get the data type of this constant'''
+        return self._dtype
+
+    @dtype.setter
+    def dtype(self, value):
+        '''Set the data type of this constant'''
+        self._dtype = value
 
     def __repr__(self):
         return f'({self.value}:{self.dtype})'

@@ -68,6 +68,18 @@ def val(self):
 
 **Explanation:** Returns the value to be pushed to the FIFO.
 
+#### `dtype` (property)
+
+```python
+@property
+def dtype(self):
+    '''Get the data type of this operation (Void for side-effect operations)'''
+    from ..dtype import void
+    return void()
+```
+
+**Explanation:** Returns `Void()` type since FIFO push operations are side-effect operations that don't produce a value.
+
 #### `__repr__(self)`
 
 ```python
@@ -152,6 +164,18 @@ def pushes(self):
 ```
 
 **Explanation:** Returns the list of FIFOPush operations associated with this bind operation.
+
+#### `dtype` (property)
+
+```python
+@property
+def dtype(self):
+    '''Get the data type of this operation (Void for binding operations)'''
+    from ..dtype import void
+    return void()
+```
+
+**Explanation:** Returns `Void()` type since bind operations are side-effect operations that don't produce a value.
 
 #### `async_called(self, **kwargs)`
 
@@ -245,6 +269,18 @@ def bind(self) -> Bind:
 ```
 
 **Explanation:** Returns the bind operation that contains the arguments for this async call.
+
+#### `dtype` (property)
+
+```python
+@property
+def dtype(self):
+    '''Get the data type of this operation (Void for call operations)'''
+    from ..dtype import void
+    return void()
+```
+
+**Explanation:** Returns `Void()` type since async call operations are side-effect operations that don't produce a value.
 
 #### `__repr__(self)`
 

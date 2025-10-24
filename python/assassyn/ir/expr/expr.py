@@ -213,6 +213,13 @@ class Log(Expr):
         super().__init__(Log.LOG, args)
         self.args = args
 
+    @property
+    def dtype(self):
+        '''Get the data type of this operation (Void for side-effect operations)'''
+        #pylint: disable=import-outside-toplevel
+        from ..dtype import void
+        return void()
+
     def __repr__(self):
         fmt = repr(self.args[0])
         return f'log({fmt}, {", ".join(i.as_operand() for i in self.args[1:])})'
@@ -248,7 +255,7 @@ class Concat(Expr):
 class Cast(Expr):
     '''The class for casting operation, including bitcast, zext, and sext.'''
 
-    dtype: DType  # Target data type
+    _dtype: DType  # Target data type
 
     BITCAST = 800
     ZEXT = 801
@@ -262,7 +269,12 @@ class Cast(Expr):
 
     def __init__(self, subcode, x, dtype):
         super().__init__(subcode, [x])
-        self.dtype = dtype
+        self._dtype = dtype
+
+    @property
+    def dtype(self) -> DType:
+        '''Get the target data type'''
+        return self._dtype
 
     @property
     def x(self) -> Value:

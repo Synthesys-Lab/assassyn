@@ -157,6 +157,7 @@ A non-synthesizable node that functions as a print statement for debugging durin
 
 **Methods:**
 - `__init__(*args)` - Initialize log operation
+- `dtype` - Get the data type of this operation (property, returns Void)
 
 ### Frontend Functions
 
