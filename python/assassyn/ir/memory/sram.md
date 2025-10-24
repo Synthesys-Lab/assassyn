@@ -28,7 +28,7 @@ SRAM memory module that extends MemoryBase for on-chip synchronous memory simula
 **Inheritance:** Extends `MemoryBase` from [base.py](./base.py)
 
 **Additional Member Fields:**
-- `dout: RegArray` - Register buffer that holds the result of read operations
+- `dout: RegArray` - Register buffer that holds the result of read operations (uses Bits type for compatibility with array read operations)
 
 ### `def __init__(self, width: int, depth: int, init_file: str | None)`
 
@@ -42,7 +42,7 @@ Initialize SRAM module with read data buffer.
 **Returns:** None
 
 **Explanation:**
-This constructor calls the parent `MemoryBase.__init__()` method to inherit base memory functionality, then creates an additional `dout` register buffer. The `dout` buffer is implemented as a `RegArray(UInt(width), 1)` to hold the result of read operations, providing a single-word output buffer for the most recently read data.
+This constructor calls the parent `MemoryBase.__init__()` method to inherit base memory functionality, then creates an additional `dout` register buffer. The `dout` buffer is implemented as a `RegArray(Bits(width), 1)` to hold the result of read operations, providing a single-word output buffer for the most recently read data. Using `Bits` type ensures compatibility with array read operations that return raw bit values.
 
 ### `def build(self, we, re, addr, wdata)`
 

@@ -34,7 +34,9 @@ def test_const_dump():
                 result2 = bits_const + UInt(4)(1)
                 log("Const test: {}", result1)
         
-        ConstTestModule().build()
+        # Create and build module
+        module_instance = ConstTestModule()
+        module_instance.build()
     
     def checker(sys_repr):
         # Verify actual IR statements appear in the dump

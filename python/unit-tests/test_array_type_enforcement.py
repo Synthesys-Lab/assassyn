@@ -14,7 +14,7 @@ from assassyn.builder import Singleton, SysBuilder
 
 def test_array_write_correct_type():
     """Test that writing a value with correct type succeeds."""
-    builder = SysBuilder("test_system")
+    builder = SysBuilder("test_array_write_correct_type")
     Singleton.builder = builder
     
     # Create a module context
@@ -40,7 +40,7 @@ def test_array_write_correct_type():
 
 def test_array_write_incorrect_type():
     """Test that writing a value with incorrect type raises TypeError."""
-    builder = SysBuilder("test_system")
+    builder = SysBuilder("test_array_write_incorrect_type")
     Singleton.builder = builder
     
     # Create a module context
@@ -69,7 +69,7 @@ def test_array_write_incorrect_type():
 
 def test_array_write_bits_mismatch():
     """Test that writing Bits with wrong width raises TypeError."""
-    builder = SysBuilder("test_system")
+    builder = SysBuilder("test_array_write_bits_mismatch")
     Singleton.builder = builder
     
     # Create a module context
@@ -95,7 +95,7 @@ def test_array_write_bits_mismatch():
 
 def test_array_write_record_correct_type():
     """Test that writing RecordValue with matching type succeeds and unwraps."""
-    builder = SysBuilder("test_system")
+    builder = SysBuilder("test_array_write_record_correct_type")
     Singleton.builder = builder
     
     # Create a module context
@@ -126,7 +126,7 @@ def test_array_write_record_correct_type():
 
 def test_array_write_record_incorrect_type():
     """Test that writing RecordValue with mismatching type raises TypeError."""
-    builder = SysBuilder("test_system")
+    builder = SysBuilder("test_array_write_record_incorrect_type")
     Singleton.builder = builder
     
     # Create a module context
@@ -158,7 +158,7 @@ def test_array_write_record_incorrect_type():
 
 def test_multiport_write_correct_type():
     """Test multi-port write with (array & module)[idx] <= value syntax."""
-    builder = SysBuilder("test_system")
+    builder = SysBuilder("test_multiport_write_correct_type")
     Singleton.builder = builder
     
     # Create two modules
@@ -196,7 +196,7 @@ def test_multiport_write_correct_type():
 
 def test_multiport_write_incorrect_type():
     """Test multi-port write rejects incorrect type."""
-    builder = SysBuilder("test_system")
+    builder = SysBuilder("test_multiport_write_incorrect_type")
     Singleton.builder = builder
     
     # Create a module
@@ -225,7 +225,7 @@ def test_multiport_write_incorrect_type():
 
 def test_multiport_write_record_unwrapping():
     """Test multi-port write properly unwraps RecordValue."""
-    builder = SysBuilder("test_system")
+    builder = SysBuilder("test_multiport_write_record_unwrapping")
     Singleton.builder = builder
     
     # Create a module

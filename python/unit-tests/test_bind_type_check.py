@@ -28,7 +28,7 @@ class ModuleBits8(Module):
 
 def test_bind_type_mismatch_int_vs_uint():
     """Test that binding an Int value to a UInt port raises ValueError"""
-    sys = SysBuilder('test_type_mismatch')
+    sys = SysBuilder('test_bind_type_mismatch_int_vs_uint')
     with sys:
         mod = ModuleUInt8()
         a_val = Int(8)(5)
@@ -45,7 +45,7 @@ def test_bind_type_mismatch_int_vs_uint():
 
 def test_bind_type_mismatch_different_bitwidths():
     """Test that binding a value with wrong bitwidth raises ValueError"""
-    sys = SysBuilder('test_bitwidth_mismatch')
+    sys = SysBuilder('test_bind_type_mismatch_different_bitwidths')
     with sys:
         mod = ModuleUInt8()
         a_val = UInt(16)(5)
@@ -61,7 +61,7 @@ def test_bind_type_mismatch_different_bitwidths():
 
 def test_bind_type_mismatch_uint_vs_bits():
     """Test that binding a UInt value to a Bits port raises ValueError"""
-    sys = SysBuilder('test_uint_bits_mismatch')
+    sys = SysBuilder('test_bind_type_mismatch_uint_vs_bits')
     with sys:
         mod = ModuleBits8()
         a_val = UInt(8)(5)
@@ -75,7 +75,7 @@ def test_bind_type_mismatch_uint_vs_bits():
 
 def test_bind_type_match_correct():
     """Test that binding with matching types works correctly"""
-    sys = SysBuilder('test_type_match')
+    sys = SysBuilder('test_bind_type_match_correct')
     with sys:
         mod = ModuleUInt8()
         a_val = UInt(8)(5)
@@ -103,7 +103,7 @@ def test_bind_type_mismatch_record():
         def __init__(self):
             super().__init__(ports={'p': Port(rec1)})
 
-    sys = SysBuilder('test_record_mismatch')
+    sys = SysBuilder('test_bind_type_mismatch_record')
     with sys:
         mod = ModuleRec1()
         val = rec2.bundle(a=UInt(8)(1), b=UInt(8)(2))
@@ -123,7 +123,7 @@ def test_bind_type_match_record():
         def __init__(self):
             super().__init__(ports={'p': Port(rec)})
 
-    sys = SysBuilder('test_record_match')
+    sys = SysBuilder('test_bind_type_match_record')
     with sys:
         mod = ModuleRec()
         val = rec.bundle(x=UInt(8)(1), y=UInt(8)(2))

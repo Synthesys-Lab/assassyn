@@ -1,5 +1,5 @@
 ---
-alwaysApply: false
+alwaysApply: true
 globs:
   - python/assassyn/*.md
   - python/assassyn/*.py
@@ -15,7 +15,7 @@ globs:
   - tools/**/*.md
   - tools/**/*.rs
   - tools/**/*.cpp
-description: How write documents and when to read documents
+description: How write documents and when to read documents for the source code.
 ---
 
 # Documentation
@@ -24,6 +24,9 @@ description: How write documents and when to read documents
 
 Each source code file, including but not limited to `.py/.rs/.cpp/.cc`,
 shall have a `.md` file with the same prefix, in the same folder.
+If needed, read that file to have a deeper understanding of the
+current implementation. Also, we asked to modify the code,
+include the document updates!
 
 If there is a `README.md` within a folder, and there
 is `mod.rs` or `__init__.py` in this folder, these

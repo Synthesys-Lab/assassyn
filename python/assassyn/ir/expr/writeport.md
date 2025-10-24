@@ -83,18 +83,32 @@ The `_create_write` method performs comprehensive type validation to ensure:
 - Proper type conversion for integer indices using `to_uint()`
 - **Strict type checking**: The value's type must exactly match the array's `scalar_ty` using `type_eq()` method
 - **RecordValue handling**: RecordValue objects are automatically unwrapped to their underlying `Bits` representation before type checking and write creation
+- **Record/Bits flexibility**: When array expects Record type and value is raw Bits (from `.value()` call), allows the write if bit widths match
 - **Error reporting**: Type mismatches raise `TypeError` with detailed information about expected vs actual types
 
 **Type Checking Process:**
 1. Extract dtype from value (handling RecordValue specially)
-2. Perform strict type checking using `type_eq()` against array's `scalar_ty`
-3. Unwrap RecordValue to raw Bits before creating ArrayWrite
-4. Raise descriptive TypeError if types don't match
+2. For RecordValue: Perform strict type checking using `type_eq()` against array's `scalar_ty`, then unwrap to raw Bits
+3. For regular values: Check if array expects Record type and value is Bits - if so, compare bit widths instead of using `type_eq()`
+4. For all other cases: Use strict type checking using `type_eq()` against array's `scalar_ty`
+5. Raise descriptive TypeError if types don't match
+
+**Record/Bits Compatibility:**
+When users explicitly call `.value()` on RecordValue to get raw Bits, the type checker allows this pattern if:
+- Array expects Record type
+- Value is raw Bits type  
+- Bit widths match exactly (`value.dtype.bits == array.scalar_ty.bits`)
+
+This follows the same pattern as `Bind._push` and enables the common frontend pattern where RecordValue is unwrapped for array writes.
 
 **Error Messages:**
 Type mismatches produce detailed error messages in the format:
 ```
 TypeError: Type mismatch in array write: array 'array_name' expects element type UInt(8), but got value of type UInt(16)
+```
+For Record/Bits width mismatches:
+```
+TypeError: Type mismatch in array write: array 'bundle' expects element type record { is_odd: b1, payload: b32 } (33 bits), but got value of type b65 (65 bits)
 ```
 
 ### IR Builder Integration

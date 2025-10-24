@@ -62,7 +62,7 @@ This constructor validates all input parameters and sets up the memory module in
 - **Address Mapping**: Values are loaded sequentially starting from address 0
 - **Simulation Only**: Initialization files are used only during simulation, not in hardware generation
 
-The payload array is created using `RegArray(Bits(width), depth)` from [ir/array.py](../array.py) to emulate register-based memory behavior. The `_payload` field is marked as private (prefixed with underscore) as it should not be accessed directly by users - memory operations should go through the proper interface methods.
+The payload array is created using `RegArray(Bits(width), depth)` from [ir/array.py](../array.py) to emulate register-based memory behavior. Using `Bits` type ensures compatibility with array read operations that return raw bit values. The `_payload` field is marked as private (prefixed with underscore) as it should not be accessed directly by users - memory operations should go through the proper interface methods.
 
 ## Internal Helpers
 
