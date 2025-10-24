@@ -68,36 +68,29 @@ class WritePort:
 
         # Handle RecordValue: extract dtype and unwrap
         if isinstance(value, RecordValue):
+            value_dtype = value.dtype  # Get Record type for checking
+            value = value.value()  # Unwrap to raw Bits now
+        else:
             value_dtype = value.dtype
-            # Type check using type_eq before unwrapping
-            if not self.array.scalar_ty.type_eq(value_dtype):
+
+        # Type check using the extracted dtype
+        # Special case: if array expects Record type and value is raw Bits,
+        # allow if bit widths match (following Bind._push pattern)
+        if isinstance(self.array.scalar_ty, Record) and isinstance(value_dtype, Bits):
+            if value_dtype.bits != self.array.scalar_ty.bits:
                 raise TypeError(
                     f"Type mismatch in array write: array '{self.array.name}' "
-                    f"expects element type {self.array.scalar_ty}, "
-                    f"but got value of type {value_dtype}"
+                    f"expects element type {self.array.scalar_ty} "
+                    f"({self.array.scalar_ty.bits} bits), "
+                    f"but got value of type {value_dtype} ({value_dtype.bits} bits)"
                 )
-            value = value.value()  # Unwrap to raw Bits
-        else:
-            # Type check for regular values
-            # Special case: if array expects Record type and value is raw Bits,
-            # allow if bit widths match (following Bind._push pattern)
-            if isinstance(self.array.scalar_ty, Record) and isinstance(value.dtype, Bits):
-                if value.dtype.bits != self.array.scalar_ty.bits:
-                    raise TypeError(
-                        f"Type mismatch in array write: array '{self.array.name}' "
-                        f"expects element type {self.array.scalar_ty} "
-                        f"({self.array.scalar_ty.bits} bits), "
-                        f"but got value of type {value.dtype} ({value.dtype.bits} bits)"
-                    )
-                # Allow the write - bit widths match
-            else:
-                # Use strict type checking for all other cases
-                if not self.array.scalar_ty.type_eq(value.dtype):
-                    raise TypeError(
-                        f"Type mismatch in array write: array '{self.array.name}' "
-                        f"expects element type {self.array.scalar_ty}, "
-                        f"but got value of type {value.dtype}"
-                    )
+            # Allow the write - bit widths match
+        elif not self.array.scalar_ty.type_eq(value_dtype):
+            raise TypeError(
+                f"Type mismatch in array write: array '{self.array.name}' "
+                f"expects element type {self.array.scalar_ty}, "
+                f"but got value of type {value_dtype}"
+            )
 
         @ir_builder
         def create_write():
