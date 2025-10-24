@@ -27,6 +27,13 @@ class DType:
         '''Hash consistent with equality for caching purposes'''
         return hash((self.__class__, self.bits))
 
+    def type_eq(self, other):
+        '''Check if two data types are exactly equal.
+        This is used for strict type checking in operations like Bind.
+        By default, uses __eq__ which checks class and bits equality.
+        '''
+        return self == other
+
     def attributize(self, value, name):
         '''The syntax sugar for creating a port'''
 
@@ -73,6 +80,14 @@ class ArrayType(DType):
     def scalar_ty(self):
         '''The data type of the elements in this array'''
         return self._scalar_ty
+
+    def type_eq(self, other):
+        '''Check if two ArrayType types are exactly equal.'''
+        if not isinstance(other, ArrayType):
+            return False
+        if self.size != other.size:
+            return False
+        return self.scalar_ty.type_eq(other.scalar_ty)
 
 
 _VOID = Void()
@@ -220,6 +235,22 @@ class Record(DType):
         fields = list(f'{name}: {dtype}' for name, (dtype, _) in self.fields.items())
         fields = ', '.join(fields)
         return f'record {{ {fields} }}'
+
+    def type_eq(self, other):
+        '''Check if two Record types are exactly equal by comparing structure.'''
+        if not isinstance(other, Record) or self.bits != other.bits:
+            return False
+        if set(self.fields.keys()) != set(other.fields.keys()):
+            return False
+        for name, (dtype, slice_obj) in self.fields.items():
+            if name not in other.fields:
+                return False
+            other_dtype, other_slice = other.fields[name]
+            if not dtype.type_eq(other_dtype):
+                return False
+            if slice_obj.start != other_slice.start or slice_obj.stop != other_slice.stop:
+                return False
+        return True
 
     def attributize(self, value, name):
         '''The reflective function for creating corresponding attributes of the host value'''

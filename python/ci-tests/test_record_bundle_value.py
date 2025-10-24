@@ -12,7 +12,6 @@ class Adder(Module):
     @module.combinational
     def build(self):
         a, b = self.pop_all_ports(True)
-        print(a.dtype, type(a.dtype))
         valid = a.is_odd & b.is_odd
         with Condition(valid):
             c = a.payload.bitcast(Int(32)) + b.payload.bitcast(Int(32))
@@ -29,8 +28,8 @@ class Driver(Module):
         value = bundle[0].payload.bitcast(Int(32))
         is_odd = value[0:0]
         new_value = (value + Int(32)(1)).bitcast(Bits(32))
-        new_record = record_ty.bundle(is_odd=is_odd, payload=new_value).value()
-        (bundle & self)[0] <= new_record
+        new_record = record_ty.bundle(is_odd=is_odd, payload=new_value)
+        (bundle & self)[0] <= new_record.value()
         adder.async_called(a = new_record, b = new_record)
 
 def check_raw(raw):

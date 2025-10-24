@@ -49,8 +49,31 @@ class Bind(Expr):
     BIND = 501
 
     def _push(self, **kwargs):
+        #pylint: disable=import-outside-toplevel
+        from ..dtype import RecordValue
+
         for k, v in kwargs.items():
-            push = getattr(self.callee, k).push(v)
+            port = getattr(self.callee, k)
+
+            # Handle RecordValue early: extract dtype and unwrap
+            if isinstance(v, RecordValue):
+                value_dtype = v.dtype  # Get Record type for checking
+                v = v.value()  # Unwrap to raw Bits now
+            elif hasattr(v, 'dtype'):
+                value_dtype = v.dtype
+            else:
+                value_dtype = None
+
+            # Type check using the extracted dtype
+            if value_dtype is not None:
+                if not port.dtype.type_eq(value_dtype):
+                    raise ValueError(
+                        f"Type mismatch in Bind: port '{k}' expects type {port.dtype}, "
+                        f"but got value of type {value_dtype}"
+                    )
+
+            # v is already unwrapped if it was RecordValue
+            push = port.push(v)
             push.bind = self
             self.pushes.append(push)
 
