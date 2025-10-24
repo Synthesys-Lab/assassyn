@@ -10,6 +10,8 @@ Register arrays in Assassyn follow a multi-port access model where each module t
 
 The module also provides the `Slice` class for bit-slicing operations, which is essential for extracting specific bit fields from wider values in hardware design.
 
+**Type System Integration:** Each `Array` instance has a `dtype` property that returns an `ArrayType` instance representing the array's type in the type system. This connects the runtime register array representation with the static type system defined in [dtype.md](dtype.md#arraytypedtype-size---array-type).
+
 ## Exposed Interfaces
 
 The `array.py` module provides the `RegArray` function and `Array` class methods for creating and manipulating register arrays.
@@ -113,6 +115,24 @@ def name(self, name: str):
 The name property implements a simplified naming system that uses the internal `_name` field and generates a default name using [identifierize](../../utils.md#identifierize) if no name is set.
 
 This naming system is crucial for code generation, as the array name is used in both Verilog and Rust simulator output. The unified naming system allows the generated code to have meaningful, hierarchical names that reflect the module structure, making debugging and analysis easier.
+
+#### `dtype` Property
+
+```python
+@property
+def dtype(self) -> ArrayType:
+    '''
+    Get the data type of the array as an ArrayType.
+
+    @return ArrayType instance representing the array's type.
+    '''
+```
+
+**Explanation:**
+
+This property provides the connection between the runtime `Array` instance and the type system's `ArrayType`. It returns an `ArrayType(self.scalar_ty, self.size)` that represents the array's type information in the static type system. This is useful for type checking, code generation, and ensuring consistency between runtime and compile-time representations.
+
+The `ArrayType` provides the same `scalar_ty` and `size` information as the `Array` instance but in a form suitable for type system operations. See [ArrayType documentation](dtype.md#arraytypedtype-size---array-type) for more details on the type system representation.
 
 #### `users` Property
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import typing
 
 from ..builder import ir_builder, Singleton
-from .dtype import to_uint, RecordValue
+from .dtype import to_uint, RecordValue, ArrayType
 from .expr import ArrayRead, ArrayWrite, Expr,BinaryOp
 from .value import Value
 from ..utils import identifierize, namify
@@ -139,6 +139,11 @@ class Array:  #pylint: disable=too-many-instance-attributes
         self._name = None
         self._users = []
         self._write_ports = {}
+    @property
+    def dtype(self) -> ArrayType:
+        '''Get the data type of the array as an ArrayType.'''
+        return ArrayType(self.scalar_ty, self.size)
+
     @property
     def users(self):
         '''Get the users of the array.'''
