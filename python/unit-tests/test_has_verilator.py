@@ -1,6 +1,7 @@
-"""Unit tests for assassyn.utils module.
-
-This test suite validates utility functions in the assassyn.utils module.
+"""Unit test to check if we have Verilator target enabled.
+THIS TEST IS SUPER IMPORTANT FOR THE CI/CD PIPELINE.
+IF IT FAILS, IT MEANS THAT HALF OF THE CI/CD IS NOT TESTED.
+DO NOT MODIFY THIS WITHOUT ASKING FOR APPROVAL.
 """
 
 import assassyn
