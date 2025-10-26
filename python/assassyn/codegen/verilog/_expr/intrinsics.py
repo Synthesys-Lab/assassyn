@@ -208,6 +208,10 @@ def codegen_pure_intrinsic(dumper, expr: PureIntrinsic) -> Optional[str]:
     intrinsic = expr.opcode
     rval = dumper.dump_rval(expr, False)
 
+    # Handle CURRENT_CYCLE directly
+    if intrinsic == PureIntrinsic.CURRENT_CYCLE:
+        return f"{rval} = self.cycle_count"
+
     for handler in (_handle_fifo_intrinsic, _handle_value_valid, _handle_external_output):
         result = handler(dumper, expr, intrinsic, rval)
         if result is not None:

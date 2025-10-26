@@ -226,6 +226,29 @@ def build(self):
 
 ---
 
+### `CURRENT_CYCLE()`
+
+**Purpose**: Get the current global cycle count for conditional scheduling and testbench logic.
+
+**Parameters**:
+- None
+
+**Returns**: `PureIntrinsic` - `UInt(64)` current cycle number
+
+**Usage**:
+```python
+@module.combinational
+def build(self):
+    from assassyn.ir.dtype import UInt
+    with Condition(CURRENT_CYCLE() == UInt(64)(10)):
+        # Executes at cycle 10
+        do_something()
+```
+
+**Notes**:
+- `Cycle(n)` is now a thin wrapper around `Condition(CURRENT_CYCLE() == UInt(64)(n))`.
+- Testbench scheduling in the simulator triggers the Testbench every cycle; guards can be applied using `CURRENT_CYCLE()`.
+
 ## Memory Request Patterns
 
 ### Basic Memory Access Pattern

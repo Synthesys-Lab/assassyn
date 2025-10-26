@@ -114,6 +114,10 @@ def Condition(cond): # pylint: disable=invalid-name
 
 @ir_builder(node_type='expr')
 def Cycle(cycle: int): # pylint: disable=invalid-name
-    '''Frontend API for creating a cycled block.'''
+    '''Frontend API for creating a cycled block (wrapper over Condition).
+    Returns a CondBlock checking CURRENT_CYCLE equals the given cycle without double insertion.'''
     assert isinstance(cycle, int)
-    return CycledBlock(cycle)
+    # pylint: disable=import-outside-toplevel
+    from .expr.intrinsic import current_cycle
+    from .dtype import UInt
+    return CondBlock(current_cycle() == UInt(64)(cycle))

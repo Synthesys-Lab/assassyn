@@ -16,6 +16,7 @@ INTRIN_INFO = {
 
 PURE_INTRIN_INFO = {
     # PureIntrinsic operations opcode: (mnemonic, num of args)
+    307: ('current_cycle', 0),
     306: ('external_output_read', None),  # (instance, port_name[, index]) - variable args
     904: ('has_mem_resp', 1),
     912: ('get_mem_resp', 1),
@@ -127,6 +128,7 @@ class PureIntrinsic(Expr):
     FIFO_PEEK  = 303
     MODULE_TRIGGERED = 304
     VALUE_VALID = 305
+    CURRENT_CYCLE = 307
 
     # External module operations
     EXTERNAL_OUTPUT_READ = 306  # Unified opcode for both wire and reg outputs
@@ -164,7 +166,7 @@ class PureIntrinsic(Expr):
     def dtype(self):
         '''Get the data type of this intrinsic'''
         # pylint: disable=import-outside-toplevel
-        from ..dtype import Bits
+        from ..dtype import Bits, UInt
 
         if self.opcode == PureIntrinsic.FIFO_PEEK:
             # pylint: disable=import-outside-toplevel
@@ -180,6 +182,9 @@ class PureIntrinsic(Expr):
         if self.opcode == PureIntrinsic.GET_MEM_RESP:
             return Bits(self.args[0].width)
 
+        if self.opcode == PureIntrinsic.CURRENT_CYCLE:
+            return UInt(64)
+
         if self.opcode == PureIntrinsic.EXTERNAL_OUTPUT_READ:
             # args[0] is ExternalIntrinsic instance, args[1] is port name
             # args[2] (optional) is index for RegOut
@@ -194,7 +199,8 @@ class PureIntrinsic(Expr):
                            PureIntrinsic.MODULE_TRIGGERED, PureIntrinsic.VALUE_VALID]:
             fifo = self.args[0].as_operand()
             return f'{self.as_operand()} = {fifo}.{self.OPERATORS[self.opcode]}()'
-        if self.opcode in [PureIntrinsic.HAS_MEM_RESP, PureIntrinsic.GET_MEM_RESP]:
+        if self.opcode in [PureIntrinsic.HAS_MEM_RESP, PureIntrinsic.GET_MEM_RESP,
+                           PureIntrinsic.CURRENT_CYCLE]:
             mn, _ = PURE_INTRIN_INFO[self.opcode]
             args = ", ".join(i.as_operand() for i in self.args)
             return f'{self.as_operand()} = pure_intrinsic.{mn}({args})'
@@ -216,6 +222,18 @@ class PureIntrinsic(Expr):
             return port.dtype.attributize(self, name)
 
         assert False, f"Cannot access attribute {name} on {self}"
+
+
+@ir_builder
+def current_cycle():
+    '''Frontend API to get current global cycle (UInt(64)).'''
+    return PureIntrinsic(PureIntrinsic.CURRENT_CYCLE)
+
+
+@ir_builder  # alias retained for backwards compatibility
+def CURRENT_CYCLE():  # pylint: disable=invalid-name
+    '''Alias for current_cycle().'''
+    return current_cycle()
 
 
 class ExternalIntrinsic(Intrinsic):
