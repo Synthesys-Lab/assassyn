@@ -5,7 +5,7 @@ from __future__ import annotations
 import typing
 
 from ...ir.visitor import Visitor
-from ...ir.block import Block, CondBlock, CycledBlock
+from ...ir.block import Block, CondBlock
 from ...ir.dtype import RecordValue
 from ...ir.expr import Expr
 from ...ir.memory.dram import DRAM
@@ -105,9 +105,6 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
                     result.append(cond_code)
             cond = dump_rval_ref(self.module_ctx, node.cond)
             result.append(f"if {cond} {{\n")
-            self.indent += 2
-        elif isinstance(node, CycledBlock):
-            result.append(f"if sim.stamp / 100 == {node.cycle} {{\n")
             self.indent += 2
 
         for elem in node.iter():

@@ -15,7 +15,7 @@
 
 ## Section 0. Summary
 
-The `block.py` module defines the `Block` class hierarchy for representing control flow blocks in the Assassyn IR. This module implements the block-based control flow system that works with the [builder singleton](../../builder/__init__.py) to manage the current insertion point for IR nodes. Blocks serve as containers for expressions and provide context management through Python's `with` statement, enabling conditional execution and testbench cycle-based execution patterns as described in the [DSL design](../../../docs/design/dsl.md).
+The `block.py` module defines the `Block` class hierarchy for representing control flow blocks in the Assassyn IR. This module implements the block-based control flow system that works with the [builder singleton](../../builder/__init__.py) to manage the current insertion point for IR nodes. Blocks serve as containers for expressions and provide context management through Python's `with` statement, enabling conditional execution (including cycle-based predicates expressed with `CURRENT_CYCLE`) as described in the [DSL design](../../../docs/design/dsl.md).
 
 ## Section 1. Exposed Interfaces
 
@@ -26,7 +26,7 @@ This section describes all the function interfaces and data structures that are 
 #### `Block`
 ```python
 class Block:
-    kind: int                                         # Kind of block (MODULE_ROOT, CONDITIONAL, CYCLE)
+    kind: int                                         # Kind of block (MODULE_ROOT, CONDITIONAL)
     _body: list[Expr]                                # List of instructions in the block
     parent: typing.Union[typing.Self, ModuleBase]    # Parent block
     module: typing.Optional[ModuleBase]              # Module of this block
@@ -35,23 +35,20 @@ class Block:
 **Purpose:** Base class for all control flow blocks in the Assassyn IR.
 
 **Member Fields:**
-- `kind`: Integer constant defining the block type (MODULE_ROOT, CONDITIONAL, or CYCLE)
+- `kind`: Integer constant defining the block type (MODULE_ROOT, CONDITIONAL)
 - `_body`: List of `Expr` objects representing the instructions contained in this block
 - `parent`: Reference to the parent block or module that contains this block
 - `module`: Reference to the module that owns this block
 
 **Static Member Fields:**
 - `MODULE_ROOT = 0`: Constant for root blocks of modules
-- `CONDITIONAL = 1`: Constant for conditional execution blocks  
-- `CYCLE = 2`: Constant for cycle-based blocks used in testbench generation
+- `CONDITIONAL = 1`: Constant for conditional execution blocks
 
 **Block Kind Usage Patterns:**
 
 1. **MODULE_ROOT (0)**: Used for the root block of each module. This block contains all the module's logic and serves as the top-level container for expressions. Created automatically when a module is instantiated.
 
-2. **CONDITIONAL (1)**: Used for conditional execution blocks created by the `Condition()` function. These blocks execute their contents only when the specified condition is true, implementing multiplexer-based conditional logic in the generated hardware.
-
-3. **CYCLE (2)**: Used for testbench generation blocks created by the `Cycle()` function. These blocks execute at specific simulation cycles, enabling precise timing control for testbench operations.
+2. **CONDITIONAL (1)**: Used for conditional execution blocks created by the `Condition()` function. These blocks execute their contents only when the specified condition is true, implementing multiplexer-based conditional logic in the generated hardware. Cycle-based gating is expressed by conditions comparing `CURRENT_CYCLE` to a value (e.g., via `Cycle(N)`), not by a special block kind.
 
 **Note on Block Kind Constants:** These constants are currently defined as integer values. Consider using an enum for better type safety and maintainability in future versions.
 
@@ -66,16 +63,7 @@ class CondBlock(Block):
 **Member Fields:**
 - `cond`: `Value` object representing the condition that determines when this block executes
 
-#### `CycledBlock`
-```python
-class CycledBlock(Block):
-    cycle: int  # Cycle count for this block
-```
-
-**Purpose:** Represents blocks that execute at specific cycles during testbench generation.
-
-**Member Fields:**
-- `cycle`: Integer specifying the cycle number when this block should execute
+####
 
 ### Functions
 
@@ -104,22 +92,22 @@ with Condition(enable_signal):
 #### `Cycle(cycle)`
 ```python
 @ir_builder(node_type='expr')
-def Cycle(cycle: int) -> CycledBlock
+def Cycle(cycle: int) -> CondBlock
 ```
 
-**Description:** Frontend API for creating a cycled block for testbench generation that executes at a specific cycle.
+**Description:** Frontend helper for creating a conditional block that triggers at a specific cycle.
 
 **Parameters:**
 - `cycle`: Integer cycle number when the block should execute
 
-**Returns:** `CycledBlock` instance that can be used as a context manager
+**Returns:** `CondBlock` instance that can be used as a context manager
 
-**Explanation:** This function creates a cycle-based block used specifically for testbench generation. The block executes at the specified cycle during simulation, allowing testbench logic to be scheduled at precise timing points. This is used in conjunction with the [simulator design](../../../docs/design/simulator.md) to coordinate testbench events.
+**Explanation:** This function creates a conditional block using a predicate `CURRENT_CYCLE == cycle`. The block executes at the specified cycle during simulation, allowing testbench logic to be scheduled at precise timing points, without requiring a dedicated block kind. See [simulator design](../../../docs/design/simulator.md) for timing details.
 
 **Example:**
 ```python
 with Cycle(10):
-    # Instructions execute at cycle 10
+    # Instructions execute when CURRENT_CYCLE == 10
     test_signal.next = UInt(1, 1)
 ```
 
@@ -137,7 +125,7 @@ def __init__(self, kind: int)
 **Description:** Creates a new block of the specified kind with empty body.
 
 **Parameters:**
-- `kind`: Integer constant defining the block type (MODULE_ROOT, CONDITIONAL, or CYCLE)
+- `kind`: Integer constant defining the block type (MODULE_ROOT, CONDITIONAL)
 
 **Explanation:** Initializes a new block with the specified kind, creates an empty body list, and sets parent and module references to None. This is the base constructor for all block types.
 
@@ -280,39 +268,8 @@ def __repr__(self) -> str
 
 **Explanation:** Creates a formatted string representation of the conditional block, showing the condition and the block's contents with proper indentation. Uses the parent's `__repr__` method to display the block body.
 
-### `CycledBlock` Class Methods
+### Migration Note: CycledBlock Removal
 
-#### `__init__(self, cycle)`
-```python
-def __init__(self, cycle: int)
-```
+`CycledBlock` and `Block.CYCLE` have been removed. Use `Condition(current_cycle() == N)` or the helper `Cycle(N)` which returns a `CondBlock`.
 
-**Description:** Creates a cycled block for testbench generation that executes at a specific cycle.
-
-**Parameters:**
-- `cycle`: Integer cycle number when the block should execute
-
-**Explanation:** Initializes a cycled block by calling the parent constructor with `Block.CYCLE` kind and stores the cycle number. This type of block is used specifically for testbench generation to schedule operations at precise timing points.
-
-**Testbench Integration:** The `CycledBlock` integrates with the testbench system for precise timing control:
-
-1. **Cycle-Based Execution**: The block executes at the specified cycle number during simulation
-2. **Testbench Coordination**: Used in conjunction with the [simulator design](../../../docs/design/internal/simulator.md) to coordinate testbench events
-3. **Timing Control**: Enables precise timing control for testbench operations, allowing operations to be scheduled at specific simulation cycles
-4. **Validation**: The cycle number should be non-negative and within reasonable bounds for the simulation
-
-**Error Conditions:**
-- Invalid cycle numbers: May occur if negative or extremely large cycle numbers are provided
-- Testbench coordination errors: May occur if the testbench system is not properly initialized
-- Timing conflicts: May occur if multiple blocks are scheduled for the same cycle without proper coordination
-
-#### `__repr__(self)`
-```python
-def __repr__(self) -> str
-```
-
-**Description:** Returns a formatted representation showing the cycle number and block contents.
-
-**Returns:** String in the format `cycle {number} { ... }`.
-
-**Explanation:** Creates a formatted string representation of the cycled block, showing the cycle number and the block's contents with proper indentation. Uses the parent's `__repr__` method to display the block body.
+This change reduces indirection and unifies conditional semantics across compile-time and runtime conditions.

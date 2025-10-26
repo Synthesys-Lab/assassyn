@@ -1,4 +1,4 @@
-"""Tests for block IR nodes: Block, CondBlock, CycledBlock."""
+"""Tests for block IR nodes: Block, CondBlock, and Cycle-as-conditional."""
 
 import sys
 import os

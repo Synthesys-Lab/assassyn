@@ -22,7 +22,6 @@ class Block:
 
     MODULE_ROOT = 0
     CONDITIONAL = 1
-    CYCLE       = 2
 
     def __init__(self, kind: int):
         self.kind = kind
@@ -88,21 +87,6 @@ class CondBlock(Block):
         res = res + f'\n{ident}}}'
         return res
 
-class CycledBlock(Block):
-    '''The inherited class of the block for cycled block used for testbench generation.'''
-
-    cycle: int  # Cycle count for this block
-
-    def __init__(self, cycle: int):
-        super().__init__(Block.CYCLE)
-        self.cycle = cycle
-
-    def __repr__(self):
-        ident = Singleton.repr_ident * ' '
-        res = f'cycle {self.cycle} {{\n'
-        res = res + super().__repr__()
-        res = res + f'\n{ident}}}'
-        return res
 
 @ir_builder(node_type='expr')
 def Condition(cond): # pylint: disable=invalid-name
@@ -114,8 +98,7 @@ def Condition(cond): # pylint: disable=invalid-name
 
 @ir_builder(node_type='expr')
 def Cycle(cycle: int): # pylint: disable=invalid-name
-    '''Frontend API for creating a cycled block (wrapper over Condition).
-    Returns a CondBlock checking CURRENT_CYCLE equals the given cycle without double insertion.'''
+    '''Frontend helper returning a CondBlock that checks CURRENT_CYCLE equals the given cycle.'''
     assert isinstance(cycle, int)
     # pylint: disable=import-outside-toplevel
     from .expr.intrinsic import current_cycle

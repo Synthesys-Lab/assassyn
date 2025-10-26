@@ -12,7 +12,7 @@ from ....ir.expr import Log
 from ....ir.expr.intrinsic import PureIntrinsic, Intrinsic, ExternalIntrinsic
 from ....ir.const import Const
 from ....ir.dtype import Int
-from ....ir.block import CondBlock, CycledBlock
+from ....ir.block import CondBlock
 from ....utils import unwrap_operand, namify
 
 if TYPE_CHECKING:
@@ -82,12 +82,13 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
     final_conditions = []
 
     for cond_str, cond_obj in dumper.cond_stack:
-        if isinstance(cond_obj, CycledBlock):
-            tb_cond_path = \
-            cond_str.replace("self.cycle_count", "dut.global_cycle_count.value")
-            final_conditions.append(tb_cond_path)
-
-        elif isinstance(cond_obj, CondBlock):
+        # CondBlock conditions may include CURRENT_CYCLE; map it to DUT path.
+        if isinstance(cond_obj, CondBlock):
+            # Fast-path: translate cycle_count references directly in the string form.
+            if "self.cycle_count" in cond_str:
+                tb_cond_path = cond_str.replace("self.cycle_count", "dut.global_cycle_count.value")
+                final_conditions.append(tb_cond_path)
+                continue
             exposed_name = _sanitize(dumper.dump_rval(cond_obj.cond, True))
 
             tb_expose_path = f"(dut.{module_name}.expose_{exposed_name}.value)"

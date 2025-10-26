@@ -18,7 +18,7 @@ from ...ir.module import Module, Downstream
 from ...ir.memory.sram import SRAM
 from ...builder import SysBuilder
 from ...ir.visitor import Visitor
-from ...ir.block import Block, CondBlock,CycledBlock
+from ...ir.block import Block, CondBlock
 from ...ir.const import Const
 from ...ir.array import Array
 from ...ir.dtype import RecordValue
@@ -189,7 +189,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
     def visit_block(self, node: Block):
         is_cond = isinstance(node, CondBlock)
-        is_cycle = isinstance(node, CycledBlock)
 
         if is_cond:
             cond_str = self.dump_rval(node.cond, False)
@@ -207,9 +206,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             if has_side_effect(node):
                 self.expose('expr', node.cond)
 
-        elif is_cycle:
-            self.cond_stack.append((f"(self.cycle_count == {node.cycle})", node))
-
         if node is not None and node.body is not None:
             for i in node.body:
                 if isinstance(i, Expr):
@@ -222,7 +218,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                     print(i)
                     raise ValueError(f'Unknown node type: {type(i)}')
 
-        if is_cond or is_cycle:
+        if is_cond:
             self.cond_stack.pop()
 
 

@@ -26,7 +26,7 @@ This function generates Python testbench code for logging operations, which are 
    - Handles signed integer conversion for proper display
 3. **Condition Generation**: Builds complex conditions based on:
    - Current execution predicate
-   - Condition stack (cycled blocks and conditional blocks), translating them into DUT-visible signals
+   - Condition stack (conditional blocks), translating them into DUT-visible signals; cycle-based predicates come from `CURRENT_CYCLE` within these conditions
    - Valid signals for exposed operands
 4. **Log Generation**: Creates Python print statements annotated with line information, module names, and formatted cycle counts so the Cocotb testbench can produce readable diagnostics.
 
