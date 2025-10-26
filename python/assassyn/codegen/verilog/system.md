@@ -19,6 +19,11 @@ def generate_system(dumper, node):
         node: The SysBuilder instance to generate code for
     """
 ```
+Note on typing:
+
+- The function parameter `dumper` is annotated as `CIRCTDumper` for static type checking.
+- To avoid a runtime cyclic import between `system.py` and `design.py`, the module uses a `TYPE_CHECKING` guard and aliases `CIRCTDumper` to `typing.Any` at runtime. This preserves type information for static analyzers (mypy/pylance) while breaking the cycle during execution.
+
 
 **Explanation**
 
