@@ -80,9 +80,6 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
     block_condition = dumper.get_pred()
     block_condition = block_condition.replace('cycle_count', 'dut.global_cycle_count')
     final_conditions = []
-    # Always respect the current predicate stack from push/pop conditions
-    if block_condition:
-        final_conditions.append(block_condition)
 
     for cond_str, cond_obj in dumper.cond_stack:
         # CondBlock conditions may include CURRENT_CYCLE; map it to DUT path.
