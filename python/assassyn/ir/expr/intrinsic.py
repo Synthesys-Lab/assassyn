@@ -9,6 +9,8 @@ INTRIN_INFO = {
     900: ('wait_until', 1, False, True),
     901: ('finish', 0, False, True),
     902: ('assert', 1, False, True),
+    914: ('PUSH_CONDITION', 1, False, True),
+    915: ('POP_CONDITION', 0, False, True),
     906: ('send_read_request', 3, True, True),
     908: ('send_write_request', 4, True, True),
     913: ('external_instantiate', None, True, True),  # None = variable args
@@ -31,6 +33,8 @@ class Intrinsic(Expr):
     SEND_READ_REQUEST = 906
     SEND_WRITE_REQUEST = 908
     EXTERNAL_INSTANTIATE = 913
+    PUSH_CONDITION = 914
+    POP_CONDITION = 915
 
     opcode: int  # Operation code for this intrinsic
 
@@ -111,6 +115,33 @@ def send_read_request(mem, re, addr):
 def send_write_request(mem, we, addr, data):
     '''Send a write request with address and data to the given memory system.'''
     return Intrinsic(Intrinsic.SEND_WRITE_REQUEST, mem, we, addr, data)
+
+
+@ir_builder
+def push_condition(cond):
+    '''Push a predicate condition to the builder condition stack and IR.'''
+    #pylint: disable=import-outside-toplevel
+    from ..value import Value
+    from ...builder import Singleton
+    assert isinstance(cond, Value)
+    # Mirror into builder condition stack for frontend semantics
+    # pylint: disable=protected-access
+    if Singleton.builder is not None:
+        Singleton.builder._ctx_stack.setdefault('cond', []).append(cond)
+    return Intrinsic(Intrinsic.PUSH_CONDITION, cond)
+
+
+@ir_builder
+def pop_condition():
+    '''Pop a predicate condition from the builder condition stack and IR.'''
+    #pylint: disable=import-outside-toplevel
+    from ...builder import Singleton
+    # pylint: disable=protected-access
+    if Singleton.builder is not None:
+        cond_stack = Singleton.builder._ctx_stack.get('cond')
+        if cond_stack:
+            cond_stack.pop()
+    return Intrinsic(Intrinsic.POP_CONDITION)
 
 
 
@@ -234,6 +265,19 @@ def current_cycle():
 def CURRENT_CYCLE():  # pylint: disable=invalid-name
     '''Alias for current_cycle().'''
     return current_cycle()
+
+
+# Frontend helper: get_pred (no opcode)
+@ir_builder
+def get_pred():
+    '''Get the current predicate as AND of builder condition stack.'''
+    #pylint: disable=import-outside-toplevel
+    from ...builder import Singleton
+    from .comm import and_
+    from ..dtype import Bits
+    # pylint: disable=protected-access
+    conds = Singleton.builder._ctx_stack.get('cond', []) if Singleton.builder else []
+    return Bits(1)(1) if not conds else and_(*conds)
 
 
 class ExternalIntrinsic(Intrinsic):

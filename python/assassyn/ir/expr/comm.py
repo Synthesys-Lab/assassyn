@@ -21,6 +21,10 @@ def and_(*args):
     '''Bitwise and on all the arguments'''
     return reduce(operator.and_, *args)
 
+def and_all(args):
+    '''Bitwise and on an iterable of arguments'''
+    return reduce(operator.and_, *args)
+
 def or_(*args):
     '''Bitwise or on all the arguments'''
     return reduce(operator.or_, *args)

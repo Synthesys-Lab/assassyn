@@ -128,6 +128,8 @@ class SysBuilder:
         from ..ir.block import CondBlock
         if isinstance(entry, CondBlock):
             self.current_module.add_external(entry.cond)
+            # Track predicate stack alongside block stack
+            self._ctx_stack.setdefault('cond', []).append(entry.cond)
         self._ctx_stack[ty].append(entry)
         if ty == 'block':
             self.array_read_cache.setdefault(entry, {})
@@ -135,6 +137,13 @@ class SysBuilder:
     def exit_context_of(self, ty):
         '''Exit the context of the given type.'''
         entry = self._ctx_stack[ty].pop()
+        # Maintain predicate stack when leaving conditional blocks
+        #pylint: disable=import-outside-toplevel
+        from ..ir.block import CondBlock
+        if isinstance(entry, CondBlock):
+            cond_stack = self._ctx_stack.get('cond')
+            if cond_stack:
+                cond_stack.pop()
         if ty == 'block':
             self.array_read_cache.pop(entry, None)
         return entry
@@ -158,7 +167,7 @@ class SysBuilder:
         self.modules = []
         self.downstreams = []
         self.arrays = []
-        self._ctx_stack = {'module': [], 'block': []}
+        self._ctx_stack = {'module': [], 'block': [], 'cond': []}
         self._exposes = {}
         self.line_expression_tracker = {}
         self.naming_manager = NamingManager()

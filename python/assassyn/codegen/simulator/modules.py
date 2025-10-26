@@ -8,6 +8,7 @@ from ...ir.visitor import Visitor
 from ...ir.block import Block, CondBlock
 from ...ir.dtype import RecordValue
 from ...ir.expr import Expr
+from ...ir.expr.intrinsic import Intrinsic as IRIntrinsic
 from ...ir.memory.dram import DRAM
 from ...utils import namify
 from .node_dumper import dump_rval_ref
@@ -60,6 +61,23 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
             need_exposure = expr_externally_used(node, True)
             id_expr = namify(node.as_operand())
             id_and_exposure = (id_expr, need_exposure)
+
+        # Handle PUSH/POP_CONDITION at the visitor level to form if blocks
+        code = None
+        if isinstance(node, IRIntrinsic) and node.opcode in (
+            IRIntrinsic.PUSH_CONDITION,
+            IRIntrinsic.POP_CONDITION,
+        ):
+            indent_str = " " * self.indent
+            if node.opcode == IRIntrinsic.PUSH_CONDITION:
+                cond_val = dump_rval_ref(self.module_ctx, node.args[0])
+                result = f"{indent_str}if {cond_val} {{\n"
+                # Increase indentation for the body inside this condition
+                self.indent += 2
+                return result
+            # POP_CONDITION closes the current scope
+            self.indent = max(0, self.indent - 2)
+            return f"{' ' * self.indent}}}\n"
 
         code = codegen_expr(node, self.module_ctx)
 

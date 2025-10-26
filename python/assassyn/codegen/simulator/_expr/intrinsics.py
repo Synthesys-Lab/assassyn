@@ -221,6 +221,7 @@ _INTRINSIC_DISPATCH = {
     Intrinsic.SEND_READ_REQUEST: _codegen_send_read_request,
     Intrinsic.SEND_WRITE_REQUEST: _codegen_send_write_request,
     Intrinsic.EXTERNAL_INSTANTIATE: _codegen_external_instantiate,
+    # PUSH/POP_CONDITION do not emit inline expressions here; handled at modules visitor
 }
 
 

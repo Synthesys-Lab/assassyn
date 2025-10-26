@@ -80,6 +80,9 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
     block_condition = dumper.get_pred()
     block_condition = block_condition.replace('cycle_count', 'dut.global_cycle_count')
     final_conditions = []
+    # Always respect the current predicate stack from push/pop conditions
+    if block_condition:
+        final_conditions.append(block_condition)
 
     for cond_str, cond_obj in dumper.cond_stack:
         # CondBlock conditions may include CURRENT_CYCLE; map it to DUT path.
@@ -299,6 +302,14 @@ def codegen_intrinsic(dumper, expr: Intrinsic) -> Optional[str]:
         cond = dumper.dump_rval(expr.args[0], False)
         final_cond = cond
         dumper.wait_until = final_cond
+        return None
+    if intrinsic == Intrinsic.PUSH_CONDITION:
+        cond_str = dumper.dump_rval(expr.args[0], False)
+        dumper.cond_stack.append((f"({cond_str})", expr))
+        return None
+    if intrinsic == Intrinsic.POP_CONDITION:
+        if dumper.cond_stack:
+            dumper.cond_stack.pop()
         return None
     if intrinsic == Intrinsic.EXTERNAL_INSTANTIATE:
         # Should be handled by ExternalIntrinsic check above

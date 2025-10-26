@@ -1,0 +1,10 @@
+---
+alwaysApply: false
+description: Debug an Assassyn Generated System
+---
+
+0. Read all the `tutorials/` to see how to write a Assassy program.
+   - Long in short, a `Driver` module is the entrance to the system. Just like `main` in C.
+1. By default in `python/assassyn/backend.py` a `workspace` folder will be created.
+2. In `workspace` a folder with the same name as `SysBuilder(name)` will be created.
+3. You can look at the `simulator` and `verilog` to see what happens.

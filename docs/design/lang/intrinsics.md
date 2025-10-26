@@ -16,6 +16,62 @@ Intrinsics are divided into two categories:
 
 ## Execution Control Intrinsics
 
+### `push_condition(condition)` / `pop_condition()`
+
+Purpose: Manage a predicate stack that guards subsequent operations.
+
+Parameters:
+- `condition: Value` (for `push_condition`) – condition to push onto the predicate stack
+
+Returns: `Intrinsic` – Non-valued operations that update the predicate stack
+
+Usage:
+```python
+@module.combinational
+def build(self):
+    cond = self.counter[0] < UInt(32)(100)
+    push_condition(cond)
+    # Statements below are guarded by cond
+    log("in range: {}", self.counter[0])
+    pop_condition()
+```
+
+Nesting:
+```python
+@module.combinational
+def build(self):
+    c1 = self.counter[0] < UInt(32)(10)
+    c2 = (self.counter[0] & UInt(32)(1)) == UInt(32)(0)
+    push_condition(c1)
+    push_condition(c2)
+    # Guarded by c1 & c2
+    log("even under 10: {}", self.counter[0])
+    pop_condition()
+    pop_condition()
+```
+
+Simulator Codegen: `push_condition` emits an `if (cond) {` and increases indentation; `pop_condition` closes the block `}`.
+
+Verilog Codegen: The dumper maintains a predicate stack used by `get_pred()` gating; push/pop only update this stack and do not emit direct code.
+
+### `get_pred()`
+
+Purpose: Return the current predicate computed as the AND of all active conditions on the predicate stack.
+
+Parameters:
+- None
+
+Returns: `Value` – `Bits(1)` predicate; if the stack is empty, returns constant `1`.
+
+Usage:
+```python
+@module.combinational
+def build(self):
+    # Guard some enable with current predicate
+    enable = get_pred()
+    assume(enable)  # example usage
+```
+
 ### `wait_until(condition)`
 
 **Purpose**: Block execution until a condition becomes true.
