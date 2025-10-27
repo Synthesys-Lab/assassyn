@@ -244,13 +244,19 @@ def __getitem__(self, index: typing.Union[int, Value]) -> ArrayRead:
 
 **Explanation:**
 
-This method implements array read operations with caching to avoid duplicate reads within the same block. It uses the builder's `array_read_cache` to store and retrieve previously created `ArrayRead` expressions, improving IR efficiency.
+This method implements array read operations with predicate-aware caching to avoid duplicate reads within active predicate scopes. The caching mechanism is integrated with the predicate frame stack to ensure correct invalidation when predicates are popped.
+
+The method probes predicate frame caches from top (most nested) to bottom, allowing outer-scope reads to be reused within inner predicates while preventing inner-scope reads from leaking out after their predicate expires. If a cached read is found in any active predicate frame, it is returned immediately. Otherwise, a new `ArrayRead` is created and stored in the top-most active predicate frame's cache.
 
 The method automatically converts integer indices to `UInt` values using [to_uint](../dtype.md#to_uint) and creates `ArrayRead` expressions that represent the read operation in the IR.
 
-The caching mechanism is block-scoped, meaning that reads within the same block are deduplicated, but reads across different blocks are treated as separate operations. This is important for hardware semantics, as different blocks may represent different clock cycles or conditional execution paths.
+The cache key is a tuple of `(array, index)`, ensuring that different indices into the same array are treated as separate operations, while the same index access within a predicate scope is deduplicated. This predicate-aware caching is essential for FSM and other conditional execution patterns where array reads must not leak across conditional boundaries.
 
-The cache key is a tuple of `(array, index)`, ensuring that different indices into the same array are treated as separate operations, while the same index access within a block is reused.
+**Cache Protocol:**
+- Cache probing: Walks the predicate frame stack from top to bottom
+- Cache insertion: New reads are stored in the top-most active predicate frame
+- Cache invalidation: Automatically handled when predicates are popped
+- Cache scope: Per-predicate frame, ensuring no leakage across conditional boundaries
 
 #### `get_flattened_size`
 

@@ -237,10 +237,9 @@ class Array:  #pylint: disable=too-many-instance-attributes
         builder = Singleton.builder
         if builder is not None:
             pred_stack = builder.get_predicate_stack()
-            cache_key = (self, index)
             # Check all active predicate caches (top to bottom) for reuse
             for frame in reversed(pred_stack):
-                cached = frame.array_cache.get(cache_key)
+                cached = frame.get_cached_read(self, index)
                 if cached is not None:
                     return cached
 
@@ -249,7 +248,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
         if builder is not None:
             pred_stack = builder.get_predicate_stack()
             if pred_stack:
-                pred_stack[-1].array_cache[cache_key] = res
+                pred_stack[-1].cache_read(self, index, res)
         return res
 
     def get_flattened_size(self):

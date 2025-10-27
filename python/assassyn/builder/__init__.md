@@ -12,13 +12,13 @@ Starting from this change, the predicate stack is isolated per module via Module
 ```python
 class ModuleContext:
     module: Module
-    cond_stack: list
+    cond_stack: list[PredicateFrame]
 ```
 
 Purpose: Encapsulates per-module builder state requiring stack semantics. Currently contains the owning module and its cond_stack (predicate stack).
 
 - module: The module object associated with this context frame.
-- cond_stack: The predicate stack for this module context. The stack holds condition Value objects in LIFO order.
+- cond_stack: The predicate stack for this module context. The stack holds PredicateFrame objects in LIFO order.
 
 ### class SysBuilder
 Core builder that also represents a system under construction. Key exposed properties and methods:
@@ -59,11 +59,35 @@ Holds process-wide builder state such as the active builder, indentation for __r
 
 ## Section 2. Internal Helpers
 
+### class PredicateFrame
+
+```python
+class PredicateFrame:
+    cond: Value
+    array_cache: dict[tuple[Array, Value], ArrayRead]
+    
+    def get_cached_read(self, array: Array, index: Value) -> ArrayRead | None
+    def cache_read(self, array: Array, index: Value, read: ArrayRead) -> None
+    def has_cached_read(self, array: Array, index: Value) -> bool
+```
+
+Purpose: Encapsulates a predicate condition and its associated array-read cache. Each predicate frame stores:
+- cond: The condition Value associated with this predicate frame
+- array_cache: A dictionary mapping (array, index) tuples to cached ArrayRead operations
+
+The cache management methods provide type-safe access to the frame's cache, abstracting away the direct dictionary access. This ensures proper encapsulation and makes the cache protocol explicit.
+
+**Explanation:**
+PredicateFrame pairs a condition with an array-read cache to ensure cache lifetime matches predicate lifetime (push/pop). When a predicate is pushed, a new empty cache is created; when popped, the entire cache is discarded. This prevents array reads created under a predicate from being reused after the predicate expires, which is essential for FSM and other conditional execution patterns.
+
+The cache is keyed by tuples of (array, index), allowing different indices into the same array to be cached separately while deduplicating identical accesses within the same predicate scope.
+
 ### Naming and Caches
 
 SysBuilder initializes and resets:
 - naming_manager: Assigns stable names to IR nodes.
-- const_cache, array_read_cache: Per-builder caches reset when entering/exiting the system context, and on block enter/exit (for array_read_cache).
+- const_cache: Per-builder cache reset when entering/exiting the system context.
+- Array read caching is handled per predicate frame (see PredicateFrame above).
 
 ### Context Management
 

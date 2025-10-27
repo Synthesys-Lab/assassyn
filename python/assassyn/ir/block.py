@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typing
 
-from ..builder import ir_builder, Singleton
+from ..builder import Singleton
 from ..utils import identifierize, namify
 
 if typing.TYPE_CHECKING:
@@ -30,6 +30,7 @@ class Block:
 
     def __repr__(self):
         # Render block body and manage indentation for predicate PUSH/POP here.
+        # pylint: disable=import-outside-toplevel
         from .expr.intrinsic import Intrinsic  # local import to avoid cycles
         Singleton.repr_ident += 2
         lines = []
@@ -127,6 +128,7 @@ def Condition(cond): # pylint: disable=invalid-name
     return _PredicateScope(cond)
 
 def Cycle(cycle: int): # pylint: disable=invalid-name
+    # pylint: disable=line-too-long
     '''Frontend helper returning a Condition sugar that checks current_cycle equals the given cycle.'''
     assert isinstance(cycle, int)
     # pylint: disable=import-outside-toplevel
