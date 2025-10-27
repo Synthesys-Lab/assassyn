@@ -35,8 +35,10 @@ def test_block_dump():
         BlockTestModule().build()
     
     def checker(sys_repr):
-        # Verify block structures appear
-        assert "when" in sys_repr
+        # Verify predicate-based conditional emission appears in IR dump
+        assert "PUSH_CONDITION" in sys_repr
+        assert "In conditional block" in sys_repr
+        assert "In cycle block" in sys_repr
     
     dump_ir("block_test", builder, checker)
 

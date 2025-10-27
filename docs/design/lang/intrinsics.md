@@ -54,7 +54,7 @@ Simulator Codegen: `push_condition` emits an `if (cond) {` and increases indenta
 
 Verilog Codegen: The dumper maintains a predicate stack used by `get_pred()` gating; push/pop only update this stack and do not emit direct code.
 
-Per-Module Semantics: The predicate stack is managed by the builder per module via a ModuleContext record. Each module has its own predicate stack; conditions do not leak across modules. Both explicit predicate intrinsics and conditional blocks (`with Condition(cond): ...`) push/pop the same builder-managed predicate stack.
+Per-Module Semantics: The predicate stack is managed by the builder per module via a ModuleContext record. Each module has its own predicate stack; conditions do not leak across modules. Both explicit predicate intrinsics and `with Condition(cond): ...` push/pop the same builder-managed predicate stack. `Condition` is a thin sugar around `push_condition(cond)` / `pop_condition()`.
 
 ### `get_pred()`
 

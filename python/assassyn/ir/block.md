@@ -70,24 +70,25 @@ class CondBlock(Block):
 #### `Condition(cond)`
 ```python
 @ir_builder(node_type='expr')
-def Condition(cond: Value) -> CondBlock
+def Condition(cond: Value) -> ContextManager
 ```
 
-**Description:** Frontend API for creating a conditional block that executes when the condition is true.
+**Description:** Frontend API for conditionally guarding statements using predicate intrinsics. It is now a thin sugar that pushes the predicate on enter and pops it on exit, without constructing a structural `CondBlock`.
 
 **Parameters:**
-- `cond`: A `Value` representing the condition to evaluate
+- `cond`: A `Value` representing the condition to push onto the predicate stack
 
-**Returns:** `CondBlock` instance that can be used as a context manager
+**Returns:** A context manager that calls `push_condition(cond)` on enter and `pop_condition()` on exit
 
-**Explanation:** This function creates a conditional block that integrates with the [builder singleton](../../builder/__init__.py) context management system. When used with a `with` statement, it changes the current insertion point to the conditional block, allowing expressions to be conditionally executed. The condition is evaluated at runtime in the generated hardware, creating a multiplexer-based conditional execution path as described in the [module generation design](../../../docs/design/module.md).
+**Explanation:** `Condition` integrates with the per-module predicate stack managed by the builder's `ModuleContext`. The simulator emits real `if {}` blocks for `push_condition`/`pop_condition`, while the Verilog dumper uses the predicate stack for `get_pred()` gating. Existing code can continue using `with Condition(cond): ...` unchanged.
 
 **Example:**
 ```python
 with Condition(enable_signal):
-    # Instructions execute when enable_signal is true
-    output.next = input_data
+    log("enabled: {}", enable_signal)
 ```
+
+**Deprecation note:** The structural `CondBlock` remains available for import-compatibility but is deprecated; new code should rely on `Condition` sugar or explicit `push_condition`/`pop_condition`.
 
 #### `Cycle(cycle)`
 ```python
@@ -100,7 +101,7 @@ def Cycle(cycle: int) -> CondBlock
 **Parameters:**
 - `cycle`: Integer cycle number when the block should execute
 
-**Returns:** `CondBlock` instance that can be used as a context manager
+**Returns:** A `Condition` context manager equivalent to `Condition(current_cycle() == cycle)`
 
 **Explanation:** This function creates a conditional block using a predicate `current_cycle() == cycle`. The block executes at the specified cycle during simulation, allowing testbench logic to be scheduled at precise timing points, without requiring a dedicated block kind. See [simulator design](../../../docs/design/simulator.md) for timing details.
 
@@ -270,6 +271,12 @@ def __repr__(self) -> str
 
 ### Migration Note: CycledBlock Removal
 
-`CycledBlock` and `Block.CYCLE` have been removed. Use `Condition(current_cycle() == N)` or the helper `Cycle(N)` which returns a `CondBlock`.
+`CycledBlock` and `Block.CYCLE` have been removed. Use `Condition(current_cycle() == N)` or the helper `Cycle(N)` which returns a `Condition` context manager.
 
 This change reduces indirection and unifies conditional semantics across compile-time and runtime conditions.
+
+## Section 3. Deprecations
+
+### `CondBlock` (deprecated)
+
+`CondBlock` previously represented structural conditional blocks. Predicate semantics are now implemented via intrinsics. `CondBlock` is retained temporarily for compatibility, but it should not be constructed by `Condition` anymore and may be removed in a future version.
