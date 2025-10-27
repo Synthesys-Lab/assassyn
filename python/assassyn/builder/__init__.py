@@ -97,14 +97,14 @@ def ir_builder(func=None, *, node_type=None):
 #pylint: disable=too-many-instance-attributes
 class PredicateFrame:  # pylint: disable=too-few-public-methods
     '''Per-predicate frame containing the condition and its array-read cache.'''
-    cond: 'Value'
-    array_cache: dict[tuple['Array', 'Value'], 'ArrayRead']
+    cond: Value
+    array_cache: dict[tuple[Array, Value], ArrayRead]
 
-    def __init__(self, cond: 'Value'):
+    def __init__(self, cond: Value):
         self.cond = cond
         self.array_cache = {}
 
-    def get_cached_read(self, array: 'Array', index: 'Value') -> 'ArrayRead | None':
+    def get_cached_read(self, array: Array, index: Value) -> ArrayRead | None:
         '''Probe this frame's cache for an existing read operation.
 
         @param array The array being read from.
@@ -113,7 +113,7 @@ class PredicateFrame:  # pylint: disable=too-few-public-methods
         '''
         return self.array_cache.get((array, index))
 
-    def cache_read(self, array: 'Array', index: 'Value', read: 'ArrayRead') -> None:
+    def cache_read(self, array: Array, index: Value, read: ArrayRead) -> None:
         '''Store an array read operation in this frame's cache.
 
         @param array The array being read from.
@@ -122,7 +122,7 @@ class PredicateFrame:  # pylint: disable=too-few-public-methods
         '''
         self.array_cache[(array, index)] = read
 
-    def has_cached_read(self, array: 'Array', index: 'Value') -> bool:
+    def has_cached_read(self, array: Array, index: Value) -> bool:
         '''Check if a read operation is cached in this frame.
 
         @param array The array being read from.
@@ -135,10 +135,10 @@ class PredicateFrame:  # pylint: disable=too-few-public-methods
 class ModuleContext:  # pylint: disable=too-few-public-methods
     '''Module-scoped context record holding module and its predicate stack.'''
 
-    module: 'Module'
+    module: Module
     cond_stack: list[PredicateFrame]
 
-    def __init__(self, module: 'Module'):
+    def __init__(self, module: Module):
         self.module = module
         self.cond_stack = []
 
