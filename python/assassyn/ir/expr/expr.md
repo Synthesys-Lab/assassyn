@@ -153,12 +153,16 @@ A non-synthesizable node that functions as a print statement for debugging durin
 - `LOG = 600`
 
 **Fields:**
-- `args: tuple` - Arguments to the log operation
-- `meta_cond: Value | None` - Predicate metadata captured at construction time; `None` when constructed outside an active builder
+- `args: tuple` - Positional arguments backing the operation. The final element stores predicate metadata.
+
+**Properties:**
+- `fmt` - Returns the format string (`args[0]`).
+- `values` - Returns the payload values to be substituted into the format string (`args[1:-1]`).
+- `meta_cond` - Returns the predicate metadata captured at construction time (`args[-1]`).
+- `dtype` - Get the data type of this operation (void for side-effect operations).
 
 **Methods:**
-- `__init__(*args)` - Initialize log operation
-- `dtype` - Get the data type of this operation (property, returns Void)
+- `__init__(fmt, *values, meta_cond)` - Initialize log operation
 
 **Notes:**
 - `Log` is an ordinary expression node, **not** an intrinsic. The frontend helper captures the active predicate using `get_pred()` and stores it in `meta_cond` for downstream tools.
@@ -178,7 +182,7 @@ The exposed frontend function to instantiate a log operation.
 **Explanation:**
 This function creates a `Log` expression node for debugging purposes. The first argument must be a string format, followed by values to be logged. It is non-synthesizable and only works during simulation.
 
-On creation the helper also records the current predicate (via `get_pred()`) into `meta_cond`. The metadata is not an operand of the node, so existing code that iterates operands remains unaffected, while backends can still gate trace emission using the stored predicate.
+On creation the helper captures the current predicate (via `get_pred()`) and appends it as trailing metadata. The convenience properties keep format/payload access ergonomic while callers that need metadata consumption can rely on `meta_cond` without duplicating state on the node.
 
 
 ---

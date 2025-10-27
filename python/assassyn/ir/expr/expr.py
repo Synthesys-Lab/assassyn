@@ -209,10 +209,25 @@ class Log(Expr):
 
     LOG = 600
 
-    def __init__(self, *args):
+    def __init__(self, fmt, *values, meta_cond):
+        args = (fmt, *values, meta_cond)
         super().__init__(Log.LOG, args)
         self.args = args
-        self.meta_cond = None
+
+    @property
+    def fmt(self):
+        '''Return the format string argument.'''
+        return self.args[0]
+
+    @property
+    def values(self):
+        '''Return the payload values excluding the format string and metadata.'''
+        return self.args[1:-1]
+
+    @property
+    def meta_cond(self):
+        '''Return the trailing predicate metadata.'''
+        return self.args[-1]
 
     @property
     def dtype(self):
@@ -222,17 +237,21 @@ class Log(Expr):
         return void()
 
     def __repr__(self):
-        fmt = repr(self.args[0])
-        payload = ", ".join(i.as_operand() for i in self.args[1:])
+        fmt = repr(self.fmt)
+        payload = ", ".join(
+            i.as_operand() if hasattr(i, 'as_operand') else repr(i)
+            for i in self.values
+        )
         base = f'log({fmt}'
         if payload:
             base += f', {payload}'
         base += ')'
-        if self.meta_cond is not None:
-            if hasattr(self.meta_cond, 'as_operand'):
-                meta_repr = self.meta_cond.as_operand()
+        meta_cond = self.meta_cond
+        if meta_cond is not None:
+            if hasattr(meta_cond, 'as_operand'):
+                meta_repr = meta_cond.as_operand()
             else:
-                meta_repr = repr(self.meta_cond)
+                meta_repr = repr(meta_cond)
             return f'{base} // meta cond {meta_repr}'
         return base
 
@@ -304,9 +323,7 @@ def log(*args):
     #pylint: disable=import-outside-toplevel
     from .intrinsic import get_pred
     meta_cond = get_pred()
-    node = Log(*args)
-    node.meta_cond = meta_cond
-    return node
+    return Log(*args, meta_cond=meta_cond)
 
 
 class Select(Expr):

@@ -90,10 +90,14 @@ def test_log_meta_cond_metadata():
     outer_log = logs[0]
     assert isinstance(outer_log.meta_cond, Const)
     assert outer_log.meta_cond.value == 1
+    assert outer_log.fmt == "Outer log"
+    assert outer_log.values == ()
 
     assert len(logs) >= 2, "Expected inner log to be present"
     inner_log = logs[1]
     assert inner_log.meta_cond is module_inst.saved_cond
+    assert inner_log.fmt == "Inner log"
+    assert inner_log.values == (module_inst.saved_cond,)
 
 
 if __name__ == '__main__':
