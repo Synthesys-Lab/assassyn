@@ -234,15 +234,22 @@ class Array:  #pylint: disable=too-many-instance-attributes
         if isinstance(index, int):
             index = to_uint(index, self.index_bits)
 
-        # builder = Singleton.builder
-        # cache = builder.array_read_cache.setdefault(builder.current_block, {})
-        # cache_key = (self, index)
-        # cached = cache.get(cache_key)
-        # if cached is not None:
-        #     return cached
+        builder = Singleton.builder
+        if builder is not None:
+            pred_stack = builder.get_predicate_stack()
+            cache_key = (self, index)
+            # Check all active predicate caches (top to bottom) for reuse
+            for frame in reversed(pred_stack):
+                cached = frame.array_cache.get(cache_key)
+                if cached is not None:
+                    return cached
 
         res = ArrayRead(self, index)
-        # cache[cache_key] = res
+        # Insert into the top-most predicate frame (if any)
+        if builder is not None:
+            pred_stack = builder.get_predicate_stack()
+            if pred_stack:
+                pred_stack[-1].array_cache[cache_key] = res
         return res
 
     def get_flattened_size(self):

@@ -17,9 +17,12 @@ class Driver(Module):
 
         push_condition(c1)
         push_condition(c2)
+        print('here1')
         pred = get_pred()
+        print('here2')
         # Log pred value and counter every cycle to validate get_pred semantics
         log("pred={} cnt={}", pred, cnt[0])
+        print('here3')
         pop_condition()
         pop_condition()
 

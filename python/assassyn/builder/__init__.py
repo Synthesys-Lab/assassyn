@@ -95,6 +95,16 @@ def ir_builder(func=None, *, node_type=None):
 
 
 #pylint: disable=too-many-instance-attributes
+class PredicateFrame:  # pylint: disable=too-few-public-methods
+    '''Per-predicate frame containing the condition and its array-read cache.'''
+    cond: 'Value'
+    array_cache: dict
+
+    def __init__(self, cond):
+        self.cond = cond
+        self.array_cache = {}
+
+
 class ModuleContext:  # pylint: disable=too-few-public-methods
     '''Module-scoped context record holding module and its predicate stack.'''
 
@@ -142,7 +152,8 @@ class SysBuilder:
 
     def push_predicate(self, cond):
         '''Push a predicate into current module's predicate stack.'''
-        self.get_predicate_stack().append(cond)
+        frame = PredicateFrame(cond)
+        self.get_predicate_stack().append(frame)
 
     def pop_predicate(self):
         '''Pop a predicate from current module's predicate stack.'''
@@ -163,9 +174,6 @@ class SysBuilder:
                 # Record external usage and push predicate for this module context
                 self.current_module.add_external(entry.cond)
                 self.push_predicate(entry.cond)
-        if ty == 'block':
-            self.array_read_cache.setdefault(entry, {})
-
     def exit_context_of(self, ty):
         '''Exit the context of the given type.'''
         #pylint: disable=import-outside-toplevel
@@ -173,14 +181,12 @@ class SysBuilder:
         if ty == 'module':
             ctx = self._ctx_stack['module'].pop()
             # Ensure no leaked predicates from this module
-            assert not ctx.cond_stack, 'Predicate stack not empty on module exit'
+            assert not ctx.cond_stack, 'Predicate stack not empty on module exit: ' + repr(ctx.cond_stack[-1].cond)
             return ctx
         entry = self._ctx_stack[ty].pop()
         # Maintain predicate stack when leaving conditional blocks
         if isinstance(entry, CondBlock):
             self.pop_predicate()
-        if ty == 'block':
-            self.array_read_cache.pop(entry, None)
         return entry
 
     def has_driver(self):
@@ -220,7 +226,6 @@ class SysBuilder:
     def _reset_caches(self):
         '''Initialise or clear per-builder caches.'''
         self.const_cache = {}
-        self.array_read_cache = {}
 
     def __enter__(self):
         '''Designate the scope of this system builder.'''
