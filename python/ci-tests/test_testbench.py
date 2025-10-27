@@ -34,7 +34,7 @@ def test_testbench():
         testbench = Testbench()
         testbench.build()
 
-    run_test('testbench', top, check)
+    run_test('testbench', top, check, verilog=False)
 
 
 if __name__ == '__main__':

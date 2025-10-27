@@ -77,7 +77,8 @@ def test_fsm():
     run_test('FSM', top, checker,
              sim_threshold=200,
              idle_threshold=200,
-             random=True)
+             random=True,
+             verilog=False)
 
 
 

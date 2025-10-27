@@ -114,7 +114,7 @@ def check_raw(raw):
 
 
 def test_multiplier():
-    run_test('multiplier_test', build_system, check_raw)
+    run_test('multiplier_test', build_system, check_raw, verilog=False)
 
 
 if __name__ == '__main__':

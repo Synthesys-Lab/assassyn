@@ -234,15 +234,15 @@ class Array:  #pylint: disable=too-many-instance-attributes
         if isinstance(index, int):
             index = to_uint(index, self.index_bits)
 
-        builder = Singleton.builder
-        cache = builder.array_read_cache.setdefault(builder.current_block, {})
-        cache_key = (self, index)
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return cached
+        # builder = Singleton.builder
+        # cache = builder.array_read_cache.setdefault(builder.current_block, {})
+        # cache_key = (self, index)
+        # cached = cache.get(cache_key)
+        # if cached is not None:
+        #     return cached
 
         res = ArrayRead(self, index)
-        cache[cache_key] = res
+        # cache[cache_key] = res
         return res
 
     def get_flattened_size(self):
