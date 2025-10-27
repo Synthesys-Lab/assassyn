@@ -54,6 +54,8 @@ Simulator Codegen: `push_condition` emits an `if (cond) {` and increases indenta
 
 Verilog Codegen: The dumper maintains a predicate stack used by `get_pred()` gating; push/pop only update this stack and do not emit direct code.
 
+Per-Module Semantics: The predicate stack is managed by the builder per module via a ModuleContext record. Each module has its own predicate stack; conditions do not leak across modules. Both explicit predicate intrinsics and conditional blocks (`with Condition(cond): ...`) push/pop the same builder-managed predicate stack.
+
 ### `get_pred()`
 
 Purpose: Return the current predicate computed as the AND of all active conditions on the predicate stack.
@@ -62,6 +64,8 @@ Parameters:
 - None
 
 Returns: `Value` – `Bits(1)` predicate; if the stack is empty, returns constant `1`.
+
+Source of Truth: `get_pred()` computes the AND over the current module's predicate stack from the builder's ModuleContext. If invoked outside any module context, it returns `Bits(1)(1)`.
 
 Usage:
 ```python
@@ -282,7 +286,7 @@ def build(self):
 
 ---
 
-### `CURRENT_CYCLE()`
+### `current_cycle()`
 
 **Purpose**: Get the current global cycle count for conditional scheduling and testbench logic.
 
@@ -296,14 +300,15 @@ def build(self):
 @module.combinational
 def build(self):
     from assassyn.ir.dtype import UInt
-    with Condition(CURRENT_CYCLE() == UInt(64)(10)):
+    from assassyn.ir.expr.intrinsic import current_cycle
+    with Condition(current_cycle() == UInt(64)(10)):
         # Executes at cycle 10
         do_something()
 ```
 
 **Notes**:
-- `Cycle(n)` is now a thin wrapper around `Condition(CURRENT_CYCLE() == UInt(64)(n))`.
-- Testbench scheduling in the simulator triggers the Testbench every cycle; guards can be applied using `CURRENT_CYCLE()`.
+- `Cycle(n)` is now a thin wrapper around `Condition(current_cycle() == UInt(64)(n))`.
+- Testbench scheduling in the simulator triggers the Testbench every cycle; guards can be applied using `current_cycle()`.
 
 ## Memory Request Patterns
 

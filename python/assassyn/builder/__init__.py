@@ -95,6 +95,17 @@ def ir_builder(func=None, *, node_type=None):
 
 
 #pylint: disable=too-many-instance-attributes
+class ModuleContext:  # pylint: disable=too-few-public-methods
+    '''Module-scoped context record holding module and its predicate stack.'''
+
+    module: 'Module'
+    cond_stack: list
+
+    def __init__(self, module):
+        self.module = module
+        self.cond_stack = []
+
+
 class SysBuilder:
     '''The class serves as both the system and the IR builder.'''
 
@@ -110,7 +121,8 @@ class SysBuilder:
     @property
     def current_module(self):
         '''Get the current module being built.'''
-        return None if not self._ctx_stack['module'] else self._ctx_stack['module'][-1]
+        ctx_stack = self._ctx_stack['module']
+        return None if not ctx_stack else ctx_stack[-1].module
 
     @property
     def current_block(self):
@@ -122,28 +134,51 @@ class SysBuilder:
         '''Get the insert point.'''
         return self.current_block.body
 
+    # Predicate stack helpers (per current module context)
+    def get_predicate_stack(self):
+        '''Get the current module's predicate stack.'''
+        ctx_stack = self._ctx_stack['module']
+        return [] if not ctx_stack else ctx_stack[-1].cond_stack
+
+    def push_predicate(self, cond):
+        '''Push a predicate into current module's predicate stack.'''
+        self.get_predicate_stack().append(cond)
+
+    def pop_predicate(self):
+        '''Pop a predicate from current module's predicate stack.'''
+        stack = self.get_predicate_stack()
+        assert stack, 'Predicate stack underflow'
+        stack.pop()
+
     def enter_context_of(self, ty, entry):
         '''Enter the context of the given type.'''
         #pylint: disable=import-outside-toplevel
         from ..ir.block import CondBlock
-        if isinstance(entry, CondBlock):
-            self.current_module.add_external(entry.cond)
-            # Track predicate stack alongside block stack
-            self._ctx_stack.setdefault('cond', []).append(entry.cond)
-        self._ctx_stack[ty].append(entry)
+        if ty == 'module':
+            # Push a new ModuleContext for this module
+            self._ctx_stack['module'].append(ModuleContext(entry))
+        else:
+            self._ctx_stack[ty].append(entry)
+            if isinstance(entry, CondBlock):
+                # Record external usage and push predicate for this module context
+                self.current_module.add_external(entry.cond)
+                self.push_predicate(entry.cond)
         if ty == 'block':
             self.array_read_cache.setdefault(entry, {})
 
     def exit_context_of(self, ty):
         '''Exit the context of the given type.'''
-        entry = self._ctx_stack[ty].pop()
-        # Maintain predicate stack when leaving conditional blocks
         #pylint: disable=import-outside-toplevel
         from ..ir.block import CondBlock
+        if ty == 'module':
+            ctx = self._ctx_stack['module'].pop()
+            # Ensure no leaked predicates from this module
+            assert not ctx.cond_stack, 'Predicate stack not empty on module exit'
+            return ctx
+        entry = self._ctx_stack[ty].pop()
+        # Maintain predicate stack when leaving conditional blocks
         if isinstance(entry, CondBlock):
-            cond_stack = self._ctx_stack.get('cond')
-            if cond_stack:
-                cond_stack.pop()
+            self.pop_predicate()
         if ty == 'block':
             self.array_read_cache.pop(entry, None)
         return entry
@@ -167,7 +202,7 @@ class SysBuilder:
         self.modules = []
         self.downstreams = []
         self.arrays = []
-        self._ctx_stack = {'module': [], 'block': [], 'cond': []}
+        self._ctx_stack = {'module': [], 'block': []}
         self._exposes = {}
         self.line_expression_tracker = {}
         self.naming_manager = NamingManager()

@@ -152,7 +152,7 @@ Visit a block and generate its Rust implementation.
 - `str`: Rust code for the block with proper control flow
 
 **Explanation:** Handles different block types:
-- **CondBlock**: Evaluates the condition (emitting it if the condition itself contains expressions) then wraps the child body in an `if`. Cycle-based gating is naturally expressed via `CURRENT_CYCLE` in the condition predicate.
+- **CondBlock**: Evaluates the condition (emitting it if the condition itself contains expressions) then wraps the child body in an `if`. Cycle-based gating is naturally expressed via `current_cycle()` in the condition predicate.
 - **Regular Block**: Processes all elements sequentially.
 
 The function maintains proper indentation, avoids duplicate visits via an identity set, and gracefully handles `RecordValue` nodes by delegating to their underlying expression. When entering or leaving a conditional block the indentation is adjusted, ensuring the emitted Rust is formatted and ready for `cargo fmt`.

@@ -209,7 +209,7 @@ def codegen_pure_intrinsic(dumper, expr: PureIntrinsic) -> Optional[str]:
     intrinsic = expr.opcode
     rval = dumper.dump_rval(expr, False)
 
-    # Handle CURRENT_CYCLE directly
+    # Handle current_cycle directly
     if intrinsic == PureIntrinsic.CURRENT_CYCLE:
         return f"{rval} = self.cycle_count"
 

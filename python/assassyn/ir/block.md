@@ -15,7 +15,7 @@
 
 ## Section 0. Summary
 
-The `block.py` module defines the `Block` class hierarchy for representing control flow blocks in the Assassyn IR. This module implements the block-based control flow system that works with the [builder singleton](../../builder/__init__.py) to manage the current insertion point for IR nodes. Blocks serve as containers for expressions and provide context management through Python's `with` statement, enabling conditional execution (including cycle-based predicates expressed with `CURRENT_CYCLE`) as described in the [DSL design](../../../docs/design/dsl.md).
+The `block.py` module defines the `Block` class hierarchy for representing control flow blocks in the Assassyn IR. This module implements the block-based control flow system that works with the [builder singleton](../../builder/__init__.py) to manage the current insertion point for IR nodes. Blocks serve as containers for expressions and provide context management through Python's `with` statement, enabling conditional execution (including cycle-based predicates expressed with `current_cycle()`) as described in the [DSL design](../../../docs/design/dsl.md).
 
 ## Section 1. Exposed Interfaces
 
@@ -48,7 +48,7 @@ class Block:
 
 1. **MODULE_ROOT (0)**: Used for the root block of each module. This block contains all the module's logic and serves as the top-level container for expressions. Created automatically when a module is instantiated.
 
-2. **CONDITIONAL (1)**: Used for conditional execution blocks created by the `Condition()` function. These blocks execute their contents only when the specified condition is true, implementing multiplexer-based conditional logic in the generated hardware. Cycle-based gating is expressed by conditions comparing `CURRENT_CYCLE` to a value (e.g., via `Cycle(N)`), not by a special block kind.
+2. **CONDITIONAL (1)**: Used for conditional execution blocks created by the `Condition()` function. These blocks execute their contents only when the specified condition is true, implementing multiplexer-based conditional logic in the generated hardware. Cycle-based gating is expressed by conditions comparing `current_cycle()` to a value (e.g., via `Cycle(N)`), not by a special block kind.
 
 **Note on Block Kind Constants:** These constants are currently defined as integer values. Consider using an enum for better type safety and maintainability in future versions.
 
@@ -102,12 +102,12 @@ def Cycle(cycle: int) -> CondBlock
 
 **Returns:** `CondBlock` instance that can be used as a context manager
 
-**Explanation:** This function creates a conditional block using a predicate `CURRENT_CYCLE == cycle`. The block executes at the specified cycle during simulation, allowing testbench logic to be scheduled at precise timing points, without requiring a dedicated block kind. See [simulator design](../../../docs/design/simulator.md) for timing details.
+**Explanation:** This function creates a conditional block using a predicate `current_cycle() == cycle`. The block executes at the specified cycle during simulation, allowing testbench logic to be scheduled at precise timing points, without requiring a dedicated block kind. See [simulator design](../../../docs/design/simulator.md) for timing details.
 
 **Example:**
 ```python
 with Cycle(10):
-    # Instructions execute when CURRENT_CYCLE == 10
+    # Instructions execute when current_cycle() == 10
     test_signal.next = UInt(1, 1)
 ```
 

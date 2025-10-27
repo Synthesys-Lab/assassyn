@@ -98,7 +98,7 @@ def codegen_pure_intrinsic(node: PureIntrinsic, module_ctx):
     """Generate code for pure intrinsic operations."""
     intrinsic = node.opcode
     if intrinsic == PureIntrinsic.CURRENT_CYCLE:
-        # CURRENT_CYCLE returns cycle count in u64; stamp is usize time in half-cycles (50).
+        # current_cycle returns cycle count in u64; stamp is usize time in half-cycles (50).
         # Divide by 100 to get cycles and cast to u64.
         return "((sim.stamp as u64) / 100u64)"
     codegen_func = _PURE_INTRINSIC_DISPATCH.get(intrinsic)

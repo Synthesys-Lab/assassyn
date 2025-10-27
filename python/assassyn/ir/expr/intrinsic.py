@@ -124,10 +124,9 @@ def push_condition(cond):
     from ..value import Value
     from ...builder import Singleton
     assert isinstance(cond, Value)
-    # Mirror into builder condition stack for frontend semantics
-    # pylint: disable=protected-access
+    # Mirror into builder predicate stack for frontend semantics (per module)
     if Singleton.builder is not None:
-        Singleton.builder._ctx_stack.setdefault('cond', []).append(cond)
+        Singleton.builder.push_predicate(cond)
     return Intrinsic(Intrinsic.PUSH_CONDITION, cond)
 
 
@@ -136,11 +135,8 @@ def pop_condition():
     '''Pop a predicate condition from the builder condition stack and IR.'''
     #pylint: disable=import-outside-toplevel
     from ...builder import Singleton
-    # pylint: disable=protected-access
     if Singleton.builder is not None:
-        cond_stack = Singleton.builder._ctx_stack.get('cond')
-        if cond_stack:
-            cond_stack.pop()
+        Singleton.builder.pop_predicate()
     return Intrinsic(Intrinsic.POP_CONDITION)
 
 
@@ -261,10 +257,7 @@ def current_cycle():
     return PureIntrinsic(PureIntrinsic.CURRENT_CYCLE)
 
 
-@ir_builder  # alias retained for backwards compatibility
-def CURRENT_CYCLE():  # pylint: disable=invalid-name
-    '''Alias for current_cycle().'''
-    return current_cycle()
+## CURRENT_CYCLE alias removed; use current_cycle() instead.
 
 
 # Frontend helper: get_pred (no opcode)
@@ -275,8 +268,7 @@ def get_pred():
     from ...builder import Singleton
     from .comm import and_
     from ..dtype import Bits
-    # pylint: disable=protected-access
-    conds = Singleton.builder._ctx_stack.get('cond', []) if Singleton.builder else []
+    conds = Singleton.builder.get_predicate_stack() if Singleton.builder else []
     return Bits(1)(1) if not conds else and_(*conds)
 
 
