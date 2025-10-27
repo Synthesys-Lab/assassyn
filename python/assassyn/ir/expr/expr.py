@@ -212,6 +212,7 @@ class Log(Expr):
     def __init__(self, *args):
         super().__init__(Log.LOG, args)
         self.args = args
+        self.meta_cond = None
 
     @property
     def dtype(self):
@@ -222,7 +223,18 @@ class Log(Expr):
 
     def __repr__(self):
         fmt = repr(self.args[0])
-        return f'log({fmt}, {", ".join(i.as_operand() for i in self.args[1:])})'
+        payload = ", ".join(i.as_operand() for i in self.args[1:])
+        base = f'log({fmt}'
+        if payload:
+            base += f', {payload}'
+        base += ')'
+        if self.meta_cond is not None:
+            if hasattr(self.meta_cond, 'as_operand'):
+                meta_repr = self.meta_cond.as_operand()
+            else:
+                meta_repr = repr(self.meta_cond)
+            return f'{base} // meta cond {meta_repr}'
+        return base
 
 class Concat(Expr):
     '''The class for concatenation operation, where {msb, lsb} as a right value'''
@@ -289,7 +301,12 @@ class Cast(Expr):
 def log(*args):
     '''The exposed frontend function to instantiate a log operation'''
     assert isinstance(args[0], str)
-    return Log(*args)
+    #pylint: disable=import-outside-toplevel
+    from .intrinsic import get_pred
+    meta_cond = get_pred()
+    node = Log(*args)
+    node.meta_cond = meta_cond
+    return node
 
 
 class Select(Expr):

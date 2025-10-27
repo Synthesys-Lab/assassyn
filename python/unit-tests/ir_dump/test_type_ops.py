@@ -82,8 +82,10 @@ def test_log_dump():
     
     def checker(sys_repr):
         # Verify log operations appear
-        assert "log('Log test message'" in sys_repr
-    
+        assert "log('Log test message') // meta cond" in sys_repr
+        assert "log('Log with value: {}'" in sys_repr
+        assert sys_repr.count("// meta cond") >= 2
+
     dump_ir("log_test", builder, checker)
 
 

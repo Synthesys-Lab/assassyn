@@ -154,10 +154,14 @@ A non-synthesizable node that functions as a print statement for debugging durin
 
 **Fields:**
 - `args: tuple` - Arguments to the log operation
+- `meta_cond: Value | None` - Predicate metadata captured at construction time; `None` when constructed outside an active builder
 
 **Methods:**
 - `__init__(*args)` - Initialize log operation
 - `dtype` - Get the data type of this operation (property, returns Void)
+
+**Notes:**
+- `Log` is an ordinary expression node, **not** an intrinsic. The frontend helper captures the active predicate using `get_pred()` and stores it in `meta_cond` for downstream tools.
 
 ### Frontend Functions
 
@@ -172,7 +176,9 @@ The exposed frontend function to instantiate a log operation.
 - `Log` - The log expression node
 
 **Explanation:**
-This function creates a `Log` expression node for debugging purposes. The first argument must be a string format, followed by values to be logged. This is non-synthesizable and only works during simulation.
+This function creates a `Log` expression node for debugging purposes. The first argument must be a string format, followed by values to be logged. It is non-synthesizable and only works during simulation.
+
+On creation the helper also records the current predicate (via `get_pred()`) into `meta_cond`. The metadata is not an operand of the node, so existing code that iterates operands remains unaffected, while backends can still gate trace emission using the stored predicate.
 
 
 ---

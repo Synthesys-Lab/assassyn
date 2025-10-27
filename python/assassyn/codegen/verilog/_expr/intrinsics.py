@@ -27,10 +27,31 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
     condition_snippets = []
     module_name = namify(dumper.current_module.name)
 
+    final_conditions = []
+    seen_conditions = set()
+
+    def append_condition(cond: Optional[str]):
+        if cond and cond not in seen_conditions:
+            seen_conditions.add(cond)
+            final_conditions.append(cond)
+
     def _sanitize(name: str) -> str:
         if name.startswith("self."):
             name = name[5:]
         return name.replace(".", "_")
+
+    meta_cond = getattr(expr, 'meta_cond', None)
+    if meta_cond is not None:
+        predicate_value = meta_cond
+        if isinstance(predicate_value, Const):
+            if predicate_value.value == 0:
+                append_condition('False')
+        else:
+            dumper.expose('expr', predicate_value)
+            exposed_name = _sanitize(dumper.dump_rval(predicate_value, True))
+            valid_signal = f'dut.{module_name}.valid_{exposed_name}.value'
+            expose_signal = f'dut.{module_name}.expose_{exposed_name}.value'
+            append_condition(f'({valid_signal} & {expose_signal})')
 
     for i in expr.operands[1:]:
         operand = unwrap_operand(i)
@@ -77,17 +98,13 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
 
     f_string_content = "".join(f_string_content_parts)
 
-    block_condition = dumper.get_pred()
-    block_condition = block_condition.replace('cycle_count', 'dut.global_cycle_count')
-    final_conditions = []
-
     for cond_str, cond_obj in dumper.cond_stack:
         # CondBlock conditions may include CURRENT_CYCLE; map it to DUT path.
         if isinstance(cond_obj, CondBlock):
             # Fast-path: translate cycle_count references directly in the string form.
             if "self.cycle_count" in cond_str:
                 tb_cond_path = cond_str.replace("self.cycle_count", "dut.global_cycle_count.value")
-                final_conditions.append(tb_cond_path)
+                append_condition(tb_cond_path)
                 continue
             exposed_name = _sanitize(dumper.dump_rval(cond_obj.cond, True))
 
@@ -95,10 +112,10 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
             tb_valid_path = f"(dut.{module_name}.valid_{exposed_name}.value)"
 
             combined_cond = f"({tb_valid_path} & {tb_expose_path})"
-            final_conditions.append(combined_cond)
+            append_condition(combined_cond)
 
     if condition_snippets:
-        final_conditions.append(" and ".join(condition_snippets))
+        append_condition(" and ".join(condition_snippets))
 
     if_condition = " and ".join(final_conditions)
 
