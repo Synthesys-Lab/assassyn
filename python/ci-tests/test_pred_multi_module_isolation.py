@@ -66,5 +66,3 @@ def test_pred_multi_module_isolation():
 
 if __name__ == '__main__':
     test_pred_multi_module_isolation()
-
-
