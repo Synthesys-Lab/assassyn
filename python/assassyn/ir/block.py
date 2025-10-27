@@ -29,14 +29,8 @@ class Block:
         self.parent = self.module = None
 
     def __repr__(self):
-        # Render block body respecting the current indent. Intrinsics control indent themselves.
-        Singleton.repr_ident += 2
-        lines = []
-        for elem in self.iter():
-            payload = repr(elem)
-            lines.append((' ' * Singleton.repr_ident) + payload)
-        Singleton.repr_ident -= 2
-        return '\n'.join(lines)
+        # Do not manage indentation here; nodes handle their own indentation in __repr__.
+        return '\n'.join(repr(elem) for elem in self.iter())
 
     @property
     def body(self):
