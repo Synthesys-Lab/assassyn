@@ -29,11 +29,27 @@ class Block:
         self.parent = self.module = None
 
     def __repr__(self):
+        # Render block body with special handling for predicate push/pop intrinsics.
+        from .expr.intrinsic import Intrinsic  # local import to avoid cycles
         Singleton.repr_ident += 2
-        ident = ' ' * Singleton.repr_ident
-        body = ident + ('\n' + ident).join(repr(elem) for elem in self.iter())
+        lines = []
+        for elem in self.iter():
+            # Detect PUSH/POP predicate intrinsics by opcode
+            if isinstance(elem, Intrinsic):
+                if elem.opcode == Intrinsic.PUSH_CONDITION:
+                    cond = elem.args[0].as_operand()
+                    lines.append((' ' * Singleton.repr_ident) + f'if {cond} {{ // PUSH_CONDITION')
+                    Singleton.repr_ident += 2
+                    continue
+                if elem.opcode == Intrinsic.POP_CONDITION:
+                    Singleton.repr_ident -= 2
+                    lines.append((' ' * Singleton.repr_ident) + '} // POP_CONDITION')
+                    continue
+            # Default rendering for non-predicate elements
+            lines.append((' ' * Singleton.repr_ident) + repr(elem))
+
         Singleton.repr_ident -= 2
-        return body
+        return '\n'.join(lines)
 
     @property
     def body(self):
