@@ -33,7 +33,8 @@ class Block:
         Singleton.repr_ident += 2
         lines = []
         for elem in self.iter():
-            lines.append((' ' * Singleton.repr_ident) + repr(elem))
+            payload = repr(elem)
+            lines.append((' ' * Singleton.repr_ident) + payload)
         Singleton.repr_ident -= 2
         return '\n'.join(lines)
 
