@@ -222,6 +222,17 @@ def __repr__(self) -> str
 
 **Explanation:** Creates a formatted string representation of the block for debugging and display purposes. Uses the `Singleton.repr_ident` to maintain proper indentation levels for nested blocks. The representation shows all expressions contained in the block's body.
 
+IR dump special rule for predicate intrinsics
+
+- When predicate intrinsics are present in a block body, the dump renders them as visual braces to make the guarded region obvious while reminding there is no structural control flow.
+  - On `push_condition(cond)`, the dump prints a single line:
+    - `if cond { // PUSH_CONDITION`
+    - The indentation then increases for subsequent lines.
+  - On `pop_condition()`, the dump first reduces indentation, then prints a single line:
+    - `} // POP_CONDITION`
+  - These markers are formatting-only hints for developers; they do not represent a real `if` statement in the IR.
+  - Indentation is still managed by `Singleton.repr_ident` and remains balanced by the builder’s predicate stack invariants.
+
 **Global State Management for String Representation:** The `__repr__` methods use `Singleton.repr_ident` for indentation, which creates a global state management pattern:
 
 1. **Global Indentation Counter**: All block types modify the global `Singleton.repr_ident` counter for indentation
