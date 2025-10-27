@@ -59,6 +59,17 @@ class Intrinsic(Expr):
         return Bits(1)
 
     def __repr__(self):
+        # Special dump rule for predicate push/pop: render as braces with comments
+        from ...builder import Singleton  # local import to avoid cycles
+        if self.opcode == Intrinsic.PUSH_CONDITION:
+            cond = self.args[0].as_operand()
+            line = f'if {cond} {{ // PUSH_CONDITION'
+            Singleton.repr_ident += 2
+            return line
+        if self.opcode == Intrinsic.POP_CONDITION:
+            Singleton.repr_ident -= 2
+            return '} // POP_CONDITION'
+
         args = {", ".join(i.as_operand() for i in self.args[0:])}
         mn, _, valued, side_effect = INTRIN_INFO[self.opcode]
         side_effect = ['', 'side effect '][side_effect]
