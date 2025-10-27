@@ -29,8 +29,24 @@ class Block:
         self.parent = self.module = None
 
     def __repr__(self):
-        # Do not manage indentation here; nodes handle their own indentation in __repr__.
-        return '\n'.join(repr(elem) for elem in self.iter())
+        # Render block body and manage indentation for predicate PUSH/POP here.
+        from .expr.intrinsic import Intrinsic  # local import to avoid cycles
+        Singleton.repr_ident += 2
+        lines = []
+        for elem in self.iter():
+            if isinstance(elem, Intrinsic):
+                if elem.opcode == Intrinsic.PUSH_CONDITION:
+                    cond = elem.args[0].as_operand()
+                    lines.append((' ' * Singleton.repr_ident) + f'if {cond} {{ // PUSH_CONDITION')
+                    Singleton.repr_ident += 2
+                    continue
+                if elem.opcode == Intrinsic.POP_CONDITION:
+                    Singleton.repr_ident -= 2
+                    lines.append((' ' * Singleton.repr_ident) + '} // POP_CONDITION')
+                    continue
+            lines.append((' ' * Singleton.repr_ident) + repr(elem))
+        Singleton.repr_ident -= 2
+        return '\n'.join(lines)
 
     @property
     def body(self):
