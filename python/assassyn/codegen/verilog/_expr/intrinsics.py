@@ -12,7 +12,6 @@ from ....ir.expr import Log
 from ....ir.expr.intrinsic import PureIntrinsic, Intrinsic, ExternalIntrinsic
 from ....ir.const import Const
 from ....ir.dtype import Int
-from ....ir.block import CondBlock
 from ....utils import unwrap_operand, namify
 
 if TYPE_CHECKING:
@@ -40,18 +39,19 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
             name = name[5:]
         return name.replace(".", "_")
 
-    meta_cond = getattr(expr, 'meta_cond', None)
-    if meta_cond is not None:
-        predicate_value = meta_cond
-        if isinstance(predicate_value, Const):
-            if predicate_value.value == 0:
-                append_condition('False')
-        else:
-            dumper.expose('expr', predicate_value)
-            exposed_name = _sanitize(dumper.dump_rval(predicate_value, True))
-            valid_signal = f'dut.{module_name}.valid_{exposed_name}.value'
-            expose_signal = f'dut.{module_name}.expose_{exposed_name}.value'
-            append_condition(f'({valid_signal} & {expose_signal})')
+    meta_cond = expr.meta_cond
+    if meta_cond is None:
+        raise ValueError("Log.meta_cond is unexpectedly missing")
+
+    if isinstance(meta_cond, Const):
+        if meta_cond.value == 0:
+            append_condition('False')
+    else:
+        dumper.expose('expr', meta_cond)
+        exposed_name = _sanitize(dumper.dump_rval(meta_cond, True))
+        valid_signal = f'dut.{module_name}.valid_{exposed_name}.value'
+        expose_signal = f'dut.{module_name}.expose_{exposed_name}.value'
+        append_condition(f'({valid_signal} & {expose_signal})')
 
     for i in expr.operands[1:-1]:
         operand = unwrap_operand(i)
@@ -97,22 +97,6 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
             f_string_content_parts.append(new_placeholder)
 
     f_string_content = "".join(f_string_content_parts)
-
-    for cond_str, cond_obj in dumper.cond_stack:
-        # CondBlock conditions may include CURRENT_CYCLE; map it to DUT path.
-        if isinstance(cond_obj, CondBlock):
-            # Fast-path: translate cycle_count references directly in the string form.
-            if "self.cycle_count" in cond_str:
-                tb_cond_path = cond_str.replace("self.cycle_count", "dut.global_cycle_count.value")
-                append_condition(tb_cond_path)
-                continue
-            exposed_name = _sanitize(dumper.dump_rval(cond_obj.cond, True))
-
-            tb_expose_path = f"(dut.{module_name}.expose_{exposed_name}.value)"
-            tb_valid_path = f"(dut.{module_name}.valid_{exposed_name}.value)"
-
-            combined_cond = f"({tb_valid_path} & {tb_expose_path})"
-            append_condition(combined_cond)
 
     if condition_snippets:
         append_condition(" and ".join(condition_snippets))

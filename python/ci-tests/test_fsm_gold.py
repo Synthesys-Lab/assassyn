@@ -75,7 +75,7 @@ def test_fsm_gold():
         sim_threshold=200,
         idle_threshold=200,
         random=True,
-        verilog=False
+        verilog=True
     )
 
 

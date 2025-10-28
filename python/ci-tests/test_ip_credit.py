@@ -78,7 +78,7 @@ def build_system():
 def test_ip_credit():
     """Run the credit counter IP test."""
     run_test('ip_credit', build_system, check_raw, 
-             sim_threshold=100, idle_threshold=200, verilog=False)
+             sim_threshold=100, idle_threshold=200, verilog=True)
 
 if __name__ == '__main__':
     test_ip_credit()

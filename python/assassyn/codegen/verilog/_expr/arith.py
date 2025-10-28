@@ -11,7 +11,7 @@ from typing import Optional
 from ....ir.expr import BinaryOp, UnaryOp, Concat, Cast, Select, Select1Hot
 from ....ir.array import Slice
 from ....ir.dtype import Bits
-from ..utils import dump_type_cast
+from ..utils import dump_type_cast, ensure_bits
 
 
 def codegen_binary_op(dumper, expr: BinaryOp) -> Optional[str]:
@@ -144,6 +144,8 @@ def codegen_select(dumper, expr: Select) -> Optional[str]:
     true_value = dumper.dump_rval(expr.true_value, False)
     false_value = dumper.dump_rval(expr.false_value, False)
     rval = dumper.dump_rval(expr, False)
+
+    cond = ensure_bits(cond)
 
     if expr.true_value.dtype != expr.false_value.dtype:
         false_value = f"{false_value}.{dump_type_cast(expr.true_value)}"

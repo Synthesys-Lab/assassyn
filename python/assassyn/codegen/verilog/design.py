@@ -27,7 +27,6 @@ from ...utils.enforce_type import enforce_type
 from ...ir.expr import (
     Expr,
     FIFOPop,
-    Log,
     ArrayRead,
     ArrayWrite,
     FIFOPush,
@@ -193,18 +192,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         if is_cond:
             cond_str = self.dump_rval(node.cond, False)
             self.cond_stack.append((f"({cond_str})", node))
-            def has_side_effect(block: Block) -> bool:
-                if block.body is None:
-                    return False
-                for item in block.body:
-                    if isinstance(item, Log):
-                        return True
-                    if isinstance(item, Block) and has_side_effect(item):
-                        return True
-                return False
-
-            if has_side_effect(node):
-                self.expose('expr', node.cond)
 
         if node is not None and node.body is not None:
             for i in node.body:

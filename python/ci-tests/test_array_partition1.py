@@ -58,7 +58,7 @@ def checker(raw):
 
 
 def test_array_partition1():
-    run_test('array_partition1', top, checker, verilog=False)
+    run_test('array_partition1', top, checker, verilog=True)
 
 
 if __name__ == '__main__':

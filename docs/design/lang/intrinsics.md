@@ -76,6 +76,16 @@ def build(self):
     assume(enable)  # example usage
 ```
 
+### `log(fmt, *values)`
+
+Purpose: Emit a formatted trace message guarded by the current predicate.
+
+Relationship to Predicates: The frontend helper captures `get_pred()` when the `Log` node is created and stores the value as the node's `meta_cond` metadata. Downstream codegen (both simulator and Verilog) reads `meta_cond` to decide when to print.
+
+Verilog Codegen: The Verilog dumper exposes only the predicate referenced by `meta_cond` once, generating a `valid_*` / `expose_*` pair that drives the trace guard. Older logic walked the entire condition stack to expose each guard separately; the metadata now serves as the single source of truth to avoid redundant exposures.
+
+Simulator Parity: The Python simulator follows the same contract—`meta_cond` controls when the `print` executes—so the behaviour stays consistent across backends.
+
 ### `wait_until(condition)`
 
 **Purpose**: Block execution until a condition becomes true.
@@ -351,4 +361,3 @@ with Condition(we):
 To handle this, use separate intrinsics to check request success:
 - `has_mem_resp(mem)` - Check if memory has a response
 - `get_mem_resp(mem)` - Get the memory response data
-

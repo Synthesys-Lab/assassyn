@@ -56,11 +56,10 @@ def test_async_call_pred():
         driver.build(adder)
 
     run_test(
-        "async_call_pred", top, check_raw, sim_threshold=200, idle_threshold=200, random=True, verilog=False
+        "async_call_pred", top, check_raw, sim_threshold=200, idle_threshold=200, random=True, verilog=True
     )
 
 
 if __name__ == "__main__":
     test_async_call_pred()
-
 

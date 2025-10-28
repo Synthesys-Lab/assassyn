@@ -51,10 +51,9 @@ def test_pred_nested():
         driver = Driver()
         driver.build()
 
-    run_test("pred_nested", top, check_raw, sim_threshold=50, idle_threshold=50, random=True, verilog=False)
+    run_test("pred_nested", top, check_raw, sim_threshold=50, idle_threshold=50, random=True, verilog=True)
 
 
 if __name__ == "__main__":
     test_pred_nested()
-
 
