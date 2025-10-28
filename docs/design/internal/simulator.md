@@ -63,8 +63,8 @@ move to the next cycle. See below for more details.
 Our code generator traverses all arrays in the system to gather all their identifiers, types,
 and initial values to fill in the `Simulator` fields, and the constructor, `new()`, function.
 Each array is instantiated as a `Array<T>` struct defined in `sim_runtime` crate, which
-includes its data payload, and associated methods to write. Arrays whose owner is
-`MemoryOwner(memory=DRAM, role="payload")` are skipped during this pass because they are modelled
+includes its data payload, and associated methods to write. Arrays whose owner is a `MemoryBase`
+instance and that match `owner._payload` are skipped during this pass because they are modelled
 through the DRAM request/response interface instead of the generic register array path. SRAM
 payload arrays remain materialised so the simulator can load initialization files and implement
 the simple black box that mirrors the Verilog backend.

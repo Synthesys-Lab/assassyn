@@ -25,10 +25,10 @@ This is the main cleanup function that generates all the necessary control signa
 
 2. **Finish Signal Generation**: Reduces every `(predicate, exec_signal)` pair queued in `dumper.finish_conditions` into the `self.finish` output.
 
-3. **SRAM Control Signal Generation**: When the current module wraps an SRAM payload (detected via `isinstance(array.owner, MemoryOwner)` with `role="payload"`), `generate_sram_control_signals` derives write enables, addresses, and data from the exposed array accesses, producing the handshakes expected by the memory blackbox.
+3. **SRAM Control Signal Generation**: When the current module wraps an SRAM payload (detected by checking `array.owner is sram_instance` and `array is sram_instance._payload`), `generate_sram_control_signals` derives write enables, addresses, and data from the exposed array accesses, producing the handshakes expected by the memory blackbox.
 
 4. **Array Write Signal Generation**: For each array exposed through `dumper._exposes`:
-   - Filters out arrays tagged with `MemoryOwner(role="payload")` because those are handled by dedicated memory logic.
+   - Filters out arrays whose owner is a memory instance and that match the memory's `_payload`, because those are handled by dedicated memory logic.
    - Groups writes by source module and maps them onto the precomputed port indices stored in the `ArrayMetadataRegistry`.
    - Emits write-enable, write-data, and write-index signals per port. Multi-writer modules use `build_mux_chain` to pick the correct payload.
 

@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Any
 
-from ...ir.array import MemoryOwner
+from ...ir.memory.base import MemoryBase
 from ...ir.expr import AsyncCall
 from ...ir.expr.intrinsic import PureIntrinsic
 from ...analysis import get_upstreams
@@ -84,7 +84,7 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
 
     for arr_container in sys.arrays:
         owner = arr_container.owner
-        if isinstance(owner, MemoryOwner) and owner.role == 'payload':
+        if isinstance(owner, MemoryBase) and arr_container is owner._payload:  # pylint: disable=protected-access
             continue
         dumper.visit_array(arr_container)
 

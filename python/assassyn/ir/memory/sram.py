@@ -3,7 +3,7 @@
 from .base import MemoryBase
 from ..module.downstream import combinational
 from ..block import Condition
-from ..array import RegArray, MemoryOwner
+from ..array import RegArray
 from ..dtype import Bits
 from ..expr import assume
 
@@ -28,7 +28,7 @@ class SRAM(MemoryBase):  # pylint: disable=too-many-instance-attributes
             Bits(width),
             1,
             name=f'{self.name}_rdata',
-            owner=MemoryOwner(self, role='dout'),
+            owner=self,
         )
 
     @combinational

@@ -8,7 +8,8 @@ from .utils import (
 
 from ...ir.module import Downstream, Module, Port
 from ...ir.memory.sram import SRAM
-from ...ir.array import Array, Slice, MemoryOwner
+from ...ir.array import Array, Slice
+from ...ir.memory.base import MemoryBase
 from ...ir.const import Const
 from ...ir.expr import (
     Expr,
@@ -135,7 +136,7 @@ def cleanup_post_generation(dumper):
     for key, exposes in dumper._exposes.items():  # pylint: disable=protected-access
         if isinstance(key, Array):
             owner = key.owner
-            if isinstance(owner, MemoryOwner) and owner.role == 'payload':
+            if isinstance(owner, MemoryBase) and key is owner._payload:  # pylint: disable=protected-access
                 continue
             array_writes = [
                     (e, p) for e, p in exposes

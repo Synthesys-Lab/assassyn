@@ -11,7 +11,7 @@ from ...ir.expr import Bind
 from ...ir.module import Downstream, Module
 from ...ir.module.external import ExternalSV
 from ...ir.memory.sram import SRAM
-from ...ir.array import MemoryOwner
+from ...ir.memory.base import MemoryBase
 from .external import (
     collect_external_classes,
     collect_external_intrinsics,
@@ -130,9 +130,9 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     for array in sys.arrays:
         owner = array.owner
         if (
-            isinstance(owner, MemoryOwner)
-            and owner.role == 'payload'
-            and owner.memory in dram_modules
+            isinstance(owner, MemoryBase)
+            and array is owner._payload  # pylint: disable=protected-access
+            and owner in dram_modules
         ):
             continue
         name = namify(array.name)

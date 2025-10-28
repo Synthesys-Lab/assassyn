@@ -2,88 +2,64 @@
 
 ## Summary
 
-This document introduces the ownership metadata carried by every IR array. The
-owner descriptor records which architectural unit is responsible for the array
-contents and how downstream infrastructure should treat the storage. Replacing
-the coarse `ArrayKind` enum with structured ownership objects lets the IR,
-Verilog backend, simulator, and tooling query precise provenance information
-without hard-coded buckets.
+Every IR array exposes an `owner` attribute that points to the runtime object
+responsible for the storage. Rather than wrapping the information in dedicated
+descriptor classes, the `owner` is simply a reference to the defining module,
+memory instance, or `None` when no explicit context exists. Downstream passes
+inspect the referenced object (most notably the concrete `MemoryBase`
+subclasses) to determine how the storage should be handled during code
+generation and simulation.
 
-## Owner Taxonomy
+## Ownership Semantics
 
-Two concrete owner descriptors are currently defined. Both implement a common
-interface that exposes a `category` string for quick filtering and helper
-methods for downstream logic.
+### Register Arrays
 
-### `RegisterOwner`
+- Arrays instantiated at the system scope carry `owner = None`.
+- Arrays created inside a module store a reference to that `ModuleBase`
+  instance. The Verilog backend and simulator use the module reference to derive
+  port ownership and naming.
 
-- **Purpose**: Represents register arrays that belong to a pipeline module or
-  global system context.
-- **Fields**:
-  - `module: ModuleBase | None` – The module that instantiated the array. This
-    is `None` for arrays declared while no module context is active (for example
-    system-level scratch space).
-- **Behaviour**:
-  - Verilog metadata collectors treat `RegisterOwner` arrays as regular
-    multi-port register banks.
-  - The simulator materialises these arrays as mutable `Array<T>` instances and
-    pre-allocates ports based on module access patterns.
+### Memory-backed Arrays
 
-### `MemoryOwner`
-
-- **Purpose**: Encodes arrays that are private to a `MemoryBase` subclass.
-- **Fields**:
-  - `memory: MemoryBase` – Reference to the owning memory instance. Downstream
-    logic inspects the concrete subclass (SRAM or DRAM) to decide whether the
-    storage is synthesised or abstracted.
-  - `role: Literal["payload", "dout"]` – Distinguishes the backing payload from
-    auxiliary buffers. `payload` arrays emulate the actual RAM contents.
-    `dout` arrays (currently SRAM-only) act as the one-word read data latch.
-- **Behaviour**:
-  - Verilog passes skip payload arrays because dedicated SRAM/DRAM generators
-    wire them, but they still expose `dout` buffers as standard registers.
-  - The simulator materialises SRAM payloads so it can execute the simple black
-    box, but it skips DRAM payloads and proxies them through the Ramulator2
-    interface.
+- Memory constructors (`SRAM`, `DRAM`, or future subclasses) assign `owner = self`
+  to their internal arrays.
+- Payload buffers are identified by the identity check
+  `array.owner is memory and array is memory._payload`. Only these buffers are
+  skipped by generic register plumbing.
+- Auxiliary registers such as the SRAM `dout` latch also reference the memory
+  instance through `owner`, but they are treated like ordinary registers because
+  they are not the payload array.
 
 ## Ownership Lifecycle
 
-- **Assignment**: `RegArray` automatically assigns a `RegisterOwner` tied to the
-  current module context. Memory modules call `RegArray(..., owner=MemoryOwner)`
-  to override the default and associate payload buffers with the correct memory.
-- **Mutation**: Ownership descriptors are immutable dataclasses. The only way to
-  change ownership is through `Array.assign_owner`, which enforces type safety
-  and is intended for tightly controlled refactors (for example, cloning an
-  array into a new module).
-- **Introspection**: `Array.owner` exposes the descriptor. Convenience checks
-  such as `array.owner.category == "memory"` or
-  `isinstance(array.owner, MemoryOwner)` allow downstream code to branch on
-  semantics without relying on enum members.
+- **Assignment**: `RegArray` records the current module (if any) automatically.
+  Memory modules call `RegArray(..., owner=self)` to override the default once
+  their base class initialisation has completed.
+- **Mutation**: `Array.assign_owner` remains available for controlled updates and
+  enforces that the owner is either a `ModuleBase`, a `MemoryBase`, or `None`.
+- **Introspection**: Use `array.owner` directly. To differentiate payloads from
+  other arrays, compare against well-known fields on the owning memory:
+  `if isinstance(owner, MemoryBase) and array is owner._payload: ...`.
 
 ## Downstream Integration
 
-- **Verilog Backend**:
-  - `ArrayMetadataRegistry` filters out `MemoryOwner(role="payload")` arrays so
-    they do not receive generic multi-port wiring.
-  - `generate_sram_control_signals` recognises `MemoryOwner` payloads when
-    synthesising SRAM handshake logic and exposes `dout` arrays as regular
-    registers.
-  - System/top-level assembly checks the owner category when deciding which
-    arrays require write-back wiring.
-- **Simulator**:
-  - Iterates over arrays and skips DRAM payload owners, delegating to the
-    `MemoryInterface`. SRAM payloads remain materialised to back the simplified
-    SRAM model.
-  - Ownership metadata is preserved so debug tooling can report which module or
-    memory produced each array.
+- **Verilog Backend**
+  - `ArrayMetadataRegistry` filters out payload buffers by checking whether the
+    array is identical to `memory._payload`.
+  - SRAM-specific passes detect payload access by comparing both owner and array
+    identity, allowing the handshake logic to route to dedicated memory signals.
+- **Simulator**
+  - The simulator enumerates arrays and skips DRAM payload buffers; SRAM payloads
+    remain materialised for the behavioural model.
+  - Register-owned arrays (module references or `None`) continue to be allocated
+    as mutable simulator arrays.
 
 ## Extension Guidelines
 
-- Prefer extending `MemoryOwner.role` for new memory-side buffers (for example,
-  FIFOs) instead of introducing additional enums.
-- If a future feature needs a different ownership semantic (e.g. external
-  accelerators exporting arrays), add a dedicated dataclass to capture the
-  required context rather than overloading existing roles.
-- Whenever ownership transfer is required, implement it in a dedicated helper
-  that records the transition. Avoid reassigning owners ad-hoc inside module
-  code—this breaks the provenance guarantees the simulator and codegen rely on.
+- Future memories that introduce additional internal arrays should expose named
+  attributes similar to `_payload` and consult those identities when branching.
+- If a new component needs to own arrays without being a `ModuleBase` or
+  `MemoryBase`, extend `assign_owner` to accept that type and document the
+  identity-based checks downstream users should apply.
+- Avoid adding fragile string tags; rely on concrete Python objects so that
+  ownership changes can be reasoned about using object identity.

@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
 
 from .metadata import ArrayMetadata
-from ...ir.array import Array, MemoryOwner
+from ...ir.array import Array
+from ...ir.memory.base import MemoryBase
 from ...ir.expr import ArrayRead, ArrayWrite
 from ...builder import SysBuilder
 
@@ -35,7 +36,7 @@ class ArrayMetadataRegistry:
         modules: List[Module] = list(sys.modules) + list(sys.downstreams)
         for arr in sys.arrays:
             owner = arr.owner
-            if isinstance(owner, MemoryOwner) and owner.role == 'payload':
+            if isinstance(owner, MemoryBase) and arr is owner._payload:  # pylint: disable=protected-access
                 continue
 
             writers = arr.get_write_ports().keys()

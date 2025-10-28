@@ -2,7 +2,7 @@
 
 import math
 from ..module.downstream import Downstream
-from ..array import RegArray, Array, MemoryOwner
+from ..array import RegArray, Array
 from ..dtype import Bits
 from ..value import Value
 
@@ -60,7 +60,7 @@ class MemoryBase(Downstream):
             depth,
             attr=[self],
             name=f'{self.name}_val',
-            owner=MemoryOwner(self, role='payload'),
+            owner=self,
         )
         
         # Initialize signal attributes to None

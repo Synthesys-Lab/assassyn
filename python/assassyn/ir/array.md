@@ -18,33 +18,19 @@ The `array.py` module provides the `RegArray` function and `Array` class methods
 
 ### Ownership Metadata
 
-```python
-@dataclass(frozen=True)
-class RegisterOwner:
-    module: ModuleBase | None
+Each array records its provenance via the `owner` attribute. The owner is one of:
 
-@dataclass(frozen=True)
-class MemoryOwner:
-    memory: MemoryBase
-    role: Literal["payload", "dout"]
-```
+- `None` when the array is instantiated outside any module.
+- A `ModuleBase` instance for module-scoped arrays.
+- A `MemoryBase` instance (for example, `SRAM` or `DRAM`) for memory-managed
+  buffers.
 
-Every array carries an immutable ownership descriptor identifying which module
-or memory instance manages its storage.
-
-- **RegisterOwner** – Applied automatically by `RegArray` when a module context
-  is active. The descriptor records the defining module (if any) so downstream
-  passes can attribute ports and metadata correctly.
-- **MemoryOwner** – Used by memory builders such as `SRAM` and `DRAM` to tag
-  internal payloads (`role="payload"`) and auxiliary buffers (e.g.
-  `role="dout"`). Verilog and simulator components inspect both the role and
-  the owning memory class to decide whether to emit generic register wiring or
-  delegate to dedicated memory logic.
-
-Ownership replaces the coarse `ArrayKind` enum with richer provenance data,
-allowing downstream code to branch on structured semantics instead of hard-coded
-enum buckets. The full ownership design is documented in
-[`docs/design/internal/array-ownership.md`](../../../docs/design/internal/array-ownership.md).
+Downstream passes rely on identity comparisons. Memory payloads are detected by
+combining `isinstance(array.owner, MemoryBase)` with
+`array is array.owner._payload`, while auxiliary registers such as the SRAM
+`dout` latch continue to look like regular arrays even though they reference the
+same owner. See [`docs/design/internal/array-ownership.md`](../../../docs/design/internal/array-ownership.md)
+for the detailed rationale.
 
 ### `RegArray`
 
@@ -56,7 +42,7 @@ def RegArray(
     name: str = None,
     attr: list = None,
     *,
-    owner: RegisterOwner | MemoryOwner | None = None,
+    owner: ModuleBase | MemoryBase | None = None,
 ) -> Array:
     '''
     The frontend API to declare a register array.
@@ -66,7 +52,7 @@ def RegArray(
     @param initializer The initializer of the register array. If not set, it is 0-initialized.
     @param name The custom name for the array.
     @param attr The attribute list of the array.
-    @param owner Optional ownership override; defaults to a RegisterOwner tied to the current module.
+    @param owner Optional ownership override; defaults to the current module (or None outside a module).
     @return Array instance registered with the AST builder.
     '''
 ```
@@ -96,7 +82,7 @@ payload = RegArray(
     1024,
     attr=[self],
     name=f'{self.name}_val',
-    owner=MemoryOwner(self, role="payload"),
+    owner=self,  # assign memory instance as owner
 )
 ```
 
@@ -116,7 +102,7 @@ class Array:
     _users: typing.List[Expr]  # Users of the array
     _name: str  # Internal name storage
     _write_ports: typing.Dict['ModuleBase', 'WritePort']  # Write ports for this array
-    _owner: RegisterOwner | MemoryOwner  # Provenance descriptor
+    _owner: 'ModuleBase | MemoryBase | None'  # Provenance descriptor
 ```
 
 #### `as_operand`
@@ -465,30 +451,30 @@ def __repr__(self):
     @return Formatted string showing the slice operation.
     '''
 ```
-#### `owner` Property
+#### `owner` Property and `assign_owner`
 
 ```python
 @property
-def owner(self) -> RegisterOwner | MemoryOwner:
+def owner(self) -> ModuleBase | MemoryBase | None:
     '''
-    Return the ownership descriptor for this array.
+    Return the ownership context for this array.
 
-    @return RegisterOwner or MemoryOwner describing provenance.
+    @return ModuleBase, MemoryBase, or None describing provenance.
     '''
 
-def assign_owner(self, owner: RegisterOwner | MemoryOwner) -> None:
+def assign_owner(self, owner: ModuleBase | MemoryBase | None) -> None:
     '''
-    Override the ownership descriptor.
+    Override the ownership context.
 
-    @param owner Ownership descriptor to apply. Intended for controlled refactors.
+    @param owner Ownership reference to apply. Intended for controlled refactors.
     '''
 ```
 
 **Explanation:**
 
-Ownership metadata replaces the legacy `ArrayKind` enum. Downstream passes inspect
-`array.owner` to decide whether the storage participates in generic register
-plumbing or memory-specific code paths. `assign_owner` is the sanctioned hook for
-changing ownership (for example, when cloning an array into a new module).
-Directly mutating internal fields is prohibited to preserve provenance
-guarantees relied upon by the Verilog backend and simulator.
+Downstream passes query `array.owner` and use identity checks to determine how
+the storage should be treated. Memory payloads are detected with
+`isinstance(array.owner, MemoryBase)` plus an identity check against
+`array.owner._payload`. The `assign_owner` helper enforces that the owner is a
+module, a memory, or `None`, providing a single sanctioned hook for refactors
+that need to re-home an array.

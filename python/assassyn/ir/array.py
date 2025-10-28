@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import typing
-from dataclasses import dataclass
-from typing import Literal
 
 from ..builder import ir_builder, Singleton
 from .dtype import to_uint, RecordValue, ArrayType
@@ -18,49 +16,27 @@ if typing.TYPE_CHECKING:
     from .dtype import DType
     from .module.base import ModuleBase
     from .memory.base import MemoryBase
+    OwnerType = ModuleBase | MemoryBase | None
+else:
+    OwnerType = typing.Any
 
 
-@dataclass(frozen=True)
-class RegisterOwner:
-    '''Descriptor for register-backed arrays owned by a module or system context.'''
+def _validate_owner(owner: typing.Any) -> OwnerType:
+    '''Ensure the provided owner reference is recognised.'''
+    # pylint: disable=import-outside-toplevel
+    from .module.base import ModuleBase
+    from .memory.base import MemoryBase
 
-    module: ModuleBase | None
-
-    @property
-    def category(self) -> str:
-        '''Return the ownership category identifier.'''
-        return 'register'
-
-
-@dataclass(frozen=True)
-class MemoryOwner:
-    '''Descriptor for arrays that belong to a memory instance.'''
-
-    memory: MemoryBase
-    role: Literal['payload', 'dout']
-
-    def __post_init__(self) -> None:
-        if self.role not in {'payload', 'dout'}:
-            raise ValueError(f'Unsupported memory owner role: {self.role!r}')
-
-    @property
-    def category(self) -> str:
-        '''Return the ownership category identifier.'''
-        return 'memory'
-
-
-ArrayOwner = RegisterOwner | MemoryOwner
-
-
-def _validate_owner(owner: ArrayOwner | None) -> ArrayOwner:
-    '''Ensure the provided owner descriptor is recognised.'''
-    if isinstance(owner, (RegisterOwner, MemoryOwner)):
+    if owner is None or isinstance(owner, (ModuleBase, MemoryBase)):
         return owner
-    raise TypeError(f'Array owner must be RegisterOwner or MemoryOwner, got {type(owner)}')
+    raise TypeError(
+        'Array owner must be a ModuleBase, MemoryBase, or None, '
+        f'got {type(owner)}'
+    )
 
 
-def _resolve_owner(owner: ArrayOwner | None) -> ArrayOwner:
-    '''Resolve the owner descriptor, falling back to the current module context.'''
+def _resolve_owner(owner: typing.Any) -> OwnerType:
+    '''Resolve the owner reference, falling back to the current module context.'''
     if owner is not None:
         return _validate_owner(owner)
 
@@ -68,7 +44,7 @@ def _resolve_owner(owner: ArrayOwner | None) -> ArrayOwner:
     module = None
     with contextlib.suppress(RuntimeError):
         module = builder.current_module
-    return RegisterOwner(module)
+    return module
 
 
 class Slice(Expr):
@@ -123,7 +99,7 @@ def RegArray(  # pylint: disable=invalid-name,too-many-arguments
         name: str = None,
         attr: list = None,
         *,
-        owner: ArrayOwner | None = None,
+        owner: OwnerType = None,
     ):
     '''
     The frontend API to declare a register array.
@@ -171,7 +147,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
     _users: typing.List[Expr]  # Users of the array
     _name: str  # Internal name storage
     _write_ports: typing.Dict['ModuleBase', 'WritePort'] = {}  # Write ports for this array
-    _owner: ArrayOwner  # Provenance descriptor
+    _owner: OwnerType  # Provenance descriptor
 
 
     def as_operand(self):
@@ -189,7 +165,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
     def name(self, name):
         self._name = namify(name)
 
-    def __init__(self, scalar_ty: DType, size: int, initializer: list, owner: ArrayOwner):
+    def __init__(self, scalar_ty: DType, size: int, initializer: list, owner: OwnerType):
         #pylint: disable=import-outside-toplevel
         from .dtype import DType
         assert isinstance(scalar_ty, DType)
@@ -213,12 +189,12 @@ class Array:  #pylint: disable=too-many-instance-attributes
         return self._users
 
     @property
-    def owner(self) -> ArrayOwner:
-        '''Get the ownership descriptor of the array.'''
+    def owner(self) -> OwnerType:
+        '''Get the ownership context of the array.'''
         return self._owner
 
-    def assign_owner(self, owner: ArrayOwner) -> None:
-        '''Override the ownership descriptor with a new value.'''
+    def assign_owner(self, owner: OwnerType) -> None:
+        '''Override the ownership context with a new value.'''
         self._owner = _validate_owner(owner)
 
     def __and__(self, other):

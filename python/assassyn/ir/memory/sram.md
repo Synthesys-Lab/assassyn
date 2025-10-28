@@ -42,7 +42,7 @@ Initialize SRAM module with read data buffer.
 **Returns:** None
 
 **Explanation:**
-This constructor calls the parent `MemoryBase.__init__()` method to inherit base memory functionality, then creates an additional `dout` register buffer. The `_payload` array is tagged with `MemoryOwner(self, "payload")`, allowing code generators to route it through dedicated SRAM interfaces. The `dout` buffer is allocated with `RegArray(Bits(width), 1, owner=MemoryOwner(self, "dout"))`, making its relationship to the SRAM explicit while still allowing downstream logic to treat it as a regular register. Using `Bits` type ensures compatibility with array read operations that return raw bit values.
+This constructor calls the parent `MemoryBase.__init__()` method to inherit base memory functionality, then creates an additional `dout` register buffer. Both arrays record the SRAM instance as their owner: `_payload` is created in the base class with `owner=self`, and `dout` uses the same override. Code generators rely on identity checks (`array is sram._payload`) to distinguish the payload buffer from auxiliary registers. Using `Bits` type ensures compatibility with array read operations that return raw bit values.
 
 ### `def build(self, we, re, addr, wdata)`
 

@@ -12,7 +12,7 @@ from .utils import (
 )
 
 from ...analysis import topo_downstream_modules
-from ...ir.array import MemoryOwner
+from ...ir.memory.base import MemoryBase
 from ...ir.module import Downstream
 from ...ir.module.base import ModuleBase
 from ...ir.memory.sram import SRAM
@@ -535,7 +535,7 @@ def generate_top_harness(dumper: CIRCTDumper):
     dumper.append_code('\n# --- Array Write-Back Connections ---')
     for arr_container in dumper.sys.arrays:
         owner = arr_container.owner
-        if isinstance(owner, MemoryOwner) and owner.role == 'payload':
+        if isinstance(owner, MemoryBase) and arr_container is owner._payload:  # pylint: disable=protected-access
             continue
         metadata = dumper.array_metadata.metadata_for(arr_container)
         if metadata and metadata.users:

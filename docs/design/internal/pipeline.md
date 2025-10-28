@@ -176,7 +176,7 @@ module reg_array #(
 endmodule
 ```
 
-When an array carries a `MemoryOwner(role="payload")`, the backend bypasses this generic module entirely and instead emits the specialised SRAM/DRAM wrappers that expose memory-specific handshakes. Ownership metadata lets the backend distinguish payload buffers from standard registers without relying on ad-hoc enums.
+When an array belongs to a memory instance and matches `memory._payload`, the backend bypasses this generic module entirely and instead emits the specialised SRAM/DRAM wrappers that expose memory-specific handshakes. Ownership metadata is now identity-based, enabling the backend to distinguish payload buffers from standard registers without dedicated descriptor classes.
 
 ## Clock Domain and Timing
 

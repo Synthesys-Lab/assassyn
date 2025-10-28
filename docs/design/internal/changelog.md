@@ -4,32 +4,31 @@ This document captures developer-facing migrations that affect internal users of
 the Assassyn codebase. Each entry summarises the change, lists the impacted
 interfaces, and outlines required follow-up for downstream consumers.
 
-## Array Ownership Migration
+## Array Ownership Simplification
 
-- **Summary**: `Array.kind` and the `ArrayKind` enum have been replaced by
-  structured ownership descriptors exposed via `Array.owner`.
-- **Effective**: 2025-10-28 (array owner migration TODO completion)
+- **Summary**: `Array.kind`/`ArrayKind` remain deprecated, but ownership is now
+  expressed directly through `Array.owner = ModuleBase | MemoryBase | None`
+  instead of custom descriptor dataclasses.
+- **Effective**: 2025-11-01 (array owner simplification refactor)
 - **Affected Components**:
-  - IR builders and transformation passes that previously branched on
-    `ArrayKind`.
-  - Verilog backend helpers that filtered arrays using `Array.kind`.
-  - Simulator utilities that skipped DRAM payload arrays.
-  - Any external tooling importing `assassyn.ir.ArrayKind`.
+  - Code paths that previously imported `RegisterOwner`/`MemoryOwner`.
+  - Backend utilities filtering arrays through `owner.role`.
+  - Simulator helpers that skipped payload buffers.
 - **Migration Guidance**:
-  1. Replace imports of `ArrayKind` with `RegisterOwner`, `MemoryOwner`, or the
-     generic `ArrayOwner` protocol.
-  2. Instead of comparing `array.kind`, inspect `array.owner`:
-     - Use `isinstance(array.owner, MemoryOwner)` to detect memory-managed
-       arrays.
-     - Check `array.owner.role == "payload"` to exclude memory payload buffers.
-     - Optional: read `array.owner.memory` to differentiate SRAM vs DRAM
-       behaviour.
-  3. When creating arrays that should belong to a memory, pass an explicit
-     `owner=MemoryOwner(...)` override to `RegArray`.
-  4. Avoid mutating internal fields; call `array.assign_owner()` if ownership
-     must change.
-- **Deprecations**: `ArrayKind` is removed entirely; importing it now fails.
-  Code that still references `array.kind` will raise `AttributeError`.
-- **Testing Notes**: New regression tests under
-  `python/unit-tests/test_array_owner.py` cover the ownership model. Downstream
-  projects should add equivalent coverage if they extend array ownership.
+  1. Stop importing `RegisterOwner` or `MemoryOwner`; they no longer exist.
+  2. Use direct identity checks:
+     - `owner is None` for top-level arrays.
+     - `owner is module_instance` for module-scoped arrays.
+     - `isinstance(owner, MemoryBase)` to detect memory-managed arrays.
+     - Compare `array is owner._payload` to skip payload buffers while leaving
+       auxiliary registers (e.g., SRAM `dout`) intact.
+  3. When creating memory-managed arrays, pass `owner=self` from the memory
+     constructor.
+  4. Use `array.assign_owner(new_owner)` when ownership must change; the method
+     validates the supplied object.
+- **Deprecations**: `RegisterOwner`, `MemoryOwner`, and `ArrayOwner` aliases are
+  removed. Code relying on `.role` must switch to identity checks as described
+  above.
+- **Testing Notes**: `python/unit-tests/test_array_owner.py` has been updated to
+  cover the simplified semantics. Downstream tests that asserted descriptor
+  types should adopt the new identity-based expectations.
