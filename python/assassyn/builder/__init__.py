@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-def ir_builder(func=None, *, node_type=None):
+def ir_builder(func=None):
     '''Decorator that records builder metadata and injects IR nodes into the AST.'''
 
     def _decorate(target):
@@ -86,8 +86,6 @@ def ir_builder(func=None, *, node_type=None):
             assert hasattr(res, 'loc')
             return res
 
-        if node_type is not None:
-            setattr(_wrapper, '_ir_builder_node_type', node_type)
         return _wrapper
 
     if func is None:

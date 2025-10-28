@@ -20,7 +20,7 @@ The builder module is the core of assassyn's IR construction system. It provides
 ```python
 # Functions
 def process_naming(expr, line_of_code: str, lineno: int) -> Dict[str, Any]
-def ir_builder(func=None, *, node_type=None) -> Callable
+def ir_builder(func=None) -> Callable
 
 # Classes
 class SysBuilder:
@@ -113,7 +113,7 @@ When entering (`__enter__`), it registers itself via `Singleton.set_builder(self
 
 ## IR Builder Decorator
 
-**`ir_builder(func=None, *, node_type=None)`** is a decorator that wraps functions to automatically inject their return values into the IR. It provides two key features:
+**`ir_builder(func=None)`** is a decorator that wraps functions to automatically inject their return values into the IR. It provides two key features:
 
 1. **Automatic IR Node Injection**: Non-`Const` return values are appended to `insert_point` (the current body list)
 2. **Source Location Tracking**: Uses stack inspection to determine the Python source location where the IR node was created
@@ -126,8 +126,6 @@ For each IR node returned by the decorated function:
 - Inserts the node into `insert_point` (current body list)
 - Inspects the call stack to find the first frame outside the assassyn package and excluded directories, recording that location as `node.loc`
 - For valued expressions with code context, calls `process_naming()` to infer a source name from the assignment statement
-
-**Optional `node_type` Parameter**: If provided, attaches `_ir_builder_node_type` attribute to the decorated function, useful for metadata tracking.
 
 ---
 
