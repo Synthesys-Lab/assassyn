@@ -303,19 +303,19 @@ class Singleton(type):
     all_dirs_to_exclude: list = []  # Directories to exclude for stack inspection
 
     @classmethod
-    def set_builder(cls, builder: SysBuilder | None) -> None:
+    def set_builder(mcs, builder: SysBuilder | None) -> None:
         '''Set or clear the global builder, preventing double registration.'''
         if builder is not None:
-            if cls._builder is not None:
+            if mcs._builder is not None:
                 raise RuntimeError('Singleton builder already initialised')
-            cls._builder = builder
+            mcs._builder = builder
             return
-        cls._builder = None
+        mcs._builder = None
 
     @classmethod
-    def peek_builder(cls) -> SysBuilder:
+    def peek_builder(mcs) -> SysBuilder:
         '''Return the active builder, raising if none is registered.'''
-        builder = cls._builder
+        builder = mcs._builder
         if builder is None:
             raise RuntimeError('Singleton builder is not initialised')
         return builder
