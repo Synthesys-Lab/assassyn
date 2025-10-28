@@ -29,9 +29,15 @@ def __assassyn_assignment__(name: str, value: Any) -> Any:
     """
     # Import here to avoid circular import
     from . import Singleton  # pylint: disable=import-outside-toplevel,cyclic-import
-    manager = Singleton.builder.naming_manager if Singleton.builder else None
-    if manager:
-        return manager.process_assignment(name, value)
+    try:
+        builder = Singleton.peek_builder()
+    except RuntimeError:
+        builder = None
+
+    if builder is not None:
+        manager = builder.naming_manager
+        if manager:
+            return manager.process_assignment(name, value)
     return value
 
 

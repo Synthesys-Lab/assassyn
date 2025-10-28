@@ -68,18 +68,19 @@ class Block:
 
     def __enter__(self):
         '''Designate the scope of entering the block.'''
-        parent = Singleton.builder.current_block
+        builder = Singleton.peek_builder()
+        parent = builder.current_block
         if parent is None:
-            parent = Singleton.builder.current_module
+            parent = builder.current_module
         assert parent is not None
         self.parent = parent
-        self.module = Singleton.builder.current_module
-        Singleton.builder.enter_context_of('block', self)
+        self.module = builder.current_module
+        builder.enter_context_of('block', self)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         '''Designate the scope of exiting the block.'''
-        Singleton.builder.exit_context_of('block')
+        Singleton.peek_builder().exit_context_of('block')
 
 class CondBlock(Block):
     '''The inherited class of the block for conditional block.'''

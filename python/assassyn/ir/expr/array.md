@@ -42,13 +42,13 @@ def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None):
     if module is None:
         # pylint: disable=import-outside-toplevel
         from ...builder import Singleton
-        module = Singleton.builder.current_module
+        module = Singleton.peek_builder().current_module
     self.module = module
 ```
 
-**Explanation:** Initializes an array write operation with the target array, index, value, and module context. If no module is provided, it retrieves the current module from the builder singleton. This module context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array.
+**Explanation:** Initializes an array write operation with the target array, index, value, and module context. If no module is provided, it retrieves the current module from the builder singleton via `Singleton.peek_builder()`. This module context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array.
 
-**Note on Builder Context Dependency:** The `ArrayWrite` class depends on the global `Singleton.builder.current_module` when no module is explicitly provided. This creates an implicit dependency on the builder context that should be considered when using this class outside of normal builder contexts.
+**Note on Builder Context Dependency:** The `ArrayWrite` class depends on `Singleton.peek_builder()` when no module is explicitly provided. Callers must ensure a builder is active or supply the module explicitly to avoid runtime errors.
 
 **Error Conditions:**
 - `AssertionError`: Raised if `arr` is not an `Array` instance or `idx` is not a `Value` instance during `ArrayRead` initialization
@@ -201,7 +201,7 @@ def __le__(self, value):
     assert isinstance(value, (Value, RecordValue)), \
         f"Value must be Value or RecordValue, got {type(value)}"
 
-    current_module = Singleton.builder.current_module
+    current_module = Singleton.peek_builder().current_module
 
     write_port = self.array & current_module
     return write_port._create_write(self.idx.value, value)

@@ -11,6 +11,7 @@ a unified interface for both simulation and RTL generation.
   - [make a plan](.cursor/rules/write-a-plan.mdc) carefully first.
   - maintain the consistency between the [documents and the code carefully](.cursor/rules/document-policy.mdc).
   - [act on this plan](.cursor/rules/act-on-todo.mdc) carefully obeying the rule.
+  - When writing code, keep [the standard of high-quality code](.cursor/rules/write-good-code.mdc) in your mind!
   - commit your changes with [a meaningful commit message](.cursor/rules/git-message.mdc).
 - When asked to develop a test case or other applications using Assassyn, make sure to read
   the [tutorial](tutorials/) (all the files ends with `_en.qmd` is English) to understand

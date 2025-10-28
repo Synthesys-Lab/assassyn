@@ -85,8 +85,8 @@ class Module(ModuleBase):  # pylint: disable=too-many-instance-attributes
             self._ports.append(getattr(self, name))
         self._users = []
 
-        assert Singleton.builder is not None, 'Cannot instantitate a module outside of a system!'
-        Singleton.builder.modules.append(self)
+        builder = Singleton.peek_builder()
+        builder.modules.append(self)
 
     @property
     def users(self):

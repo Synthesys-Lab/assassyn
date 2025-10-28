@@ -35,7 +35,7 @@ class Downstream(ModuleBase):
 
         self.body = None
 
-        Singleton.builder.downstreams.append(self)
+        Singleton.peek_builder().downstreams.append(self)
 
     def _repr_impl(self, head):
         Singleton.repr_ident = 2

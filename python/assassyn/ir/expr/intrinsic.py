@@ -125,7 +125,7 @@ def push_condition(cond):
     from ...builder import Singleton
     assert isinstance(cond, Value)
     # Mirror into builder predicate stack for frontend semantics (per module)
-    Singleton.builder.push_predicate(cond)
+    Singleton.peek_builder().push_predicate(cond)
     return Intrinsic(Intrinsic.PUSH_CONDITION, cond)
 
 
@@ -134,7 +134,7 @@ def pop_condition():
     '''Pop a predicate condition from the builder condition stack and IR.'''
     #pylint: disable=import-outside-toplevel
     from ...builder import Singleton
-    Singleton.builder.pop_predicate()
+    Singleton.peek_builder().pop_predicate()
     return Intrinsic(Intrinsic.POP_CONDITION)
 
 
@@ -265,7 +265,7 @@ def get_pred():
     from ...builder import Singleton
     from . import comm
     from ..dtype import Bits
-    conds = Singleton.builder.get_predicate_stack()
+    conds = Singleton.peek_builder().get_predicate_stack()
     return Bits(1)(1) if not conds else comm.and_(*[frame.cond for frame in conds])
 
 

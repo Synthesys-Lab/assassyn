@@ -53,12 +53,12 @@ class Factory(Generic[ModuleLike]):  # pylint: disable=too-few-public-methods
 
 def this():
     """Return the module currently being constructed."""
-    return Singleton.builder.current_module
+    return Singleton.peek_builder().current_module
 
 
 def pin(*pins: Value) -> None:
     """Expose combinational pins from the current module being constructed."""
-    module = Singleton.builder.current_module
+    module = Singleton.peek_builder().current_module
     if module is None:
         raise RuntimeError("pin() must be called within an active module context")
     if not hasattr(module, 'pins') or module.pins is None:
@@ -91,7 +91,7 @@ def _verify_inner_name(outer_name: str, inner_name: str) -> None:
 def _rename_module(module: Any, inner_name: str) -> None:
     """Assign a unique, capitalised module name derived from `inner_name`."""
 
-    unique_name = Singleton.builder.naming_manager.get_module_name(inner_name)
+    unique_name = Singleton.peek_builder().naming_manager.get_module_name(inner_name)
     if hasattr(module, 'name'):
         setattr(module, 'name', unique_name)
 
@@ -101,14 +101,14 @@ def _enter_module_context(module: Any) -> Block:
 
     body = Block(Block.MODULE_ROOT)
     setattr(module, 'body', body)
-    Singleton.builder.enter_context_of('module', module)
+    Singleton.peek_builder().enter_context_of('module', module)
     return body
 
 
 def _exit_module_context() -> None:
     """Exit the current module context."""
 
-    Singleton.builder.exit_context_of('module')
+    Singleton.peek_builder().exit_context_of('module')
 
 
 def factory(

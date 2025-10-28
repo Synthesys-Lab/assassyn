@@ -61,7 +61,10 @@ def _const_impl(dtype, value: int):
     #pylint: disable=import-outside-toplevel
     from ..builder import Singleton
 
-    builder = getattr(Singleton, 'builder', None)
+    try:
+        builder = Singleton.peek_builder()
+    except RuntimeError:
+        builder = None
     cache_key = None
     if builder is not None:
         cache = getattr(builder, 'const_cache', None)

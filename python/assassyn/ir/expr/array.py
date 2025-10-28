@@ -28,7 +28,7 @@ class ArrayWrite(Expr):
         if module is None:
             # pylint: disable=import-outside-toplevel
             from ...builder import Singleton
-            module = Singleton.builder.current_module
+            module = Singleton.peek_builder().current_module
         self.module = module
 
     @property
@@ -106,7 +106,7 @@ class ArrayRead(Expr):
         assert isinstance(value, (Value, RecordValue)), \
             f"Value must be Value or RecordValue, got {type(value)}"
 
-        current_module = Singleton.builder.current_module
+        current_module = Singleton.peek_builder().current_module
 
         write_port = self.array & current_module
         return write_port._create_write(self.idx.value, value)

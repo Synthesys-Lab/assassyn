@@ -186,12 +186,12 @@ def __enter__(self) -> Block
 
 **Returns:** The block instance for use in the `with` statement.
 
-**Explanation:** Implements the context manager protocol for blocks. Establishes parent-child relationships by assigning the current block/module as parent, sets the module reference from the builder singleton, and switches the builder context to this block. This enables the block to become the current insertion point for new IR nodes. The method includes assertions to ensure safe nesting of blocks.
+**Explanation:** Implements the context manager protocol for blocks. It fetches the active builder via `Singleton.peek_builder()`, establishes parent-child relationships by assigning the current block/module as parent, sets the module reference from the builder, and switches the builder context to this block. This enables the block to become the current insertion point for new IR nodes. The method includes assertions to ensure safe nesting of blocks.
 
 **Builder Context Management Integration:** The block system integrates with the builder singleton through a context stack mechanism:
 
-1. **Context Entry**: When entering a block via `__enter__()`, the block calls `Singleton.builder.enter_context_of('block', self)` to push itself onto the context stack
-2. **Context Exit**: When exiting a block via `__exit__()`, the block calls `Singleton.builder.exit_context_of('block')` to pop itself from the context stack
+1. **Context Entry**: When entering a block via `__enter__()`, the block calls `Singleton.peek_builder().enter_context_of('block', self)` to push itself onto the context stack
+2. **Context Exit**: When exiting a block via `__exit__()`, the block calls `Singleton.peek_builder().exit_context_of('block')` to pop itself from the context stack
 3. **Nested Blocks**: The context stack allows for proper nesting of blocks, with each block maintaining its own insertion point
 4. **Error Handling**: The context management includes assertions to prevent invalid nesting scenarios and ensure proper cleanup
 

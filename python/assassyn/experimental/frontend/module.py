@@ -61,7 +61,7 @@ Module.factory_create = staticmethod(factory_create)
 def pop_all(validate: bool = False):
     """Pop all ports from the current module under construction."""
 
-    module = Singleton.builder.current_module
+    module = Singleton.peek_builder().current_module
     if module is None:
         raise RuntimeError("pop_all must be called within an active module context")
     return module.pop_all_ports(validate)

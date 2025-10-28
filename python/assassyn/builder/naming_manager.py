@@ -85,10 +85,14 @@ class NamingManager:
         """
         # pylint: disable=import-outside-toplevel,cyclic-import
         from . import Singleton
-        builder = Singleton.builder
-        if builder and builder.current_module:
+
+        try:
+            builder = Singleton.peek_builder()
+        except RuntimeError:
+            return None
+
+        if builder.current_module:
             module = builder.current_module
-            # Get the module's name directly
             module_name = getattr(module, 'name', None)
             return module_name
         return None

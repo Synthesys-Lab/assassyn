@@ -122,7 +122,7 @@ The system provides hierarchical naming contexts to reflect the structure of har
 
 The naming system integrates deeply with the Assassyn builder system:
 
-**Global State Management**: Uses singleton pattern through `Singleton.builder` to access current module context
+**Global State Management**: Uses the singleton helper `Singleton.peek_builder()` to access the active builder and recover the current module context
 
 **IR Builder Integration**: `ir_builder` decorator automatically names new IR expressions
 

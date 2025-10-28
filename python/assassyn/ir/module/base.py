@@ -93,8 +93,9 @@ def combinational_for(module_type):  # pylint: disable=too-many-statements
             module_self.body = Block(Block.MODULE_ROOT)
             module_self.body.parent = module_self
             module_self.body.module = module_self
-            Singleton.builder.enter_context_of('module', module_self)
-            Singleton.builder.enter_context_of('block', module_self.body)
+            builder = Singleton.peek_builder()
+            builder.enter_context_of('module', module_self)
+            builder.enter_context_of('block', module_self.body)
 
             try:
                 try:
@@ -122,8 +123,9 @@ def combinational_for(module_type):  # pylint: disable=too-many-statements
 
                 return new_func(*args, **kwargs)
             finally:
-                Singleton.builder.exit_context_of('block')
-                Singleton.builder.exit_context_of('module')
+                builder = Singleton.peek_builder()
+                builder.exit_context_of('block')
+                builder.exit_context_of('module')
 
         wrapper._is_combinational = True  # pylint: disable=protected-access
         wrapper._module_class = module_type  # pylint: disable=protected-access

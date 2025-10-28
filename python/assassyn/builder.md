@@ -88,7 +88,7 @@ class Singleton(type):
 - `expose_on_top(node, kind=None)`: Marks a node for exposure in the top-level function with an optional kind label
 
 **Context Manager Protocol:**
-When entering (`__enter__`), it sets itself as `Singleton.builder` and initializes the global naming tracker. When exiting (`__exit__`), it clears the singleton references. This ensures only one builder is active at a time.
+When entering (`__enter__`), it registers itself via `Singleton.set_builder(self)` and initialises the global naming tracker. When exiting (`__exit__`), it verifies the active builder matches and then clears it with `Singleton.set_builder(None)`. This ensures only one builder is active at a time.
 
 **String Representation:**
 `__repr__` generates a textual representation showing all arrays, modules, and downstreams in a structured format.
@@ -97,13 +97,15 @@ When entering (`__enter__`), it sets itself as `Singleton.builder` and initializ
 
 ## Singleton Metaclass
 
-`Singleton` maintains global state for the IR builder system using class attributes:
+`Singleton` maintains global state for the IR builder system using class attributes and helper methods:
 
-- `builder`: The currently active `SysBuilder` instance (or `None`)
+- `_builder`: Internal slot storing the active `SysBuilder` instance
 - `repr_ident`: Indentation level for string representations
 - `id_slice`: Slice used for generating object identifiers (default `slice(-6, -1)`), referenced by `utils.identifierize()`
 - `with_py_loc`: Boolean flag controlling whether Python source locations are included in representations
 - `all_dirs_to_exclude`: List of directory paths to exclude during stack inspection (site-packages, etc.)
+- `set_builder(builder: Optional[SysBuilder])`: Registers or clears the active builder, raising if a different builder is already present
+- `peek_builder() -> SysBuilder`: Returns the active builder, raising if none is registered
 
 **`initialize_dirs_to_exclude()`**: Lazily initializes `all_dirs_to_exclude` with Python's site-packages directories (from `site.getsitepackages()` and `site.getusersitepackages()`). This prevents the builder from attributing source locations to library code.
 

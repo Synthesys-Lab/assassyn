@@ -64,7 +64,7 @@ def get_context_prefix(self) -> Optional[str]:
 
 Returns the current hierarchical naming context based on the active module stack. When inside a module's `build()` method, this returns the module instance's name to be used as a prefix for arrays and other entities created within that context.
 
-**Explanation**: This method accesses the global `Singleton.builder` to get the current module context. It's used to provide hierarchical naming hints for arrays and other entities created within modules. The method gets the module's name directly from the `name` attribute. This enables context-aware naming where entities inherit their parent module's name as a prefix.
+**Explanation**: This method attempts to fetch the active builder via `Singleton.peek_builder()` to recover the current module context. When a builder is active, the helper returns that module's `name`, enabling consistent hierarchical prefixes for newly created arrays or values. If no builder is active, the catch block returns `None`, signalling that no contextual prefix is available.
 
 ### get_naming_manager
 

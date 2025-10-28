@@ -99,7 +99,7 @@ def RegArray( #pylint: disable=invalid-name,too-many-arguments
         if name is None:
             manager.assign_name(res, hint)
 
-    Singleton.builder.arrays.append(res)
+    Singleton.peek_builder().arrays.append(res)
 
     return res
 
@@ -233,23 +233,8 @@ class Array:  #pylint: disable=too-many-instance-attributes
     def __getitem__(self, index: typing.Union[int, Value]):
         if isinstance(index, int):
             index = to_uint(index, self.index_bits)
-
-        builder = Singleton.builder
-        if builder is not None:
-            pred_stack = builder.get_predicate_stack()
-            # Check all active predicate caches (top to bottom) for reuse
-            for frame in reversed(pred_stack):
-                cached = frame.get_cached_read(self, index)
-                if cached is not None:
-                    return cached
-
-        res = ArrayRead(self, index)
-        # Insert into the top-most predicate frame (if any)
-        if builder is not None:
-            pred_stack = builder.get_predicate_stack()
-            if pred_stack:
-                pred_stack[-1].cache_read(self, index, res)
-        return res
+        builder = Singleton.peek_builder()
+        return builder.reuse_array_read(self, index, lambda: ArrayRead(self, index))
 
     def get_flattened_size(self):
         '''Get the flattened size of the array.'''
@@ -263,6 +248,6 @@ class Array:  #pylint: disable=too-many-instance-attributes
         assert isinstance(index, Value)
         assert isinstance(value, (Value, RecordValue)), type(value)
 
-        current_module = Singleton.builder.current_module
+        current_module = Singleton.peek_builder().current_module
         write_port = self & current_module
         return write_port._create_write(index, value)

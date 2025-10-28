@@ -77,7 +77,8 @@ class Expr(Value):
             return operand
 
         if isinstance(operand, Expr):
-            return self._prepare_expr_operand(operand, Singleton.builder.current_module)
+            builder = Singleton.peek_builder()
+            return self._prepare_expr_operand(operand, builder.current_module)
 
         if isinstance(operand, (Const, str, RecordValue, Module, Downstream)):
             return Operand(operand, self)

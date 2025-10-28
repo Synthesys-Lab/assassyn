@@ -51,12 +51,12 @@ def ir_builder(func=None, *, node_type=None):
             from ..utils import package_path
             from ..ir.expr import Expr
 
-            manager = Singleton.builder.naming_manager if Singleton.builder else None
+            builder = Singleton.peek_builder()
+            manager = builder.naming_manager
             is_expr = isinstance(res, Expr)
-            builder = Singleton.builder
             already_materialized = is_expr and getattr(res, 'parent', None) is not None
 
-            if manager and is_expr and not already_materialized:
+            if is_expr and not already_materialized:
                 manager.push_value(res)
 
             if not isinstance(res, Const):
@@ -177,6 +177,22 @@ class SysBuilder:
         ctx_stack = self._ctx_stack['module']
         return [] if not ctx_stack else ctx_stack[-1].cond_stack
 
+    def reuse_array_read(self, array, index, factory):
+        '''Reuse a cached array read or materialize a new one via ``factory``.'''
+        stack = self.get_predicate_stack()
+
+        for frame in reversed(stack):
+            cached = frame.get_cached_read(array, index)
+            if cached is not None:
+                return cached
+
+        read = factory()
+
+        if stack:
+            stack[-1].cache_read(array, index, read)
+
+        return read
+
     def push_predicate(self, cond):
         '''Push a predicate into current module's predicate stack.'''
         frame = PredicateFrame(cond)
@@ -258,8 +274,7 @@ class SysBuilder:
 
     def __enter__(self):
         '''Designate the scope of this system builder.'''
-        assert Singleton.builder is None
-        Singleton.builder = self
+        Singleton.set_builder(self)
         Singleton.line_expression_tracker = self.line_expression_tracker
         Singleton.naming_manager = self.naming_manager
         self._reset_caches()
@@ -267,8 +282,8 @@ class SysBuilder:
 
     def __exit__(self, exc_type, exc_value, traceback):
         '''Leave the scope of this system builder.'''
-        assert Singleton.builder is self
-        Singleton.builder = None
+        assert Singleton.peek_builder() is self
+        Singleton.set_builder(None)
         Singleton.line_expression_tracker = None
         Singleton.naming_manager = None
         self._reset_caches()
@@ -281,11 +296,29 @@ class SysBuilder:
 
 class Singleton(type):
     '''The class maintains the global singleton instance of the system builder.'''
-    builder: SysBuilder = None  # Global singleton instance of the system builder
+    _builder: SysBuilder | None = None  # Global singleton instance of the system builder
     repr_ident: int = None  # Indentation level for string representation
     id_slice: slice = slice(-6, -1)  # Slice for identifiers
     with_py_loc: bool = False  # Whether to include Python location in string representation
     all_dirs_to_exclude: list = []  # Directories to exclude for stack inspection
+
+    @classmethod
+    def set_builder(cls, builder: SysBuilder | None) -> None:
+        '''Set or clear the global builder, preventing double registration.'''
+        if builder is not None:
+            if cls._builder is not None:
+                raise RuntimeError('Singleton builder already initialised')
+            cls._builder = builder
+            return
+        cls._builder = None
+
+    @classmethod
+    def peek_builder(cls) -> SysBuilder:
+        '''Return the active builder, raising if none is registered.'''
+        builder = cls._builder
+        if builder is None:
+            raise RuntimeError('Singleton builder is not initialised')
+        return builder
 
     @classmethod
     def initialize_dirs_to_exclude(mcs):
