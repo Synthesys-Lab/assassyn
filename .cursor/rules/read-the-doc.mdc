@@ -5,10 +5,14 @@ description: Read the high-level design documents
 
 ## Read Document
 
-When asked to modify a module or document,
-incorporate the descriptions in the documents for better understandings.
-Especially, remember to recursively read all the documents in `docs/design/*.md`
-to learn the project-specific knowledge, including but
-not limited to:
+When asked to modify a module or document, incorporate the descriptions in the documents for better understandings.
+
+When it comes to a specific design and implementation in a source code, within the same folder,
+there should be a `*.md` file with the same name that documents this source code.
+Read that to gain more insights.
+
+Also, remember to recursively read all the documents in `docs/design/*.md`
+to learn the project-specific knowledge, including but not limited to:
 1. The purpose of this project;
 2. The design decisions of core modules.
+3. Other high-level knowledge of this project.
