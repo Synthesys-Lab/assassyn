@@ -29,9 +29,9 @@ class SysBuilder:
     def __exit__(self, exc_type, exc_value, traceback) -> None
 
     @property
-    def current_module(self) -> Module | None
+    def current_module(self) -> Module
     @property
-    def current_body(self) -> list | None
+    def current_body(self) -> list
     @property
     def insert_point(self) -> list
     @property
@@ -65,20 +65,22 @@ class Singleton(type):
 - `modules`: List of all modules in the system
 - `downstreams`: List of downstream modules
 - `arrays`: List of array objects
-- `_ctx_stack`: Dictionary tracking module and body context stacks (keys: `'module'`, `'body'`)
+- `_ctx_stack['module']`: Stack tracking active module contexts
 - `_exposes`: Dictionary mapping nodes to their exposure kinds
 - `line_expression_tracker`: Tracks expressions on each source line for naming
 - `naming_manager`: Instance of `NamingManager` for variable name generation
 
 **Properties:**
-- `current_module`: Returns the module at the top of the module context stack, or `None` if empty
-- `current_body`: Returns the list at the top of the body context stack, or `None` if empty
+- `current_module`: Returns the module at the top of the module context stack; raises `RuntimeError` if no module is active
+- `current_body`: Returns `current_module.body`
 - `insert_point`: Alias for `current_body`, the list where new IR nodes are inserted
 - `exposed_nodes`: Returns the dictionary of exposed nodes
 
 **Context Methods:**
-- `enter_context_of(ty, entry)`: Pushes a new context onto the stack for type `ty` (either `'module'` or `'body'`).
-- `exit_context_of(ty)`: Pops the top context from the stack for type `ty`
+- `enter_context_of('module', entry)`: Pushes a new module context onto the stack.
+- `enter_context_of('body', entry)`: Compatibility helper that asserts the active module body matches `entry`.
+- `exit_context_of('module')`: Pops the top module context after verifying predicate balance.
+- `exit_context_of('body')`: Compatibility shim that returns the provided body reference.
 
 **Query Methods:**
 - `has_driver()`: Returns `True` if any module has class name `'Driver'`
@@ -122,7 +124,7 @@ When entering (`__enter__`), it registers itself via `Singleton.set_builder(self
 
 For each IR node returned by the decorated function:
 - If the result is `None` or a `Const`, no special handling occurs
-- For `Expr` nodes, sets `parent` to `current_module` and adds operands to the module's externals
+- For `Expr` nodes, sets `parent` to the active module (via `current_module`) and adds operands to the module's externals
 - Inserts the node into `insert_point` (current body list)
 - Inspects the call stack to find the first frame outside the assassyn package and excluded directories, recording that location as `node.loc`
 - For valued expressions with code context, calls `process_naming()` to infer a source name from the assignment statement
