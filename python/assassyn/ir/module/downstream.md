@@ -43,7 +43,7 @@ The `Downstream` class is a specialized module container for combinational logic
 
 **Member Fields:**
 - `_name: str` - Internal storage for the module name
-- `body: Block` - The IR block containing the module's logic
+- `body: list[Expr]` - Ordered list of expressions representing the module's logic
 
 **Methods:**
 
@@ -53,7 +53,7 @@ The `Downstream` class is a specialized module container for combinational logic
 Initializes a new downstream module instance. The constructor:
 1. Calls the parent `ModuleBase.__init__()` to initialize base functionality
 2. Determines the module name using the naming manager if available, or generates a default name
-3. Initializes the body to `None` (will be set by the `@combinational` decorator)
+3. Initializes the body to `None` (will be set to a plain list by the `@combinational` decorator)
 4. Registers the module with the system builder's downstream list for special handling during code generation
 
 The naming follows Assassyn's naming conventions, with special handling for reserved names and automatic semantic name assignment.
@@ -69,7 +69,7 @@ Provides access to the module's name for IR generation. When the name is explici
 Generates the string representation for IR dumps. This method:
 1. Sets the representation indentation level
 2. Generates the module's operand identifier
-3. Includes the module body representation if available
+3. Uses the shared `render_module_body()` helper to include the module body representation if available, so downstream dumps stay consistent with regular module dumps
 4. Dumps external dependencies
 5. Formats the output with the specified head attribute (typically "downstream")
 
@@ -87,9 +87,9 @@ The `@combinational` decorator is a specialized instance of `combinational_for(D
 **Explanation:**
 This decorator provides essential functionality for downstream module logic definition:
 
-1. **IR Context Management:** Automatically enters and exits the module and block contexts in the IR builder
+1. **IR Context Management:** Automatically enters and exits the module and body contexts in the IR builder
 2. **Signal Naming:** Infers signal names from Python source code parameters
 3. **AST Transformation:** Uses `rewrite_assign` to handle assignment operations
-4. **Body Assignment:** Creates and assigns a `Block` object to store the module's logic
+4. **Body Assignment:** Creates and assigns a list object to store the module's logic
 
 The decorator ensures that all operations within the decorated function are properly recorded in the IR and that the module's body is correctly structured for downstream code generation stages.

@@ -137,25 +137,9 @@ Visit an integer immediate value and generate its Rust representation.
 
 **Explanation:** Converts Python integer values to Rust with proper type casting using `ValueCastTo`. This handles the conversion from Python's arbitrary precision integers to Rust's typed integer system. The function uses `dump_rval_ref` to determine the appropriate Rust type for the immediate value.
 
-#### `visit_block`
+#### Module Body Traversal
 
-```python
-def visit_block(self, node: Block) -> str:
-```
-
-Visit a block and generate its Rust implementation.
-
-**Parameters:**
-- `node`: The block to visit (can be Block or CondBlock)
-
-**Returns:**
-- `str`: Rust code for the block with proper control flow
-
-**Explanation:** Handles different block types:
-- **CondBlock**: Evaluates the condition (emitting it if the condition itself contains expressions) then wraps the child body in an `if`. Cycle-based gating is naturally expressed via `current_cycle()` in the condition predicate.
-- **Regular Block**: Processes all elements sequentially.
-
-The function maintains proper indentation, avoids duplicate visits via an identity set, and gracefully handles `RecordValue` nodes by delegating to their underlying expression. When entering or leaving a conditional block the indentation is adjusted, ensuring the emitted Rust is formatted and ready for `cargo fmt`.
+Module bodies are flat `list[Expr]` sequences. `visit_module()` iterates this list and feeds each element to `visit_expr()`. Predicate push/pop intrinsics are intercepted inside `visit_expr()` to emit `if { ... }` indentation in the generated Rust. Other values, such as `RecordValue`, delegate to their contained expression before code generation, so no additional structural traversal helper is required.
 
 #### `visit_external_module`
 

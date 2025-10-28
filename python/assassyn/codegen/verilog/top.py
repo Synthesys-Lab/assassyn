@@ -12,6 +12,7 @@ from .utils import (
 
 from ...analysis import topo_downstream_modules
 from ...ir.module import Downstream
+from ...ir.module.base import ModuleBase
 from ...ir.memory.sram import SRAM
 from ...ir.expr import (
     Bind,
@@ -297,7 +298,11 @@ def generate_top_harness(dumper):
                     unwrap_operand(ext_val), Const):
                 continue
 
-            producer_module = getattr(ext_val.parent, 'module', None)
+            parent_ref = getattr(ext_val, 'parent', None)
+            if isinstance(parent_ref, ModuleBase):
+                producer_module = parent_ref
+            else:
+                producer_module = getattr(parent_ref, 'module', None)
 
             if producer_module is None:
                 continue

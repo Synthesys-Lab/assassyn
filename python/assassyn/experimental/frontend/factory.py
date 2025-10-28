@@ -14,7 +14,6 @@ from typing import (
 )
 
 from assassyn.builder import Singleton
-from assassyn.ir.block import Block
 from assassyn.ir.value import Value
 from assassyn.utils.enforce_type import validate_arguments
 
@@ -96,19 +95,23 @@ def _rename_module(module: Any, inner_name: str) -> None:
         setattr(module, 'name', unique_name)
 
 
-def _enter_module_context(module: Any) -> Block:
-    """Initialise a module body and enter the builder context."""
+def _enter_module_context(module: Any) -> list:
+    """Initialise a module body list and enter the builder context."""
 
-    body = Block(Block.MODULE_ROOT)
+    body: list = []
     setattr(module, 'body', body)
-    Singleton.peek_builder().enter_context_of('module', module)
+    builder = Singleton.peek_builder()
+    builder.enter_context_of('module', module)
+    builder.enter_context_of('body', body)
     return body
 
 
 def _exit_module_context() -> None:
     """Exit the current module context."""
 
-    Singleton.peek_builder().exit_context_of('module')
+    builder = Singleton.peek_builder()
+    builder.exit_context_of('body')
+    builder.exit_context_of('module')
 
 
 def factory(
@@ -155,13 +158,12 @@ def factory(
 
             _rename_module(module_instance, inner.__name__)
 
-            body = _enter_module_context(module_instance)
+            _enter_module_context(module_instance)
             try:
-                with body:
-                    kwargs_for_inner = inner_kwargs or {}
-                    if not isinstance(kwargs_for_inner, dict):
-                        kwargs_for_inner = dict(kwargs_for_inner)
-                    inner(**kwargs_for_inner)
+                kwargs_for_inner = inner_kwargs or {}
+                if not isinstance(kwargs_for_inner, dict):
+                    kwargs_for_inner = dict(kwargs_for_inner)
+                inner(**kwargs_for_inner)
             finally:
                 _exit_module_context()
 

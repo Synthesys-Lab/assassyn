@@ -1,13 +1,10 @@
-"""Tests for block IR nodes: Block, CondBlock, and Cycle-as-conditional."""
+"""Tests for predicate intrinsics and Cycle-as-conditional sugar."""
 
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from assassyn.frontend import (
-    Module, SysBuilder, UInt, Condition, Cycle,
-    Port, log, module
-)
+from assassyn.frontend import Module, SysBuilder, UInt, Condition, Cycle, Port, log, module
 from assassyn.ir.const import Const
 from assassyn.ir.expr import Log
 from assassyn.test import dump_ir
@@ -80,11 +77,11 @@ def test_log_meta_cond_metadata():
             if isinstance(elem, Log):
                 found.append(elem)
             body = getattr(elem, 'body', None)
-            if body:
+            if isinstance(body, list):
                 found.extend(_gather_logs(body))
         return found
 
-    logs = _gather_logs(top_module.body.body)
+    logs = _gather_logs(top_module.body)
 
     assert logs, "Expected at least one log node"
     outer_log = logs[0]

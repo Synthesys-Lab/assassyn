@@ -39,7 +39,7 @@ def ir_builder(func=None, *, node_type=None):
 
     def _decorate(target):
         @functools.wraps(target)
-        def _wrapper(*args, **kwargs):  # pylint: disable=too-many-nested-blocks
+        def _wrapper(*args, **kwargs):  # pylint: disable=too-many-nested-blocks,too-many-locals
             res = target(*args, **kwargs)
 
             # This indicates this res is handled somewhere else, so we do not need to rehandle it
@@ -61,11 +61,15 @@ def ir_builder(func=None, *, node_type=None):
 
             if not isinstance(res, Const):
                 if is_expr and not already_materialized:
-                    res.parent = builder.current_block
-                    for i in res.operands:
-                        builder.current_module.add_external(i)
+                    current_module = builder.current_module
+                    if current_module is not None:
+                        res.parent = current_module
+                        for i in res.operands:
+                            current_module.add_external(i)
                 if not already_materialized:
-                    builder.insert_point.append(res)
+                    insert_point = builder.insert_point
+                    if insert_point is not None:
+                        insert_point.append(res)
 
             package_dir = os.path.abspath(package_path())
 
@@ -162,14 +166,15 @@ class SysBuilder:
         return None if not ctx_stack else ctx_stack[-1].module
 
     @property
-    def current_block(self):
-        '''Get the current block being built.'''
-        return None if not self._ctx_stack['block'] else self._ctx_stack['block'][-1]
+    def current_body(self):
+        '''Get the current module body being built.'''
+        body_stack = self._ctx_stack['body']
+        return None if not body_stack else body_stack[-1]
 
     @property
     def insert_point(self):
         '''Get the insert point.'''
-        return self.current_block.body
+        return self.current_body
 
     # Predicate stack helpers (per current module context)
     def get_predicate_stack(self):
@@ -206,33 +211,25 @@ class SysBuilder:
 
     def enter_context_of(self, ty, entry):
         '''Enter the context of the given type.'''
-        #pylint: disable=import-outside-toplevel
-        from ..ir.block import CondBlock
         if ty == 'module':
-            # Push a new ModuleContext for this module
             self._ctx_stack['module'].append(ModuleContext(entry))
-        else:
-            self._ctx_stack[ty].append(entry)
-            if isinstance(entry, CondBlock):
-                # Record external usage and push predicate for this module context
-                self.current_module.add_external(entry.cond)
-                self.push_predicate(entry.cond)
+            return
+        if ty == 'body':
+            self._ctx_stack['body'].append(entry)
+            return
+        raise ValueError(f'Unsupported context type: {ty}')
+
     def exit_context_of(self, ty):
         '''Exit the context of the given type.'''
-        #pylint: disable=import-outside-toplevel
-        from ..ir.block import CondBlock
         if ty == 'module':
             ctx = self._ctx_stack['module'].pop()
-            # Ensure no leaked predicates from this module
             if ctx.cond_stack:
                 msg = 'Predicate stack not empty on module exit: ' + repr(ctx.cond_stack[-1].cond)
                 assert False, msg
             return ctx
-        entry = self._ctx_stack[ty].pop()
-        # Maintain predicate stack when leaving conditional blocks
-        if isinstance(entry, CondBlock):
-            self.pop_predicate()
-        return entry
+        if ty == 'body':
+            return self._ctx_stack['body'].pop()
+        raise ValueError(f'Unsupported context type: {ty}')
 
     def has_driver(self):
         '''Check if the system has a driver module.'''
@@ -253,7 +250,7 @@ class SysBuilder:
         self.modules = []
         self.downstreams = []
         self.arrays = []
-        self._ctx_stack = {'module': [], 'block': []}
+        self._ctx_stack = {'module': [], 'body': []}
         self._exposes = {}
         self.line_expression_tracker = {}
         self.naming_manager = NamingManager()

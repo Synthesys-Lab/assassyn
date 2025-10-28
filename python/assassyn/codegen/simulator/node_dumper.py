@@ -32,8 +32,8 @@ def _handle_module(unwrapped, _module_ctx):
 def _handle_expr(unwrapped, module_ctx):
     """Handle Expr nodes."""
     # Figure out the ID format based on context
-    parent_block = unwrapped.parent
-    if module_ctx != parent_block.module:
+    parent_module = getattr(unwrapped, 'parent', None)
+    if module_ctx != parent_module:
         raw = namify(unwrapped.as_operand())
         field_id = f"{raw}_value"
         panic_log = f"Value {raw} invalid!"

@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import typing
 from ...builder import Singleton, ir_builder
-from ..block import Block
 from ..dtype import DType
 from ..expr import Bind, FIFOPop, FIFOPush, AsyncCall, Expr
 from ..expr.intrinsic import wait_until, PureIntrinsic
-from .base import ModuleBase, combinational_for
+from .base import ModuleBase, combinational_for, render_module_body
 
 if typing.TYPE_CHECKING:
     from ..value import Value
@@ -30,7 +29,7 @@ class Timing:
 class Module(ModuleBase):  # pylint: disable=too-many-instance-attributes
     '''The AST node for defining a module.'''
 
-    body: Block  # Body of the module
+    body: list[Expr]  # Body of the module
     name: str  # Name of the module
     _attrs: dict  # Dictionary of module attributes
     _ports: list  # List of ports
@@ -140,7 +139,7 @@ class Module(ModuleBase):  # pylint: disable=too-many-instance-attributes
         var_id = self.as_operand()
 
         Singleton.repr_ident = 2
-        body = self.body.__repr__()
+        body = render_module_body(self.body)
         ext = self._dump_externals()
         return f'''{ext}  {attrs}
   {var_id} = module {self.name} {ports}{{

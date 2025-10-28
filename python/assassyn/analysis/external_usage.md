@@ -4,10 +4,10 @@ This module provides utilities for analyzing external usage patterns of expressi
 
 ## Section 1. Exposed Interfaces
 
-### `get_module(operand: Operand) -> Module`
+### `get_module(operand: Operand) -> ModuleBase | None`
 
 ```python
-def get_module(operand: Operand) -> Module:
+def get_module(operand: Operand) -> ModuleBase | None:
     """Get the module that contains the given operand."""
 ```
 
@@ -15,10 +15,10 @@ def get_module(operand: Operand) -> Module:
 - `operand`: The operand whose containing module needs to be determined
 
 **Returns:**
-- `Module`: The module that contains the operand, or `None` if the operand's user is not an `Expr` or `CondBlock`
+- `ModuleBase | None`: The module that contains the operand, or `None` if the operand's user is not an `Expr`
 
 **Behavior:**
-This function determines which module contains a given operand by examining the operand's user. If the user is an `Expr`, it returns the module of the expression's parent block. If the user is a `CondBlock`, it returns the module of the conditional block. Otherwise, it returns `None`.
+This function determines which module contains a given operand by examining the operand's user. If the user is an `Expr`, it returns the module recorded on the expression's `parent` field. Otherwise, it returns `None`.
 
 ### `expr_externally_used(expr: Expr, exclude_push: bool) -> bool`
 
@@ -35,7 +35,7 @@ def expr_externally_used(expr: Expr, exclude_push: bool) -> bool:
 - `bool`: `True` if the expression is used outside its containing module, `False` otherwise
 
 **Behavior:**
-This function analyzes whether an expression is used by other modules outside its own module. It iterates through all users of the expression and checks if any user belongs to a different module than the expression's own module. When `exclude_push` is `True`, `FIFOPush` expressions are automatically considered as not externally used.
+This function analyzes whether an expression is used by other modules outside its own module. It iterates through all users of the expression and checks if any user belongs to a different module than the expression's owning module. When `exclude_push` is `True`, `FIFOPush` expressions are automatically considered as not externally used.
 
 ## Section 2. Internal Helpers
 
@@ -61,10 +61,8 @@ The functions work together to analyze cross-module dependencies and usage patte
 ## Dependencies
 
 This module depends on the following IR components:
-- `Expr` and `FIFOPush` from `ir.expr`
-- `Module` from `ir.module`
-- `CondBlock` from `ir.block`
-- `Operand` from `ir.expr`
+- `Expr`, `Operand`, and `FIFOPush` from `ir.expr`
+- `ModuleBase` from `ir.module.base`
 
 ## Technical Notes
 

@@ -18,7 +18,6 @@ from ...ir.module import Module, Downstream
 from ...ir.memory.sram import SRAM
 from ...builder import SysBuilder
 from ...ir.visitor import Visitor
-from ...ir.block import Block, CondBlock
 from ...ir.const import Const
 from ...ir.array import Array
 from ...ir.dtype import RecordValue
@@ -113,7 +112,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
     def get_external_port_name(self, node: Expr) -> str:
         """Get the mangled port name for an external value."""
-        producer_module = node.parent.module
+        producer_module = node.parent
         producer_name = namify(producer_module.name)
         base_port_name = namify(node.as_operand())
         if base_port_name.startswith("_"):
@@ -147,7 +146,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         if not CIRCTDumper._is_external_module(module):
             return False
         body = getattr(module, "body", None)
-        body_insts = getattr(body, "body", []) if body is not None else []
+        body_insts = body if isinstance(body, list) else []
         return not body_insts
 
 
@@ -186,27 +185,14 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             self._exposes[key] = []
         self._exposes[key].append((expr, self.get_pred()))
 
-    def visit_block(self, node: Block):
-        is_cond = isinstance(node, CondBlock)
-
-        if is_cond:
-            cond_str = self.dump_rval(node.cond, False)
-            self.cond_stack.append((f"({cond_str})", node))
-
-        if node is not None and node.body is not None:
-            for i in node.body:
-                if isinstance(i, Expr):
-                    self.visit_expr(i)
-                elif isinstance(i, Block):
-                    self.visit_block(i)
-                elif isinstance(i, RecordValue):
-                    pass
-                else:
-                    print(i)
-                    raise ValueError(f'Unknown node type: {type(i)}')
-
-        if is_cond:
-            self.cond_stack.pop()
+    def _visit_body(self, body_nodes):
+        for node in body_nodes:
+            if isinstance(node, Expr):
+                self.visit_expr(node)
+            elif isinstance(node, RecordValue):
+                pass
+            else:
+                raise ValueError(f'Unknown node type: {type(node)}')
 
 
     # pylint: disable=arguments-renamed
@@ -267,7 +253,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
         # For downstream modules, we still need to process the body
         if node.body is not None:
-            self.visit_block(node.body)
+            self._visit_body(node.body)
         cleanup_post_generation(self)
 
         construct_method_body = self.code
@@ -308,17 +294,13 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.append_code('')
         self.module_ctx = previous_module_ctx
 
-    def _walk_expressions(self, block: Block):
-        """Recursively walks a block and yields all expressions."""
+    def _walk_expressions(self, block):
+        """Iterate through module bodies and yield all expressions."""
         if block is None:
             return
-        if block.body is None:
-            return
-        for item in block.body:
+        for item in block:
             if isinstance(item, Expr):
                 yield item
-            elif isinstance(item, Block):
-                yield from self._walk_expressions(item)
 
 
     # pylint: disable=too-many-locals,R0912

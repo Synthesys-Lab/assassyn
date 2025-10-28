@@ -5,7 +5,6 @@ from __future__ import annotations
 import typing
 
 from ...ir.visitor import Visitor
-from ...ir.block import Block, CondBlock
 from ...ir.dtype import RecordValue
 from ...ir.expr import Expr
 from ...ir.expr.intrinsic import Intrinsic as IRIntrinsic
@@ -43,7 +42,7 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
         result.append(f"pub fn {namify(self.module_name)}(sim: &mut Simulator) -> bool {{")
 
         self.indent += 2
-        body = self.visit_block(node.body)
+        body = self._emit_body(node.body or [])
         result.append(body)
 
         self.indent -= 2
@@ -104,46 +103,29 @@ class ElaborateModule(Visitor):  # pylint: disable=too-many-instance-attributes
 
         return result
 
-    def visit_int_imm(self, int_imm):
-        """Render integer immediates as Rust ``ValueCastTo`` expressions."""
-        ty = dump_rval_ref(self.module_ctx, int_imm.dtype)
-        value = int_imm.value
-        return f"ValueCastTo::<{ty}>::cast(&{value})"
-
-    def visit_block(self, node: Block):
+    def _emit_body(self, body_nodes):
         result = []
         visited = set()
 
-        restore_indent = self.indent
-
-        if isinstance(node, CondBlock):
-            if isinstance(node.cond, Expr):
-                cond_code = self.visit_expr(node.cond)
-                if cond_code:
-                    result.append(cond_code)
-            cond = dump_rval_ref(self.module_ctx, node.cond)
-            result.append(f"if {cond} {{\n")
-            self.indent += 2
-
-        for elem in node.iter():
+        for elem in body_nodes:
             elem_id = id(elem)
             if elem_id in visited:
                 continue
             visited.add(elem_id)
             if isinstance(elem, Expr):
                 result.append(self.visit_expr(elem))
-            elif isinstance(elem, Block):
-                result.append(self.visit_block(elem))
             elif isinstance(elem, RecordValue):
                 result.append(self.visit_expr(elem.value()))
             else:
                 raise ValueError(f"Unexpected reference type: {type(elem).__name__}")
 
-        if restore_indent != self.indent:
-            self.indent -= 2
-            result.append(f"{' ' * self.indent}}}\n")
-
         return "".join(result)
+
+    def visit_int_imm(self, int_imm):
+        """Render integer immediates as Rust ``ValueCastTo`` expressions."""
+        ty = dump_rval_ref(self.module_ctx, int_imm.dtype)
+        value = int_imm.value
+        return f"ValueCastTo::<{ty}>::cast(&{value})"
 
     def visit_external_module(self, node: ExternalSV):
         """Emit a stub implementation for an external module."""

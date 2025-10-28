@@ -10,6 +10,7 @@ from ..simulator.external import collect_external_intrinsics
 from ...utils import unwrap_operand
 from ...builder import SysBuilder
 from ...utils import enforce_type
+from ...ir.module.base import ModuleBase
 
 if TYPE_CHECKING:
     from .design import CIRCTDumper
@@ -41,7 +42,7 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
 
     # Pre-populate external_instance_owners so cross-module references work
     for intrinsic in external_intrinsics:
-        owner_module = intrinsic.parent.module
+        owner_module = intrinsic.parent
         dumper.external_instance_owners[intrinsic] = owner_module
 
         ext_class = intrinsic.external_class
@@ -61,7 +62,11 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
             ):
                 instance_operand = expr.args[0]
                 instance = unwrap_operand(instance_operand)
-                owner_module = getattr(getattr(instance, 'parent', None), 'module', None)
+                parent_ref = getattr(instance, 'parent', None)
+                if isinstance(parent_ref, ModuleBase):
+                    owner_module = parent_ref
+                else:
+                    owner_module = getattr(parent_ref, 'module', None)
                 if owner_module is None or owner_module == module:
                     continue
                 port_operand = expr.args[1]

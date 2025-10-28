@@ -75,8 +75,9 @@ This function identifies upstream modules that a given module depends on. It:
 1. **External Analysis**: Analyzes external dependencies of the module
 2. **Upstream Identification**: Identifies upstream modules from external references
 3. **Dependency Filtering**: Filters out certain types of dependencies
-4. **External Module Handling**: Treats any expression found in `module.externals` as a potential dependency source
-5. **Result**: Returns set of upstream modules
+4. **Parent Detection**: Supports both legacy block parents and the new module-level parents introduced by the block removal refactor
+5. **External Module Handling**: Treats any expression found in `module.externals` as a potential dependency source
+6. **Result**: Returns set of upstream modules
 
 **Parameters:**
 - `module`: The module to analyze

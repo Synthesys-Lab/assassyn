@@ -3,7 +3,6 @@
 from ..builder import SysBuilder
 from .module import Module, Port
 from .expr import Expr
-from .block import Block
 
 class Visitor:
     '''The visitor pattern class for the frontend AST'''
@@ -38,17 +37,11 @@ class Visitor:
     def visit_module(self, node: Module):
         '''Enter a module'''
         body = getattr(node, "body", None)
-        if body is not None:
-            self.visit_block(body)
-
-    def visit_block(self, node: Block):
-        '''Enter a block'''
-        for elem in node.iter():
-            self.dispatch(elem)
+        if isinstance(body, list):
+            for elem in body:
+                self.dispatch(elem)
 
     def dispatch(self, node):
         '''Dispatch the node in a block to the corresponding visitor'''
         if isinstance(node, Expr):
             self.visit_expr(node)
-        if isinstance(node, Block):
-            self.visit_block(node)

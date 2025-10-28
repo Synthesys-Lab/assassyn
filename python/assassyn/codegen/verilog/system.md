@@ -32,7 +32,7 @@ This function generates the complete Verilog system by performing comprehensive 
 1. **System Analysis Phase**:
    - **SRAM Payload Identification**: Identifies SRAM payload arrays that need special handling.
    - **External Module Collection**: Harvests every `ExternalIntrinsic` in the system, records per-instance metadata, and generates PyCDE wrapper classes for each unique external class upfront.
-   - **Cross-Module External Reads**: Scans every module body for `PureIntrinsic.EXTERNAL_OUTPUT_READ` operations whose producer lives in a different module, storing both the consumer-facing entries (`cross_module_external_reads`) and the producer-facing grouping (`external_outputs_by_instance`).
+   - **Cross-Module External Reads**: Scans every module body for `PureIntrinsic.EXTERNAL_OUTPUT_READ` operations whose producer lives in a different module, storing both the consumer-facing entries (`cross_module_external_reads`) and the producer-facing grouping (`external_outputs_by_instance`). Producer lookup first checks whether the intrinsic’s parent is already a module—supporting the block-free IR—before falling back to legacy `.module` handles when present.
 
 2. **Array Management Phase**:
    - **Write Port Assignment**: Assigns unique port indices to each module writing to an array, storing the mapping in `dumper.array_write_port_mapping`.

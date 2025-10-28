@@ -36,7 +36,7 @@ The base class for all expression nodes in the IR. It serves as the foundation f
 **Fields:**
 - `opcode: int` - Operation code for this expression
 - `loc: str` - Source location information  
-- `parent: typing.Optional[Block]` - Parent block of this expression
+- `parent: typing.Optional[ModuleBase]` - Owning module of this expression (set by the builder)
 - `users: typing.List[Operand]` - List of users of this expression
 - `_operands: typing.List[typing.Union[Operand, Port, Array, int]]` - List of operands of this expression
 
@@ -67,7 +67,7 @@ Direct storage would only provide forward traversal (Expr → Value). The wrappe
 
 **Fields:**
 - `_value: Value` - The value of this operand
-- `_user: typing.Union[Expr, CondBlock]` - The user of this operand (expressions are common, but guard expressions stored on `CondBlock` instances also reuse Operand)
+- `_user: Expr` - The expression that consumes this operand
 
 **Methods:**
 - `__init__(value: Value, user: Expr)` - Initialize the operand
@@ -244,8 +244,8 @@ The intentional redundancy in the use-def graph enables critical compiler operat
 - Enables precise timing analysis for pipeline stages
 
 **Dependency Tracking:**
-- Essential for conditional blocks (`CondBlock`) and other control flow
-- The `CondBlock` wraps its condition in an `Operand` to track the dependency
+- Essential for predicate-managed control flow because predicate intrinsics still consume the condition operands
+- Each predicate push intrinsic wraps its condition in an `Operand` to track the dependency
 - Enables proper ordering of operations across different execution contexts
 
 **Multi-Port Write Tracking:**

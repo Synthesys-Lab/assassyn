@@ -224,8 +224,8 @@ based on the inner function name, ensuring no naming conflicts across module ins
 ### _enter_module_context
 
 ```python
-def _enter_module_context(module: Any) -> Block:
-    """Initialise a module body and enter the builder context."""
+def _enter_module_context(module: Any) -> list[Expr]:
+    """Initialise a module body list and enter the builder context."""
 ```
 
 **Purpose**: Initializes the module's body and enters the builder context for AST construction.
@@ -233,9 +233,9 @@ def _enter_module_context(module: Any) -> Block:
 **Parameters**:
 - `module`: The module instance to initialize
 
-**Returns**: The module's body block
+**Returns**: The module's body list
 
-**Explanation**: Creates a new `Block` for the module body and enters the builder context
+**Explanation**: Creates a new list for the module body and enters the builder context
 to enable AST construction within the module.
 
 ### _exit_module_context

@@ -48,21 +48,11 @@ def visit_system(self, node: SysBuilder):
 ```python
 def visit_module(self, node: Module):
     '''Enter a module'''
-    self.visit_block(node.body)
-```
-
-**Explanation:** Visits a module by delegating to its body block. This method provides a hook for subclasses to perform module-specific processing before visiting the module's body.
-
-#### `visit_block(self, node: Block)`
-
-```python
-def visit_block(self, node: Block):
-    '''Enter a block'''
-    for elem in node.iter():
+    for elem in node.body or ():
         self.dispatch(elem)
 ```
 
-**Explanation:** Visits a block by iterating through its elements and dispatching each element to the appropriate visitor method. This method handles the traversal of block contents and delegates to `dispatch()` for proper routing.
+**Explanation:** Visits a module by iterating through its flat body list. This hook allows subclasses to run module-specific logic before the traversal when needed.
 
 #### `dispatch(self, node)`
 
@@ -71,11 +61,9 @@ def dispatch(self, node):
     '''Dispatch the node in a block to the corresponding visitor'''
     if isinstance(node, Expr):
         self.visit_expr(node)
-    if isinstance(node, Block):
-        self.visit_block(node)
 ```
 
-**Explanation:** Dispatches a node to the appropriate visitor method based on its type. Routes `Expr` nodes to `visit_expr()` and `Block` nodes to `visit_block()`. This method enables polymorphic traversal of different node types within blocks.
+**Explanation:** Dispatches a node to the appropriate visitor method based on its type. Currently only `Expr` nodes are handled, as module bodies are flat lists of expressions guarded by predicate intrinsics.
 
 #### `visit_array(self, node)`
 

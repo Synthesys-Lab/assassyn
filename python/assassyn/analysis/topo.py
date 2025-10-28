@@ -1,6 +1,7 @@
 """Topological analysis utilities for Assassyn."""
 from collections import defaultdict, deque
 from ..ir.expr import Expr, FIFOPush, Bind
+from ..ir.module.base import ModuleBase
 
 
 def topo_downstream_modules(sys):
@@ -61,7 +62,10 @@ def get_upstreams(module):
             continue
 
         parent_block = getattr(elem, 'parent', None)
-        upstream_module = getattr(parent_block, 'module', None)
+        if isinstance(parent_block, ModuleBase):
+            upstream_module = parent_block
+        else:
+            upstream_module = getattr(parent_block, 'module', None)
         if upstream_module is not None:
             res.add(upstream_module)
 

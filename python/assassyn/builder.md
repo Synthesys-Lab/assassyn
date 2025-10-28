@@ -31,7 +31,7 @@ class SysBuilder:
     @property
     def current_module(self) -> Module | None
     @property
-    def current_block(self) -> Block | None
+    def current_body(self) -> list | None
     @property
     def insert_point(self) -> list
     @property
@@ -58,26 +58,26 @@ class Singleton(type):
 
 ## SysBuilder Class
 
-`SysBuilder` is a context manager that serves as both the system and the IR builder. It maintains the state of IR construction, including active modules, blocks, arrays, and exposed nodes.
+`SysBuilder` is a context manager that serves as both the system and the IR builder. It maintains the state of IR construction, including active modules, module bodies, arrays, and exposed nodes.
 
 **Key Attributes:**
 - `name`: System name
 - `modules`: List of all modules in the system
 - `downstreams`: List of downstream modules
 - `arrays`: List of array objects
-- `_ctx_stack`: Dictionary tracking module and block context stacks (keys: `'module'`, `'block'`)
+- `_ctx_stack`: Dictionary tracking module and body context stacks (keys: `'module'`, `'body'`)
 - `_exposes`: Dictionary mapping nodes to their exposure kinds
 - `line_expression_tracker`: Tracks expressions on each source line for naming
 - `naming_manager`: Instance of `NamingManager` for variable name generation
 
 **Properties:**
 - `current_module`: Returns the module at the top of the module context stack, or `None` if empty
-- `current_block`: Returns the block at the top of the block context stack, or `None` if empty
-- `insert_point`: Returns `current_block.body`, the list where new IR nodes are inserted
+- `current_body`: Returns the list at the top of the body context stack, or `None` if empty
+- `insert_point`: Alias for `current_body`, the list where new IR nodes are inserted
 - `exposed_nodes`: Returns the dictionary of exposed nodes
 
 **Context Methods:**
-- `enter_context_of(ty, entry)`: Pushes a new context onto the stack for type `ty` (either `'module'` or `'block'`). For `CondBlock` entries, it adds the condition to the module's externals.
+- `enter_context_of(ty, entry)`: Pushes a new context onto the stack for type `ty` (either `'module'` or `'body'`).
 - `exit_context_of(ty)`: Pops the top context from the stack for type `ty`
 
 **Query Methods:**
@@ -115,15 +115,15 @@ When entering (`__enter__`), it registers itself via `Singleton.set_builder(self
 
 **`ir_builder(func=None, *, node_type=None)`** is a decorator that wraps functions to automatically inject their return values into the IR. It provides two key features:
 
-1. **Automatic IR Node Injection**: Non-`Const` return values are appended to `insert_point` (the current block's body)
+1. **Automatic IR Node Injection**: Non-`Const` return values are appended to `insert_point` (the current body list)
 2. **Source Location Tracking**: Uses stack inspection to determine the Python source location where the IR node was created
 
 **Decorator Behavior (`_apply_ir_builder`):**
 
 For each IR node returned by the decorated function:
 - If the result is `None` or a `Const`, no special handling occurs
-- For `Expr` nodes, sets `parent` to `current_block` and adds operands to the module's externals
-- Inserts the node into `insert_point` (current block's body)
+- For `Expr` nodes, sets `parent` to `current_module` and adds operands to the module's externals
+- Inserts the node into `insert_point` (current body list)
 - Inspects the call stack to find the first frame outside the assassyn package and excluded directories, recording that location as `node.loc`
 - For valued expressions with code context, calls `process_naming()` to infer a source name from the assignment statement
 

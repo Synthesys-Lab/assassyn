@@ -13,6 +13,34 @@ from ..expr import Operand, Expr
 from ..expr.intrinsic import PureIntrinsic
 
 
+def render_module_body(body: list[Expr] | None) -> str:
+    '''Pretty-print a flat module body while honouring predicate intrinsics.'''
+    # pylint: disable=import-outside-toplevel
+    from ..expr.intrinsic import Intrinsic
+
+    Singleton.repr_ident += 2
+    try:
+        if not body:
+            return ''
+
+        lines: list[str] = []
+        for elem in body:
+            if isinstance(elem, Intrinsic):
+                if elem.opcode == Intrinsic.PUSH_CONDITION:
+                    cond = elem.args[0].as_operand()
+                    lines.append((' ' * Singleton.repr_ident) + f'if {cond} {{ // PUSH_CONDITION')
+                    Singleton.repr_ident += 2
+                    continue
+                if elem.opcode == Intrinsic.POP_CONDITION:
+                    Singleton.repr_ident -= 2
+                    lines.append((' ' * Singleton.repr_ident) + '} // POP_CONDITION')
+                    continue
+            lines.append((' ' * Singleton.repr_ident) + repr(elem))
+        return '\n'.join(lines)
+    finally:
+        Singleton.repr_ident -= 2
+
+
 # pylint: disable=too-few-public-methods, cyclic-import
 class ModuleBase:
     '''The base class for the module definition.'''
@@ -53,24 +81,20 @@ class ModuleBase:
             if isinstance(value, (Array, Module)):
                 is_external = True
             if isinstance(value, Expr):
-                is_external = value.parent.module != self
+                parent_module = getattr(value, 'parent', None)
+                is_external = parent_module is not None and parent_module != self
             if is_external:
                 if value not in self._externals:
                     self._externals[value] = []
                 self._externals[value].append(operand)
 
     def _dump_externals(self):
-        # pylint: disable=import-outside-toplevel
-        from ..block import Block
         res = ''
         for value, operands in self._externals.items():
             unwrapped = unwrap_operand(value)
             res = res + f'  // External: {unwrapped}\n'
             for operand in operands:
-                if not isinstance(operand.user, Block):
-                    res = res + f'  //  .usedby: {operand.user}\n'
-                else:
-                    res = res + f'  //  .usedby: condition::{operand.user.as_operand()}\n'
+                res = res + f'  //  .usedby: {operand.user}\n'
         return res
 
 def combinational_for(module_type):  # pylint: disable=too-many-statements
@@ -83,19 +107,16 @@ def combinational_for(module_type):  # pylint: disable=too-many-statements
         @wraps(func)
         def wrapper(*args, **kwargs):
             # pylint: disable=import-outside-toplevel,cyclic-import
-            from ..block import Block
             from ..array import Array
 
             module_self = args[0]
             assert isinstance(module_self, module_type), \
                 f"Expected {module_type.__name__}, got {type(module_self).__name__}"
 
-            module_self.body = Block(Block.MODULE_ROOT)
-            module_self.body.parent = module_self
-            module_self.body.module = module_self
+            module_self.body = []
             builder = Singleton.peek_builder()
             builder.enter_context_of('module', module_self)
-            builder.enter_context_of('block', module_self.body)
+            builder.enter_context_of('body', module_self.body)
 
             try:
                 try:
@@ -124,7 +145,7 @@ def combinational_for(module_type):  # pylint: disable=too-many-statements
                 return new_func(*args, **kwargs)
             finally:
                 builder = Singleton.peek_builder()
-                builder.exit_context_of('block')
+                builder.exit_context_of('body')
                 builder.exit_context_of('module')
 
         wrapper._is_combinational = True  # pylint: disable=protected-access

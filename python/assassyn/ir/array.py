@@ -188,14 +188,14 @@ class Array:  #pylint: disable=too-many-instance-attributes
 
         # Add read operations
         for read_op in read_ops:
-            module_name = getattr(read_op.parent, 'module', None)
-            module_str = getattr(module_name, 'name', 'Unknown') if module_name else 'Unknown'
+            module_owner = getattr(read_op, 'parent', None)
+            module_str = getattr(module_owner, 'name', 'Unknown') if module_owner else 'Unknown'
             all_ops.append(f'Read  by: {read_op} in {module_str}')
 
         # Add write operations
         for write_op in write_ops:
-            module_name = getattr(write_op.parent, 'module', None)
-            module_str = getattr(module_name, 'name', 'Unknown') if module_name else 'Unknown'
+            module_owner = getattr(write_op, 'parent', None)
+            module_str = getattr(module_owner, 'name', 'Unknown') if module_owner else 'Unknown'
             all_ops.append(f'Write by: {write_op} in {module_str}')
 
         # Format tree structure

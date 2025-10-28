@@ -41,7 +41,7 @@ This function generates comprehensive port declarations for Verilog modules base
 
 4. **External Value Inputs**: Declares two categories of inbound external data:
    - Entries from `dumper.cross_module_external_reads` ensure consumers that read another module’s external register output get `producer_value`/`producer_value_valid` inputs even if the value never appears in `node.externals`.
-   - Direct externals (`node.externals`) still emit `<producer>_<value>` and `<producer>_<value>_valid` inputs for expressions that originate elsewhere (skipping bindings, constants, and the `ExternalIntrinsic` handles themselves).
+   - Direct externals (`node.externals`) still emit `<producer>_<value>` and `<producer>_<value>_valid` inputs for expressions that originate elsewhere (skipping bindings, constants, and the `ExternalIntrinsic` handles themselves). The implementation now resolves the producer by first checking whether `expr.parent` is already a module—reflecting the block-free IR—before falling back to legacy `.module` lookups.
 
 5. **FIFO Handshake Ports**:
    - For pipeline modules, declares FIFO inputs (`port`, `port_valid`) and optional `port_pop_ready` outputs when the module pops from the FIFO, determined by `pops` metadata (`{p.fifo for p in pops}`).

@@ -69,7 +69,9 @@ def is_stub_external(module: Module) -> bool:
 
 Helper predicates that distinguish fully elaborated modules from placeholder
 stubs. They keep downstream passes from generating code for external modules
-that have no synthesized body.
+that have no synthesized body. The detection explicitly handles the new list
+backed bodies produced by the builder as well as any legacy wrappers that still
+expose a `.body` attribute.
 
 ### `collect_external_intrinsics`
 
@@ -97,8 +99,8 @@ users.
 ### `_ModuleValueExposureCollector`
 
 A thin `Visitor` subclass that records expressions flagged by
-`expr_externally_used`. The collector intentionally reuses the generic block
-traversal logic from `Visitor` to keep the implementation minimal.
+`expr_externally_used`. The collector walks the flat module body list emitted by
+the builder so it stays aligned with the block-free IR representation.
 
 ## Section 3. Design Notes
 

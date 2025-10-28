@@ -75,7 +75,7 @@ The `Module` class is the primary AST node for defining hardware modules (pipeli
 **Purpose:** Represents a pipeline stage that can be activated through credit-based flow control, handles port-based communication, and provides timing policy management for different execution models.
 
 **Member Fields:**
-- `body: Block` - The IR block containing the module's logic
+- `body: list[Expr]` - Ordered list of expressions that make up the module's logic
 - `name: str` - The module's name
 - `_attrs: dict` - Dictionary of module attributes (timing, arbiter settings, etc.)
 - `_ports: list` - List of port objects
@@ -142,10 +142,10 @@ The bind operation establishes the connection between the caller and this module
 Generates the string representation for IR dumps. The method:
 1. Formats port definitions with proper indentation
 2. Includes module attributes in the header
-3. Generates the module declaration with body content
+3. Renders the module body via the shared `render_module_body()` helper, which iterates the flat expression list and interprets predicate push/pop intrinsics as braces for display purposes
 4. Includes external dependencies
 
-The output follows Assassyn's IR format for module declarations.
+The output follows Assassyn's IR format for module declarations while reflecting the predicate-based structure encoded in the expression stream.
 
 #### `timing` property
 
@@ -211,9 +211,9 @@ The `@combinational` decorator is created by `combinational_for(Module)` from [b
 **Explanation:**
 This decorator provides essential functionality for module logic definition:
 
-1. **IR Context Management:** Automatically enters and exits module and block contexts
+1. **IR Context Management:** Automatically enters and exits module and body contexts
 2. **Signal Naming:** Infers signal names from Python source code parameters
 3. **AST Transformation:** Uses `rewrite_assign` to handle assignment operations
-4. **Body Assignment:** Creates and assigns a `Block` object to store the module's logic
+4. **Body Assignment:** Creates and assigns the list object that stores the module's logic
 
 The decorator ensures that all operations within the decorated function are properly recorded in the IR and that the module's body is correctly structured for code generation.

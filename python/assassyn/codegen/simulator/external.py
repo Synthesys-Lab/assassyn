@@ -34,11 +34,12 @@ def collect_module_value_exposures(module: Module) -> Set[Expr]:
     """Collect expressions that require simulator-side caching for a module."""
 
     body = getattr(module, "body", None)
-    if body is None:
+    if not body:
         return set()
 
     collector = _ModuleValueExposureCollector()
-    collector.visit_block(body)
+    collector.current_module = module
+    collector.visit_module(module)
     return collector.exprs
 
 def gather_expr_validities(sys) -> Tuple[Set[Expr], Dict[Module, Set[Expr]]]:
@@ -73,7 +74,14 @@ def gather_expr_validities(sys) -> Tuple[Set[Expr], Dict[Module, Set[Expr]]]:
 def has_module_body(module: Module) -> bool:
     """Return True when the module has an elaborated body."""
     body = getattr(module, "body", None)
-    return body is not None and bool(getattr(body, "body", []))
+    if body is None:
+        return False
+    if isinstance(body, list):
+        return bool(body)
+    nested_body = getattr(body, "body", None)
+    if isinstance(nested_body, list):
+        return bool(nested_body)
+    return bool(body)
 
 
 def is_stub_external(module: Module) -> bool:

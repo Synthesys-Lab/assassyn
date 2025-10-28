@@ -18,7 +18,7 @@ This file provides the foundational components for defining hardware modules, in
 
 ## Section 0. Summary
 
-The `base.py` module implements the core infrastructure for Assassyn's module system. It provides `ModuleBase`, the parent class for all hardware modules that enables external dependency tracking and operand representation. Additionally, it implements `combinational_for`, a decorator factory that creates specialized decorators for module logic functions, handling IR context management and automatic signal naming through AST rewriting. This module is essential for the [credit-based pipeline architecture](../../../docs/design/arch/arch.md) as it provides the base functionality that all module types inherit.
+The `base.py` module implements the core infrastructure for Assassyn's module system. It provides `ModuleBase`, the parent class for all hardware modules that enables external dependency tracking and operand representation. Additionally, it implements `combinational_for`, a decorator factory that creates specialized decorators for module logic functions, handling IR context management and automatic signal naming through AST rewriting. Module bodies are plain `list[Expr]` instances populated while the decorator holds the module context. This module is essential for the [credit-based pipeline architecture](../../../docs/design/arch/arch.md) as it provides the base functionality that all module types inherit.
 
 ## Section 1. Exposed Interfaces
 
@@ -77,7 +77,7 @@ Records external dependencies by adding operands that reference values from othe
 1. **Array References**: If the operand references an `Array` object, it's considered external
 2. **Module References**: If the operand references a `Module` object, it's considered external  
 3. **Cross-Module Expression References**: If the operand references an expression from a different module, it's considered external
-4. **Block Condition References**: Special handling for `CondBlock` conditions that may reference external values
+4. **Predicate Intrinsics**: Predicate push/pop intrinsics emitted by `Condition` are considered external when their operands originate from other modules
 
 The detection logic is complex and handles various edge cases with nested expressions and complex operand chains. External dependencies are stored in the `_externals` dictionary and used during code generation to establish proper module connections.
 
@@ -111,6 +111,17 @@ A decorator factory that creates specialized decorators for module logic functio
 
 The decorator is essential for the [DSL abstraction](../../../docs/design/lang/dsl.md) as it bridges the gap between Python function definitions and hardware module logic, providing the syntactic sugar that makes Assassyn's module definitions intuitive and debuggable.
 
+### `render_module_body`
+
+```python
+def render_module_body(body: list[Expr] | None) -> str:
+    '''Pretty-print a flat module body while honouring predicate intrinsics.'''
+```
+
+Utility function shared by `Module` and `Downstream` stringifiers. It walks the flat body list produced by the builder, respects predicate push/pop intrinsics by adjusting `Singleton.repr_ident`, and assembles a readable textual dump.
+
+**Explanation:** The helper centralizes the predicate-aware pretty printer that used to live separately in both `module.py` and `downstream.py`. With the block removal refactor, module bodies are stored as simple lists, so the renderer only needs to handle inlined `PUSH_CONDITION` / `POP_CONDITION` intrinsics before delegating to each node's `repr`. Keeping the implementation in one place avoids duplicate logic and ensures future format tweaks remain consistent across module representations.
+
 ## Section 2. Internal Helpers
 
 ### `_dump_externals`
@@ -121,4 +132,4 @@ def _dump_externals(self) -> str:
 
 Internal helper method that generates a string representation of all external dependencies for debugging purposes.
 
-**Explanation:** This method iterates through the `_externals` dictionary and creates a formatted string showing all external dependencies and their usage contexts. It handles different operand types (including `Block` conditions) and provides detailed information about where each external dependency is used. This is primarily used in module string representations for debugging and IR inspection.
+**Explanation:** This method iterates through the `_externals` dictionary and creates a formatted string showing all external dependencies and their usage contexts. It handles different operand types (including predicate-guard operands) and provides detailed information about where each external dependency is used. This is primarily used in module string representations for debugging and IR inspection.

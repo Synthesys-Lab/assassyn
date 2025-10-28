@@ -143,7 +143,7 @@ def _handle_value_valid(dumper, expr, intrinsic, rval):
         return None
 
     value_expr = expr.operands[0].value
-    if value_expr.parent.module != expr.parent.module:
+    if value_expr.parent != expr.parent:
         port_name = dumper.get_external_port_name(value_expr)
         return f"{rval} = self.{port_name}_valid"
     return f"{rval} = self.executed"

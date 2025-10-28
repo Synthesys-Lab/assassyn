@@ -13,13 +13,13 @@ from ...utils import namify, identifierize
 if typing.TYPE_CHECKING:
     from ..array import Array
     from ..module import Port, Module
+    from ..module.base import ModuleBase
     from ..dtype import DType
-    from ..block import Block, CondBlock
 
 class Operand:
     '''The base class for all operands. It is used to dump the operand as a string.'''
     _value: Value # The value of this operand
-    _user: typing.Union[Expr, CondBlock] # The user of this operand
+    _user: Expr # The user of this operand
 
     def __init__(self, value: Value, user: Expr):
         self._value = value
@@ -44,7 +44,7 @@ class Expr(Value):
 
     opcode: int  # Operation code for this expression
     loc: str  # Source location information
-    parent: typing.Optional[Block]  # Parent block of this expression
+    parent: typing.Optional[ModuleBase]  # Parent module of this expression
     users: typing.List[Operand]  # List of users of this expression
     _operands: typing.List[
         typing.Union[Operand, Port, Array, int]
@@ -97,7 +97,7 @@ class Expr(Value):
             return wrapped
 
         if not isinstance(current_module, Downstream):
-            expr_module = expr_operand.parent.module if expr_operand.parent else None
+            expr_module = expr_operand.parent if expr_operand.parent else None
             if not self._is_cross_module_allowed(expr_operand):
                 assert current_module == expr_module, (
                     f'Expression {expr_operand} is from module {expr_module}, '

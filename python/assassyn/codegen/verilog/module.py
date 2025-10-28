@@ -3,6 +3,7 @@
 from typing import List
 from .utils import dump_type, get_sram_info
 from ...ir.module import Module
+from ...ir.module.base import ModuleBase
 from ...ir.expr import Bind
 from ...ir.expr.intrinsic import ExternalIntrinsic
 from ...ir.const import Const
@@ -68,7 +69,11 @@ def generate_module_ports(dumper, node: Module, is_downstream: bool, is_sram: bo
                 unwrap_operand(ext_val), Const):
             continue
         port_name = dumper.get_external_port_name(ext_val)
-        parent_module = getattr(getattr(ext_val, 'parent', None), 'module', None)
+        parent_ref = getattr(ext_val, 'parent', None)
+        if isinstance(parent_ref, ModuleBase):
+            parent_module = parent_ref
+        else:
+            parent_module = getattr(parent_ref, 'module', None)
         print(
             f"[verilog] module {node.name} external port {port_name} "
             f"from {parent_module} expr={ext_val}"

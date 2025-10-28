@@ -39,7 +39,7 @@ def _dump_expr(dumper, node, with_namespace: bool, module_name: str = None) -> s
     unique_name = dumper.expr_to_name[node]
 
     if with_namespace:
-        owner_module_name = namify(node.parent.module.name)
+        owner_module_name = namify(node.parent.name)
         if owner_module_name is None:
             owner_module_name = module_name
         return f"{owner_module_name}_{unique_name}"

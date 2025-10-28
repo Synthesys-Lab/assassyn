@@ -1,18 +1,15 @@
-
 """Analysis of external module usage patterns."""
 
 from ..ir.expr import Expr, FIFOPush
-from ..ir.module import Module
-from ..ir.block import CondBlock
+from ..ir.module.base import ModuleBase
 from ..ir.expr import Operand
 
-def get_module(operand: Operand) -> Module:
+def get_module(operand: Operand) -> ModuleBase | None:
     """Get the module that contains the given operand."""
     if isinstance(operand.user, Expr):
-        return operand.user.parent.module
-
-    if isinstance(operand.user, CondBlock):
-        return operand.user.module
+        parent = getattr(operand.user, 'parent', None)
+        if isinstance(parent, ModuleBase):
+            return parent
     return None
 
 def expr_externally_used(expr: Expr, exclude_push: bool) -> bool:
@@ -21,7 +18,9 @@ def expr_externally_used(expr: Expr, exclude_push: bool) -> bool:
         if isinstance(expr, FIFOPush):
             return False
 
-    this_module = expr.parent.module
+    this_module = expr.parent if isinstance(expr.parent, ModuleBase) else None
+    if this_module is None:
+        return False
 
     for user in expr.users:
         user_parent_module = get_module(user)

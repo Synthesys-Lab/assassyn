@@ -63,7 +63,7 @@ This function generates the complete top-level Verilog module that serves as the
    - **Regular Modules**: Connected to trigger counters and FIFO ports
    - **Downstream Modules**: Connected to dependency signals and external values
    - **SRAM Modules**: Connected to memory interfaces
-   - **External Modules**: Hooked up through helper routines that splice in cross-module wires derived from both `module.externals` and the cross-module metadata precomputed during system analysis, and avoid duplicating instantiations
+   - **External Modules**: Hooked up through helper routines that splice in cross-module wires derived from both `module.externals` and the cross-module metadata precomputed during system analysis, and avoid duplicating instantiations. Producer discovery now checks whether `expr.parent` is already a module—reflecting the block removal refactor—before consulting legacy `.module` fields so mixed IR shapes continue to work.
 
 7. **Module Connections**: Creates all inter-module connections:
    - **FIFO Connections**: Push/pop signal routing between modules
