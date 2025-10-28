@@ -38,6 +38,7 @@ from .rval import dump_rval as dump_rval_impl
 from .module import generate_module_ports
 from .system import generate_system
 from .metadata import PostDesignGeneration
+from .array import ArrayMetadataRegistry
 
 
 class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-many-statements
@@ -74,13 +75,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.exposed_ports_to_add = []
         self.downstream_dependencies = {}
         self.is_top_generation = False
-        self.array_users = {}
         self.finish_body = []
         self.finish_conditions = []
-        self.array_write_port_mapping = {}
-        self.array_read_port_mapping = {}
-        self.array_read_ports = {}
-        self.array_read_expr_port = {}
+        self.array_metadata = ArrayMetadataRegistry()
         self.sram_payload_arrays = set()
         self.memory_defs = set()
         self.expr_to_name = {}
@@ -302,6 +299,10 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             if isinstance(item, Expr):
                 yield item
 
+    def walk_expressions(self, block):
+        """Public wrapper for expression iteration used by helper utilities."""
+        yield from self._walk_expressions(block)
+
 
     # pylint: disable=too-many-locals,R0912
     def visit_system(self, node: SysBuilder):
@@ -317,10 +318,13 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         index_bits = array.index_bits
         index_bits_type = index_bits if index_bits > 0 else 1
 
-        writers = list(array.get_write_ports().keys())
-        num_write_ports = len(writers)
-        read_ports = self.array_read_ports.get(array, [])
-        num_read_ports = len(read_ports)
+        metadata = self.array_metadata.metadata_for(array)
+        if metadata is None:
+            num_write_ports = len(array.get_write_ports())
+            num_read_ports = 0
+        else:
+            num_write_ports = len(metadata.write_ports)
+            num_read_ports = len(metadata.read_order)
 
         dim_type = f"dim({dump_type(dtype)}, {size})"
         class_name = namify(array.name)
@@ -435,9 +439,12 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     def _connect_array(self, arr):
         """Connect each array to its writers and readers."""
         arr_name = namify(arr.name)
-        write_mapping = self.array_write_port_mapping.get(arr, {})
-        read_mapping = self.array_read_port_mapping.get(arr, {})
-        if not write_mapping and not read_mapping:
+        metadata = self.array_metadata.metadata_for(arr)
+        if metadata is None:
+            return
+        write_mapping = metadata.write_ports
+        read_mapping = metadata.read_ports_by_module
+        if not write_mapping and not any(read_mapping.values()):
             return
 
         self.append_code(f'# Connections for array {arr_name}')

@@ -29,7 +29,7 @@ This is the main cleanup function that generates all the necessary control signa
 
 4. **Array Write Signal Generation**: For each array exposed through `dumper._exposes`:
    - Filters out SRAM payload arrays (already handled by the SRAM logic).
-   - Groups writes by source module and maps them onto the precomputed port indices stored in `dumper.array_write_port_mapping`.
+   - Groups writes by source module and maps them onto the precomputed port indices stored in the `ArrayMetadataRegistry`.
    - Emits write-enable, write-data, and write-index signals per port. Multi-writer modules use `build_mux_chain` to pick the correct payload.
 
 5. **FIFO Signal Generation**: For every port exposure:

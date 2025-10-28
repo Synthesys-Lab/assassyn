@@ -145,9 +145,12 @@ def cleanup_post_generation(dumper):
                     if isinstance(e, ArrayRead)
                 ]
             arr = key
+            metadata = dumper.array_metadata.metadata_for(arr)
+            if metadata is None:
+                continue
             array_name = dumper.dump_rval(arr, False)
             array_dtype = arr.scalar_ty
-            port_mapping = dumper.array_write_port_mapping.get(arr, {})
+            port_mapping = metadata.write_ports
             # Group writes by their source module
             writes_by_module = {}
             for expr, pred in array_writes:
@@ -193,7 +196,7 @@ def cleanup_post_generation(dumper):
                 assigned_read_ports = set()
                 index_bits = arr.index_bits
                 for expr, _ in array_reads:
-                    port_idx = dumper.array_read_expr_port.get(expr)
+                    port_idx = dumper.array_metadata.read_port_index_for_expr(expr)
                     if port_idx is None or port_idx in assigned_read_ports:
                         continue
                     idx_value = dumper.dump_rval(expr.idx, False)

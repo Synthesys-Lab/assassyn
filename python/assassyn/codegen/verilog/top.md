@@ -117,10 +117,9 @@ The function uses several utility functions and data structures:
 The function manages several CIRCTDumper state variables:
 
 - `memory_defs`: SRAM memory definitions
-- `array_write_port_mapping`: Array write port assignments
+- `array_metadata`: Registry containing array write/read port assignments and usage
 - `downstream_dependencies`: Downstream module dependencies
 - `async_callees`: Async call relationships
-- `array_users`: Array usage mapping
 - `sram_payload_arrays`: SRAM payload arrays
 
 **Project-specific Knowledge Required**:

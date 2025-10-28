@@ -8,6 +8,40 @@ The metadata module defines dataclasses that hold information about modules disc
 
 ## Exposed Interfaces
 
+### `ArrayMetadata`
+
+```python
+@dataclass
+class ArrayMetadata:
+    """Metadata describing how an IR array is used across the system."""
+```
+
+**Explanation**
+
+`ArrayMetadata` captures every detail required to synthesise a shared multi-port memory wrapper for an IR `Array`.  The structure is produced by [`array.py`](./array.md) while the system is analysed, and then consumed by `design.py`, `module.py`, `cleanup.py`, and `top.py` when they need to emit per-port wires, assignments, or PyCDE modules.
+
+**Fields:**
+
+- `array: Array` – Reference to the IR array this metadata describes.
+- `write_ports: Dict[Module, int]` – Deterministic mapping from writer modules to their assigned write-port indices.  These indices are stable across the run so that every consumer can agree on signal names such as `_w_port0`.
+- `read_ports_by_module: Dict[Module, List[int]]` – Per-module list of read-port indices used when a module exposes address wires for the shared reader.
+- `read_order: List[Tuple[Module, ArrayRead]]` – Ordered catalogue of every `ArrayRead` encountered.  The index in this list is the global read-port number.
+- `read_expr_port: Dict[ArrayRead, int]` – Reverse lookup from a specific read expression to its global port index; used by expression code generation and cleanup to reference the right `*_rdata_portN` signal.
+- `users: List[Module]` – Unique list of modules that touch the array (read or write).  This drives both module port generation and top-level wiring.
+
+**When Metadata is Populated:**
+
+`ArrayMetadata` instances are emitted by [`ArrayMetadataRegistry.collect`](./array.md) during `generate_system`.  The registry walks every module with `CIRCTDumper._walk_expressions`, records writers via `Array.get_write_ports()`, and assigns read-port indices in first-seen order while skipping SRAM payload arrays that are emitted separately.
+
+**How Metadata is Consumed:**
+
+- [design.py](./design.md) – Builds PyCDE array wrapper classes with the correct number of read/write ports.
+- [module.py](./module.md) – Declares per-module ports for array reads/writes by querying the registry.
+- [cleanup.py](./cleanup.md) – Routes module-level signals into shared array writers using the recorded port indices.
+- [top.py](./top.md) – Emits global wire declarations and instance connections for every shared array.
+
+The registry exposes helper methods (`write_port_index`, `read_port_indices`, `read_port_index_for_expr`, `users_for`) that all consumers use instead of recomputing the data.  This eliminates the ad-hoc dictionaries previously scattered across `design.py` and `system.py`.
+
 ### `PostDesignGeneration`
 
 ```python
@@ -84,4 +118,3 @@ Dataclasses provide:
 - Easy extensibility for future metadata fields
 - Readable initialization with default values
 - Integration with Python's type checking tools
-

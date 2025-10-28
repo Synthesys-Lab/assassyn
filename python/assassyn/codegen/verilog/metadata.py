@@ -6,17 +6,33 @@ harness generation).
 """
 
 from dataclasses import dataclass, field
-from typing import List, TYPE_CHECKING, Any
+from typing import Dict, List, Tuple, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from ...ir.expr import FIFOPush, AsyncCall, FIFOPop
+    from ...ir.expr import FIFOPush, AsyncCall, FIFOPop, ArrayRead
+    from ...ir.array import Array
+    from ...ir.module import Module
     PushList = List[FIFOPush]
     CallList = List[AsyncCall]
     PopList = List[FIFOPop]
+    ModuleList = List[Module]
 else:
     PushList = List[Any]
     CallList = List[Any]
     PopList = List[Any]
+    ModuleList = List[Any]
+
+
+@dataclass
+class ArrayMetadata:
+    """Metadata describing how an IR array is accessed throughout the system."""
+
+    array: 'Array'
+    write_ports: Dict['Module', int] = field(default_factory=dict)
+    read_ports_by_module: Dict['Module', List[int]] = field(default_factory=dict)
+    read_order: List[Tuple['Module', 'ArrayRead']] = field(default_factory=list)
+    read_expr_port: Dict['ArrayRead', int] = field(default_factory=dict)
+    users: ModuleList = field(default_factory=list)
 
 
 @dataclass

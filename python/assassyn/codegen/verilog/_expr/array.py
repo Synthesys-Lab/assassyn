@@ -26,7 +26,7 @@ def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
         dumper.expose('array', expr)
     else:
         array_name = dumper.dump_rval(array_ref, False)
-        port_idx = dumper.array_read_expr_port.get(expr)
+        port_idx = dumper.array_metadata.read_port_index_for_expr(expr)
         if port_idx is None:
             return None
         body = f'{rval} = self.{array_name}_rdata_port{port_idx}'

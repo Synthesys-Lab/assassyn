@@ -35,9 +35,9 @@ This function generates the complete Verilog system by performing comprehensive 
    - **Cross-Module External Reads**: Scans every module body for `PureIntrinsic.EXTERNAL_OUTPUT_READ` operations whose producer lives in a different module, storing both the consumer-facing entries (`cross_module_external_reads`) and the producer-facing grouping (`external_outputs_by_instance`). Producer lookup first checks whether the intrinsic’s parent is already a module—supporting the block-free IR—before falling back to legacy `.module` handles when present.
 
 2. **Array Management Phase**:
-   - **Write Port Assignment**: Assigns unique port indices to each module writing to an array, storing the mapping in `dumper.array_write_port_mapping`.
+   - **Write Port Assignment**: Assigns unique port indices to each module writing to an array, recording them inside `dumper.array_metadata`.
    - **Array Module Generation**: Generates multi-port array modules for non-SRAM arrays via `visit_array`.
-   - **Array User Analysis**: Populates `dumper.array_users` with the modules that read or write each array.
+   - **Array User Analysis**: Populates the registry with every module that reads or writes each array so downstream passes can query a single source of truth.
 
 3. **Module Analysis Phase**:
    - **Dependency Tracking**: Records downstream dependencies using `get_upstreams`.
@@ -83,10 +83,9 @@ The function manages several CIRCTDumper state variables:
 - `cross_module_external_reads`: Consumer-side records of external register outputs read from another module
 - `external_outputs_by_instance`: Producer-side grouping of the external outputs that must be exposed for other modules
 - `external_output_exposures`: Per-module cache populated during instantiation to drive `cleanup_post_generation`
-- `array_write_port_mapping`: Maps arrays to write port assignments
+- `array_metadata`: `ArrayMetadataRegistry` instance with write/read port assignments and user membership
 - `downstream_dependencies`: Maps downstream modules to their dependencies
 - `async_callees`: Maps modules to their callers
-- `array_users`: Maps arrays to modules that use them
 
 **Project-specific Knowledge Required**:
 - Understanding of [CIRCTDumper state management](/python/assassyn/codegen/verilog/design.md)

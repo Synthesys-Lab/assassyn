@@ -96,7 +96,7 @@ These map to `fifo.sv` and `trigger_counter.sv` shipped with the backend.
 
 ### CIRCTDumper Walkthrough
 
-- `visit_system` builds: `array_write_port_mapping`, `async_callees` (callee→callers), `downstream_dependencies` (downstream→upstreams), `array_users`, external wrappers, and SRAM metadata. Then visits modules and emits `Top`.
+- `visit_system` builds: `array_metadata`, `async_callees` (callee→callers), `downstream_dependencies` (downstream→upstreams), external wrappers, and SRAM metadata. Then visits modules and emits `Top`.
 - `visit_module` walks the body (via `_expr`), declares ports (`generate_module_ports`), then emits handshakes and gating (`cleanup_post_generation`) inside `construct`.
 - `visit_block` tracks nested predicates for conditional and cycled blocks so `Log`/`FINISH`/FIFO ops inherit the correct guards.
 

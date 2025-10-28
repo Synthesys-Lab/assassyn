@@ -3,6 +3,7 @@
 """Top-level harness generation for Verilog designs."""
 
 from collections import defaultdict
+from typing import TYPE_CHECKING, Any
 
 from .utils import (
     dump_type,
@@ -22,8 +23,13 @@ from ...ir.dtype import Record
 from ...utils import namify, unwrap_operand
 from ...ir.const import Const
 
+if TYPE_CHECKING:
+    from .design import CIRCTDumper
+else:
+    CIRCTDumper = Any  # type: ignore
+
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-def generate_top_harness(dumper):
+def generate_top_harness(dumper: CIRCTDumper):
     """
     Generates a generic Top-level harness that connects all modules based on
     the analyzed dependencies (async calls, array usage).
@@ -112,10 +118,13 @@ def generate_top_harness(dumper):
         arr_name = namify(arr.name)
         index_bits = arr.index_bits
         index_bits_type = index_bits if index_bits > 0 else 1
-        port_mapping = dumper.array_write_port_mapping.get(arr, {})
-        num_write_ports = len(port_mapping)
-        read_ports = dumper.array_read_ports.get(arr, [])
-        num_read_ports = len(read_ports)
+        metadata = dumper.array_metadata.metadata_for(arr)
+        if metadata is None:
+            num_write_ports = len(arr.get_write_ports())
+            num_read_ports = 0
+        else:
+            num_write_ports = len(metadata.write_ports)
+            num_read_ports = len(metadata.read_order)
         dumper.append_code(
             f'# Multi-port array {arr_name} with '
             f'{num_write_ports} write ports and {num_read_ports} read ports'
@@ -370,19 +379,31 @@ def generate_top_harness(dumper):
                 array_name = namify(array.name)
                 port_map.append(f'mem_dataout=mem_{array_name}_dataout')
 
-        for arr, users in dumper.array_users.items():
-            if module in users:
-                # Skip SRAM arrays as they don't have array_writer instances
-                is_sram_array = any(isinstance(m, SRAM) and
-                                   m._payload == arr for m in dumper.sys.downstreams)
-                if not is_sram_array:
-                    read_indices = dumper.array_read_port_mapping.get(arr, {}).get(module, [])
-                    arr_name = namify(arr.name)
-                    for port_idx in read_indices:
-                        port_suffix = f"_port{port_idx}"
-                        port_map.append(
-                            f"{arr_name}_rdata{port_suffix}=aw_{arr_name}_rdata{port_suffix}"
-                        )
+        for arr in dumper.array_metadata.arrays():
+            users = dumper.array_metadata.users_for(arr)
+            if not any(user is module for user in users):
+                continue
+            # Skip SRAM arrays as they don't have array_writer instances
+            is_sram_array = any(
+                isinstance(m, SRAM) and m._payload == arr  # pylint: disable=protected-access
+                for m in dumper.sys.downstreams
+            )
+            if is_sram_array:
+                continue
+            read_indices = dumper.array_metadata.read_port_indices(arr, module)
+            if not read_indices:
+                metadata = dumper.array_metadata.metadata_for(arr)
+                if metadata is not None:
+                    for module_key, ports in metadata.read_ports_by_module.items():
+                        if module_key is module:
+                            read_indices = ports
+                            break
+            arr_name = namify(arr.name)
+            for port_idx in read_indices:
+                port_suffix = f"_port{port_idx}"
+                port_map.append(
+                    f"{arr_name}_rdata{port_suffix}=aw_{arr_name}_rdata{port_suffix}"
+                )
 
         # Use metadata instead of walking expressions again
         metadata = dumper.module_metadata.get(module)
@@ -512,8 +533,10 @@ def generate_top_harness(dumper):
                     )
     dumper.append_code('\n# --- Array Write-Back Connections ---')
     for arr_container in dumper.sys.arrays:
-        if arr_container in dumper.array_users and \
-                arr_container not in dumper.sram_payload_arrays:
+        if arr_container in dumper.sram_payload_arrays:
+            continue
+        metadata = dumper.array_metadata.metadata_for(arr_container)
+        if metadata and metadata.users:
             dumper._connect_array(arr_container)
 
     dumper.append_code('\n# --- Trigger Counter Delta Connections ---')

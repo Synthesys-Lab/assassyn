@@ -138,23 +138,28 @@ def generate_module_ports(dumper, node: Module, is_downstream: bool, is_sram: bo
             sram_info = get_sram_info(node)
             if sram_info and arr == sram_info['array']:
                 continue
-        read_mapping = dumper.array_read_port_mapping.get(arr, {})
-        read_port_indices = read_mapping.get(node)
-        if read_port_indices is None:
-            for module_key, ports in read_mapping.items():
+        metadata = dumper.array_metadata.metadata_for(arr)
+        if metadata is None:
+            continue
+
+        users = dumper.array_metadata.users_for(arr)
+        if not any(user is node for user in users):
+            continue
+
+        read_port_indices = dumper.array_metadata.read_port_indices(arr, node)
+        if not read_port_indices:
+            for module_key, ports in metadata.read_ports_by_module.items():
                 if module_key is node:
                     read_port_indices = ports
                     break
-        if read_port_indices is None:
-            read_port_indices = []
 
-        port_mapping = dumper.array_write_port_mapping.get(arr, {})
-        writes_idx = port_mapping.get(node)
+        writes_idx = dumper.array_metadata.write_port_index(arr, node)
         if writes_idx is None:
-            for module_key, idx in port_mapping.items():
+            for module_key, idx in metadata.write_ports.items():
                 if module_key is node:
                     writes_idx = idx
                     break
+
         if read_port_indices or writes_idx is not None:
             index_bits = arr.index_bits
             idx_type = index_bits if index_bits > 0 else 1

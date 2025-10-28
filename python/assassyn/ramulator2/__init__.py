@@ -1,4 +1,4 @@
-# pylint: disable=duplicate-code
+# pylint: disable=duplicate-code, cyclic-import
 
 '''Ramulator2 module for the Assassyn compiler.'''
 

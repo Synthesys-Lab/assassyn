@@ -49,7 +49,7 @@ This function generates comprehensive port declarations for Verilog modules base
 
 6. **Output Handshakes**: Declares `<callee>_<fifo>_push_valid/data` outputs and `<callee>_trigger` outputs for each async call target, again skipping external-only callees so we do not generate unused ports.
 
-7. **Array Interfaces**: For every array listed in `dumper.array_users[node]`, creates inputs for the array value (`_q_in`) and, when the current module writes to the array, outputs for the per-port write enable/data/index signals. Port indices come from `dumper.array_write_port_mapping`.
+7. **Array Interfaces**: For every array recorded in `dumper.array_metadata.users_for(arr)`, creates inputs for the array value (`_q_in`) and, when the current module writes to the array, outputs for the per-port write enable/data/index signals. Port indices come from `dumper.array_metadata.write_port_index(arr, node)`.
 
 8. **Exposed Ports**: Appends any additional port declarations recorded in `dumper.exposed_ports_to_add` during expression traversal (e.g. `expose_*` and `valid_*` ports).
 
@@ -80,8 +80,7 @@ The function uses several utility functions and data structures:
 
 The function integrates with the CIRCTDumper's state management:
 - `downstream_dependencies`: Maps downstream modules to their dependencies
-- `array_users`: Maps arrays to modules that use them
-- `array_write_port_mapping`: Maps arrays to write port assignments
+- `array_metadata`: Registry supplying array usage and port assignments
 - `exposed_ports_to_add`: Additional ports registered through expose mechanism
 
 **Project-specific Knowledge Required**:

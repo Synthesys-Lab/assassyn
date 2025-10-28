@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any
 
 from ...ir.memory.sram import SRAM
-from ...ir.expr import AsyncCall, ArrayRead, ArrayWrite
+from ...ir.expr import AsyncCall
 from ...ir.expr.intrinsic import PureIntrinsic
 from ...analysis import get_upstreams
 from ..simulator.external import collect_external_intrinsics
@@ -83,40 +83,7 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
                 dumper.cross_module_external_reads.append(entry)
                 dumper.external_outputs_by_instance[instance].append(entry)
 
-    for arr_container in sys.arrays:
-        if arr_container in dumper.sram_payload_arrays:
-            continue
-        sub_array = arr_container
-        if sub_array not in dumper.array_write_port_mapping:
-            dumper.array_write_port_mapping[sub_array] = {}
-        sub_array_writers = sub_array.get_write_ports()
-        for module, _ in sub_array_writers.items():
-            if module not in dumper.array_write_port_mapping[sub_array]:
-                port_idx = len(dumper.array_write_port_mapping[sub_array])
-                dumper.array_write_port_mapping[sub_array][module] = port_idx
-
-        # Record read port usage per array and module.
-        arr_reads = []
-        for module in sys.modules + sys.downstreams:
-            if module.body is None:
-                continue
-            reads = [
-                expr for expr in dumper._walk_expressions(module.body)
-                if isinstance(expr, ArrayRead) and expr.array == sub_array
-            ]
-            if reads:
-                arr_reads.append((module, reads))
-
-        dumper.array_read_port_mapping[sub_array] = {}
-        dumper.array_read_ports[sub_array] = []
-        port_counter = 0
-        for module, reads in arr_reads:
-            dumper.array_read_port_mapping[sub_array][module] = []
-            for read_expr in reads:
-                dumper.array_read_port_mapping[sub_array][module].append(port_counter)
-                dumper.array_read_ports[sub_array].append((module, read_expr))
-                dumper.array_read_expr_port[read_expr] = port_counter
-                port_counter += 1
+    dumper.array_metadata.collect(dumper, sys)
 
     for arr_container in sys.arrays:
         if arr_container not in dumper.sram_payload_arrays:
@@ -135,21 +102,6 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
 
                 if module not in dumper.async_callees[callee]:
                     dumper.async_callees[callee].append(module)
-
-    dumper.array_users = {}
-    # pylint: disable=R1702
-    for arr_container in dumper.sys.arrays:
-        if arr_container in dumper.sram_payload_arrays:
-            continue
-        arr = arr_container
-        dumper.array_users[arr] = []
-        for mod in dumper.sys.modules + dumper.sys.downstreams:
-            if isinstance(mod, SRAM) and hasattr(mod, 'payload') and arr == mod.payload:
-                continue
-            for expr in dumper._walk_expressions(mod.body):
-                if isinstance(expr, (ArrayRead, ArrayWrite)) and expr.array == arr:
-                    if mod not in dumper.array_users[arr]:
-                        dumper.array_users[arr].append(mod)
 
     # Process only non-external modules from sys.modules
     for elem in sys.modules:
