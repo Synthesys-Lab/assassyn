@@ -151,7 +151,7 @@ class SysBuilder:
     modules: typing.List[Module]  # List of modules
     downstreams: list  # List of downstream modules
     arrays: typing.List[Array]  # List of arrays
-    _ctx_stack: dict  # Stack for context tracking
+    _module_stack: list[ModuleContext]  # Stack for module context tracking
     _exposes: dict  # Dictionary of exposed nodes
     line_expression_tracker: dict  # Dictionary of line expression tracker
     naming_manager: NamingManager  # Naming manager
@@ -159,10 +159,10 @@ class SysBuilder:
     @property
     def current_module(self):
         '''Get the current module being built.'''
-        ctx_stack = self._ctx_stack['module']
-        if not ctx_stack:
+        module_stack = self._module_stack
+        if not module_stack:
             raise RuntimeError('Module context stack is empty')
-        return ctx_stack[-1].module
+        return module_stack[-1].module
 
     @property
     def current_body(self):
@@ -181,8 +181,8 @@ class SysBuilder:
     # Predicate stack helpers (per current module context)
     def get_predicate_stack(self):
         '''Get the current module's predicate stack.'''
-        ctx_stack = self._ctx_stack['module']
-        return [] if not ctx_stack else ctx_stack[-1].cond_stack
+        module_stack = self._module_stack
+        return [] if not module_stack else module_stack[-1].cond_stack
 
     def reuse_array_read(self, array, index, factory):
         '''Reuse a cached array read or materialize a new one via ``factory``.'''
@@ -211,32 +211,24 @@ class SysBuilder:
         assert stack, 'Predicate stack underflow'
         stack.pop()
 
-    def enter_context_of(self, ty, entry):
-        '''Enter the context of the given type.'''
-        if ty == 'module':
-            self._ctx_stack['module'].append(ModuleContext(entry))
-            return
-        if ty == 'body':
-            module = self.current_module
-            module_body = getattr(module, 'body', None)
-            if module_body is not entry:
-                raise RuntimeError(
-                    f'Active module {module!r} body does not match requested context'
-                )
-            return
-        raise ValueError(f'Unsupported context type: {ty}')
+    def enter_context_of(self, module: Module) -> None:
+        '''Enter the context of the given module.'''
+        if module is None:
+            raise RuntimeError('Cannot enter context of None')
+        body = getattr(module, 'body', None)
+        if body is None:
+            raise RuntimeError(f'Module {module!r} has no body before entering context')
+        self._module_stack.append(ModuleContext(module))
 
-    def exit_context_of(self, ty):
-        '''Exit the context of the given type.'''
-        if ty == 'module':
-            ctx = self._ctx_stack['module'].pop()
-            if ctx.cond_stack:
-                msg = 'Predicate stack not empty on module exit: ' + repr(ctx.cond_stack[-1].cond)
-                assert False, msg
-            return ctx
-        if ty == 'body':
-            return self.current_body
-        raise ValueError(f'Unsupported context type: {ty}')
+    def exit_context_of(self) -> ModuleContext:
+        '''Exit the current module context.'''
+        if not self._module_stack:
+            raise RuntimeError('Module context stack is empty')
+        ctx = self._module_stack.pop()
+        if ctx.cond_stack:
+            msg = 'Predicate stack not empty on module exit: ' + repr(ctx.cond_stack[-1].cond)
+            assert False, msg
+        return ctx
 
     def has_driver(self):
         '''Check if the system has a driver module.'''
@@ -257,7 +249,7 @@ class SysBuilder:
         self.modules = []
         self.downstreams = []
         self.arrays = []
-        self._ctx_stack = {'module': []}
+        self._module_stack = []
         self._exposes = {}
         self.line_expression_tracker = {}
         self.naming_manager = NamingManager()

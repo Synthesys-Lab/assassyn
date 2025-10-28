@@ -8,7 +8,7 @@ This module provides the core infrastructure for building intermediate represent
 
 The builder module is the core of assassyn's IR construction system. It provides:
 
-1. **Context Management**: `SysBuilder` manages the hierarchical context of modules and blocks during IR construction
+1. **Context Management**: `SysBuilder` manages the active module context during IR construction
 2. **Automatic IR Injection**: The `@ir_builder` decorator automatically injects IR nodes into the AST and tracks their source locations
 3. **Source Name Inference**: Automatically derives meaningful variable names from Python source code using AST analysis
 4. **Global State Management**: `Singleton` metaclass maintains global builder state and configuration
@@ -37,8 +37,8 @@ class SysBuilder:
     @property
     def exposed_nodes(self) -> dict
 
-    def enter_context_of(self, ty: str, entry) -> None
-    def exit_context_of(self, ty: str) -> None
+    def enter_context_of(self, module) -> None
+    def exit_context_of(self) -> None
     def has_driver(self) -> bool
     def has_module(self, name: str) -> Module | None
     def expose_on_top(self, node, kind=None) -> None
@@ -65,7 +65,7 @@ class Singleton(type):
 - `modules`: List of all modules in the system
 - `downstreams`: List of downstream modules
 - `arrays`: List of array objects
-- `_ctx_stack['module']`: Stack tracking active module contexts
+- `_module_stack`: Stack tracking active module contexts
 - `_exposes`: Dictionary mapping nodes to their exposure kinds
 - `line_expression_tracker`: Tracks expressions on each source line for naming
 - `naming_manager`: Instance of `NamingManager` for variable name generation
@@ -77,10 +77,8 @@ class Singleton(type):
 - `exposed_nodes`: Returns the dictionary of exposed nodes
 
 **Context Methods:**
-- `enter_context_of('module', entry)`: Pushes a new module context onto the stack.
-- `enter_context_of('body', entry)`: Compatibility helper that asserts the active module body matches `entry`.
-- `exit_context_of('module')`: Pops the top module context after verifying predicate balance.
-- `exit_context_of('body')`: Compatibility shim that returns the provided body reference.
+- `enter_context_of(module)`: Pushes a new module context onto the stack after wrapping it in a ModuleContext.
+- `exit_context_of()`: Pops the top module context after verifying predicate balance and returns it.
 
 **Query Methods:**
 - `has_driver()`: Returns `True` if any module has class name `'Driver'`

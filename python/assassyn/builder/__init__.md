@@ -2,9 +2,9 @@
 
 ## Section 0. Summary
 
-This module implements the system-wide IR builder (SysBuilder) and the global Singleton used to manage building context (modules, module bodies, naming, and caches). It also defines the ModuleContext record that holds per-module state, including the per-module predicate stack used by predicate intrinsics. Every expression materialised through the builder now records the active module as its `parent`, relying on the invariant that module contexts are present whenever IR nodes are emitted.
+This module implements the system-wide IR builder (SysBuilder) and the global Singleton used to manage building context (modules, naming, and caches). It also defines the ModuleContext record that holds per-module state, including the per-module predicate stack used by predicate intrinsics. Every expression materialised through the builder now records the active module as its `parent`, relying on the invariant that module contexts are present whenever IR nodes are emitted.
 
-Module bodies are plain Python lists owned by each module instance. The builder derives the active insertion list directly from the current module instead of keeping a parallel body stack. Predicate push/pop intrinsics (emitted by `Condition`) rely on the per-module predicate stack maintained here.
+Module bodies are plain Python lists owned by each module instance. The builder derives the active insertion list directly from the current module instead of keeping additional body stacks. Predicate push/pop intrinsics (emitted by `Condition`) rely on the per-module predicate stack maintained here.
 
 ## Section 1. Exposed Interfaces
 
@@ -34,8 +34,8 @@ class SysBuilder:
     @property
     def insert_point(self): ...
 
-    def enter_context_of(self, ty, entry): ...
-    def exit_context_of(self, ty): ...
+    def enter_context_of(self, module): ...
+    def exit_context_of(self): ...
 
     # Predicate helpers (per current module)
     def get_predicate_stack(self): ...
@@ -47,10 +47,8 @@ class SysBuilder:
 - current_body: Returns the active module body by referencing `current_module.body`.
 - insert_point: Alias for `current_body`—the list where new IR nodes are appended.
 
-- enter_context_of('module', entry): Wraps `entry` in a new ModuleContext and pushes it on the module stack.
-- enter_context_of('body', entry): Compatibility helper that verifies the active module's body matches `entry`. Does not mutate builder state.
-- exit_context_of('module'): Pops the module context after asserting the predicate stack is balanced.
-- exit_context_of('body'): Compatibility shim that returns the provided body reference without mutating state.
+- enter_context_of(module): Wraps `module` in a new ModuleContext and pushes it on the module stack.
+- exit_context_of(): Pops the module context after asserting the predicate stack is balanced and returns the popped ModuleContext.
 
 - get_predicate_stack: Returns the current module's predicate stack (empty list if no current module).
 - push_predicate(cond): Pushes a predicate onto the current module's predicate stack. Used by predicate intrinsics (e.g. `Condition`).
@@ -94,7 +92,7 @@ SysBuilder initializes and resets:
 ### Context Management
 
 - Module context is represented by ModuleContext. Isolation across modules is achieved by keeping a separate cond_stack per module-frame on the module stack. This guarantees no leakage of conditions between modules.
-- Module bodies live on the module instances. The builder consults `current_module.body` to determine the insertion list, so no separate body stack is required.
+- Module bodies live on the module instances. The builder consults `current_module.body` to determine the insertion list, so no separate body stack or body context calls are required.
 
 ### Predicate Semantics
 

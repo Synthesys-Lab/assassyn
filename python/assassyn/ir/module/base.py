@@ -115,8 +115,7 @@ def combinational_for(module_type):  # pylint: disable=too-many-statements
 
             module_self.body = []
             builder = Singleton.peek_builder()
-            builder.enter_context_of('module', module_self)
-            builder.enter_context_of('body', module_self.body)
+            builder.enter_context_of(module_self)
 
             try:
                 try:
@@ -145,8 +144,7 @@ def combinational_for(module_type):  # pylint: disable=too-many-statements
                 return new_func(*args, **kwargs)
             finally:
                 builder = Singleton.peek_builder()
-                builder.exit_context_of('body')
-                builder.exit_context_of('module')
+                builder.exit_context_of()
 
         wrapper._is_combinational = True  # pylint: disable=protected-access
         wrapper._module_class = module_type  # pylint: disable=protected-access
