@@ -3,7 +3,7 @@
 from .base import MemoryBase
 from ..module.downstream import combinational
 from ..block import Condition
-from ..array import RegArray, ArrayKind
+from ..array import RegArray, MemoryOwner
 from ..dtype import Bits
 from ..expr import assume
 
@@ -22,9 +22,14 @@ class SRAM(MemoryBase):  # pylint: disable=too-many-instance-attributes
             depth: Depth of memory in words (must be power of 2)
             init_file: Path to initialization file (can be None)
         """
-        super().__init__(width, depth, init_file, ArrayKind.SRAM_PAYLOAD)
+        super().__init__(width, depth, init_file)
         # Create dout register buffer with instance-prefixed name
-        self.dout = RegArray(Bits(width), 1, name=f'{self.name}_rdata')
+        self.dout = RegArray(
+            Bits(width),
+            1,
+            name=f'{self.name}_rdata',
+            owner=MemoryOwner(self, role='dout'),
+        )
 
     @combinational
     def build(self, we, re, addr, wdata):  # pylint: disable=too-many-arguments

@@ -3,7 +3,6 @@
 from .base import MemoryBase
 from ..module.downstream import combinational
 from ..block import Condition
-from ..array import ArrayKind
 from ..expr.intrinsic import (
     send_read_request, send_write_request
 )
@@ -25,7 +24,7 @@ class DRAM(MemoryBase):
             depth: Depth of memory in words (must be power of 2)
             init_file: Path to initialization file (can be None)
         """
-        super().__init__(width, depth, init_file, ArrayKind.DRAM_PAYLOAD)
+        super().__init__(width, depth, init_file)
 
     @combinational
     def build(self, we, re, addr, wdata):  # pylint: disable=too-many-arguments

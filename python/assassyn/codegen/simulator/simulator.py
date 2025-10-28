@@ -11,7 +11,7 @@ from ...ir.expr import Bind
 from ...ir.module import Downstream, Module
 from ...ir.module.external import ExternalSV
 from ...ir.memory.sram import SRAM
-from ...ir.array import ArrayKind
+from ...ir.array import MemoryOwner
 from .external import (
     collect_external_classes,
     collect_external_intrinsics,
@@ -128,7 +128,12 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         fd.write(f"pub {dram_name}_response: Response,\n")
     # Add array fields to simulator struct
     for array in sys.arrays:
-        if array.kind is ArrayKind.DRAM_PAYLOAD:
+        owner = array.owner
+        if (
+            isinstance(owner, MemoryOwner)
+            and owner.role == 'payload'
+            and owner.memory in dram_modules
+        ):
             continue
         name = namify(array.name)
         dtype = dtype_to_rust_type(array.scalar_ty)

@@ -5,7 +5,7 @@ This module contains functions to generate Verilog code for array and FIFO opera
 
 from typing import Optional
 
-from ....ir.array import ArrayKind
+from ....ir.array import MemoryOwner
 from ....ir.expr import ArrayRead, ArrayWrite, FIFOPop, FIFOPush
 from ....ir.memory.sram import SRAM
 from ....utils import namify
@@ -17,7 +17,12 @@ def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
     is_sram_payload = False
 
     if isinstance(dumper.current_module, SRAM):
-        if array_ref.kind is ArrayKind.SRAM_PAYLOAD:
+        owner = array_ref.owner
+        if (
+            isinstance(owner, MemoryOwner)
+            and owner.memory is dumper.current_module
+            and owner.role == 'payload'
+        ):
             is_sram_payload = True
 
     rval = dumper.dump_rval(expr, False)

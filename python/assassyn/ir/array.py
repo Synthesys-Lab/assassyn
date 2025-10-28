@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import typing
-from enum import Enum, auto
+from dataclasses import dataclass
+from typing import Literal
 
 from ..builder import ir_builder, Singleton
 from .dtype import to_uint, RecordValue, ArrayType
@@ -15,13 +17,58 @@ from .expr.writeport import WritePort
 if typing.TYPE_CHECKING:
     from .dtype import DType
     from .module.base import ModuleBase
+    from .memory.base import MemoryBase
 
 
-class ArrayKind(Enum):
-    '''Enumeration describing the hardware resource an Array models.'''
-    REG = auto()
-    SRAM_PAYLOAD = auto()
-    DRAM_PAYLOAD = auto()
+@dataclass(frozen=True)
+class RegisterOwner:
+    '''Descriptor for register-backed arrays owned by a module or system context.'''
+
+    module: ModuleBase | None
+
+    @property
+    def category(self) -> str:
+        '''Return the ownership category identifier.'''
+        return 'register'
+
+
+@dataclass(frozen=True)
+class MemoryOwner:
+    '''Descriptor for arrays that belong to a memory instance.'''
+
+    memory: MemoryBase
+    role: Literal['payload', 'dout']
+
+    def __post_init__(self) -> None:
+        if self.role not in {'payload', 'dout'}:
+            raise ValueError(f'Unsupported memory owner role: {self.role!r}')
+
+    @property
+    def category(self) -> str:
+        '''Return the ownership category identifier.'''
+        return 'memory'
+
+
+ArrayOwner = RegisterOwner | MemoryOwner
+
+
+def _validate_owner(owner: ArrayOwner | None) -> ArrayOwner:
+    '''Ensure the provided owner descriptor is recognised.'''
+    if isinstance(owner, (RegisterOwner, MemoryOwner)):
+        return owner
+    raise TypeError(f'Array owner must be RegisterOwner or MemoryOwner, got {type(owner)}')
+
+
+def _resolve_owner(owner: ArrayOwner | None) -> ArrayOwner:
+    '''Resolve the owner descriptor, falling back to the current module context.'''
+    if owner is not None:
+        return _validate_owner(owner)
+
+    builder = Singleton.peek_builder()
+    module = None
+    with contextlib.suppress(RuntimeError):
+        module = builder.current_module
+    return RegisterOwner(module)
 
 
 class Slice(Expr):
@@ -76,7 +123,7 @@ def RegArray(  # pylint: disable=invalid-name,too-many-arguments
         name: str = None,
         attr: list = None,
         *,
-        kind: ArrayKind | None = None,
+        owner: ArrayOwner | None = None,
     ):
     '''
     The frontend API to declare a register array.
@@ -89,11 +136,9 @@ def RegArray(  # pylint: disable=invalid-name,too-many-arguments
     '''
 
     attr = attr if attr is not None else []
-    array_kind = ArrayKind.REG if kind is None else kind
-    if not isinstance(array_kind, ArrayKind):
-        raise TypeError(f'Array kind must be ArrayKind, got {type(array_kind)}')
+    resolved_owner = _resolve_owner(owner)
 
-    res = Array(scalar_ty, size, initializer, array_kind)
+    res = Array(scalar_ty, size, initializer, resolved_owner)
     if name is not None:
         res.name = name
 
@@ -126,7 +171,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
     _users: typing.List[Expr]  # Users of the array
     _name: str  # Internal name storage
     _write_ports: typing.Dict['ModuleBase', 'WritePort'] = {}  # Write ports for this array
-    _kind: ArrayKind  # Hardware classification flag
+    _owner: ArrayOwner  # Provenance descriptor
 
 
     def as_operand(self):
@@ -144,12 +189,11 @@ class Array:  #pylint: disable=too-many-instance-attributes
     def name(self, name):
         self._name = namify(name)
 
-    def __init__(self, scalar_ty: DType, size: int, initializer: list, kind: ArrayKind):
+    def __init__(self, scalar_ty: DType, size: int, initializer: list, owner: ArrayOwner):
         #pylint: disable=import-outside-toplevel
         from .dtype import DType
         assert isinstance(scalar_ty, DType)
-        if not isinstance(kind, ArrayKind):
-            raise TypeError(f'Array kind must be ArrayKind, got {type(kind)}')
+        validated_owner = _validate_owner(owner)
         self.scalar_ty = scalar_ty
         self.size = size
         self.initializer = initializer
@@ -157,7 +201,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
         self._name = None
         self._users = []
         self._write_ports = {}
-        self._kind = kind
+        self._owner = validated_owner
     @property
     def dtype(self) -> ArrayType:
         '''Get the data type of the array as an ArrayType.'''
@@ -169,15 +213,13 @@ class Array:  #pylint: disable=too-many-instance-attributes
         return self._users
 
     @property
-    def kind(self) -> ArrayKind:
-        '''Get the hardware classification of the array.'''
-        return self._kind
+    def owner(self) -> ArrayOwner:
+        '''Get the ownership descriptor of the array.'''
+        return self._owner
 
-    @kind.setter
-    def kind(self, value: ArrayKind):
-        if not isinstance(value, ArrayKind):
-            raise TypeError(f'Array kind must be ArrayKind, got {type(value)}')
-        self._kind = value
+    def assign_owner(self, owner: ArrayOwner) -> None:
+        '''Override the ownership descriptor with a new value.'''
+        self._owner = _validate_owner(owner)
 
     def __and__(self, other):
         '''

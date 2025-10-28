@@ -1,6 +1,6 @@
 # SystemVerilog Generator
 
-This backend lowers Assassyn IR into a PyCDE design (`design.py`), compiles it to SystemVerilog, and generates a cocotb/Verilator testbench (`tb.py`). It wires modules via FIFOs, surfaces cross‑module values, and materializes memory payloads (detected via `Array.kind`) as simple blackboxes.
+This backend lowers Assassyn IR into a PyCDE design (`design.py`), compiles it to SystemVerilog, and generates a cocotb/Verilator testbench (`tb.py`). It wires modules via FIFOs, surfaces cross‑module values, and materializes memory payloads (detected via `array.owner`) as simple blackboxes.
 
 ## Entry Points
 
@@ -37,7 +37,7 @@ def generate_sram_blackbox_files(sys, path, resource_base=None) -> None
 - Expression lowering (`_expr`): Lowers IR ops and records cross‑module “exposures”.
 - Port synthesis (module.py): Declares module IO based on role (driver/downstream/SRAM) and usage.
 - Cleanup (cleanup.py): Produces `executed_wire`, `finish`, FIFO push/pop, array write muxes, SRAM controls, and `expose_*`/`valid_*`.
-- System assembly (system.py, top.py): Analyzes async callers, arrays, and `Array.kind`-annotated memory payloads alongside externals; generates the `Top` netlist.
+- System assembly (system.py, top.py): Analyzes async callers, arrays, and memory payload ownership alongside externals; generates the `Top` netlist.
 - Elaboration (elaborate.py): Writes `design.py`, compiles SV, emits blackboxes, copies resources, generates the testbench.
 
 ## PyCDE Header

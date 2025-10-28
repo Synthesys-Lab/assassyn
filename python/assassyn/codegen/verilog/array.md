@@ -18,13 +18,13 @@ class ArrayMetadataRegistry:
 **collect(self, dumper, sys)**
 
 - Invokes a full-system scan to populate the registry.
-- Ignores arrays whose `Array.kind` is `SRAM_PAYLOAD` or `DRAM_PAYLOAD`, because those are emitted as dedicated memory modules.
+- Ignores arrays whose owner is `MemoryOwner(role="payload")`, because those are emitted as dedicated memory modules.
 - Records writers via `Array.get_write_ports()` and assigns sequential write-port indices.
 - Walks every module body with `CIRCTDumper._walk_expressions` to find `ArrayRead` / `ArrayWrite` nodes, assigning read-port indices and user membership on first sighting.
 
 **metadata_for(self, array) -> Optional[ArrayMetadata]**
 
-- Returns the metadata object for the given IR array, or `None` when the array is ignored (e.g. memory payload tagged by `Array.kind`).
+- Returns the metadata object for the given IR array, or `None` when the array is ignored (e.g. memory payload identified by ownership metadata).
 
 **write_port_index(self, array, module) -> Optional[int]**
 

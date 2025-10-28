@@ -176,7 +176,7 @@ module reg_array #(
 endmodule
 ```
 
-When the IR marks an array with `ArrayKind.SRAM_PAYLOAD` or `ArrayKind.DRAM_PAYLOAD`, the backend bypasses this generic module entirely and instead emits the specialised SRAM/DRAM wrappers that expose memory-specific handshakes.
+When an array carries a `MemoryOwner(role="payload")`, the backend bypasses this generic module entirely and instead emits the specialised SRAM/DRAM wrappers that expose memory-specific handshakes. Ownership metadata lets the backend distinguish payload buffers from standard registers without relying on ad-hoc enums.
 
 ## Clock Domain and Timing
 

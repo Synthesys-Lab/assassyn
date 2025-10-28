@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
 
 from .metadata import ArrayMetadata
-from ...ir.array import Array, ArrayKind
+from ...ir.array import Array, MemoryOwner
 from ...ir.expr import ArrayRead, ArrayWrite
 from ...builder import SysBuilder
 
@@ -34,7 +34,8 @@ class ArrayMetadataRegistry:
         self.clear()
         modules: List[Module] = list(sys.modules) + list(sys.downstreams)
         for arr in sys.arrays:
-            if arr.kind in (ArrayKind.SRAM_PAYLOAD, ArrayKind.DRAM_PAYLOAD):
+            owner = arr.owner
+            if isinstance(owner, MemoryOwner) and owner.role == 'payload':
                 continue
 
             writers = arr.get_write_ports().keys()

@@ -16,22 +16,35 @@ The module also provides the `Slice` class for bit-slicing operations, which is 
 
 The `array.py` module provides the `RegArray` function and `Array` class methods for creating and manipulating register arrays.
 
-### `ArrayKind`
+### Ownership Metadata
 
 ```python
-class ArrayKind(Enum):
-    REG = auto()
-    SRAM_PAYLOAD = auto()
-    DRAM_PAYLOAD = auto()
+@dataclass(frozen=True)
+class RegisterOwner:
+    module: ModuleBase | None
+
+@dataclass(frozen=True)
+class MemoryOwner:
+    memory: MemoryBase
+    role: Literal["payload", "dout"]
 ```
 
-`ArrayKind` classifies each IR array according to the hardware resource it models:
+Every array carries an immutable ownership descriptor identifying which module
+or memory instance manages its storage.
 
-- `REG` (default): Standard register arrays created through `RegArray`.
-- `SRAM_PAYLOAD`: Internal storage privately owned by an `SRAM` module.
-- `DRAM_PAYLOAD`: Backing store associated with a `DRAM` module's request/response interface.
+- **RegisterOwner** – Applied automatically by `RegArray` when a module context
+  is active. The descriptor records the defining module (if any) so downstream
+  passes can attribute ports and metadata correctly.
+- **MemoryOwner** – Used by memory builders such as `SRAM` and `DRAM` to tag
+  internal payloads (`role="payload"`) and auxiliary buffers (e.g.
+  `role="dout"`). Verilog and simulator components inspect both the role and
+  the owning memory class to decide whether to emit generic register wiring or
+  delegate to dedicated memory logic.
 
-The enum replaces ad-hoc payload tracking in the Verilog backend. Downstream consumers consult `Array.kind` to decide how to wire the array. Memory payloads, for example, skip generic multi-port emission because dedicated SRAM/DRAM logic drives those signals.
+Ownership replaces the coarse `ArrayKind` enum with richer provenance data,
+allowing downstream code to branch on structured semantics instead of hard-coded
+enum buckets. The full ownership design is documented in
+[`docs/design/internal/array-ownership.md`](../../../docs/design/internal/array-ownership.md).
 
 ### `RegArray`
 
@@ -43,7 +56,7 @@ def RegArray(
     name: str = None,
     attr: list = None,
     *,
-    kind: ArrayKind | None = None,
+    owner: RegisterOwner | MemoryOwner | None = None,
 ) -> Array:
     '''
     The frontend API to declare a register array.
@@ -53,7 +66,7 @@ def RegArray(
     @param initializer The initializer of the register array. If not set, it is 0-initialized.
     @param name The custom name for the array.
     @param attr The attribute list of the array.
-    @param kind Optional ArrayKind override; defaults to ArrayKind.REG.
+    @param owner Optional ownership override; defaults to a RegisterOwner tied to the current module.
     @return Array instance registered with the AST builder.
     '''
 ```
@@ -78,7 +91,13 @@ my_array = RegArray(UInt(32), 16, name="register_file")  # 16-element array of 3
 counter = RegArray(Int(32), 1, initializer=[0])  # Single-element counter initialized to 0
 
 # Array with attributes (commonly used in memory modules)
-payload = RegArray(Bits(64), 1024, attr=[self], name=f'{self.name}_val', kind=ArrayKind.SRAM_PAYLOAD)
+payload = RegArray(
+    Bits(64),
+    1024,
+    attr=[self],
+    name=f'{self.name}_val',
+    owner=MemoryOwner(self, role="payload"),
+)
 ```
 
 ## Internal Helpers
@@ -97,7 +116,7 @@ class Array:
     _users: typing.List[Expr]  # Users of the array
     _name: str  # Internal name storage
     _write_ports: typing.Dict['ModuleBase', 'WritePort']  # Write ports for this array
-    _kind: ArrayKind  # Hardware classification flag
+    _owner: RegisterOwner | MemoryOwner  # Provenance descriptor
 ```
 
 #### `as_operand`
@@ -446,26 +465,30 @@ def __repr__(self):
     @return Formatted string showing the slice operation.
     '''
 ```
-#### `kind` Property
+#### `owner` Property
 
 ```python
 @property
-def kind(self) -> ArrayKind:
+def owner(self) -> RegisterOwner | MemoryOwner:
     '''
-    Return the hardware classification associated with this array.
+    Return the ownership descriptor for this array.
 
-    @return ArrayKind enum value describing the array semantics.
+    @return RegisterOwner or MemoryOwner describing provenance.
     '''
 
-@kind.setter
-def kind(self, value: ArrayKind):
+def assign_owner(self, owner: RegisterOwner | MemoryOwner) -> None:
     '''
-    Override the hardware classification.
+    Override the ownership descriptor.
 
-    @param value ArrayKind enum value to assign.
+    @param owner Ownership descriptor to apply. Intended for controlled refactors.
     '''
 ```
 
 **Explanation:**
 
-The `kind` flag lets downstream passes differentiate between ordinary register arrays and memory payloads. Verilog code generation, for example, skips arrays tagged `SRAM_PAYLOAD` or `DRAM_PAYLOAD` when building generic multi-port array metadata because those resources are emitted through dedicated SRAM/DRAM plumbing instead. Simulator backends can make similar decisions when scheduling updates or loading initialization files.
+Ownership metadata replaces the legacy `ArrayKind` enum. Downstream passes inspect
+`array.owner` to decide whether the storage participates in generic register
+plumbing or memory-specific code paths. `assign_owner` is the sanctioned hook for
+changing ownership (for example, when cloning an array into a new module).
+Directly mutating internal fields is prohibited to preserve provenance
+guarantees relied upon by the Verilog backend and simulator.
