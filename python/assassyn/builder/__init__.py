@@ -62,14 +62,11 @@ def ir_builder(func=None, *, node_type=None):
             if not isinstance(res, Const):
                 if is_expr and not already_materialized:
                     current_module = builder.current_module
-                    if current_module is not None:
-                        res.parent = current_module
-                        for i in res.operands:
-                            current_module.add_external(i)
+                    res.parent = current_module
+                    for operand in res.operands:
+                        current_module.add_external(operand)
                 if not already_materialized:
-                    insert_point = builder.insert_point
-                    if insert_point is not None:
-                        insert_point.append(res)
+                    builder.insert_point.append(res)
 
             package_dir = os.path.abspath(package_path())
 
@@ -163,13 +160,18 @@ class SysBuilder:
     def current_module(self):
         '''Get the current module being built.'''
         ctx_stack = self._ctx_stack['module']
-        return None if not ctx_stack else ctx_stack[-1].module
+        if not ctx_stack:
+            raise RuntimeError('Module context stack is empty')
+        return ctx_stack[-1].module
 
     @property
     def current_body(self):
         '''Get the current module body being built.'''
-        body_stack = self._ctx_stack['body']
-        return None if not body_stack else body_stack[-1]
+        module = self.current_module
+        body = getattr(module, 'body', None)
+        if body is None:
+            raise RuntimeError(f'Module {module!r} has no active body')
+        return body
 
     @property
     def insert_point(self):
@@ -215,7 +217,12 @@ class SysBuilder:
             self._ctx_stack['module'].append(ModuleContext(entry))
             return
         if ty == 'body':
-            self._ctx_stack['body'].append(entry)
+            module = self.current_module
+            module_body = getattr(module, 'body', None)
+            if module_body is not entry:
+                raise RuntimeError(
+                    f'Active module {module!r} body does not match requested context'
+                )
             return
         raise ValueError(f'Unsupported context type: {ty}')
 
@@ -228,7 +235,7 @@ class SysBuilder:
                 assert False, msg
             return ctx
         if ty == 'body':
-            return self._ctx_stack['body'].pop()
+            return self.current_body
         raise ValueError(f'Unsupported context type: {ty}')
 
     def has_driver(self):
@@ -250,7 +257,7 @@ class SysBuilder:
         self.modules = []
         self.downstreams = []
         self.arrays = []
-        self._ctx_stack = {'module': [], 'body': []}
+        self._ctx_stack = {'module': []}
         self._exposes = {}
         self.line_expression_tracker = {}
         self.naming_manager = NamingManager()

@@ -88,11 +88,9 @@ class NamingManager:
 
         try:
             builder = Singleton.peek_builder()
+            module = builder.current_module
         except RuntimeError:
             return None
 
-        if builder.current_module:
-            module = builder.current_module
-            module_name = getattr(module, 'name', None)
-            return module_name
-        return None
+        module_name = getattr(module, 'name', None)
+        return module_name

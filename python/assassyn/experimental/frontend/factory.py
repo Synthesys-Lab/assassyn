@@ -57,9 +57,10 @@ def this():
 
 def pin(*pins: Value) -> None:
     """Expose combinational pins from the current module being constructed."""
-    module = Singleton.peek_builder().current_module
-    if module is None:
-        raise RuntimeError("pin() must be called within an active module context")
+    try:
+        module = Singleton.peek_builder().current_module
+    except RuntimeError as exc:
+        raise RuntimeError("pin() must be called within an active module context") from exc
     if not hasattr(module, 'pins') or module.pins is None:
         module.pins = []
     module.pins.extend(pins)

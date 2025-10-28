@@ -88,7 +88,7 @@ def test_bind_type_match_correct():
             if "Type mismatch" in str(e):
                 pytest.fail(f"Type check failed unexpectedly: {e}")
             # Other ValueErrors are acceptable for this test
-        except AttributeError:
+        except (AttributeError, RuntimeError):
             # Expected - we're not in proper module context for full bind
             # But type check passed, which is what we're testing
             assert True
@@ -136,7 +136,7 @@ def test_bind_type_match_record():
             if "Type mismatch" in str(e):
                 pytest.fail(f"Type check failed unexpectedly: {e}")
             # Other ValueErrors are acceptable for this test
-        except AttributeError:
+        except (AttributeError, RuntimeError):
             # Expected - we're not in proper module context for full bind
             # But type check passed, which is what we're testing
             assert True
@@ -145,4 +145,3 @@ def test_bind_type_match_record():
 if __name__ == "__main__":
     # Run tests with pytest
     sys.exit(pytest.main([__file__, "-v"]))
-
