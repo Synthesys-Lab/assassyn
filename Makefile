@@ -63,4 +63,4 @@ include scripts/init/verilator.inc
 include scripts/init/wrapper.inc
 include scripts/init/circt.inc
 include scripts/init/apptainer.inc
-include @scripts/codex.inc
+include scripts/codex.inc
