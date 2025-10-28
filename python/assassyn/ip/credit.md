@@ -5,7 +5,7 @@ This module provides a credit counter for credit-based flow control in pipeline 
 ## Design Documents
 
 - [trigger_counter.sv](../codegen/verilog/trigger_counter.sv) - Original SystemVerilog implementation
-- [Downstream Module](../../docs/design/lang/experimental_fe.md) - Downstream module architecture
+- [Downstream Tutorial](../../tutorials/downstream.qmd) - Downstream module architecture and usage patterns
 
 ## Summary
 

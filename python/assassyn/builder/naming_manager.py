@@ -73,7 +73,7 @@ class NamingManager:
         Get a unique module name based on the given base name.
 
         The name is capitalized and made unique using a counter.
-        Used by the experimental frontend factory functions.
+        Used by builder utilities that synthesize modules programmatically.
         """
         capitalized = base_name.capitalize()
         return self._module_name_cache.get_unique_name(capitalized)

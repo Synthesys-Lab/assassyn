@@ -112,7 +112,6 @@ The runtime system complements static type checkers like mypy, providing runtime
 ### Core Infrastructure
 - ✅ `python/assassyn/utils/enforce_type.py` - Core validation engine
 - ✅ `python/unit-tests/test_enforce_type.py` - Comprehensive test suite (20 tests)
-- ✅ `python/assassyn/experimental/frontend/factory.py` - Refactored to use shared validation
 
 ### Applied Modules
 - ✅ `python/assassyn/ir/expr/array.py` - ArrayWrite and ArrayRead constructors

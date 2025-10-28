@@ -52,9 +52,9 @@ Exposes semantic naming for non-expression objects (modules, arrays, etc.). Appl
 def get_module_name(self, base_name: str) -> str:
 ```
 
-Capitalizes the supplied base name and feeds it through a `UniqueNameCache` to guarantee unique module identifiers for the experimental builder front-ends.
+Capitalizes the supplied base name and feeds it through a `UniqueNameCache` to guarantee unique module identifiers for builder-generated modules.
 
-**Explanation**: This method is used by the experimental frontend factory functions to generate unique module names. It ensures that modules created from the same base name (like function names) get unique identifiers to avoid naming conflicts. The method capitalizes the base name and uses a `UniqueNameCache` to guarantee uniqueness.
+**Explanation**: This helper backs module construction paths that synthesize IR modules from decorators or helper factories. It ensures that modules created from the same base name (like function names) get unique identifiers to avoid naming conflicts. The method capitalizes the base name and uses a `UniqueNameCache` to guarantee uniqueness.
 
 #### NamingManager.get_context_prefix
 

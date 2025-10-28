@@ -42,6 +42,6 @@ This module contains no internal helper functions. The `UniqueNameCache` class i
 The `UniqueNameCache` is used throughout the Assassyn naming pipeline:
 
 - **TypeOrientedNamer**: Uses the cache to ensure unique names for IR values based on their type and operation
-- **NamingManager**: Uses the cache to generate unique module names for experimental frontend components
+- **NamingManager**: Uses the cache to generate unique module names when constructing IR modules and submodules
 
 The cache provides a simple but effective mechanism for avoiding naming conflicts while preserving semantic meaning in generated identifiers.

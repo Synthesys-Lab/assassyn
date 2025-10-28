@@ -58,9 +58,7 @@ format:
 - 可以在下游逻辑内使用 `async_called` ，在合适条件下触发其他模块的 `async_called` ，交由调度器安排执行（`test_pipemul.py:89`）。
 - 在 `test_toposort.py:33` 中，多个下游实例串联，返回的中间值可继续传给其他下游组合逻辑，形成**拓扑有向无环图**。
 
-#### 实验性流水线接口
-
-- `test_exp_fe_downstream.py` 展示了实验前端 `pipeline`/`converge` API。`@converge` 生成的 `adder` 闭包本质上扮演下游角色：它对来自流水线阶段的 `Value` 做组合运算，再通过日志验证结果。
+> **备注**：早期的实验性流水线接口已经退役，相应的教程和测试不再提供。
 
 ## 4. 典型案例
 
@@ -77,8 +75,6 @@ format:
   - `Downstream` 作为胶水逻辑，将 `Value` 转发到 `ExternalSV`，然后在同一拍内消费输出。
   - 展示如何在组合域里包裹复杂 IP（加法器、带握手的乘法器）。
 
-- **流水线实验前端**（`python/unit-tests/test_exp_fe_downstream.py`）：
-  - `@converge`/`@pipeline.factory` 组合模拟下游处理阶段，强调“上游推送数据 + 下游即时加工”的模式在新 API 下仍成立。
 
 ### 案例核心代码讲解
 

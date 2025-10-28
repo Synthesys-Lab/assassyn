@@ -6,22 +6,20 @@
 
 ---
 
-## 1. TO CHECK (24 files) - Review existing documentation against new rules
+## 1. TO CHECK (22 files) - Review existing documentation against new rules
 
-## 2. TO DOCUMENT (30 files) - Create new documentation
+## 2. TO DOCUMENT (28 files) - Create new documentation
 
 ### Leaf-level files (simple to complex)
 
 ### Module initialization files (leaf to parent)
 - [ ] `codegen/simulator/_expr/__init__.py` → `codegen/simulator/_expr/__init__.md` (to write)
 - [ ] `codegen/verilog/_expr/__init__.py` → `codegen/verilog/_expr/__init__.md` (to write)
-- [ ] `experimental/frontend/__init__.py` → `experimental/frontend/__init__.md` (to write)
 - [ ] `ir/module/__init__.py` → `ir/module/__init__.md` (to write)
 - [ ] `codegen/simulator/__init__.py` → `codegen/simulator/__init__.md` (to write)
 - [ ] `codegen/verilog/__init__.py` → `codegen/verilog/__init__.md` (to write)
 - [ ] `analysis/__init__.py` → `analysis/__init__.md` (to write)
 - [ ] `builder/__init__.py` → `builder/__init__.md` (to write)
-- [ ] `experimental/__init__.py` → `experimental/__init__.md` (to write)
 - [ ] `ip/__init__.py` → `ip/__init__.md` (to write)
 - [ ] `ir/__init__.py` → `ir/__init__.md` (to write)
 - [ ] `ramulator2/__init__.py` → `ramulator2/__init__.md` (to write)
@@ -33,8 +31,6 @@
 
 - [ ] `builder.md` (to check)
 - [ ] `codegen/verilog/README.md` (to check)
-- [ ] `experimental/frontend/README.md` (to check)
-- [ ] `experimental/README.md` (to check)
 - [ ] `ir/expr/README.md` (to check)
 - [ ] `ir/memory/README.md` (to check)
 - [ ] `test/README.md` (to check)
@@ -52,9 +48,6 @@
 - [x] `frontend.py` → `frontend.md` (completed)
 - [x] `backend.py` → `backend.md` (completed)
 - [x] `ramulator2/ramulator2.py` → `ramulator2/ramulator2.md` (completed)
-- [x] `experimental/frontend/downstream.py` → `experimental/frontend/downstream.md` (completed)
-- [x] `experimental/frontend/factory.py` → `experimental/frontend/factory.md` (completed)
-- [x] `experimental/frontend/module.py` → `experimental/frontend/module.md` (completed)
 - [x] `codegen/simulator/_expr/intrinsics.py` → `codegen/simulator/_expr/intrinsics.md` (completed)
 - [x] `ir/module/base.py` → `ir/module/base.md` (completed)
 - [x] `ir/module/downstream.py` → `ir/module/downstream.md` (completed)
@@ -108,10 +101,10 @@
 ## 4. Progress Summary
 
 ### Statistics
-- **Total Python files**: 74
-- **Files to check**: 9 (12%)
-- **Files to document**: 16 (22%)
-- **Files completed**: 53 (72%)
+- **Total Python files**: 70
+- **Files to check**: 7 (10%)
+- **Files to document**: 14 (20%)
+- **Files completed**: 50 (71%)
 
 ### Workflow Notes
 - **Order**: Work from leaf to parent, simple to complex
