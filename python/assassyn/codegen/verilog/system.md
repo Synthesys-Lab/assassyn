@@ -77,13 +77,12 @@ The function uses several analysis and utility functions:
 
 The function manages several CIRCTDumper state variables:
 
-- `sram_payload_arrays`: Set of arrays that are SRAM payloads
 - `external_intrinsics`: List of `ExternalIntrinsic` nodes encountered in the system
 - `external_classes`: Unique set of external classes that require PyCDE wrappers
 - `cross_module_external_reads`: Consumer-side records of external register outputs read from another module
 - `external_outputs_by_instance`: Producer-side grouping of the external outputs that must be exposed for other modules
 - `external_output_exposures`: Per-module cache populated during instantiation to drive `cleanup_post_generation`
-- `array_metadata`: `ArrayMetadataRegistry` instance with write/read port assignments and user membership
+- `array_metadata`: `ArrayMetadataRegistry` instance with write/read port assignments and user membership. Arrays tagged with `ArrayKind.SRAM_PAYLOAD` or `ArrayKind.DRAM_PAYLOAD` are skipped during collection because they are handled by dedicated memory generators.
 - `downstream_dependencies`: Maps downstream modules to their dependencies
 - `async_callees`: Maps modules to their callers
 

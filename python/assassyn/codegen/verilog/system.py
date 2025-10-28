@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Any
 
-from ...ir.memory.sram import SRAM
+from ...ir.array import ArrayKind
 from ...ir.expr import AsyncCall
 from ...ir.expr.intrinsic import PureIntrinsic
 from ...analysis import get_upstreams
@@ -29,9 +29,6 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
     """
     sys = node
     dumper.sys = sys
-    for module in sys.downstreams:
-        if isinstance(module, SRAM):
-            dumper.sram_payload_arrays.add(module._payload)
 
     external_intrinsics = collect_external_intrinsics(sys)
     dumper.external_intrinsics = external_intrinsics
@@ -86,8 +83,9 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
     dumper.array_metadata.collect(dumper, sys)
 
     for arr_container in sys.arrays:
-        if arr_container not in dumper.sram_payload_arrays:
-            dumper.visit_array(arr_container)
+        if arr_container.kind in (ArrayKind.SRAM_PAYLOAD, ArrayKind.DRAM_PAYLOAD):
+            continue
+        dumper.visit_array(arr_container)
 
     for ds_module in sys.downstreams:
         dumper.downstream_dependencies[ds_module] = get_upstreams(ds_module)

@@ -8,7 +8,7 @@ from .utils import (
 
 from ...ir.module import Downstream, Module, Port
 from ...ir.memory.sram import SRAM
-from ...ir.array import Array, Slice
+from ...ir.array import Array, Slice, ArrayKind
 from ...ir.const import Const
 from ...ir.expr import (
     Expr,
@@ -134,7 +134,7 @@ def cleanup_post_generation(dumper):
     # pylint: disable=too-many-nested-blocks
     for key, exposes in dumper._exposes.items():  # pylint: disable=protected-access
         if isinstance(key, Array):
-            if key in dumper.sram_payload_arrays:
+            if key.kind in (ArrayKind.SRAM_PAYLOAD, ArrayKind.DRAM_PAYLOAD):
                 continue
             array_writes = [
                     (e, p) for e, p in exposes

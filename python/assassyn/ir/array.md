@@ -16,6 +16,23 @@ The module also provides the `Slice` class for bit-slicing operations, which is 
 
 The `array.py` module provides the `RegArray` function and `Array` class methods for creating and manipulating register arrays.
 
+### `ArrayKind`
+
+```python
+class ArrayKind(Enum):
+    REG = auto()
+    SRAM_PAYLOAD = auto()
+    DRAM_PAYLOAD = auto()
+```
+
+`ArrayKind` classifies each IR array according to the hardware resource it models:
+
+- `REG` (default): Standard register arrays created through `RegArray`.
+- `SRAM_PAYLOAD`: Internal storage privately owned by an `SRAM` module.
+- `DRAM_PAYLOAD`: Backing store associated with a `DRAM` module's request/response interface.
+
+The enum replaces ad-hoc payload tracking in the Verilog backend. Downstream consumers consult `Array.kind` to decide how to wire the array. Memory payloads, for example, skip generic multi-port emission because dedicated SRAM/DRAM logic drives those signals.
+
 ### `RegArray`
 
 ```python
@@ -25,6 +42,8 @@ def RegArray(
     initializer: list = None,
     name: str = None,
     attr: list = None,
+    *,
+    kind: ArrayKind | None = None,
 ) -> Array:
     '''
     The frontend API to declare a register array.
@@ -34,6 +53,7 @@ def RegArray(
     @param initializer The initializer of the register array. If not set, it is 0-initialized.
     @param name The custom name for the array.
     @param attr The attribute list of the array.
+    @param kind Optional ArrayKind override; defaults to ArrayKind.REG.
     @return Array instance registered with the AST builder.
     '''
 ```
@@ -58,7 +78,7 @@ my_array = RegArray(UInt(32), 16, name="register_file")  # 16-element array of 3
 counter = RegArray(Int(32), 1, initializer=[0])  # Single-element counter initialized to 0
 
 # Array with attributes (commonly used in memory modules)
-payload = RegArray(Bits(64), 1024, attr=[self], name=f'{self.name}_val')
+payload = RegArray(Bits(64), 1024, attr=[self], name=f'{self.name}_val', kind=ArrayKind.SRAM_PAYLOAD)
 ```
 
 ## Internal Helpers
@@ -77,6 +97,7 @@ class Array:
     _users: typing.List[Expr]  # Users of the array
     _name: str  # Internal name storage
     _write_ports: typing.Dict['ModuleBase', 'WritePort']  # Write ports for this array
+    _kind: ArrayKind  # Hardware classification flag
 ```
 
 #### `as_operand`
@@ -425,3 +446,26 @@ def __repr__(self):
     @return Formatted string showing the slice operation.
     '''
 ```
+#### `kind` Property
+
+```python
+@property
+def kind(self) -> ArrayKind:
+    '''
+    Return the hardware classification associated with this array.
+
+    @return ArrayKind enum value describing the array semantics.
+    '''
+
+@kind.setter
+def kind(self, value: ArrayKind):
+    '''
+    Override the hardware classification.
+
+    @param value ArrayKind enum value to assign.
+    '''
+```
+
+**Explanation:**
+
+The `kind` flag lets downstream passes differentiate between ordinary register arrays and memory payloads. Verilog code generation, for example, skips arrays tagged `SRAM_PAYLOAD` or `DRAM_PAYLOAD` when building generic multi-port array metadata because those resources are emitted through dedicated SRAM/DRAM plumbing instead. Simulator backends can make similar decisions when scheduling updates or loading initialization files.

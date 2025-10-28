@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import typing
+from enum import Enum, auto
 
 from ..builder import ir_builder, Singleton
 from .dtype import to_uint, RecordValue, ArrayType
-from .expr import ArrayRead, ArrayWrite, Expr,BinaryOp
+from .expr import ArrayRead, ArrayWrite, Expr, BinaryOp
 from .value import Value
 from ..utils import identifierize, namify
 from .expr.writeport import WritePort
@@ -14,6 +15,13 @@ from .expr.writeport import WritePort
 if typing.TYPE_CHECKING:
     from .dtype import DType
     from .module.base import ModuleBase
+
+
+class ArrayKind(Enum):
+    '''Enumeration describing the hardware resource an Array models.'''
+    REG = auto()
+    SRAM_PAYLOAD = auto()
+    DRAM_PAYLOAD = auto()
 
 
 class Slice(Expr):
@@ -61,12 +69,15 @@ class Slice(Expr):
 
 
 
-def RegArray( #pylint: disable=invalid-name,too-many-arguments
+def RegArray(  # pylint: disable=invalid-name,too-many-arguments
         scalar_ty: DType,
         size: int,
         initializer: list = None,
         name: str = None,
-        attr: list = None,):
+        attr: list = None,
+        *,
+        kind: ArrayKind | None = None,
+    ):
     '''
     The frontend API to declare a register array.
 
@@ -78,9 +89,11 @@ def RegArray( #pylint: disable=invalid-name,too-many-arguments
     '''
 
     attr = attr if attr is not None else []
+    array_kind = ArrayKind.REG if kind is None else kind
+    if not isinstance(array_kind, ArrayKind):
+        raise TypeError(f'Array kind must be ArrayKind, got {type(array_kind)}')
 
-
-    res = Array(scalar_ty, size, initializer)
+    res = Array(scalar_ty, size, initializer, array_kind)
     if name is not None:
         res.name = name
 
@@ -112,7 +125,8 @@ class Array:  #pylint: disable=too-many-instance-attributes
     attr: list  # Attributes of the array
     _users: typing.List[Expr]  # Users of the array
     _name: str  # Internal name storage
-    _write_ports: typing.Dict['ModuleBase', 'WritePort'] = {} # Write ports for this array
+    _write_ports: typing.Dict['ModuleBase', 'WritePort'] = {}  # Write ports for this array
+    _kind: ArrayKind  # Hardware classification flag
 
 
     def as_operand(self):
@@ -130,10 +144,12 @@ class Array:  #pylint: disable=too-many-instance-attributes
     def name(self, name):
         self._name = namify(name)
 
-    def __init__(self, scalar_ty: DType, size: int, initializer: list):
+    def __init__(self, scalar_ty: DType, size: int, initializer: list, kind: ArrayKind):
         #pylint: disable=import-outside-toplevel
         from .dtype import DType
         assert isinstance(scalar_ty, DType)
+        if not isinstance(kind, ArrayKind):
+            raise TypeError(f'Array kind must be ArrayKind, got {type(kind)}')
         self.scalar_ty = scalar_ty
         self.size = size
         self.initializer = initializer
@@ -141,6 +157,7 @@ class Array:  #pylint: disable=too-many-instance-attributes
         self._name = None
         self._users = []
         self._write_ports = {}
+        self._kind = kind
     @property
     def dtype(self) -> ArrayType:
         '''Get the data type of the array as an ArrayType.'''
@@ -150,6 +167,17 @@ class Array:  #pylint: disable=too-many-instance-attributes
     def users(self):
         '''Get the users of the array.'''
         return self._users
+
+    @property
+    def kind(self) -> ArrayKind:
+        '''Get the hardware classification of the array.'''
+        return self._kind
+
+    @kind.setter
+    def kind(self, value: ArrayKind):
+        if not isinstance(value, ArrayKind):
+            raise TypeError(f'Array kind must be ArrayKind, got {type(value)}')
+        self._kind = value
 
     def __and__(self, other):
         '''

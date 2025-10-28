@@ -120,7 +120,6 @@ The function manages several CIRCTDumper state variables:
 - `array_metadata`: Registry containing array write/read port assignments and usage
 - `downstream_dependencies`: Downstream module dependencies
 - `async_callees`: Async call relationships
-- `sram_payload_arrays`: SRAM payload arrays
 
 **Project-specific Knowledge Required**:
 - Understanding of [CIRCTDumper state management](/python/assassyn/codegen/verilog/design.md)

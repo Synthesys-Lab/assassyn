@@ -176,6 +176,8 @@ module reg_array #(
 endmodule
 ```
 
+When the IR marks an array with `ArrayKind.SRAM_PAYLOAD` or `ArrayKind.DRAM_PAYLOAD`, the backend bypasses this generic module entirely and instead emits the specialised SRAM/DRAM wrappers that expose memory-specific handshakes.
+
 ## Clock Domain and Timing
 
 All generated Verilog follows these timing conventions:

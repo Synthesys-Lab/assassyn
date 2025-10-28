@@ -12,6 +12,7 @@ from .utils import (
 )
 
 from ...analysis import topo_downstream_modules
+from ...ir.array import ArrayKind
 from ...ir.module import Downstream
 from ...ir.module.base import ModuleBase
 from ...ir.memory.sram import SRAM
@@ -533,7 +534,7 @@ def generate_top_harness(dumper: CIRCTDumper):
                     )
     dumper.append_code('\n# --- Array Write-Back Connections ---')
     for arr_container in dumper.sys.arrays:
-        if arr_container in dumper.sram_payload_arrays:
+        if arr_container.kind in (ArrayKind.SRAM_PAYLOAD, ArrayKind.DRAM_PAYLOAD):
             continue
         metadata = dumper.array_metadata.metadata_for(arr_container)
         if metadata and metadata.users:

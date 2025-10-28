@@ -34,9 +34,9 @@ Base class for memory modules that provides common functionality for SRAM and DR
 - `addr: Value` - Address signal (combinational input)
 - `wdata: Value` - Write data signal (combinational input)
 - `addr_width: int` - Width of the address in bits (derived as log2(depth))
-- `_payload: Array` - Array holding the memory contents (private, not for direct access)
+- `_payload: Array` - Array holding the memory contents (private, not for direct access, tagged with the appropriate `ArrayKind` by subclasses)
 
-### `def __init__(self, width: int, depth: int, init_file: str | None)`
+### `def __init__(self, width: int, depth: int, init_file: str | None, payload_kind: ArrayKind)`
 
 Initialize memory base class with validation and setup.
 
@@ -44,6 +44,7 @@ Initialize memory base class with validation and setup.
 - `width: int` - Width of memory in bits (must be positive integer)
 - `depth: int` - Depth of memory in words (must be positive integer and power of 2)
 - `init_file: str | None` - Path to initialization file for simulation (can be None)
+- `payload_kind: ArrayKind` - Classification applied to the backing array (e.g. `ArrayKind.SRAM_PAYLOAD`)
 
 **Returns:** None
 
@@ -62,7 +63,7 @@ This constructor validates all input parameters and sets up the memory module in
 - **Address Mapping**: Values are loaded sequentially starting from address 0
 - **Simulation Only**: Initialization files are used only during simulation, not in hardware generation
 
-The payload array is created using `RegArray(Bits(width), depth)` from [ir/array.py](../array.py) to emulate register-based memory behavior. Using `Bits` type ensures compatibility with array read operations that return raw bit values. The `_payload` field is marked as private (prefixed with underscore) as it should not be accessed directly by users - memory operations should go through the proper interface methods.
+The payload array is created using `RegArray(Bits(width), depth, kind=payload_kind)` from [ir/array.py](../array.py) to emulate register-based memory behavior while annotating the backing storage with an `ArrayKind`. Using `Bits` type ensures compatibility with array read operations that return raw bit values. The `_payload` field is marked as private (prefixed with underscore) as it should not be accessed directly by users - memory operations should go through the proper interface methods. Subclasses pass `ArrayKind.SRAM_PAYLOAD` or `ArrayKind.DRAM_PAYLOAD` so that code generation can route memory arrays through the dedicated SRAM/DRAM plumbing instead of generic register array wiring.
 
 ## Internal Helpers
 

@@ -11,6 +11,7 @@ from ...ir.expr import Bind
 from ...ir.module import Downstream, Module
 from ...ir.module.external import ExternalSV
 from ...ir.memory.sram import SRAM
+from ...ir.array import ArrayKind
 from .external import (
     collect_external_classes,
     collect_external_intrinsics,
@@ -127,6 +128,8 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         fd.write(f"pub {dram_name}_response: Response,\n")
     # Add array fields to simulator struct
     for array in sys.arrays:
+        if array.kind is ArrayKind.DRAM_PAYLOAD:
+            continue
         name = namify(array.name)
         dtype = dtype_to_rust_type(array.scalar_ty)
         num_ports = port_manager.get_port_count(name)

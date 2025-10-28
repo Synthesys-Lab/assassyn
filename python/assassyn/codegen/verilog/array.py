@@ -5,9 +5,8 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
 
 from .metadata import ArrayMetadata
-from ...ir.array import Array
+from ...ir.array import Array, ArrayKind
 from ...ir.expr import ArrayRead, ArrayWrite
-from ...ir.memory.sram import SRAM
 from ...builder import SysBuilder
 
 if TYPE_CHECKING:
@@ -34,21 +33,15 @@ class ArrayMetadataRegistry:
         """Populate the registry by analysing the given system."""
         self.clear()
         modules: List[Module] = list(sys.modules) + list(sys.downstreams)
-        payload_arrays = getattr(dumper, "sram_payload_arrays", set())
-
         for arr in sys.arrays:
-            if arr in payload_arrays:
+            if arr.kind in (ArrayKind.SRAM_PAYLOAD, ArrayKind.DRAM_PAYLOAD):
                 continue
 
             writers = arr.get_write_ports().keys()
             for module in writers:
-                if self._is_payload_owner(module, arr):
-                    continue
                 self.register_writer(arr, module)
 
             for module in modules:
-                if self._is_payload_owner(module, arr):
-                    continue
                 body = getattr(module, "body", None)
                 if body is None:
                     continue
@@ -142,14 +135,5 @@ class ArrayMetadataRegistry:
         if meta is None:
             return []
         return list(meta.users)
-
-    @staticmethod
-    def _is_payload_owner(module: Module, array: Array) -> bool:
-        """Return True if the module is the SRAM wrapper for the array."""
-        if not isinstance(module, SRAM):
-            return False
-        payload = getattr(module, "payload", None)
-        return payload is array
-
 
 __all__ = ["ArrayMetadataRegistry"]

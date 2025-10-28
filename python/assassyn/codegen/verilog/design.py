@@ -56,9 +56,8 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     async_callees: Dict[Module, List[Module]]
     downstream_dependencies: Dict[Module, List[Module]]
     is_top_generation: bool
-    finish_body:list[str]
-    sram_payload_arrays:set
-    memory_defs:set
+    finish_body: list[str]
+    memory_defs: set
 
     def __init__(self):
         super().__init__()
@@ -78,7 +77,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.finish_body = []
         self.finish_conditions = []
         self.array_metadata = ArrayMetadataRegistry()
-        self.sram_payload_arrays = set()
         self.memory_defs = set()
         self.expr_to_name = {}
         self.name_counters = defaultdict(int)
