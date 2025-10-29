@@ -77,7 +77,7 @@ Keeping these definitions in a runtime module ensures generated designs and user
 ### CIRCTDumper Walkthrough
 
 - `visit_system` builds: `array_metadata`, `async_callees` (callee→callers), `downstream_dependencies` (downstream→upstreams), external wrappers, and SRAM metadata. Then visits modules and emits `Top`.
-- `visit_module` walks the body (via `_expr`), declares ports (`generate_module_ports`), then emits handshakes and gating (`cleanup_post_generation`) inside `construct`.
+- `visit_module` walks the body (via `_expr`), declares ports (`generate_module_ports`, which infers roles and metadata internally), then emits handshakes and gating (`cleanup_post_generation`) inside `construct`.
 - `visit_block` tracks nested predicates for conditional and cycled blocks so `Log`/`FINISH`/FIFO ops inherit the correct guards.
 
 ### Expression Lowering
