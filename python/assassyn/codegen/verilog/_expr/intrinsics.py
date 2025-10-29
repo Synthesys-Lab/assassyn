@@ -303,11 +303,10 @@ def codegen_intrinsic(dumper, expr: Intrinsic) -> Optional[str]:
         return None
     if intrinsic == Intrinsic.PUSH_CONDITION:
         cond_str = dumper.dump_rval(expr.args[0], False)
-        dumper.cond_stack.append((f"({cond_str})", expr))
+        dumper.predicate_stack.push(f"({cond_str})", expr)
         return None
     if intrinsic == Intrinsic.POP_CONDITION:
-        if dumper.cond_stack:
-            dumper.cond_stack.pop()
+        dumper.predicate_stack.pop()
         return None
     if intrinsic == Intrinsic.EXTERNAL_INSTANTIATE:
         # Should be handled by ExternalIntrinsic check above

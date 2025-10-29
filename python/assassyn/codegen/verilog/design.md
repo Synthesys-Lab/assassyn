@@ -103,13 +103,13 @@ class CIRCTDumper(Visitor):
 
 The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog code. It inherits from the Visitor pattern and implements the credit-based pipeline architecture. The class maintains extensive state for managing:
 
-1. **Execution Control**: `wait_until`, `cond_stack`, and `finish_conditions` track predicate stacking, wait-until clauses, and FINISH intrinsics.
+1. **Execution Control**: `wait_until`, the shared `PredicateStack`, and `finish_conditions` track predicate stacking, wait-until clauses, and FINISH intrinsics.
 2. **Module State**: `current_module`, `_exposes`, `module_ctx`, and `exposed_ports_to_add` capture which values need to become ports.
 3. **Array Management**: `array_metadata`, `memory_defs`, and ownership metadata ensure multi-port register arrays are emitted while memory payloads (`array.is_payload(memory)` returning `True`) are routed through dedicated generators.
 4. **External Integration**: `external_intrinsics`, `external_classes`, `external_wrapper_names`, `external_instance_names`, `external_instance_owners`, `cross_module_external_reads`, `external_outputs_by_instance`, and `external_output_exposures` track how `ExternalIntrinsic` nodes map to wrapper modules, which modules read each exposed register output, and the producer-side ports required to materialise those reads.
 5. **Expression Naming**: `expr_to_name` and `name_counters` guarantee deterministic signal names whenever expression results must be reused across statements.
 6. **Code Generation**: `code`, `logs`, and `indent` store emitted lines and diagnostic information used later by the testbench.
-7. **Module Metadata**: `module_metadata` maps each Module to its `ModuleMetadata`. The structure tracks FINISH intrinsics, async calls, and a rich FIFO record that annotates every push/pop with its predicate (`get_pred()` output) and originating module. This metadata is populated during module generation and consumed during top-level harness generation to avoid redundant expression walking. See [metadata module](/python/assassyn/codegen/verilog/metadata.md) for details.
+7. **Module Metadata**: `module_metadata` maps each Module to its `ModuleMetadata`. The structure tracks FINISH intrinsics, async calls, and a rich FIFO record that annotates every push/pop with its predicate (`get_pred()` output) and originating module. FIFO interactions are now populated ahead of code generation by the dedicated pre-pass (`FIFOAnalysisVisitor`) so every consumer observes a stable snapshot; code emission only reads this data while continuing to append FINISH / async-call bookkeeping. See [metadata module](/python/assassyn/codegen/verilog/metadata.md) for details.
 
 #### Key Methods
 
@@ -131,7 +131,7 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 
 **`visit_block`**: Manages conditional and cycled blocks by maintaining a condition stack for proper predicate generation; when a conditional contains logging or other side effects it exposes the condition to the outside world to keep the testbench accurate.
 
-**`expose`**: Registers expressions that need to be exposed as module outputs, handling valued expressions, arrays, and async triggers. FIFO push/pop traffic now bypasses `_exposes` entirely; instead, the expression helpers log pushes/pops with the global FIFO registry (and the module view `module_metadata.fifo` records references to those shared interactions) so downstream phases can choose whichever lookup best suits their wiring logic.
+**`expose`**: Registers expressions that need to be exposed as module outputs, handling valued expressions, arrays, and async triggers. FIFO push/pop traffic now bypasses `_exposes` entirely; the pre-pass records every interaction in the global registry, and the module view (`module_metadata.fifo`) simply reads the frozen results so downstream phases can choose whichever lookup best suits their wiring logic.
 
 **`get_pred`**: Generates the current execution predicate by combining all conditions in the condition stack
 

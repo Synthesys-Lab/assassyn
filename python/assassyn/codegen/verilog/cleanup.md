@@ -4,7 +4,7 @@ This module provides post-generation cleanup utilities for Verilog code generati
 
 ## Summary
 
-The cleanup module is responsible for generating the final control signals and interconnections after the main Verilog code generation is complete. It handles complex signal routing for arrays, ports, modules, and memory interfaces, ensuring proper connectivity between generated modules according to the credit-based pipeline architecture. As part of the external module flow, it also materialises producer-side `expose_*`/`valid_*` ports for any external register outputs that are consumed by another module, so cross-module reads can be wired up without duplicating logic.
+The cleanup module is responsible for generating the final control signals and interconnections after the main Verilog code generation is complete. It handles complex signal routing for arrays, ports, modules, and memory interfaces, ensuring proper connectivity between generated modules according to the credit-based pipeline architecture. As part of the external module flow, it also materialises producer-side `expose_*`/`valid_*` ports for any external register outputs that are consumed by another module, so cross-module reads can be wired up without duplicating logic.  FIFO wiring now consumes the metadata snapshot produced by the pre-pass instead of mutating registries during emission.
 
 ## Exposed Interfaces
 
@@ -34,7 +34,7 @@ This is the main cleanup function that generates all the necessary control signa
 
 5. **FIFO Signal Generation**: Uses `module_metadata[current_module].fifo.iter_channels()` to visit each FIFO touched by the module:
    - Pulls the per-port `FIFOMetadata` directly from the registry so push predicates, values, and pop predicates stay in sync with the module view, while the module view provides the filtered interactions.
-   - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata.
+   - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata captured during the pre-pass (no on-the-fly logging).
    - Produces the module-local `*_pop_ready` backpressure signal without consulting `dumper._exposes`.
 
 6. **Module Trigger Signal Generation**: When async calls target another module, sums all predicates (each converted to an 8-bit increment) and routes the result into `<callee>_trigger`.

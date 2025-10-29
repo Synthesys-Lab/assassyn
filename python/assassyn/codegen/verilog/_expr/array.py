@@ -49,14 +49,10 @@ def codegen_array_write(dumper: CIRCTDumper, expr: ArrayWrite) -> Optional[str]:
 
 
 @enforce_type
-def codegen_fifo_push(dumper: CIRCTDumper, expr: FIFOPush) -> Optional[str]:
+def codegen_fifo_push(_dumper: CIRCTDumper, _expr: FIFOPush) -> Optional[str]:
     """Generate code for FIFO push operations."""
-    metadata = dumper.module_metadata[dumper.current_module]
-    predicate = dumper.get_pred()
-    interaction = dumper.fifo_registry.record_push(
-        dumper.current_module, expr, predicate
-    )
-    metadata.record_fifo_interaction(expr.fifo, interaction)
+    # FIFO interactions are recorded during the analysis pre-pass.
+    return None
 
 
 @enforce_type
@@ -64,10 +60,4 @@ def codegen_fifo_pop(dumper: CIRCTDumper, expr: FIFOPop) -> Optional[str]:
     """Generate code for FIFO pop operations."""
     rval = namify(expr.as_operand())
     fifo_name = dumper.dump_rval(expr.fifo, False)
-    metadata = dumper.module_metadata[dumper.current_module]
-    predicate = dumper.get_pred()
-    interaction = dumper.fifo_registry.record_pop(
-        dumper.current_module, expr, predicate
-    )
-    metadata.record_fifo_interaction(expr.fifo, interaction)
     return f'{rval} = self.{fifo_name}'

@@ -43,7 +43,7 @@ def test_fifo_metadata_records_predicates():
         Pipe().build()
 
     dumper = CIRCTDumper()
-    dumper.visit_system(sysb)
+    dumper.run_fifo_analysis(sysb)
 
     pipe_module = sysb.modules[0]
     metadata = dumper.module_metadata[pipe_module]
@@ -82,7 +82,7 @@ def test_fifo_metadata_records_predicates():
 
     # Revisit the module in isolation to ensure FIFO operations skip the expose map
     isolated_dumper = CIRCTDumper()
-    isolated_dumper.sys = sysb
+    isolated_dumper.run_fifo_analysis(sysb, modules=[pipe_module])
     isolated_dumper.visit_module(pipe_module)
     isolated_module_md = isolated_dumper.module_metadata[pipe_module]
     isolated_registry = isolated_dumper.fifo_registry
@@ -140,7 +140,7 @@ def test_fifo_registry_cross_module_sharing():
         producer.build(consumer)
 
     dumper = CIRCTDumper()
-    dumper.visit_system(sysb)
+    dumper.run_fifo_analysis(sysb)
 
     consumer_module = consumer
     producer_module = producer
@@ -167,3 +167,48 @@ def test_fifo_registry_cross_module_sharing():
         assert port is consumer_port
         assert fifo_metadata is fifo_meta
         assert list(interactions) == producer_md.fifo.interactions_for(port)
+
+
+def test_fifo_analysis_single_module_refresh():
+    sysb = SysBuilder("fifo_prepass_incremental")
+
+    with sysb:
+
+        class Pipe(Module):
+
+            def __init__(self):
+                super().__init__(ports={
+                    'in0': Port(UInt(8)),
+                    'out0': Port(UInt(8)),
+                })
+
+            @module.combinational
+            def build(self):
+                push_condition(Bits(1)(1))
+                data = self.in0.pop()
+                push_condition(Bits(1)(0))
+                self.out0.push(data)
+                pop_condition()
+                pop_condition()
+
+        Pipe().build()
+
+    pipe_module = sysb.modules[0]
+    in_port = pipe_module.ports[0]
+    out_port = pipe_module.ports[1]
+
+    dumper = CIRCTDumper()
+    dumper.run_fifo_analysis(sysb)
+
+    fifo_meta = dumper.fifo_registry.metadata_for(out_port)
+    assert len(fifo_meta.pushes) == 1
+    fifo_meta = dumper.fifo_registry.metadata_for(in_port)
+    assert len(fifo_meta.pops) == 1
+
+    # Re-run analysis for the pipe module only; metadata should stay consistent.
+    dumper.run_fifo_analysis(sysb, modules=[pipe_module])
+    fifo_meta_out = dumper.fifo_registry.metadata_for(out_port)
+    fifo_meta_in = dumper.fifo_registry.metadata_for(in_port)
+    assert len(fifo_meta_out.pushes) == 1
+    assert len(fifo_meta_in.pops) == 1
+    assert fifo_meta_out.pushes[0].predicate == "(Bits(1)(1)) & (Bits(1)(0))"

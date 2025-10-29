@@ -1,10 +1,21 @@
 # Verilog Code Generation Metadata
 
-This module provides metadata structures for tracking information collected during Verilog code generation that needs to be referenced in later compilation phases.
+This module provides metadata structures for tracking information collected for Verilog code generation that need to be referenced in later compilation phases.  FIFO metadata is now populated by a dedicated analysis pre-pass that runs before any code is emitted, ensuring every downstream consumer observes a stable snapshot of push/pop activity.
 
 ## Summary
 
-The metadata module defines dataclasses that hold information about modules discovered during the code generation pass. This metadata is populated incrementally as expressions are processed and later consumed during top-level harness generation, eliminating the need for redundant analysis passes.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
+The metadata module defines dataclasses that hold information about modules discovered during a dedicated FIFO analysis pass that precedes code emission. The pre-pass traverses every module with `FIFOAnalysisVisitor`, reproducing the dumper’s predicate semantics through the shared `PredicateStack` helper and recording FIFO interactions in one sweep.  Later phases consume the frozen metadata, eliminating the need for runtime bookkeeping and avoiding mismatches caused by incremental mutation.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
+
+## FIFO Analysis Pre-pass
+
+`FIFOAnalysisVisitor` performs a read-only walk of module bodies before `CIRCTDumper.visit_module` runs.  The visitor reuses the dumper’s `dump_rval` helpers to evaluate predicates and, by relying on the shared `PredicateStack`, guarantees the exact same condition-string normalisation as the code generator.  Each module’s metadata is cleared and repopulated during the analysis pass; the registry is reset once per compile run, and incremental re-generation is handled by rerunning the visitor for the affected module.
+
+Key responsibilities:
+
+1. Seed `CIRCTDumper.module_metadata[module]` with a `ModuleMetadata` instance that owns a `ModuleFIFOView`.
+2. Call `FIFORegistry.clear_for_module(module)` before re-analyzing a module so stale interactions are dropped.
+3. Push/pop predicates through `PredicateStack` when encountering `PUSH_CONDITION` / `POP_CONDITION` intrinsics.
+4. Record every `FIFOPush`/`FIFOPop` interaction by constructing `FIFOInteraction` entries shared between the registry and the module view.
 
 ## Exposed Interfaces
 
@@ -52,9 +63,9 @@ class ModuleMetadata:
 
 **Explanation**
 
-This dataclass tracks module-level facts discovered during code generation and exposes
-them to later phases.  Its FIFO information is now a *view* layered on top of the global
-registry rather than a duplicated structure.  The module view is the authoritative record
+This dataclass tracks module-level facts discovered during the analysis + codegen pipeline
+and exposes them to later phases.  Its FIFO information is a *view* layered on top of the
+global registry populated during the pre-pass.  The module view is the authoritative record
 of which FIFO ports a module touches; the registry only keeps the complementary FIFO-keyed
 aggregation.
 
@@ -76,13 +87,15 @@ aggregation.
 
 **When Metadata is Populated**
 
-1. `CIRCTDumper.visit_module` initialises a `ModuleMetadata` instance for the current
-   module, wiring it to the shared `FIFORegistry`.
-2. `codegen_intrinsic` and `codegen_async_call` update `has_finish` and `calls`
-   respectively.
-3. [`_expr/array.py`](./_expr/array.md) records FIFO operations: the registry creates the
-   shared `FIFOInteraction`, and the module view stores a reference to it together with the
-   touched FIFO port.
+1. `FIFOAnalysisVisitor` ensures a `ModuleMetadata` instance exists for the module,
+   clearing any stale FIFO interactions and wiring the metadata to the shared registry.
+2. The visitor pushes/pops predicates via `PredicateStack` so the recorded
+   `FIFOInteraction.predicate` strings match `CIRCTDumper.get_pred()`.
+3. Each fifo push/pop encountered during the pre-pass creates a shared `FIFOInteraction`,
+   adds it to the registry, and registers it with the module’s `ModuleFIFOView`.
+4. During subsequent code generation the same `ModuleMetadata` object accumulates FINISH
+   intrinsics and async call information; FIFO lists remain immutable once analysis
+   finishes so downstream consumers see a stable snapshot.
 
 **How Metadata is Consumed**
 
@@ -174,8 +187,9 @@ The registry is the single owner of FIFO interaction data:
   `FIFOMetadata`.
 - `metadata_for(port)` – Fetch (or lazily create) the `FIFOMetadata` container for `port`.
 - `clear_for_module(module, fifo_ports)` – Remove all interactions emitted by `module`
-  across the provided FIFO ports and drop empty channel records.  `CIRCTDumper.visit_module`
-  supplies the port list from `ModuleMetadata.fifo.ports` before re-visiting a module.
+  across the provided FIFO ports and drop empty channel records.  The FIFO analysis pass
+  uses this helper when re-running on a single module so incremental regeneration never
+  leaves stale interactions behind.
 
 Because both the module-level view and downstream consumers reference the same
 `FIFOInteraction` objects, predicates and expression handles stay perfectly in sync without

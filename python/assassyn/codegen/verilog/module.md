@@ -4,7 +4,7 @@ This module provides utilities for generating Verilog module port declarations, 
 
 ## Summary
 
-The module port generation utilities handle the creation of comprehensive module interfaces for Verilog modules. They manage the complex port requirements of the credit-based pipeline architecture, including execution control signals, FIFO handshaking, array read/write interfaces, external module connections, and special handling for downstream modules and SRAM modules.
+The module port generation utilities handle the creation of comprehensive module interfaces for Verilog modules. They manage the complex port requirements of the credit-based pipeline architecture, including execution control signals, FIFO handshaking, array read/write interfaces, external module connections, and special handling for downstream modules and SRAM modules. FIFO information consumed here is already frozen by the analysis pre-pass, so port declarations never depend on codegen-time side effects.
 
 ## Exposed Interfaces
 
@@ -20,7 +20,7 @@ def generate_module_ports(dumper, node: Module) -> None:
 This function generates comprehensive port declarations for Verilog modules based on their role in the credit-based pipeline architecture. Rather than requiring callers to pre-compute module roles or FIFO metadata, it derives all inputs from the dumper:
 
 - `is_downstream`, `is_sram`, and `is_driver` are inferred via `isinstance` checks and the dumper’s `async_callees` registry.
-- FIFO and async-call behaviour is loaded from `dumper.module_metadata[node]`, defaulting to empty lists when metadata is missing (e.g. for stubs filtered earlier).
+- FIFO and async-call behaviour is loaded from `dumper.module_metadata[node]`, which has already been populated by the FIFO analysis pre-pass (falling back to empty lists only for filtered stubs).
 
 It then performs the following steps:
 

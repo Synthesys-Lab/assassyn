@@ -9,6 +9,16 @@ For simulator implementation, see [simulator.md](./simulator.md).
 
 Assassyn generates Verilog code that implements the credit-based pipeline architecture described in [arch.md](../arch/arch.md). The key challenge in Verilog generation is translating the high-level execution model into synthesizable hardware that maintains the same behavior.
 
+### Analysis Pre-pass
+
+Before any Verilog is emitted the backend now performs a dedicated FIFO metadata pre-pass:
+
+1. `FIFOAnalysisVisitor` walks every module body, applying the same predicate semantics as `CIRCTDumper` through the shared `PredicateStack` helper.
+2. The visitor populates the global `FIFORegistry` and per-module `ModuleFIFOView` instances, producing a frozen snapshot of push/pop behaviour (module, predicate, expression).
+3. Incremental regeneration reuses the visitor: re-running it for a single module clears the old interactions via `FIFORegistry.clear_for_module` and records the fresh ones.
+
+This separation removes runtime bookkeeping from code emission and guarantees that cleanup, module port generation, and top-level wiring all consult a consistent dataset.
+
 ## Credit-based Flow Control Implementation
 
 The credit system is implemented using counters and control logic. Each pipeline stage has:

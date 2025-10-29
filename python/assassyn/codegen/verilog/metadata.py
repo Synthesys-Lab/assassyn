@@ -103,6 +103,15 @@ class ModuleFIFOView:
         self.pushes: List[FIFOInteraction] = []
         self.pops: List[FIFOInteraction] = []
 
+    def reset(self, registry: FIFORegistry | None = None) -> None:
+        """Clear recorded interactions and optionally retarget the registry."""
+        self._ports.clear()
+        self._interactions_by_port.clear()
+        self.pushes.clear()
+        self.pops.clear()
+        if registry is not None and registry is not self._registry:
+            self._registry = registry
+
     @property
     def ports(self) -> Sequence[Port]:
         """Return the FIFO ports touched by the owning module."""
@@ -138,9 +147,28 @@ class ModuleMetadata:
     has_finish: bool = False
     calls: CallList = field(default_factory=list)
     fifo: ModuleFIFOView = field(init=False)
+    fifo_ready: bool = False
 
     def __post_init__(self) -> None:
         self.fifo = ModuleFIFOView(self.module, self.registry)
+
+    def reset_for_analysis(self, registry: FIFORegistry) -> None:
+        """Prepare FIFO metadata for a fresh analysis run."""
+        if self.registry is not registry:
+            self.registry = registry
+            self.fifo = ModuleFIFOView(self.module, registry)
+        else:
+            self.fifo.reset()
+        self.fifo_ready = False
+
+    def mark_fifo_ready(self) -> None:
+        """Mark FIFO metadata as populated by the analysis pre-pass."""
+        self.fifo_ready = True
+
+    def prepare_for_codegen(self) -> None:
+        """Clear transient state ahead of code emission."""
+        self.has_finish = False
+        self.calls.clear()
 
     @property
     def pushes(self) -> List[FIFOPush]:
@@ -186,6 +214,10 @@ class FIFORegistry:
         metadata = self.metadata_for(fifo_port)
         metadata.record_interaction(interaction)
         return interaction
+
+    def reset(self) -> None:
+        """Drop all recorded FIFO metadata."""
+        self._metadata_by_fifo.clear()
 
     def clear_for_module(self, module: Module, fifo_ports: Iterable[Port] | None = None) -> None:
         """Remove every interaction produced by `module` across all FIFOs."""

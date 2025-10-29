@@ -45,7 +45,7 @@ def test_fifo_cleanup_metadata_drives_handshakes():
     pipe_module = sysb.modules[0]
 
     dumper = CIRCTDumper()
-    dumper.sys = sysb
+    dumper.run_fifo_analysis(sysb, modules=[pipe_module])
     dumper.visit_module(pipe_module)
 
     fifo_meta = dumper.module_metadata[pipe_module].fifo
