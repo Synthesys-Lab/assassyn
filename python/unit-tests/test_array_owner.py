@@ -3,6 +3,7 @@
 import pytest
 
 from assassyn.builder import SysBuilder
+from assassyn.codegen.verilog.array import ArrayMetadataRegistry
 from assassyn.codegen.verilog.design import CIRCTDumper
 from assassyn.ir.array import RegArray
 from assassyn.ir.dtype import UInt
@@ -81,10 +82,15 @@ def test_metadata_registry_skips_memory_payloads():
         reader.build(reg_arr)
 
     dumper = CIRCTDumper()
-    dumper.array_metadata.collect(dumper, sys)
+    dumper.array_metadata.collect(sys)
 
     assert dumper.array_metadata.metadata_for(reg_arr) is not None
     assert dumper.array_metadata.metadata_for(sram._payload) is None  # pylint: disable=protected-access
+
+    standalone_registry = ArrayMetadataRegistry()
+    standalone_registry.collect(sys)
+    assert standalone_registry.metadata_for(reg_arr) is not None
+    assert standalone_registry.metadata_for(sram._payload) is None  # pylint: disable=protected-access
 
 
 def test_assign_owner_validates_types():
