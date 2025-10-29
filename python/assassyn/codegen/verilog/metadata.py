@@ -7,9 +7,8 @@ handoff).
 
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, Iterator, List, Sequence, Set, TYPE_CHECKING
+from typing import Any, Dict, Iterable, Iterator, List, Sequence, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ...ir.array import Array
@@ -99,7 +98,8 @@ class ModuleFIFOView:
     def __init__(self, module: Module, registry: FIFORegistry) -> None:
         self._module = module
         self._registry = registry
-        self._ports: Set[Port] = set()
+        self._ports: Dict[Port, None] = {}
+        self._interactions_by_port: Dict[Port, List[FIFOInteraction]] = {}
         self.pushes: List[FIFOInteraction] = []
         self.pops: List[FIFOInteraction] = []
 
@@ -110,7 +110,8 @@ class ModuleFIFOView:
 
     def register(self, fifo_port: Port, interaction: FIFOInteraction) -> None:
         """Record a FIFO interaction for the owning module."""
-        self._ports.add(fifo_port)
+        self._ports.setdefault(fifo_port, None)
+        self._interactions_by_port.setdefault(fifo_port, []).append(interaction)
         if interaction.is_push:
             self.pushes.append(interaction)
         else:
@@ -118,8 +119,14 @@ class ModuleFIFOView:
 
     def interactions_for(self, fifo_port: Port) -> List[FIFOInteraction]:
         """Fetch the module's interactions associated with the given FIFO port."""
-        channel = self._registry.metadata_for(fifo_port)
-        return channel.interactions_for_module(self._module)
+        return list(self._interactions_by_port.get(fifo_port, ()))
+
+    def iter_channels(self) -> Iterator[tuple[Port, FIFOMetadata, Sequence[FIFOInteraction]]]:
+        """Yield `(fifo_port, metadata, interactions)` triples for the module."""
+        for fifo_port in self._ports:
+            metadata = self._registry.metadata_for(fifo_port)
+            interactions = self._interactions_by_port.get(fifo_port, [])
+            yield fifo_port, metadata, tuple(interactions)
 
 
 @dataclass
@@ -155,7 +162,6 @@ class FIFORegistry:
 
     def __init__(self) -> None:
         self._metadata_by_fifo: Dict[Port, FIFOMetadata] = {}
-        self._fifos_by_module: Dict[Module, Set[Port]] = defaultdict(set)
 
     def metadata_for(self, fifo_port: Port) -> FIFOMetadata:
         """Return the metadata object for `fifo_port`, creating it when missing."""
@@ -171,7 +177,6 @@ class FIFORegistry:
         interaction = FIFOInteraction(module=module, expr=expr, predicate=predicate, is_push=True)
         metadata = self.metadata_for(fifo_port)
         metadata.record_interaction(interaction)
-        self._fifos_by_module[module].add(fifo_port)
         return interaction
 
     def record_pop(self, module: Module, expr: FIFOPop, predicate: str) -> FIFOInteraction:
@@ -180,22 +185,19 @@ class FIFORegistry:
         interaction = FIFOInteraction(module=module, expr=expr, predicate=predicate, is_push=False)
         metadata = self.metadata_for(fifo_port)
         metadata.record_interaction(interaction)
-        self._fifos_by_module[module].add(fifo_port)
         return interaction
 
-    def channels_for_module(self, module: Module) -> Iterable[tuple[Port, FIFOMetadata]]:
-        """Yield `(fifo_port, metadata)` pairs for every FIFO touched by `module`."""
-        for fifo_port in self._fifos_by_module.get(module, ()):
-            metadata = self._metadata_by_fifo.get(fifo_port)
-            if metadata is None:
-                continue
-            yield fifo_port, metadata
-
-    def clear_for_module(self, module: Module) -> None:
+    def clear_for_module(self, module: Module, fifo_ports: Iterable[Port] | None = None) -> None:
         """Remove every interaction produced by `module` across all FIFOs."""
-        fifo_ports = self._fifos_by_module.pop(module, None)
-        if not fifo_ports:
-            return
+        if fifo_ports is None:
+            fifo_ports = [
+                fifo_port
+                for fifo_port, metadata in self._metadata_by_fifo.items()
+                if metadata.interactions_for_module(module)
+            ]
+        else:
+            fifo_ports = list(dict.fromkeys(fifo_ports))
+
         for fifo_port in fifo_ports:
             metadata = self._metadata_by_fifo.get(fifo_port)
             if metadata is None:

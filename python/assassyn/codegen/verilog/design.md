@@ -116,7 +116,7 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 **`visit_system`**: Generates code for the entire system by calling `generate_system()`
 
 **`visit_module`**: Generates a complete Verilog module with the following phases:
-1. **Analysis Phase**: Processes the module body, collecting exposes, async call metadata, and external wiring information. During this phase, metadata for pushes and calls is collected incrementally as expressions are processed.
+1. **Analysis Phase**: Clears any stale FIFO interactions using the previous `ModuleMetadata.fifo.ports`, then processes the module body, collecting exposes, async call metadata, and external wiring information. During this phase, metadata for pushes and calls is collected incrementally as expressions are processed.
 2. **Port Generation**: Calls `generate_module_ports()` to create module interfaces. The helper now derives downstream/SRAM/driver roles and reads FIFO metadata (predicated pushes/pops) and async calls directly from `CIRCTDumper.module_metadata`, so `visit_module` no longer threads redundant flags or lists between phases.
 3. **Code Integration**: Combines the collected body statements with the module boilerplate and generator decorators.
 4. **Special Handling**: Resets external bookkeeping between modules, emits SRAM-specific prelude code, and avoids instantiating pure external stubs.

@@ -274,16 +274,11 @@ def cleanup_post_generation(dumper):
             pred_condition = f"reduce(or_, [{', '.join([f'({p})' for p in all_predicates])}])"
             dumper.append_code(f'self.valid_{exposed_name} = executed_wire & ({pred_condition})')
 
-    for fifo_port, fifo_metadata in dumper.fifo_registry.channels_for_module(dumper.current_module):
+    module_metadata = dumper.module_metadata[dumper.current_module]
+    for fifo_port, _, interactions in module_metadata.fifo.iter_channels():
         fifo_name = dumper.dump_rval(fifo_port, False)
-        local_pushes = [
-            entry for entry in fifo_metadata.pushes
-            if entry.module is dumper.current_module
-        ]
-        local_pops = [
-            entry for entry in fifo_metadata.pops
-            if entry.module is dumper.current_module
-        ]
+        local_pushes = [entry for entry in interactions if entry.is_push]
+        local_pops = [entry for entry in interactions if not entry.is_push]
 
         if local_pushes:
             predicates = [f'({entry.predicate})' for entry in local_pushes]

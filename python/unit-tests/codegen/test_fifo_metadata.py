@@ -65,14 +65,16 @@ def test_fifo_metadata_records_predicates():
     out_port = pipe_module.ports[1]
     assert fifo_registry.metadata_for(out_port).pushes == [push_entry]
     assert fifo_registry.metadata_for(in_port).pops == [pop_entry]
-    assert {
-        port for port, _ in fifo_registry.channels_for_module(pipe_module)
-    } == {in_port, out_port}
-    fifo_ports = set(metadata.fifo.ports)
+    channel_view = list(metadata.fifo.iter_channels())
+    assert {port for port, _, _ in channel_view} == {in_port, out_port}
+    fifo_ports = list(metadata.fifo.ports)
     assert out_port in fifo_ports
     assert in_port in fifo_ports
     assert metadata.fifo.interactions_for(out_port) == [push_entry]
     assert metadata.fifo.interactions_for(in_port) == [pop_entry]
+    for port, fifo_metadata, interactions in channel_view:
+        assert fifo_metadata is fifo_registry.metadata_for(port)
+        assert list(interactions) == list(metadata.fifo.interactions_for(port))
 
     # Backwards compatibility accessors still expose expression lists
     assert [entry.expr for entry in fifo_meta.pushes] == metadata.pushes
@@ -82,16 +84,20 @@ def test_fifo_metadata_records_predicates():
     isolated_dumper = CIRCTDumper()
     isolated_dumper.sys = sysb
     isolated_dumper.visit_module(pipe_module)
-    isolated_registry = isolated_dumper.fifo_registry
     isolated_module_md = isolated_dumper.module_metadata[pipe_module]
+    isolated_registry = isolated_dumper.fifo_registry
     assert len(isolated_registry.metadata_for(out_port).pushes) == 1
     assert len(isolated_registry.metadata_for(in_port).pops) == 1
+    assert [
+        port for port, _, _ in isolated_module_md.fifo.iter_channels()
+    ] == list(isolated_module_md.fifo.ports)
     # Re-run module generation to confirm metadata clears stale entries
     isolated_dumper.visit_module(pipe_module)
     assert len(isolated_registry.metadata_for(out_port).pushes) == 1
     assert len(isolated_registry.metadata_for(in_port).pops) == 1
     isolated_module_md = isolated_dumper.module_metadata[pipe_module]
     assert isolated_module_md.fifo.pushes[0] is isolated_registry.metadata_for(out_port).pushes[0]
+    assert len(list(isolated_module_md.fifo.iter_channels())) == 2
 
     fifo_expose_keys = [key for key in isolated_dumper._exposes if isinstance(key, IRPort)]
     assert fifo_expose_keys == []
@@ -153,3 +159,11 @@ def test_fifo_registry_cross_module_sharing():
     # Module metadata still exposes aggregated views
     assert producer_md.fifo.pushes[0] is fifo_meta.pushes[0]
     assert consumer_md.fifo.pops[0] is fifo_meta.pops[0]
+    producer_ports = list(producer_md.fifo.ports)
+    consumer_ports = list(consumer_md.fifo.ports)
+    assert producer_ports == [consumer_port]
+    assert consumer_ports == [consumer_port]
+    for port, fifo_metadata, interactions in producer_md.fifo.iter_channels():
+        assert port is consumer_port
+        assert fifo_metadata is fifo_meta
+        assert list(interactions) == producer_md.fifo.interactions_for(port)

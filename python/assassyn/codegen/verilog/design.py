@@ -211,7 +211,11 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.indent = original_indent + 8
 
         # Initialize metadata for this module
-        self.fifo_registry.clear_for_module(node)
+        previous_metadata = self.module_metadata.get(node)
+        previous_ports = None
+        if previous_metadata is not None:
+            previous_ports = previous_metadata.fifo.ports
+        self.fifo_registry.clear_for_module(node, previous_ports)
         self.module_metadata[node] = ModuleMetadata(node, self.fifo_registry)
 
         self.wait_until = None

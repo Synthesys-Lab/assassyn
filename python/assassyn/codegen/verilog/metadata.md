@@ -54,7 +54,9 @@ class ModuleMetadata:
 
 This dataclass tracks module-level facts discovered during code generation and exposes
 them to later phases.  Its FIFO information is now a *view* layered on top of the global
-registry rather than a duplicated structure.
+registry rather than a duplicated structure.  The module view is the authoritative record
+of which FIFO ports a module touches; the registry only keeps the complementary FIFO-keyed
+aggregation.
 
 **Fields**
 
@@ -89,8 +91,8 @@ registry rather than a duplicated structure.
 - **Module port generation** ([module.py](/python/assassyn/codegen/verilog/module.md)):
   Uses `metadata.fifo` to determine which handshake ports are required.
 - **Cleanup wiring** ([cleanup.py](/python/assassyn/codegen/verilog/cleanup.md)):
-  Iterates `metadata.fifo.ports` and `interactions_for(port)` to emit valid/ready logic
-  without re-scanning expressions.
+  Iterates `metadata.fifo.iter_channels()` to emit valid/ready logic without re-scanning
+  expressions, pairing each port with its module-local interactions and registry metadata.
 - **Finish collection**: Uses `has_finish` to decide which modules surface finish outputs.
 - **Performance benefit**: Maintains O(1) lookups with predicate context intact, while
   avoiding duplicated FIFO metadata.
@@ -116,14 +118,18 @@ class ModuleFIFOView:
 ```
 
 `ModuleFIFOView` keeps track of every FIFO port a module touched and provides filtered
-access to the shared interactions:
+access to the shared interactions.  It is the authoritative source for per-module FIFO
+sets:
 
-- `ports` – Iterable of FIFO ports the module interacted with.
+- `ports` – Iterable of FIFO ports the module interacted with (preserving insertion order).
 - `pushes` / `pops` – Lists of `FIFOInteraction` objects produced by the module (references
   to the registry-owned entries).
 - `interactions_for(port)` – Returns the interactions for `port` that originate from the
   owning module, letting consumers wire ready/valid signals without re-filtering the
   registry.
+- `iter_channels()` – Iterates `(Port, FIFOMetadata, Sequence[FIFOInteraction])` triples,
+  exposing the registry-owned channel metadata alongside the module’s filtered
+  interactions without relying on registry-maintained module maps.
 
 ### `FIFOInteraction`
 
@@ -164,14 +170,12 @@ class FIFORegistry:
 
 The registry is the single owner of FIFO interaction data:
 
-- `record_push()` / `record_pop()` – Create a `FIFOInteraction`, append it to the port’s
-  `FIFOMetadata`, and remember that the emitting module touched the port.
+- `record_push()` / `record_pop()` – Create a `FIFOInteraction` and append it to the port’s
+  `FIFOMetadata`.
 - `metadata_for(port)` – Fetch (or lazily create) the `FIFOMetadata` container for `port`.
-- `channels_for_module(module)` – Iterate over `(Port, FIFOMetadata)` pairs for every FIFO
-  the module interacted with.  [`cleanup.py`](./cleanup.md) uses this to wire valid/ready
-  logic without consulting module-level mirrors.
-- `clear_for_module(module)` – Remove all interactions emitted by `module` across every
-  port and drop empty channel records.
+- `clear_for_module(module, fifo_ports)` – Remove all interactions emitted by `module`
+  across the provided FIFO ports and drop empty channel records.  `CIRCTDumper.visit_module`
+  supplies the port list from `ModuleMetadata.fifo.ports` before re-visiting a module.
 
 Because both the module-level view and downstream consumers reference the same
 `FIFOInteraction` objects, predicates and expression handles stay perfectly in sync without
