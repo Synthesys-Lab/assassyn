@@ -23,9 +23,9 @@ def generate_module_ports(dumper, node: Module) -> None:
     is_driver = node not in dumper.async_callees
 
     metadata = dumper.module_metadata.get(node)
-    pushes = metadata.pushes if metadata else []
-    calls = metadata.calls if metadata else []
-    pops = metadata.pops if metadata else []
+    pushes = metadata.pushes
+    calls = metadata.calls
+    pops = metadata.pops
 
     dumper.append_code('clk = Clock()')
     dumper.append_code('rst = Reset()')
