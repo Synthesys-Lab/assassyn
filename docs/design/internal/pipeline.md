@@ -106,6 +106,10 @@ module fifo #(
 endmodule
 ```
 
+### PyCDE Runtime Helpers
+
+The generated `design.py` imports reusable PyCDE helpers from `assassyn.pycde_wrapper`. This module defines the parameterized `FIFO` and `TriggerCounter` classes using `@modparams`, mirroring the handwritten templates above. Centralizing the definitions prevents divergent copies of these primitives between generated designs and user-authored PyCDE code.
+
 ## Combinational Downstream Modules
 
 Downstream modules are implemented as pure combinational logic. The key considerations are:

@@ -42,42 +42,22 @@ def generate_sram_blackbox_files(sys, path, resource_base=None) -> None
 
 ## PyCDE Header
 
-The top of `design.py` defines parameterized wrappers used by `Top`:
+The top of `design.py` imports shared parameterized wrappers used by `Top`:
 
 ```python
 from pycde import Input, Output, Module, System, Clock, Reset, dim
 from pycde import generator, modparams
 from pycde.constructs import Reg, Array, Mux, Wire
 from pycde.types import Bits, SInt, UInt
-
-@modparams
-def FIFO(WIDTH: int, DEPTH_LOG2: int):
-    class FIFOImpl(Module):
-        module_name = "fifo"
-        clk = Clock()
-        rst_n = Input(Bits(1))
-        push_valid = Input(Bits(1))
-        push_data = Input(Bits(WIDTH))
-        pop_ready = Input(Bits(1))
-        push_ready = Output(Bits(1))
-        pop_valid = Output(Bits(1))
-        pop_data = Output(Bits(WIDTH))
-    return FIFOImpl
-
-@modparams
-def TriggerCounter(WIDTH: int):
-    class TriggerCounterImpl(Module):
-        module_name = "trigger_counter"
-        clk = Clock()
-        rst_n = Input(Bits(1))
-        delta = Input(Bits(WIDTH))
-        delta_ready = Output(Bits(1))
-        pop_ready = Input(Bits(1))
-        pop_valid = Output(Bits(1))
-    return TriggerCounterImpl
+from assassyn.pycde_wrapper import FIFO, TriggerCounter
 ```
 
-These map to `fifo.sv` and `trigger_counter.sv` shipped with the backend.
+`assassyn.pycde_wrapper` centralizes PyCDE helpers that back the credit-based pipeline. It exposes:
+
+- `FIFO`: Parameterized depth-tracking FIFO that maps to `fifo.sv`
+- `TriggerCounter`: Credit counter primitive that maps to `trigger_counter.sv`
+
+Keeping these definitions in a runtime module ensures generated designs and user-authored helpers reuse the same implementations.
 
 ## Design Content
 
