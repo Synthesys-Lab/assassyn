@@ -80,7 +80,7 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
                 dumper.cross_module_external_reads.append(entry)
                 dumper.external_outputs_by_instance[instance].append(entry)
 
-    dumper.array_metadata.collect(dumper, sys)
+    dumper.array_metadata.collect(sys)
 
     for arr_container in sys.arrays:
         owner = arr_container.owner

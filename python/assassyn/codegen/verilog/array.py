@@ -7,14 +7,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, TYPE_CHECKING
 from .metadata import ArrayMetadata
 from ...ir.array import Array
 from ...ir.memory.base import MemoryBase
-from ...ir.expr import ArrayRead, ArrayWrite
+from ...ir.expr import ArrayRead, ArrayWrite, Expr
 from ...builder import SysBuilder
 
 if TYPE_CHECKING:
-    from .design import CIRCTDumper
     from ...ir.module import Module
 else:
-    CIRCTDumper = Any  # type: ignore
     Module = Any  # type: ignore
 
 
@@ -30,8 +28,13 @@ class ArrayMetadataRegistry:
         self._metadata.clear()
         self._read_expr_lookup.clear()
 
-    def collect(self, dumper: CIRCTDumper, sys: SysBuilder) -> None:
-        """Populate the registry by analysing the given system."""
+    def collect(self, sys: SysBuilder) -> None:
+        """Populate the registry by analysing the given system.
+
+        Module bodies are already flattened (see `DONE-remove-block`), so we can
+        iterate each body's entries directly without relying on CIRCTDumper
+        helpers.
+        """
         self.clear()
         modules: List[Module] = list(sys.modules) + list(sys.downstreams)
         for arr in sys.arrays:
@@ -42,12 +45,13 @@ class ArrayMetadataRegistry:
             writers = arr.get_write_ports().keys()
             for module in writers:
                 self.register_writer(arr, module)
-
             for module in modules:
                 body = getattr(module, "body", None)
                 if body is None:
                     continue
-                for expr in dumper.walk_expressions(body):
+                for expr in body:
+                    if not isinstance(expr, Expr):
+                        continue
                     if isinstance(expr, ArrayRead) and expr.array is arr:
                         self.register_read(arr, module, expr)
                     elif isinstance(expr, ArrayWrite) and expr.array is arr:
