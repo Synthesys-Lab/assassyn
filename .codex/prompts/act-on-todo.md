@@ -8,3 +8,5 @@ Assuming you are an expert to this project after [read the document](.cursor/rul
 According to [our rule](.cursor/rules/act-on-todo.mdc) to act on the given plan, $1.
 Make sure you [write good code](.cursor/rules/write-good-code.mdc) and
 [stage and commit properly](.cursor/rules/git-message.mdc).
+
+When staging and committing, DO NOT include this corresponding TODO file!
