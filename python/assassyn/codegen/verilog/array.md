@@ -18,7 +18,7 @@ class ArrayMetadataRegistry:
 **collect(self, dumper, sys)**
 
 - Invokes a full-system scan to populate the registry.
-- Ignores arrays whose owner is a memory instance and the array matches `owner._payload`, because those are emitted as dedicated memory modules.
+- Ignores arrays whose owner is a memory instance and `array.is_payload(owner)` returns `True`, because those are emitted as dedicated memory modules.
 - Records writers via `Array.get_write_ports()` and assigns sequential write-port indices.
 - Walks every module body with `CIRCTDumper._walk_expressions` to find `ArrayRead` / `ArrayWrite` nodes, assigning read-port indices and user membership on first sighting.
 

@@ -16,12 +16,11 @@ interfaces, and outlines required follow-up for downstream consumers.
   - Simulator helpers that skipped payload buffers.
 - **Migration Guidance**:
   1. Stop importing `RegisterOwner` or `MemoryOwner`; they no longer exist.
-  2. Use direct identity checks:
+  2. Use direct identity checks for general ownership and the `Array.is_payload` helper to encapsulate payload detection:
      - `owner is None` for top-level arrays.
      - `owner is module_instance` for module-scoped arrays.
      - `isinstance(owner, MemoryBase)` to detect memory-managed arrays.
-     - Compare `array is owner._payload` to skip payload buffers while leaving
-       auxiliary registers (e.g., SRAM `dout`) intact.
+     - Call `array.is_payload(owner)` (or `array.is_payload(SRAM)` / `DRAM`) to skip payload buffers while leaving auxiliary registers (e.g., SRAM `dout`) intact.
   3. When creating memory-managed arrays, pass `owner=self` from the memory
      constructor.
   4. Use `array.assign_owner(new_owner)` when ownership must change; the method

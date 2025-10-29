@@ -176,7 +176,7 @@ module reg_array #(
 endmodule
 ```
 
-When an array belongs to a memory instance and matches `memory._payload`, the backend bypasses this generic module entirely and instead emits the specialised SRAM/DRAM wrappers that expose memory-specific handshakes. Ownership metadata is now identity-based, enabling the backend to distinguish payload buffers from standard registers without dedicated descriptor classes.
+When an array belongs to a memory instance and `array.is_payload(memory)` returns `True`, the backend bypasses this generic module entirely and instead emits the specialised SRAM/DRAM wrappers that expose memory-specific handshakes. Ownership metadata is now identity-based, enabling the backend to distinguish payload buffers from standard registers without dedicated descriptor classes.
 
 ## Clock Domain and Timing
 

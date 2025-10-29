@@ -110,11 +110,7 @@ def generate_top_harness(dumper: CIRCTDumper):
 
     for arr_container in dumper.sys.arrays:
         arr = arr_container
-        is_sram_array = any(
-            isinstance(m, SRAM) and m._payload == arr  # pylint: disable=protected-access
-            for m in dumper.sys.downstreams
-        )
-        if is_sram_array:
+        if arr.is_payload(SRAM):
             continue
         arr_name = namify(arr.name)
         index_bits = arr.index_bits
@@ -385,11 +381,7 @@ def generate_top_harness(dumper: CIRCTDumper):
             if not any(user is module for user in users):
                 continue
             # Skip SRAM arrays as they don't have array_writer instances
-            is_sram_array = any(
-                isinstance(m, SRAM) and m._payload == arr  # pylint: disable=protected-access
-                for m in dumper.sys.downstreams
-            )
-            if is_sram_array:
+            if arr.is_payload(SRAM):
                 continue
             read_indices = dumper.array_metadata.read_port_indices(arr, module)
             if not read_indices:
@@ -535,7 +527,7 @@ def generate_top_harness(dumper: CIRCTDumper):
     dumper.append_code('\n# --- Array Write-Back Connections ---')
     for arr_container in dumper.sys.arrays:
         owner = arr_container.owner
-        if isinstance(owner, MemoryBase) and arr_container is owner._payload:  # pylint: disable=protected-access
+        if isinstance(owner, MemoryBase) and arr_container.is_payload(owner):
             continue
         metadata = dumper.array_metadata.metadata_for(arr_container)
         if metadata and metadata.users:

@@ -39,7 +39,7 @@ Initialize DRAM module with the same interface as MemoryBase.
 **Returns:** None
 
 **Explanation:**
-This constructor delegates to the parent `MemoryBase.__init__()` method, inheriting all the base memory functionality including parameter validation, address width calculation, and payload array creation. The backing array records the DRAM instance as its owner (`owner=self`), signalling to downstream passes that it is serviced by the DRAM request/response interface. No additional DRAM-specific buffers are required at construction time.
+This constructor delegates to the parent `MemoryBase.__init__()` method, inheriting all the base memory functionality including parameter validation, address width calculation, and payload array creation. The backing array records the DRAM instance as its owner (`owner=self`), signalling to downstream passes that it is serviced by the DRAM request/response interface. Consumers detect this payload via `Array.is_payload(DRAM)`; no additional DRAM-specific buffers are required at construction time.
 
 ### `def build(self, we, re, addr, wdata)`
 

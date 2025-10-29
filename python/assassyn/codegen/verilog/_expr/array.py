@@ -16,7 +16,7 @@ def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
     is_sram_payload = False
 
     if isinstance(dumper.current_module, SRAM):
-        if array_ref is dumper.current_module._payload:  # pylint: disable=protected-access
+        if array_ref.is_payload(dumper.current_module):
             is_sram_payload = True
 
     rval = dumper.dump_rval(expr, False)

@@ -84,7 +84,7 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
 
     for arr_container in sys.arrays:
         owner = arr_container.owner
-        if isinstance(owner, MemoryBase) and arr_container is owner._payload:  # pylint: disable=protected-access
+        if isinstance(owner, MemoryBase) and arr_container.is_payload(owner):
             continue
         dumper.visit_array(arr_container)
 

@@ -25,11 +25,12 @@ Each array records its provenance via the `owner` attribute. The owner is one of
 - A `MemoryBase` instance (for example, `SRAM` or `DRAM`) for memory-managed
   buffers.
 
-Downstream passes rely on identity comparisons. Memory payloads are detected by
-combining `isinstance(array.owner, MemoryBase)` with
-`array is array.owner._payload`, while auxiliary registers such as the SRAM
-`dout` latch continue to look like regular arrays even though they reference the
-same owner. See [`docs/design/internal/array-ownership.md`](../../../docs/design/internal/array-ownership.md)
+Downstream passes should use `Array.is_payload(memory_cls_or_instance)` to detect
+memory payload buffers. The helper consolidates the identity logic that used to
+be implemented ad hoc (`array.owner is memory and array is memory._payload`),
+while auxiliary registers such as the SRAM `dout` latch continue to look like
+regular arrays even though they reference the same owner. See
+[`docs/design/internal/array-ownership.md`](../../../docs/design/internal/array-ownership.md)
 for the detailed rationale.
 
 ### `RegArray`
@@ -93,8 +94,8 @@ payload = RegArray(
 ```python
 class Array:
     '''
-    The class represents a register array in the AST IR.
-    '''
+The class represents a register array in the AST IR.
+'''
     scalar_ty: DType  # Data type of each element in the array
     size: int  # Size of the array
     initializer: list  # Initial values for the array elements
@@ -468,13 +469,33 @@ def assign_owner(self, owner: ModuleBase | MemoryBase | None) -> None:
 
     @param owner Ownership reference to apply. Intended for controlled refactors.
     '''
+
+def is_payload(self, memory: type['MemoryBase'] | 'MemoryBase') -> bool:
+    '''
+    Return whether this array is the payload buffer of the provided memory.
+
+    @param memory Memory class (SRAM/DRAM) or instance to test against.
+    @return True when self.owner matches the memory type and the array is the memory payload.
+    '''
 ```
 
 **Explanation:**
 
-Downstream passes query `array.owner` and use identity checks to determine how
-the storage should be treated. Memory payloads are detected with
-`isinstance(array.owner, MemoryBase)` plus an identity check against
-`array.owner._payload`. The `assign_owner` helper enforces that the owner is a
-module, a memory, or `None`, providing a single sanctioned hook for refactors
-that need to re-home an array.
+`owner` exposes the provenance metadata described in the ownership model
+documentation, and `assign_owner` provides the sanctioned hook for controlled
+refactors that need to re-home an array while keeping type validation in place.
+The `is_payload` helper is the canonical way to detect memory payload buffers:
+it accepts either a memory class (`SRAM`, `DRAM`) or an instance of those
+classes. Passing a class checks whether `self.owner` is an instance of the
+class and confirms the array is identical to the memory's `_payload`. Passing
+an instance performs the same comparison directly. Supplying any other type
+raises `TypeError`, keeping misuse obvious.
+
+**Example:**
+
+```python
+sram = SRAM(width=64, depth=1024, init_file=None)
+assert sram._payload.is_payload(SRAM)
+assert sram._payload.is_payload(sram)
+assert not sram.dout.is_payload(SRAM)
+```

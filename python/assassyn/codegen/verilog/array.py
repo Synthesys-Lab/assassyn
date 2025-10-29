@@ -36,7 +36,7 @@ class ArrayMetadataRegistry:
         modules: List[Module] = list(sys.modules) + list(sys.downstreams)
         for arr in sys.arrays:
             owner = arr.owner
-            if isinstance(owner, MemoryBase) and arr is owner._payload:  # pylint: disable=protected-access
+            if isinstance(owner, MemoryBase) and arr.is_payload(owner):
                 continue
 
             writers = arr.get_write_ports().keys()

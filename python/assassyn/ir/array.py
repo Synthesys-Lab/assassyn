@@ -197,6 +197,34 @@ class Array:  #pylint: disable=too-many-instance-attributes
         '''Override the ownership context with a new value.'''
         self._owner = _validate_owner(owner)
 
+    def is_payload(self, memory: type['MemoryBase'] | 'MemoryBase') -> bool:
+        '''Return whether this array is the payload buffer for the supplied memory.'''
+        # pylint: disable=import-outside-toplevel,cyclic-import
+        from .memory.base import MemoryBase
+
+        owner = self.owner
+
+        if isinstance(memory, type):
+            if not issubclass(memory, MemoryBase):
+                raise TypeError(
+                    'Array.is_payload expects a MemoryBase subclass or instance; '
+                    f'got class {memory}'
+                )
+            if owner is None or not isinstance(owner, memory):
+                return False
+            memory_instance = owner
+        else:
+            if not isinstance(memory, MemoryBase):
+                raise TypeError(
+                    'Array.is_payload expects a MemoryBase subclass or instance; '
+                    f'got {type(memory)}'
+                )
+            if owner is not memory:
+                return False
+            memory_instance = memory
+
+        return self is getattr(memory_instance, '_payload', None)
+
     def __and__(self, other):
         '''
         Overload & operator to create WritePort when combined with a Module.

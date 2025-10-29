@@ -129,11 +129,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     # Add array fields to simulator struct
     for array in sys.arrays:
         owner = array.owner
-        if (
-            isinstance(owner, MemoryBase)
-            and array is owner._payload  # pylint: disable=protected-access
-            and owner in dram_modules
-        ):
+        if isinstance(owner, MemoryBase) and array.is_payload(owner) and owner in dram_modules:
             continue
         name = namify(array.name)
         dtype = dtype_to_rust_type(array.scalar_ty)

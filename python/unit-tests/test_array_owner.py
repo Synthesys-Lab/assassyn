@@ -115,3 +115,24 @@ def test_assign_owner_validates_types():
 
     with pytest.raises(TypeError):
         arr.assign_owner("memory")  # type: ignore[arg-type]
+
+
+def test_is_payload_helper_detects_memory_payloads():
+    """Array.is_payload should identify payload buffers and reject non-payload arrays."""
+
+    sys = SysBuilder("array_is_payload")
+    with sys:
+        sram = SRAM(32, 64, None)
+        dram = DRAM(32, 64, None)
+        reg_arr = RegArray(UInt(8), 2, name="plain")
+
+    sram_payload = sram._payload  # pylint: disable=protected-access
+    dram_payload = dram._payload  # pylint: disable=protected-access
+
+    assert sram_payload.is_payload(SRAM) is True
+    assert dram_payload.is_payload(DRAM) is True
+
+    assert sram_payload.is_payload(DRAM) is False
+    assert sram.dout.is_payload(SRAM) is False
+    assert reg_arr.is_payload(SRAM) is False
+    assert reg_arr.is_payload(DRAM) is False

@@ -136,7 +136,7 @@ def cleanup_post_generation(dumper):
     for key, exposes in dumper._exposes.items():  # pylint: disable=protected-access
         if isinstance(key, Array):
             owner = key.owner
-            if isinstance(owner, MemoryBase) and key is owner._payload:  # pylint: disable=protected-access
+            if isinstance(owner, MemoryBase) and key.is_payload(owner):
                 continue
             array_writes = [
                     (e, p) for e, p in exposes
