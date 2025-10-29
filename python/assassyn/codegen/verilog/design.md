@@ -147,7 +147,7 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 
 #### Internal Helpers
 
-**`_walk_expressions`**: Recursively traverses blocks to find all expressions for analysis
+**`_walk_expressions`**: Iterates flattened module `body` lists to yield every `Expr`.  Helper analyses still consume it, but array metadata collection now walks bodies directly without routing through the dumper.
 
 **`_generate_external_module_wrapper`**: Creates PyCDE wrapper classes for external SystemVerilog modules. If the external metadata defines explicit wires (and their direction), the wrapper mirrors them; otherwise it falls back to treating the declared ports as inputs for backwards compatibility. Clock/reset ports are emitted when requested by the metadata.
 

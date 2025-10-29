@@ -75,7 +75,6 @@ The function uses several utility functions and data structures:
 - `get_sram_info()` from [utils module](/python/assassyn/codegen/verilog/utils.md) for SRAM information
 - `namify()` and `unwrap_operand()` from [utils module](/python/assassyn/utils.md) for name generation
 - `get_external_port_name()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external port naming
-- `_walk_expressions()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for expression traversal
 - `_is_external_module()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external module detection
 
 The function integrates with the CIRCTDumper's state management:

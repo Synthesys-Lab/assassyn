@@ -15,12 +15,12 @@ class ArrayMetadataRegistry:
     """Collects and serves metadata for shared IR arrays."""
 ```
 
-**collect(self, dumper, sys)**
+**collect(self, sys)**
 
 - Invokes a full-system scan to populate the registry.
 - Ignores arrays whose owner is a memory instance and `array.is_payload(owner)` returns `True`, because those are emitted as dedicated memory modules.
 - Records writers via `Array.get_write_ports()` and assigns sequential write-port indices.
-- Walks every module body with `CIRCTDumper._walk_expressions` to find `ArrayRead` / `ArrayWrite` nodes, assigning read-port indices and user membership on first sighting.
+- Iterates each module body directly (thanks to the flattened IR described in [`DONE-remove-block`](../../../../dones/DONE-remove-block.md)) and records every `ArrayRead` / `ArrayWrite` expression, assigning read-port indices and user membership on first sighting.
 
 **metadata_for(self, array) -> Optional[ArrayMetadata]**
 
@@ -61,6 +61,6 @@ The registry keeps a reverse lookup from `ArrayRead` nodes to `(array, port_inde
 ## Project-specific Knowledge Required
 
 - [`ArrayMetadata`](./metadata.md) – Structure describing per-array usage.
-- [`CIRCTDumper`](./design.md) – Provides `_walk_expressions`, logging utilities, and holds the registry instance.
 - [`generate_system`](./system.md) – Calls `collect()` during system analysis to prime the registry.
 - [`cleanup.post_generation`](./cleanup.md) & [`module.generate_module_ports`](./module.md) – Consumers that rely on the registry for deterministic wiring and port declarations.
+- [`DONE-remove-block`](../../../../dones/DONE-remove-block.md) – Documents the block removal that enables direct body iteration without the dumper helper.

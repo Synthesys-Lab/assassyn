@@ -37,7 +37,7 @@ This function generates the complete Verilog system by performing comprehensive 
 2. **Array Management Phase**:
    - **Write Port Assignment**: Assigns unique port indices to each module writing to an array, recording them inside `dumper.array_metadata`.
    - **Array Module Generation**: Generates multi-port array modules for non-SRAM arrays via `visit_array`.
-   - **Array User Analysis**: Populates the registry with every module that reads or writes each array so downstream passes can query a single source of truth.
+   - **Array User Analysis**: Populates the registry with every module that reads or writes each array by iterating the flattened `module.body` lists directly, so downstream passes can query a single source of truth without relying on dumper-specific helpers.
 
 3. **Module Analysis Phase**:
    - **Dependency Tracking**: Records downstream dependencies using `get_upstreams`.
