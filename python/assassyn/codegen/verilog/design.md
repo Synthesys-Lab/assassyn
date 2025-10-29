@@ -131,7 +131,7 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 
 **`visit_block`**: Manages conditional and cycled blocks by maintaining a condition stack for proper predicate generation; when a conditional contains logging or other side effects it exposes the condition to the outside world to keep the testbench accurate.
 
-**`expose`**: Registers expressions that need to be exposed as module outputs, handling valued expressions, arrays, and async triggers. FIFO push/pop traffic now bypasses `_exposes` entirely; instead, the expression helpers log pushes/pops into both the per-module registry (`module_metadata.fifo`) and the global FIFO-indexed registry so downstream phases can choose whichever lookup best suits their wiring logic.
+**`expose`**: Registers expressions that need to be exposed as module outputs, handling valued expressions, arrays, and async triggers. FIFO push/pop traffic now bypasses `_exposes` entirely; instead, the expression helpers log pushes/pops with the global FIFO registry (and the module view `module_metadata.fifo` records references to those shared interactions) so downstream phases can choose whichever lookup best suits their wiring logic.
 
 **`get_pred`**: Generates the current execution predicate by combining all conditions in the condition stack
 

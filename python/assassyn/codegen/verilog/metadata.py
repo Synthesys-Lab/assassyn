@@ -2,211 +2,204 @@
 
 This module provides dataclasses to hold metadata collected during the code generation
 pass that needs to be referenced in later compilation phases (e.g., during top-level
-harness generation).
+handoff).
 """
+
+from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, TYPE_CHECKING, Any, Set
+from typing import Any, Dict, Iterable, Iterator, List, Sequence, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ...ir.expr import FIFOPush, AsyncCall, FIFOPop, ArrayRead
     from ...ir.array import Array
+    from ...ir.expr import ArrayRead, AsyncCall, FIFOPop, FIFOPush
     from ...ir.module import Module, Port
 else:
-    FIFOPush = Any  # type: ignore
+    Array = Any  # type: ignore
+    ArrayRead = Any  # type: ignore
     AsyncCall = Any  # type: ignore
     FIFOPop = Any  # type: ignore
-    ArrayRead = Any  # type: ignore
-    Array = Any  # type: ignore
+    FIFOPush = Any  # type: ignore
     Module = Any  # type: ignore
     Port = Any  # type: ignore
 
-CallList = List['AsyncCall']
-ModuleList = List['Module']
+CallList = List[AsyncCall]
+ModuleList = List[Module]
 
 
 @dataclass
 class ArrayMetadata:
     """Metadata describing how an IR array is accessed throughout the system."""
 
-    array: 'Array'
-    write_ports: Dict['Module', int] = field(default_factory=dict)
-    read_ports_by_module: Dict['Module', List[int]] = field(default_factory=dict)
-    read_order: List[Tuple['Module', 'ArrayRead']] = field(default_factory=list)
-    read_expr_port: Dict['ArrayRead', int] = field(default_factory=dict)
+    array: Array
+    write_ports: Dict[Module, int] = field(default_factory=dict)
+    read_ports_by_module: Dict[Module, List[int]] = field(default_factory=dict)
+    read_order: List[tuple[Module, ArrayRead]] = field(default_factory=list)
+    read_expr_port: Dict[ArrayRead, int] = field(default_factory=dict)
     users: ModuleList = field(default_factory=list)
 
 
 @dataclass
-class FIFOPushMetadata:
-    """Metadata entry describing a FIFO push operation."""
+class FIFOInteraction:
+    """Single FIFO interaction captured during code generation."""
 
-    module: 'Module'
-    expr: 'FIFOPush'
+    module: Module
+    expr: FIFOPush | FIFOPop
     predicate: str
+    is_push: bool
 
 
-@dataclass
-class FIFOPopMetadata:
-    """Metadata entry describing a FIFO pop operation."""
-
-    module: 'Module'
-    expr: 'FIFOPop'
-    predicate: str
-
-
-@dataclass
 class FIFOMetadata:
-    """Metadata container tracking FIFO pushes and pops with predicate context."""
+    """Per-FIFO metadata owned by the global registry."""
 
-    pushes: List[FIFOPushMetadata] = field(default_factory=list)
-    pops: List[FIFOPopMetadata] = field(default_factory=list)
+    def __init__(self) -> None:
+        self._pushes: List[FIFOInteraction] = []
+        self._pops: List[FIFOInteraction] = []
 
-    def record_push(self, module: 'Module', expr: 'FIFOPush', predicate: str) -> None:
-        """Record a FIFO push along with its predicate."""
-        self.pushes.append(FIFOPushMetadata(module=module, expr=expr, predicate=predicate))
+    @property
+    def pushes(self) -> List[FIFOInteraction]:
+        """Return FIFO push interactions for this channel."""
+        return self._pushes
 
-    def record_pop(self, module: 'Module', expr: 'FIFOPop', predicate: str) -> None:
-        """Record a FIFO pop along with its predicate."""
-        self.pops.append(FIFOPopMetadata(module=module, expr=expr, predicate=predicate))
+    @property
+    def pops(self) -> List[FIFOInteraction]:
+        """Return FIFO pop interactions for this channel."""
+        return self._pops
 
-    def push_exprs(self) -> List['FIFOPush']:
-        """Return just the FIFO push expressions for backwards compatibility."""
-        return [entry.expr for entry in self.pushes]
+    def record_interaction(self, interaction: FIFOInteraction) -> None:
+        """Append an interaction to the appropriate push/pop list."""
+        if interaction.is_push:
+            self._pushes.append(interaction)
+        else:
+            self._pops.append(interaction)
 
-    def pop_exprs(self) -> List['FIFOPop']:
-        """Return just the FIFO pop expressions for backwards compatibility."""
-        return [entry.expr for entry in self.pops]
+    def iter_interactions(self) -> Iterator[FIFOInteraction]:
+        """Yield every interaction associated with this FIFO channel."""
+        yield from self._pushes
+        yield from self._pops
+
+    def interactions_for_module(self, module: Module) -> List[FIFOInteraction]:
+        """Return the interactions emitted by the provided module."""
+        return [entry for entry in self.iter_interactions() if entry.module is module]
+
+    def remove_module(self, module: Module) -> None:
+        """Drop all interactions that belong to the provided module."""
+        self._pushes[:] = [entry for entry in self._pushes if entry.module is not module]
+        self._pops[:] = [entry for entry in self._pops if entry.module is not module]
+
+    def is_empty(self) -> bool:
+        """Return True when no interactions remain for this FIFO."""
+        return not self._pushes and not self._pops
+
+
+class ModuleFIFOView:
+    """Module-scoped view over registry-owned FIFO interactions."""
+
+    def __init__(self, module: Module, registry: FIFORegistry) -> None:
+        self._module = module
+        self._registry = registry
+        self._ports: Set[Port] = set()
+        self.pushes: List[FIFOInteraction] = []
+        self.pops: List[FIFOInteraction] = []
+
+    @property
+    def ports(self) -> Sequence[Port]:
+        """Return the FIFO ports touched by the owning module."""
+        return tuple(self._ports)
+
+    def register(self, fifo_port: Port, interaction: FIFOInteraction) -> None:
+        """Record a FIFO interaction for the owning module."""
+        self._ports.add(fifo_port)
+        if interaction.is_push:
+            self.pushes.append(interaction)
+        else:
+            self.pops.append(interaction)
+
+    def interactions_for(self, fifo_port: Port) -> List[FIFOInteraction]:
+        """Fetch the module's interactions associated with the given FIFO port."""
+        channel = self._registry.metadata_for(fifo_port)
+        return channel.interactions_for_module(self._module)
 
 
 @dataclass
 class ModuleMetadata:
-    """Metadata collected during module code generation.
-    
-    This class holds information about a module that is discovered during the code
-    generation pass and needs to be referenced later (e.g., during top-level harness
-    generation).
-    
-    Attributes:
-        has_finish: Whether the module contains a FINISH intrinsic. This flag is
-            set to True when codegen_intrinsic encounters a FINISH operation, allowing
-            top-level generation to determine which modules need their finish signals
-            collected without walking the module body again.
-        calls: List of AsyncCall expressions found in this module. Collected during
-            expression generation to avoid redundant walking.
-        fifo: Aggregated FIFO metadata capturing expressions, modules, and predicates.
-    """
+    """Metadata collected during module code generation."""
+
+    module: Module
+    registry: FIFORegistry
     has_finish: bool = False
     calls: CallList = field(default_factory=list)
-    fifo: FIFOMetadata = field(default_factory=FIFOMetadata)
-    fifo_by_port: Dict['Port', FIFOMetadata] = field(default_factory=dict)
+    fifo: ModuleFIFOView = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.fifo = ModuleFIFOView(self.module, self.registry)
 
     @property
-    def pushes(self) -> List['FIFOPush']:
-        """Backwards-compatible access to FIFO push expressions."""
-        return self.fifo.push_exprs()
+    def pushes(self) -> List[FIFOPush]:
+        """Expose FIFO push expressions recorded for this module."""
+        return [entry.expr for entry in self.fifo.pushes]
 
     @property
-    def pops(self) -> List['FIFOPop']:
-        """Backwards-compatible access to FIFO pop expressions."""
-        return self.fifo.pop_exprs()
+    def pops(self) -> List[FIFOPop]:
+        """Expose FIFO pop expressions recorded for this module."""
+        return [entry.expr for entry in self.fifo.pops]
 
-    def register_fifo_push(
-        self,
-        fifo_port: 'Port',
-        fifo_metadata: FIFOMetadata,
-        entry: FIFOPushMetadata,
-    ) -> None:
-        """Record a FIFO push in both the aggregate and per-port views."""
-        self.fifo.pushes.append(entry)
-        self._attach_fifo_metadata(fifo_port, fifo_metadata)
-
-    def register_fifo_pop(
-        self,
-        fifo_port: 'Port',
-        fifo_metadata: FIFOMetadata,
-        entry: FIFOPopMetadata,
-    ) -> None:
-        """Record a FIFO pop in both the aggregate and per-port views."""
-        self.fifo.pops.append(entry)
-        self._attach_fifo_metadata(fifo_port, fifo_metadata)
-
-    def _attach_fifo_metadata(
-        self,
-        fifo_port: 'Port',
-        fifo_metadata: FIFOMetadata,
-    ) -> None:
-        existing = self.fifo_by_port.get(fifo_port)
-        if existing is not None:
-            # Ensure the registry stays consistent if the module revisits the port.
-            if existing is not fifo_metadata:
-                raise ValueError("FIFO metadata registry mismatch for port")
-            return
-        self.fifo_by_port[fifo_port] = fifo_metadata
-
-    # Future extensions:
-    # has_wait_until: bool = False
-    # array_usage: Optional[List[Array]] = None
+    def record_fifo_interaction(self, fifo_port: Port, interaction: FIFOInteraction) -> None:
+        """Track an interaction produced by this module on the given FIFO port."""
+        self.fifo.register(fifo_port, interaction)
 
 
 class FIFORegistry:
-    """Maintain a FIFO-indexed view of metadata alongside per-module tracking."""
+    """Maintain FIFO metadata indexed by FIFO ports."""
 
     def __init__(self) -> None:
-        self._metadata_by_fifo: Dict['Port', FIFOMetadata] = {}
-        self._fifos_by_module: Dict['Module', Set['Port']] = defaultdict(set)
+        self._metadata_by_fifo: Dict[Port, FIFOMetadata] = {}
+        self._fifos_by_module: Dict[Module, Set[Port]] = defaultdict(set)
 
-    def metadata_for(self, fifo_port: 'Port') -> FIFOMetadata:
-        """Return the metadata object for a FIFO port, creating it if needed."""
+    def metadata_for(self, fifo_port: Port) -> FIFOMetadata:
+        """Return the metadata object for `fifo_port`, creating it when missing."""
         metadata = self._metadata_by_fifo.get(fifo_port)
         if metadata is None:
             metadata = FIFOMetadata()
             self._metadata_by_fifo[fifo_port] = metadata
         return metadata
 
-    def record_push(
-        self,
-        module: 'Module',
-        expr: FIFOPush,
-        predicate: str,
-    ) -> Tuple[FIFOMetadata, FIFOPushMetadata]:
-        """Record a FIFO push in the FIFO-indexed view."""
+    def record_push(self, module: Module, expr: FIFOPush, predicate: str) -> FIFOInteraction:
+        """Record a FIFO push performed by `module`."""
         fifo_port = expr.fifo
-        fifo_metadata = self.metadata_for(fifo_port)
-        entry = FIFOPushMetadata(module=module, expr=expr, predicate=predicate)
-        fifo_metadata.pushes.append(entry)
+        interaction = FIFOInteraction(module=module, expr=expr, predicate=predicate, is_push=True)
+        metadata = self.metadata_for(fifo_port)
+        metadata.record_interaction(interaction)
         self._fifos_by_module[module].add(fifo_port)
-        return fifo_metadata, entry
+        return interaction
 
-    def record_pop(
-        self,
-        module: 'Module',
-        expr: FIFOPop,
-        predicate: str,
-    ) -> Tuple[FIFOMetadata, FIFOPopMetadata]:
-        """Record a FIFO pop in the FIFO-indexed view."""
+    def record_pop(self, module: Module, expr: FIFOPop, predicate: str) -> FIFOInteraction:
+        """Record a FIFO pop performed by `module`."""
         fifo_port = expr.fifo
-        fifo_metadata = self.metadata_for(fifo_port)
-        entry = FIFOPopMetadata(module=module, expr=expr, predicate=predicate)
-        fifo_metadata.pops.append(entry)
+        interaction = FIFOInteraction(module=module, expr=expr, predicate=predicate, is_push=False)
+        metadata = self.metadata_for(fifo_port)
+        metadata.record_interaction(interaction)
         self._fifos_by_module[module].add(fifo_port)
-        return fifo_metadata, entry
+        return interaction
 
-    def clear_for_module(self, module: 'Module') -> None:
-        """Remove any FIFO entries associated with the given module."""
+    def channels_for_module(self, module: Module) -> Iterable[tuple[Port, FIFOMetadata]]:
+        """Yield `(fifo_port, metadata)` pairs for every FIFO touched by `module`."""
+        for fifo_port in self._fifos_by_module.get(module, ()):
+            metadata = self._metadata_by_fifo.get(fifo_port)
+            if metadata is None:
+                continue
+            yield fifo_port, metadata
+
+    def clear_for_module(self, module: Module) -> None:
+        """Remove every interaction produced by `module` across all FIFOs."""
         fifo_ports = self._fifos_by_module.pop(module, None)
         if not fifo_ports:
             return
         for fifo_port in fifo_ports:
-            fifo_metadata = self._metadata_by_fifo.get(fifo_port)
-            if fifo_metadata is None:
+            metadata = self._metadata_by_fifo.get(fifo_port)
+            if metadata is None:
                 continue
-            fifo_metadata.pushes[:] = [
-                entry for entry in fifo_metadata.pushes if entry.module is not module
-            ]
-            fifo_metadata.pops[:] = [
-                entry for entry in fifo_metadata.pops if entry.module is not module
-            ]
-            if not fifo_metadata.pushes and not fifo_metadata.pops:
+            metadata.remove_module(module)
+            if metadata.is_empty():
                 self._metadata_by_fifo.pop(fifo_port, None)

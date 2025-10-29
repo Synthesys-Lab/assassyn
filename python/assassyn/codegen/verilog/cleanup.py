@@ -130,7 +130,6 @@ def cleanup_post_generation(dumper):
         sram_info = get_sram_info(dumper.current_module)
         if sram_info:
             generate_sram_control_signals(dumper, sram_info)
-    module_metadata = dumper.module_metadata.get(dumper.current_module)
     # pylint: disable=too-many-nested-blocks
     for key, exposes in dumper._exposes.items():  # pylint: disable=protected-access
         if isinstance(key, Array):
@@ -275,56 +274,55 @@ def cleanup_post_generation(dumper):
             pred_condition = f"reduce(or_, [{', '.join([f'({p})' for p in all_predicates])}])"
             dumper.append_code(f'self.valid_{exposed_name} = executed_wire & ({pred_condition})')
 
-    if module_metadata is not None:
-        for fifo_port, fifo_metadata in module_metadata.fifo_by_port.items():
-            fifo_name = dumper.dump_rval(fifo_port, False)
-            local_pushes = [
-                entry for entry in fifo_metadata.pushes
-                if entry.module is dumper.current_module
-            ]
-            local_pops = [
-                entry for entry in fifo_metadata.pops
-                if entry.module is dumper.current_module
-            ]
+    for fifo_port, fifo_metadata in dumper.fifo_registry.channels_for_module(dumper.current_module):
+        fifo_name = dumper.dump_rval(fifo_port, False)
+        local_pushes = [
+            entry for entry in fifo_metadata.pushes
+            if entry.module is dumper.current_module
+        ]
+        local_pops = [
+            entry for entry in fifo_metadata.pops
+            if entry.module is dumper.current_module
+        ]
 
-            if local_pushes:
-                predicates = [f'({entry.predicate})' for entry in local_pushes]
-                final_push_predicate = (
-                    f"reduce(or_, [{', '.join(predicates)}], Bits(1)(0))"
-                    if predicates else "Bits(1)(0)"
-                )
+        if local_pushes:
+            predicates = [f'({entry.predicate})' for entry in local_pushes]
+            final_push_predicate = (
+                f"reduce(or_, [{', '.join(predicates)}], Bits(1)(0))"
+                if predicates else "Bits(1)(0)"
+            )
 
-                if len(local_pushes) == 1:
-                    final_push_data = dumper.dump_rval(local_pushes[0].expr.val, False)
-                else:
-                    mux_chain = f"{dump_type(fifo_port.dtype)}(0)"
-                    for entry in local_pushes:
-                        rval = dumper.dump_rval(entry.expr.val, False)
-                        mux_chain = f"Mux({entry.predicate}, {mux_chain}, {rval})"
-                    final_push_data = mux_chain
+            if len(local_pushes) == 1:
+                final_push_data = dumper.dump_rval(local_pushes[0].expr.val, False)
+            else:
+                mux_chain = f"{dump_type(fifo_port.dtype)}(0)"
+                for entry in local_pushes:
+                    rval = dumper.dump_rval(entry.expr.val, False)
+                    mux_chain = f"Mux({entry.predicate}, {mux_chain}, {rval})"
+                final_push_data = mux_chain
 
-                dumper.append_code(f'# Push logic for port: {fifo_name}')
-                ready_signal = (
-                    f"self.fifo_{namify(fifo_port.module.name)}_{fifo_name}_push_ready"
-                )
-                fifo_prefix = f"self.{namify(fifo_port.module.name)}_{fifo_name}"
+            dumper.append_code(f'# Push logic for port: {fifo_name}')
+            ready_signal = (
+                f"self.fifo_{namify(fifo_port.module.name)}_{fifo_name}_push_ready"
+            )
+            fifo_prefix = f"self.{namify(fifo_port.module.name)}_{fifo_name}"
 
-                dumper.append_code(
-                    f"{fifo_prefix}_push_valid = executed_wire & "
-                    f"({final_push_predicate}) & {ready_signal}"
-                )
-                dumper.append_code(f"{fifo_prefix}_push_data = {final_push_data}")
+            dumper.append_code(
+                f"{fifo_prefix}_push_valid = executed_wire & "
+                f"({final_push_predicate}) & {ready_signal}"
+            )
+            dumper.append_code(f"{fifo_prefix}_push_data = {final_push_data}")
 
-            if local_pops:
-                pop_predicates = [f'({entry.predicate})' for entry in local_pops]
-                final_pop_condition = (
-                    f"reduce(or_, [{', '.join(pop_predicates)}], Bits(1)(0))"
-                    if pop_predicates else "Bits(1)(0)"
-                )
-                dumper.append_code(f'# {local_pops[0].expr}')
-                dumper.append_code(
-                    f"self.{fifo_name}_pop_ready = executed_wire & ({final_pop_condition})"
-                )
+        if local_pops:
+            pop_predicates = [f'({entry.predicate})' for entry in local_pops]
+            final_pop_condition = (
+                f"reduce(or_, [{', '.join(pop_predicates)}], Bits(1)(0))"
+                if pop_predicates else "Bits(1)(0)"
+            )
+            dumper.append_code(f'# {local_pops[0].expr}')
+            dumper.append_code(
+                f"self.{fifo_name}_pop_ready = executed_wire & ({final_pop_condition})"
+            )
 
     external_exposures = dumper.external_output_exposures.get(dumper.current_module, {})
     for data in external_exposures.values():

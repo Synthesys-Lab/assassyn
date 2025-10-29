@@ -63,12 +63,16 @@ def test_fifo_metadata_records_predicates():
     fifo_registry = dumper.fifo_registry
     in_port = pipe_module.ports[0]
     out_port = pipe_module.ports[1]
-    pushes_by_port = metadata.fifo_by_port[out_port]
-    pops_by_port = metadata.fifo_by_port[in_port]
-    assert pushes_by_port is fifo_registry.metadata_for(out_port)
-    assert pops_by_port is fifo_registry.metadata_for(in_port)
-    assert pushes_by_port.pushes == [push_entry]
-    assert pops_by_port.pops == [pop_entry]
+    assert fifo_registry.metadata_for(out_port).pushes == [push_entry]
+    assert fifo_registry.metadata_for(in_port).pops == [pop_entry]
+    assert {
+        port for port, _ in fifo_registry.channels_for_module(pipe_module)
+    } == {in_port, out_port}
+    fifo_ports = set(metadata.fifo.ports)
+    assert out_port in fifo_ports
+    assert in_port in fifo_ports
+    assert metadata.fifo.interactions_for(out_port) == [push_entry]
+    assert metadata.fifo.interactions_for(in_port) == [pop_entry]
 
     # Backwards compatibility accessors still expose expression lists
     assert [entry.expr for entry in fifo_meta.pushes] == metadata.pushes

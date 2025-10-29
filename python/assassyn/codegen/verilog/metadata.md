@@ -52,42 +52,54 @@ class ModuleMetadata:
 
 **Explanation**
 
-This dataclass holds information about a module that is discovered during the code generation pass and needs to be referenced later (e.g., during top-level harness generation). It provides a type-safe, extensible way to track module properties without requiring additional traversals of the IR. The structure exposes both historical lists (`pushes`, `pops`) for backwards-compatible consumers and a rich `fifo` record that captures predicate context for each FIFO interaction.
+This dataclass tracks module-level facts discovered during code generation and exposes
+them to later phases.  Its FIFO information is now a *view* layered on top of the global
+registry rather than a duplicated structure.
 
-**Fields:**
+**Fields**
 
-- `has_finish: bool = False` – Indicates whether the module contains a FINISH intrinsic. This is set to `True` when `codegen_intrinsic` encounters a FINISH operation, allowing top-level generation to determine which modules need their finish signals collected without walking the module body again.
-- `calls: List[AsyncCall]` – List of `AsyncCall` expressions found in this module. This list is populated by `codegen_async_call` when processing async call operations during expression generation, avoiding redundant expression walking during module port generation and top-level harness generation.
-- `fifo: FIFOMetadata` – FIFO-specific metadata that records every push and pop together with the module that emitted the operation and the predicate active at emission time. The structure exposes helpers for both rich entries and plain expression lists.
-- `pushes: List[FIFOPush]` *(property)* – Convenience accessor returning the sequence of FIFO push expressions collected in `fifo.pushes`.
-- `pops: List[FIFOPop]` *(property)* – Convenience accessor returning the sequence of FIFO pop expressions collected in `fifo.pops`.
+- `module: Module` – Owning module used to filter registry lookups.
+- `has_finish: bool = False` – Toggled by `codegen_intrinsic` when a FINISH intrinsic is
+  encountered so the top-level harness knows which modules expose finish signals.
+- `calls: List[AsyncCall]` – Populated by `codegen_async_call` when async calls are emitted.
+- `fifo: ModuleFIFOView` – Module-scoped view that references registry-owned FIFO
+  interactions.  It keeps per-module lists of those shared objects without duplicating
+  their contents.
 
-**When Metadata is Populated:**
+**Convenience Properties**
 
-1. **Initialization**: An empty `ModuleMetadata` instance is created for each module at the start of `visit_module` in [design.py](/python/assassyn/codegen/verilog/design.md).
-2. **Population**: Metadata fields are populated during expression generation:
-   - The `has_finish` flag is set to `True` in [intrinsics.py](/python/assassyn/codegen/verilog/_expr/intrinsics.md) when a FINISH intrinsic is encountered
-   - The `calls` list is populated in [call.py](/python/assassyn/codegen/verilog/_expr/call.md) when processing AsyncCall operations
-   - The FIFO metadata is populated in [array.py](/python/assassyn/codegen/verilog/_expr/array.md) when processing FIFO push/pop operations. Each entry records the expression, the module performing the operation, and the predicate returned by `CIRCTDumper.get_pred()`.
+- `pushes` – Returns `FIFOPush` expressions for this module by projecting
+  `fifo.pushes`.
+- `pops` – Returns `FIFOPop` expressions for this module by projecting `fifo.pops`.
 
-**How Metadata is Consumed:**
+**When Metadata is Populated**
 
-The metadata is stored in `CIRCTDumper.module_metadata`, a dictionary mapping `Module` objects to their `ModuleMetadata`. This metadata is consumed in multiple places:
+1. `CIRCTDumper.visit_module` initialises a `ModuleMetadata` instance for the current
+   module, wiring it to the shared `FIFORegistry`.
+2. `codegen_intrinsic` and `codegen_async_call` update `has_finish` and `calls`
+   respectively.
+3. [`_expr/array.py`](./_expr/array.md) records FIFO operations: the registry creates the
+   shared `FIFOInteraction`, and the module view stores a reference to it together with the
+   touched FIFO port.
 
-- **Top-level harness generation** ([top.py](/python/assassyn/codegen/verilog/top.md)): Uses the FIFO metadata and async call list to determine module interconnections without walking module bodies again. Predicate strings are available when wiring needs conditional context.
-- **Module port generation** ([module.py](/python/assassyn/codegen/verilog/module.md)): Uses FIFO metadata (pushes, pops with predicates) and async calls during module generation to determine required ports, including whether to emit `<port>_pop_ready` outputs.
-- **Global finish signal collection**: Uses `has_finish` flag to determine which modules need finish signals collected
-- **Performance Benefit**: Eliminates redundant expression walking, converting O(n) traversals into O(1) metadata lookups while also capturing predicate context that would otherwise require re-traversing the condition stack
+**How Metadata is Consumed**
 
-**Future Extensions:**
+- **Top-level harness generation** ([top.py](/python/assassyn/codegen/verilog/top.md)):
+  Reads `metadata.fifo.pushes` to compute FIFO depths and wiring.
+- **Module port generation** ([module.py](/python/assassyn/codegen/verilog/module.md)):
+  Uses `metadata.fifo` to determine which handshake ports are required.
+- **Cleanup wiring** ([cleanup.py](/python/assassyn/codegen/verilog/cleanup.md)):
+  Iterates `metadata.fifo.ports` and `interactions_for(port)` to emit valid/ready logic
+  without re-scanning expressions.
+- **Finish collection**: Uses `has_finish` to decide which modules surface finish outputs.
+- **Performance benefit**: Maintains O(1) lookups with predicate context intact, while
+  avoiding duplicated FIFO metadata.
 
-The `ModuleMetadata` structure can be extended to track additional module properties:
+**Future Extensions**
 
-- `has_wait_until: bool` - Modules containing WAIT_UNTIL intrinsics
-- `has_async_calls: bool` - Modules that make asynchronous calls
-- `array_usage: List[Array]` - Which arrays are accessed by the module
-- `external_dependencies: List[ExternalSV]` - External modules used
-- `port_counts: Dict[str, int]` - Number of input/output ports for optimization
+The `ModuleMetadata` structure can still be extended with additional flags such as
+`has_wait_until` or `array_usage`.  The refactor only removes duplicated FIFO storage; the
+extensibility story remains unchanged.
 
 **Project-specific Knowledge Required:**
 
@@ -96,88 +108,71 @@ The `ModuleMetadata` structure can be extended to track additional module proper
 - Reference to [top-level harness generation](/python/assassyn/codegen/verilog/top.md)
 - Understanding of [visitor pattern](/python/assassyn/ir/visitor.md)
 
-### `FIFOMetadata`
+### `ModuleFIFOView`
+
+```python
+class ModuleFIFOView:
+    """Module-scoped view over registry-owned FIFO interactions."""
+```
+
+`ModuleFIFOView` keeps track of every FIFO port a module touched and provides filtered
+access to the shared interactions:
+
+- `ports` – Iterable of FIFO ports the module interacted with.
+- `pushes` / `pops` – Lists of `FIFOInteraction` objects produced by the module (references
+  to the registry-owned entries).
+- `interactions_for(port)` – Returns the interactions for `port` that originate from the
+  owning module, letting consumers wire ready/valid signals without re-filtering the
+  registry.
+
+### `FIFOInteraction`
 
 ```python
 @dataclass
-class FIFOMetadata:
-    """Metadata describing FIFO push/pop interactions for a module."""
+class FIFOInteraction:
+    module: Module
+    expr: Union[FIFOPush, FIFOPop]
+    predicate: str
 ```
 
-**Explanation**
+This unified record replaces the redundant `FIFOPushMetadata` / `FIFOPopMetadata`
+wrappers.  The interaction type is inferred from `expr`, and the predicate preserves the
+conditional context observed during code generation.
 
-`FIFOMetadata` captures every FIFO interaction discovered while visiting a module.
+### `FIFOMetadata`
 
-- `pushes: List[FIFOPushMetadata]` – Rich entries describing each push, including the producing module, the `FIFOPush` expression itself, and the predicate active when the push executed.
-- `pops: List[FIFOPopMetadata]` – Mirror entries for pop operations with the consuming module and predicate.
-- `record_push()` / `record_pop()` – Helpers invoked by expression lowering to append entries while visiting the module body.
+```python
+class FIFOMetadata:
+    """Per-FIFO channel metadata owned by the registry."""
+```
 
-Each entry persists:
+Each FIFO port is associated with a `FIFOMetadata` instance that stores ordered lists of
+`FIFOInteraction` objects:
 
-1. The exact expression that triggered the interaction (`FIFOPush` or `FIFOPop`)
-2. The module performing the action (useful when analysing downstream relationships)
-3. The predicate string returned by `CIRCTDumper.get_pred()`, providing conditional context without re-walking the IR
-
-This information allows later passes (module port generation, top-level wiring, verification tooling) to reason about handshake requirements using the same control predicates observed during code generation.
-
-## Design Rationale
-
-**Why Track at Intrinsic Detection Point:**
-
-By setting metadata flags immediately when intrinsics are encountered (rather than in a post-processing pass), we ensure the metadata is always consistent with the generated code. This approach leverages the existing visitor pattern without adding new traversal logic.
-
-**Why Initialize in visit_module:**
-
-Creating an empty metadata entry for each module at the start of `visit_module` ensures that:
-
-1. All modules have metadata entries, even if they contain no special intrinsics
-2. No null checks are needed when setting flags in expression handlers
-3. The metadata lifetime matches the module processing lifetime
-
-**Why Use Dataclass:**
-
-Dataclasses provide:
-
-- Type safety with clear field definitions
-- Easy extensibility for future metadata fields
-- Readable initialization with default values
-- Integration with Python's type checking tools
+- `pushes` – Interactions whose expression is a `FIFOPush`.
+- `pops` – Interactions whose expression is a `FIFOPop`.
+- `record_interaction()` – Adds a new interaction to the appropriate list.
+- `remove_module(module)` – Purges all interactions produced by `module`, keeping the
+  registry consistent after regenerating a module.
 
 ### `FIFORegistry`
 
 ```python
 class FIFORegistry:
-    """Redundant lookup table that maps FIFO ports to FIFOMetadata entries."""
+    """Global FIFO metadata index keyed by FIFO ports."""
 ```
 
-**Explanation**
+The registry is the single owner of FIFO interaction data:
 
-`FIFORegistry` mirrors the per-module FIFO bookkeeping with a FIFO-keyed view.  It exposes
-`metadata_for(fifo)` to fetch the `FIFOMetadata` object for a given FIFO port, creating it
-on demand, and `clear_for_module(module)` to drop FIFO associations the module no longer
-touches when the dumper revisits the module in isolation.  Both the module-indexed and
-FIFO-indexed views share the same `FIFOMetadata` instances, ensuring predicates and
-expression lists stay perfectly in sync regardless of which lookup path a consumer uses.
+- `record_push()` / `record_pop()` – Create a `FIFOInteraction`, append it to the port’s
+  `FIFOMetadata`, and remember that the emitting module touched the port.
+- `metadata_for(port)` – Fetch (or lazily create) the `FIFOMetadata` container for `port`.
+- `channels_for_module(module)` – Iterate over `(Port, FIFOMetadata)` pairs for every FIFO
+  the module interacted with.  [`cleanup.py`](./cleanup.md) uses this to wire valid/ready
+  logic without consulting module-level mirrors.
+- `clear_for_module(module)` – Remove all interactions emitted by `module` across every
+  port and drop empty channel records.
 
-**When Metadata is Populated:**
-
-- [`_expr/array.py`](./_expr/array.md) calls `fifo_registry.record_push` /
-  `record_pop` alongside the existing module metadata updates. Each helper returns the
-  shared `FIFOMetadata` entry so the module view can keep lightweight references without
-  duplicating state.
-
-**How Metadata is Consumed:**
-
-- [`cleanup.py`](./cleanup.md) pulls FIFO metadata directly from the registry keyed by the
-  FIFO port, eliminating ad-hoc `defaultdict` groupings and clarifying how push/pop
-  predicates map to generated handshake logic.
-- [`module.py`](./module.md) and [`top.py`](./top.md) continue to use the module-oriented
-  view for backwards compatibility, but they can opt into the FIFO-indexed lookup when
-  working with cross-module producers.
-
-**Lifecycle Guarantees:**
-
-Because the registry stores the exact `FIFOMetadata` instance referenced by
-`ModuleMetadata.fifo`, both indices observe any mutations immediately. When a module is
-regenerated, the dumper clears the module’s FIFO associations before replaying expression
-lowering so stale predicate entries cannot accumulate.
+Because both the module-level view and downstream consumers reference the same
+`FIFOInteraction` objects, predicates and expression handles stay perfectly in sync without
+two indices drifting apart.

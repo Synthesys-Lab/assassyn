@@ -32,8 +32,8 @@ This is the main cleanup function that generates all the necessary control signa
    - Groups writes by source module and maps them onto the precomputed port indices stored in the `ArrayMetadataRegistry`.
    - Emits write-enable, write-data, and write-index signals per port. Multi-writer modules use `build_mux_chain` to pick the correct payload.
 
-5. **FIFO Signal Generation**: For every FIFO recorded in the global `fifo_registry` that is touched by the current module:
-   - Reuses the shared `FIFOMetadata` entry so push predicates, values, and pop predicates stay in sync with the per-module view, avoiding ad-hoc dictionaries inside the cleanup pass.
+5. **FIFO Signal Generation**: Uses `fifo_registry.channels_for_module(current_module)` to visit each FIFO touched by the module:
+   - Pulls the per-port `FIFOMetadata` directly from the registry so push predicates, values, and pop predicates stay in sync with the module view.
    - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata.
    - Produces the module-local `*_pop_ready` backpressure signal without consulting `dumper._exposes`.
 

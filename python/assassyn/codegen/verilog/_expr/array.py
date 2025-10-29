@@ -53,10 +53,10 @@ def codegen_fifo_push(dumper: CIRCTDumper, expr: FIFOPush) -> Optional[str]:
     """Generate code for FIFO push operations."""
     metadata = dumper.module_metadata[dumper.current_module]
     predicate = dumper.get_pred()
-    fifo_metadata, entry = dumper.fifo_registry.record_push(
+    interaction = dumper.fifo_registry.record_push(
         dumper.current_module, expr, predicate
     )
-    metadata.register_fifo_push(expr.fifo, fifo_metadata, entry)
+    metadata.record_fifo_interaction(expr.fifo, interaction)
 
 
 @enforce_type
@@ -66,8 +66,8 @@ def codegen_fifo_pop(dumper: CIRCTDumper, expr: FIFOPop) -> Optional[str]:
     fifo_name = dumper.dump_rval(expr.fifo, False)
     metadata = dumper.module_metadata[dumper.current_module]
     predicate = dumper.get_pred()
-    fifo_metadata, entry = dumper.fifo_registry.record_pop(
+    interaction = dumper.fifo_registry.record_pop(
         dumper.current_module, expr, predicate
     )
-    metadata.register_fifo_pop(expr.fifo, fifo_metadata, entry)
+    metadata.record_fifo_interaction(expr.fifo, interaction)
     return f'{rval} = self.{fifo_name}'

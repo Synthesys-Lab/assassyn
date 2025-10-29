@@ -212,7 +212,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
         # Initialize metadata for this module
         self.fifo_registry.clear_for_module(node)
-        self.module_metadata[node] = ModuleMetadata()
+        self.module_metadata[node] = ModuleMetadata(node, self.fifo_registry)
 
         self.wait_until = None
         self._exposes = {}
