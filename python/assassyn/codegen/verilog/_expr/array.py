@@ -53,7 +53,9 @@ def codegen_fifo_push(dumper: CIRCTDumper, expr: FIFOPush) -> Optional[str]:
     """Generate code for FIFO push operations."""
     dumper.expose('fifo', expr)
     # Track pushes in module metadata to avoid redundant expression walking
-    dumper.module_metadata[dumper.current_module].pushes.append(expr)
+    metadata = dumper.module_metadata[dumper.current_module]
+    predicate = dumper.get_pred()
+    metadata.fifo.record_push(dumper.current_module, expr, predicate)
 
 
 @enforce_type
@@ -63,5 +65,7 @@ def codegen_fifo_pop(dumper: CIRCTDumper, expr: FIFOPop) -> Optional[str]:
     fifo_name = dumper.dump_rval(expr.fifo, False)
     dumper.expose('fifo_pop', expr)
     # Track pops in module metadata to avoid redundant expression walking
-    dumper.module_metadata[dumper.current_module].pops.append(expr)
+    metadata = dumper.module_metadata[dumper.current_module]
+    predicate = dumper.get_pred()
+    metadata.fifo.record_pop(dumper.current_module, expr, predicate)
     return f'{rval} = self.{fifo_name}'

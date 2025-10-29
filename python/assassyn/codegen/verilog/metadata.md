@@ -42,46 +42,46 @@ class ArrayMetadata:
 
 The registry exposes helper methods (`write_port_index`, `read_port_indices`, `read_port_index_for_expr`, `users_for`) that all consumers use instead of recomputing the data.  This eliminates the ad-hoc dictionaries previously scattered across `design.py` and `system.py`.
 
-### `PostDesignGeneration`
+### `ModuleMetadata`
 
 ```python
 @dataclass
-class PostDesignGeneration:
+class ModuleMetadata:
     """Metadata collected during module code generation."""
 ```
 
 **Explanation**
 
-This dataclass holds information about a module that is discovered during the code generation pass and needs to be referenced later (e.g., during top-level harness generation). It provides a type-safe, extensible way to track module properties without requiring additional traversals of the IR.
+This dataclass holds information about a module that is discovered during the code generation pass and needs to be referenced later (e.g., during top-level harness generation). It provides a type-safe, extensible way to track module properties without requiring additional traversals of the IR. The structure exposes both historical lists (`pushes`, `pops`) for backwards-compatible consumers and a rich `fifo` record that captures predicate context for each FIFO interaction.
 
 **Fields:**
 
-- `has_finish: bool = False` - Indicates whether the module contains a FINISH intrinsic. This is set to `True` when `codegen_intrinsic` encounters a FINISH operation, allowing top-level generation to determine which modules need their finish signals collected without walking the module body again.
-- `pushes: List[FIFOPush]` - List of FIFOPush expressions found in this module. This list is populated by `codegen_fifo_push` when processing FIFO push operations during expression generation, avoiding redundant expression walking during top-level harness generation.
-- `calls: List[AsyncCall]` - List of AsyncCall expressions found in this module. This list is populated by `codegen_async_call` when processing async call operations during expression generation, avoiding redundant expression walking during module port generation and top-level harness generation.
-- `pops: List[FIFOPop]` - List of FIFOPop expressions found in this module. This list is populated by `codegen_fifo_pop` when processing FIFO pop operations during expression generation, allowing both module and top-level generators to determine where `*_pop_ready` handshakes are required without walking the IR.
+- `has_finish: bool = False` – Indicates whether the module contains a FINISH intrinsic. This is set to `True` when `codegen_intrinsic` encounters a FINISH operation, allowing top-level generation to determine which modules need their finish signals collected without walking the module body again.
+- `calls: List[AsyncCall]` – List of `AsyncCall` expressions found in this module. This list is populated by `codegen_async_call` when processing async call operations during expression generation, avoiding redundant expression walking during module port generation and top-level harness generation.
+- `fifo: FIFOMetadata` – FIFO-specific metadata that records every push and pop together with the module that emitted the operation and the predicate active at emission time. The structure exposes helpers for both rich entries and plain expression lists.
+- `pushes: List[FIFOPush]` *(property)* – Convenience accessor returning the sequence of FIFO push expressions collected in `fifo.pushes`.
+- `pops: List[FIFOPop]` *(property)* – Convenience accessor returning the sequence of FIFO pop expressions collected in `fifo.pops`.
 
 **When Metadata is Populated:**
 
-1. **Initialization**: An empty `PostDesignGeneration` instance is created for each module at the start of `visit_module` in [design.py](/python/assassyn/codegen/verilog/design.md)
+1. **Initialization**: An empty `ModuleMetadata` instance is created for each module at the start of `visit_module` in [design.py](/python/assassyn/codegen/verilog/design.md).
 2. **Population**: Metadata fields are populated during expression generation:
    - The `has_finish` flag is set to `True` in [intrinsics.py](/python/assassyn/codegen/verilog/_expr/intrinsics.md) when a FINISH intrinsic is encountered
-   - The `pushes` list is populated in [array.py](/python/assassyn/codegen/verilog/_expr/array.md) when processing FIFOPush operations
    - The `calls` list is populated in [call.py](/python/assassyn/codegen/verilog/_expr/call.md) when processing AsyncCall operations
-   - The `pops` list is populated in [array.py](/python/assassyn/codegen/verilog/_expr/array.md) when processing FIFOPop operations
+   - The FIFO metadata is populated in [array.py](/python/assassyn/codegen/verilog/_expr/array.md) when processing FIFO push/pop operations. Each entry records the expression, the module performing the operation, and the predicate returned by `CIRCTDumper.get_pred()`.
 
 **How Metadata is Consumed:**
 
-The metadata is stored in `CIRCTDumper.module_metadata`, a dictionary mapping `Module` objects to their `PostDesignGeneration` metadata. This metadata is consumed in multiple places:
+The metadata is stored in `CIRCTDumper.module_metadata`, a dictionary mapping `Module` objects to their `ModuleMetadata`. This metadata is consumed in multiple places:
 
-- **Top-level harness generation** ([top.py](/python/assassyn/codegen/verilog/top.md)): Uses `pushes` and `calls` lists to determine module interconnections without walking module bodies again
-- **Module port generation** ([design.py](/python/assassyn/codegen/verilog/design.md)): Uses `pushes`, `calls`, and `pops` during module generation to determine required ports, including whether to emit `<port>_pop_ready` outputs
+- **Top-level harness generation** ([top.py](/python/assassyn/codegen/verilog/top.md)): Uses the FIFO metadata and async call list to determine module interconnections without walking module bodies again. Predicate strings are available when wiring needs conditional context.
+- **Module port generation** ([module.py](/python/assassyn/codegen/verilog/module.md)): Uses FIFO metadata (pushes, pops with predicates) and async calls during module generation to determine required ports, including whether to emit `<port>_pop_ready` outputs.
 - **Global finish signal collection**: Uses `has_finish` flag to determine which modules need finish signals collected
-- **Performance Benefit**: Eliminates redundant expression walking, converting O(n) traversals into O(1) metadata lookups
+- **Performance Benefit**: Eliminates redundant expression walking, converting O(n) traversals into O(1) metadata lookups while also capturing predicate context that would otherwise require re-traversing the condition stack
 
 **Future Extensions:**
 
-The `PostDesignGeneration` structure can be extended to track additional module properties:
+The `ModuleMetadata` structure can be extended to track additional module properties:
 
 - `has_wait_until: bool` - Modules containing WAIT_UNTIL intrinsics
 - `has_async_calls: bool` - Modules that make asynchronous calls
@@ -95,6 +95,30 @@ The `PostDesignGeneration` structure can be extended to track additional module 
 - Knowledge of [intrinsic code generation](/python/assassyn/codegen/verilog/_expr/intrinsics.md)
 - Reference to [top-level harness generation](/python/assassyn/codegen/verilog/top.md)
 - Understanding of [visitor pattern](/python/assassyn/ir/visitor.md)
+
+### `FIFOMetadata`
+
+```python
+@dataclass
+class FIFOMetadata:
+    """Metadata describing FIFO push/pop interactions for a module."""
+```
+
+**Explanation**
+
+`FIFOMetadata` captures every FIFO interaction discovered while visiting a module.
+
+- `pushes: List[FIFOPushMetadata]` – Rich entries describing each push, including the producing module, the `FIFOPush` expression itself, and the predicate active when the push executed.
+- `pops: List[FIFOPopMetadata]` – Mirror entries for pop operations with the consuming module and predicate.
+- `record_push()` / `record_pop()` – Helpers invoked by expression lowering to append entries while visiting the module body.
+
+Each entry persists:
+
+1. The exact expression that triggered the interaction (`FIFOPush` or `FIFOPop`)
+2. The module performing the action (useful when analysing downstream relationships)
+3. The predicate string returned by `CIRCTDumper.get_pred()`, providing conditional context without re-walking the IR
+
+This information allows later passes (module port generation, top-level wiring, verification tooling) to reason about handshake requirements using the same control predicates observed during code generation.
 
 ## Design Rationale
 

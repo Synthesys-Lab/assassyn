@@ -109,7 +109,7 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 4. **External Integration**: `external_intrinsics`, `external_classes`, `external_wrapper_names`, `external_instance_names`, `external_instance_owners`, `cross_module_external_reads`, `external_outputs_by_instance`, and `external_output_exposures` track how `ExternalIntrinsic` nodes map to wrapper modules, which modules read each exposed register output, and the producer-side ports required to materialise those reads.
 5. **Expression Naming**: `expr_to_name` and `name_counters` guarantee deterministic signal names whenever expression results must be reused across statements.
 6. **Code Generation**: `code`, `logs`, and `indent` store emitted lines and diagnostic information used later by the testbench.
-7. **Module Metadata**: `module_metadata` maps each Module to its `PostDesignGeneration` metadata, tracking properties like whether the module contains FINISH intrinsics. This metadata is populated during module generation and consumed during top-level harness generation to avoid redundant expression walking. See [metadata module](/python/assassyn/codegen/verilog/metadata.md) for details.
+7. **Module Metadata**: `module_metadata` maps each Module to its `ModuleMetadata`. The structure tracks FINISH intrinsics, async calls, and a rich FIFO record that annotates every push/pop with its predicate (`get_pred()` output) and originating module. This metadata is populated during module generation and consumed during top-level harness generation to avoid redundant expression walking. See [metadata module](/python/assassyn/codegen/verilog/metadata.md) for details.
 
 #### Key Methods
 
@@ -117,7 +117,7 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 
 **`visit_module`**: Generates a complete Verilog module with the following phases:
 1. **Analysis Phase**: Processes the module body, collecting exposes, async call metadata, and external wiring information. During this phase, metadata for pushes and calls is collected incrementally as expressions are processed.
-2. **Port Generation**: Calls `generate_module_ports()` to create module interfaces. The helper now derives downstream/SRAM/driver roles and reads push/call/pop metadata directly from `CIRCTDumper.module_metadata`, so `visit_module` no longer threads redundant flags or lists between phases.
+2. **Port Generation**: Calls `generate_module_ports()` to create module interfaces. The helper now derives downstream/SRAM/driver roles and reads FIFO metadata (predicated pushes/pops) and async calls directly from `CIRCTDumper.module_metadata`, so `visit_module` no longer threads redundant flags or lists between phases.
 3. **Code Integration**: Combines the collected body statements with the module boilerplate and generator decorators.
 4. **Special Handling**: Resets external bookkeeping between modules, emits SRAM-specific prelude code, and avoids instantiating pure external stubs.
 
