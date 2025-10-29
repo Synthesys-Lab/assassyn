@@ -55,6 +55,12 @@ def test_fifo_cleanup_metadata_drives_handshakes():
     fifo_expose_keys = [key for key in dumper._exposes if isinstance(key, IRPort)]
     assert fifo_expose_keys == []
 
+    fifo_registry = dumper.fifo_registry
+    in_port = pipe_module.ports[0]
+    out_port = pipe_module.ports[1]
+    assert fifo_registry.metadata_for(out_port).pushes == fifo_meta.pushes
+    assert fifo_registry.metadata_for(in_port).pops == fifo_meta.pops
+
     code = "\n".join(dumper.code)
     module_prefix = namify(pipe_module.name)
     assert "reduce(or_, [" in code

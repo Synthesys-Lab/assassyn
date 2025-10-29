@@ -4,7 +4,7 @@ This module provides metadata structures for tracking information collected duri
 
 ## Summary
 
-The metadata module defines dataclasses that hold information about modules discovered during the code generation pass. This metadata is populated incrementally as expressions are processed and later consumed during top-level harness generation, eliminating the need for redundant analysis passes.
+The metadata module defines dataclasses that hold information about modules discovered during the code generation pass. This metadata is populated incrementally as expressions are processed and later consumed during top-level harness generation, eliminating the need for redundant analysis passes.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
 
 ## Exposed Interfaces
 
@@ -142,3 +142,42 @@ Dataclasses provide:
 - Easy extensibility for future metadata fields
 - Readable initialization with default values
 - Integration with Python's type checking tools
+
+### `FIFORegistry`
+
+```python
+class FIFORegistry:
+    """Redundant lookup table that maps FIFO ports to FIFOMetadata entries."""
+```
+
+**Explanation**
+
+`FIFORegistry` mirrors the per-module FIFO bookkeeping with a FIFO-keyed view.  It exposes
+`metadata_for(fifo)` to fetch the `FIFOMetadata` object for a given FIFO port, creating it
+on demand, and `clear_for_module(module)` to drop FIFO associations the module no longer
+touches when the dumper revisits the module in isolation.  Both the module-indexed and
+FIFO-indexed views share the same `FIFOMetadata` instances, ensuring predicates and
+expression lists stay perfectly in sync regardless of which lookup path a consumer uses.
+
+**When Metadata is Populated:**
+
+- [`_expr/array.py`](./_expr/array.md) calls `fifo_registry.record_push` /
+  `record_pop` alongside the existing module metadata updates. Each helper returns the
+  shared `FIFOMetadata` entry so the module view can keep lightweight references without
+  duplicating state.
+
+**How Metadata is Consumed:**
+
+- [`cleanup.py`](./cleanup.md) pulls FIFO metadata directly from the registry keyed by the
+  FIFO port, eliminating ad-hoc `defaultdict` groupings and clarifying how push/pop
+  predicates map to generated handshake logic.
+- [`module.py`](./module.md) and [`top.py`](./top.md) continue to use the module-oriented
+  view for backwards compatibility, but they can opt into the FIFO-indexed lookup when
+  working with cross-module producers.
+
+**Lifecycle Guarantees:**
+
+Because the registry stores the exact `FIFOMetadata` instance referenced by
+`ModuleMetadata.fifo`, both indices observe any mutations immediately. When a module is
+regenerated, the dumper clears the module’s FIFO associations before replaying expression
+lowering so stale predicate entries cannot accumulate.
