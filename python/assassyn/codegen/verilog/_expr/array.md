@@ -1,6 +1,6 @@
 # Array Expression Generation
 
-This module provides Verilog code generation for array and FIFO operations, including array read/write operations and FIFO push/pop operations.
+This module provides Verilog code generation for array and FIFO operations, including array read/write operations and FIFO push/pop operations. All public helpers in this file now declare `dumper: CIRCTDumper` in their signatures and are wrapped with the project-wide [`@enforce_type`](../../../utils/enforce_type.md) decorator, ensuring callers provide the expected dumper implementation and expression types at runtime.
 
 ## Summary
 
@@ -11,7 +11,8 @@ The array expression generation module handles the conversion of Assassyn array 
 ### `codegen_array_read`
 
 ```python
-def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
+@enforce_type
+def codegen_array_read(dumper: CIRCTDumper, expr: ArrayRead) -> Optional[str]:
     """Generate code for array read operations."""
 ```
 
@@ -30,6 +31,8 @@ This function generates Verilog code for array read operations. It handles two d
 
 The function also calls `dumper.expose('array', expr)` to register the array operation with the module's expose mechanism, ensuring proper port generation and signal routing.
 
+**Runtime contract**: The helper expects a fully initialised `CIRCTDumper` and validates both arguments via `@enforce_type`. Passing any other dumper stub raises a `TypeError` before code generation begins.
+
 **Project-specific Knowledge Required**:
 - Understanding of [array read operations](/python/assassyn/ir/expr/array.md)
 - Knowledge of [SRAM memory model](/python/assassyn/ir/memory/sram.md)
@@ -39,7 +42,8 @@ The function also calls `dumper.expose('array', expr)` to register the array ope
 ### `codegen_array_write`
 
 ```python
-def codegen_array_write(dumper, expr: ArrayWrite) -> Optional[str]:
+@enforce_type
+def codegen_array_write(dumper: CIRCTDumper, expr: ArrayWrite) -> Optional[str]:
     """Generate code for array write operations."""
 ```
 
@@ -56,6 +60,8 @@ This deferred approach allows the cleanup phase to:
 - Handle write data multiplexing
 - Create proper write enable and address signals
 
+**Runtime contract**: The helper validates its arguments via `@enforce_type`, which protects against accidental invocation with a non-`CIRCTDumper` dumper or mismatched expression node. See [Type Enforcement](../../../utils/enforce_type.md) for decorator details.
+
 **Project-specific Knowledge Required**:
 - Understanding of [array write operations](/python/assassyn/ir/expr/array.md)
 - Knowledge of [expose mechanism](/python/assassyn/codegen/verilog/design.md)
@@ -64,7 +70,8 @@ This deferred approach allows the cleanup phase to:
 ### `codegen_fifo_push`
 
 ```python
-def codegen_fifo_push(dumper, expr: FIFOPush) -> Optional[str]:
+@enforce_type
+def codegen_fifo_push(dumper: CIRCTDumper, expr: FIFOPush) -> Optional[str]:
     """Generate code for FIFO push operations."""
 ```
 
@@ -82,6 +89,8 @@ The cleanup phase handles FIFO push operations by:
 - Creating proper FIFO interface connections
 - Handling push data multiplexing when multiple pushes occur
 
+**Runtime contract**: `@enforce_type` enforces that callers pass a `CIRCTDumper` instance and a `FIFOPush` expression, ensuring metadata tracking happens on the correct dumper implementation.
+
 **Project-specific Knowledge Required**:
 - Understanding of [FIFO push operations](/python/assassyn/ir/expr/array.md)
 - Knowledge of [expose mechanism](/python/assassyn/codegen/verilog/design.md)
@@ -90,7 +99,8 @@ The cleanup phase handles FIFO push operations by:
 ### `codegen_fifo_pop`
 
 ```python
-def codegen_fifo_pop(dumper, expr: FIFOPop) -> Optional[str]:
+@enforce_type
+def codegen_fifo_pop(dumper: CIRCTDumper, expr: FIFOPop) -> Optional[str]:
     """Generate code for FIFO pop operations."""
 ```
 
@@ -104,6 +114,8 @@ This function generates Verilog code for FIFO pop operations. It performs the fo
 4. **Code Generation**: Returns an assignment that reads from the FIFO's output signal
 
 The generated code assigns the FIFO's output data to a local variable, allowing the popped data to be used in subsequent operations.
+
+**Runtime contract**: The helper enforces the `CIRCTDumper` contract through `@enforce_type`, preventing downstream code from using incomplete dumper stubs that would break metadata bookkeeping.
 
 **Project-specific Knowledge Required**:
 - Understanding of [FIFO pop operations](/python/assassyn/ir/expr/array.md)

@@ -3,14 +3,21 @@
 This module contains functions to generate Verilog code for array and FIFO operations.
 """
 
-from typing import Optional
+from __future__ import annotations
+
+from typing import Optional, TYPE_CHECKING
 
 from ....ir.expr import ArrayRead, ArrayWrite, FIFOPop, FIFOPush
 from ....ir.memory.sram import SRAM
 from ....utils import namify
+from ....utils.enforce_type import enforce_type
+
+if TYPE_CHECKING:
+    from ..design import CIRCTDumper
 
 
-def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
+@enforce_type
+def codegen_array_read(dumper: CIRCTDumper, expr: ArrayRead) -> Optional[str]:
     """Generate code for array read operations."""
     array_ref = expr.array
     is_sram_payload = False
@@ -35,19 +42,22 @@ def codegen_array_read(dumper, expr: ArrayRead) -> Optional[str]:
     return body
 
 
-def codegen_array_write(dumper, expr: ArrayWrite) -> Optional[str]:
+@enforce_type
+def codegen_array_write(dumper: CIRCTDumper, expr: ArrayWrite) -> Optional[str]:
     """Generate code for array write operations."""
     dumper.expose('array', expr)
 
 
-def codegen_fifo_push(dumper, expr: FIFOPush) -> Optional[str]:
+@enforce_type
+def codegen_fifo_push(dumper: CIRCTDumper, expr: FIFOPush) -> Optional[str]:
     """Generate code for FIFO push operations."""
     dumper.expose('fifo', expr)
     # Track pushes in module metadata to avoid redundant expression walking
     dumper.module_metadata[dumper.current_module].pushes.append(expr)
 
 
-def codegen_fifo_pop(dumper, expr: FIFOPop) -> Optional[str]:
+@enforce_type
+def codegen_fifo_pop(dumper: CIRCTDumper, expr: FIFOPop) -> Optional[str]:
     """Generate code for FIFO pop operations."""
     rval = namify(expr.as_operand())
     fifo_name = dumper.dump_rval(expr.fifo, False)

@@ -484,3 +484,9 @@ def sramBlackbox_{array_name}():
         fd.write(code)
     logs = dumper.logs
     return logs
+
+
+# Late-bind CIRCTDumper so forward-referenced helpers resolve the runtime type.
+from ._expr import array as _array_codegen  # pylint: disable=wrong-import-position
+
+_array_codegen.CIRCTDumper = CIRCTDumper
