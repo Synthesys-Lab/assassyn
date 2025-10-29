@@ -30,3 +30,17 @@
 - **Generated code breakage**: Verify that the emitted import path matches runtime packaging; add an integration test if necessary.
 - **Packaging visibility**: Ensure `assassyn.pycde_wrapper` is accessible when users consume generated modules (consider adding to `__all__`).
 - **Test brittleness**: Prefer resilient assertions (e.g., regex or targeted substring checks) so formatting adjustments don't cause false negatives.
+
+## Section 5: Completion Checklist
+
+- [x] Updated Verilog pipeline and utility docs to reference the shared runtime wrapper.
+- [x] Added a unit test that enforces `design.py` imports `FIFO` and `TriggerCounter` from `assassyn.pycde_wrapper`.
+- [x] Introduced `python/assassyn/pycde_wrapper.py` and refactored `HEADER` to import the shared helpers.
+- [x] Ran `source setup.sh && make test-all` after refactor to confirm regressions are green.
+
+## Section 6: Summary
+
+- Documented the new wrapper flow across design docs and utility references so future updates keep code and docs aligned.
+- Strengthened regression coverage with `python/unit-tests/codegen/test_pycde_header_import.py`, catching inadvertent header regressions.
+- Added `python/assassyn/pycde_wrapper.py` and updated `python/assassyn/codegen/verilog/utils.py` so generated designs reuse the shared FIFO/TriggerCounter implementations.
+- Verified the refactor with the full `make test-all` suite sourced from `setup.sh`, ensuring the codegen pipeline remains stable.

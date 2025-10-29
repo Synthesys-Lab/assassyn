@@ -109,34 +109,6 @@ from pycde.signals import Struct, BitsSignal
 from pycde.dialects import comb,sv
 from functools import reduce
 from operator import or_, and_, add
-
-@modparams
-def FIFO(WIDTH: int, DEPTH_LOG2: int):
-    class FIFOImpl(Module):
-        module_name = f"fifo"
-        # Define inputs
-        clk = Clock()
-        rst_n = Input(Bits(1))
-        push_valid = Input(Bits(1))
-        push_data = Input(Bits(WIDTH))
-        pop_ready = Input(Bits(1))
-        # Define outputs
-        push_ready = Output(Bits(1))
-        pop_valid = Output(Bits(1))
-        pop_data = Output(Bits(WIDTH))
-    return FIFOImpl
-
-
-@modparams
-def TriggerCounter(WIDTH: int):
-    class TriggerCounterImpl(Module):
-        module_name = f"trigger_counter"
-        clk = Clock()
-        rst_n = Input(Bits(1))
-        delta = Input(Bits(WIDTH))
-        delta_ready = Output(Bits(1))
-        pop_ready = Input(Bits(1))
-        pop_valid = Output(Bits(1))
-    return TriggerCounterImpl
+from assassyn.pycde_wrapper import FIFO, TriggerCounter
 
 '''
