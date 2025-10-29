@@ -138,21 +138,15 @@ def generate_top_harness(dumper: CIRCTDumper):
                 f'aw_{arr_name}_widx{port_suffix} = Wire(Bits({index_bits_type}))'
             )
         # Declare wires for read ports
-        if index_bits > 0:
-            for port_idx in range(num_read_ports):
-                port_suffix = f"_port{port_idx}"
+        for port_idx in range(num_read_ports):
+            port_suffix = f"_port{port_idx}"
+            if index_bits > 0:
                 dumper.append_code(
                     f'aw_{arr_name}_ridx{port_suffix} = Wire(Bits({index_bits}))'
                 )
-                dumper.append_code(
-                    f'aw_{arr_name}_rdata{port_suffix} = Wire({dump_type(arr.scalar_ty)})'
-                )
-        else:
-            for port_idx in range(num_read_ports):
-                port_suffix = f"_port{port_idx}"
-                dumper.append_code(
-                    f'aw_{arr_name}_rdata{port_suffix} = Wire({dump_type(arr.scalar_ty)})'
-                )
+            dumper.append_code(
+                f'aw_{arr_name}_rdata{port_suffix} = Wire({dump_type(arr.scalar_ty)})'
+            )
 
         # Instantiate multi-port array
         port_connections = ['clk=self.clk', 'rst=self.rst']
@@ -163,9 +157,9 @@ def generate_top_harness(dumper: CIRCTDumper):
                 f'wdata{port_suffix}=aw_{arr_name}_wdata{port_suffix}',
                 f'widx{port_suffix}=aw_{arr_name}_widx{port_suffix}'
             ])
-        if index_bits > 0:
-            for port_idx in range(num_read_ports):
-                port_suffix = f"_port{port_idx}"
+        for port_idx in range(num_read_ports):
+            port_suffix = f"_port{port_idx}"
+            if index_bits > 0:
                 port_connections.append(
                     f'ridx{port_suffix}=aw_{arr_name}_ridx{port_suffix}'
                 )
