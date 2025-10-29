@@ -14,7 +14,7 @@ from .utils import (
 )
 
 from ...analysis import expr_externally_used
-from ...ir.module import Module, Downstream
+from ...ir.module import Module
 from ...ir.memory.sram import SRAM
 from ...builder import SysBuilder
 from ...ir.visitor import Visitor
@@ -240,26 +240,16 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
         self.current_module = node
 
-        is_downstream = isinstance(node, Downstream)
-        is_sram = isinstance(node, SRAM)
-        is_driver = node not in self.async_callees
-
         self.append_code(f'class {namify(node.name)}(Module):')
         self.indent += 4
 
-        # Use metadata instead of walking expressions
-        metadata = self.module_metadata.get(node)
-        pushes = metadata.pushes if metadata else []
-        calls = metadata.calls if metadata else []
-        pops = metadata.pops if metadata else []
-
-        generate_module_ports(self, node, is_downstream, is_sram, is_driver, pushes, calls, pops)
+        generate_module_ports(self, node)
 
         self.append_code('')
         self.append_code('@generator')
         self.append_code('def construct(self):')
 
-        if is_sram:
+        if isinstance(node, SRAM):
             self.indent += 4
             self.append_code('# SRAM dataout from memory')
             self.append_code('dataout = self.mem_dataout')

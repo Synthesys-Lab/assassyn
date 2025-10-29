@@ -1,8 +1,8 @@
 """Module port generation utilities for Verilog code generation."""
 
-from typing import List
 from .utils import dump_type, get_sram_info
-from ...ir.module import Module
+from ...ir.module import Module, Downstream
+from ...ir.memory.sram import SRAM
 from ...ir.module.base import ModuleBase
 from ...ir.expr import Bind
 from ...ir.expr.intrinsic import ExternalIntrinsic
@@ -11,19 +11,22 @@ from ...utils import namify, unwrap_operand
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
-def generate_module_ports(dumper, node: Module, is_downstream: bool, is_sram: bool,
-                          is_driver: bool, pushes: List, calls: List, pops: List) -> None:
+def generate_module_ports(dumper, node: Module) -> None:
     """Generate port declarations for a module.
 
     Args:
         dumper: The CIRCTDumper instance
         node: The module to generate ports for
-        is_downstream: Whether this is a downstream module
-        is_sram: Whether this is an SRAM module
-        is_driver: Whether this module is a driver
-        pushes: List of FIFOPush expressions
-        calls: List of AsyncCall expressions
     """
+    is_downstream = isinstance(node, Downstream)
+    is_sram = isinstance(node, SRAM)
+    is_driver = node not in dumper.async_callees
+
+    metadata = dumper.module_metadata.get(node)
+    pushes = metadata.pushes if metadata else []
+    calls = metadata.calls if metadata else []
+    pops = metadata.pops if metadata else []
+
     dumper.append_code('clk = Clock()')
     dumper.append_code('rst = Reset()')
     dumper.append_code('executed = Output(Bits(1))')
