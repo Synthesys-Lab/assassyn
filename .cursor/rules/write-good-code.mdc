@@ -68,3 +68,18 @@ class Coord:
 6. Low invasion. Every time you make a mofication, carefully control the files are affective.
    Unless you are sure you are told to do an interface refactor, make sure all the modifications
    should be inside the module and the interface exposed by the module.
+
+7. When creating a Python function, remember to annotate the signature with types
+   - DO NOT use str to annotate the types
+   - USE `typing.TYPE_CHECKING` to import the required types and prevent cyclic imports
+   - Remember to annotate the function with `enforce_type` in `python/assassyn/utils/enforce_type.py`
+```python
+if typing.TYPE_CHECKING
+   import <actual types>
+else
+   <actual type> = typing.Any
+```
+
+8. When creating a Python class, remember to use `@dataclass` to make the member attributes static.
+   - DO NOT over check the attributes using `getattr` and `setattr` which lowers the readability,
+     missing attributes should be handled somewhere else by assumption checks!
