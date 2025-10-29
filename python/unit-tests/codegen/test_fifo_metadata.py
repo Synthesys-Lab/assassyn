@@ -16,6 +16,7 @@ from assassyn.frontend import (
     pop_condition,
 )
 from assassyn.codegen.verilog.design import CIRCTDumper
+from assassyn.ir.module import Port as IRPort
 
 
 def test_fifo_metadata_records_predicates():
@@ -61,3 +62,11 @@ def test_fifo_metadata_records_predicates():
     # Backwards compatibility accessors still expose expression lists
     assert [entry.expr for entry in fifo_meta.pushes] == metadata.pushes
     assert [entry.expr for entry in fifo_meta.pops] == metadata.pops
+
+    # Revisit the module in isolation to ensure FIFO operations skip the expose map
+    isolated_dumper = CIRCTDumper()
+    isolated_dumper.sys = sysb
+    isolated_dumper.visit_module(pipe_module)
+
+    fifo_expose_keys = [key for key in isolated_dumper._exposes if isinstance(key, IRPort)]
+    assert fifo_expose_keys == []

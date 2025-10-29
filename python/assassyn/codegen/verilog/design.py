@@ -25,10 +25,8 @@ from ...utils import namify, unwrap_operand
 from ...utils.enforce_type import enforce_type
 from ...ir.expr import (
     Expr,
-    FIFOPop,
     ArrayRead,
     ArrayWrite,
-    FIFOPush,
     AsyncCall,
 )
 from ...ir.expr.intrinsic import PureIntrinsic, ExternalIntrinsic
@@ -147,12 +145,8 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         elif kind == 'array':
             assert isinstance(expr, (ArrayRead, ArrayWrite))
             key = expr.array
-        elif kind == 'fifo':
-            assert isinstance(expr, FIFOPush)
-            key = expr.fifo
-        elif kind == 'fifo_pop':
-            assert isinstance(expr, FIFOPop)
-            key = expr.fifo
+        elif kind in ('fifo', 'fifo_pop'):
+            raise ValueError('FIFO exposes were removed; rely on metadata instead')
         elif kind == 'trigger':
             assert isinstance(expr, AsyncCall)
             key = expr.bind.callee

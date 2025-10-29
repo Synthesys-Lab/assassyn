@@ -1,5 +1,7 @@
 """Post-generation cleanup and signal generation for Verilog codegen."""
 
+from collections import defaultdict
+
 from .utils import (
     dump_type,
     dump_type_cast,
@@ -15,8 +17,6 @@ from ...ir.expr import (
     Expr,
     ArrayWrite,
     ArrayRead,
-    FIFOPush,
-    FIFOPop,
     AsyncCall,
 )
 from ...utils import namify, unwrap_operand
@@ -132,6 +132,7 @@ def cleanup_post_generation(dumper):
         sram_info = get_sram_info(dumper.current_module)
         if sram_info:
             generate_sram_control_signals(dumper, sram_info)
+    module_metadata = dumper.module_metadata.get(dumper.current_module)
     # pylint: disable=too-many-nested-blocks
     for key, exposes in dumper._exposes.items():  # pylint: disable=protected-access
         if isinstance(key, Array):
@@ -213,50 +214,8 @@ def cleanup_post_generation(dumper):
                     assigned_read_ports.add(port_idx)
 
         elif isinstance(key, Port):
-            has_push = any(isinstance(e, FIFOPush) for e, p in exposes)
-            has_pop = any(isinstance(e, FIFOPop) for e, p in exposes)
-
-            if has_push:
-                fifo = dumper.dump_rval(key, False)
-                pushes = [(e, p) for e, p in exposes if isinstance(e, FIFOPush)]
-                final_push_predicate = (
-                    f"reduce(or_, [{', '.join([f'({p})' for _, p in pushes])}], Bits(1)(0))"
-                    if pushes else "Bits(1)(0)"
-                )
-
-                if len(pushes) == 1:
-                    final_push_data = dumper.dump_rval(pushes[0][0].val, False)
-                else:
-                    mux_data = f"{dump_type(key.dtype)}(0)"
-                    for expr, pred in pushes:
-                        rval = dumper.dump_rval(expr.val, False)
-                        mux_data = f"Mux({pred}, {mux_data}, {rval})"
-                    final_push_data = mux_data
-
-                dumper.append_code(f'# Push logic for port: {fifo}')
-                ready_signal = f"self.fifo_{namify(key.module.name)}_{fifo}_push_ready"
-
-                fifo_prefix = f"self.{namify(key.module.name)}_{fifo}"
-
-                dumper.append_code(
-                    f"{fifo_prefix}_push_valid = executed_wire & "
-                    f"({final_push_predicate}) & {ready_signal}"
-                )
-                dumper.append_code(f"{fifo_prefix}_push_data = {final_push_data}")
-
-            if has_pop:
-                fifo = dumper.dump_rval(key, False)
-
-                pop_expr = [e for e, p in exposes if isinstance(e, FIFOPop)][0]
-                dumper.append_code(f'# {pop_expr}')
-                pop_predicates = [pred for expr, pred in exposes if isinstance(expr, FIFOPop)]
-
-                final_pop_condition = (
-                    f"reduce(or_, [{', '.join([f'({p})' for p in pop_predicates])}], Bits(1)(0))"
-                )
-                dumper.append_code(
-                    f"self.{fifo}_pop_ready = executed_wire & ({final_pop_condition})"
-                )
+            # FIFO exposures are now driven exclusively by module metadata.
+            continue
 
         elif isinstance(key, Module):
             rval = dumper.dump_rval(key, False)
@@ -317,6 +276,58 @@ def cleanup_post_generation(dumper):
             all_predicates = [pred for _, pred in exposes]
             pred_condition = f"reduce(or_, [{', '.join([f'({p})' for p in all_predicates])}])"
             dumper.append_code(f'self.valid_{exposed_name} = executed_wire & ({pred_condition})')
+
+    if module_metadata is not None:
+        fifo_metadata = module_metadata.fifo
+        if fifo_metadata.pushes or fifo_metadata.pops:
+            pushes_by_port = defaultdict(list)
+            for entry in fifo_metadata.pushes:
+                pushes_by_port[entry.expr.fifo].append(entry)
+
+            pops_by_port = defaultdict(list)
+            for entry in fifo_metadata.pops:
+                pops_by_port[entry.expr.fifo].append(entry)
+
+            for port, entries in pushes_by_port.items():
+                fifo_name = dumper.dump_rval(port, False)
+                predicates = [f'({entry.predicate})' for entry in entries]
+                final_push_predicate = (
+                    f"reduce(or_, [{', '.join(predicates)}], Bits(1)(0))"
+                    if predicates else "Bits(1)(0)"
+                )
+
+                if len(entries) == 1:
+                    final_push_data = dumper.dump_rval(entries[0].expr.val, False)
+                else:
+                    mux_data = f"{dump_type(port.dtype)}(0)"
+                    for entry in entries:
+                        rval = dumper.dump_rval(entry.expr.val, False)
+                        mux_data = f"Mux({entry.predicate}, {mux_data}, {rval})"
+                    final_push_data = mux_data
+
+                dumper.append_code(f'# Push logic for port: {fifo_name}')
+                ready_signal = (
+                    f"self.fifo_{namify(port.module.name)}_{fifo_name}_push_ready"
+                )
+                fifo_prefix = f"self.{namify(port.module.name)}_{fifo_name}"
+
+                dumper.append_code(
+                    f"{fifo_prefix}_push_valid = executed_wire & "
+                    f"({final_push_predicate}) & {ready_signal}"
+                )
+                dumper.append_code(f"{fifo_prefix}_push_data = {final_push_data}")
+
+            for port, entries in pops_by_port.items():
+                fifo_name = dumper.dump_rval(port, False)
+                pop_predicates = [f'({entry.predicate})' for entry in entries]
+                final_pop_condition = (
+                    f"reduce(or_, [{', '.join(pop_predicates)}], Bits(1)(0))"
+                    if pop_predicates else "Bits(1)(0)"
+                )
+                dumper.append_code(f'# {entries[0].expr}')
+                dumper.append_code(
+                    f"self.{fifo_name}_pop_ready = executed_wire & ({final_pop_condition})"
+                )
 
     external_exposures = dumper.external_output_exposures.get(dumper.current_module, {})
     for data in external_exposures.values():
