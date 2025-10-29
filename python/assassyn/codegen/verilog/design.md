@@ -42,6 +42,7 @@ This module provides the main Verilog design generation functionality, including
 4. **Signal Routing**: External module signals are routed through the design
 5. **Co-simulation Support**: External modules are integrated for co-simulation
 6. **Cross-Module Output Tracking**: `CIRCTDumper` now tracks every cross-module read of an external register output via `cross_module_external_reads`, `external_outputs_by_instance`, and the normalised wire keys returned by `get_external_wire_key`, allowing downstream passes to declare data/valid ports exactly once per producer.
+7. **Centralised Detection Logic**: External-module identification is now handled by the system-analysis bookkeeping shared with the simulator’s [external stub utilities](../simulator/external.md); the dumper does not expose dedicated helper predicates anymore.
 
 **Credit-Based Pipeline Implementation Details:** The Verilog design generation implements the credit-based pipeline:
 
@@ -152,8 +153,6 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 **`_generate_external_module_wrapper`**: Creates PyCDE wrapper classes for external SystemVerilog modules. If the external metadata defines explicit wires (and their direction), the wrapper mirrors them; otherwise it falls back to treating the declared ports as inputs for backwards compatibility. Clock/reset ports are emitted when requested by the metadata.
 
 **`_connect_array`**: Handles multi-port array connections between modules by wiring each module’s per-port write enable/data/index signals into the shared array writer instance the dumper previously generated.
-
-**`_is_external_module`**: Determines if a module represents an external implementation
 
 The CIRCTDumper class integrates with multiple other modules:
 - [Expression generation](/python/assassyn/codegen/verilog/_expr/__init__.md) for handling different expression types

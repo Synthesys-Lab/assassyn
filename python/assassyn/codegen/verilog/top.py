@@ -85,8 +85,6 @@ def generate_top_harness(dumper: CIRCTDumper):
     # --- 1. Wire Declarations (Generic) ---
     dumper.append_code('# --- Wires for FIFOs, Triggers, and Arrays ---')
     for module in dumper.sys.modules:
-        if dumper.is_stub_external(module):
-            continue
         for port in module.ports:
             fifo_base_name = f'fifo_{namify(module.name)}_{namify(port.name)}'
             dumper.append_code(f'# Wires for FIFO connected to {module.name}.{port.name}')
@@ -99,8 +97,6 @@ def generate_top_harness(dumper: CIRCTDumper):
 
     # Wires for TriggerCounters (one per module)
     for module in dumper.sys.modules:
-        if dumper.is_stub_external(module):
-            continue
         tc_base_name = f'{namify(module.name)}_trigger_counter'
         dumper.append_code(f'# Wires for {module.name}\'s TriggerCounter')
         dumper.append_code(f'{tc_base_name}_delta = Wire(Bits(8))')
@@ -177,8 +173,7 @@ def generate_top_harness(dumper: CIRCTDumper):
     dumper.append_code('\n# --- Hardware Instantiations ---')
 
     module_fifo_depths = {}
-    all_modules = [m for m in (dumper.sys.modules + dumper.sys.downstreams)
-                   if not dumper.is_stub_external(m)]
+    all_modules = dumper.sys.modules + dumper.sys.downstreams
     default_fifo_depth = 2
     for mod in all_modules:
         module_fifo_depths[mod] = \
@@ -201,8 +196,6 @@ def generate_top_harness(dumper: CIRCTDumper):
             module_fifo_depths[owner][fifo_port] = max(current, depth)
 
     for module in dumper.sys.modules:
-        if dumper.is_stub_external(module):
-            continue
         depth_map = module_fifo_depths.get(module, {})
         for port in module.ports:
             fifo_base_name = f'fifo_{namify(module.name)}_{namify(port.name)}'
@@ -225,8 +218,6 @@ def generate_top_harness(dumper: CIRCTDumper):
 
     # Instantiate TriggerCounters
     for module in dumper.sys.modules:
-        if dumper.is_stub_external(module):
-            continue
         tc_base_name = f'{namify(module.name)}_trigger_counter'
         dumper.append_code(
             f'{tc_base_name}_inst = TriggerCounter(WIDTH=8)'
@@ -404,24 +395,12 @@ def generate_top_harness(dumper: CIRCTDumper):
         unique_push_targets = {(p.fifo.module, p.fifo) for p in pushes}
         unique_call_targets = {c.bind.callee for c in calls}
 
-        # Filter out external modules from push targets
-        filtered_push_targets = set()
         for (callee_mod, callee_port) in unique_push_targets:
-            if not dumper.is_stub_external(callee_mod):
-                filtered_push_targets.add((callee_mod, callee_port))
-
-        # Filter out external modules from call targets
-        filtered_call_targets = set()
-        for callee_mod in unique_call_targets:
-            if not dumper.is_stub_external(callee_mod):
-                filtered_call_targets.add(callee_mod)
-
-        for (callee_mod, callee_port) in filtered_push_targets:
             port_map.append(
                 f"fifo_{namify(callee_mod.name)}_{namify(callee_port.name)}_push_ready="
                 f"fifo_{namify(callee_mod.name)}_{namify(callee_port.name)}_push_ready"
             )
-        for callee_mod in filtered_call_targets:
+        for callee_mod in unique_call_targets:
             port_map.append(
                 f"{namify(callee_mod.name)}_trigger_counter_delta_ready="
                 f"{namify(callee_mod.name)}_trigger_counter_delta_ready"
@@ -508,8 +487,6 @@ def generate_top_harness(dumper: CIRCTDumper):
 
     # dumper.append_code('\n# --- Tie off unused FIFO push ports ---')
     for module in dumper.sys.modules:
-        if dumper.is_stub_external(module):
-            continue
         for port in getattr(module, 'ports', []):
             if port not in all_driven_fifo_ports:
                 fifo_base_name = f'fifo_{namify(module.name)}_{namify(port.name)}'
@@ -529,8 +506,6 @@ def generate_top_harness(dumper: CIRCTDumper):
 
     dumper.append_code('\n# --- Trigger Counter Delta Connections ---')
     for module in dumper.sys.modules:
-        if dumper.is_stub_external(module):
-            continue
         mod_name = namify(module.name)
         if module in dumper.async_callees:
             callers_of_this_module = dumper.async_callees[module]

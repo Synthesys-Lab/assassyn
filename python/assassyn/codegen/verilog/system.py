@@ -102,17 +102,12 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
                 if module not in dumper.async_callees[callee]:
                     dumper.async_callees[callee].append(module)
 
-    # Process only non-external modules from sys.modules
+    # Process every module from sys.modules
     for elem in sys.modules:
-        if dumper.is_stub_external(elem):
-            continue
-
         dumper.current_module = elem
         dumper.visit_module(elem)
     dumper.current_module = None
     for elem in sys.downstreams:
-        if dumper.is_stub_external(elem):
-            continue
         dumper.current_module = elem
         dumper.visit_module(elem)
     dumper.current_module = None

@@ -11,7 +11,6 @@ from ...utils import namify, unwrap_operand
 
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-branches,too-many-statements
-# pylint: disable=protected-access
 def generate_module_ports(dumper, node: Module, is_downstream: bool, is_sram: bool,
                           is_driver: bool, pushes: List, calls: List, pops: List) -> None:
     """Generate port declarations for a module.
@@ -85,7 +84,7 @@ def generate_module_ports(dumper, node: Module, is_downstream: bool, is_sram: bo
         dumper.append_code(f'{port_name}_valid = Input(Bits(1))')
         added_external_ports.add(port_name)
 
-    if not is_downstream and not dumper._is_external_module(node):
+    if not is_downstream:
         for i in node.ports:
             name = namify(i.name)
             dumper.append_code(f'{name} = Input({dump_type(i.dtype)})')
@@ -99,36 +98,20 @@ def generate_module_ports(dumper, node: Module, is_downstream: bool, is_sram: bo
     unique_call_handshake_targets = {c.bind.callee for c in calls}
     unique_output_push_ports = {p.fifo for p in pushes}
 
-    # Skip external modules for handshake targets
-    filtered_push_targets = set()
     for module, fifo_name in unique_push_handshake_targets:
-        if not dumper._is_external_module(module):
-            filtered_push_targets.add((module, fifo_name))
-
-    filtered_call_targets = set()
-    for callee in unique_call_handshake_targets:
-        if not dumper._is_external_module(callee):
-            filtered_call_targets.add(callee)
-
-    for module, fifo_name in filtered_push_targets:
         port_name = f'fifo_{namify(module.name)}_{namify(fifo_name)}_push_ready'
         dumper.append_code(f'{port_name} = Input(Bits(1))')
-    for callee in filtered_call_targets:
+    for callee in unique_call_handshake_targets:
         port_name = f'{namify(callee.name)}_trigger_counter_delta_ready'
         dumper.append_code(f'{port_name} = Input(Bits(1))')
 
-    # Skip external modules for output push ports
-    filtered_output_push_ports = set()
+    # Output push ports for async callees and FIFO producers
     for fifo_port in unique_output_push_ports:
-        if not dumper._is_external_module(fifo_port.module):
-            filtered_output_push_ports.add(fifo_port)
-
-    for fifo_port in filtered_output_push_ports:
         port_prefix = f"{namify(fifo_port.module.name)}_{namify(fifo_port.name)}"
         dumper.append_code(f'{port_prefix}_push_valid = Output(Bits(1))')
         dtype = fifo_port.dtype
         dumper.append_code(f'{port_prefix}_push_data = Output({dump_type(dtype)})')
-    for callee in filtered_call_targets:
+    for callee in unique_call_handshake_targets:
         dumper.append_code(f'{namify(callee.name)}_trigger = Output(UInt(8))')
 
     # pylint: disable=too-many-nested-blocks

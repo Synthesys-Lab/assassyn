@@ -45,7 +45,7 @@ This function generates the complete Verilog system by performing comprehensive 
    - **External Wiring**: Records which exposed values flow across module boundaries so the top-level harness can declare and route the corresponding wires; legacy `external_wire_assignments` have been retired in favour of the intrinsic-driven bookkeeping, which now includes both consumer-side port declarations and producer-side exposure planning.
 
 4. **Module Generation Phase**:
-   - **Regular Module Generation**: Skips pure external stubs and generates code for all remaining modules.
+   - **Regular Module Generation**: Generates code for all recorded modules; pure external stubs are filtered out earlier when collecting external intrinsic metadata.
    - **Downstream Module Generation**: Processes downstream modules after regular modules.
    - **Top-Level Harness Generation**: Marks `is_top_generation`, invokes `generate_top_harness`, then resets the flag.
 
@@ -68,7 +68,6 @@ The function handles complex system-wide relationships:
 The function uses several analysis and utility functions:
 
 - `get_upstreams()` from [analysis module](/python/assassyn/analysis/external_usage.md) for dependency analysis
-- `_is_external_module()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external module detection
 - `_walk_expressions()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for expression traversal
 - `_generate_external_module_wrapper()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external module wrapper generation
 - `visit_array()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for array module generation

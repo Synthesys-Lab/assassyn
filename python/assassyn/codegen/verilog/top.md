@@ -111,7 +111,6 @@ The function uses several utility functions and data structures:
 - `topo_downstream_modules()` from [analysis module](/python/assassyn/analysis/external_usage.md) for topological ordering
 - `get_external_port_name()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external port naming
 - Metadata-driven checks for `FIFOPop` readiness: `_walk_expressions()` is no longer used to detect whether a module pops a FIFO. Instead, the `pops` list in `module_metadata` is consulted to decide if `<port>_pop_ready` connections should be emitted.
-- `_is_external_module()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external module detection
 - `_connect_array()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for array connections
 
 The function manages several CIRCTDumper state variables:

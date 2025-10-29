@@ -45,9 +45,9 @@ This function generates comprehensive port declarations for Verilog modules base
 
 5. **FIFO Handshake Ports**:
    - For pipeline modules, declares FIFO inputs (`port`, `port_valid`) and optional `port_pop_ready` outputs when the module pops from the FIFO, determined by `pops` metadata (`{p.fifo for p in pops}`).
-   - Adds ready inputs for FIFO pushes and trigger counter deltas, skipping handshake ports when the producer/consumer is a pure external stub.
+   - Adds ready inputs for FIFO pushes and trigger counter deltas using push/call metadata collected during system analysis.
 
-6. **Output Handshakes**: Declares `<callee>_<fifo>_push_valid/data` outputs and `<callee>_trigger` outputs for each async call target, again skipping external-only callees so we do not generate unused ports.
+6. **Output Handshakes**: Declares `<callee>_<fifo>_push_valid/data` outputs and `<callee>_trigger` outputs for each async call target, relying on system analysis to omit dormant integrations.
 
 7. **Array Interfaces**: For every array recorded in `dumper.array_metadata.users_for(arr)`, creates inputs for the array value (`_q_in`) and, when the current module writes to the array, outputs for the per-port write enable/data/index signals. Port indices come from `dumper.array_metadata.write_port_index(arr, node)`.
 
@@ -58,7 +58,7 @@ The function accounts for several module categories:
 - **Downstream Modules**: Receive upstream execution flags and, if applicable, SRAM memory interfaces.
 - **Pipeline Modules**: Get trigger-counter pop-valid signals, FIFO inputs, and handshake ports.
 - **SRAM Modules**: Extend downstream behaviour with memory-specific ports.
-- **External Stubs**: Skipped from handshake port generation so we do not expose meaningless signals for modules implemented outside of Python.
+- **External Stubs**: Filtered out during system analysis when they truly exist, so port generation only needs to describe modules that participate in hardware emission.
 
 **Project-specific Knowledge Required**:
 - Understanding of [credit-based pipeline architecture](/docs/design/arch/arch.md)
@@ -75,7 +75,6 @@ The function uses several utility functions and data structures:
 - `get_sram_info()` from [utils module](/python/assassyn/codegen/verilog/utils.md) for SRAM information
 - `namify()` and `unwrap_operand()` from [utils module](/python/assassyn/utils.md) for name generation
 - `get_external_port_name()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external port naming
-- `_is_external_module()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external module detection
 
 The function integrates with the CIRCTDumper's state management:
 - `downstream_dependencies`: Maps downstream modules to their dependencies

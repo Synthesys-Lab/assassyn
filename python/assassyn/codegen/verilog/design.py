@@ -127,24 +127,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         return (instance, port_name, idx_key)
 
 
-    # pylint: disable=protected-access
-    @staticmethod
-    def _is_external_module(module: Module) -> bool:
-        """Return True if the module represents an external implementation."""
-
-        attrs = getattr(module, '_attrs', None)
-        return attrs is not None and Module.ATTR_EXTERNAL in attrs
-
-    @staticmethod
-    def is_stub_external(module: Module) -> bool:
-        """Return True if the module has no generated body and acts as a pure external stub."""
-        if not CIRCTDumper._is_external_module(module):
-            return False
-        body = getattr(module, "body", None)
-        body_insts = body if isinstance(body, list) else []
-        return not body_insts
-
-
     def dump_rval(self, node, with_namespace: bool, module_name: str = None) -> str:
         """Dump a reference to a node with options."""
         return dump_rval_impl(self, node, with_namespace, module_name)
