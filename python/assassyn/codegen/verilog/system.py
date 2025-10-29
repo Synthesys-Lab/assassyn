@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any
 
 from ...ir.memory.base import MemoryBase
-from ...ir.expr import AsyncCall
+from ...ir.expr import AsyncCall, Expr
 from ...ir.expr.intrinsic import PureIntrinsic
 from ...analysis import get_upstreams
 from ..simulator.external import collect_external_intrinsics
@@ -52,7 +52,8 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
         body = getattr(module, "body", None)
         if body is None:
             continue
-        for expr in dumper._walk_expressions(body):
+        filtered_exprs = (entry for entry in body if isinstance(entry, Expr))
+        for expr in filtered_exprs:
             if (
                 isinstance(expr, PureIntrinsic)
                 and expr.opcode == PureIntrinsic.EXTERNAL_OUTPUT_READ
@@ -93,7 +94,11 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
 
     all_modules = dumper.sys.modules + dumper.sys.downstreams
     for module in all_modules:
-        for expr in dumper._walk_expressions(module.body):
+        body = getattr(module, "body", None)
+        if body is None:
+            continue
+        filtered_exprs = (entry for entry in body if isinstance(entry, Expr))
+        for expr in filtered_exprs:
             if isinstance(expr, AsyncCall):
                 callee = expr.bind.callee
                 if callee not in dumper.async_callees:

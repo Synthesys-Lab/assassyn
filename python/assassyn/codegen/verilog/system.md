@@ -68,11 +68,12 @@ The function handles complex system-wide relationships:
 The function uses several analysis and utility functions:
 
 - `get_upstreams()` from [analysis module](/python/assassyn/analysis/external_usage.md) for dependency analysis
-- `_walk_expressions()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for expression traversal
 - `_generate_external_module_wrapper()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external module wrapper generation
 - `visit_array()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for array module generation
 - `visit_module()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for module generation
 - `generate_top_harness()` from [top module](/python/assassyn/codegen/verilog/top.md) for top-level generation
+
+Expression traversal now happens inline: each analysis iterates the flattened `module.body` list directly and filters entries to `Expr` instances. This preserves ordering while avoiding a dedicated dumper helper.
 
 The function manages several CIRCTDumper state variables:
 

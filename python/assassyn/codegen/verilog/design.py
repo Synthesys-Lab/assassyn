@@ -261,19 +261,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.append_code('')
         self.module_ctx = previous_module_ctx
 
-    def _walk_expressions(self, block):
-        """Iterate through module bodies and yield all expressions."""
-        if block is None:
-            return
-        for item in block:
-            if isinstance(item, Expr):
-                yield item
-
-    def walk_expressions(self, block):
-        """Public wrapper for expression iteration used by helper utilities."""
-        yield from self._walk_expressions(block)
-
-
     # pylint: disable=too-many-locals,R0912
     def visit_system(self, node: SysBuilder):
         """Visit a system and generate code for all modules."""
