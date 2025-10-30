@@ -46,19 +46,19 @@ wrapper = AWrapper(a)
    - If it is an IR-wise analysis and operation, use the visitor-pattern base class implemented in
      `python/assassyn/ir/visitor.py`.
 
-4. DO NOT excessively try catch. Carefully inspect the data structure you are working on!
-   Even in some managed language with very flexible meta programming manipulation, it is not preferred to use
-   such language feature as it is error-prone!
-   - Every time, if you used try-catch, carefully think if you are making too conservative assumption on the code!
-   - If you want to access a member, `setattr` and `getattr` in Python are NOT preferred!
-     If it causes an error, carefully inspect if you are accessing a correct attribute first!
-   - All the Python class, if possible, should declare their members and types at the beginning of each type using
-     the similar style below:
+4. Make a clear boundary between interface declaration, usage, and error handling, especially for
+   the managed languages like Python, as the attribute addition and remove it super flexible.
+   - It is preferred to use `@dataclass`, even frozen, to create Python structs so that all the attributes
+     are already determined. UNLESS NO OTHER WAYS, DO NOT use `getattr` and `setattr` to access the attributes.
 ```python
+@dataclass
 class Coord:
    x: float
    y: float
 ```
+   - It is the accessers' duty to handle the `None`.  If an attribute is not available upon usage,
+     carefully consider: if this attribute is mandatory? If so, raise and error. If not, give a default value.
+     DO NOT handle this at usage sites, as it breaks point 2 above. That is repeatitive code.
 
 5. DO NOT hard code. If you have a constant value defined for a specific purpose, when used do not hard code
    its literal value. Is is possible to:
@@ -75,11 +75,7 @@ class Coord:
    - Remember to annotate the function with `enforce_type` in `python/assassyn/utils/enforce_type.py`
 ```python
 if typing.TYPE_CHECKING
-   import <actual types>
+   import <types for annotation>
 else
-   <actual type> = typing.Any
+   <types for annotation> = typing.Any
 ```
-
-8. When creating a Python class, remember to use `@dataclass` to make the member attributes static.
-   - DO NOT over check the attributes using `getattr` and `setattr` which lowers the readability,
-     missing attributes should be handled somewhere else by assumption checks!
