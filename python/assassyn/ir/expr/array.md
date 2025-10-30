@@ -30,7 +30,6 @@ The IR node class for array write operations, representing `arr[idx] = val`.
 #### Attributes
 
 - `module: ModuleBase` - The module performing the write operation
-- `meta_cond: Value | None` - Predicate metadata captured at construction time
 
 #### Methods
 
@@ -43,13 +42,11 @@ def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None, meta_
         # pylint: disable=import-outside-toplevel
         from ...builder import Singleton
         module = Singleton.peek_builder().current_module
-    # pylint: disable=import-outside-toplevel
-    from ..intrinsic import get_pred
-    super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val, meta_cond or get_pred()])
+    super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val], meta_cond=meta_cond)
     self.module = module
 ```
 
-**Explanation:** Initializes an array write operation with the target array, index, value, predicate, and module context. If no module is provided, it retrieves the current module from the builder singleton via `Singleton.peek_builder()`. The trailing `meta_cond` metadata is captured automatically using `get_pred()` to record the active predicate stack for downstream consumers whenever the caller does not provide one explicitly. This module and predicate context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array while remaining gated by guard conditions.
+**Explanation:** Initializes an array write operation with the target array, index, value, predicate, and module context. If no module is provided, it retrieves the current module from the builder singleton via `Singleton.peek_builder()`. Predicate metadata is captured by the base `Expr` constructor, which snapshots the active predicate stack (or uses the explicitly supplied `meta_cond`) so downstream consumers can reuse the same guards without recomputing condition stacks. This module and predicate context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array while remaining gated by guard conditions.
 
 **Note on Builder Context Dependency:** The `ArrayWrite` class depends on `Singleton.peek_builder()` when no module is explicitly provided. Callers must ensure a builder is active or supply the module explicitly to avoid runtime errors.
 
@@ -102,18 +99,6 @@ def dtype(self):
 ```
 
 **Explanation:** Returns `Void()` type since array write operations are side-effect operations that don't produce a value.
-
-#### `meta_cond` (property)
-
-```python
-@property
-def meta_cond(self):
-    '''Return the predicate metadata captured at construction time'''
-    meta = self._operands[3]
-    return meta.value if isinstance(meta, Operand) else meta
-```
-
-**Explanation:** Provides access to the predicate metadata (`Bits(1)` value) captured when the node was created, unwrapping the internal `Operand` wrapper to return the underlying `Value`. Verilog and simulator backends rely on this field to decide when the write should be emitted without recomputing the predicate stack.
 
 #### `__repr__(self)`
 

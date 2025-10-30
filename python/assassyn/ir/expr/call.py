@@ -5,7 +5,7 @@ from __future__ import annotations
 import typing
 
 from ...builder import ir_builder
-from .expr import Expr, Operand
+from .expr import Expr
 
 if typing.TYPE_CHECKING:
     from ..module import Module, Port
@@ -24,7 +24,7 @@ class FIFOPush(Expr):
             # pylint: disable=import-outside-toplevel
             from .intrinsic import get_pred
             meta_cond = get_pred()
-        super().__init__(FIFOPush.FIFO_PUSH, [fifo, val, meta_cond])
+        super().__init__(FIFOPush.FIFO_PUSH, [fifo, val], meta_cond=meta_cond)
         self.bind = None
         self.fifo_depth = None
 
@@ -39,12 +39,6 @@ class FIFOPush(Expr):
         return self._operands[1]
 
     @property
-    def meta_cond(self):
-        '''Get the predicate metadata associated with this push'''
-        meta = self._operands[2]
-        return meta.value if isinstance(meta, Operand) else meta
-
-    @property
     def dtype(self):
         '''Get the data type of this operation (Void for side-effect operations)'''
         #pylint: disable=import-outside-toplevel
@@ -53,9 +47,7 @@ class FIFOPush(Expr):
 
     def __repr__(self):
         handle = self.as_operand()
-        meta = self.meta_cond
-        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
-        meta_repr = f' // meta cond {operand}'
+        meta_repr = self.meta_comment()
         return (
             f'{self.fifo.as_operand()}.push({self.val.as_operand()})'
             f' // handle = {handle}{meta_repr}'
@@ -180,19 +172,13 @@ class AsyncCall(Expr):
             # pylint: disable=import-outside-toplevel
             from .intrinsic import get_pred
             meta_cond = get_pred()
-        super().__init__(AsyncCall.ASYNC_CALL, [bind, meta_cond])
+        super().__init__(AsyncCall.ASYNC_CALL, [bind], meta_cond=meta_cond)
         bind.callee.users.append(self)
 
     @property
     def bind(self) -> Bind:
         '''Get the bind operation'''
         return self._operands[0]
-
-    @property
-    def meta_cond(self):
-        '''Get the predicate metadata associated with this async call'''
-        meta = self._operands[1]
-        return meta.value if isinstance(meta, Operand) else meta
 
     @property
     def dtype(self):
@@ -203,7 +189,4 @@ class AsyncCall(Expr):
 
     def __repr__(self):
         bind = self.bind.as_operand()
-        meta = self.meta_cond
-        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
-        meta_repr = f' // meta cond {operand}'
-        return f'async_call {bind}{meta_repr}'
+        return f'async_call {bind}{self.meta_comment()}'

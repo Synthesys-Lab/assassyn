@@ -39,15 +39,19 @@ The base class for all expression nodes in the IR. It serves as the foundation f
 - `parent: typing.Optional[ModuleBase]` - Owning module of this expression (set by the builder)
 - `users: typing.List[Operand]` - List of users of this expression
 - `_operands: typing.List[typing.Union[Operand, Port, Array, int]]` - List of operands of this expression
+- `_predicate_trace: list[tuple[Value, Value]]` - Snapshot of the predicate stack taken at construction time. Each tuple stores `(cond, carry)` where `carry` is the cumulative `AND` of the predicates up to and including `cond`. The flattened ordering is always `cond, carry` for every active predicate frame.
 
 **Methods:**
-- `__init__(opcode, operands: list)` - Initialize the expression with an opcode
+- `__init__(opcode, operands: list, *, meta_cond: Value | None = None)` - Initialize the expression with an opcode. If `meta_cond` is not supplied, the constructor snapshots the active predicate stack from the builder (if available) and records it in `_predicate_trace`. When `meta_cond` is provided, the final carry entry in the snapshot is replaced with the supplied value (appending a `(meta_cond, meta_cond)` pair if the stack is empty).
 - `get_operand(idx: int)` - Get the operand at the given index
 - `operands` - Get the operands of this expression (property)
 - `as_operand()` - Dump the expression as an operand string
 - `is_binary()` - Check if the opcode is a binary operator
 - `is_unary()` - Check if the opcode is a unary operator  
 - `is_valued()` - Check if this operation has a return value
+- `meta_cond` - Return the final carry `Value` captured in `_predicate_trace` (or `None` if no predicates were active) (property)
+- `predicate_trace` - Return a list of `(cond, carry)` tuples representing the predicate stack snapshot in construction order (property)
+- `predicate_tokens` - Return a flattened list `[cond0, carry0, cond1, carry1, ...]` useful for backends that expect sequential `cond` / `carry` pairs (property)
 
 Internally, the constructor normalizes operands through `_prepare_operand`. Direct references to `Array` or `Port` objects are registered with the operand's `users` list. Expression operands must originate from the same module unless `_is_cross_module_allowed()` explicitly approves the reference. Today the only cross-module exceptions are `PureIntrinsic` nodes for external output reads and `ExternalIntrinsic` handles, which let external SystemVerilog modules share outputs without relaxing other invariants.
 
@@ -88,9 +92,6 @@ Represents consuming a value from a port's FIFO. The resulting data type is deri
 - `__init__(fifo, meta_cond=None)` - Initialize FIFO pop operation
 - `fifo` - Get the FIFO port (property)
 - `dtype` - Get the data type of the popped value (property)
-- `meta_cond` - Access the predicate metadata captured when the pop was created (property)
-
-`meta_cond` carries the `Bits(1)` predicate returned by [`get_pred()`](intrinsic.md#get_pred) at construction time, unwrapping the internal `Operand` wrapper to expose the underlying `Value`. Backends use it to gate the pop event without reconstructing the condition stack.
 
 #### `class Concat(Expr)`
 
@@ -156,19 +157,18 @@ A non-synthesizable node that functions as a print statement for debugging durin
 - `LOG = 600`
 
 **Fields:**
-- `args: tuple` - Positional arguments backing the operation. The final element stores predicate metadata.
+- `args: tuple` - Positional arguments backing the operation.
 
 **Properties:**
 - `fmt` - Returns the format string (`args[0]`).
 - `values` - Returns the payload values to be substituted into the format string (`args[1:-1]`).
-- `meta_cond` - Returns the predicate metadata captured at construction time (`args[-1]`).
 - `dtype` - Get the data type of this operation (void for side-effect operations).
 
 **Methods:**
 - `__init__(fmt, *values, meta_cond)` - Initialize log operation
 
 **Notes:**
-- `Log` is an ordinary expression node, **not** an intrinsic. The frontend helper captures the active predicate using `get_pred()` and stores it in `meta_cond` for downstream tools.
+- `Log` is an ordinary expression node, **not** an intrinsic. The frontend helper relies on the base `Expr` constructor to snapshot the predicate stack so `meta_cond`, `predicate_trace`, and `predicate_tokens` are available to downstream tools without managing extra operands.
 
 ### Frontend Functions
 
@@ -185,7 +185,7 @@ The exposed frontend function to instantiate a log operation.
 **Explanation:**
 This function creates a `Log` expression node for debugging purposes. The first argument must be a string format, followed by values to be logged. It is non-synthesizable and only works during simulation.
 
-On creation the helper captures the current predicate (via `get_pred()`) and appends it as trailing metadata. The convenience properties keep format/payload access ergonomic while callers that need metadata consumption can rely on `meta_cond` without duplicating state on the node.
+On creation the helper captures the predicate stack snapshot from the builder, so `meta_cond` exposes the accumulated guard while `predicate_trace` retains the per-level `(cond, carry)` pairs for downstream analysis. Backends now rely on these base-class accessors instead of ad-hoc metadata stored in `args`.
 
 
 ---

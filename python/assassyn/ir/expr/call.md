@@ -32,7 +32,6 @@ The IR node class for FIFO push operations, representing the sending of data to 
 - `fifo: Port` - FIFO port to push to
 - `bind: Bind` - Bind reference (set by Bind operations)
 - `fifo_depth: int` - Depth of the FIFO (set by Bind operations)
-- `meta_cond: Value | None` - Predicate metadata captured at construction time
 
 #### Methods
 
@@ -40,7 +39,7 @@ The IR node class for FIFO push operations, representing the sending of data to 
 
 ```python
 def __init__(self, fifo, val, meta_cond=None):
-    super().__init__(FIFOPush.FIFO_PUSH, [fifo, val, meta_cond])
+    super().__init__(FIFOPush.FIFO_PUSH, [fifo, val], meta_cond=meta_cond)
     self.bind = None
     self.fifo_depth = None
 ```
@@ -80,18 +79,6 @@ def dtype(self):
 ```
 
 **Explanation:** Returns `Void()` type since FIFO push operations are side-effect operations that don't produce a value.
-
-#### `meta_cond` (property)
-
-```python
-@property
-def meta_cond(self):
-    '''Get the predicate metadata associated with this push'''
-    meta = self._operands[2]
-    return meta.value if isinstance(meta, Operand) else meta
-```
-
-**Explanation:** Returns the predicate metadata captured during construction, unwrapping any internal `Operand` wrapper so callers receive the underlying `Value`. Backends emit the push only when this predicate evaluates true.
 
 #### `__repr__(self)`
 
@@ -270,7 +257,7 @@ The IR node class for async call operations, representing the asynchronous invoc
 
 ```python
 def __init__(self, bind: Bind, meta_cond=None):
-    super().__init__(AsyncCall.ASYNC_CALL, [bind, meta_cond])
+    super().__init__(AsyncCall.ASYNC_CALL, [bind], meta_cond=meta_cond)
     bind.callee.users.append(self)
 ```
 
@@ -298,18 +285,6 @@ def dtype(self):
 ```
 
 **Explanation:** Returns `Void()` type since async call operations are side-effect operations that don't produce a value.
-
-#### `meta_cond` (property)
-
-```python
-@property
-def meta_cond(self):
-    '''Get the predicate metadata associated with this async call'''
-    meta = self._operands[1]
-    return meta.value if isinstance(meta, Operand) else meta
-```
-
-**Explanation:** Returns the predicate metadata captured during construction, unwrapping any `Operand` wrapper to expose the underlying `Value`. Simulator and Verilog backends gate the async call emission using this predicate instead of recomputing condition stacks.
 
 #### `__repr__(self)`
 

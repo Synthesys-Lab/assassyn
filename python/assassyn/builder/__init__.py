@@ -97,10 +97,12 @@ def ir_builder(func=None):
 class PredicateFrame:  # pylint: disable=too-few-public-methods
     '''Per-predicate frame containing the condition and its array-read cache.'''
     cond: Value
+    carry: Value
     array_cache: dict[tuple[Array, Value], ArrayRead]
 
-    def __init__(self, cond: Value):
+    def __init__(self, cond: Value, carry: Value):
         self.cond = cond
+        self.carry = carry
         self.array_cache = {}
 
     def get_cached_read(self, array: Array, index: Value) -> ArrayRead | None:
@@ -200,8 +202,14 @@ class SysBuilder:
 
     def push_predicate(self, cond):
         '''Push a predicate into current module's predicate stack.'''
-        frame = PredicateFrame(cond)
-        self.get_predicate_stack().append(frame)
+        stack = self.get_predicate_stack()
+        if not stack:
+            carry = cond
+        else:
+            from ..ir.expr import comm  # pylint: disable=import-outside-toplevel
+            carry = comm.and_(stack[-1].carry, cond)
+        frame = PredicateFrame(cond, carry)
+        stack.append(frame)
 
     def pop_predicate(self):
         '''Pop a predicate from current module's predicate stack.'''

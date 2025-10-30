@@ -2,7 +2,7 @@
 #pylint: disable=cyclic-import
 
 from ...builder import ir_builder
-from .expr import Expr, Operand
+from .expr import Expr
 
 INTRIN_INFO = {
     # Intrinsic operations opcode: (mnemonic, num of args, valued, side effect)
@@ -46,24 +46,13 @@ class Intrinsic(Expr):
             assert len(payload) == num_args
         if meta_cond is None:
             meta_cond = get_pred()
-        payload_len = len(payload)
-        super().__init__(opcode, payload + [meta_cond])
-        self._payload_len = payload_len
-
-    @property
-    def _meta_operand(self):
-        return self._operands[self._payload_len]
+        super().__init__(opcode, payload, meta_cond=meta_cond)
+        self._payload_len = len(payload)
 
     @property
     def args(self):
         '''Get the arguments of this intrinsic.'''
         return self._operands[:self._payload_len]
-
-    @property
-    def meta_cond(self):
-        '''Return the predicate metadata captured at construction time.'''
-        meta = self._meta_operand
-        return meta.value if isinstance(meta, Operand) else meta
     @property
     def dtype(self):
         '''Get the data type of this intrinsic.'''
@@ -197,20 +186,13 @@ class PureIntrinsic(Expr):
                     f"Expected {num_args} args for opcode {opcode}, got {len(args)}"
         if meta_cond is None:
             meta_cond = get_pred()
-        payload_len = len(operands)
-        super().__init__(opcode, operands + [meta_cond])
-        self._payload_len = payload_len
+        super().__init__(opcode, operands, meta_cond=meta_cond)
+        self._payload_len = len(operands)
 
     @property
     def args(self):
         '''Get the arguments of this intrinsic'''
         return self._operands[:self._payload_len]
-
-    @property
-    def meta_cond(self):
-        '''Return the predicate metadata captured at construction time.'''
-        meta = self._operands[self._payload_len]
-        return meta.value if isinstance(meta, Operand) else meta
 
     @property
     def dtype(self):
@@ -288,10 +270,9 @@ def get_pred():
     '''Get the current predicate as AND of builder condition stack.'''
     #pylint: disable=import-outside-toplevel
     from ...builder import Singleton
-    from . import comm
     from ..dtype import Bits
-    conds = Singleton.peek_builder().get_predicate_stack()
-    return Bits(1)(1) if not conds else comm.and_(*[frame.cond for frame in conds])
+    stack = Singleton.peek_builder().get_predicate_stack()
+    return Bits(1)(1) if not stack else stack[-1].carry
 
 
 class ExternalIntrinsic(Intrinsic):

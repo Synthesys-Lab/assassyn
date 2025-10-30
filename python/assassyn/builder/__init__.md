@@ -64,6 +64,7 @@ Holds process-wide builder state such as the active builder, indentation for __r
 ```python
 class PredicateFrame:
     cond: Value
+    carry: Value
     array_cache: dict[tuple[Array, Value], ArrayRead]
     
     def get_cached_read(self, array: Array, index: Value) -> ArrayRead | None
@@ -73,12 +74,13 @@ class PredicateFrame:
 
 Purpose: Encapsulates a predicate condition and its associated array-read cache. Each predicate frame stores:
 - cond: The condition Value associated with this predicate frame
+- carry: The cumulative `AND` of all predicate conditions from the bottom of the stack through this frame. Carry values are materialised once at push time, so callers can reuse them without recomputing chained `AND`s.
 - array_cache: A dictionary mapping (array, index) tuples to cached ArrayRead operations
 
 The cache management methods provide type-safe access to the frame's cache, abstracting away the direct dictionary access. This ensures proper encapsulation and makes the cache protocol explicit.
 
 **Explanation:**
-PredicateFrame pairs a condition with an array-read cache to ensure cache lifetime matches predicate lifetime (push/pop). When a predicate is pushed, a new empty cache is created; when popped, the entire cache is discarded. This prevents array reads created under a predicate from being reused after the predicate expires, which is essential for FSM and other conditional execution patterns.
+PredicateFrame pairs a condition with an array-read cache to ensure cache lifetime matches predicate lifetime (push/pop). When a predicate is pushed, a new empty cache is created; when popped, the entire cache is discarded. This prevents array reads created under a predicate from being reused after the predicate expires, which is essential for FSM and other conditional execution patterns. The cached carry mirrors the behaviour of [`get_pred()`](../ir/expr/intrinsic.md#get_pred) and is now the single source of truth for downstream metadata capture.
 
 The cache is keyed by tuples of (array, index), allowing different indices into the same array to be cached separately while deduplicating identical accesses within the same predicate scope.
 
@@ -96,7 +98,9 @@ SysBuilder initializes and resets:
 
 ### Predicate Semantics
 
-- get_predicate_stack returns the LIFO list of active conditions for the current module. get_pred() from intrinsic.py computes the logical AND of all active conditions (or Bits(1)(1) if empty).
+- get_predicate_stack returns the LIFO list of active predicate frames for the current module. Each frame exposes both the individual condition (`cond`) and the accumulated carry (`carry`).
+- push_predicate(cond) computes the new carry by `AND`ing the parent frame's carry with the incoming condition (or using the condition directly when the stack is empty) before pushing a new frame.
+- get_pred() from intrinsic.py now reuses the top frame's `carry` (or `Bits(1)(1)` if the stack is empty), avoiding repeated recomputation of the predicate chain.
 - Intrinsics push_condition/pop_condition directly manipulate the predicate stack. They no longer synchronise with structural blocks—the predicate stack is the single source of truth.
 
 ### Error Handling

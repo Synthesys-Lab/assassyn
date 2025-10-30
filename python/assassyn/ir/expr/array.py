@@ -7,7 +7,7 @@ from __future__ import annotations
 import typing
 
 from ..value import Value
-from .expr import Expr, Operand
+from .expr import Expr
 from ...utils.enforce_type import enforce_type
 
 if typing.TYPE_CHECKING:
@@ -36,12 +36,7 @@ class ArrayWrite(Expr):
             # pylint: disable=import-outside-toplevel
             from ...builder import Singleton
             module = Singleton.peek_builder().current_module
-        # Capture predicate metadata when not provided explicitly
-        if meta_cond is None:
-            # pylint: disable=import-outside-toplevel
-            from .intrinsic import get_pred
-            meta_cond = get_pred()
-        super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val, meta_cond])
+        super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val], meta_cond=meta_cond)
         self.module = module
 
     @property
@@ -60,12 +55,6 @@ class ArrayWrite(Expr):
         return self._operands[2]
 
     @property
-    def meta_cond(self) -> Value:
-        '''Return the predicate metadata captured at construction time'''
-        meta = self._operands[3]
-        return meta.value if isinstance(meta, Operand) else meta
-
-    @property
     def dtype(self):
         '''Get the data type of this operation (Void for side-effect operations)'''
         #pylint: disable=import-outside-toplevel
@@ -74,9 +63,7 @@ class ArrayWrite(Expr):
 
     def __repr__(self):
         module_info = f' /* {self.module.name} */' if self.module else ''
-        meta = self.meta_cond
-        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
-        meta_info = f' // meta cond {operand}'
+        meta_info = self.meta_comment()
         return (
             f'{self.array.as_operand()}[{self.idx.as_operand()}]'
             f' <= {self.val.as_operand()}{module_info}{meta_info}'

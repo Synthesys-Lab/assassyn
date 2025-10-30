@@ -48,6 +48,7 @@ def test_side_effects_capture_meta_cond():
                 self.saved_cond = cond
 
                 with Condition(cond):
+                    self.add_expr = value + idx
                     write_port = array & self
                     self.write_expr = write_port[idx] <= value
 
@@ -78,6 +79,12 @@ def test_side_effects_capture_meta_cond():
     assert module_inst.direct_push.meta_cond is cond_value
     assert module_inst.pop_expr.meta_cond is cond_value
     assert module_inst.async_expr.meta_cond is cond_value
+    assert module_inst.add_expr.meta_cond is cond_value
+
+    add_trace = module_inst.add_expr.predicate_trace
+    assert len(add_trace) == 1
+    assert add_trace[0][0] is cond_value
+    assert add_trace[0][1] is cond_value
 
     for push in module_inst.bound_pushes:
         assert push.meta_cond is cond_value

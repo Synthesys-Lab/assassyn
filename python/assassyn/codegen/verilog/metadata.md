@@ -4,16 +4,16 @@ This module provides metadata structures for tracking information collected for 
 
 ## Summary
 
-The metadata module defines dataclasses that hold information about modules discovered during a dedicated FIFO analysis pass that precedes code emission. The pass is orchestrated by [`collect_fifo_metadata`](./fifo_analysis.md), which uses `FIFOAnalysisVisitor` to walk the requested modules, reading each interaction’s `meta_cond` operand so the recorded predicates mirror those consumed by the dumper.  Later phases consume the frozen metadata, eliminating the need for runtime bookkeeping and avoiding mismatches caused by incremental mutation.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
+The metadata module defines dataclasses that hold information about modules discovered during a dedicated FIFO analysis pass that precedes code emission. The pass is orchestrated by [`collect_fifo_metadata`](./fifo_analysis.md), which uses `FIFOAnalysisVisitor` to walk the requested modules, reading each interaction’s predicate snapshot (`expr.meta_cond` for the final carry and `expr.predicate_tokens` for the ordered `(cond, carry)` trail) so the recorded predicates mirror those consumed by the dumper.  Later phases consume the frozen metadata, eliminating the need for runtime bookkeeping and avoiding mismatches caused by incremental mutation.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
 
 ## FIFO Analysis Pre-pass
 
-`FIFOAnalysisVisitor` performs a read-only walk of module bodies before `CIRCTDumper.visit_module` runs.  The visitor reuses the dumper’s rvalue formatting logic (via a lightweight analysis shim) to evaluate predicates and, by storing the original `Value` objects captured in `meta_cond`, guarantees the exact same predicate normalisation as the code generator.  The visitor is intentionally small—only `visit_expr` is overridden—so traversal mirrors the runtime dumper and remains easy to audit.  Every invocation of `collect_fifo_metadata` returns fresh data structures; callers that want to refresh a subset of modules can request just those modules and merge the results without mutating previously produced registries.
+`FIFOAnalysisVisitor` performs a read-only walk of module bodies before `CIRCTDumper.visit_module` runs.  The visitor reuses the dumper’s rvalue formatting logic (via a lightweight analysis shim) to evaluate predicates and, by storing the original `Value` objects captured in the predicate snapshot, guarantees the exact same predicate normalisation as the code generator.  The visitor is intentionally small—only `visit_expr` is overridden—so traversal mirrors the runtime dumper and remains easy to audit.  Every invocation of `collect_fifo_metadata` returns fresh data structures; callers that want to refresh a subset of modules can request just those modules and merge the results without mutating previously produced registries.
 
 Key responsibilities:
 
 1. Instantiate `ModuleMetadata` for every visited module and attach a `ModuleFIFOView` pointing at the shared registry.
-2. Record every `FIFOPush`/`FIFOPop` interaction by constructing `FIFOInteraction` entries shared between the registry and the module view, preserving the original predicate `Value`.
+2. Record every `FIFOPush`/`FIFOPop` interaction by constructing `FIFOInteraction` entries shared between the registry and the module view, preserving the original predicate `Value` and the ordered `(cond, carry)` tokens.
 
 ## Exposed Interfaces
 
@@ -94,15 +94,15 @@ snapshots.
 
 1. `FIFOAnalysisVisitor` ensures a `ModuleMetadata` instance exists for the module,
    clearing any stale FIFO interactions and wiring the metadata to the shared registry.
-2. The visitor reads each interaction’s `meta_cond` operand so the recorded
-   `FIFOInteraction.predicate` values are the original `Value` nodes instead of
-   formatted strings.
+2. The visitor reads each interaction’s predicate snapshot so the recorded
+   `FIFOInteraction` entries carry both the original `Value` guard and the flattened
+   `(cond, carry)` tokens instead of backend-formatted strings.
 3. Each fifo push/pop encountered during the pre-pass creates a shared `FIFOInteraction`,
    adds it to the registry, and registers it with the module’s `ModuleFIFOView`.
 4. When valued expressions require exposure (array writes/reads, async triggers, general
    outputs) or FINISH/async-call nodes are encountered, the analysis visitor records them
-   directly in `ModuleMetadata`, preserving the original predicate `Value` objects
-   (`expr.meta_cond`) alongside expression handles.
+   directly in `ModuleMetadata`, preserving both the final predicate `Value`
+   (`expr.meta_cond`) and the flattened `(cond, carry)` tokens alongside expression handles.
 5. During subsequent code generation the same `ModuleMetadata` object remains read-only;
    emission simply queries `ModuleMetadata` for FIFO interactions, FINISH flags, async
    calls, and exposure data without mutating state.
@@ -141,9 +141,9 @@ class ModuleExposure:
 ```
 
 This container replaces the dumper’s `_exposes` dictionary.  Entries are populated during
-analysis and stay immutable afterwards.  Each collection stores raw IR handles and their
-associated predicates (`meta_cond`).  Cleanup and module generation format these values at
-emit time.
+analysis and stay immutable afterwards.  Each collection stores raw IR handles together
+with their predicate snapshots (final carry via `meta_cond` plus flattened `(cond, carry)`
+tokens).  Cleanup and module generation format these values at emit time.
 
 ### `ArrayExposure`
 
@@ -157,8 +157,10 @@ class ArrayExposure:
 
 `ArrayExposure` groups all array interactions performed by the owning module.  Writes are
 bucketed by source module so cleanup can derive per-port enable/data muxes while reads are
-listed in first-seen order for index wiring.  Predicates are stored as raw `Value`
-objects.
+listed in first-seen order for index wiring.  Each write retains both the final carry
+(`predicate`) and the flattened `(cond, carry)` list (`predicate_tokens`) captured when the
+expression was materialised, so downstream passes can recover the precise predicate stack
+without replaying control flow.
 
 ### `ArrayWriteExposure`
 
@@ -166,11 +168,13 @@ objects.
 @dataclass
 class ArrayWriteExposure:
     expr: ArrayWrite
-    predicate: Value
+    predicate: Value | None
+    predicate_tokens: Tuple[Value, ...]
 ```
 
-Captures a single `ArrayWrite` together with its `meta_cond`.  Cleanup converts the
-predicate via `format_predicate` while dumping values and indices.
+Captures a single `ArrayWrite` together with its predicate snapshot.  Cleanup converts the
+final carry via `format_predicate` while dumping values and indices, while future analyses
+can consult `predicate_tokens` to reason about individual condition frames.
 
 ### `ArrayReadExposure`
 
@@ -189,12 +193,13 @@ wrapper retains the expression handle so cleanup can recover addresses and types
 @dataclass
 class ValueExposure:
     expr: Expr
-    predicate: Value
+    predicate: Value | None
+    predicate_tokens: Tuple[Value, ...]
 ```
 
 Records valued expressions that must surface as module outputs because they are consumed
-externally (`expr_externally_used(expr, True)`).  The stored predicate mirrors the
-runtime stack behaviour through `expr.meta_cond`.
+externally (`expr_externally_used(expr, True)`).  Both the final carry and the ordered
+predicate tokens mirror the runtime stack behaviour captured on the IR node.
 
 ### `AsyncTriggerExposure`
 
@@ -202,12 +207,13 @@ runtime stack behaviour through `expr.meta_cond`.
 @dataclass
 class AsyncTriggerExposure:
     call: AsyncCall
-    predicate: Value
+    predicate: Value | None
+    predicate_tokens: Tuple[Value, ...]
 ```
 
-Async trigger metadata keeps the originating `AsyncCall` and predicate.  Entries are
+Async trigger metadata keeps the originating `AsyncCall` plus the predicate snapshot.  Entries are
 grouped per callee module so cleanup can build the trigger-counter increments without
-re-scanning expression trees.
+re-scanning expression trees, while retaining predicate provenance for future analyses.
 
 **Project-specific Knowledge Required:**
 
@@ -244,13 +250,15 @@ sets:
 class FIFOInteraction:
     module: Module
     expr: Union[FIFOPush, FIFOPop]
-    predicate: Value
+    predicate: Value | None
+    predicate_tokens: Tuple[Value, ...]
 ```
 
 This unified record replaces the redundant `FIFOPushMetadata` / `FIFOPopMetadata`
-wrappers.  The interaction type is inferred from `expr`, and the predicate stores the
-original IR value captured at construction time, letting later stages dump it using the
-standard `dump_rval` helpers.
+wrappers.  The interaction type is inferred from `expr`.  The record retains both the
+final carry (`predicate`) and the flattened `(cond, carry)` sequence (`predicate_tokens`),
+mirroring the IR snapshot so later stages can dump predicates directly or reconstruct the
+exact condition stack without replaying control flow.
 
 ### `FIFOMetadata`
 

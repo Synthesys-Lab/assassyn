@@ -1,6 +1,6 @@
 '''The AST node data structure for the expressions'''
 
-#pylint: disable=cyclic-import,import-outside-toplevel
+#pylint: disable=cyclic-import,import-outside-toplevel,too-many-instance-attributes
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ class Expr(Value):
         typing.Union[Operand, Port, Array, int]
     ] # List of operands of this expression
 
-    def __init__(self, opcode, operands: list):
+    def __init__(self, opcode, operands: list, *, meta_cond: typing.Optional[Value] = None):
         '''Initialize the expression with an opcode'''
         #pylint: disable=import-outside-toplevel,too-many-locals
         self.opcode = opcode
@@ -61,6 +61,38 @@ class Expr(Value):
         for operand in operands:
             self._operands.append(self._prepare_operand(operand))
         self.users = []
+        self._predicate_trace = self._capture_predicate_trace(meta_cond)
+        self._meta_cond = self._predicate_trace[-1][1] if self._predicate_trace else None
+
+    @staticmethod
+    def _unwrap_predicate(value):
+        return value.value if isinstance(value, Operand) else value
+
+    def _capture_predicate_trace(self, override: typing.Optional[Value]):
+        trace: list[tuple[Value, Value]] = []
+        stack = []
+        try:
+            # pylint: disable=import-outside-toplevel
+            from ...builder import Singleton
+            builder = Singleton.peek_builder()
+        except (RuntimeError, ImportError):
+            builder = None
+        if builder is not None:
+            stack = builder.get_predicate_stack()
+
+        for frame in stack:
+            cond_value = self._unwrap_predicate(frame.cond)
+            carry_value = self._unwrap_predicate(frame.carry)
+            trace.append((cond_value, carry_value))
+
+        if override is not None:
+            override_value = self._unwrap_predicate(override)
+            if trace:
+                cond_value, _ = trace[-1]
+                trace[-1] = (cond_value, override_value)
+            else:
+                trace.append((override_value, override_value))
+        return trace
 
     def _prepare_operand(self, operand):
         '''Normalize an incoming operand and register its usage'''
@@ -134,6 +166,33 @@ class Expr(Value):
         '''Get the operands of this expression'''
         return self._operands
 
+    @property
+    def meta_cond(self):
+        '''Return the cumulative predicate guarding this expression.'''
+        return self._meta_cond
+
+    @property
+    def predicate_trace(self):
+        '''Return the snapshot of predicate frames as (cond, carry) tuples.'''
+        return list(self._predicate_trace)
+
+    @property
+    def predicate_tokens(self):
+        '''Return the predicate snapshot flattened as [cond0, carry0, ...].'''
+        tokens: list[Value] = []
+        for cond_value, carry_value in self._predicate_trace:
+            tokens.append(cond_value)
+            tokens.append(carry_value)
+        return tokens
+
+    def meta_comment(self):
+        '''Return the formatted predicate comment for repr helpers.'''
+        meta = self.meta_cond
+        if meta is None:
+            return ''
+        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+        return f' // meta cond {operand}'
+
     def as_operand(self):
         '''Dump the expression as an operand'''
         # Use the name if assigned by the naming system
@@ -187,7 +246,7 @@ class FIFOPop(Expr):
             # pylint: disable=import-outside-toplevel
             from .intrinsic import get_pred
             meta_cond = get_pred()
-        super().__init__(FIFOPop.FIFO_POP, [fifo, meta_cond])
+        super().__init__(FIFOPop.FIFO_POP, [fifo], meta_cond=meta_cond)
 
     @property
     def fifo(self):
@@ -199,17 +258,8 @@ class FIFOPop(Expr):
         '''Get the data type of the popped value'''
         return self.fifo.dtype
 
-    @property
-    def meta_cond(self):
-        '''Return the predicate metadata captured at construction time'''
-        meta = self._operands[1]
-        return meta.value if isinstance(meta, Operand) else meta
-
     def __repr__(self):
-        meta = self.meta_cond
-        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
-        meta_repr = f' // meta cond {operand}'
-        return f'{self.as_operand()} = {self.fifo.as_operand()}.pop(){meta_repr}'
+        return f'{self.as_operand()} = {self.fifo.as_operand()}.pop(){self.meta_comment()}'
 
     def __getattr__(self, name):
         return self.dtype.attributize(self, name)
@@ -223,9 +273,13 @@ class Log(Expr):
 
     LOG = 600
 
-    def __init__(self, fmt, *values, meta_cond):
-        args = (fmt, *values, meta_cond)
-        super().__init__(Log.LOG, args)
+    def __init__(self, fmt, *values, meta_cond=None):
+        args = (fmt, *values)
+        if meta_cond is None:
+            # pylint: disable=import-outside-toplevel
+            from .intrinsic import get_pred
+            meta_cond = get_pred()
+        super().__init__(Log.LOG, args, meta_cond=meta_cond)
         self.args = args
 
     @property
@@ -235,13 +289,8 @@ class Log(Expr):
 
     @property
     def values(self):
-        '''Return the payload values excluding the format string and metadata.'''
-        return self.args[1:-1]
-
-    @property
-    def meta_cond(self):
-        '''Return the trailing predicate metadata.'''
-        return self.args[-1]
+        '''Return the payload values excluding the format string.'''
+        return self.args[1:]
 
     @property
     def dtype(self):
@@ -260,14 +309,7 @@ class Log(Expr):
         if payload:
             base += f', {payload}'
         base += ')'
-        meta_cond = self.meta_cond
-        if meta_cond is not None:
-            if hasattr(meta_cond, 'as_operand'):
-                meta_repr = meta_cond.as_operand()
-            else:
-                meta_repr = repr(meta_cond)
-            return f'{base} // meta cond {meta_repr}'
-        return base
+        return f'{base}{self.meta_comment()}'
 
 class Concat(Expr):
     '''The class for concatenation operation, where {msb, lsb} as a right value'''
@@ -334,10 +376,7 @@ class Cast(Expr):
 def log(*args):
     '''The exposed frontend function to instantiate a log operation'''
     assert isinstance(args[0], str)
-    #pylint: disable=import-outside-toplevel
-    from .intrinsic import get_pred
-    meta_cond = get_pred()
-    return Log(*args, meta_cond=meta_cond)
+    return Log(*args)
 
 
 class Select(Expr):

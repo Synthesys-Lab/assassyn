@@ -37,7 +37,7 @@ def codegen_log(node: Log, module_ctx):
     result.append("println!(")
     result.append(f"{dump_rval_ref(module_ctx, node.operands[0])}, ")
 
-    for elem in node.operands[1:-1]:
+    for elem in node.operands[1:]:
         dump = dump_rval_ref(module_ctx, elem)
         dtype = elem.dtype
         if dtype.bits == 1:

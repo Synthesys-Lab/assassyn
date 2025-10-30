@@ -52,7 +52,7 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
         expose_signal = f'dut.{module_name}.expose_{exposed_name}.value'
         append_condition(f'({valid_signal} & {expose_signal})')
 
-    for i in expr.operands[1:-1]:
+    for i in expr.operands[1:]:
         operand = unwrap_operand(i)
         if not isinstance(operand, Const):
             exposed_name = _sanitize(dumper.dump_rval(operand, True))

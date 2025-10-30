@@ -38,7 +38,8 @@ class ArrayWriteExposure:
     """Exposure metadata for a single array write expression."""
 
     expr: 'ArrayWrite'
-    predicate: 'Value'
+    predicate: 'Value | None'
+    predicate_tokens: Tuple['Value', ...]
 
 
 @dataclass(frozen=True)
@@ -53,7 +54,8 @@ class ValueExposure:
     """Metadata describing a valued expression that must be exposed externally."""
 
     expr: 'Expr'
-    predicate: 'Value'
+    predicate: 'Value | None'
+    predicate_tokens: Tuple['Value', ...]
 
 
 @dataclass(frozen=True)
@@ -61,7 +63,8 @@ class AsyncTriggerExposure:
     """Metadata describing an async call that contributes to a trigger sum."""
 
     call: 'AsyncCall'
-    predicate: 'Value'
+    predicate: 'Value | None'
+    predicate_tokens: Tuple['Value', ...]
 
 
 @dataclass
@@ -119,16 +122,21 @@ class ModuleExposure:
             for module, entries in self._async_triggers.items()
         }
 
-    def record_array_write(
+    def record_array_write(  # pylint: disable=too-many-arguments
         self,
         array: Array,
         module: Module,
         expr: 'ArrayWrite',
-        predicate: 'Value',
+        predicate: 'Value | None',
+        predicate_tokens: Sequence['Value'],
     ) -> None:
         """Capture an array write exposure for *array* performed by *module*."""
         self._ensure_mutable()
-        exposure = ArrayWriteExposure(expr=expr, predicate=predicate)
+        exposure = ArrayWriteExposure(
+            expr=expr,
+            predicate=predicate,
+            predicate_tokens=tuple(predicate_tokens),
+        )
         bucket = self._arrays.setdefault(array, ArrayExposure(array))
         bucket.add_write(module, exposure)
 
@@ -139,15 +147,36 @@ class ModuleExposure:
         bucket = self._arrays.setdefault(array, ArrayExposure(array))
         bucket.add_read(exposure)
 
-    def record_value(self, expr: 'Expr', predicate: 'Value') -> None:
+    def record_value(
+        self,
+        expr: 'Expr',
+        predicate: 'Value | None',
+        predicate_tokens: Sequence['Value'],
+    ) -> None:
         """Capture a valued expression that must be exposed externally."""
         self._ensure_mutable()
-        self._values.append(ValueExposure(expr=expr, predicate=predicate))
+        self._values.append(
+            ValueExposure(
+                expr=expr,
+                predicate=predicate,
+                predicate_tokens=tuple(predicate_tokens),
+            )
+        )
 
-    def record_async_trigger(self, callee: Module, call: 'AsyncCall', predicate: 'Value') -> None:
+    def record_async_trigger(  # pylint: disable=too-many-arguments
+        self,
+        callee: Module,
+        call: 'AsyncCall',
+        predicate: 'Value | None',
+        predicate_tokens: Sequence['Value'],
+    ) -> None:
         """Record an async trigger exposure for a specific callee module."""
         self._ensure_mutable()
-        entry = AsyncTriggerExposure(call=call, predicate=predicate)
+        entry = AsyncTriggerExposure(
+            call=call,
+            predicate=predicate,
+            predicate_tokens=tuple(predicate_tokens),
+        )
         self._async_triggers.setdefault(callee, []).append(entry)
 
     def freeze(self) -> None:
@@ -191,7 +220,8 @@ class FIFOInteraction:
 
     module: Module
     expr: FIFOPush | FIFOPop
-    predicate: Value
+    predicate: Value | None
+    predicate_tokens: Tuple[Value, ...]
     is_push: bool
 
 
@@ -318,18 +348,42 @@ class FIFORegistry:
             self._metadata_by_fifo[fifo_port] = metadata
         return metadata
 
-    def record_push(self, module: Module, expr: FIFOPush, predicate: Value) -> FIFOInteraction:
+    def record_push(
+        self,
+        module: Module,
+        expr: FIFOPush,
+        predicate: Value | None,
+        predicate_tokens: Sequence[Value],
+    ) -> FIFOInteraction:
         """Record a FIFO push performed by `module`."""
         fifo_port = expr.fifo
-        interaction = FIFOInteraction(module=module, expr=expr, predicate=predicate, is_push=True)
+        interaction = FIFOInteraction(
+            module=module,
+            expr=expr,
+            predicate=predicate,
+            predicate_tokens=tuple(predicate_tokens),
+            is_push=True,
+        )
         metadata = self.metadata_for(fifo_port)
         metadata.record_interaction(interaction)
         return interaction
 
-    def record_pop(self, module: Module, expr: FIFOPop, predicate: Value) -> FIFOInteraction:
+    def record_pop(
+        self,
+        module: Module,
+        expr: FIFOPop,
+        predicate: Value | None,
+        predicate_tokens: Sequence[Value],
+    ) -> FIFOInteraction:
         """Record a FIFO pop performed by `module`."""
         fifo_port = expr.fifo
-        interaction = FIFOInteraction(module=module, expr=expr, predicate=predicate, is_push=False)
+        interaction = FIFOInteraction(
+            module=module,
+            expr=expr,
+            predicate=predicate,
+            predicate_tokens=tuple(predicate_tokens),
+            is_push=False,
+        )
         metadata = self.metadata_for(fifo_port)
         metadata.record_interaction(interaction)
         return interaction
