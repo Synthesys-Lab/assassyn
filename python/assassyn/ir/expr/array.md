@@ -30,23 +30,26 @@ The IR node class for array write operations, representing `arr[idx] = val`.
 #### Attributes
 
 - `module: ModuleBase` - The module performing the write operation
+- `meta_cond: Value | None` - Predicate metadata captured at construction time
 
 #### Methods
 
-#### `__init__(self, arr, idx: Value, val: Value, module: ModuleBase = None)`
+#### `__init__(self, arr, idx: Value, val: Value, module: ModuleBase = None, meta_cond=None)`
 
 ```python
-def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None):
-    super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val])
+def __init__(self, arr, idx: Value, val: Value, module: ModuleBase = None, meta_cond=None):
     # Get module from Singleton if not provided
     if module is None:
         # pylint: disable=import-outside-toplevel
         from ...builder import Singleton
         module = Singleton.peek_builder().current_module
+    # pylint: disable=import-outside-toplevel
+    from ..intrinsic import get_pred
+    super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val, meta_cond or get_pred()])
     self.module = module
 ```
 
-**Explanation:** Initializes an array write operation with the target array, index, value, and module context. If no module is provided, it retrieves the current module from the builder singleton via `Singleton.peek_builder()`. This module context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array.
+**Explanation:** Initializes an array write operation with the target array, index, value, predicate, and module context. If no module is provided, it retrieves the current module from the builder singleton via `Singleton.peek_builder()`. The trailing `meta_cond` metadata is captured automatically using `get_pred()` to record the active predicate stack for downstream consumers whenever the caller does not provide one explicitly. This module and predicate context is crucial for [multi-port write support](../../../docs/design/pipeline.md) where multiple modules may write to the same array while remaining gated by guard conditions.
 
 **Note on Builder Context Dependency:** The `ArrayWrite` class depends on `Singleton.peek_builder()` when no module is explicitly provided. Callers must ensure a builder is active or supply the module explicitly to avoid runtime errors.
 
@@ -100,18 +103,36 @@ def dtype(self):
 
 **Explanation:** Returns `Void()` type since array write operations are side-effect operations that don't produce a value.
 
+#### `meta_cond` (property)
+
+```python
+@property
+def meta_cond(self):
+    '''Return the predicate metadata captured at construction time'''
+    meta = self._operands[3]
+    return meta.value if isinstance(meta, Operand) else meta
+```
+
+**Explanation:** Provides access to the predicate metadata (`Bits(1)` value or `None`) captured when the node was created, unwrapping the internal `Operand` wrapper to return the underlying `Value`. Verilog and simulator backends rely on this field to decide when the write should be emitted without recomputing the predicate stack.
+
 #### `__repr__(self)`
 
 ```python
 def __repr__(self):
     module_info = f' /* {self.module.name} */' if self.module else ''
+    meta = self.meta_cond
+    if meta is None:
+        meta_info = ''
+    else:
+        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+        meta_info = f' // meta cond {operand}'
     return (
         f'{self.array.as_operand()}[{self.idx.as_operand()}]'
-        f' <= {self.val.as_operand()}{module_info}'
+        f' <= {self.val.as_operand()}{module_info}{meta_info}'
     )
 ```
 
-**Explanation:** Returns a human-readable string representation of the array write operation in the format `array[index] <= value /* module_name */`, including the module context for debugging purposes.
+**Explanation:** Returns a human-readable string representation of the array write operation in the format `array[index] <= value /* module_name */ // meta cond`, including the module context and captured predicate metadata for debugging purposes. The metadata comment is only added when `meta_cond` is not `None`.
 
 ### class ArrayRead
 

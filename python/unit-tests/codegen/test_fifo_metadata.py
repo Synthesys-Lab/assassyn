@@ -20,6 +20,14 @@ from assassyn.frontend import (  # type: ignore
 from assassyn.codegen.verilog.design import CIRCTDumper
 from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata
 from assassyn.ir.module import Port as IRPort
+from assassyn.ir.const import Const
+from assassyn.ir.expr import BinaryOp
+from assassyn.ir.expr.expr import Operand
+
+
+def unwrap_value(node):
+    """Return the underlying IR value when *node* is an Operand."""
+    return node.value if isinstance(node, Operand) else node
 
 
 def test_fifo_metadata_records_predicates():
@@ -58,12 +66,22 @@ def test_fifo_metadata_records_predicates():
     assert len(fifo_meta.pops) == 1
     pop_entry = fifo_meta.pops[0]
     assert pop_entry.module is pipe_module
-    assert pop_entry.predicate == "(Bits(1)(1))"
+    pop_predicate = unwrap_value(pop_entry.predicate)
+    assert isinstance(pop_predicate, Const)
+    assert pop_predicate.value == 1
 
     assert len(fifo_meta.pushes) == 1
     push_entry = fifo_meta.pushes[0]
     assert push_entry.module is pipe_module
-    assert push_entry.predicate == "(Bits(1)(1)) & (Bits(1)(0))"
+    push_predicate = unwrap_value(push_entry.predicate)
+    assert isinstance(push_predicate, BinaryOp)
+    assert push_predicate.opcode == BinaryOp.BITWISE_AND
+    lhs = unwrap_value(push_predicate.lhs)
+    rhs = unwrap_value(push_predicate.rhs)
+    assert isinstance(lhs, Const)
+    assert lhs.value == 1
+    assert isinstance(rhs, Const)
+    assert rhs.value == 0
 
     # FIFO registry mirrors per-module metadata
     fifo_registry = dumper.fifo_registry
@@ -222,7 +240,15 @@ def test_fifo_analysis_single_module_refresh():
     fifo_meta_in = partial_registry.metadata_for(in_port)
     assert len(fifo_meta_out.pushes) == 1
     assert len(fifo_meta_in.pops) == 1
-    assert fifo_meta_out.pushes[0].predicate == "(Bits(1)(1)) & (Bits(1)(0))"
+    push_predicate = unwrap_value(fifo_meta_out.pushes[0].predicate)
+    assert isinstance(push_predicate, BinaryOp)
+    assert push_predicate.opcode == BinaryOp.BITWISE_AND
+    lhs = unwrap_value(push_predicate.lhs)
+    rhs = unwrap_value(push_predicate.rhs)
+    assert isinstance(lhs, Const)
+    assert lhs.value == 1
+    assert isinstance(rhs, Const)
+    assert rhs.value == 0
 
     # Visiting the module with only the refreshed metadata should succeed without
     # mutating the registry snapshot.

@@ -17,9 +17,12 @@ def codegen_async_call(node: AsyncCall, module_ctx):
     """Generate code for async call operations."""
     bind = node.bind
     event_q = f"{namify(bind.callee.name)}_event"
+    predicate = dump_rval_ref(module_ctx, node.meta_cond)
     return f"""{{
-              let stamp = sim.stamp - sim.stamp % 100 + 100;
-              sim.{event_q}.push_back(stamp)
+              if {predicate} {{
+                let stamp = sim.stamp - sim.stamp % 100 + 100;
+                sim.{event_q}.push_back(stamp);
+              }}
             }}"""
 
 
@@ -28,10 +31,13 @@ def codegen_fifo_pop(node: FIFOPop, module_ctx):
     fifo = node.fifo
     fifo_id = fifo_name(fifo)
     module_name = module_ctx.name
+    predicate = dump_rval_ref(module_ctx, node.meta_cond)
 
     return f"""{{
-              let stamp = sim.stamp - sim.stamp % 100 + 50;
-              sim.{fifo_id}.pop.push(FIFOPop::new(stamp, "{module_name}"));
+              if {predicate} {{
+                let stamp = sim.stamp - sim.stamp % 100 + 50;
+                sim.{fifo_id}.pop.push(FIFOPop::new(stamp, "{module_name}"));
+              }}
               match sim.{fifo_id}.payload.front() {{
                 Some(value) => value.clone(),
                 None => return false,
@@ -45,11 +51,14 @@ def codegen_fifo_push(node: FIFOPush, module_ctx):
     fifo_id = fifo_name(fifo)
     value = dump_rval_ref(module_ctx, node.val)
     module_name = module_ctx.name
+    predicate = dump_rval_ref(module_ctx, node.meta_cond)
 
     return f"""{{
-              let stamp = sim.stamp;
-              sim.{fifo_id}.push.push(
-                FIFOPush::new(stamp + 50, {value}.clone(), "{module_name}"));
+              if {predicate} {{
+                let stamp = sim.stamp;
+                sim.{fifo_id}.push.push(
+                  FIFOPush::new(stamp + 50, {value}.clone(), "{module_name}"));
+              }}
             }}"""
 
 

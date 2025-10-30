@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from ...ir.array import Array
     from ...ir.expr import ArrayRead, AsyncCall, FIFOPop, FIFOPush
     from ...ir.module import Module, Port
+    from ...ir.value import Value
 else:
     Array = Any  # type: ignore
     ArrayRead = Any  # type: ignore
@@ -22,6 +23,7 @@ else:
     FIFOPush = Any  # type: ignore
     Module = Any  # type: ignore
     Port = Any  # type: ignore
+    Value = Any  # type: ignore
 
 CallList = List[AsyncCall]
 ModuleList = List[Module]
@@ -45,7 +47,7 @@ class FIFOInteraction:
 
     module: Module
     expr: FIFOPush | FIFOPop
-    predicate: str
+    predicate: Value
     is_push: bool
 
 
@@ -176,7 +178,7 @@ class FIFORegistry:
             self._metadata_by_fifo[fifo_port] = metadata
         return metadata
 
-    def record_push(self, module: Module, expr: FIFOPush, predicate: str) -> FIFOInteraction:
+    def record_push(self, module: Module, expr: FIFOPush, predicate: Value) -> FIFOInteraction:
         """Record a FIFO push performed by `module`."""
         fifo_port = expr.fifo
         interaction = FIFOInteraction(module=module, expr=expr, predicate=predicate, is_push=True)
@@ -184,7 +186,7 @@ class FIFORegistry:
         metadata.record_interaction(interaction)
         return interaction
 
-    def record_pop(self, module: Module, expr: FIFOPop, predicate: str) -> FIFOInteraction:
+    def record_pop(self, module: Module, expr: FIFOPop, predicate: Value) -> FIFOInteraction:
         """Record a FIFO pop performed by `module`."""
         fifo_port = expr.fifo
         interaction = FIFOInteraction(module=module, expr=expr, predicate=predicate, is_push=False)

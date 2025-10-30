@@ -182,8 +182,12 @@ class FIFOPop(Expr):
 
     FIFO_POP = 301
 
-    def __init__(self, fifo):
-        super().__init__(FIFOPop.FIFO_POP, [fifo])
+    def __init__(self, fifo, meta_cond: typing.Optional[Value] = None):
+        if meta_cond is None:
+            # pylint: disable=import-outside-toplevel
+            from .intrinsic import get_pred
+            meta_cond = get_pred()
+        super().__init__(FIFOPop.FIFO_POP, [fifo, meta_cond])
 
     @property
     def fifo(self):
@@ -195,8 +199,19 @@ class FIFOPop(Expr):
         '''Get the data type of the popped value'''
         return self.fifo.dtype
 
+    @property
+    def meta_cond(self):
+        '''Return the predicate metadata captured at construction time'''
+        meta = self._operands[1]
+        return meta.value if isinstance(meta, Operand) else meta
+
     def __repr__(self):
-        return f'{self.as_operand()} = {self.fifo.as_operand()}.pop()'
+        meta = self.meta_cond
+        meta_repr = ''
+        if meta is not None:
+            operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+            meta_repr = f' // meta cond {operand}'
+        return f'{self.as_operand()} = {self.fifo.as_operand()}.pop(){meta_repr}'
 
     def __getattr__(self, name):
         return self.dtype.attributize(self, name)

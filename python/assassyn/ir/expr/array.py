@@ -7,7 +7,7 @@ from __future__ import annotations
 import typing
 
 from ..value import Value
-from .expr import Expr
+from .expr import Expr, Operand
 from ...utils.enforce_type import enforce_type
 
 if typing.TYPE_CHECKING:
@@ -22,13 +22,26 @@ class ArrayWrite(Expr):
     ARRAY_WRITE = 401
 
     @enforce_type
-    def __init__(self, arr: Array, idx: Value, val: Value, module: ModuleBase = None):
-        super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val])
+    # pylint: disable=too-many-arguments
+    def __init__(
+        self,
+        arr: Array,
+        idx: Value,
+        val: Value,
+        module: ModuleBase = None,
+        meta_cond: typing.Optional[Value] = None,
+    ):
         # Get module from Singleton if not provided
         if module is None:
             # pylint: disable=import-outside-toplevel
             from ...builder import Singleton
             module = Singleton.peek_builder().current_module
+        # Capture predicate metadata when not provided explicitly
+        if meta_cond is None:
+            # pylint: disable=import-outside-toplevel
+            from .intrinsic import get_pred
+            meta_cond = get_pred()
+        super().__init__(ArrayWrite.ARRAY_WRITE, [arr, idx, val, meta_cond])
         self.module = module
 
     @property
@@ -47,6 +60,12 @@ class ArrayWrite(Expr):
         return self._operands[2]
 
     @property
+    def meta_cond(self) -> Value:
+        '''Return the predicate metadata captured at construction time'''
+        meta = self._operands[3]
+        return meta.value if isinstance(meta, Operand) else meta
+
+    @property
     def dtype(self):
         '''Get the data type of this operation (Void for side-effect operations)'''
         #pylint: disable=import-outside-toplevel
@@ -55,9 +74,15 @@ class ArrayWrite(Expr):
 
     def __repr__(self):
         module_info = f' /* {self.module.name} */' if self.module else ''
+        meta = self.meta_cond
+        if meta is None:
+            meta_info = ''
+        else:
+            operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+            meta_info = f' // meta cond {operand}'
         return (
             f'{self.array.as_operand()}[{self.idx.as_operand()}]'
-            f' <= {self.val.as_operand()}{module_info}'
+            f' <= {self.val.as_operand()}{module_info}{meta_info}'
         )
 
 

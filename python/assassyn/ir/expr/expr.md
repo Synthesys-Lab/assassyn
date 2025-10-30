@@ -85,9 +85,12 @@ Represents consuming a value from a port's FIFO. The resulting data type is deri
 - `FIFO_POP = 301`
 
 **Methods:**
-- `__init__(fifo)` - Initialize FIFO pop operation
+- `__init__(fifo, meta_cond=None)` - Initialize FIFO pop operation
 - `fifo` - Get the FIFO port (property)
 - `dtype` - Get the data type of the popped value (property)
+- `meta_cond` - Access the predicate metadata captured when the pop was created (property)
+
+`meta_cond` carries the `Bits(1)` predicate returned by [`get_pred()`](intrinsic.md#get_pred) at construction time, unwrapping the internal `Operand` wrapper to expose the underlying `Value`. Backends use it to gate the pop event without reconstructing the condition stack. When no predicate is active, the helper records the constant `Bits(1)(1)`.
 
 #### `class Concat(Expr)`
 

@@ -88,8 +88,9 @@ aggregation.
 
 1. `FIFOAnalysisVisitor` ensures a `ModuleMetadata` instance exists for the module,
    clearing any stale FIFO interactions and wiring the metadata to the shared registry.
-2. The visitor pushes/pops predicates via `PredicateStack` so the recorded
-   `FIFOInteraction.predicate` strings match `CIRCTDumper.get_pred()`.
+2. The visitor reads each interaction’s `meta_cond` operand so the recorded
+   `FIFOInteraction.predicate` values are the original `Value` nodes instead of
+   formatted strings.
 3. Each fifo push/pop encountered during the pre-pass creates a shared `FIFOInteraction`,
    adds it to the registry, and registers it with the module’s `ModuleFIFOView`.
 4. During subsequent code generation the same `ModuleMetadata` object accumulates FINISH
@@ -150,12 +151,13 @@ sets:
 class FIFOInteraction:
     module: Module
     expr: Union[FIFOPush, FIFOPop]
-    predicate: str
+    predicate: Value
 ```
 
 This unified record replaces the redundant `FIFOPushMetadata` / `FIFOPopMetadata`
-wrappers.  The interaction type is inferred from `expr`, and the predicate preserves the
-conditional context observed during code generation.
+wrappers.  The interaction type is inferred from `expr`, and the predicate stores the
+original IR value captured at construction time, letting later stages dump it using the
+standard `dump_rval` helpers.
 
 ### `FIFOMetadata`
 

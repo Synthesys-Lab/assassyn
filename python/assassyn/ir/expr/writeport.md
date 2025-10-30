@@ -66,7 +66,7 @@ The expression `(array & module)[index] <= value` is processed through the follo
 
 2. **`[index]`**: The indexing operation `[]` is called on the `WritePort` object. This does not perform a write, but instead returns a temporary `IndexedWritePort` proxy object that stores both the parent `WritePort` and the `index`.
 
-3. **`<= value`**: The less-than-or-equal operator `<=` is called on the `IndexedWritePort` proxy. This final step triggers the creation of the `ArrayWrite` IR node, passing the array, index, value, and the original module context to its constructor to correctly represent the multi-ported write in the IR.
+3. **`<= value`**: The less-than-or-equal operator `<=` is called on the `IndexedWritePort` proxy. This final step triggers the creation of the `ArrayWrite` IR node, passing the array, index, value, the original module context, and the current predicate (captured via `get_pred()`) to its constructor to correctly represent the multi-ported write in the IR.
 
 ### Write Port Management
 
@@ -114,7 +114,7 @@ TypeError: Type mismatch in array write: array 'bundle' expects element type rec
 
 ### IR Builder Integration
 
-The `_create_write` method uses the `@ir_builder` decorator to ensure that the `ArrayWrite` expression is properly inserted into the current IR block with correct source location information.
+The `_create_write` method uses the `@ir_builder` decorator to ensure that the `ArrayWrite` expression is properly inserted into the current IR block with correct source location information. During construction it also captures the active predicate via `get_pred()` and stores it in `ArrayWrite.meta_cond`, providing a single source of truth for backend gating.
 
 **Error Conditions:**
 - Type validation errors: May occur if index is not an integer or `Value`, or if value is not a `Value` or `RecordValue`

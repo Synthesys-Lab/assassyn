@@ -94,7 +94,10 @@ class WritePort:
 
         @ir_builder
         def create_write():
-            return ArrayWrite(self.array, index, value, self.module)
+            # pylint: disable=import-outside-toplevel
+            from .intrinsic import get_pred
+            meta_cond = get_pred()
+            return ArrayWrite(self.array, index, value, self.module, meta_cond=meta_cond)
 
         return create_write()
 

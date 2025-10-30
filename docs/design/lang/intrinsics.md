@@ -86,6 +86,18 @@ Verilog Codegen: The Verilog dumper exposes only the predicate referenced by `me
 
 Simulator Parity: The Python simulator follows the same contract—`meta_cond` controls when the `print` executes—so the behaviour stays consistent across backends.
 
+### Predicate Metadata on Array/FIFO/Async Operations
+
+Purpose: Provide a unified predicate contract for side-effecting operations beyond `log()`, enabling backends to skip redundant condition-stack reconstruction.
+
+Relationship to Predicates: `ArrayWrite`, `FIFOPush`, `FIFOPop`, and `AsyncCall` now capture `get_pred()` when instantiated. The resulting `meta_cond` operand mirrors the Log node contract and is either a `Bits(1)` value or `None` when the node is constructed manually without a builder context.
+
+Backend Consumption:
+- **Verilog** uses `expr.meta_cond` when recording FIFO interactions and array writes, matching simulator gating without formatting the predicate stack.
+- **Simulator** threads the same metadata into the generated Rust glue so runtime events only materialize when the predicate is true.
+
+Legacy Compatibility: Older nodes that predate the metadata field continue to work; codegen falls back to `Bits(1)(1)` when metadata is missing, but new construction paths must ensure the field is populated.
+
 ### `wait_until(condition)`
 
 **Purpose**: Block execution until a condition becomes true.

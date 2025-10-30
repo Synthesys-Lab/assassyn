@@ -32,9 +32,9 @@ generation.
    allowing incremental workflows to refresh subsets and merge the new results into an
    existing cache.
 2. **Visitor Execution**: Instantiates `FIFOAnalysisVisitor` with a fresh
-   `FIFORegistry`, a mutable `dict[Module, ModuleMetadata]`, and a predicate formatter
-   that shares the dumper’s naming rules. The visitor visits each module body and records
-   push/pop interactions while maintaining predicate context with `PredicateStack`.
+   `FIFORegistry` and a mutable `dict[Module, ModuleMetadata]`. The visitor walks each
+   module body, recording push/pop interactions and reading their `meta_cond` operands
+   directly so predicate information stays attached as IR values.
 3. **Metadata Construction**: For every visited module the helper creates a new
    `ModuleMetadata` whose `ModuleFIFOView` references the shared registry. Recorded
    `FIFOInteraction` instances are owned by the registry and re-used inside the module
@@ -53,21 +53,18 @@ stitch the returned dictionaries into their own caches.
 ### `FIFOAnalysisVisitor`
 
 `FIFOAnalysisVisitor` subclasses the generic IR `Visitor` and overrides only `visit_expr`.
-It receives three collaborators:
+It receives two collaborators:
 
 - A shared `FIFORegistry` that owns every `FIFOInteraction`.
 - A mutable `dict[Module, ModuleMetadata]` populated on demand.
-- A predicate formatter that exposes `dump_rval(expr, with_namespace, module_name)` so
-  `PUSH_CONDITION` intrinsics and their predicates match the strings produced during code
-  emission.
 
-`visit_expr` handles three cases:
+`visit_expr` handles two cases:
 
-1. `Intrinsic.PUSH_CONDITION` – formats the guard expression with the shared predicate
-   formatter and pushes it onto `PredicateStack`.
-2. `Intrinsic.POP_CONDITION` – pops the most recent predicate frame.
-3. `FIFOPush` / `FIFOPop` – records interactions in `FIFORegistry` and in the
-   per-module `ModuleFIFOView`, using the current predicate string supplied by the stack.
+1. `Intrinsic` guard management – these intrinsics are ignored because predicate
+   information is already baked into the consumer nodes’ `meta_cond` fields.
+2. `FIFOPush` / `FIFOPop` – records interactions in `FIFORegistry` and in the
+   per-module `ModuleFIFOView`, capturing the predicate value directly from
+   `expr.meta_cond` (falling back to `Bits(1)(1)` for legacy IR).
 
 Traversal of module bodies is delegated to the base `Visitor`, keeping the class small and
 ensuring new IR constructs automatically flow through the pass as long as they surface as

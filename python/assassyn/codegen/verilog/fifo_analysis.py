@@ -4,16 +4,13 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import Dict, List, Sequence, Set, Tuple, TYPE_CHECKING
 
+from ...ir.const import Const
 from ...ir.expr import Expr, FIFOPop, FIFOPush
 from ...ir.expr.intrinsic import Intrinsic
 from ...ir.visitor import Visitor
-from ...utils import namify
 from .metadata import FIFORegistry, ModuleMetadata
-from .predicate import PredicateStack
-from .rval import dump_rval as dump_rval_impl
 
 if TYPE_CHECKING:
     from ...builder import SysBuilder
@@ -52,8 +49,7 @@ def collect_fifo_metadata(
 
     registry = FIFORegistry()
     module_metadata: Dict["Module", ModuleMetadata] = {}
-    formatter = _PredicateFormatter()
-    visitor = FIFOAnalysisVisitor(registry, module_metadata, formatter)
+    visitor = FIFOAnalysisVisitor(registry, module_metadata)
 
     for module in modules_to_visit:
         module_metadata[module] = ModuleMetadata(module, registry)
@@ -69,29 +65,23 @@ class FIFOAnalysisVisitor(Visitor):
         self,
         registry: FIFORegistry,
         module_metadata: Dict["Module", ModuleMetadata],
-        formatter: "_PredicateFormatter",
     ) -> None:
         super().__init__()
         self._registry = registry
         self._module_metadata = module_metadata
-        self._formatter = formatter
-        self._predicate_stack = PredicateStack()
+        self._true_predicate: Const | None = None
 
     def analyse_modules(self, modules: Sequence["Module"]) -> None:
         """Analyse the provided modules and populate FIFO metadata."""
 
         for module in modules:
             self.current_module = module
-            self._formatter.enter_module(module)
-            self._predicate_stack.reset()
 
             body = getattr(module, "body", None)
             if isinstance(body, list):
                 for entry in body:
                     self.dispatch(entry)
 
-            self._predicate_stack.reset()
-            self._formatter.leave_module()
             self.current_module = None
 
     def dispatch(self, node) -> None:  # type: ignore[override]
@@ -101,12 +91,6 @@ class FIFOAnalysisVisitor(Visitor):
     # pylint: disable=too-many-return-statements
     def visit_expr(self, node: Expr) -> None:  # type: ignore[override]
         if isinstance(node, Intrinsic):
-            opcode = node.opcode
-            if opcode == Intrinsic.PUSH_CONDITION:
-                cond_str = self._formatter.dump(node.args[0])
-                self._predicate_stack.push(f"({cond_str})", node)
-            elif opcode == Intrinsic.POP_CONDITION:
-                self._predicate_stack.pop()
             return
 
         module = self.current_module
@@ -114,77 +98,27 @@ class FIFOAnalysisVisitor(Visitor):
             return
 
         metadata = self._module_metadata[module]
-        predicate = self._predicate_stack.predicate()
 
         if isinstance(node, FIFOPush):
-            interaction = self._registry.record_push(module, node, predicate)
+            predicate_value = node.meta_cond if hasattr(node, "meta_cond") else None
+            if predicate_value is None:
+                predicate_value = self._true_predicate or self._materialise_true()
+            interaction = self._registry.record_push(module, node, predicate_value)
             metadata.record_fifo_interaction(node.fifo, interaction)
             return
 
         if isinstance(node, FIFOPop):
-            interaction = self._registry.record_pop(module, node, predicate)
+            predicate_value = node.meta_cond if hasattr(node, "meta_cond") else None
+            if predicate_value is None:
+                predicate_value = self._true_predicate or self._materialise_true()
+            interaction = self._registry.record_pop(module, node, predicate_value)
             metadata.record_fifo_interaction(node.fifo, interaction)
             return
 
+    def _materialise_true(self) -> Const:
+        """Return a cached constant true predicate."""
+        # Lazy import to avoid circular dependencies during module load.
+        from ...ir.dtype import Bits  # pylint: disable=import-outside-toplevel
 
-class _PredicateFormatter:
-    """Formats predicate expressions using dumper-compatible naming rules."""
-
-    def __init__(self) -> None:
-        self._ctx = _AnalysisDumpContext()
-        self._module_name: str | None = None
-
-    def enter_module(self, module: "Module") -> None:
-        """Prepare predicate formatting for *module*."""
-
-        self._ctx.enter_module(module)
-        self._module_name = namify(module.name)
-
-    def leave_module(self) -> None:
-        """Reset formatter state after leaving a module."""
-
-        self._ctx.leave_module()
-        self._module_name = None
-
-    def dump(self, expr) -> str:
-        """Format *expr* using the active module context."""
-
-        return dump_rval_impl(self._ctx, expr, False, self._module_name)
-
-
-class _AnalysisDumpContext:
-    """Mimics the subset of CIRCTDumper used by ``dump_rval``."""
-
-    def __init__(self) -> None:
-        self.expr_to_name: Dict[Expr, str] = {}
-        self.name_counters = defaultdict(int)
-        self.current_module = None
-        self.is_top_generation = False
-
-    def enter_module(self, module: "Module") -> None:
-        """Start formatting values while visiting *module*."""
-
-        self.current_module = module
-        self._reset_names()
-
-    def leave_module(self) -> None:
-        """Clear module-specific formatting state."""
-
-        self.current_module = None
-        self._reset_names()
-
-    def get_external_port_name(self, node: Expr) -> str:
-        """Derive the mangled port name for an external value."""
-
-        producer_module = node.parent
-        producer_name = namify(producer_module.name)
-        base_port_name = namify(node.as_operand())
-        if base_port_name.startswith("_"):
-            base_port_name = f"port{base_port_name}"
-        return f"{producer_name}_{base_port_name}"
-
-    def _reset_names(self) -> None:
-        """Clear expression naming caches."""
-
-        self.expr_to_name.clear()
-        self.name_counters.clear()
+        self._true_predicate = Bits(1)(1)
+        return self._true_predicate

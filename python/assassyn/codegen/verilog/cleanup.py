@@ -281,10 +281,12 @@ def cleanup_post_generation(dumper):
         local_pops = [entry for entry in interactions if not entry.is_push]
 
         if local_pushes:
-            predicates = [f'({entry.predicate})' for entry in local_pushes]
+            predicate_terms = [
+                f'({dumper.dump_rval(entry.predicate, False)})' for entry in local_pushes
+            ]
             final_push_predicate = (
-                f"reduce(or_, [{', '.join(predicates)}], Bits(1)(0))"
-                if predicates else "Bits(1)(0)"
+                f"reduce(or_, [{', '.join(predicate_terms)}], Bits(1)(0))"
+                if predicate_terms else "Bits(1)(0)"
             )
 
             if len(local_pushes) == 1:
@@ -293,7 +295,8 @@ def cleanup_post_generation(dumper):
                 mux_chain = f"{dump_type(fifo_port.dtype)}(0)"
                 for entry in local_pushes:
                     rval = dumper.dump_rval(entry.expr.val, False)
-                    mux_chain = f"Mux({entry.predicate}, {mux_chain}, {rval})"
+                    predicate_expr = dumper.dump_rval(entry.predicate, False)
+                    mux_chain = f"Mux({predicate_expr}, {mux_chain}, {rval})"
                 final_push_data = mux_chain
 
             dumper.append_code(f'# Push logic for port: {fifo_name}')
@@ -309,7 +312,9 @@ def cleanup_post_generation(dumper):
             dumper.append_code(f"{fifo_prefix}_push_data = {final_push_data}")
 
         if local_pops:
-            pop_predicates = [f'({entry.predicate})' for entry in local_pops]
+            pop_predicates = [
+                f'({dumper.dump_rval(entry.predicate, False)})' for entry in local_pops
+            ]
             final_pop_condition = (
                 f"reduce(or_, [{', '.join(pop_predicates)}], Bits(1)(0))"
                 if pop_predicates else "Bits(1)(0)"
