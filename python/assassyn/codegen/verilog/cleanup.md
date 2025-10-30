@@ -31,12 +31,13 @@ This is the main cleanup function that generates all the necessary control signa
    `module_metadata.exposures.arrays`:
    - Filters out arrays whose owner is a memory instance and satisfy `array.is_payload(owner)`, because those are handled by dedicated memory logic.
    - Uses the pre-bucketed writes-per-module data to map interactions onto the precomputed port indices stored in the `ArrayMetadataRegistry`.
-   - Emits write-enable, write-data, and write-index signals per port, formatting the stored predicate values with `dumper.format_predicate`. Multi-writer modules use `build_mux_chain` to pick the correct payload.
+   - Emits write-enable, write-data, and write-index signals per port, formatting the stored predicate values with `dumper.format_predicate`. Multi-writer modules rely on `_emit_predicate_mux_chain` to both collapse predicates and thread prioritised mux chains for data and indices, guaranteeing consistent selection semantics.
 
 5. **FIFO Signal Generation**: Uses `module_metadata[current_module].fifo.iter_channels()` to visit each FIFO touched by the module:
    - Pulls the per-port `FIFOMetadata` directly from the registry so push predicates, values, and pop predicates stay in sync with the module view, while the module view provides the filtered interactions.
    - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata captured during the pre-pass.
    - Produces the module-local `*_pop_ready` backpressure signal without consulting dumper internals.
+   - Reuses `_emit_predicate_mux_chain` so the push-valid reduction and push-data mux mirror the prioritisation used for array writes.
 
 6. **Module Trigger Signal Generation**: Reads async trigger exposures from metadata, sums all predicates (each converted to an 8-bit increment), and routes the result into `<callee>_trigger`.
 
@@ -78,26 +79,25 @@ This function generates the control signals specifically for SRAM memory interfa
 - Understanding of [SRAM memory model](/python/assassyn/ir/memory/sram.md)
 - Knowledge of [array read/write operations](/python/assassyn/ir/expr/array.md)
 
-### `build_mux_chain`
+### `_emit_predicate_mux_chain`
 
 ```python
-def build_mux_chain(dumper, writes, dtype):
-    """Helper to build a mux chain for write data"""
+def _emit_predicate_mux_chain(entries, *, render_predicate, render_value, default_value, aggregate_predicates):
+    """Return both the mux chain and aggregate predicate for *entries*."""
 ```
 
 **Explanation**
 
-This helper function builds a multiplexer chain for handling multiple write operations to the same array location from the same module. It creates a cascaded multiplexer structure where each write operation is conditionally selected based on its predicate. Type mismatches are reconciled through `dump_type_cast` so the generated hardware preserves bit widths.
+This helper consolidates the predicate-driven mux logic shared by array writes and FIFO pushes. Callers provide renderers for predicates and values alongside a default expression and reduction strategy; the helper then:
 
-The function:
-1. Takes the first write value as the base case
-2. Iteratively builds multiplexer expressions for each additional write
-3. Handles type casting when necessary
-4. Returns the final multiplexer expression
+1. Collects predicate literals via `render_predicate` and feeds them into `aggregate_predicates`, allowing array writers to omit a default literal while FIFO pushes supply `Bits(1)(0)`.
+2. Threads a nested `Mux` chain seeded with `default_value`, preserving iteration order so later entries win, matching the legacy manual loops.
+3. Returns a `(mux_expr, aggregated_predicate)` tuple so enable reductions, data muxes, and index muxes can reuse the same predicate formatting without duplication.
 
 **Project-specific Knowledge Required**:
 - Understanding of [array write operations](/python/assassyn/ir/expr/array.md)
-- Knowledge of [type casting utilities](/python/assassyn/codegen/verilog/utils.md)
+- Knowledge of [FIFO metadata collection](/python/assassyn/codegen/verilog/fifo_analysis.md)
+- Familiarity with [type casting utilities](/python/assassyn/codegen/verilog/utils.md)
 
 ## Internal Helpers
 
@@ -106,5 +106,7 @@ The module uses several internal helper functions and imports utilities from oth
 - `dump_type()` and `dump_type_cast()` from [utils](/python/assassyn/codegen/verilog/utils.md) for type handling
 - `get_sram_info()` from [utils](/python/assassyn/codegen/verilog/utils.md) for SRAM information extraction
 - `namify()` and `unwrap_operand()` from [utils](/python/assassyn/utils.md) for name generation and operand handling
+- `_format_reduce_or()` ensures predicate reductions share identical formatting between arrays and FIFOs.
+- `_emit_predicate_mux_chain()` centralises predicate-driven mux construction so callers reuse ordering and reduction semantics.
 
 The cleanup process is tightly integrated with the [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) class and is called as the final step in module generation to ensure all interconnections are properly established.

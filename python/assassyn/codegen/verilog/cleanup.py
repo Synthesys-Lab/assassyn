@@ -1,9 +1,9 @@
 """Post-generation cleanup and signal generation for Verilog codegen."""
 
 from collections import defaultdict
-from typing import Dict, List, NamedTuple, Optional, Sequence
+from typing import Callable, Dict, List, NamedTuple, Optional, Sequence, TypeVar
 
-from .metadata import ArrayExposure, ArrayWriteExposure, ValueExposure
+from .metadata import ArrayExposure, ArrayWriteExposure, FIFOInteraction, ValueExposure
 from .utils import dump_type, dump_type_cast, get_sram_info
 
 from ...ir.module import Downstream
@@ -13,6 +13,8 @@ from ...ir.memory.base import MemoryBase
 from ...ir.const import Const
 from ...ir.expr import Expr
 from ...utils import namify, unwrap_operand
+
+T = TypeVar("T")
 
 
 class ValueExposureRender(NamedTuple):
@@ -96,25 +98,42 @@ def generate_sram_control_signals(dumper, sram_info, module_exposure):
     dumper.append_code('self.mem_read_enable = Bits(1)(1)')  # Always enable reads
 
 
-def build_mux_chain(dumper, writes: Sequence[ArrayWriteExposure], dtype):
-    """Helper to build a mux chain for write data."""
+def _format_reduce_or(predicates: Sequence[str], *, default_literal: Optional[str]) -> str:
+    """Format a reduce-or expression with an optional default literal."""
 
-    dtype_str = dump_type(dtype)
-    first_write = writes[0]
-    first_val = dumper.dump_rval(first_write.expr.val, False)
-    if dump_type(first_write.expr.val.dtype) != dtype_str:
-        first_val = f"{first_val}.{dump_type_cast(dtype)}"
-    first_pred = dumper.format_predicate(first_write.predicate)
-    mux = f"Mux({first_pred}, {dtype_str}(0), {first_val})"
+    if not predicates:
+        if default_literal is None:
+            raise ValueError("Cannot build predicate reduction without a default literal")
+        return default_literal
 
-    for exposure in writes[1:]:
-        val = dumper.dump_rval(exposure.expr.val, False)
-        if dump_type(exposure.expr.val.dtype) != dtype_str:
-            val = f"{val}.{dump_type_cast(dtype)}"
-        pred_literal = dumper.format_predicate(exposure.predicate)
-        mux = f"Mux({pred_literal}, {mux}, {val})"
+    joined = ", ".join(predicates)
+    if default_literal is None:
+        return f"reduce(or_, [{joined}])"
+    return f"reduce(or_, [{joined}], {default_literal})"
 
-    return mux
+
+def _emit_predicate_mux_chain(
+    entries: Sequence[T],
+    *,
+    render_predicate: Callable[[T], str],
+    render_value: Callable[[T], str],
+    default_value: str,
+    aggregate_predicates: Callable[[Sequence[str]], str],
+) -> tuple[str, str]:
+    """Return both the mux chain and aggregate predicate for *entries*."""
+
+    if not entries:
+        raise ValueError("_emit_predicate_mux_chain requires at least one entry")
+
+    predicate_terms = [render_predicate(entry) for entry in entries]
+    aggregate_expr = aggregate_predicates(predicate_terms)
+
+    value_terms = [render_value(entry) for entry in entries]
+    mux_expr = default_value
+    for predicate_expr, value_expr in zip(predicate_terms, value_terms):
+        mux_expr = f"Mux({predicate_expr}, {mux_expr}, {value_expr})"
+
+    return mux_expr, aggregate_expr
 
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements,too-many-nested-blocks
@@ -180,36 +199,64 @@ def cleanup_post_generation(dumper):
             if port_idx is None:
                 continue
             port_suffix = f"_port{port_idx}"
-            predicate_terms = [dumper.format_predicate(write.predicate) for write in module_writes]
-            joined_terms = ', '.join(predicate_terms)
+            array_dtype_str = dump_type(array_dtype)
+
+            def render_array_predicate(exposure: ArrayWriteExposure) -> str:
+                return dumper.format_predicate(exposure.predicate)
+
+            def render_array_value(
+                exposure: ArrayWriteExposure,
+                dtype_str: str = array_dtype_str,
+                dtype=array_dtype,
+            ) -> str:
+                value_expr = dumper.dump_rval(exposure.expr.val, False)
+                if dump_type(exposure.expr.val.dtype) != dtype_str:
+                    value_expr = f"{value_expr}.{dump_type_cast(dtype)}"
+                return value_expr
+
+            def aggregate_array(predicates: Sequence[str]) -> str:
+                return _format_reduce_or(predicates, default_literal=None)
+
+            wdata_mux, aggregated_predicates = _emit_predicate_mux_chain(
+                module_writes,
+                render_predicate=render_array_predicate,
+                render_value=render_array_value,
+                default_value=f"{array_dtype_str}(0)",
+                aggregate_predicates=aggregate_array,
+            )
+
             dumper.append_code(
-                f'self.{array_name}_w{port_suffix} = '
-                f'executed_wire & reduce(or_, [{joined_terms}])'
+                f'self.{array_name}_w{port_suffix} = executed_wire & {aggregated_predicates}'
             )
 
             if len(module_writes) == 1:
                 write_expr = module_writes[0].expr
-                wdata = dumper.dump_rval(write_expr.val, False)
-                if dump_type(write_expr.val.dtype) != dump_type(array_dtype):
-                    wdata = f"{wdata}.{dump_type_cast(array_dtype)}"
-                widx_mux = dumper.dump_rval(write_expr.idx, False)
+                wdata = render_array_value(module_writes[0])
+                widx_base = dumper.dump_rval(write_expr.idx, False)
             else:
-                wdata = build_mux_chain(dumper, module_writes, array_dtype)
-                first_write = module_writes[0]
-                first_pred = dumper.format_predicate(first_write.predicate)
-                widx_mux = (
-                    f"Mux({first_pred}, {dump_type(first_write.expr.idx.dtype)}(0), "
-                    f"{dumper.dump_rval(first_write.expr.idx, False)})"
+                wdata = wdata_mux
+                idx_default = f"{dump_type(module_writes[0].expr.idx.dtype)}(0)"
+
+                def render_array_index(exposure: ArrayWriteExposure) -> str:
+                    return dumper.dump_rval(exposure.expr.idx, False)
+
+                def reuse_aggregated(
+                    _predicates: Sequence[str],
+                    combined: str = aggregated_predicates,
+                ) -> str:
+                    return combined
+
+                widx_mux, _ = _emit_predicate_mux_chain(
+                    module_writes,
+                    render_predicate=render_array_predicate,
+                    render_value=render_array_index,
+                    default_value=idx_default,
+                    aggregate_predicates=reuse_aggregated,
                 )
-                for exposure in module_writes[1:]:
-                    pred_literal = dumper.format_predicate(exposure.predicate)
-                    widx_mux = (
-                        f"Mux({pred_literal}, {widx_mux}, "
-                        f"{dumper.dump_rval(exposure.expr.idx, False)})"
-                    )
+                widx_base = widx_mux
 
             dumper.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata}')
-            dumper.append_code(f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()')
+            dumper.append_code(f'self.{array_name}_widx{port_suffix} = {widx_base}.as_bits()')
 
         if array_exposure.reads and arr.index_bits > 0:
             assigned_read_ports = set()
@@ -273,23 +320,30 @@ def cleanup_post_generation(dumper):
         local_pops = [entry for entry in interactions if not entry.is_push]
 
         if local_pushes:
-            predicate_terms = [
-                f'({dumper.dump_rval(entry.predicate, False)})' for entry in local_pushes
-            ]
-            final_push_predicate = (
-                f"reduce(or_, [{', '.join(predicate_terms)}], Bits(1)(0))"
-                if predicate_terms else "Bits(1)(0)"
+            fifo_default = f"{dump_type(fifo_port.dtype)}(0)"
+
+            def render_fifo_predicate(entry: FIFOInteraction) -> str:
+                return dumper.dump_rval(entry.predicate, False)
+
+            def render_fifo_value(entry: FIFOInteraction) -> str:
+                return dumper.dump_rval(entry.expr.val, False)
+
+            def aggregate_fifo(predicates: Sequence[str]) -> str:
+                wrapped = [f"({term})" for term in predicates]
+                return _format_reduce_or(wrapped, default_literal="Bits(1)(0)")
+
+            fifo_data_mux, fifo_predicate_expr = _emit_predicate_mux_chain(
+                local_pushes,
+                render_predicate=render_fifo_predicate,
+                render_value=render_fifo_value,
+                default_value=fifo_default,
+                aggregate_predicates=aggregate_fifo,
             )
 
             if len(local_pushes) == 1:
-                final_push_data = dumper.dump_rval(local_pushes[0].expr.val, False)
+                final_push_data = render_fifo_value(local_pushes[0])
             else:
-                mux_chain = f"{dump_type(fifo_port.dtype)}(0)"
-                for entry in local_pushes:
-                    rval = dumper.dump_rval(entry.expr.val, False)
-                    predicate_expr = dumper.dump_rval(entry.predicate, False)
-                    mux_chain = f"Mux({predicate_expr}, {mux_chain}, {rval})"
-                final_push_data = mux_chain
+                final_push_data = fifo_data_mux
 
             dumper.append_code(f'# Push logic for port: {fifo_name}')
             ready_signal = (
@@ -299,7 +353,7 @@ def cleanup_post_generation(dumper):
 
             dumper.append_code(
                 f"{fifo_prefix}_push_valid = executed_wire & "
-                f"({final_push_predicate}) & {ready_signal}"
+                f"({fifo_predicate_expr}) & {ready_signal}"
             )
             dumper.append_code(f"{fifo_prefix}_push_data = {final_push_data}")
 

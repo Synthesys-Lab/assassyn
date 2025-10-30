@@ -111,6 +111,8 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 6. **Code Generation**: `code`, `logs`, and `indent` store emitted lines and diagnostic information used later by the testbench.
 7. **Module Metadata**: `module_metadata` maps each `Module` to its `ModuleMetadata`. The structure tracks FINISH intrinsics, async calls, FIFO interactions (annotated with `expr.meta_cond`), and every array/value exposure required for cleanup. These entries are populated before the dumper is constructed via [`collect_fifo_metadata`](./fifo_analysis.md), so `CIRCTDumper` receives a frozen snapshot and never mutates it during emission. See [metadata module](/python/assassyn/codegen/verilog/metadata.md) for details.
 
+During the cleanup pass the dumper feeds the precomputed metadata into `_emit_predicate_mux_chain`, producing both the `reduce(or_, …)` guards and prioritised mux chains shared by array writes and FIFO pushes. Centralising the logic here keeps the emitted Verilog stable if predicate formatting or default literals change in the future.
+
 #### Key Methods
 
 **`visit_system`**: Generates code for the entire system by calling `generate_system()`
