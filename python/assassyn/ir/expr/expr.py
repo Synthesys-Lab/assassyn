@@ -61,38 +61,24 @@ class Expr(Value):
         for operand in operands:
             self._operands.append(self._prepare_operand(operand))
         self.users = []
-        self._predicate_trace = self._capture_predicate_trace(meta_cond)
-        self._meta_cond = self._predicate_trace[-1][1] if self._predicate_trace else None
+        override = self._normalize_meta_cond(meta_cond)
+        if override is not None:
+            self._meta_cond = override
+        else:
+            self._meta_cond = self._resolve_ambient_meta_cond()
 
     @staticmethod
-    def _unwrap_predicate(value):
+    def _normalize_meta_cond(value: typing.Optional[Value]):
         return value.value if isinstance(value, Operand) else value
 
-    def _capture_predicate_trace(self, override: typing.Optional[Value]):
-        trace: list[tuple[Value, Value]] = []
-        stack = []
+    def _resolve_ambient_meta_cond(self):
         try:
             # pylint: disable=import-outside-toplevel
             from ...builder import Singleton
             builder = Singleton.peek_builder()
         except (RuntimeError, ImportError):
-            builder = None
-        if builder is not None:
-            stack = builder.get_predicate_stack()
-
-        for frame in stack:
-            cond_value = self._unwrap_predicate(frame.cond)
-            carry_value = self._unwrap_predicate(frame.carry)
-            trace.append((cond_value, carry_value))
-
-        if override is not None:
-            override_value = self._unwrap_predicate(override)
-            if trace:
-                cond_value, _ = trace[-1]
-                trace[-1] = (cond_value, override_value)
-            else:
-                trace.append((override_value, override_value))
-        return trace
+            return None
+        return self._normalize_meta_cond(builder.current_predicate_carry())
 
     def _prepare_operand(self, operand):
         '''Normalize an incoming operand and register its usage'''
@@ -171,27 +157,6 @@ class Expr(Value):
         '''Return the cumulative predicate guarding this expression.'''
         return self._meta_cond
 
-    @property
-    def predicate_trace(self):
-        '''Return the snapshot of predicate frames as (cond, carry) tuples.'''
-        return list(self._predicate_trace)
-
-    @property
-    def predicate_tokens(self):
-        '''Return the predicate snapshot flattened as [cond0, carry0, ...].'''
-        tokens: list[Value] = []
-        for cond_value, carry_value in self._predicate_trace:
-            tokens.append(cond_value)
-            tokens.append(carry_value)
-        return tokens
-
-    def meta_comment(self):
-        '''Return the formatted predicate comment for repr helpers.'''
-        meta = self.meta_cond
-        if meta is None:
-            return ''
-        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
-        return f' // meta cond {operand}'
 
     def as_operand(self):
         '''Dump the expression as an operand'''
@@ -259,7 +224,13 @@ class FIFOPop(Expr):
         return self.fifo.dtype
 
     def __repr__(self):
-        return f'{self.as_operand()} = {self.fifo.as_operand()}.pop(){self.meta_comment()}'
+        meta = self.meta_cond
+        if meta is None:
+            suffix = ''
+        else:
+            operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+            suffix = f' // meta cond {operand}'
+        return f'{self.as_operand()} = {self.fifo.as_operand()}.pop(){suffix}'
 
     def __getattr__(self, name):
         return self.dtype.attributize(self, name)
@@ -309,7 +280,11 @@ class Log(Expr):
         if payload:
             base += f', {payload}'
         base += ')'
-        return f'{base}{self.meta_comment()}'
+        meta = self.meta_cond
+        if meta is None:
+            return base
+        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+        return f'{base} // meta cond {operand}'
 
 class Concat(Expr):
     '''The class for concatenation operation, where {msb, lsb} as a right value'''

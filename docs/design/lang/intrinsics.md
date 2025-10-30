@@ -80,23 +80,23 @@ def build(self):
 
 Purpose: Emit a formatted trace message guarded by the current predicate.
 
-Relationship to Predicates: The frontend helper snapshots the builder predicate stack when the `Log` node is created. The base `Expr` stores the final `AND` as `meta_cond` and retains the full `(cond, carry)` sequence in `predicate_trace`, so backends can rely on a single source of truth without re-deriving the stack.
+Relationship to Predicates: The frontend helper captures the builder’s current predicate carry when the `Log` node is created. The base `Expr` stores this value in `meta_cond`, giving every backend a single guard without threading extra operands or replaying the predicate stack.
 
-Verilog Codegen: The Verilog dumper exposes only the predicate referenced by `meta_cond` once, generating a `valid_*` / `expose_*` pair that drives the trace guard. Older logic walked the entire condition stack to expose each guard separately; the snapshot now serves as the single source of truth to avoid redundant exposures while still keeping `predicate_trace` available for diagnostics.
+Verilog Codegen: The Verilog dumper exposes only the predicate referenced by `meta_cond` once, generating a `valid_*` / `expose_*` pair that drives the trace guard. Older logic walked the entire condition stack to expose each guard separately; the carry capture now serves as the single source of truth while keeping the IR lightweight.
 
-Simulator Parity: The Python simulator follows the same contract—`meta_cond` controls when the `print` executes—so the behaviour stays consistent across backends. Nested conditions respect the same `(cond, carry)` ordering as Verilog metadata.
+Simulator Parity: The Python simulator follows the same contract—`meta_cond` controls when the `print` executes—so the behaviour stays consistent across backends.
 
 ### Predicate Metadata on Array/FIFO/Async Operations
 
 Purpose: Provide a unified predicate contract for side-effecting operations beyond `log()`, enabling backends to skip redundant condition-stack reconstruction.
 
-Relationship to Predicates: `Expr` now hoists predicate capture for all nodes, so valued and side-effect operations automatically acquire `meta_cond` and the full `predicate_trace` snapshot at construction time. Existing helpers (e.g., `ArrayWrite`, `FIFOPush`, `FIFOPop`, `AsyncCall`, and valued intrinsics) simply forward explicit overrides when they need to deviate from the ambient predicate stack.
+Relationship to Predicates: `Expr` hoists predicate capture for all nodes, so valued and side-effect operations automatically acquire `meta_cond` at construction time. Existing helpers (e.g., `ArrayWrite`, `FIFOPush`, `FIFOPop`, `AsyncCall`, and valued intrinsics) simply forward explicit overrides when they need to deviate from the ambient predicate stack.
 
 Backend Consumption:
-- **Verilog** uses `expr.meta_cond` when recording FIFO interactions and array writes, matching simulator gating without formatting the predicate stack. When condition provenance is required, consumers iterate `expr.predicate_tokens`, which is ordered `(cond0, carry0, cond1, carry1, ...)`.
+- **Verilog** uses `expr.meta_cond` when recording FIFO interactions and array writes, matching simulator gating without formatting the predicate stack.
 - **Simulator** threads the same metadata into the generated Rust glue so runtime events only materialize when the predicate is true.
 
-Legacy Compatibility: Older nodes that predate the metadata snapshot should migrate to the new helpers; current constructors always populate `meta_cond` (final carry) and `predicate_trace` (per-frame `(cond, carry)` pairs). When no guard is present, `meta_cond` resolves to `Bits(1)(1)` and the trace remains empty.
+Legacy Compatibility: Older nodes that predate the metadata snapshot should migrate to the new helpers; current constructors always populate `meta_cond` (final carry). When no guard is present, `meta_cond` resolves to `Bits(1)(1)`.
 
 ### `wait_until(condition)`
 

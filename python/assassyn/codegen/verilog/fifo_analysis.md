@@ -35,8 +35,7 @@ generation.
    `FIFORegistry` and a mutable `dict[Module, ModuleMetadata]`. The visitor walks each
    module body, recording push/pop interactions, FINISH intrinsics, async calls, and any
    valued expression that must be exposed outside the module. Predicates are read directly
-   from the base `Expr` snapshot (`expr.meta_cond` for the final carry and `expr.predicate_tokens`
-   for provenance), so the stored metadata contains raw IR values.
+   from the base `Expr` snapshot (`expr.meta_cond`), so the stored metadata contains raw IR values.
 3. **Metadata Construction**: For every visited module the helper creates a new
    `ModuleMetadata` whose `ModuleFIFOView` references the shared registry and whose
    `ModuleExposure` aggregates array, async-trigger, and general value exposures. Recorded

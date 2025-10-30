@@ -20,10 +20,6 @@ class FIFOPush(Expr):
     FIFO_PUSH  = 302
 
     def __init__(self, fifo, val, meta_cond=None):
-        if meta_cond is None:
-            # pylint: disable=import-outside-toplevel
-            from .intrinsic import get_pred
-            meta_cond = get_pred()
         super().__init__(FIFOPush.FIFO_PUSH, [fifo, val], meta_cond=meta_cond)
         self.bind = None
         self.fifo_depth = None
@@ -47,7 +43,12 @@ class FIFOPush(Expr):
 
     def __repr__(self):
         handle = self.as_operand()
-        meta_repr = self.meta_comment()
+        meta = self.meta_cond
+        if meta is None:
+            meta_repr = ''
+        else:
+            operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+            meta_repr = f' // meta cond {operand}'
         return (
             f'{self.fifo.as_operand()}.push({self.val.as_operand()})'
             f' // handle = {handle}{meta_repr}'
@@ -168,10 +169,6 @@ class AsyncCall(Expr):
     ASYNC_CALL = 500
 
     def __init__(self, bind: Bind, meta_cond=None):
-        if meta_cond is None:
-            # pylint: disable=import-outside-toplevel
-            from .intrinsic import get_pred
-            meta_cond = get_pred()
         super().__init__(AsyncCall.ASYNC_CALL, [bind], meta_cond=meta_cond)
         bind.callee.users.append(self)
 
@@ -189,4 +186,8 @@ class AsyncCall(Expr):
 
     def __repr__(self):
         bind = self.bind.as_operand()
-        return f'async_call {bind}{self.meta_comment()}'
+        meta = self.meta_cond
+        if meta is None:
+            return f'async_call {bind}'
+        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+        return f'async_call {bind} // meta cond {operand}'

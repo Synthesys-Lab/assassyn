@@ -44,8 +44,6 @@ class Intrinsic(Expr):
         # num_args can be None for variable-length args (like EXTERNAL_INSTANTIATE)
         if num_args is not None:
             assert len(payload) == num_args
-        if meta_cond is None:
-            meta_cond = get_pred()
         super().__init__(opcode, payload, meta_cond=meta_cond)
         self._payload_len = len(payload)
 
@@ -184,8 +182,6 @@ class PureIntrinsic(Expr):
             if num_args is not None:
                 assert len(args) == num_args, \
                     f"Expected {num_args} args for opcode {opcode}, got {len(args)}"
-        if meta_cond is None:
-            meta_cond = get_pred()
         super().__init__(opcode, operands, meta_cond=meta_cond)
         self._payload_len = len(operands)
 
@@ -270,9 +266,7 @@ def get_pred():
     '''Get the current predicate as AND of builder condition stack.'''
     #pylint: disable=import-outside-toplevel
     from ...builder import Singleton
-    from ..dtype import Bits
-    stack = Singleton.peek_builder().get_predicate_stack()
-    return Bits(1)(1) if not stack else stack[-1].carry
+    return Singleton.peek_builder().current_predicate_carry()
 
 
 class ExternalIntrinsic(Intrinsic):

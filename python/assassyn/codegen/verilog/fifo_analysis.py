@@ -108,34 +108,33 @@ class FIFOAnalysisVisitor(Visitor):
             return
 
         if isinstance(node, FIFOPush):
-            predicate_value, tokens = self._predicate_snapshot(node)
-            interaction = self._registry.record_push(module, node, predicate_value, tokens)
+            predicate_value = self._predicate_value(node)
+            interaction = self._registry.record_push(module, node, predicate_value)
             metadata.record_fifo_interaction(node.fifo, interaction)
             return
 
         if isinstance(node, FIFOPop):
-            predicate_value, tokens = self._predicate_snapshot(node)
-            interaction = self._registry.record_pop(module, node, predicate_value, tokens)
+            predicate_value = self._predicate_value(node)
+            interaction = self._registry.record_pop(module, node, predicate_value)
             metadata.record_fifo_interaction(node.fifo, interaction)
             if expr_externally_used(node, True):
-                metadata.exposures.record_value(node, predicate_value, tokens)
+                metadata.exposures.record_value(node, predicate_value)
             return
 
         if isinstance(node, AsyncCall):
             metadata.calls.append(node)
             callee = node.bind.callee
-            predicate, tokens = self._predicate_snapshot(node)
-            metadata.exposures.record_async_trigger(callee, node, predicate, tokens)
+            predicate = self._predicate_value(node)
+            metadata.exposures.record_async_trigger(callee, node, predicate)
             return
 
         if isinstance(node, ArrayWrite):
-            predicate, tokens = self._predicate_snapshot(node)
+            predicate = self._predicate_value(node)
             metadata.exposures.record_array_write(
                 node.array,
                 node.module,
                 node,
                 predicate,
-                tokens,
             )
             return
 
@@ -168,8 +167,8 @@ class FIFOAnalysisVisitor(Visitor):
             if isinstance(unwrapped, Const):
                 return
 
-            predicate, tokens = self._predicate_snapshot(node)
-            metadata.exposures.record_value(node, predicate, tokens)
+            predicate = self._predicate_value(node)
+            metadata.exposures.record_value(node, predicate)
 
     def _handle_intrinsic(self, metadata: ModuleMetadata, node: Intrinsic) -> None:
         intrinsic = node.opcode
@@ -186,12 +185,8 @@ class FIFOAnalysisVisitor(Visitor):
         # Other intrinsics (WAIT_UNTIL, predicate stack ops, etc.) do not
         # require additional metadata.
 
-    def _predicate_snapshot(self, expr: Expr) -> tuple[Optional['Value'], tuple['Value', ...]]:
-        predicate = getattr(expr, "meta_cond", None)
-        tokens = getattr(expr, "predicate_tokens", ())
-        if not tokens:
-            return predicate, tuple()
-        return predicate, tuple(tokens)
+    def _predicate_value(self, expr: Expr) -> Optional['Value']:
+        return getattr(expr, "meta_cond", None)
 
     def _record_value_exposure(self, metadata: ModuleMetadata, value) -> None:
         expr = unwrap_operand(value)
@@ -199,8 +194,8 @@ class FIFOAnalysisVisitor(Visitor):
             return
         if not isinstance(expr, Expr):
             return
-        predicate, tokens = self._predicate_snapshot(expr)
-        metadata.exposures.record_value(expr, predicate, tokens)
+        predicate = self._predicate_value(expr)
+        metadata.exposures.record_value(expr, predicate)
 
     def _record_log_exposures(self, metadata: ModuleMetadata, node: Log) -> None:
         self._record_value_exposure(metadata, node.meta_cond)

@@ -63,7 +63,12 @@ class ArrayWrite(Expr):
 
     def __repr__(self):
         module_info = f' /* {self.module.name} */' if self.module else ''
-        meta_info = self.meta_comment()
+        meta = self.meta_cond
+        if meta is None:
+            meta_info = ''
+        else:
+            operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+            meta_info = f' // meta cond {operand}'
         return (
             f'{self.array.as_operand()}[{self.idx.as_operand()}]'
             f' <= {self.val.as_operand()}{module_info}{meta_info}'

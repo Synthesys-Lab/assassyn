@@ -131,7 +131,7 @@ The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog
 
 **`visit_block`**: Visits conditional and cycled blocks, relying on the IR-level `meta_cond` metadata captured during construction to keep predicates aligned across code generation, metadata collection, and log emission.
 
-**`get_pred(expr)`**: Formats the predicate metadata attached to `expr`. The dumper consumes the final carry exposed via `expr.meta_cond`, while auxiliary helpers access `expr.predicate_tokens` when they need the ordered `(cond, carry)` provenance. Expressions that lack `meta_cond` now trigger an explicit error so refactors cannot silently drop predicate capture.
+**`get_pred(expr)`**: Formats the predicate metadata attached to `expr`. The dumper consumes the final carry exposed via `expr.meta_cond`, and expressions that lack `meta_cond` now trigger an explicit error so refactors cannot silently drop predicate capture.
 
 **`get_external_port_name`**: Creates mangled port names for external values to avoid naming conflicts
 

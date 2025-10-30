@@ -184,6 +184,15 @@ class SysBuilder:
         module_stack = self._module_stack
         return [] if not module_stack else module_stack[-1].cond_stack
 
+    def current_predicate_carry(self):
+        '''Return the cumulative predicate for the current context.'''
+        stack = self.get_predicate_stack()
+        if not stack:
+            # pylint: disable=import-outside-toplevel
+            from ..ir.dtype import Bits
+            return Bits(1)(1)
+        return stack[-1].carry
+
     def reuse_array_read(self, array, index, factory):
         '''Reuse a cached array read or materialize a new one via ``factory``.'''
         stack = self.get_predicate_stack()

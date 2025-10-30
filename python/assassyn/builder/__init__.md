@@ -99,8 +99,9 @@ SysBuilder initializes and resets:
 ### Predicate Semantics
 
 - get_predicate_stack returns the LIFO list of active predicate frames for the current module. Each frame exposes both the individual condition (`cond`) and the accumulated carry (`carry`).
+- current_predicate_carry() exposes the top frame’s `carry`, defaulting to `Bits(1)(1)` when the stack is empty or no builder is active. IR constructors call this helper so every expression automatically captures the correct predicate metadata.
 - push_predicate(cond) computes the new carry by `AND`ing the parent frame's carry with the incoming condition (or using the condition directly when the stack is empty) before pushing a new frame.
-- get_pred() from intrinsic.py now reuses the top frame's `carry` (or `Bits(1)(1)` if the stack is empty), avoiding repeated recomputation of the predicate chain.
+- get_pred() from intrinsic.py reuses the top frame's `carry` (or `Bits(1)(1)` if the stack is empty), avoiding repeated recomputation of the predicate chain.
 - Intrinsics push_condition/pop_condition directly manipulate the predicate stack. They no longer synchronise with structural blocks—the predicate stack is the single source of truth.
 
 ### Error Handling

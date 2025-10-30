@@ -39,7 +39,6 @@ class ArrayWriteExposure:
 
     expr: 'ArrayWrite'
     predicate: 'Value | None'
-    predicate_tokens: Tuple['Value', ...]
 
 
 @dataclass(frozen=True)
@@ -55,7 +54,6 @@ class ValueExposure:
 
     expr: 'Expr'
     predicate: 'Value | None'
-    predicate_tokens: Tuple['Value', ...]
 
 
 @dataclass(frozen=True)
@@ -64,7 +62,6 @@ class AsyncTriggerExposure:
 
     call: 'AsyncCall'
     predicate: 'Value | None'
-    predicate_tokens: Tuple['Value', ...]
 
 
 @dataclass
@@ -122,20 +119,18 @@ class ModuleExposure:
             for module, entries in self._async_triggers.items()
         }
 
-    def record_array_write(  # pylint: disable=too-many-arguments
+    def record_array_write(
         self,
         array: Array,
         module: Module,
         expr: 'ArrayWrite',
         predicate: 'Value | None',
-        predicate_tokens: Sequence['Value'],
     ) -> None:
         """Capture an array write exposure for *array* performed by *module*."""
         self._ensure_mutable()
         exposure = ArrayWriteExposure(
             expr=expr,
             predicate=predicate,
-            predicate_tokens=tuple(predicate_tokens),
         )
         bucket = self._arrays.setdefault(array, ArrayExposure(array))
         bucket.add_write(module, exposure)
@@ -151,7 +146,6 @@ class ModuleExposure:
         self,
         expr: 'Expr',
         predicate: 'Value | None',
-        predicate_tokens: Sequence['Value'],
     ) -> None:
         """Capture a valued expression that must be exposed externally."""
         self._ensure_mutable()
@@ -159,23 +153,20 @@ class ModuleExposure:
             ValueExposure(
                 expr=expr,
                 predicate=predicate,
-                predicate_tokens=tuple(predicate_tokens),
             )
         )
 
-    def record_async_trigger(  # pylint: disable=too-many-arguments
+    def record_async_trigger(
         self,
         callee: Module,
         call: 'AsyncCall',
         predicate: 'Value | None',
-        predicate_tokens: Sequence['Value'],
     ) -> None:
         """Record an async trigger exposure for a specific callee module."""
         self._ensure_mutable()
         entry = AsyncTriggerExposure(
             call=call,
             predicate=predicate,
-            predicate_tokens=tuple(predicate_tokens),
         )
         self._async_triggers.setdefault(callee, []).append(entry)
 
@@ -221,7 +212,6 @@ class FIFOInteraction:
     module: Module
     expr: FIFOPush | FIFOPop
     predicate: Value | None
-    predicate_tokens: Tuple[Value, ...]
     is_push: bool
 
 
@@ -353,7 +343,6 @@ class FIFORegistry:
         module: Module,
         expr: FIFOPush,
         predicate: Value | None,
-        predicate_tokens: Sequence[Value],
     ) -> FIFOInteraction:
         """Record a FIFO push performed by `module`."""
         fifo_port = expr.fifo
@@ -361,7 +350,6 @@ class FIFORegistry:
             module=module,
             expr=expr,
             predicate=predicate,
-            predicate_tokens=tuple(predicate_tokens),
             is_push=True,
         )
         metadata = self.metadata_for(fifo_port)
@@ -373,7 +361,6 @@ class FIFORegistry:
         module: Module,
         expr: FIFOPop,
         predicate: Value | None,
-        predicate_tokens: Sequence[Value],
     ) -> FIFOInteraction:
         """Record a FIFO pop performed by `module`."""
         fifo_port = expr.fifo
@@ -381,7 +368,6 @@ class FIFORegistry:
             module=module,
             expr=expr,
             predicate=predicate,
-            predicate_tokens=tuple(predicate_tokens),
             is_push=False,
         )
         metadata = self.metadata_for(fifo_port)

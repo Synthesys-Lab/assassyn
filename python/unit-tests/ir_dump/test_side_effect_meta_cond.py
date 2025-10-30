@@ -6,6 +6,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from assassyn.frontend import Module, SysBuilder, UInt, RegArray, Port, Condition, module, finish, wait_until, assume  # pylint: disable=import-error
+from assassyn.ir.const import Const  # pylint: disable=import-error
 from assassyn.ir.expr.intrinsic import current_cycle  # pylint: disable=import-error
 
 
@@ -69,6 +70,7 @@ def test_side_effects_capture_meta_cond():
                     self.peek_expr = self.fifo_in.peek()
                     self.pop_valid = self.pop_expr.valid()
                     self.cycle_value = current_cycle()
+                self.unpredicated_expr = value + idx
 
         module_inst = PredicatedOps()
         module_inst.build()
@@ -80,11 +82,6 @@ def test_side_effects_capture_meta_cond():
     assert module_inst.pop_expr.meta_cond is cond_value
     assert module_inst.async_expr.meta_cond is cond_value
     assert module_inst.add_expr.meta_cond is cond_value
-
-    add_trace = module_inst.add_expr.predicate_trace
-    assert len(add_trace) == 1
-    assert add_trace[0][0] is cond_value
-    assert add_trace[0][1] is cond_value
 
     for push in module_inst.bound_pushes:
         assert push.meta_cond is cond_value
@@ -100,3 +97,7 @@ def test_side_effects_capture_meta_cond():
     assert module_inst.peek_expr.meta_cond is cond_value
     assert module_inst.pop_valid.meta_cond is cond_value
     assert module_inst.cycle_value.meta_cond is cond_value
+
+    unpredicated_meta = module_inst.unpredicated_expr.meta_cond
+    assert isinstance(unpredicated_meta, Const)
+    assert unpredicated_meta.value == 1
