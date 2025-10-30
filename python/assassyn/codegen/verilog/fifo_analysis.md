@@ -67,8 +67,8 @@ It receives two collaborators:
    the expression snapshot (`expr.meta_cond` plus the ordered `(cond, carry)` tokens). When a pop’s value escapes its defining module the visitor also
    records a value exposure so downstream stages can surface the produced data without
    revisiting the IR.
-2. **FINISH intrinsics** – toggle `ModuleMetadata.has_finish` so downstream wiring can
-   expose finish outputs without mutating state during emission.
+2. **FINISH intrinsics** – append `FinishSite` entries to `ModuleMetadata.finish_sites`
+   so downstream wiring can expose finish outputs without mutating state during emission.
 3. **Async calls** – append `AsyncCall` expressions to `ModuleMetadata.calls` and record
    trigger exposure metadata (grouped per callee) with the associated predicate.
 4. **Exposure candidates** – arrays and valued expressions used outside the module are

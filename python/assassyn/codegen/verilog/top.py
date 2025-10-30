@@ -481,7 +481,7 @@ def generate_top_harness(dumper: CIRCTDumper):
         mod_name = namify(module.name)
         # Check if this module type has finish conditions using metadata
         metadata = dumper.module_metadata.get(module)
-        if metadata and metadata.has_finish:
+        if metadata and metadata.finish_sites:
             finish_signals.append(f'inst_{mod_name}.finish')
 
     if finish_signals:

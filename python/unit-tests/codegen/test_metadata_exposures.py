@@ -17,6 +17,7 @@ from assassyn.frontend import (  # type: ignore
 )
 from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata  # type: ignore
 from assassyn.ir.expr.call import AsyncCall  # type: ignore
+from assassyn.ir.expr.intrinsic import Intrinsic  # type: ignore
 
 
 class Callee(Module):
@@ -59,6 +60,7 @@ def test_metadata_exposures_capture():
                 callee = Callee()
 
                 with Condition(cond):
+                    self.finish_cond = cond
                     write_port = array & self
                     write_port[idx] <= value
                     target.push(value)
@@ -72,7 +74,11 @@ def test_metadata_exposures_capture():
     module_metadata, fifo_registry = collect_fifo_metadata(sys_builder)
     dumper_metadata = module_metadata[instance]
 
-    assert dumper_metadata.has_finish is True
+    finish_sites = dumper_metadata.finish_sites
+    assert finish_sites, "expected finish sites to be recorded"
+    assert all(site.expr.opcode == Intrinsic.FINISH for site in finish_sites)
+    assert all(site.predicate is not None for site in finish_sites)
+    assert finish_sites[0].predicate is instance.finish_cond
     assert len(dumper_metadata.calls) == 1
     assert isinstance(dumper_metadata.calls[0], AsyncCall)
 

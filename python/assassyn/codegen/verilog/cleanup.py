@@ -180,18 +180,18 @@ def cleanup_post_generation(dumper):
         )
         dumper.append_code(f"executed_wire = {executed_expr}")
 
-    finish_terms = [
-        f"({pred} & {exec_signal})"
-        for pred, exec_signal in dumper.finish_conditions
-    ]
+    module_metadata = dumper.module_metadata[dumper.current_module]
+    module_exposure = module_metadata.exposures
+
+    finish_terms = []
+    for finish_site in module_metadata.finish_sites:
+        predicate = dumper.format_predicate(finish_site.predicate)
+        finish_terms.append(f"({predicate} & executed_wire)")
     finish_expr = _format_reduce_or(
         finish_terms,
         default_literal="Bits(1)(0)",
     )
     dumper.append_code(f"self.finish = {finish_expr}")
-
-    module_metadata = dumper.module_metadata[dumper.current_module]
-    module_exposure = module_metadata.exposures
 
     if isinstance(dumper.current_module, SRAM):
         sram_info = get_sram_info(dumper.current_module)

@@ -67,7 +67,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.downstream_dependencies = {}
         self.is_top_generation = False
         self.finish_body = []
-        self.finish_conditions = []
         self.array_metadata = ArrayMetadataRegistry()
         self.memory_defs = set()
         self.expr_to_name = {}
@@ -184,7 +183,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         previous_module_ctx = self.module_ctx
         self.module_ctx = node
         self.finish_body = []
-        self.finish_conditions = []
 
         # For downstream modules, we still need to process the body
         if node.body is not None:

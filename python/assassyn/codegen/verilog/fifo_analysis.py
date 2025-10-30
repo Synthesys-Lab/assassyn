@@ -61,7 +61,7 @@ def collect_fifo_metadata(
     visitor.analyse_modules(modules_to_visit)
 
     for metadata in module_metadata.values():
-        metadata.exposures.freeze()
+        metadata.freeze()
 
     return module_metadata, registry
 
@@ -174,7 +174,7 @@ class FIFOAnalysisVisitor(Visitor):
         intrinsic = node.opcode
 
         if intrinsic == Intrinsic.FINISH:
-            metadata.has_finish = True
+            metadata.record_finish(node, self._predicate_value(node))
             return
 
         if intrinsic == Intrinsic.ASSERT:

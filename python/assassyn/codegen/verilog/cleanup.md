@@ -23,7 +23,9 @@ This is the main cleanup function that generates all the necessary control signa
    - For downstream modules: Gathers upstream dependencies from `dumper.downstream_dependencies` and ORs their `executed` flags via `_format_reduce_or(..., op="or_", default_literal="Bits(1)(0)")`.
    - For regular modules: ANDs the trigger-counter pop-valid input with any active `wait_until` predicate recorded during expression lowering using the same helper with `op="and_"` and a `Bits(1)(1)` default.
 
-2. **Finish Signal Generation**: Reduces every `(predicate, exec_signal)` pair queued in `dumper.finish_conditions` into the `self.finish` output.
+2. **Finish Signal Generation**: Reduces every FINISH site captured in
+   `module_metadata.finish_sites`, formatting each stored predicate and gating it with
+   `executed_wire` before OR-reducing the terms into `self.finish`.
 
 3. **SRAM Control Signal Generation**: When the current module wraps an SRAM payload (detected via `array.is_payload(sram_instance)`), `generate_sram_control_signals` derives write enables, addresses, and data from the exposed array accesses, producing the handshakes expected by the memory blackbox.
 

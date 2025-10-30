@@ -285,8 +285,6 @@ def codegen_intrinsic(dumper, expr: Intrinsic) -> Optional[str]:
     intrinsic = expr.opcode
 
     if intrinsic == Intrinsic.FINISH:
-        predicate_signal = dumper.get_pred(expr)
-        dumper.finish_conditions.append((predicate_signal, "executed_wire"))
         return None
     if intrinsic == Intrinsic.ASSERT:
         return None

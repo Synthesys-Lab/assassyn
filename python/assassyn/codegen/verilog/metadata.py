@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterator, List, Sequence, TYPE_CHECKING, Tuple
 if TYPE_CHECKING:
     from ...ir.array import Array
     from ...ir.expr import ArrayRead, ArrayWrite, AsyncCall, Expr, FIFOPop, FIFOPush
+    from ...ir.expr.intrinsic import Intrinsic
     from ...ir.module import Module, Port
     from ...ir.value import Value
 else:
@@ -23,6 +24,7 @@ else:
     Expr = Any  # type: ignore
     FIFOPop = Any  # type: ignore
     FIFOPush = Any  # type: ignore
+    Intrinsic = Any  # type: ignore
     Module = Any  # type: ignore
     Port = Any  # type: ignore
     Value = Any  # type: ignore
@@ -61,6 +63,14 @@ class AsyncTriggerExposure:
     """Metadata describing an async call that contributes to a trigger sum."""
 
     call: 'AsyncCall'
+    predicate: 'Value | None'
+
+
+@dataclass(frozen=True)
+class FinishSite:
+    """Metadata describing a FINISH intrinsic encountered in a module."""
+
+    expr: 'Intrinsic'
     predicate: 'Value | None'
 
 
@@ -301,13 +311,16 @@ class ModuleMetadata:
 
     module: Module
     registry: FIFORegistry
-    has_finish: bool = False
     calls: CallList = field(default_factory=list)
     exposures: ModuleExposure = field(default_factory=ModuleExposure)
     fifo: ModuleFIFOView = field(init=False)
+    _finish_sites: List[FinishSite] = field(init=False, default_factory=list)
+    _frozen: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
         self.fifo = ModuleFIFOView(self.module, self.registry)
+        self._finish_sites = []
+        self._frozen = False
 
     @property
     def pushes(self) -> List[FIFOPush]:
@@ -322,6 +335,33 @@ class ModuleMetadata:
     def record_fifo_interaction(self, fifo_port: Port, interaction: FIFOInteraction) -> None:
         """Track an interaction produced by this module on the given FIFO port."""
         self.fifo.register(fifo_port, interaction)
+
+    @property
+    def finish_sites(self) -> Tuple[FinishSite, ...]:
+        """Return recorded FINISH intrinsics for this module."""
+        if isinstance(self._finish_sites, tuple):
+            return self._finish_sites
+        return tuple(self._finish_sites)
+
+    def record_finish(self, expr: Intrinsic, predicate: Value | None) -> None:
+        """Record a FINISH intrinsic encountered during analysis."""
+        if self._frozen:
+            raise RuntimeError("ModuleMetadata is frozen; cannot record finish sites")
+        self._finish_sites.append(
+            FinishSite(
+                expr=expr,
+                predicate=predicate,
+            )
+        )
+
+    def freeze(self) -> None:
+        """Prevent further mutation of metadata collections."""
+        if self._frozen:
+            return
+        self.exposures.freeze()
+        if not isinstance(self._finish_sites, tuple):
+            self._finish_sites = tuple(self._finish_sites)
+        self._frozen = True
 
 
 class FIFORegistry:

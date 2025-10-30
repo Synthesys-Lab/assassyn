@@ -73,8 +73,10 @@ snapshots.
 **Fields**
 
 - `module: Module` – Owning module used to filter registry lookups.
-- `has_finish: bool = False` – Raised during analysis when a FINISH intrinsic is
-  encountered so the top-level harness knows which modules expose finish signals.
+- `finish_sites: Tuple[FinishSite, ...]` – Ordered list of FINISH intrinsics recorded
+  during analysis; each entry preserves the intrinsic expression and the predicate value
+  active at the call site so cleanup/top wiring can gate `self.finish` without mutating
+  dumper state.
 - `calls: List[AsyncCall]` – Populated during analysis when async calls are encountered
   in the module body.  Emission simply reads the preserved list.
 - `fifo: ModuleFIFOView` – Module-scoped view that references registry-owned FIFO
@@ -103,6 +105,7 @@ snapshots.
    outputs) or FINISH/async-call nodes are encountered, the analysis visitor records them
    directly in `ModuleMetadata`, preserving both the final predicate `Value`
    (`expr.meta_cond`) and the flattened `(cond, carry)` tokens alongside expression handles.
+   FINISH intrinsics are stored as `FinishSite` entries instead of toggling a boolean.
 5. During subsequent code generation the same `ModuleMetadata` object remains read-only;
    emission simply queries `ModuleMetadata` for FIFO interactions, FINISH flags, async
    calls, and exposure data without mutating state.
@@ -110,7 +113,7 @@ snapshots.
 **How Metadata is Consumed**
 
 - **Top-level harness generation** ([top.py](/python/assassyn/codegen/verilog/top.md)):
-  Reads `metadata.fifo.pushes` and `metadata.has_finish` to compute FIFO wiring and finish
+  Reads `metadata.fifo.pushes` and `metadata.finish_sites` to compute FIFO wiring and finish
   exposure.
 - **Module port generation** ([module.py](/python/assassyn/codegen/verilog/module.md)):
   Uses `metadata.fifo` for handshake ports and `metadata.exposures.values` to declare
@@ -119,8 +122,8 @@ snapshots.
   Iterates `metadata.exposures.arrays`, `metadata.exposures.values`, and
   `metadata.exposures.async_triggers` to emit final signal assignments without walking
   expressions or mutating dumper state.
-- **Finish collection**: Reads `has_finish` directly from metadata populated during the
-  pre-pass.
+- **Finish collection**: Iterates `finish_sites` recorded during the pre-pass, formatting
+  predicates at emit time instead of rebuilding conditionals on the dumper.
 - **Performance benefit**: Maintains O(1) lookups with predicate context intact while
   eliminating the runtime `_exposes` dictionary.
 
@@ -128,7 +131,8 @@ snapshots.
 
 The `ModuleMetadata` structure can still be extended with additional flags such as
 `has_wait_until` or `array_usage`.  Exposure metadata already centralises the wiring
-surface, making future additions (e.g., external memory handshakes) straightforward.
+surface, and the new `finish_sites` snapshots keep FINISH handling consistent without
+runtime mutation, making future additions (e.g., external memory handshakes) straightforward.
 
 ### `ModuleExposure`
 

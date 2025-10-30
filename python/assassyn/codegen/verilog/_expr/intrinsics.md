@@ -93,10 +93,9 @@ def codegen_intrinsic(dumper, expr: Intrinsic) -> Optional[str]:
 This function generates Verilog code for block intrinsic operations, which are control flow operations that affect module execution. It handles the following intrinsic types:
 
 1. **FINISH**: Signals that the module should finish execution
-   - Adds the current predicate and execution signal to `finish_conditions`
-   - The metadata pre-pass has already toggled `ModuleMetadata.has_finish`; emission simply honours that snapshot
+   - Emits no Verilog directly; metadata analysis has already recorded the intrinsic and its predicate in `ModuleMetadata.finish_sites`
    - Used to implement early termination of module execution
-   - The cleanup phase combines all finish conditions with OR logic
+   - The cleanup phase formats each stored predicate, gates it with `executed_wire`, and OR-reduces the results
 
 2. **ASSERT**: Generates assertion code for verification
    - Metadata analysis has already marked the expression for exposure when required

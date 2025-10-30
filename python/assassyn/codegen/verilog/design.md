@@ -103,7 +103,7 @@ class CIRCTDumper(Visitor):
 
 The CIRCTDumper class is the main visitor that converts Assassyn IR into Verilog code. It inherits from the Visitor pattern and implements the credit-based pipeline architecture. The class maintains extensive state for managing:
 
-1. **Execution Control**: `wait_until`, per-expression `meta_cond` metadata, and `finish_conditions` track predicate gating for FINISH intrinsics without recomputing a runtime stack.
+1. **Execution Control**: `wait_until` and per-expression `meta_cond` metadata decide when statements run, while FINISH gating now reads the precomputed `finish_sites` stored in module metadata instead of collecting tuples during emission.
 2. **Module State**: `current_module` and `module_ctx` track traversal context, while port declarations are derived from immutable metadata instead of mutating dumper dictionaries.
 3. **Array Management**: `array_metadata`, `memory_defs`, and ownership metadata ensure multi-port register arrays are emitted while memory payloads (`array.is_payload(memory)` returning `True`) are routed through dedicated generators.
 4. **External Integration**: `external_intrinsics`, `external_classes`, `external_wrapper_names`, `external_instance_names`, `external_instance_owners`, `cross_module_external_reads`, `external_outputs_by_instance`, and `external_output_exposures` track how `ExternalIntrinsic` nodes map to wrapper modules, which modules read each exposed register output, and the producer-side ports required to materialise those reads.
