@@ -61,21 +61,28 @@ class ModuleMetadata:
 
 **Explanation**
 
-This dataclass tracks module-level facts discovered during the analysis + codegen pipeline
-and exposes them to later phases.  Its FIFO information is a *view* layered on top of the
-global registry populated during the pre-pass.  The module view is the authoritative record
-of which FIFO ports a module touches; the registry only keeps the complementary FIFO-keyed
-aggregation.
+This dataclass tracks module-level facts discovered during the analysis pre-pass and
+exposes them to later phases.  Its FIFO information is a *view* layered on top of the
+global registry populated during the pre-pass.  The module view is the authoritative
+record of which FIFO ports a module touches; the registry only keeps the complementary
+FIFO-keyed aggregation.  Starting with the metadata consolidation, every other
+code-generation concern that previously mutated the dumper during emission (FINISH flags,
+async-call tracking, array/value exposure bookkeeping) is now captured here as immutable
+snapshots.
 
 **Fields**
 
 - `module: Module` – Owning module used to filter registry lookups.
-- `has_finish: bool = False` – Toggled by `codegen_intrinsic` when a FINISH intrinsic is
+- `has_finish: bool = False` – Raised during analysis when a FINISH intrinsic is
   encountered so the top-level harness knows which modules expose finish signals.
-- `calls: List[AsyncCall]` – Populated by `codegen_async_call` when async calls are emitted.
+- `calls: List[AsyncCall]` – Populated during analysis when async calls are encountered
+  in the module body.  Emission simply reads the preserved list.
 - `fifo: ModuleFIFOView` – Module-scoped view that references registry-owned FIFO
   interactions.  It keeps per-module lists of those shared objects without duplicating
   their contents.
+- `exposures: ModuleExposure` – Aggregated array/async/value exposure information
+  collected by the pre-pass.  Cleanup and module port generation consume these immutable
+  structures instead of relying on `CIRCTDumper.expose()`.
 
 **Convenience Properties**
 
@@ -92,28 +99,115 @@ aggregation.
    formatted strings.
 3. Each fifo push/pop encountered during the pre-pass creates a shared `FIFOInteraction`,
    adds it to the registry, and registers it with the module’s `ModuleFIFOView`.
-4. During subsequent code generation the same `ModuleMetadata` object accumulates FINISH
-   intrinsics and async call information; FIFO lists remain immutable once analysis
-   finishes so downstream consumers see a stable snapshot.
+4. When valued expressions require exposure (array writes/reads, async triggers, general
+   outputs) or FINISH/async-call nodes are encountered, the analysis visitor records them
+   directly in `ModuleMetadata`, preserving the original predicate `Value` objects
+   (`expr.meta_cond`) alongside expression handles.
+5. During subsequent code generation the same `ModuleMetadata` object remains read-only;
+   emission simply queries `ModuleMetadata` for FIFO interactions, FINISH flags, async
+   calls, and exposure data without mutating state.
 
 **How Metadata is Consumed**
 
 - **Top-level harness generation** ([top.py](/python/assassyn/codegen/verilog/top.md)):
-  Reads `metadata.fifo.pushes` to compute FIFO depths and wiring.
+  Reads `metadata.fifo.pushes` and `metadata.has_finish` to compute FIFO wiring and finish
+  exposure.
 - **Module port generation** ([module.py](/python/assassyn/codegen/verilog/module.md)):
-  Uses `metadata.fifo` to determine which handshake ports are required.
+  Uses `metadata.fifo` for handshake ports and `metadata.exposures.values` to declare
+  `expose_*` / `valid_*` outputs.
 - **Cleanup wiring** ([cleanup.py](/python/assassyn/codegen/verilog/cleanup.md)):
-  Iterates `metadata.fifo.iter_channels()` to emit valid/ready logic without re-scanning
-  expressions, pairing each port with its module-local interactions and registry metadata.
-- **Finish collection**: Uses `has_finish` to decide which modules surface finish outputs.
-- **Performance benefit**: Maintains O(1) lookups with predicate context intact, while
-  avoiding duplicated FIFO metadata.
+  Iterates `metadata.exposures.arrays`, `metadata.exposures.values`, and
+  `metadata.exposures.async_triggers` to emit final signal assignments without walking
+  expressions or mutating dumper state.
+- **Finish collection**: Reads `has_finish` directly from metadata populated during the
+  pre-pass.
+- **Performance benefit**: Maintains O(1) lookups with predicate context intact while
+  eliminating the runtime `_exposes` dictionary.
 
 **Future Extensions**
 
 The `ModuleMetadata` structure can still be extended with additional flags such as
-`has_wait_until` or `array_usage`.  The refactor only removes duplicated FIFO storage; the
-extensibility story remains unchanged.
+`has_wait_until` or `array_usage`.  Exposure metadata already centralises the wiring
+surface, making future additions (e.g., external memory handshakes) straightforward.
+
+### `ModuleExposure`
+
+```python
+@dataclass
+class ModuleExposure:
+    arrays: Dict[Array, ArrayExposure]
+    values: List[ValueExposure]
+    async_triggers: Dict[Module, List[AsyncTriggerExposure]]
+```
+
+This container replaces the dumper’s `_exposes` dictionary.  Entries are populated during
+analysis and stay immutable afterwards.  Each collection stores raw IR handles and their
+associated predicates (`meta_cond`).  Cleanup and module generation format these values at
+emit time.
+
+### `ArrayExposure`
+
+```python
+@dataclass
+class ArrayExposure:
+    array: Array
+    writes_by_module: Dict[Module, Tuple[ArrayWriteExposure, ...]]
+    reads: Tuple[ArrayReadExposure, ...]
+```
+
+`ArrayExposure` groups all array interactions performed by the owning module.  Writes are
+bucketed by source module so cleanup can derive per-port enable/data muxes while reads are
+listed in first-seen order for index wiring.  Predicates are stored as raw `Value`
+objects.
+
+### `ArrayWriteExposure`
+
+```python
+@dataclass
+class ArrayWriteExposure:
+    expr: ArrayWrite
+    predicate: Value
+```
+
+Captures a single `ArrayWrite` together with its `meta_cond`.  Cleanup converts the
+predicate via `format_predicate` while dumping values and indices.
+
+### `ArrayReadExposure`
+
+```python
+@dataclass
+class ArrayReadExposure:
+    expr: ArrayRead
+```
+
+`ArrayRead` exposures currently do not need explicit predicates (reads are free), but the
+wrapper retains the expression handle so cleanup can recover addresses and types.
+
+### `ValueExposure`
+
+```python
+@dataclass
+class ValueExposure:
+    expr: Expr
+    predicate: Value
+```
+
+Records valued expressions that must surface as module outputs because they are consumed
+externally (`expr_externally_used(expr, True)`).  The stored predicate mirrors the
+runtime stack behaviour through `expr.meta_cond`.
+
+### `AsyncTriggerExposure`
+
+```python
+@dataclass
+class AsyncTriggerExposure:
+    call: AsyncCall
+    predicate: Value
+```
+
+Async trigger metadata keeps the originating `AsyncCall` and predicate.  Entries are
+grouped per callee module so cleanup can build the trigger-counter increments without
+re-scanning expression trees.
 
 **Project-specific Knowledge Required:**
 

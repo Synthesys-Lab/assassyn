@@ -29,7 +29,7 @@ This function generates Verilog code for array read operations. It handles two d
    - Handles record types differently from scalar types
    - Applies type casting for non-record types
 
-The function also calls `dumper.expose('array', expr)` to register the array operation with the module's expose mechanism, ensuring proper port generation and signal routing.
+Metadata analysis captures array reads ahead of time, so the helper simply returns the body text.
 
 **Runtime contract**: The helper expects a fully initialised `CIRCTDumper` and validates both arguments via `@enforce_type`. Passing any other dumper stub raises a `TypeError` before code generation begins.
 
@@ -49,18 +49,9 @@ def codegen_array_write(dumper: CIRCTDumper, expr: ArrayWrite) -> Optional[str]:
 
 **Explanation**
 
-This function handles array write operations by registering them with the module's expose mechanism. Unlike array reads, array writes don't generate immediate code but instead:
+Array writes are metadata-only. The IR analysis pre-pass records every `ArrayWrite` encountered in module metadata so the cleanup phase can build the final port handshakes. As a result the emitter simply validates its arguments and returns `None`.
 
-1. **Expose Registration**: Calls `dumper.expose('array', expr)` to register the write operation
-2. **Deferred Processing**: The actual write logic is generated later during the cleanup phase by the [cleanup module](/python/assassyn/codegen/verilog/cleanup.md)
-
-This deferred approach allows the cleanup phase to:
-- Group multiple writes to the same array
-- Generate appropriate port-based write signals
-- Handle write data multiplexing
-- Create proper write enable and address signals
-
-**Runtime contract**: The helper validates its arguments via `@enforce_type`, which protects against accidental invocation with a non-`CIRCTDumper` dumper or mismatched expression node. See [Type Enforcement](../../../utils/enforce_type.md) for decorator details.
+**Runtime contract**: The helper validates its arguments via `@enforce_type`, protecting against accidental invocation with a non-`CIRCTDumper` dumper or mismatched expression node. See [Type Enforcement](../../../utils/enforce_type.md) for decorator details.
 
 **Project-specific Knowledge Required**:
 - Understanding of [array write operations](/python/assassyn/ir/expr/array.md)

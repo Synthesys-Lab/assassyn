@@ -1,5 +1,6 @@
 """Module port generation utilities for Verilog code generation."""
 
+from .cleanup import resolve_value_exposure_render
 from .utils import dump_type, get_sram_info
 from ...ir.module import Module, Downstream
 from ...ir.memory.sram import SRAM
@@ -23,11 +24,12 @@ def generate_module_ports(dumper, node: Module) -> None:
     is_driver = node not in dumper.async_callees
 
     metadata = dumper.module_metadata.get(node)
+    module_metadata = metadata
     fifo_metadata = metadata.fifo
     push_entries = fifo_metadata.pushes
     pop_entries = fifo_metadata.pops
     pushes = [entry.expr for entry in push_entries]
-    calls = metadata.calls
+    calls = module_metadata.calls
     pops = [entry.expr for entry in pop_entries]
 
     dumper.append_code('clk = Clock()')
@@ -176,5 +178,18 @@ def generate_module_ports(dumper, node: Module) -> None:
                     f' Output(Bits({idx_type}))'
                 )
 
-    for port_code in dumper.exposed_ports_to_add:
-        dumper.append_code(port_code)
+    exposure_groups = {}
+    for exposure in module_metadata.exposures.values:
+        exposure_groups.setdefault(exposure.expr, []).append(exposure)
+
+    for expr in exposure_groups:
+        render = resolve_value_exposure_render(dumper, expr)
+        dumper.append_code(f'expose_{render.exposed_name} = Output({render.dtype_str})')
+        dumper.append_code(f'valid_{render.exposed_name} = Output(Bits(1))')
+
+    external_exposures = dumper.external_output_exposures.get(node, {})
+    for data in external_exposures.values():
+        output_name = data['output_name']
+        dtype_str = dump_type(data['dtype'])
+        dumper.append_code(f'expose_{output_name} = Output({dtype_str})')
+        dumper.append_code(f'valid_{output_name} = Output(Bits(1))')

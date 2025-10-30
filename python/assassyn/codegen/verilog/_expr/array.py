@@ -30,23 +30,20 @@ def codegen_array_read(dumper: CIRCTDumper, expr: ArrayRead) -> Optional[str]:
 
     if is_sram_payload:
         body = f'{rval} = self.mem_dataout'
-        dumper.expose('array', expr)
     else:
         array_name = dumper.dump_rval(array_ref, False)
         port_idx = dumper.array_metadata.read_port_index_for_expr(expr)
         if port_idx is None:
             return None
         body = f'{rval} = self.{array_name}_rdata_port{port_idx}'
-        dumper.expose('array', expr)
 
     return body
 
 
 @enforce_type
-def codegen_array_write(dumper: CIRCTDumper, expr: ArrayWrite) -> Optional[str]:
+def codegen_array_write(_dumper: CIRCTDumper, _expr: ArrayWrite) -> Optional[str]:
     """Generate code for array write operations."""
-    dumper.expose('array', expr)
-
+    return None
 
 @enforce_type
 def codegen_fifo_push(_dumper: CIRCTDumper, _expr: FIFOPush) -> Optional[str]:

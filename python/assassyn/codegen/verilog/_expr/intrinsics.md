@@ -21,13 +21,13 @@ This function generates Python testbench code for logging operations, which are 
 
 1. **Format String Processing**: Extracts the format string from the first operand and processes it using Python's `Formatter` class. Placeholder conversions such as `:?` are mapped to Python's `!r` conversions to match the DSL semantics.
 2. **Argument Processing**: For each argument after the format string:
-   - Exposes non-constant operands to the module's output ports
-   - Generates sanitized testbench signal references (removing `self.` prefixes and replacing punctuation) for exposed values
+   - Assumes the metadata pre-pass has already recorded any non-constant operands that need to surface as module outputs
+   - Generates sanitized testbench signal references (removing `self.` prefixes and replacing punctuation) for those values
    - Handles signed integer conversion for proper display
 3. **Condition Generation**: Builds complex conditions based on:
    - Current execution predicate
    - Condition stack (conditional blocks), translating them into DUT-visible signals; cycle-based predicates come from `current_cycle()` within these conditions
-   - Valid signals for exposed operands
+   - Valid signals for operands tracked by metadata
 4. **Log Generation**: Creates Python print statements annotated with line information, module names, and formatted cycle counts so the Cocotb testbench can produce readable diagnostics.
 
 The function generates testbench code that:
@@ -39,7 +39,7 @@ The function generates testbench code that:
 **Project-specific Knowledge Required**:
 - Understanding of [log operations](/python/assassyn/ir/expr/intrinsic.md)
 - Knowledge of [testbench generation](/python/assassyn/codegen/verilog/testbench.md)
-- Understanding of [expose mechanism](/python/assassyn/codegen/verilog/design.md)
+- Understanding of [metadata-driven exposure handling](/python/assassyn/codegen/verilog/metadata.md)
 - Reference to [condition stack handling](/python/assassyn/codegen/verilog/design.md)
 
 ### `codegen_pure_intrinsic`
@@ -58,7 +58,6 @@ This function generates Verilog code for pure intrinsic operations, which are si
    - Used to check if FIFO has valid data available
 
 2. **FIFO_PEEK**: Returns the data at the head of a FIFO without consuming it
-   - Exposes the expression to generate output ports
    - Generates `self.fifo_name` signal reference
    - Used to examine FIFO data without popping
 
@@ -73,7 +72,7 @@ This function generates Verilog code for pure intrinsic operations, which are si
    - For cross-module reads, records the consumer/producer relationship and returns the exposed input (`self.<producer>_<value>`)
    - For local reads, ensures the external wrapper is instantiated and cached in `external_instance_names`, then emits either the raw signal or an indexed access (with index-0 treated as the scalar case)
 
-The function handles FIFO operations by generating appropriate signal references and managing the expose mechanism for peek operations.
+The function handles FIFO operations by generating appropriate signal references; metadata collected during analysis ensures any required values are surfaced.
 
 **Project-specific Knowledge Required**:
 - Understanding of [pure intrinsic operations](/python/assassyn/ir/expr/intrinsic.md)
@@ -95,12 +94,12 @@ This function generates Verilog code for block intrinsic operations, which are c
 
 1. **FINISH**: Signals that the module should finish execution
    - Adds the current predicate and execution signal to `finish_conditions`
-   - Sets the `has_finish` flag in the module's metadata (see [metadata module](/python/assassyn/codegen/verilog/metadata.md)) for top-level generation
+   - The metadata pre-pass has already toggled `ModuleMetadata.has_finish`; emission simply honours that snapshot
    - Used to implement early termination of module execution
    - The cleanup phase combines all finish conditions with OR logic
 
 2. **ASSERT**: Generates assertion code for verification
-   - Exposes the assertion condition to generate output ports
+   - Metadata analysis has already marked the expression for exposure when required
    - Used for formal verification and simulation debugging
 
 3. **WAIT_UNTIL**: Implements the credit-based pipeline wait mechanism

@@ -1,57 +1,76 @@
 """Post-generation cleanup and signal generation for Verilog codegen."""
 
-from .utils import (
-    dump_type,
-    dump_type_cast,
-    get_sram_info,
-)
+from collections import defaultdict
+from typing import Dict, List, NamedTuple, Optional, Sequence
 
-from ...ir.module import Downstream, Module, Port
+from .metadata import ArrayExposure, ArrayWriteExposure, ValueExposure
+from .utils import dump_type, dump_type_cast, get_sram_info
+
+from ...ir.module import Downstream
 from ...ir.memory.sram import SRAM
-from ...ir.array import Array, Slice
+from ...ir.array import Slice
 from ...ir.memory.base import MemoryBase
 from ...ir.const import Const
-from ...ir.expr import (
-    Expr,
-    ArrayWrite,
-    ArrayRead,
-    AsyncCall,
-)
+from ...ir.expr import Expr
 from ...utils import namify, unwrap_operand
 
 
-# pylint: disable=too-many-locals,too-many-branches
-def generate_sram_control_signals(dumper, sram_info):
-    """Generate control signals for SRAM memory interface."""
-    array = sram_info['array']
+class ValueExposureRender(NamedTuple):
+    """Rendered information for a value exposure."""
 
-    array_writes = []
-    array_reads = []
-    write_addr = None
-    write_data = None
-    read_addr = None
+    exposed_name: str
+    dtype_str: str
+    rval: str
 
-    for key, exposes in dumper._exposes.items():  # pylint: disable=protected-access
-        if isinstance(key, Array) and key == array:
-            for expr, pred in exposes:
-                if isinstance(expr, ArrayWrite):
-                    array_writes.append((expr, pred))
-                elif isinstance(expr, ArrayRead):
-                    array_reads.append((expr, pred))
 
-    if array_writes:
-        write_expr, write_pred = array_writes[0]
-        write_addr = dumper.dump_rval(write_expr.idx, False)
-        write_pred_literal = dumper.format_predicate(write_pred)
-        write_enable = f'executed_wire & ({write_pred_literal})'
-        write_data = dumper.dump_rval(write_expr.val, False)
+def resolve_value_exposure_render(dumper, expr: Expr) -> ValueExposureRender:
+    """Compute the rendered name, dtype, and rval for a value exposure."""
+
+    rval = dumper.dump_rval(expr, False)
+
+    exposed_name = dumper.dump_rval(expr, True)
+    module_externals = getattr(dumper.current_module, 'externals', [])
+    if isinstance(expr, Expr) and expr in module_externals:
+        exposed_name = dumper.get_external_port_name(expr)
+
+    if isinstance(expr, Slice):
+        left = expr.l.value.value if hasattr(expr.l, 'value') else expr.l
+        right = expr.r.value.value if hasattr(expr.r, 'value') else expr.r
+        actual_bits = right - left + 1
+        dtype_str = f"Bits({actual_bits})"
     else:
-        write_enable = 'Bits(1)(0)'
+        dtype_str = dump_type(expr.dtype)
+
+    return ValueExposureRender(exposed_name=exposed_name, dtype_str=dtype_str, rval=rval)
+
+
+def generate_sram_control_signals(dumper, sram_info, module_exposure):
+    """Generate control signals for SRAM memory interface."""
+
+    array = sram_info['array']
+    exposure: Optional[ArrayExposure] = module_exposure.arrays.get(array)
+
+    writes: List[ArrayWriteExposure] = []
+    reads = []
+    if exposure is not None:
+        for entries in exposure.writes_by_module.values():
+            writes.extend(entries)
+        reads.extend(exposure.reads)
+
+    if writes:
+        first_write = writes[0]
+        write_addr = dumper.dump_rval(first_write.expr.idx, False)
+        write_pred_literal = dumper.format_predicate(first_write.predicate)
+        write_enable = f'executed_wire & ({write_pred_literal})'
+        write_data = dumper.dump_rval(first_write.expr.val, False)
+    else:
         write_addr = None
-        write_data = dump_type(array.scalar_ty)(0)
+        write_enable = 'Bits(1)(0)'
+        write_data = f"{dump_type(array.scalar_ty)}(0)"
+
     read_addr = None
-    if array_reads:
-        read_expr, _ = array_reads[0]
+    if reads:
+        read_expr = reads[0].expr
         read_addr = dumper.dump_rval(read_expr.idx, False)
 
     dumper.append_code(f'self.mem_write_enable = {write_enable}')
@@ -59,8 +78,11 @@ def generate_sram_control_signals(dumper, sram_info):
     # Address selection (prioritize write address when writing)
     if write_addr and read_addr:
         if write_addr != read_addr:
-            dumper.append_code(f'self.mem_address = Mux({write_enable},'
-                f' {read_addr}.as_bits(), {write_addr}.as_bits())')
+            dumper.append_code(
+                f'self.mem_address = Mux({write_enable}, '
+                f'{read_addr}.as_bits(), '
+                f'{write_addr}.as_bits())'
+            )
         else:
             dumper.append_code(f'self.mem_address = {write_addr}.as_bits()')
     elif write_addr:
@@ -70,25 +92,26 @@ def generate_sram_control_signals(dumper, sram_info):
     else:
         dumper.append_code(f'self.mem_address = Bits({array.index_bits})(0)')
 
-
     dumper.append_code(f'self.mem_write_data = {write_data}')
-
     dumper.append_code('self.mem_read_enable = Bits(1)(1)')  # Always enable reads
 
 
-def build_mux_chain(dumper, writes, dtype):
-    """Helper to build a mux chain for write data"""
-    first_val = dumper.dump_rval(writes[0][0].val, False)
-    if writes[0][0].val.dtype != dump_type(dtype):
-        first_val = f"{first_val}.{dump_type_cast(dtype)}"
-    first_pred = dumper.format_predicate(writes[0][1])
-    mux = f"Mux({first_pred}, {dump_type(dtype)}(0), {first_val})"
+def build_mux_chain(dumper, writes: Sequence[ArrayWriteExposure], dtype):
+    """Helper to build a mux chain for write data."""
 
-    for expr, pred in writes[1:]:
-        val = dumper.dump_rval(expr.val, False)
-        if expr.val.dtype != dump_type(dtype):
+    dtype_str = dump_type(dtype)
+    first_write = writes[0]
+    first_val = dumper.dump_rval(first_write.expr.val, False)
+    if dump_type(first_write.expr.val.dtype) != dtype_str:
+        first_val = f"{first_val}.{dump_type_cast(dtype)}"
+    first_pred = dumper.format_predicate(first_write.predicate)
+    mux = f"Mux({first_pred}, {dtype_str}(0), {first_val})"
+
+    for exposure in writes[1:]:
+        val = dumper.dump_rval(exposure.expr.val, False)
+        if dump_type(exposure.expr.val.dtype) != dtype_str:
             val = f"{val}.{dump_type_cast(dtype)}"
-        pred_literal = dumper.format_predicate(pred)
+        pred_literal = dumper.format_predicate(exposure.predicate)
         mux = f"Mux({pred_literal}, {mux}, {val})"
 
     return mux
@@ -129,166 +152,121 @@ def cleanup_post_generation(dumper):
     else:
         dumper.append_code('self.finish = Bits(1)(0)')
 
+    module_metadata = dumper.module_metadata[dumper.current_module]
+    module_exposure = module_metadata.exposures
+
     if isinstance(dumper.current_module, SRAM):
         sram_info = get_sram_info(dumper.current_module)
         if sram_info:
-            generate_sram_control_signals(dumper, sram_info)
-    # pylint: disable=too-many-nested-blocks
-    for key, exposes in dumper._exposes.items():  # pylint: disable=protected-access
-        if isinstance(key, Array):
-            owner = key.owner
-            if isinstance(owner, MemoryBase) and key.is_payload(owner):
-                continue
-            array_writes = [
-                    (e, p) for e, p in exposes
-                    if isinstance(e, ArrayWrite)
-                ]
-            array_reads = [
-                    (e, p) for e, p in exposes
-                    if isinstance(e, ArrayRead)
-                ]
-            arr = key
-            metadata = dumper.array_metadata.metadata_for(arr)
-            if metadata is None:
-                continue
-            array_name = dumper.dump_rval(arr, False)
-            array_dtype = arr.scalar_ty
-            port_mapping = metadata.write_ports
-            # Group writes by their source module
-            writes_by_module = {}
-            for expr, pred in array_writes:
-                module = expr.module
-                if module not in writes_by_module:
-                    writes_by_module[module] = []
-                writes_by_module[module].append((expr, pred))
-            # Generate signals for each port
-            for module, module_writes in writes_by_module.items():
-                port_idx = port_mapping[module]
-                port_suffix = f"_port{port_idx}"
-                # Write enable
-                ce_terms = [dumper.format_predicate(p) for _, p in module_writes]
-                dumper.append_code(
-                    f'self.{array_name}_w{port_suffix} = '
-                    f'executed_wire & reduce(or_, [{", ".join(ce_terms)}])'
-                )
-                # Write data (mux if multiple writes from same module)
-                if len(module_writes) == 1:
-                    wdata = dumper.dump_rval(module_writes[0][0].val, False)
-                    if module_writes[0][0].val.dtype != dump_type(array_dtype):
-                        wdata = f"{wdata}.{dump_type_cast(array_dtype)}"
-                else:
-                    # Build mux chain
-                    wdata = build_mux_chain(dumper, module_writes, array_dtype)
-                dumper.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata}')
-                if len(module_writes) == 1:
-                    # Single write - no mux needed, just use the index directly
-                    widx_mux = dumper.dump_rval(module_writes[0][0].idx, False)
-                else:
-                    # Multiple writes - build mux chain
-                    first_pred = dumper.format_predicate(module_writes[0][1])
-                    widx_mux = (
-                        f"Mux({first_pred},"
-                        f" {dump_type(module_writes[0][0].idx.dtype)}(0),"
-                        f" {dumper.dump_rval(module_writes[0][0].idx, False)})"
-                    )
-                    for expr, pred in module_writes[1:]:
-                        pred_literal = dumper.format_predicate(pred)
-                        widx_mux = (
-                            f"Mux({pred_literal},  {widx_mux}, "
-                            f"{dumper.dump_rval(expr.idx, False)})"
-                        )
-                dumper.append_code(
-                    f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()'
-                    )
-            if array_reads and arr.index_bits > 0:
-                assigned_read_ports = set()
-                index_bits = arr.index_bits
-                for expr, _ in array_reads:
-                    port_idx = dumper.array_metadata.read_port_index_for_expr(expr)
-                    if port_idx is None or port_idx in assigned_read_ports:
-                        continue
-                    idx_value = dumper.dump_rval(expr.idx, False)
-                    idx_dtype = expr.idx.dtype
-                    if idx_dtype.is_raw() and idx_dtype.bits == index_bits:
-                        cast_idx = idx_value
-                    else:
-                        cast_idx = f'{idx_value}.as_bits({index_bits})'
-                    dumper.append_code(
-                        f'self.{array_name}_ridx_port{port_idx} = {cast_idx}'
-                    )
-                    assigned_read_ports.add(port_idx)
+            generate_sram_control_signals(dumper, sram_info, module_exposure)
 
-        elif isinstance(key, Port):
-            # FIFO exposures are now driven exclusively by module metadata.
+    for arr, array_exposure in module_exposure.arrays.items():
+        owner = arr.owner
+        if isinstance(owner, MemoryBase) and arr.is_payload(owner):
             continue
 
-        elif isinstance(key, Module):
-            rval = dumper.dump_rval(key, False)
+        metadata = dumper.array_metadata.metadata_for(arr)
+        if metadata is None:
+            continue
 
-            call_predicates = [
-                dumper.format_predicate(pred)
-                for expr, pred in exposes
-                if isinstance(expr, AsyncCall)
-            ]
+        array_name = dumper.dump_rval(arr, False)
+        array_dtype = arr.scalar_ty
+        port_mapping = metadata.write_ports
 
-            if not call_predicates:
-                dumper.append_code(f'self.{rval}_trigger = UInt(8)(0)')
+        for writer_module, module_writes in array_exposure.writes_by_module.items():
+            if not module_writes:
                 continue
-
-            dumper.append_code(f'# Summing triggers for {rval}')
-
-            add_terms = [f"Mux({pred}, UInt(8)(0), UInt(8)(1))" for pred in call_predicates]
-
-            sum_expression = f"reduce(add, [{', '.join(add_terms)}])"
-
-            resized_sum = f"(({sum_expression}).as_bits()[0:8].as_uint())"
-
-            final_trigger_value = \
-                f"Mux(executed_wire, UInt(8)(0), {resized_sum})"
-            dumper.append_code(f'self.{rval}_trigger = {final_trigger_value}')
-
-        else:
-            expr, pred = exposes[0]
-            if isinstance(unwrap_operand(expr), Const):
+            port_idx = port_mapping.get(writer_module)
+            if port_idx is None:
                 continue
-            rval = dumper.dump_rval(expr, False)
-            if (
-                isinstance(expr, Expr)
-                and hasattr(dumper.current_module, "externals")
-                and expr in dumper.current_module.externals
-            ):
-                exposed_name = dumper.get_external_port_name(expr)
-            else:
-                exposed_name = dumper.dump_rval(expr, True)
-            if not isinstance(key,ArrayWrite ):
-                dtype_str = dump_type(expr.dtype)
-            else :
-                dtype_str = dump_type(expr.x.dtype)
-
-            if isinstance(expr, Slice):
-                # For slice expressions, calculate actual width
-                l = expr.l.value.value if hasattr(expr.l, 'value') else expr.l
-                r = expr.r.value.value if hasattr(expr.r, 'value') else expr.r
-                actual_bits = r - l + 1
-                dtype_str = f"Bits({actual_bits})"
-
-
-            # Add port declaration strings to our list
-            dumper.exposed_ports_to_add.append(f'expose_{exposed_name} = Output({dtype_str})')
-            dumper.exposed_ports_to_add.append(f'valid_{exposed_name} = Output(Bits(1))')
-
-            # Generate the logic assignment
-            dumper.append_code(f'# Expose: {expr}')
-            dumper.append_code(f'self.expose_{exposed_name} = {rval}')
-            # Include the condition predicate for the valid signal
-            # OR all the predicates together when the same expression is exposed multiple times
-            all_predicates = [dumper.format_predicate(pred) for _, pred in exposes]
-            pred_condition = (
-                f"reduce(or_, [{', '.join([f'({p})' for p in all_predicates])}])"
+            port_suffix = f"_port{port_idx}"
+            predicate_terms = [dumper.format_predicate(write.predicate) for write in module_writes]
+            joined_terms = ', '.join(predicate_terms)
+            dumper.append_code(
+                f'self.{array_name}_w{port_suffix} = '
+                f'executed_wire & reduce(or_, [{joined_terms}])'
             )
-            dumper.append_code(f'self.valid_{exposed_name} = executed_wire & ({pred_condition})')
 
-    module_metadata = dumper.module_metadata[dumper.current_module]
+            if len(module_writes) == 1:
+                write_expr = module_writes[0].expr
+                wdata = dumper.dump_rval(write_expr.val, False)
+                if dump_type(write_expr.val.dtype) != dump_type(array_dtype):
+                    wdata = f"{wdata}.{dump_type_cast(array_dtype)}"
+                widx_mux = dumper.dump_rval(write_expr.idx, False)
+            else:
+                wdata = build_mux_chain(dumper, module_writes, array_dtype)
+                first_write = module_writes[0]
+                first_pred = dumper.format_predicate(first_write.predicate)
+                widx_mux = (
+                    f"Mux({first_pred}, {dump_type(first_write.expr.idx.dtype)}(0), "
+                    f"{dumper.dump_rval(first_write.expr.idx, False)})"
+                )
+                for exposure in module_writes[1:]:
+                    pred_literal = dumper.format_predicate(exposure.predicate)
+                    widx_mux = (
+                        f"Mux({pred_literal}, {widx_mux}, "
+                        f"{dumper.dump_rval(exposure.expr.idx, False)})"
+                    )
+
+            dumper.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata}')
+            dumper.append_code(f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()')
+
+        if array_exposure.reads and arr.index_bits > 0:
+            assigned_read_ports = set()
+            index_bits = arr.index_bits
+            for read_exposure in array_exposure.reads:
+                expr = read_exposure.expr
+                port_idx = dumper.array_metadata.read_port_index_for_expr(expr)
+                if port_idx is None or port_idx in assigned_read_ports:
+                    continue
+                idx_value = dumper.dump_rval(expr.idx, False)
+                idx_dtype = expr.idx.dtype
+                if (
+                    hasattr(idx_dtype, 'is_raw')
+                    and idx_dtype.is_raw()
+                    and idx_dtype.bits == index_bits
+                ):
+                    cast_idx = idx_value
+                else:
+                    cast_idx = f'{idx_value}.as_bits({index_bits})'
+                dumper.append_code(
+                    f'self.{array_name}_ridx_port{port_idx} = {cast_idx}'
+                )
+                assigned_read_ports.add(port_idx)
+
+    value_groups: Dict[Expr, List[ValueExposure]] = defaultdict(list)
+    for exposure in module_exposure.values:
+        value_groups[exposure.expr].append(exposure)
+
+    for expr, grouped_exposures in value_groups.items():
+        if isinstance(unwrap_operand(expr), Const):
+            continue
+        render = resolve_value_exposure_render(dumper, expr)
+        dumper.append_code(f'# Expose: {expr}')
+        dumper.append_code(f'self.expose_{render.exposed_name} = {render.rval}')
+        predicate_terms = [dumper.format_predicate(entry.predicate) for entry in grouped_exposures]
+        if predicate_terms:
+            joined = ', '.join(f'({term})' for term in predicate_terms)
+            pred_condition = f"reduce(or_, [{joined}])"
+        else:
+            pred_condition = 'Bits(1)(1)'
+        dumper.append_code(
+            f'self.valid_{render.exposed_name} = executed_wire & ({pred_condition})'
+        )
+
+    for callee, trigger_entries in module_exposure.async_triggers.items():
+        rval = dumper.dump_rval(callee, False)
+        trigger_predicates = [dumper.format_predicate(entry.predicate) for entry in trigger_entries]
+        if not trigger_predicates:
+            dumper.append_code(f'self.{rval}_trigger = UInt(8)(0)')
+            continue
+        dumper.append_code(f'# Summing triggers for {rval}')
+        add_terms = [f"Mux({pred}, UInt(8)(0), UInt(8)(1))" for pred in trigger_predicates]
+        sum_expression = f"reduce(add, [{', '.join(add_terms)}])"
+        resized_sum = f"(({sum_expression}).as_bits()[0:8].as_uint())"
+        final_trigger_value = f"Mux(executed_wire, UInt(8)(0), {resized_sum})"
+        dumper.append_code(f'self.{rval}_trigger = {final_trigger_value}')
+
     for fifo_port, _, interactions in module_metadata.fifo.iter_channels():
         fifo_name = dumper.dump_rval(fifo_port, False)
         local_pushes = [entry for entry in interactions if entry.is_push]
@@ -341,9 +319,6 @@ def cleanup_post_generation(dumper):
     external_exposures = dumper.external_output_exposures.get(dumper.current_module, {})
     for data in external_exposures.values():
         output_name = data['output_name']
-        dtype_str = dump_type(data['dtype'])
-        dumper.exposed_ports_to_add.append(f'expose_{output_name} = Output({dtype_str})')
-        dumper.exposed_ports_to_add.append(f'valid_{output_name} = Output(Bits(1))')
         index_key = data.get('index_key')
         index_operand = data['index_operand']
         if index_key is None or index_key == ('const', 0):

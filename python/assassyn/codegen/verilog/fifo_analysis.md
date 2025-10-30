@@ -2,10 +2,10 @@
 
 ## Summary
 
-The FIFO analysis module performs a read-only traversal of Assassyn IR before any Verilog
-code is emitted. The helper `collect_fifo_metadata` drives a lightweight
-`FIFOAnalysisVisitor` that mirrors the dumper’s predicate semantics and records every
-`FIFOPush`/`FIFOPop` interaction into immutable metadata structures. The resulting
+The analysis module performs a read-only traversal of Assassyn IR before any Verilog code
+is emitted. The helper `collect_fifo_metadata` drives a visitor that mirrors the dumper’s
+predicate semantics and records every `FIFOPush`/`FIFOPop` interaction, FINISH intrinsic,
+async call, and cross-module exposure into immutable metadata structures. The resulting
 `module_metadata` map and `FIFORegistry` are passed to `CIRCTDumper` at construction time,
 ensuring downstream phases observe a stable snapshot without manipulating mutable global
 state during code emission.
@@ -33,12 +33,14 @@ generation.
    existing cache.
 2. **Visitor Execution**: Instantiates `FIFOAnalysisVisitor` with a fresh
    `FIFORegistry` and a mutable `dict[Module, ModuleMetadata]`. The visitor walks each
-   module body, recording push/pop interactions and reading their `meta_cond` operands
-   directly so predicate information stays attached as IR values.
+   module body, recording push/pop interactions, FINISH intrinsics, async calls, and any
+   valued expression that must be exposed outside the module. Predicates are read directly
+   from `expr.meta_cond`, so the stored metadata contains raw IR values.
 3. **Metadata Construction**: For every visited module the helper creates a new
-   `ModuleMetadata` whose `ModuleFIFOView` references the shared registry. Recorded
-   `FIFOInteraction` instances are owned by the registry and re-used inside the module
-   view so predicates and expression handles stay in sync for all consumers.
+   `ModuleMetadata` whose `ModuleFIFOView` references the shared registry and whose
+   `ModuleExposure` aggregates array, async-trigger, and general value exposures. Recorded
+   `FIFOInteraction` instances are owned by the registry and re-used inside the module view
+   so predicates and expression handles stay in sync for all consumers.
 4. **Result Delivery**: Returns `(module_metadata, fifo_registry)` for the caller to feed
    into `CIRCTDumper`. The helper never mutates the caller’s existing metadata, making it
    safe to run in parallel with other analyses or to layer partial refreshes on top of
@@ -58,14 +60,21 @@ It receives two collaborators:
 - A shared `FIFORegistry` that owns every `FIFOInteraction`.
 - A mutable `dict[Module, ModuleMetadata]` populated on demand.
 
-`visit_expr` handles two cases:
+`visit_expr` handles four categories:
 
-1. `Intrinsic` guard management – these intrinsics are ignored because predicate
-   information is already baked into the consumer nodes’ `meta_cond` fields.
-2. `FIFOPush` / `FIFOPop` – records interactions in `FIFORegistry` and in the
-   per-module `ModuleFIFOView`, capturing the predicate value directly from
-   `expr.meta_cond`.
+1. **FIFO interactions** – `FIFOPush` / `FIFOPop` nodes register interactions in
+   `FIFORegistry` and the per-module `ModuleFIFOView`, capturing predicates from
+   `expr.meta_cond`. When a pop’s value escapes its defining module the visitor also
+   records a value exposure so downstream stages can surface the produced data without
+   revisiting the IR.
+2. **FINISH intrinsics** – toggle `ModuleMetadata.has_finish` so downstream wiring can
+   expose finish outputs without mutating state during emission.
+3. **Async calls** – append `AsyncCall` expressions to `ModuleMetadata.calls` and record
+   trigger exposure metadata (grouped per callee) with the associated predicate.
+4. **Exposure candidates** – arrays and valued expressions used outside the module are
+   captured in `ModuleExposure` structures so cleanup can emit wiring without revisiting
+   the IR.
 
-Traversal of module bodies is delegated to the base `Visitor`, keeping the class small and
-ensuring new IR constructs automatically flow through the pass as long as they surface as
+Traversal of module bodies is delegated to the base visitor, keeping the class compact and
+ensuring new IR constructs automatically flow through analysis as long as they surface as
 expressions.

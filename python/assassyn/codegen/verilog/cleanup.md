@@ -27,20 +27,21 @@ This is the main cleanup function that generates all the necessary control signa
 
 3. **SRAM Control Signal Generation**: When the current module wraps an SRAM payload (detected via `array.is_payload(sram_instance)`), `generate_sram_control_signals` derives write enables, addresses, and data from the exposed array accesses, producing the handshakes expected by the memory blackbox.
 
-4. **Array Write Signal Generation**: For each array exposed through `dumper._exposes`:
+4. **Array Write Signal Generation**: For each array exposure recorded in
+   `module_metadata.exposures.arrays`:
    - Filters out arrays whose owner is a memory instance and satisfy `array.is_payload(owner)`, because those are handled by dedicated memory logic.
-   - Groups writes by source module and maps them onto the precomputed port indices stored in the `ArrayMetadataRegistry`.
+   - Uses the pre-bucketed writes-per-module data to map interactions onto the precomputed port indices stored in the `ArrayMetadataRegistry`.
    - Emits write-enable, write-data, and write-index signals per port, formatting the stored predicate values with `dumper.format_predicate`. Multi-writer modules use `build_mux_chain` to pick the correct payload.
 
 5. **FIFO Signal Generation**: Uses `module_metadata[current_module].fifo.iter_channels()` to visit each FIFO touched by the module:
    - Pulls the per-port `FIFOMetadata` directly from the registry so push predicates, values, and pop predicates stay in sync with the module view, while the module view provides the filtered interactions.
-   - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata captured during the pre-pass (no on-the-fly logging).
-   - Produces the module-local `*_pop_ready` backpressure signal without consulting `dumper._exposes`.
+   - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata captured during the pre-pass.
+   - Produces the module-local `*_pop_ready` backpressure signal without consulting dumper internals.
 
-6. **Module Trigger Signal Generation**: When async calls target another module, sums all predicates (each converted to an 8-bit increment) and routes the result into `<callee>_trigger`.
+6. **Module Trigger Signal Generation**: Reads async trigger exposures from metadata, sums all predicates (each converted to an 8-bit increment), and routes the result into `<callee>_trigger`.
 
-7. **External Exposure Generation**: For every expression that must leave the module:
-   - Appends `expose_<name>`/`valid_<name>` port declarations to `dumper.exposed_ports_to_add`.
+7. **External Exposure Generation**: For every value exposure recorded in metadata:
+   - Schedules `expose_<name>`/`valid_<name>` port declarations for the module generator.
    - Emits assignments that drive the value and its validity, converting the recorded predicate `Value` objects into bit expressions through `dumper.format_predicate`.
    - Skips raw objects that are bridged through dedicated external wiring handled elsewhere.
    - Emits additional `expose_<instance>_<port>` / `valid_<instance>_<port>` pairs for every external register output that is consumed by another module, using the cross-module metadata recorded earlier in the pipeline.

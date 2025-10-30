@@ -2,7 +2,7 @@
 # pylint: disable=no-member
 """Verilog design generation and code dumping."""
 
-from typing import List, Dict, Tuple, Union, Any, Optional
+from typing import List, Dict, Tuple, Union, Optional
 from collections import defaultdict
 from pathlib import Path
 
@@ -13,7 +13,6 @@ from .utils import (
     ensure_bits,
 )
 
-from ...analysis import expr_externally_used
 from ...ir.module import Module
 from ...ir.memory.sram import SRAM
 from ...builder import SysBuilder
@@ -23,13 +22,7 @@ from ...ir.array import Array
 from ...ir.dtype import RecordValue
 from ...utils import namify, unwrap_operand
 from ...utils.enforce_type import enforce_type
-from ...ir.expr import (
-    Expr,
-    ArrayRead,
-    ArrayWrite,
-    AsyncCall,
-)
-from ...ir.expr.intrinsic import PureIntrinsic, ExternalIntrinsic
+from ...ir.expr import Expr
 from ._expr import codegen_expr
 from .cleanup import cleanup_post_generation
 from .rval import dump_rval as dump_rval_impl
@@ -46,7 +39,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     wait_until: bool
     indent: int
     code: List[str]
-    _exposes: Dict[Any, List[Tuple[Any, Optional[Expr]]]]
     logs: List[str]
     connections: List[Tuple[Module, str, str]]
     current_module: Module
@@ -67,13 +59,11 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.wait_until = None
         self.indent = 0
         self.code = []
-        self._exposes = {}
         self.logs = []
         self.connections = []
         self.current_module = None
         self.sys = None
         self.async_callees = {}
-        self.exposed_ports_to_add = []
         self.downstream_dependencies = {}
         self.is_top_generation = False
         self.finish_body = []
@@ -144,31 +134,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         else:
             self.code.append(self.indent * ' ' + code)
 
-    def expose(self, kind: str, expr: Expr):
-        ''' Expose an expression out of the module.'''
-        key = None
-        if kind == 'expr':
-            key = expr
-
-        elif kind == 'array':
-            assert isinstance(expr, (ArrayRead, ArrayWrite))
-            key = expr.array
-        elif kind in ('fifo', 'fifo_pop'):
-            raise ValueError('FIFO exposes were removed; rely on metadata instead')
-        elif kind == 'trigger':
-            assert isinstance(expr, AsyncCall)
-            key = expr.bind.callee
-
-        assert key is not None
-        if key not in self._exposes:
-            self._exposes[key] = []
-        predicate = None
-        if isinstance(expr, Expr):
-            meta_attr = getattr(type(expr), "meta_cond", None)
-            if meta_attr is not None:
-                predicate = expr.meta_cond  # type: ignore[attr-defined]
-        self._exposes[key].append((expr, predicate))
-
     def _visit_body(self, body_nodes):
         for node in body_nodes:
             if isinstance(node, Expr):
@@ -189,25 +154,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
         # Delegate to the expression code generator
         body = codegen_expr(self, expr)
-
-        # Handle exposure logic for valued expressions that are externally used
-        if expr.is_valued() and expr_externally_used(expr, True):
-            # Skip exposure for ExternalIntrinsic - they should never be exposed as ports
-            skip_exposure = isinstance(expr, ExternalIntrinsic)
-
-            # For EXTERNAL_OUTPUT_READ, skip exposure only if the instance is in the same module
-            if (
-                isinstance(expr, PureIntrinsic)
-                and expr.opcode == PureIntrinsic.EXTERNAL_OUTPUT_READ
-            ):
-                instance = expr.args[0]  # The ExternalIntrinsic
-                instance_owner = self.external_instance_owners.get(instance)
-                # Skip exposure if the instance is in the current module
-                if instance_owner == self.current_module:
-                    skip_exposure = True
-
-            if not skip_exposure and not isinstance(unwrap_operand(expr), Const):
-                self.expose('expr', expr)
 
         if body is not None:
             self.append_code(body)
@@ -232,14 +178,11 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             raise RuntimeError(
                 f"FIFO metadata for module {node.name} is associated with a different registry."
             )
-        metadata.prepare_for_codegen()
 
         self.wait_until = None
-        self._exposes = {}
         self.current_module = node
         previous_module_ctx = self.module_ctx
         self.module_ctx = node
-        self.exposed_ports_to_add = []
         self.finish_body = []
         self.finish_conditions = []
 

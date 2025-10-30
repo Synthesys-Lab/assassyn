@@ -44,7 +44,9 @@ It then performs the following steps:
 
 7. **Array Interfaces**: For every array recorded in `dumper.array_metadata.users_for(arr)`, creates inputs for the array value (`_q_in`) and, when the current module writes to the array, outputs for the per-port write enable/data/index signals. Port indices come from `dumper.array_metadata.write_port_index(arr, node)`.
 
-8. **Exposed Ports**: Appends any additional port declarations recorded in `dumper.exposed_ports_to_add` during expression traversal (e.g. `expose_*` and `valid_*` ports).
+8. **Exposed Ports**: Declares additional `expose_*` / `valid_*` ports derived from
+   `module_metadata.exposures.values` and async trigger exposures so cleanup can wire
+   producer outputs without mutating dumper state.
 
 The function accounts for several module categories:
 
@@ -72,7 +74,8 @@ The function uses several utility functions and data structures:
 The function integrates with the CIRCTDumper's state management:
 - `downstream_dependencies`: Maps downstream modules to their dependencies
 - `array_metadata`: Registry supplying array usage and port assignments
-- `exposed_ports_to_add`: Additional ports registered through expose mechanism
+- `module_metadata`: Immutable per-module snapshot containing FIFO interactions, exposure
+  metadata, FINISH flags, and async calls
 
 **Project-specific Knowledge Required**:
 - Understanding of [CIRCTDumper integration](/python/assassyn/codegen/verilog/design.md)

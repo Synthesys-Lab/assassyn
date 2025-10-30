@@ -47,7 +47,6 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
         if meta_cond.value == 0:
             append_condition('False')
     else:
-        dumper.expose('expr', meta_cond)
         exposed_name = _sanitize(dumper.dump_rval(meta_cond, True))
         valid_signal = f'dut.{module_name}.valid_{exposed_name}.value'
         expose_signal = f'dut.{module_name}.expose_{exposed_name}.value'
@@ -56,7 +55,6 @@ def codegen_log(dumper, expr: Log) -> Optional[str]:
     for i in expr.operands[1:-1]:
         operand = unwrap_operand(i)
         if not isinstance(operand, Const):
-            dumper.expose('expr', operand)
             exposed_name = _sanitize(dumper.dump_rval(operand, True))
             valid_signal = f'dut.{module_name}.valid_{exposed_name}.value'
             condition_snippets.append(valid_signal)
@@ -132,7 +130,6 @@ def _handle_fifo_intrinsic(dumper, expr, intrinsic, rval):
     fifo = expr.args[0]
     fifo_name = dumper.dump_rval(fifo, False)
     if intrinsic == PureIntrinsic.FIFO_PEEK:
-        dumper.expose('expr', expr)
         return f'{rval} = self.{fifo_name}'
     return f'{rval} = self.{fifo_name}_valid'
 
@@ -290,11 +287,8 @@ def codegen_intrinsic(dumper, expr: Intrinsic) -> Optional[str]:
     if intrinsic == Intrinsic.FINISH:
         predicate_signal = dumper.get_pred(expr)
         dumper.finish_conditions.append((predicate_signal, "executed_wire"))
-        # Track that this module has a finish intrinsic for top-level generation
-        dumper.module_metadata[dumper.current_module].has_finish = True
         return None
     if intrinsic == Intrinsic.ASSERT:
-        dumper.expose('expr', expr.args[0])
         return None
     if intrinsic == Intrinsic.WAIT_UNTIL:
         cond = dumper.dump_rval(expr.args[0], False)

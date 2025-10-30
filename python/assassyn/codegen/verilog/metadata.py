@@ -8,17 +8,19 @@ handoff).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterator, List, Sequence, TYPE_CHECKING
+from typing import Any, Dict, Iterator, List, Sequence, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from ...ir.array import Array
-    from ...ir.expr import ArrayRead, AsyncCall, FIFOPop, FIFOPush
+    from ...ir.expr import ArrayRead, ArrayWrite, AsyncCall, Expr, FIFOPop, FIFOPush
     from ...ir.module import Module, Port
     from ...ir.value import Value
 else:
     Array = Any  # type: ignore
     ArrayRead = Any  # type: ignore
+    ArrayWrite = Any  # type: ignore
     AsyncCall = Any  # type: ignore
+    Expr = Any  # type: ignore
     FIFOPop = Any  # type: ignore
     FIFOPush = Any  # type: ignore
     Module = Any  # type: ignore
@@ -27,6 +29,148 @@ else:
 
 CallList = List[AsyncCall]
 ModuleList = List[Module]
+ArrayReadList = List['ArrayRead']
+ArrayWriteList = List['ArrayWrite']
+
+
+@dataclass(frozen=True)
+class ArrayWriteExposure:
+    """Exposure metadata for a single array write expression."""
+
+    expr: 'ArrayWrite'
+    predicate: 'Value'
+
+
+@dataclass(frozen=True)
+class ArrayReadExposure:
+    """Exposure metadata for an array read expression."""
+
+    expr: 'ArrayRead'
+
+
+@dataclass(frozen=True)
+class ValueExposure:
+    """Metadata describing a valued expression that must be exposed externally."""
+
+    expr: 'Expr'
+    predicate: 'Value'
+
+
+@dataclass(frozen=True)
+class AsyncTriggerExposure:
+    """Metadata describing an async call that contributes to a trigger sum."""
+
+    call: 'AsyncCall'
+    predicate: 'Value'
+
+
+@dataclass
+class ArrayExposure:
+    """Aggregated exposure data for a given array within a module."""
+
+    array: Array
+    writes_by_module: Dict[Module, Tuple[ArrayWriteExposure, ...]] = field(default_factory=dict)
+    reads: Tuple[ArrayReadExposure, ...] = ()
+
+    def add_write(self, module: Module, exposure: ArrayWriteExposure) -> None:
+        """Record an array write produced by *module*."""
+        writes = list(self.writes_by_module.get(module, ()))
+        writes.append(exposure)
+        self.writes_by_module[module] = tuple(writes)
+
+    def add_read(self, exposure: ArrayReadExposure) -> None:
+        """Record an array read exposure."""
+        self.reads = self.reads + (exposure,)
+
+
+class ModuleExposure:
+    """Mutable exposure accumulator for a module, frozen post-analysis."""
+
+    __slots__ = (
+        "_arrays",
+        "_values",
+        "_async_triggers",
+        "_frozen",
+    )
+
+    def __init__(self) -> None:
+        self._arrays: Dict[Array, ArrayExposure] = {}
+        self._values: List[ValueExposure] = []
+        self._async_triggers: Dict[Module, List[AsyncTriggerExposure]] = {}
+        self._frozen = False
+
+    @property
+    def arrays(self) -> Dict[Array, ArrayExposure]:
+        """Return array exposure data keyed by the IR array."""
+        return self._arrays
+
+    @property
+    def values(self) -> Tuple[ValueExposure, ...]:
+        """Return the value exposures that must surface as module outputs."""
+        if isinstance(self._values, tuple):
+            return self._values
+        return tuple(self._values)
+
+    @property
+    def async_triggers(self) -> Dict[Module, Tuple[AsyncTriggerExposure, ...]]:
+        """Return async trigger exposures grouped by callee module."""
+        return {
+            module: tuple(entries) if not isinstance(entries, tuple) else entries
+            for module, entries in self._async_triggers.items()
+        }
+
+    def record_array_write(
+        self,
+        array: Array,
+        module: Module,
+        expr: 'ArrayWrite',
+        predicate: 'Value',
+    ) -> None:
+        """Capture an array write exposure for *array* performed by *module*."""
+        self._ensure_mutable()
+        exposure = ArrayWriteExposure(expr=expr, predicate=predicate)
+        bucket = self._arrays.setdefault(array, ArrayExposure(array))
+        bucket.add_write(module, exposure)
+
+    def record_array_read(self, array: Array, expr: 'ArrayRead') -> None:
+        """Capture an array read exposure for *array*."""
+        self._ensure_mutable()
+        exposure = ArrayReadExposure(expr=expr)
+        bucket = self._arrays.setdefault(array, ArrayExposure(array))
+        bucket.add_read(exposure)
+
+    def record_value(self, expr: 'Expr', predicate: 'Value') -> None:
+        """Capture a valued expression that must be exposed externally."""
+        self._ensure_mutable()
+        self._values.append(ValueExposure(expr=expr, predicate=predicate))
+
+    def record_async_trigger(self, callee: Module, call: 'AsyncCall', predicate: 'Value') -> None:
+        """Record an async trigger exposure for a specific callee module."""
+        self._ensure_mutable()
+        entry = AsyncTriggerExposure(call=call, predicate=predicate)
+        self._async_triggers.setdefault(callee, []).append(entry)
+
+    def freeze(self) -> None:
+        """Prevent further mutation and canonicalise collection types."""
+        if self._frozen:
+            return
+        for array, exposure in list(self._arrays.items()):
+            exposure.reads = tuple(exposure.reads)
+            exposure.writes_by_module = {
+                module: tuple(entries)
+                for module, entries in exposure.writes_by_module.items()
+            }
+            self._arrays[array] = exposure
+        if not isinstance(self._values, tuple):
+            self._values = tuple(self._values)
+        for module, entries in list(self._async_triggers.items()):
+            if not isinstance(entries, tuple):
+                self._async_triggers[module] = tuple(entries)
+        self._frozen = True
+
+    def _ensure_mutable(self) -> None:
+        if self._frozen:
+            raise RuntimeError("ModuleExposure is frozen; cannot record new entries")
 
 
 @dataclass
@@ -139,15 +283,11 @@ class ModuleMetadata:
     registry: FIFORegistry
     has_finish: bool = False
     calls: CallList = field(default_factory=list)
+    exposures: ModuleExposure = field(default_factory=ModuleExposure)
     fifo: ModuleFIFOView = field(init=False)
 
     def __post_init__(self) -> None:
         self.fifo = ModuleFIFOView(self.module, self.registry)
-
-    def prepare_for_codegen(self) -> None:
-        """Clear transient state ahead of code emission."""
-        self.has_finish = False
-        self.calls.clear()
 
     @property
     def pushes(self) -> List[FIFOPush]:

@@ -18,7 +18,6 @@ from assassyn.frontend import (  # type: ignore
 )
 from assassyn.codegen.verilog.design import CIRCTDumper
 from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata
-from assassyn.ir.module import Port as IRPort
 from assassyn.utils import namify
 
 
@@ -54,8 +53,7 @@ def test_fifo_cleanup_metadata_drives_handshakes():
     assert len(fifo_meta.pushes) == 1
     assert len(fifo_meta.pops) == 1
 
-    fifo_expose_keys = [key for key in dumper._exposes if isinstance(key, IRPort)]
-    assert fifo_expose_keys == []
+    assert not hasattr(dumper, '_exposes')
 
     fifo_registry = dumper.fifo_registry
     in_port = pipe_module.ports[0]

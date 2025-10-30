@@ -15,13 +15,12 @@ two responsibilities:
 def codegen_async_call(dumper, expr: AsyncCall) -> Optional[str]:
 ```
 
-Registers an async call with the dumper's expose mechanism. The helper does not
-emit Verilog immediately; instead it defers generation to the cleanup phase,
-where triggers for each callee are aggregated and translated into credit
-updates. This mirrors the behaviour described in
+Registers an async call with metadata-driven trigger bookkeeping. The helper
+does not emit Verilog immediately; instead it defers generation to the cleanup
+phase, where triggers for each callee are aggregated (using the immutable
+metadata populated by [`collect_fifo_metadata`](../fifo_analysis.md)) and
+translated into credit updates. This mirrors the behaviour described in
 [`arch.md`](../../../docs/design/arch/arch.md).
-
-Additionally, this function records the AsyncCall expression in the module's metadata (see [metadata module](/python/assassyn/codegen/verilog/metadata.md)) to avoid redundant expression walking during module port generation and top-level harness generation.
 
 ### `codegen_bind`
 
@@ -39,6 +38,6 @@ the emitter intentionally returns `None`.
   SystemVerilog modules. Those responsibilities moved to
   `ExternalIntrinsic`-aware code paths, so `call.py` now contains only the two
   functions above.
-- Async call registration still relies on `dumper.expose()` so that the cleanup
-  pass can assemble trigger expressions in one place.
-
+- Async call registration now relies entirely on metadata; the pre-pass records
+  every `AsyncCall` and its predicate, letting cleanup build trigger sums without
+  touching dumper internals.

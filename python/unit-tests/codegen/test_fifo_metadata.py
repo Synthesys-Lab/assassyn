@@ -19,7 +19,6 @@ from assassyn.frontend import (  # type: ignore
 )
 from assassyn.codegen.verilog.design import CIRCTDumper
 from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata
-from assassyn.ir.module import Port as IRPort
 from assassyn.ir.const import Const
 from assassyn.ir.expr import BinaryOp
 from assassyn.ir.expr.expr import Operand
@@ -126,8 +125,7 @@ def test_fifo_metadata_records_predicates():
     assert isolated_module_md.fifo.pushes[0] is isolated_registry.metadata_for(out_port).pushes[0]
     assert len(list(isolated_module_md.fifo.iter_channels())) == 2
 
-    fifo_expose_keys = [key for key in isolated_dumper._exposes if isinstance(key, IRPort)]
-    assert fifo_expose_keys == []
+    assert not hasattr(isolated_dumper, '_exposes')
 
 
 def test_fifo_registry_cross_module_sharing():
