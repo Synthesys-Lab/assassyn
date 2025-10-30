@@ -17,6 +17,10 @@ from assassyn.frontend import (  # type: ignore
     push_condition,
     pop_condition,
 )
+from assassyn.codegen.verilog.cleanup import (  # type: ignore
+    _emit_predicate_mux_chain,
+    _format_reduce_or,
+)
 from assassyn.codegen.verilog.design import CIRCTDumper  # type: ignore
 from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata  # type: ignore
 from assassyn.utils import namify  # type: ignore
@@ -108,6 +112,77 @@ def _render_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
     return [line.strip() for line in dumper.code if line.strip()], context
 
 
+def _render_single_writer_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
+    """Generate cleanup code for a single-writer module to validate passthrough cases."""
+    sys_builder = SysBuilder("cleanup_mux_single")
+    with sys_builder:
+
+        class SingleWriter(Module):  # type: ignore[misc]
+
+            def __init__(self):
+                super().__init__(ports={
+                    'pred': Port(UInt(1)),
+                    'idx': Port(UInt(2)),
+                    'val': Port(UInt(8)),
+                    'fifo': Port(UInt(8)),
+                })
+
+            @module.combinational
+            def build(self):
+                pred = self.pred.pop()
+                idx = self.idx.pop()
+                val = self.val.pop()
+
+                array = RegArray(UInt(8), 4, name="target_array_single")
+
+                with Condition(pred):
+                    write_port = array & self
+                    write_port[idx] <= val
+
+                push_condition(pred)
+                self.fifo.push(val)
+                pop_condition()
+
+        SingleWriter().build()
+
+    cleanup_module = sys_builder.modules[0]
+
+    module_metadata, fifo_registry = collect_fifo_metadata(sys_builder)
+    dumper = CIRCTDumper(module_metadata=module_metadata, fifo_registry=fifo_registry)
+    dumper.sys = sys_builder
+    dumper.array_metadata.collect(sys_builder)
+    dumper.visit_module(cleanup_module)
+
+    module_entry = module_metadata[cleanup_module]
+
+    array_ref = next(iter(module_entry.exposures.arrays))
+    array_name = dumper.dump_rval(array_ref, False)
+    array_meta = dumper.array_metadata.metadata_for(array_ref)
+    port_idx = 0 if array_meta is None else array_meta.write_ports.get(cleanup_module, 0)
+    fifo_port = None
+    for candidate, _, interactions in module_entry.fifo.iter_channels():
+        if any(entry.is_push for entry in interactions):
+            fifo_port = candidate
+            break
+
+    assert fifo_port is not None
+
+    fifo_name = dumper.dump_rval(fifo_port, False)
+    fifo_module_prefix = namify(fifo_port.module.name)
+    fifo_push_prefix = f"self.{fifo_module_prefix}_{fifo_port.name}"
+
+    context = {
+        'array_name': array_name,
+        'array_port_suffix': f"_port{port_idx}",
+        'module_name': cleanup_module.name,
+        'fifo_name': fifo_name,
+        'fifo_module_prefix': fifo_module_prefix,
+        'fifo_push_prefix': fifo_push_prefix,
+    }
+
+    return [line.strip() for line in dumper.code if line.strip()], context
+
+
 def _extract_assignments(lines: Iterable[str], targets: Iterable[str]) -> Dict[str, str]:
     """Return the assignment lines for *targets* from the rendered code."""
     want = set(targets)
@@ -170,3 +245,63 @@ def test_fifo_push_mux_matches_reference_rendering():
     }
     assignments = _extract_assignments(lines, expected.keys())
     assert assignments == expected
+
+
+def test_array_write_single_entry_passthrough():
+    """Single writer uses direct assignments instead of redundant muxing."""
+    lines, context = _render_single_writer_cleanup_lines()
+    base = f"self.{context['array_name']}_w{context['array_port_suffix']}"
+    expected = {
+        base: (
+            f"{base} = executed_wire & "
+            "reduce(or_, [self.pred.as_bits()])"
+        ),
+        f"{base.replace('_w', '_wdata')}": (
+            f"{base.replace('_w', '_wdata')} = self.val"
+        ),
+        f"{base.replace('_w', '_widx')}": (
+            f"{base.replace('_w', '_widx')} = self.idx.as_bits()"
+        ),
+    }
+    assignments = _extract_assignments(lines, expected.keys())
+    assert assignments == expected
+
+
+def test_fifo_push_single_entry_passthrough():
+    """Single FIFO push should re-use the predicate and value verbatim."""
+    lines, context = _render_single_writer_cleanup_lines()
+    fifo_prefix = context['fifo_push_prefix']
+    ready_signal = (
+        f"self.fifo_{context['fifo_module_prefix']}_{context['fifo_name']}_push_ready"
+    )
+    expected = {
+        f"{fifo_prefix}_push_valid": (
+            f"{fifo_prefix}_push_valid = executed_wire & "
+            "(reduce(or_, [(self.pred)], Bits(1)(0))) & "
+            f"{ready_signal}"
+        ),
+        f"{fifo_prefix}_push_data": (
+            f"{fifo_prefix}_push_data = self.val"
+        ),
+    }
+    assignments = _extract_assignments(lines, expected.keys())
+    assert assignments == expected
+
+
+def test_emit_predicate_mux_chain_empty_sequence_defaults():
+    """Helper should surface the caller's defaults when no entries are provided."""
+    default_value = "UInt(8)(0)"
+
+    def aggregate(predicates):
+        return _format_reduce_or(predicates, default_literal="Bits(1)(0)")
+
+    mux_expr, predicate_expr = _emit_predicate_mux_chain(
+        [],
+        render_predicate=lambda entry: entry,
+        render_value=lambda entry: entry,
+        default_value=default_value,
+        aggregate_predicates=aggregate,
+    )
+
+    assert mux_expr == default_value
+    assert predicate_expr == "Bits(1)(0)"

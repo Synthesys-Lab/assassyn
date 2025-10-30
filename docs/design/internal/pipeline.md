@@ -19,7 +19,7 @@ Before any Verilog is emitted the backend now performs a dedicated metadata pre-
 
 This separation removes runtime bookkeeping from code emission and guarantees that cleanup, module port generation, and top-level wiring all consult a consistent dataset.
 
-Cleanup now routes both array writes and FIFO pushes through a shared `_emit_predicate_mux_chain` helper, so the metadata-derived predicates feed a single implementation of the reduction-and-mux pattern. This keeps enable signals and data selection aligned with the prioritisation defined during IR construction.
+Cleanup now routes both array writes and FIFO pushes through a shared `_emit_predicate_mux_chain` helper, so the metadata-derived predicates feed a single implementation of the reduction-and-mux pattern. The helper collapses single-entry collections to a passthrough assignment and lets callers supply deterministic defaults for the empty case, keeping enable signals and data selection aligned with the prioritisation defined during IR construction without sprinkling ad-hoc guards across call sites.
 
 ## Credit-based Flow Control Implementation
 

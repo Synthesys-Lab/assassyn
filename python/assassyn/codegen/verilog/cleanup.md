@@ -91,8 +91,8 @@ def _emit_predicate_mux_chain(entries, *, render_predicate, render_value, defaul
 This helper consolidates the predicate-driven mux logic shared by array writes and FIFO pushes. Callers provide renderers for predicates and values alongside a default expression and reduction strategy; the helper then:
 
 1. Collects predicate literals via `render_predicate` and feeds them into `aggregate_predicates`, allowing array writers to omit a default literal while FIFO pushes supply `Bits(1)(0)`.
-2. Threads a nested `Mux` chain seeded with `default_value`, preserving iteration order so later entries win, matching the legacy manual loops.
-3. Returns a `(mux_expr, aggregated_predicate)` tuple so enable reductions, data muxes, and index muxes can reuse the same predicate formatting without duplication.
+2. Threads a nested `Mux` chain seeded with `default_value`, preserving iteration order so later entries win, matching the legacy manual loops. A single-entry list simply returns that entry’s value (no redundant `Mux` is introduced), while an empty list yields the caller-supplied default value.
+3. Returns a `(mux_expr, aggregated_predicate)` tuple so enable reductions, data muxes, and index muxes can reuse the same predicate formatting without duplication. When no entries exist, callers receive the reduction produced by `aggregate_predicates([])` (for example, `Bits(1)(0)` in the FIFO case), keeping zero-writer scenarios explicit and consistent across call sites.
 
 **Project-specific Knowledge Required**:
 - Understanding of [array write operations](/python/assassyn/ir/expr/array.md)
