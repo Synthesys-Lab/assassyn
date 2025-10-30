@@ -2,7 +2,7 @@
 # pylint: disable=no-member
 """Verilog design generation and code dumping."""
 
-from typing import List, Dict, Tuple, Union
+from typing import List, Dict, Tuple, Union, Any, Optional
 from collections import defaultdict
 from pathlib import Path
 
@@ -10,6 +10,7 @@ from .utils import (
     HEADER,
     dump_type,
     extract_sram_params,
+    ensure_bits,
 )
 
 from ...analysis import expr_externally_used
@@ -35,7 +36,6 @@ from .rval import dump_rval as dump_rval_impl
 from .module import generate_module_ports
 from .system import generate_system
 from .metadata import ModuleMetadata, FIFORegistry
-from .predicate import PredicateStack
 from .fifo_analysis import collect_fifo_metadata
 from .array import ArrayMetadataRegistry
 
@@ -46,8 +46,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     wait_until: bool
     indent: int
     code: List[str]
-    predicate_stack: PredicateStack
-    _exposes: Dict[Expr, List[Tuple[Expr, str]]]
+    _exposes: Dict[Any, List[Tuple[Any, Optional[Expr]]]]
     logs: List[str]
     connections: List[Tuple[Module, str, str]]
     current_module: Module
@@ -69,7 +68,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.indent = 0
         self.code = []
         self._exposes = {}
-        self.predicate_stack = PredicateStack()
         self.logs = []
         self.connections = []
         self.current_module = None
@@ -102,9 +100,16 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         )
         self.fifo_registry = fifo_registry if fifo_registry is not None else FIFORegistry()
 
-    def get_pred(self) -> str:
-        """Get the current predicate for conditional execution."""
-        return self.predicate_stack.predicate()
+    def get_pred(self, expr: Expr) -> str:
+        """Format the predicate guarding *expr* (or return the default literal)."""
+        return self.format_predicate(expr.meta_cond)
+
+    def format_predicate(self, predicate: Optional[Expr]) -> str:
+        """Format a predicate value as a Bits expression."""
+        if predicate is None:
+            return "Bits(1)(1)"
+        predicate_code = self.dump_rval(predicate, False)
+        return ensure_bits(predicate_code)
 
     def get_external_port_name(self, node: Expr) -> str:
         """Get the mangled port name for an external value."""
@@ -157,7 +162,12 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         assert key is not None
         if key not in self._exposes:
             self._exposes[key] = []
-        self._exposes[key].append((expr, self.get_pred()))
+        predicate = None
+        if isinstance(expr, Expr):
+            meta_attr = getattr(type(expr), "meta_cond", None)
+            if meta_attr is not None:
+                predicate = expr.meta_cond  # type: ignore[attr-defined]
+        self._exposes[key].append((expr, predicate))
 
     def _visit_body(self, body_nodes):
         for node in body_nodes:
@@ -226,7 +236,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
 
         self.wait_until = None
         self._exposes = {}
-        self.predicate_stack.reset()
         self.current_module = node
         previous_module_ctx = self.module_ctx
         self.module_ctx = node

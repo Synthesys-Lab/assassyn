@@ -30,7 +30,7 @@ This is the main cleanup function that generates all the necessary control signa
 4. **Array Write Signal Generation**: For each array exposed through `dumper._exposes`:
    - Filters out arrays whose owner is a memory instance and satisfy `array.is_payload(owner)`, because those are handled by dedicated memory logic.
    - Groups writes by source module and maps them onto the precomputed port indices stored in the `ArrayMetadataRegistry`.
-   - Emits write-enable, write-data, and write-index signals per port. Multi-writer modules use `build_mux_chain` to pick the correct payload.
+   - Emits write-enable, write-data, and write-index signals per port, formatting the stored predicate values with `dumper.format_predicate`. Multi-writer modules use `build_mux_chain` to pick the correct payload.
 
 5. **FIFO Signal Generation**: Uses `module_metadata[current_module].fifo.iter_channels()` to visit each FIFO touched by the module:
    - Pulls the per-port `FIFOMetadata` directly from the registry so push predicates, values, and pop predicates stay in sync with the module view, while the module view provides the filtered interactions.
@@ -41,7 +41,7 @@ This is the main cleanup function that generates all the necessary control signa
 
 7. **External Exposure Generation**: For every expression that must leave the module:
    - Appends `expose_<name>`/`valid_<name>` port declarations to `dumper.exposed_ports_to_add`.
-   - Emits assignments that drive the value and its validity.
+   - Emits assignments that drive the value and its validity, converting the recorded predicate `Value` objects into bit expressions through `dumper.format_predicate`.
    - Skips raw objects that are bridged through dedicated external wiring handled elsewhere.
    - Emits additional `expose_<instance>_<port>` / `valid_<instance>_<port>` pairs for every external register output that is consumed by another module, using the cross-module metadata recorded earlier in the pipeline.
 

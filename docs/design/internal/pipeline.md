@@ -13,7 +13,7 @@ Assassyn generates Verilog code that implements the credit-based pipeline archit
 
 Before any Verilog is emitted the backend now performs a dedicated FIFO metadata pre-pass:
 
-1. `collect_fifo_metadata` instantiates a lightweight `FIFOAnalysisVisitor` that walks every module body, applying the same predicate semantics as `CIRCTDumper` through the shared `PredicateStack` helper.
+1. `collect_fifo_metadata` instantiates a lightweight `FIFOAnalysisVisitor` that walks every module body, recording each push/pop node’s `meta_cond` so later code reuse the original predicate values without rebuilding a stack during emission.
 2. The visitor populates `ModuleMetadata`/`ModuleFIFOView` instances and a FIFO-keyed `FIFORegistry`, producing a frozen snapshot of push/pop behaviour (module, predicate, expression) that can be handed directly to the dumper constructor.
 3. Callers that need a partial refresh can analyse a subset of modules and merge the returned metadata, without mutating previously produced registries during code emission.
 

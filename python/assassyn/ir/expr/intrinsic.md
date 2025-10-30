@@ -42,8 +42,9 @@ The class for intrinsic operations with side effects. These operations may have 
 - `opcode: int` - Operation code for this intrinsic
 
 **Methods:**
-- `__init__(opcode, *args)` - Initialize intrinsic with opcode and arguments
-- `args` - Get the arguments of this intrinsic (property)
+- `__init__(opcode, *args, meta_cond=None)` - Initialize the intrinsic with opcode and arguments, capturing the active predicate in `meta_cond` (defaults to `get_pred()` when omitted).
+- `args` - Get the arguments of this intrinsic excluding predicate metadata (property)
+- `meta_cond` - Access the predicate `Value` captured at construction time (property)
 - `dtype` - Get the data type of this intrinsic (property)
 - `__enter__()` - Context manager entry
 - `__exit__(exc_type, exc_value, traceback)` - Context manager exit
@@ -62,8 +63,9 @@ The class for pure intrinsic operations without side effects. These operations a
 - `GET_MEM_RESP = 912` - Get memory response data
 
 **Methods:**
-- `__init__(opcode, *args)` - Initialize pure intrinsic with opcode and arguments
-- `args` - Get the arguments of this intrinsic (property)
+- `__init__(opcode, *args, meta_cond=None)` - Initialize the pure intrinsic with opcode and arguments, capturing the active predicate in `meta_cond` (defaults to `get_pred()` when omitted).
+- `args` - Get the arguments of this intrinsic excluding predicate metadata (property)
+- `meta_cond` - Access the predicate `Value` captured at construction time (property)
 - `dtype` - Get the data type of this intrinsic (property)
 
 ### Frontend Functions

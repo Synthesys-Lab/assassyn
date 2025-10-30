@@ -264,7 +264,7 @@ def codegen_external_intrinsic(dumper, expr: ExternalIntrinsic) -> Optional[str]
             seen_keys.add(wire_key)
             output_name = f"{rval}_{entry['port_name']}"
             dumper.external_wire_outputs[wire_key] = output_name
-            current_pred = dumper.get_pred()
+            current_pred = dumper.get_pred(expr)
             exposures.setdefault(wire_key, {
                 'output_name': output_name,
                 'dtype': entry['expr'].dtype,
@@ -288,7 +288,7 @@ def codegen_intrinsic(dumper, expr: Intrinsic) -> Optional[str]:
     intrinsic = expr.opcode
 
     if intrinsic == Intrinsic.FINISH:
-        predicate_signal = dumper.get_pred()
+        predicate_signal = dumper.get_pred(expr)
         dumper.finish_conditions.append((predicate_signal, "executed_wire"))
         # Track that this module has a finish intrinsic for top-level generation
         dumper.module_metadata[dumper.current_module].has_finish = True
@@ -302,11 +302,8 @@ def codegen_intrinsic(dumper, expr: Intrinsic) -> Optional[str]:
         dumper.wait_until = final_cond
         return None
     if intrinsic == Intrinsic.PUSH_CONDITION:
-        cond_str = dumper.dump_rval(expr.args[0], False)
-        dumper.predicate_stack.push(f"({cond_str})", expr)
         return None
     if intrinsic == Intrinsic.POP_CONDITION:
-        dumper.predicate_stack.pop()
         return None
     if intrinsic == Intrinsic.EXTERNAL_INSTANTIATE:
         # Should be handled by ExternalIntrinsic check above

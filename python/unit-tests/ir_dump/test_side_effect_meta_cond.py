@@ -5,7 +5,8 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from assassyn.frontend import Module, SysBuilder, UInt, RegArray, Port, Condition, module  # pylint: disable=import-error
+from assassyn.frontend import Module, SysBuilder, UInt, RegArray, Port, Condition, module, finish, wait_until, assume  # pylint: disable=import-error
+from assassyn.ir.expr.intrinsic import current_cycle  # pylint: disable=import-error
 
 
 class Callee(Module):
@@ -53,10 +54,20 @@ def test_side_effects_capture_meta_cond():
                     self.direct_push = self.fifo_out.push(value)
                     self.pop_expr = self.fifo_in.pop()
 
+                    self.finish_expr = finish()
+                    self.assert_expr = assume(cond)
+                    self.wait_expr = wait_until(cond)
+
                     bound = callee.bind(input_port=value)
                     self.bound_pushes = list(bound.pushes)
                     self.async_expr = bound.async_called(input_port=value)
                     self.async_pushes = list(bound.pushes)
+
+                    self.module_triggered = self.triggered()
+                    self.output_valid = self.fifo_out.valid()
+                    self.peek_expr = self.fifo_in.peek()
+                    self.pop_valid = self.pop_expr.valid()
+                    self.cycle_value = current_cycle()
 
         module_inst = PredicatedOps()
         module_inst.build()
@@ -73,3 +84,12 @@ def test_side_effects_capture_meta_cond():
 
     for push in module_inst.async_pushes:
         assert push.meta_cond is cond_value
+
+    assert module_inst.finish_expr.meta_cond is cond_value
+    assert module_inst.assert_expr.meta_cond is cond_value
+    assert module_inst.wait_expr.meta_cond is cond_value
+    assert module_inst.module_triggered.meta_cond is cond_value
+    assert module_inst.output_valid.meta_cond is cond_value
+    assert module_inst.peek_expr.meta_cond is cond_value
+    assert module_inst.pop_valid.meta_cond is cond_value
+    assert module_inst.cycle_value.meta_cond is cond_value

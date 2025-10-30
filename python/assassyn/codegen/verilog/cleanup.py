@@ -42,7 +42,8 @@ def generate_sram_control_signals(dumper, sram_info):
     if array_writes:
         write_expr, write_pred = array_writes[0]
         write_addr = dumper.dump_rval(write_expr.idx, False)
-        write_enable = f'executed_wire & ({write_pred})'
+        write_pred_literal = dumper.format_predicate(write_pred)
+        write_enable = f'executed_wire & ({write_pred_literal})'
         write_data = dumper.dump_rval(write_expr.val, False)
     else:
         write_enable = 'Bits(1)(0)'
@@ -80,13 +81,15 @@ def build_mux_chain(dumper, writes, dtype):
     first_val = dumper.dump_rval(writes[0][0].val, False)
     if writes[0][0].val.dtype != dump_type(dtype):
         first_val = f"{first_val}.{dump_type_cast(dtype)}"
-    mux = f"Mux({writes[0][1]}, {dump_type(dtype)}(0), {first_val})"
+    first_pred = dumper.format_predicate(writes[0][1])
+    mux = f"Mux({first_pred}, {dump_type(dtype)}(0), {first_val})"
 
     for expr, pred in writes[1:]:
         val = dumper.dump_rval(expr.val, False)
         if expr.val.dtype != dump_type(dtype):
             val = f"{val}.{dump_type_cast(dtype)}"
-        mux = f"Mux({pred}, {mux}, {val})"
+        pred_literal = dumper.format_predicate(pred)
+        mux = f"Mux({pred_literal}, {mux}, {val})"
 
     return mux
 
@@ -163,7 +166,7 @@ def cleanup_post_generation(dumper):
                 port_idx = port_mapping[module]
                 port_suffix = f"_port{port_idx}"
                 # Write enable
-                ce_terms = [p for _, p in module_writes]
+                ce_terms = [dumper.format_predicate(p) for _, p in module_writes]
                 dumper.append_code(
                     f'self.{array_name}_w{port_suffix} = '
                     f'executed_wire & reduce(or_, [{", ".join(ce_terms)}])'
@@ -182,13 +185,18 @@ def cleanup_post_generation(dumper):
                     widx_mux = dumper.dump_rval(module_writes[0][0].idx, False)
                 else:
                     # Multiple writes - build mux chain
+                    first_pred = dumper.format_predicate(module_writes[0][1])
                     widx_mux = (
-                        f"Mux({module_writes[0][1]},"
+                        f"Mux({first_pred},"
                         f" {dump_type(module_writes[0][0].idx.dtype)}(0),"
                         f" {dumper.dump_rval(module_writes[0][0].idx, False)})"
                     )
                     for expr, pred in module_writes[1:]:
-                        widx_mux = f"Mux({pred},  {widx_mux},{dumper.dump_rval(expr.idx, False)})"
+                        pred_literal = dumper.format_predicate(pred)
+                        widx_mux = (
+                            f"Mux({pred_literal},  {widx_mux}, "
+                            f"{dumper.dump_rval(expr.idx, False)})"
+                        )
                 dumper.append_code(
                     f'self.{array_name}_widx{port_suffix} = {widx_mux}.as_bits()'
                     )
@@ -217,7 +225,11 @@ def cleanup_post_generation(dumper):
         elif isinstance(key, Module):
             rval = dumper.dump_rval(key, False)
 
-            call_predicates = [pred for expr, pred in exposes if isinstance(expr, AsyncCall)]
+            call_predicates = [
+                dumper.format_predicate(pred)
+                for expr, pred in exposes
+                if isinstance(expr, AsyncCall)
+            ]
 
             if not call_predicates:
                 dumper.append_code(f'self.{rval}_trigger = UInt(8)(0)')
@@ -270,8 +282,10 @@ def cleanup_post_generation(dumper):
             dumper.append_code(f'self.expose_{exposed_name} = {rval}')
             # Include the condition predicate for the valid signal
             # OR all the predicates together when the same expression is exposed multiple times
-            all_predicates = [pred for _, pred in exposes]
-            pred_condition = f"reduce(or_, [{', '.join([f'({p})' for p in all_predicates])}])"
+            all_predicates = [dumper.format_predicate(pred) for _, pred in exposes]
+            pred_condition = (
+                f"reduce(or_, [{', '.join([f'({p})' for p in all_predicates])}])"
+            )
             dumper.append_code(f'self.valid_{exposed_name} = executed_wire & ({pred_condition})')
 
     module_metadata = dumper.module_metadata[dumper.current_module]
