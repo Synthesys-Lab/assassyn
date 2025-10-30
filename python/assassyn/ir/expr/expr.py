@@ -207,10 +207,8 @@ class FIFOPop(Expr):
 
     def __repr__(self):
         meta = self.meta_cond
-        meta_repr = ''
-        if meta is not None:
-            operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
-            meta_repr = f' // meta cond {operand}'
+        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+        meta_repr = f' // meta cond {operand}'
         return f'{self.as_operand()} = {self.fifo.as_operand()}.pop(){meta_repr}'
 
     def __getattr__(self, name):

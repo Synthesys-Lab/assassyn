@@ -105,7 +105,7 @@ def __repr__(self):
     return f'{self.fifo.as_operand()}.push({self.val.as_operand()}) // handle = {handle}{meta_repr}'
 ```
 
-**Explanation:** Returns a human-readable string representation of the FIFO push operation in the format `fifo.push(value) // handle = handle`, optionally appending the predicate metadata comment when present.
+**Explanation:** Returns a human-readable string representation of the FIFO push operation in the format `fifo.push(value) // handle = handle // meta cond predicate`, surfacing the predicate metadata alongside the handle for debugging.
 
 ### class Bind
 
@@ -323,7 +323,7 @@ def __repr__(self):
     return f'async_call {bind}{meta_repr}'
 ```
 
-**Explanation:** Returns a human-readable string representation of the async call operation in the format `async_call bind_operation`, optionally appending predicate metadata when present.
+**Explanation:** Returns a human-readable string representation of the async call operation in the format `async_call bind_operation // meta cond predicate`, making the predicate explicit for debugging.
 
 ---
 

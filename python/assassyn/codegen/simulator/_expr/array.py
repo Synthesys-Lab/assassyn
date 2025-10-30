@@ -27,16 +27,13 @@ def codegen_array_write(node, module_ctx, module_name):
     idx_val = dump_rval_ref(module_ctx, idx)
     value_val = dump_rval_ref(module_ctx, value)
     module_writer = namify(module.name)
-    predicate = dump_rval_ref(module_ctx, node.meta_cond)
 
     manager = get_port_manager()
     port_idx = manager.get_or_assign_port(array_name, module_writer)
 
     return f"""{{
-              if {predicate} {{
-                let stamp = sim.stamp - sim.stamp % 100 + 50;
-                let write = ArrayWrite::new(stamp, {idx_val} as usize,
-                                           {value_val}.clone(), "{module_writer}");
-                sim.{array_name}.write({port_idx}, write);
-              }}
+              let stamp = sim.stamp - sim.stamp % 100 + 50;
+              let write = ArrayWrite::new(stamp, {idx_val} as usize,
+                                         {value_val}.clone(), "{module_writer}");
+              sim.{array_name}.write({port_idx}, write);
             }}"""

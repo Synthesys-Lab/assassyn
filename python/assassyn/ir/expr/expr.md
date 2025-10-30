@@ -90,7 +90,7 @@ Represents consuming a value from a port's FIFO. The resulting data type is deri
 - `dtype` - Get the data type of the popped value (property)
 - `meta_cond` - Access the predicate metadata captured when the pop was created (property)
 
-`meta_cond` carries the `Bits(1)` predicate returned by [`get_pred()`](intrinsic.md#get_pred) at construction time, unwrapping the internal `Operand` wrapper to expose the underlying `Value`. Backends use it to gate the pop event without reconstructing the condition stack. When no predicate is active, the helper records the constant `Bits(1)(1)`.
+`meta_cond` carries the `Bits(1)` predicate returned by [`get_pred()`](intrinsic.md#get_pred) at construction time, unwrapping the internal `Operand` wrapper to expose the underlying `Value`. Backends use it to gate the pop event without reconstructing the condition stack.
 
 #### `class Concat(Expr)`
 

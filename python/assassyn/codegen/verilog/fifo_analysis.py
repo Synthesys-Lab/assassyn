@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from typing import Dict, List, Sequence, Set, Tuple, TYPE_CHECKING
 
-from ...ir.const import Const
 from ...ir.expr import Expr, FIFOPop, FIFOPush
 from ...ir.expr.intrinsic import Intrinsic
 from ...ir.visitor import Visitor
@@ -69,7 +68,6 @@ class FIFOAnalysisVisitor(Visitor):
         super().__init__()
         self._registry = registry
         self._module_metadata = module_metadata
-        self._true_predicate: Const | None = None
 
     def analyse_modules(self, modules: Sequence["Module"]) -> None:
         """Analyse the provided modules and populate FIFO metadata."""
@@ -100,25 +98,13 @@ class FIFOAnalysisVisitor(Visitor):
         metadata = self._module_metadata[module]
 
         if isinstance(node, FIFOPush):
-            predicate_value = node.meta_cond if hasattr(node, "meta_cond") else None
-            if predicate_value is None:
-                predicate_value = self._true_predicate or self._materialise_true()
+            predicate_value = node.meta_cond
             interaction = self._registry.record_push(module, node, predicate_value)
             metadata.record_fifo_interaction(node.fifo, interaction)
             return
 
         if isinstance(node, FIFOPop):
-            predicate_value = node.meta_cond if hasattr(node, "meta_cond") else None
-            if predicate_value is None:
-                predicate_value = self._true_predicate or self._materialise_true()
+            predicate_value = node.meta_cond
             interaction = self._registry.record_pop(module, node, predicate_value)
             metadata.record_fifo_interaction(node.fifo, interaction)
             return
-
-    def _materialise_true(self) -> Const:
-        """Return a cached constant true predicate."""
-        # Lazy import to avoid circular dependencies during module load.
-        from ...ir.dtype import Bits  # pylint: disable=import-outside-toplevel
-
-        self._true_predicate = Bits(1)(1)
-        return self._true_predicate

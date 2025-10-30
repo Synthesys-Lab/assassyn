@@ -64,7 +64,7 @@ It receives two collaborators:
    information is already baked into the consumer nodes’ `meta_cond` fields.
 2. `FIFOPush` / `FIFOPop` – records interactions in `FIFORegistry` and in the
    per-module `ModuleFIFOView`, capturing the predicate value directly from
-   `expr.meta_cond` (falling back to `Bits(1)(1)` for legacy IR).
+   `expr.meta_cond`.
 
 Traversal of module bodies is delegated to the base `Visitor`, keeping the class small and
 ensuring new IR constructs automatically flow through the pass as long as they surface as

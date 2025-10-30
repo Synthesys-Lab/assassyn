@@ -113,7 +113,7 @@ def meta_cond(self):
     return meta.value if isinstance(meta, Operand) else meta
 ```
 
-**Explanation:** Provides access to the predicate metadata (`Bits(1)` value or `None`) captured when the node was created, unwrapping the internal `Operand` wrapper to return the underlying `Value`. Verilog and simulator backends rely on this field to decide when the write should be emitted without recomputing the predicate stack.
+**Explanation:** Provides access to the predicate metadata (`Bits(1)` value) captured when the node was created, unwrapping the internal `Operand` wrapper to return the underlying `Value`. Verilog and simulator backends rely on this field to decide when the write should be emitted without recomputing the predicate stack.
 
 #### `__repr__(self)`
 
@@ -132,7 +132,7 @@ def __repr__(self):
     )
 ```
 
-**Explanation:** Returns a human-readable string representation of the array write operation in the format `array[index] <= value /* module_name */ // meta cond`, including the module context and captured predicate metadata for debugging purposes. The metadata comment is only added when `meta_cond` is not `None`.
+**Explanation:** Returns a human-readable string representation of the array write operation in the format `array[index] <= value /* module_name */ // meta cond`, including the module context and captured predicate metadata for debugging purposes.
 
 ### class ArrayRead
 

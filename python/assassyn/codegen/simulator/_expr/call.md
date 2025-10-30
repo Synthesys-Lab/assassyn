@@ -31,15 +31,13 @@ Schedules an asynchronous event by pushing a future timestamp onto the callee's 
 **Generated Code:**
 ```rust
 {
-    if <predicate> {
-        let stamp = sim.stamp - sim.stamp % 100 + 100;
-        sim.<callee_name>_event.push_back(stamp);
-    }
+    let stamp = sim.stamp - sim.stamp % 100 + 100;
+    sim.<callee_name>_event.push_back(stamp)
 }
 ```
 
 **Explanation:**
-The function calculates a timestamp for the next cycle (current cycle + 100) and, when the captured predicate is true, pushes it to the callee's event queue. This matches the simulator's timing model while ensuring side effects are suppressed whenever the enclosing condition is false, mirroring the Verilog backend’s gating.
+The function calculates a timestamp for the next cycle (current cycle + 100) and pushes it to the callee's event queue. This follows the simulator's timing model where pipeline stages are triggered at cycle boundaries. The callee module checks its event queue and executes when the timestamp matches the current simulation time.
 
 ### codegen_fifo_pop
 
@@ -58,10 +56,8 @@ Requests a value from a FIFO buffer. It logs a pop event and attempts to retriev
 **Generated Code:**
 ```rust
 {
-    if <predicate> {
-        let stamp = sim.stamp - sim.stamp % 100 + 50;
-        sim.<fifo_id>.pop.push(FIFOPop::new(stamp, "<module_name>"));
-    }
+    let stamp = sim.stamp - sim.stamp % 100 + 50;
+    sim.<fifo_id>.pop.push(FIFOPop::new(stamp, "<module_name>"));
     match sim.<fifo_id>.payload.front() {
         Some(value) => value.clone(),
         None => return false,
@@ -70,7 +66,7 @@ Requests a value from a FIFO buffer. It logs a pop event and attempts to retriev
 ```
 
 **Explanation:**
-The function records a pop request at the half-cycle timestamp (current cycle + 50) only when the predicate metadata evaluates to true. Regardless of whether an event was queued, it attempts to peek the front value, returning `false` if the FIFO is empty. This maintains the blocking behaviour while avoiding spurious events under disabled predicates.
+The function schedules a pop operation at the half-cycle timestamp (current cycle + 50) and immediately attempts to retrieve the front value. If the FIFO is empty, the module returns `false` to indicate it cannot proceed. This implements the blocking behavior of FIFO operations in the simulator.
 
 ### codegen_fifo_push
 
@@ -89,16 +85,14 @@ Adds a timestamped push request containing the value to the target FIFO's push q
 **Generated Code:**
 ```rust
 {
-    if <predicate> {
-        let stamp = sim.stamp;
-        sim.<fifo_id>.push.push(
-            FIFOPush::new(stamp + 50, <value>.clone(), "<module_name>"));
-    }
+    let stamp = sim.stamp;
+    sim.<fifo_id>.push.push(
+        FIFOPush::new(stamp + 50, <value>.clone(), "<module_name>"));
 }
 ```
 
 **Explanation:**
-The function schedules a push operation at the half-cycle timestamp (current cycle + 50) with the provided value, cloning it to satisfy Rust ownership. The predicate guard ensures only enabled pushes enqueue events, keeping the simulator aligned with Verilog predicate handling.
+The function schedules a push operation at the half-cycle timestamp (current cycle + 50) with the value to be pushed. The value is cloned to ensure proper ownership in Rust. This implements the non-blocking behavior of FIFO push operations.
 
 ### codegen_bind
 

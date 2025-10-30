@@ -46,13 +46,11 @@ def codegen_array_write(node, module_ctx, module_name) -> str:
 **Generated Code**:
 ```rust
 {
-    if <predicate> {
-        let stamp = sim.stamp - sim.stamp % 100 + 50;
-        let write = ArrayWrite::new(stamp, <index> as usize,
-                                   <value>.clone(), "<module_name>");
-        sim.<array_name>.write(<port_idx>, write);
-    }
+    let stamp = sim.stamp - sim.stamp % 100 + 50;
+    let write = ArrayWrite::new(stamp, <index> as usize,
+                               <value>.clone(), "<module_name>");
+    sim.<array_name>.write(<port_idx>, write);
 }
 ```
 
-**Explanation**: This function generates a code block that creates a timestamped write operation guarded by the IR node’s `meta_cond` predicate. The timestamp calculation (`sim.stamp - sim.stamp % 100 + 50`) aligns the write to the half-cycle boundary as described in the [simulator timing model](../simulator.md). The write uses a port index assigned by the [port manager](../port_mapper.md) to enable multiple modules to write to the same array efficiently. The predicate guard ensures simulator behaviour matches the Verilog backend by suppressing events when the enclosing condition is false. The actual write is deferred until the next half-cycle when `tick_registers()` is called.
+**Explanation**: This function generates a code block that creates a timestamped write operation. The timestamp calculation (`sim.stamp - sim.stamp % 100 + 50`) aligns the write to the half-cycle boundary as described in the [simulator timing model](../simulator.md). The write uses a port index assigned by the [port manager](../port_mapper.md) to enable multiple modules to write to the same array efficiently. The actual write is deferred until the next half-cycle when `tick_registers()` is called.

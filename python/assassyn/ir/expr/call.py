@@ -54,11 +54,8 @@ class FIFOPush(Expr):
     def __repr__(self):
         handle = self.as_operand()
         meta = self.meta_cond
-        if meta is None:
-            meta_repr = ''
-        else:
-            operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
-            meta_repr = f' // meta cond {operand}'
+        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+        meta_repr = f' // meta cond {operand}'
         return (
             f'{self.fifo.as_operand()}.push({self.val.as_operand()})'
             f' // handle = {handle}{meta_repr}'
@@ -207,9 +204,6 @@ class AsyncCall(Expr):
     def __repr__(self):
         bind = self.bind.as_operand()
         meta = self.meta_cond
-        if meta is None:
-            meta_repr = ''
-        else:
-            operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
-            meta_repr = f' // meta cond {operand}'
+        operand = meta.as_operand() if hasattr(meta, 'as_operand') else repr(meta)
+        meta_repr = f' // meta cond {operand}'
         return f'async_call {bind}{meta_repr}'
