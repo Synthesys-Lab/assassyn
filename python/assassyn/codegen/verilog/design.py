@@ -2,7 +2,7 @@
 # pylint: disable=no-member
 """Verilog design generation and code dumping."""
 
-from typing import List, Dict, Tuple, Union, Sequence
+from typing import List, Dict, Tuple, Union
 from collections import defaultdict
 from pathlib import Path
 
@@ -36,7 +36,7 @@ from .module import generate_module_ports
 from .system import generate_system
 from .metadata import ModuleMetadata, FIFORegistry
 from .predicate import PredicateStack
-from .fifo_analysis import FIFOAnalysisVisitor
+from .fifo_analysis import collect_fifo_metadata
 from .array import ArrayMetadataRegistry
 
 
@@ -58,7 +58,12 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     finish_body: list[str]
     memory_defs: set
 
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        module_metadata: Dict[Module, ModuleMetadata] | None = None,
+        fifo_registry: FIFORegistry | None = None,
+    ):
         super().__init__()
         self.wait_until = None
         self.indent = 0
@@ -92,65 +97,14 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.external_instance_owners = {}
         self.external_intrinsics = []
         self.external_classes = []
-        self.module_metadata: Dict[Module, ModuleMetadata] = {}
-        self.fifo_registry = FIFORegistry()
-        self._fifo_analysis = FIFOAnalysisVisitor(self)
-        self._fifo_analyzed_modules: set[Module] = set()
+        self.module_metadata: Dict[Module, ModuleMetadata] = (
+            module_metadata if module_metadata is not None else {}
+        )
+        self.fifo_registry = fifo_registry if fifo_registry is not None else FIFORegistry()
 
     def get_pred(self) -> str:
         """Get the current predicate for conditional execution."""
         return self.predicate_stack.predicate()
-
-    def run_fifo_analysis(
-        self,
-        sys: SysBuilder | None = None,
-        modules: Sequence[Module] | None = None,
-    ) -> None:
-        """Populate FIFO metadata using the analysis pre-pass."""
-        if sys is not None:
-            self.sys = sys
-        if self.sys is None:
-            raise RuntimeError(
-                "FIFO analysis requires an associated system; provide `sys` once."
-            )
-
-        if modules is None:
-            modules = list(self.sys.modules) + list(self.sys.downstreams)
-            self.fifo_registry = FIFORegistry()
-            self._fifo_analysis = FIFOAnalysisVisitor(self)
-            self._fifo_analyzed_modules.clear()
-        else:
-            modules = list(modules)
-            if not modules:
-                return
-            missing = [
-                module for module in modules
-                if module not in self.sys.modules and module not in self.sys.downstreams
-            ]
-            if missing:
-                missing_names = ", ".join(module.name for module in missing)
-                raise ValueError(f"Modules not present in the system: {missing_names}")
-
-        self._fifo_analysis.analyze(self.sys, modules)
-        self._fifo_analyzed_modules.update(modules)
-
-    def _ensure_fifo_metadata(self, module: Module) -> ModuleMetadata:
-        """Ensure FIFO metadata exists for `module`, triggering analysis on demand."""
-        metadata = self.module_metadata.get(module)
-        needs_analysis = (
-            metadata is None
-            or not metadata.fifo_ready
-            or module not in self._fifo_analyzed_modules
-        )
-        if needs_analysis:
-            if self.sys is None:
-                raise RuntimeError(
-                    "Cannot analyze module without system context; set `sys` or call "
-                    "run_fifo_analysis(sys)."
-                )
-            self.run_fifo_analysis(self.sys, modules=[module])
-            metadata = self.module_metadata[module]
-        return metadata
 
     def get_external_port_name(self, node: Expr) -> str:
         """Get the mangled port name for an external value."""
@@ -258,7 +212,16 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.code = []
         self.indent = original_indent + 8
 
-        metadata = self._ensure_fifo_metadata(node)
+        metadata = self.module_metadata.get(node)
+        if metadata is None:
+            raise RuntimeError(
+                f"FIFO metadata missing for module {node.name}; run collect_fifo_metadata "
+                "and pass the results to CIRCTDumper."
+            )
+        if metadata.registry is not self.fifo_registry:
+            raise RuntimeError(
+                f"FIFO metadata for module {node.name} is associated with a different registry."
+            )
         metadata.prepare_for_codegen()
 
         self.wait_until = None
@@ -491,7 +454,11 @@ def generate_design(fname: Union[str, Path], sys: SysBuilder) -> None:
     with open(str(fname), 'w', encoding='utf-8') as fd:
         fd.write(HEADER)
 
-        dumper = CIRCTDumper()
+        module_metadata, fifo_registry = collect_fifo_metadata(sys)
+        dumper = CIRCTDumper(
+            module_metadata=module_metadata,
+            fifo_registry=fifo_registry,
+        )
 
         # Generate sramBlackbox module definitions for each SRAM
         sram_modules = [m for m in sys.downstreams if isinstance(m, SRAM)]

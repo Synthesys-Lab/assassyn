@@ -17,6 +17,7 @@ from assassyn.frontend import (  # type: ignore
     pop_condition,
 )
 from assassyn.codegen.verilog.design import CIRCTDumper
+from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata
 from assassyn.ir.module import Port as IRPort
 from assassyn.utils import namify
 
@@ -44,8 +45,9 @@ def test_fifo_cleanup_metadata_drives_handshakes():
 
     pipe_module = sysb.modules[0]
 
-    dumper = CIRCTDumper()
-    dumper.run_fifo_analysis(sysb, modules=[pipe_module])
+    module_metadata, fifo_registry = collect_fifo_metadata(sysb, modules=[pipe_module])
+    dumper = CIRCTDumper(module_metadata=module_metadata, fifo_registry=fifo_registry)
+    dumper.sys = sysb
     dumper.visit_module(pipe_module)
 
     fifo_meta = dumper.module_metadata[pipe_module].fifo

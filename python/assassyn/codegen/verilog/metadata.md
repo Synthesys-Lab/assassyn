@@ -4,18 +4,17 @@ This module provides metadata structures for tracking information collected for 
 
 ## Summary
 
-The metadata module defines dataclasses that hold information about modules discovered during a dedicated FIFO analysis pass that precedes code emission. The pre-pass traverses every module with `FIFOAnalysisVisitor`, reproducing the dumper’s predicate semantics through the shared `PredicateStack` helper and recording FIFO interactions in one sweep.  Later phases consume the frozen metadata, eliminating the need for runtime bookkeeping and avoiding mismatches caused by incremental mutation.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
+The metadata module defines dataclasses that hold information about modules discovered during a dedicated FIFO analysis pass that precedes code emission. The pass is orchestrated by [`collect_fifo_metadata`](./fifo_analysis.md), which uses `FIFOAnalysisVisitor` to walk the requested modules, reproducing the dumper’s predicate semantics through the shared `PredicateStack` helper and recording FIFO interactions in one sweep.  Later phases consume the frozen metadata, eliminating the need for runtime bookkeeping and avoiding mismatches caused by incremental mutation.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
 
 ## FIFO Analysis Pre-pass
 
-`FIFOAnalysisVisitor` performs a read-only walk of module bodies before `CIRCTDumper.visit_module` runs.  The visitor reuses the dumper’s `dump_rval` helpers to evaluate predicates and, by relying on the shared `PredicateStack`, guarantees the exact same condition-string normalisation as the code generator.  Each module’s metadata is cleared and repopulated during the analysis pass; the registry is reset once per compile run, and incremental re-generation is handled by rerunning the visitor for the affected module.
+`FIFOAnalysisVisitor` performs a read-only walk of module bodies before `CIRCTDumper.visit_module` runs.  The visitor reuses the dumper’s rvalue formatting logic (via a lightweight analysis shim) to evaluate predicates and, with the shared `PredicateStack`, guarantees the exact same condition-string normalisation as the code generator.  The visitor is intentionally small—only `visit_expr` is overridden—so traversal mirrors the runtime dumper and remains easy to audit.  Every invocation of `collect_fifo_metadata` returns fresh data structures; callers that want to refresh a subset of modules can request just those modules and merge the results without mutating previously produced registries.
 
 Key responsibilities:
 
-1. Seed `CIRCTDumper.module_metadata[module]` with a `ModuleMetadata` instance that owns a `ModuleFIFOView`.
-2. Call `FIFORegistry.clear_for_module(module)` before re-analyzing a module so stale interactions are dropped.
-3. Push/pop predicates through `PredicateStack` when encountering `PUSH_CONDITION` / `POP_CONDITION` intrinsics.
-4. Record every `FIFOPush`/`FIFOPop` interaction by constructing `FIFOInteraction` entries shared between the registry and the module view.
+1. Instantiate `ModuleMetadata` for every visited module and attach a `ModuleFIFOView` pointing at the shared registry.
+2. Push/pop predicates through `PredicateStack` when encountering `PUSH_CONDITION` / `POP_CONDITION` intrinsics.
+3. Record every `FIFOPush`/`FIFOPop` interaction by constructing `FIFOInteraction` entries shared between the registry and the module view.
 
 ## Exposed Interfaces
 
@@ -186,10 +185,6 @@ The registry is the single owner of FIFO interaction data:
 - `record_push()` / `record_pop()` – Create a `FIFOInteraction` and append it to the port’s
   `FIFOMetadata`.
 - `metadata_for(port)` – Fetch (or lazily create) the `FIFOMetadata` container for `port`.
-- `clear_for_module(module, fifo_ports)` – Remove all interactions emitted by `module`
-  across the provided FIFO ports and drop empty channel records.  The FIFO analysis pass
-  uses this helper when re-running on a single module so incremental regeneration never
-  leaves stale interactions behind.
 
 Because both the module-level view and downstream consumers reference the same
 `FIFOInteraction` objects, predicates and expression handles stay perfectly in sync without

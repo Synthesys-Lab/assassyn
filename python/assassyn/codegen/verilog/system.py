@@ -106,9 +106,6 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
 
                 if module not in dumper.async_callees[callee]:
                     dumper.async_callees[callee].append(module)
-
-    dumper.run_fifo_analysis(sys)
-
     # Process every module from sys.modules
     for elem in sys.modules:
         dumper.current_module = elem

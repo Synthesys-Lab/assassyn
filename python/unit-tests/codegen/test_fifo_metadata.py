@@ -3,9 +3,11 @@
 import os
 import sys
 
+import pytest
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from assassyn.frontend import (
+from assassyn.frontend import (  # type: ignore
     Module,
     SysBuilder,
     UInt,
@@ -16,6 +18,7 @@ from assassyn.frontend import (
     pop_condition,
 )
 from assassyn.codegen.verilog.design import CIRCTDumper
+from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata
 from assassyn.ir.module import Port as IRPort
 
 
@@ -42,8 +45,11 @@ def test_fifo_metadata_records_predicates():
 
         Pipe().build()
 
-    dumper = CIRCTDumper()
-    dumper.run_fifo_analysis(sysb)
+    module_metadata, fifo_registry = collect_fifo_metadata(sysb)
+    dumper = CIRCTDumper(
+        module_metadata=module_metadata,
+        fifo_registry=fifo_registry,
+    )
 
     pipe_module = sysb.modules[0]
     metadata = dumper.module_metadata[pipe_module]
@@ -81,11 +87,14 @@ def test_fifo_metadata_records_predicates():
     assert [entry.expr for entry in fifo_meta.pops] == metadata.pops
 
     # Revisit the module in isolation to ensure FIFO operations skip the expose map
-    isolated_dumper = CIRCTDumper()
-    isolated_dumper.run_fifo_analysis(sysb, modules=[pipe_module])
+    isolated_metadata, isolated_registry = collect_fifo_metadata(sysb, modules=[pipe_module])
+    isolated_dumper = CIRCTDumper(
+        module_metadata=isolated_metadata,
+        fifo_registry=isolated_registry,
+    )
+    isolated_dumper.sys = sysb
     isolated_dumper.visit_module(pipe_module)
     isolated_module_md = isolated_dumper.module_metadata[pipe_module]
-    isolated_registry = isolated_dumper.fifo_registry
     assert len(isolated_registry.metadata_for(out_port).pushes) == 1
     assert len(isolated_registry.metadata_for(in_port).pops) == 1
     assert [
@@ -139,8 +148,11 @@ def test_fifo_registry_cross_module_sharing():
         consumer.build()
         producer.build(consumer)
 
-    dumper = CIRCTDumper()
-    dumper.run_fifo_analysis(sysb)
+    module_metadata, fifo_registry = collect_fifo_metadata(sysb)
+    dumper = CIRCTDumper(
+        module_metadata=module_metadata,
+        fifo_registry=fifo_registry,
+    )
 
     consumer_module = consumer
     producer_module = producer
@@ -197,18 +209,53 @@ def test_fifo_analysis_single_module_refresh():
     in_port = pipe_module.ports[0]
     out_port = pipe_module.ports[1]
 
-    dumper = CIRCTDumper()
-    dumper.run_fifo_analysis(sysb)
-
-    fifo_meta = dumper.fifo_registry.metadata_for(out_port)
+    base_metadata, base_registry = collect_fifo_metadata(sysb)
+    fifo_meta = base_registry.metadata_for(out_port)
     assert len(fifo_meta.pushes) == 1
-    fifo_meta = dumper.fifo_registry.metadata_for(in_port)
+    fifo_meta = base_registry.metadata_for(in_port)
     assert len(fifo_meta.pops) == 1
 
-    # Re-run analysis for the pipe module only; metadata should stay consistent.
-    dumper.run_fifo_analysis(sysb, modules=[pipe_module])
-    fifo_meta_out = dumper.fifo_registry.metadata_for(out_port)
-    fifo_meta_in = dumper.fifo_registry.metadata_for(in_port)
+    # Re-run analysis for the pipe module only; metadata should stay consistent and
+    # independent from the base snapshot.
+    partial_metadata, partial_registry = collect_fifo_metadata(sysb, modules=[pipe_module])
+    fifo_meta_out = partial_registry.metadata_for(out_port)
+    fifo_meta_in = partial_registry.metadata_for(in_port)
     assert len(fifo_meta_out.pushes) == 1
     assert len(fifo_meta_in.pops) == 1
     assert fifo_meta_out.pushes[0].predicate == "(Bits(1)(1)) & (Bits(1)(0))"
+
+    # Visiting the module with only the refreshed metadata should succeed without
+    # mutating the registry snapshot.
+    isolated_dumper = CIRCTDumper(
+        module_metadata=partial_metadata,
+        fifo_registry=partial_registry,
+    )
+    isolated_dumper.sys = sysb
+    isolated_dumper.visit_module(pipe_module)
+
+
+def test_circtdumper_requires_fifo_metadata():
+    sysb = SysBuilder("fifo_requires_metadata")
+
+    with sysb:
+
+        class Pipe(Module):
+
+            def __init__(self):
+                super().__init__(ports={
+                    'in0': Port(UInt(8)),
+                    'out0': Port(UInt(8)),
+                })
+
+            @module.combinational
+            def build(self):
+                data = self.in0.pop()
+                self.out0.push(data)
+
+        Pipe().build()
+
+    dumper = CIRCTDumper()
+    pipe_module = sysb.modules[0]
+
+    with pytest.raises(RuntimeError, match="FIFO metadata"):
+        dumper.visit_module(pipe_module)
