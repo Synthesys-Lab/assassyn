@@ -8,7 +8,7 @@ from assassyn.frontend import *
 from assassyn.backend import elaborate
 from assassyn import utils
 import assassyn
-  import os
+import os
 
 ARRAY_SIZE = 128
 LOOP_COUNT = 100  
