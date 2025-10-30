@@ -98,18 +98,27 @@ def generate_sram_control_signals(dumper, sram_info, module_exposure):
     dumper.append_code('self.mem_read_enable = Bits(1)(1)')  # Always enable reads
 
 
-def _format_reduce_or(predicates: Sequence[str], *, default_literal: Optional[str]) -> str:
-    """Format a reduce-or expression with an optional default literal."""
+def _format_reduce_or(
+    predicates: Sequence[str],
+    *,
+    default_literal: Optional[str],
+    op: str = "or_",
+) -> str:
+    """Format a reduction expression with an optional default literal and operator."""
 
     if not predicates:
         if default_literal is None:
             raise ValueError("Cannot build predicate reduction without a default literal")
         return default_literal
 
+    if default_literal is None and len(predicates) == 1:
+        return predicates[0]
+
     joined = ", ".join(predicates)
     if default_literal is None:
-        return f"reduce(or_, [{joined}])"
-    return f"reduce(or_, [{joined}], {default_literal})"
+        return f"reduce({op}, [{joined}])"
+
+    return f"reduce({op}, [{joined}], {default_literal})"
 
 
 def _emit_predicate_mux_chain(
@@ -145,35 +154,41 @@ def cleanup_post_generation(dumper):
     """generating signals for connecting modules"""
     dumper.append_code('')
 
-    exec_conditions = []
     if isinstance(dumper.current_module, Downstream):
         node = dumper.current_module
+        dep_signals = []
         if dumper.current_module in dumper.downstream_dependencies:
-            dep_signals = [f'self.{namify(dep.name)}_executed'
-                for dep in dumper.downstream_dependencies[node]]
-            dumper.append_code(
-                f"executed_wire = reduce(or_, [{', '.join(dep_signals)}], Bits(1)(0))"
-            )
-        else:
-            dumper.append_code('executed_wire = Bits(1)(0)')
+            dep_signals = [
+                f'self.{namify(dep.name)}_executed'
+                for dep in dumper.downstream_dependencies[node]
+            ]
+
+        executed_expr = _format_reduce_or(
+            dep_signals,
+            default_literal="Bits(1)(0)",
+        )
+        dumper.append_code(f"executed_wire = {executed_expr}")
     else:
-        exec_conditions.append("self.trigger_counter_pop_valid")
+        exec_conditions = ["self.trigger_counter_pop_valid"]
         if dumper.wait_until:
             exec_conditions.append(f"({dumper.wait_until})")
 
-        if not exec_conditions:
-            dumper.append_code('executed_wire = Bits(1)(1)')
-        else:
-            dumper.append_code(f"executed_wire = reduce(and_, [{', '.join(exec_conditions)}])")
+        executed_expr = _format_reduce_or(
+            exec_conditions,
+            default_literal="Bits(1)(1)",
+            op="and_",
+        )
+        dumper.append_code(f"executed_wire = {executed_expr}")
 
-    if dumper.finish_conditions:
-        finish_terms = []
-        for pred, exec_signal in dumper.finish_conditions:
-            finish_terms.append(f"({pred} & {exec_signal})")
-
-        dumper.append_code(f'self.finish = reduce(or_, [{", ".join(finish_terms)}])')
-    else:
-        dumper.append_code('self.finish = Bits(1)(0)')
+    finish_terms = [
+        f"({pred} & {exec_signal})"
+        for pred, exec_signal in dumper.finish_conditions
+    ]
+    finish_expr = _format_reduce_or(
+        finish_terms,
+        default_literal="Bits(1)(0)",
+    )
+    dumper.append_code(f"self.finish = {finish_expr}")
 
     module_metadata = dumper.module_metadata[dumper.current_module]
     module_exposure = module_metadata.exposures
@@ -249,7 +264,7 @@ def cleanup_post_generation(dumper):
             )
 
             dumper.append_code(
-                f'self.{array_name}_w{port_suffix} = executed_wire & {aggregated_predicates}'
+                f'self.{array_name}_w{port_suffix} = executed_wire & ({aggregated_predicates})'
             )
 
             dumper.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata_expr}')
@@ -288,12 +303,14 @@ def cleanup_post_generation(dumper):
         render = resolve_value_exposure_render(dumper, expr)
         dumper.append_code(f'# Expose: {expr}')
         dumper.append_code(f'self.expose_{render.exposed_name} = {render.rval}')
-        predicate_terms = [dumper.format_predicate(entry.predicate) for entry in grouped_exposures]
-        if predicate_terms:
-            joined = ', '.join(f'({term})' for term in predicate_terms)
-            pred_condition = f"reduce(or_, [{joined}])"
-        else:
-            pred_condition = 'Bits(1)(1)'
+        predicate_terms = [
+            f'({dumper.format_predicate(entry.predicate)})'
+            for entry in grouped_exposures
+        ]
+        pred_condition = _format_reduce_or(
+            predicate_terms,
+            default_literal="Bits(1)(1)",
+        )
         dumper.append_code(
             f'self.valid_{render.exposed_name} = executed_wire & ({pred_condition})'
         )
@@ -351,11 +368,12 @@ def cleanup_post_generation(dumper):
 
         if local_pops:
             pop_predicates = [
-                f'({dumper.dump_rval(entry.predicate, False)})' for entry in local_pops
+                f'({dumper.dump_rval(entry.predicate, False)})'
+                for entry in local_pops
             ]
-            final_pop_condition = (
-                f"reduce(or_, [{', '.join(pop_predicates)}], Bits(1)(0))"
-                if pop_predicates else "Bits(1)(0)"
+            final_pop_condition = _format_reduce_or(
+                pop_predicates,
+                default_literal="Bits(1)(0)",
             )
             dumper.append_code(f'# {local_pops[0].expr}')
             dumper.append_code(

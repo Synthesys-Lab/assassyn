@@ -93,7 +93,7 @@ Keeping these definitions in a runtime module ensures generated designs and user
 
 ## Handshake & Scheduling
 
-- `executed_wire` gates side‑effects each cycle:
+- `executed_wire` gates side‑effects each cycle (built through `_format_reduce_or` so OR / AND reductions share the same formatting):
   - Drivers: `trigger_counter_pop_valid [& WAIT_UNTIL]`
   - Downstreams: OR of upstream `inst_<dep>.executed`
 - FIFO push (producer of `<C>.<p>`):

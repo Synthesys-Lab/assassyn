@@ -20,8 +20,8 @@ def cleanup_post_generation(dumper):
 This is the main cleanup function that generates all the necessary control signals and interconnections after the primary Verilog code generation is complete. It performs the following steps:
 
 1. **Execution Signal Generation**: Creates the `executed_wire` signal that determines when a module should execute:
-   - For downstream modules: Gathers upstream dependencies from `dumper.downstream_dependencies` and ORs their `executed` flags.
-   - For regular modules: ANDs the trigger-counter pop-valid input with any active `wait_until` predicate recorded during expression lowering.
+   - For downstream modules: Gathers upstream dependencies from `dumper.downstream_dependencies` and ORs their `executed` flags via `_format_reduce_or(..., op="or_", default_literal="Bits(1)(0)")`.
+   - For regular modules: ANDs the trigger-counter pop-valid input with any active `wait_until` predicate recorded during expression lowering using the same helper with `op="and_"` and a `Bits(1)(1)` default.
 
 2. **Finish Signal Generation**: Reduces every `(predicate, exec_signal)` pair queued in `dumper.finish_conditions` into the `self.finish` output.
 
@@ -106,7 +106,7 @@ The module uses several internal helper functions and imports utilities from oth
 - `dump_type()` and `dump_type_cast()` from [utils](/python/assassyn/codegen/verilog/utils.md) for type handling
 - `get_sram_info()` from [utils](/python/assassyn/codegen/verilog/utils.md) for SRAM information extraction
 - `namify()` and `unwrap_operand()` from [utils](/python/assassyn/utils.md) for name generation and operand handling
-- `_format_reduce_or()` ensures predicate reductions share identical formatting between arrays and FIFOs.
+- `_format_reduce_or(predicates, *, default_literal, op="or_")` canonicalises all predicate reductions, supporting both OR and AND reducers while emitting caller-provided defaults for empty sequences.
 - `_emit_predicate_mux_chain()` centralises predicate-driven mux construction so callers reuse ordering and reduction semantics.
 
 The cleanup process is tightly integrated with the [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) class and is called as the final step in module generation to ensure all interconnections are properly established.

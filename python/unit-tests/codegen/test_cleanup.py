@@ -204,7 +204,7 @@ def test_array_write_mux_matches_reference_rendering():
     expected = {
         base: (
             f"{base} = executed_wire & "
-            "reduce(or_, [self.pred0.as_bits(), self.pred1.as_bits()])"
+            "(reduce(or_, [self.pred0.as_bits(), self.pred1.as_bits()]))"
         ),
         f"{base.replace('_w', '_wdata')}": (
             f"{base.replace('_w', '_wdata')} = Mux("
@@ -254,7 +254,7 @@ def test_array_write_single_entry_passthrough():
     expected = {
         base: (
             f"{base} = executed_wire & "
-            "reduce(or_, [self.pred.as_bits()])"
+            "(self.pred.as_bits())"
         ),
         f"{base.replace('_w', '_wdata')}": (
             f"{base.replace('_w', '_wdata')} = self.val"
@@ -286,6 +286,45 @@ def test_fifo_push_single_entry_passthrough():
     }
     assignments = _extract_assignments(lines, expected.keys())
     assert assignments == expected
+
+
+def test_format_reduce_or_supports_and_operator_with_defaults():
+    """Generalised helper emits AND reductions and surfaces defaults."""
+    assert (
+        _format_reduce_or([], default_literal="Bits(1)(1)", op="and_")
+        == "Bits(1)(1)"
+    )
+    assert (
+        _format_reduce_or(["lhs"], default_literal="Bits(1)(1)", op="and_")
+        == "reduce(and_, [lhs], Bits(1)(1))"
+    )
+    assert (
+        _format_reduce_or(["lhs", "rhs"], default_literal="Bits(1)(1)", op="and_")
+        == "reduce(and_, [lhs, rhs], Bits(1)(1))"
+    )
+
+
+def test_emit_predicate_mux_chain_preserves_custom_reduce():
+    """Aggregated predicate from helper should be forwarded unchanged."""
+    entries = ["v0", "v1"]
+
+    def render_predicate(entry):
+        return f"{entry}_pred"
+
+    mux_expr, predicate_expr = _emit_predicate_mux_chain(
+        entries,
+        render_predicate=render_predicate,
+        render_value=lambda entry: entry,
+        default_value="DEFAULT",
+        aggregate_predicates=lambda preds: _format_reduce_or(
+            preds,
+            default_literal="Bits(1)(1)",
+            op="and_",
+        ),
+    )
+
+    assert predicate_expr == "reduce(and_, [v0_pred, v1_pred], Bits(1)(1))"
+    assert mux_expr == "Mux(v1_pred, Mux(v0_pred, DEFAULT, v0), v1)"
 
 
 def test_emit_predicate_mux_chain_empty_sequence_defaults():
