@@ -44,22 +44,22 @@ def test_fifo_cleanup_metadata_drives_handshakes():
 
     pipe_module = sysb.modules[0]
 
-    module_metadata, fifo_registry = collect_fifo_metadata(sysb, modules=[pipe_module])
-    dumper = CIRCTDumper(module_metadata=module_metadata, fifo_registry=fifo_registry)
+    module_metadata, interactions = collect_fifo_metadata(sysb, modules=[pipe_module])
+    dumper = CIRCTDumper(module_metadata=module_metadata, interactions=interactions)
     dumper.sys = sysb
     dumper.visit_module(pipe_module)
 
-    fifo_meta = dumper.module_metadata[pipe_module].fifo
+    module_entry = dumper.module_metadata[pipe_module]
+    fifo_meta = module_entry.interactions
     assert len(fifo_meta.pushes) == 1
     assert len(fifo_meta.pops) == 1
 
     assert not hasattr(dumper, '_exposes')
 
-    fifo_registry = dumper.fifo_registry
     in_port = pipe_module.ports[0]
     out_port = pipe_module.ports[1]
-    assert fifo_registry.metadata_for(out_port).pushes == fifo_meta.pushes
-    assert fifo_registry.metadata_for(in_port).pops == fifo_meta.pops
+    assert dumper.interactions.fifo_view(out_port).pushes == fifo_meta.pushes
+    assert dumper.interactions.fifo_view(in_port).pops == fifo_meta.pops
 
     code = "\n".join(dumper.code)
     module_prefix = namify(pipe_module.name)

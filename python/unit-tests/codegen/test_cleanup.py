@@ -77,18 +77,19 @@ def _render_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
 
     cleanup_module = sys_builder.modules[0]
 
-    module_metadata, fifo_registry = collect_fifo_metadata(sys_builder)
-    dumper = CIRCTDumper(module_metadata=module_metadata, fifo_registry=fifo_registry)
+    module_metadata, interactions = collect_fifo_metadata(sys_builder)
+    dumper = CIRCTDumper(module_metadata=module_metadata, interactions=interactions)
     dumper.sys = sys_builder
     dumper.array_metadata.collect(sys_builder)
     dumper.visit_module(cleanup_module)
 
     module_entry = module_metadata[cleanup_module]
+    module_view = module_entry.interactions
 
     array_name = None
     array_port_suffix = ''
-    if module_entry.exposures.arrays:
-        array_ref = next(iter(module_entry.exposures.arrays))
+    if module_view.writes:
+        array_ref = next(iter(module_view.writes))
         array_name = dumper.dump_rval(array_ref, False)
         array_meta = dumper.array_metadata.metadata_for(array_ref)
         if array_meta is not None:
@@ -97,9 +98,10 @@ def _render_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
 
     fifo_name = None
     fifo_module_prefix = None
-    for fifo_port, _, interactions in module_entry.fifo.iter_channels():
-        pushes = [entry for entry in interactions if isinstance(entry, FIFOPush)]
-        pops = [entry for entry in interactions if isinstance(entry, FIFOPop)]
+    for fifo_port in module_view.fifo_ports:
+        interactions_for_port = module_view.fifo_map[fifo_port]
+        pushes = [entry for entry in interactions_for_port if isinstance(entry, FIFOPush)]
+        pops = [entry for entry in interactions_for_port if isinstance(entry, FIFOPop)]
         assert all(isinstance(entry, FIFOPush) for entry in pushes)
         assert all(isinstance(entry, FIFOPop) for entry in pops)
         if pushes:
@@ -153,22 +155,24 @@ def _render_single_writer_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
 
     cleanup_module = sys_builder.modules[0]
 
-    module_metadata, fifo_registry = collect_fifo_metadata(sys_builder)
-    dumper = CIRCTDumper(module_metadata=module_metadata, fifo_registry=fifo_registry)
+    module_metadata, interactions = collect_fifo_metadata(sys_builder)
+    dumper = CIRCTDumper(module_metadata=module_metadata, interactions=interactions)
     dumper.sys = sys_builder
     dumper.array_metadata.collect(sys_builder)
     dumper.visit_module(cleanup_module)
 
     module_entry = module_metadata[cleanup_module]
+    module_view = module_entry.interactions
 
-    array_ref = next(iter(module_entry.exposures.arrays))
+    array_ref = next(iter(module_view.writes))
     array_name = dumper.dump_rval(array_ref, False)
     array_meta = dumper.array_metadata.metadata_for(array_ref)
     port_idx = 0 if array_meta is None else array_meta.write_ports.get(cleanup_module, 0)
     fifo_port = None
-    for candidate, _, interactions in module_entry.fifo.iter_channels():
-        pushes = [entry for entry in interactions if isinstance(entry, FIFOPush)]
-        pops = [entry for entry in interactions if isinstance(entry, FIFOPop)]
+    for candidate in module_view.fifo_ports:
+        interactions_for_port = module_view.fifo_map[candidate]
+        pushes = [entry for entry in interactions_for_port if isinstance(entry, FIFOPush)]
+        pops = [entry for entry in interactions_for_port if isinstance(entry, FIFOPop)]
         assert all(isinstance(entry, FIFOPush) for entry in pushes)
         assert all(isinstance(entry, FIFOPop) for entry in pops)
         if pushes:

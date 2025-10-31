@@ -182,9 +182,9 @@ def generate_top_harness(dumper: CIRCTDumper):
     # Use metadata-driven pushes to compute FIFO depths, avoiding expression walking
     for module in dumper.sys.modules + dumper.sys.downstreams:
         metadata = dumper.module_metadata.get(module)
-        if not metadata:
+        if metadata is None:
             continue
-        for push in metadata.fifo.pushes:
+        for push in metadata.interactions.pushes:
             fifo_port = push.fifo
             owner = fifo_port.module
             if owner not in module_fifo_depths:
@@ -385,7 +385,7 @@ def generate_top_harness(dumper: CIRCTDumper):
 
         # Use metadata instead of walking expressions again
         metadata = dumper.module_metadata.get(module)
-        pushes = metadata.fifo.pushes if metadata else ()
+        pushes = metadata.interactions.pushes if metadata else ()
         calls = metadata.calls if metadata else []
 
         for push in pushes:
@@ -426,7 +426,7 @@ def generate_top_harness(dumper: CIRCTDumper):
                 f"{mod_name}_trigger_counter_pop_ready.assign(inst_{mod_name}.executed)"
             )
             metadata = dumper.module_metadata.get(module)
-            popped_fifos = {pop.fifo for pop in (metadata.fifo.pops if metadata else ())}
+            popped_fifos = {pop.fifo for pop in (metadata.interactions.pops if metadata else ())}
             for port in module_ports:
                 if port in popped_fifos:
                     connection_lines.append(

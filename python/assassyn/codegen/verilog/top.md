@@ -72,7 +72,7 @@ This function generates the complete top-level Verilog module that serves as the
    - **Memory Connections**: SRAM interface signal routing
 
 8. **Global Finish Signal**: Collects finish signals from all modules using metadata-based detection (O(1) lookup via `module_metadata`), avoiding redundant expression walking, and creates global finish. See [metadata module](/python/assassyn/codegen/verilog/metadata.md) for implementation details.
-  Additionally, FIFO depth selection no longer walks expressions; it computes depths from the predicated push expressions stored in `module_metadata.fifo.interactions_by_kind[FIFOPush]` (with `module_metadata.fifo.pushes` serving as the convenience alias for the same tuple).
+  Additionally, FIFO depth selection no longer walks expressions; it computes depths from the predicated push expressions stored in the shared `InteractionMatrix` (queried via `dumper.interactions.fifo_view(port).pushes`), with `module_metadata.interactions.pushes` serving as the module-scoped projection of the same tuples.
 
 9. **Unused Port Tie-off**: Ties off unused FIFO push ports to prevent floating signals
 
@@ -85,7 +85,7 @@ This function generates the complete top-level Verilog module that serves as the
 The function handles complex system-wide relationships:
 
 - **Multi-Port Array Management**: Ensures proper write port assignment and connection
-- **FIFO Depth Configuration**: Determines FIFO depths from `module_metadata.fifo.interactions_by_kind[FIFOPush]` (no expression walking, predicate context preserved for downstream analysis, and the data is shared with the FIFO-indexed registry produced by the pre-pass)
+- **FIFO Depth Configuration**: Determines FIFO depths from `dumper.interactions.fifo_view(port).pushes` (no expression walking, predicate context preserved for downstream analysis, and the data is mirrored by the module-scoped interaction view)
 - **External Module Integration**: Properly integrates external SystemVerilog modules
   by:
   - Declaring shared wires once per exposed external value (data + valid), using the normalised wire keys emitted by the intrinsic lowering pass
@@ -110,7 +110,7 @@ The function uses several utility functions and data structures:
 - `namify()` and `unwrap_operand()` from [utils module](/python/assassyn/utils.md) for name generation
 - `topo_downstream_modules()` from [analysis module](/python/assassyn/analysis/external_usage.md) for topological ordering
 - `get_external_port_name()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external port naming
-- Metadata-driven checks for `FIFOPop` readiness: the predicated pop entries surfaced from `module_metadata.fifo.interactions_by_kind[FIFOPop]` (with `.pops` mirroring the same tuple) determine whether `<port>_pop_ready` connections should be emitted, replacing the legacy dumper helper traversal.
+- Metadata-driven checks for `FIFOPop` readiness: the predicated pop entries surfaced from `module_metadata.interactions.pops` (backed by the same tuples returned from `dumper.interactions.fifo_view(port).pops`) determine whether `<port>_pop_ready` connections should be emitted, replacing the legacy dumper helper traversal.
 - `_connect_array()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for array connections
 
 The function manages several CIRCTDumper state variables:

@@ -1,415 +1,375 @@
-"""Metadata structures for tracking information during Verilog code generation.
-
-This module provides dataclasses to hold metadata collected during the code generation
-pass that needs to be referenced in later compilation phases (e.g., during top-level
-handoff).
-"""
+"""Shared metadata structures for Verilog code generation."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Iterator, List, Mapping, Sequence, TYPE_CHECKING, Tuple, Type
+from enum import Enum, auto
+from types import MappingProxyType
+from typing import (
+    Dict,
+    Mapping,
+    NamedTuple,
+    Tuple,
+    List,
+    TYPE_CHECKING,
+)
 
 if TYPE_CHECKING:
     from ...ir.array import Array
     from ...ir.expr import ArrayRead, ArrayWrite, AsyncCall, Expr, FIFOPop, FIFOPush
     from ...ir.expr.intrinsic import Intrinsic
     from ...ir.module import Module, Port
-    from ...ir.value import Value
-else:
+else:  # pragma: no cover - runtime imports only for type checking
     from ...ir.array import Array  # type: ignore
     from ...ir.expr import ArrayRead, ArrayWrite, AsyncCall, Expr, FIFOPop, FIFOPush  # type: ignore
     from ...ir.expr.intrinsic import Intrinsic  # type: ignore
     from ...ir.module import Module, Port  # type: ignore
-    from ...ir.value import Value  # type: ignore
 
-CallList = List[AsyncCall]
-ModuleList = List[Module]
 FIFOExpr = FIFOPush | FIFOPop
-FIFOInteractionCollection = list[FIFOExpr] | tuple[FIFOExpr, ...]
-FIFOInteractionKind = Type[FIFOPush] | Type[FIFOPop]
-FIFO_INTERACTION_KINDS: Tuple[FIFOInteractionKind, ...] = (FIFOPush, FIFOPop)
+
+
+class InteractionKind(Enum):
+    """Kinds of interactions recorded between modules and shared resources."""
+
+    ARRAY_READ = auto()
+    ARRAY_WRITE = auto()
+    FIFO_PUSH = auto()
+    FIFO_POP = auto()
 
 
 @dataclass
-class ArrayExposure:
-    """Aggregated exposure data for a given array within a module."""
+class ModuleBundle:
+    """Mutable bucket of interactions gathered while analysing a module."""
 
-    array: Array
-    writes_by_module: Dict[Module, Tuple[ArrayWrite, ...]] = field(default_factory=dict)
-    reads: Tuple[ArrayRead, ...] = ()
-
-    def add_write(self, module: Module, exposure: ArrayWrite) -> None:
-        """Record an array write produced by *module*."""
-        writes = list(self.writes_by_module.get(module, ()))
-        writes.append(exposure)
-        self.writes_by_module[module] = tuple(writes)
-
-    def add_read(self, exposure: ArrayRead) -> None:
-        """Record an array read exposure."""
-        self.reads = self.reads + (exposure,)
-
-
-class ModuleExposure:
-    """Mutable exposure accumulator for a module, frozen post-analysis."""
-
-    __slots__ = (
-        "_arrays",
-        "_values",
-        "_async_triggers",
-        "_frozen",
-    )
-
-    def __init__(self) -> None:
-        self._arrays: Dict[Array, ArrayExposure] = {}
-        self._values: List[Expr] = []
-        self._async_triggers: Dict[Module, List[AsyncCall]] = {}
-        self._frozen = False
-
-    @property
-    def arrays(self) -> Dict[Array, ArrayExposure]:
-        """Return array exposure data keyed by the IR array."""
-        return self._arrays
-
-    @property
-    def values(self) -> Tuple[Expr, ...]:
-        """Return the value exposures that must surface as module outputs."""
-        if isinstance(self._values, tuple):
-            return self._values
-        return tuple(self._values)
-
-    @property
-    def async_triggers(self) -> Dict[Module, Tuple[AsyncCall, ...]]:
-        """Return async trigger exposures grouped by callee module."""
-        return {
-            module: tuple(entries) if not isinstance(entries, tuple) else entries
-            for module, entries in self._async_triggers.items()
-        }
-
-    def record_array_write(
-        self,
-        array: Array,
-        module: Module,
-        expr: ArrayWrite,
-    ) -> None:
-        """Capture an array write exposure for *array* performed by *module*."""
-        self._ensure_mutable()
-        bucket = self._arrays.setdefault(array, ArrayExposure(array))
-        bucket.add_write(module, expr)
-
-    def record_array_read(self, array: Array, expr: ArrayRead) -> None:
-        """Capture an array read exposure for *array*."""
-        self._ensure_mutable()
-        bucket = self._arrays.setdefault(array, ArrayExposure(array))
-        bucket.add_read(expr)
-
-    def record_value(
-        self,
-        expr: Expr,
-    ) -> None:
-        """Capture a valued expression that must be exposed externally."""
-        self._ensure_mutable()
-        self._values.append(expr)
-
-    def record_async_trigger(
-        self,
-        callee: Module,
-        call: AsyncCall,
-    ) -> None:
-        """Record an async trigger exposure for a specific callee module."""
-        self._ensure_mutable()
-        self._async_triggers.setdefault(callee, []).append(call)
-
-    def freeze(self) -> None:
-        """Prevent further mutation and canonicalise collection types."""
-        if self._frozen:
-            return
-        for array, exposure in list(self._arrays.items()):
-            exposure.reads = tuple(exposure.reads)
-            exposure.writes_by_module = {
-                module: tuple(entries)
-                for module, entries in exposure.writes_by_module.items()
-            }
-            self._arrays[array] = exposure
-        if not isinstance(self._values, tuple):
-            # Snap the list to a tuple so downstream property access does not rebuild copies.
-            self._values = tuple(self._values)
-        for module, entries in list(self._async_triggers.items()):
-            if not isinstance(entries, tuple):
-                self._async_triggers[module] = tuple(entries)
-        self._frozen = True
-
-    def _ensure_mutable(self) -> None:
-        if self._frozen:
-            raise RuntimeError("ModuleExposure is frozen; cannot record new entries")
+    pushes: list[FIFOPush] = field(default_factory=list)
+    pops: list[FIFOPop] = field(default_factory=list)
+    fifo: dict[Port, list[FIFOExpr]] = field(default_factory=dict)
+    writes: dict[Array, list[ArrayWrite]] = field(default_factory=dict)
+    reads: dict[Array, list[ArrayRead]] = field(default_factory=dict)
 
 
 @dataclass
 class ArrayMetadata:
-    """Metadata describing how an IR array is accessed throughout the system."""
+    """Compatibility container used by ArrayMetadataRegistry."""
 
     array: Array
     write_ports: Dict[Module, int] = field(default_factory=dict)
     read_ports_by_module: Dict[Module, List[int]] = field(default_factory=dict)
-    read_order: List[tuple[Module, ArrayRead]] = field(default_factory=list)
+    read_order: List[Tuple[Module, ArrayRead]] = field(default_factory=list)
     read_expr_port: Dict[ArrayRead, int] = field(default_factory=dict)
-    users: ModuleList = field(default_factory=list)
+    users: List[Module] = field(default_factory=list)
 
 
-class FIFOMetadata:
-    """Per-FIFO metadata owned by the global registry."""
+class AsyncLedger:
+    """Book-keeping for async call relationships."""
 
     def __init__(self) -> None:
-        self._interactions_by_kind: Dict[FIFOInteractionKind, FIFOInteractionCollection] = {
-            kind: [] for kind in FIFO_INTERACTION_KINDS
-        }
+        """Initialise empty call maps."""
+        self._by_module: Dict[Module, Dict[Module, list[AsyncCall]]] = {}
+        self._by_callee: Dict[Module, list[AsyncCall]] = {}
+        self._module_view: Dict[Module, Mapping[Module, Tuple[AsyncCall, ...]]] = {}
+        self._callee_view: Dict[Module, Tuple[AsyncCall, ...]] = {}
         self._frozen = False
 
-    @property
-    def pushes(self) -> Tuple[FIFOPush, ...]:
-        """Return FIFO push interactions for this channel."""
-        return self._bucket_as_tuple(FIFOPush)
+    def record(self, module: Module, callee: Module, call: AsyncCall) -> None:
+        """Record an async call issued by *module* to *callee*."""
+        if self._frozen:
+            raise RuntimeError("AsyncLedger is frozen; cannot record new entries")
+        self._by_module.setdefault(module, {}).setdefault(callee, []).append(call)
+        self._by_callee.setdefault(callee, []).append(call)
 
-    @property
-    def pops(self) -> Tuple[FIFOPop, ...]:
-        """Return FIFO pop interactions for this channel."""
-        bucket = self._bucket_as_tuple(FIFOPop)
-        return bucket  # Help type inference
+    def calls_for_module(self, module: Module) -> Mapping[Module, Tuple[AsyncCall, ...]]:
+        """Expose the frozen calls grouped by callee for *module*."""
+        if not self._frozen:
+            raise RuntimeError("AsyncLedger is not frozen")
+        return self._module_view.get(module, MappingProxyType({}))
 
-    @property
-    def interactions_by_kind(self) -> Mapping[FIFOInteractionKind, Tuple[FIFOExpr, ...]]:
-        """Return FIFO interactions grouped by their expression type."""
-        return {
-            kind: self._bucket_as_tuple(kind)
-            for kind in FIFO_INTERACTION_KINDS
-        }
-
-    def record_interaction(self, expr: FIFOExpr) -> None:
-        """Append an interaction to the appropriate FIFO bucket."""
-        self._ensure_mutable()
-        kind = type(expr)
-        bucket = self._interactions_by_kind.get(kind)
-        if bucket is None:
-            raise TypeError(f"Unsupported FIFO expression: {expr!r}")
-        if isinstance(bucket, tuple):
-            raise RuntimeError("FIFOMetadata is frozen; cannot record new interactions")
-        bucket.append(expr)
-
-    def iter_interactions(self) -> Iterator[FIFOExpr]:
-        """Yield every interaction associated with this FIFO channel."""
-        for kind in FIFO_INTERACTION_KINDS:
-            yield from self._bucket_as_tuple(kind)
-
-    def interactions_for_module(self, module: Module) -> Tuple[FIFOExpr, ...]:
-        """Return the interactions emitted by the provided module."""
-        return tuple(
-            expr for expr in self.iter_interactions() if getattr(expr, "parent", None) is module
-        )
-
-    def is_empty(self) -> bool:
-        """Return True when no interactions remain for this FIFO."""
-        return not self.pushes and not self.pops
+    def calls_by_callee(self, callee: Module) -> Tuple[AsyncCall, ...]:
+        """Return all calls targeting *callee*."""
+        if not self._frozen:
+            raise RuntimeError("AsyncLedger is not frozen")
+        return self._callee_view.get(callee, ())
 
     def freeze(self) -> None:
-        """Prevent further mutation and canonicalise collection types."""
+        """Convert the internal storage into immutable views."""
         if self._frozen:
             return
-        for kind, bucket in list(self._interactions_by_kind.items()):
-            if isinstance(bucket, tuple):
-                continue
-            self._interactions_by_kind[kind] = tuple(bucket)
+        self._module_view = {
+            module: MappingProxyType({callee: tuple(calls) for callee, calls in by_callee.items()})
+            for module, by_callee in self._by_module.items()
+        }
+        self._callee_view = {callee: tuple(calls) for callee, calls in self._by_callee.items()}
         self._frozen = True
 
-    def _bucket_as_tuple(self, kind: FIFOInteractionKind) -> Tuple[FIFOExpr, ...]:
-        bucket = self._interactions_by_kind.get(kind, ())
-        if isinstance(bucket, tuple):
-            return bucket
-        return tuple(bucket)
 
-    def _ensure_mutable(self) -> None:
-        if self._frozen:
-            raise RuntimeError("FIFOMetadata is frozen; cannot record new interactions")
+class ModuleInteractionView(NamedTuple):
+    """Immutable projection of interactions scoped to a module."""
+
+    module: Module
+    matrix: InteractionMatrix
+    pushes: Tuple[FIFOPush, ...]
+    pops: Tuple[FIFOPop, ...]
+    fifo_ports: Tuple[Port, ...]
+    fifo_map: Mapping[Port, Tuple[FIFOExpr, ...]]
+    writes: Mapping[Array, Tuple[ArrayWrite, ...]]
+    reads: Mapping[Array, Tuple[ArrayRead, ...]]
 
 
-class ModuleFIFOView:
-    """Module-scoped view over registry-owned FIFO interactions."""
+class ArrayInteractionView(NamedTuple):
+    """Array-centric view of recorded reads and writes."""
 
-    def __init__(self, module: Module, registry: FIFORegistry) -> None:
-        self._module = module
-        self._registry = registry
-        self._ports: Dict[Port, None] = {}
-        self._interactions_by_port: Dict[
-            Port, list[FIFOPush | FIFOPop] | tuple[FIFOPush | FIFOPop, ...]
-        ] = {}
-        self._interactions_by_kind: Dict[FIFOInteractionKind, FIFOInteractionCollection] = {
-            kind: [] for kind in FIFO_INTERACTION_KINDS
-        }
+    reads: Tuple[ArrayRead, ...]
+    writers: Mapping[Module, Tuple[ArrayWrite, ...]]
+    reads_by_module: Mapping[Module, Tuple[ArrayRead, ...]]
+
+
+class FIFOInteractionView(NamedTuple):
+    """FIFO-centric view of pushes and pops recorded in the matrix."""
+
+    pushes: Tuple[FIFOPush, ...]
+    pops: Tuple[FIFOPop, ...]
+
+
+class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
+    """Centralised interaction store keyed by (module, resource, role)."""
+
+    def __init__(self) -> None:
+        self._modules: Dict[Module, ModuleBundle] = {}
+        self._fifos: Dict[Port, dict[str, list[FIFOExpr]]] = {}
+        self._module_views: Dict[Module, ModuleInteractionView] | None = None
+        self._array_views: Dict[Array, ArrayInteractionView] | None = None
+        self._fifo_views: Dict[Port, FIFOInteractionView] | None = None
+        self.async_ledger = AsyncLedger()
         self._frozen = False
 
-    @property
-    def ports(self) -> Sequence[Port]:
-        """Return the FIFO ports touched by the owning module."""
-        return tuple(self._ports)
-
-    @property
-    def pushes(self) -> Tuple[FIFOPush, ...]:
-        """Return the FIFO pushes recorded for this module."""
-        return self._bucket_as_tuple(FIFOPush)
-
-    @property
-    def pops(self) -> Tuple[FIFOPop, ...]:
-        """Return the FIFO pops recorded for this module."""
-        bucket = self._bucket_as_tuple(FIFOPop)
-        return bucket
-
-    @property
-    def interactions_by_kind(self) -> Mapping[FIFOInteractionKind, Tuple[FIFOExpr, ...]]:
-        """Return module interactions grouped by push/pop kind."""
-        return {
-            kind: self._bucket_as_tuple(kind)
-            for kind in FIFO_INTERACTION_KINDS
-        }
-
-    def register(self, fifo_port: Port, expr: FIFOExpr) -> None:
-        """Record a FIFO interaction for the owning module."""
+    def record(
+        self,
+        *,
+        module: Module,
+        resource: Array | Port,
+        kind: InteractionKind,
+        expr: Expr,
+    ) -> None:
+        """Record a single interaction emitted during analysis."""
         self._ensure_mutable()
-        self._ports.setdefault(fifo_port, None)
-        bucket = self._interactions_by_port.setdefault(fifo_port, [])
-        assert not isinstance(bucket, tuple)
-        bucket.append(expr)
-        kind = type(expr)
-        kind_bucket = self._interactions_by_kind.get(kind)
-        if kind_bucket is None:
-            raise TypeError(f"Unsupported FIFO expression: {expr!r}")
-        if isinstance(kind_bucket, tuple):
-            raise RuntimeError("ModuleFIFOView is frozen; cannot record new interactions")
-        kind_bucket.append(expr)
+        bundle = self._modules.setdefault(module, ModuleBundle())
+        if isinstance(resource, Port):
+            fifo = bundle.fifo.setdefault(resource, [])
+            fifo.append(expr)
+            fifo_bundle = self._fifos.setdefault(resource, {"pushes": [], "pops": []})
+            if isinstance(expr, FIFOPush):
+                bundle.pushes.append(expr)
+                fifo_bundle["pushes"].append(expr)
+            else:
+                bundle.pops.append(expr)  # type: ignore[arg-type]
+                fifo_bundle["pops"].append(expr)  # type: ignore[arg-type]
+            return
+        if kind is InteractionKind.ARRAY_WRITE:
+            bundle.writes.setdefault(resource, []).append(expr)  # type: ignore[arg-type]
+        elif kind is InteractionKind.ARRAY_READ:
+            bundle.reads.setdefault(resource, []).append(expr)  # type: ignore[arg-type]
+        else:
+            raise TypeError(f"Unsupported array interaction kind: {kind}")
 
-    def interactions_for(self, fifo_port: Port) -> Tuple[FIFOPush | FIFOPop, ...]:
-        """Fetch the module's interactions associated with the given FIFO port."""
-        interactions = self._interactions_by_port.get(fifo_port, ())
-        return tuple(interactions)
+    def module_view(self, module: Module) -> ModuleInteractionView:
+        """Return the frozen view for *module*."""
+        if not self._frozen or self._module_views is None:
+            raise RuntimeError("InteractionMatrix is not frozen; module view unavailable")
+        view = self._module_views.get(module)
+        if view is None:
+            empty = ModuleInteractionView(
+                module,
+                self,
+                (),
+                (),
+                (),
+                MappingProxyType({}),
+                MappingProxyType({}),
+                MappingProxyType({}),
+            )
+            self._module_views[module] = empty
+            return empty
+        return view
 
-    def iter_channels(self) -> Iterator[tuple[Port, FIFOMetadata, Tuple[FIFOPush | FIFOPop, ...]]]:
-        """Yield `(fifo_port, metadata, interactions)` triples for the module."""
-        for fifo_port in self._ports:
-            metadata = self._registry.metadata_for(fifo_port)
-            interactions = self._interactions_by_port.get(fifo_port, ())
-            yield fifo_port, metadata, tuple(interactions)
+    def array_view(self, array: Array) -> ArrayInteractionView:
+        """Return the frozen array-level view for *array*."""
+        if not self._frozen or self._array_views is None:
+            raise RuntimeError("InteractionMatrix is not frozen; array view unavailable")
+        view = self._array_views.get(array)
+        if view is None:
+            raise KeyError(f"Array {array} has no recorded interactions")
+        return view
+
+    def fifo_view(self, port: Port) -> FIFOInteractionView:
+        """Return the frozen FIFO-level view for *port*."""
+        if not self._frozen or self._fifo_views is None:
+            raise RuntimeError("InteractionMatrix is not frozen; FIFO view unavailable")
+        view = self._fifo_views.get(port)
+        if view is None:
+            raise KeyError(f"FIFO port {port} has no recorded interactions")
+        return view
 
     def freeze(self) -> None:
-        """Freeze stored FIFO expressions to prevent further mutation."""
+        """Snapshot all recorded interactions into immutable views."""
         if self._frozen:
             return
-        for port, interactions in list(self._interactions_by_port.items()):
-            if not isinstance(interactions, tuple):
-                self._interactions_by_port[port] = tuple(interactions)
-        for kind, bucket in list(self._interactions_by_kind.items()):
-            if isinstance(bucket, tuple):
-                continue
-            self._interactions_by_kind[kind] = tuple(bucket)
+
+        self.async_ledger.freeze()
+        self._module_views = {
+            module: ModuleInteractionView(
+                module,
+                self,
+                tuple(bundle.pushes),
+                tuple(bundle.pops),
+                tuple(bundle.fifo.keys()),
+                MappingProxyType(
+                    {
+                        port: tuple(exprs)
+                        for port, exprs in bundle.fifo.items()
+                    }
+                ),
+                MappingProxyType(
+                    {
+                        arr: tuple(exprs)
+                        for arr, exprs in bundle.writes.items()
+                    }
+                ),
+                MappingProxyType(
+                    {
+                        arr: tuple(exprs)
+                        for arr, exprs in bundle.reads.items()
+                    }
+                ),
+            )
+            for module, bundle in self._modules.items()
+        }
+
+        array_reads: Dict[Array, list[ArrayRead]] = {}
+        array_writers: Dict[Array, Dict[Module, list[ArrayWrite]]] = {}
+        array_reads_by_mod: Dict[Array, Dict[Module, list[ArrayRead]]] = {}
+        for module, bundle in self._modules.items():
+            for array, writes in bundle.writes.items():
+                array_writers.setdefault(array, {}).setdefault(module, []).extend(writes)
+            for array, reads in bundle.reads.items():
+                array_reads.setdefault(array, []).extend(reads)
+                array_reads_by_mod.setdefault(array, {}).setdefault(module, []).extend(reads)
+
+        self._array_views = {
+            array: ArrayInteractionView(
+                tuple(array_reads.get(array, ())),
+                MappingProxyType(
+                    {
+                        mod: tuple(exprs)
+                        for mod, exprs in array_writers.get(array, {}).items()
+                    }
+                ),
+                MappingProxyType(
+                    {
+                        mod: tuple(exprs)
+                        for mod, exprs in array_reads_by_mod.get(array, {}).items()
+                    }
+                ),
+            )
+            for array in array_reads.keys() | array_writers.keys()
+        }
+
+        self._fifo_views = {
+            port: FIFOInteractionView(tuple(bundle["pushes"]), tuple(bundle["pops"]))
+            for port, bundle in self._fifos.items()
+        }
+
         self._frozen = True
 
-    def _bucket_as_tuple(self, kind: FIFOInteractionKind) -> Tuple[FIFOExpr, ...]:
-        bucket = self._interactions_by_kind.get(kind, ())
-        if isinstance(bucket, tuple):
-            return bucket
-        return tuple(bucket)
-
     def _ensure_mutable(self) -> None:
+        """Guard helper that prevents mutation after freeze()."""
         if self._frozen:
-            raise RuntimeError("ModuleFIFOView is frozen; cannot record new interactions")
+            raise RuntimeError("InteractionMatrix is frozen; cannot record new interactions")
 
 
 @dataclass
-class ModuleMetadata:
-    """Metadata collected during module code generation."""
+class ModuleMetadata:  # pylint: disable=too-many-instance-attributes
+    """Module-scoped metadata that decorates InteractionMatrix records."""
 
     module: Module
-    registry: FIFORegistry
-    calls: CallList = field(default_factory=list)
-    exposures: ModuleExposure = field(default_factory=ModuleExposure)
-    fifo: ModuleFIFOView = field(init=False)
-    _finish_sites: List[Intrinsic] = field(init=False, default_factory=list)
+    matrix: InteractionMatrix
+    _value_exposures: list[Expr] = field(default_factory=list)
+    _finish_sites: list[Intrinsic] = field(default_factory=list)
+    _calls: list[AsyncCall] = field(default_factory=list)
+    _value_snapshot: Tuple[Expr, ...] | None = field(init=False, default=None)
+    _finish_snapshot: Tuple[Intrinsic, ...] | None = field(init=False, default=None)
+    _calls_snapshot: Tuple[AsyncCall, ...] | None = field(init=False, default=None)
+    _interactions: ModuleInteractionView | None = field(init=False, default=None)
     _frozen: bool = field(init=False, default=False)
 
-    def __post_init__(self) -> None:
-        self.fifo = ModuleFIFOView(self.module, self.registry)
-        self._finish_sites = []
-        self._frozen = False
+    def record_value(self, expr: Expr) -> None:
+        """Track a value exposure encountered during analysis."""
+        self._ensure_mutable()
+        self._value_exposures.append(expr)
 
-    @property
-    def pushes(self) -> Tuple[FIFOPush, ...]:
-        """Expose FIFO push expressions recorded for this module."""
-        return self.fifo.pushes
+    def record_finish(self, expr: Intrinsic) -> None:
+        """Record a FINISH intrinsic so cleanup can emit completion logic."""
+        self._ensure_mutable()
+        self._finish_sites.append(expr)
 
-    @property
-    def pops(self) -> Tuple[FIFOPop, ...]:
-        """Expose FIFO pop expressions recorded for this module."""
-        return self.fifo.pops
+    def record_call(self, call: AsyncCall) -> None:
+        """Register an async call issued by this module."""
+        self._ensure_mutable()
+        self._calls.append(call)
 
-    def record_fifo_interaction(self, fifo_port: Port, expr: FIFOPush | FIFOPop) -> None:
-        """Track an interaction produced by this module on the given FIFO port."""
+    def freeze(self) -> None:
+        """Finalise the metadata and snapshot interaction projections."""
         if self._frozen:
-            raise RuntimeError("ModuleMetadata is frozen; cannot record FIFO interactions")
-        self.fifo.register(fifo_port, expr)
+            return
+        self.matrix.freeze()
+        self._value_snapshot = tuple(self._value_exposures)
+        self._finish_snapshot = tuple(self._finish_sites)
+        self._calls_snapshot = tuple(self._calls)
+        self._value_exposures.clear()
+        self._finish_sites.clear()
+        self._calls.clear()
+        self._interactions = self.matrix.module_view(self.module)
+        self._frozen = True
+
+    @property
+    def value_exposures(self) -> Tuple[Expr, ...]:
+        """Return the value exposures recorded for the module."""
+        if self._value_snapshot is not None:
+            return self._value_snapshot
+        return tuple(self._value_exposures)
 
     @property
     def finish_sites(self) -> Tuple[Intrinsic, ...]:
-        """Return recorded FINISH intrinsics for this module."""
-        if isinstance(self._finish_sites, tuple):
-            return self._finish_sites
+        """Return the FINISH intrinsics that terminate the module."""
+        if self._finish_snapshot is not None:
+            return self._finish_snapshot
         return tuple(self._finish_sites)
 
-    def record_finish(self, expr: Intrinsic) -> None:
-        """Record a FINISH intrinsic encountered during analysis."""
+    @property
+    def calls(self) -> Tuple[AsyncCall, ...]:
+        """Return async calls issued by the module."""
+        if self._calls_snapshot is not None:
+            return self._calls_snapshot
+        return tuple(self._calls)
+
+    @property
+    def interactions(self) -> ModuleInteractionView:
+        """Return the frozen interaction view for the module."""
+        if self._interactions is None:
+            raise RuntimeError("Module interactions are unavailable before freeze()")
+        return self._interactions
+
+    def _ensure_mutable(self) -> None:
         if self._frozen:
-            raise RuntimeError("ModuleMetadata is frozen; cannot record finish sites")
-        self._finish_sites.append(expr)
-
-    def freeze(self) -> None:
-        """Prevent further mutation of metadata collections."""
-        if self._frozen:
-            return
-        self.exposures.freeze()
-        self.fifo.freeze()
-        if not isinstance(self._finish_sites, tuple):
-            # Converting to tuple provides a deterministic, read-only view for emitters.
-            self._finish_sites = tuple(self._finish_sites)
-        self._frozen = True
+            raise RuntimeError("ModuleMetadata is frozen; cannot record new entries")
 
 
-class FIFORegistry:
-    """Maintain FIFO metadata indexed by FIFO ports."""
-
-    def __init__(self) -> None:
-        self._metadata_by_fifo: Dict[Port, FIFOMetadata] = {}
-
-    def metadata_for(self, fifo_port: Port) -> FIFOMetadata:
-        """Return the metadata object for `fifo_port`, creating it when missing."""
-        metadata = self._metadata_by_fifo.get(fifo_port)
-        if metadata is None:
-            metadata = FIFOMetadata()
-            self._metadata_by_fifo[fifo_port] = metadata
-        return metadata
-
-    def record_interaction(
-        self,
-        _module: Module,
-        expr: FIFOPush | FIFOPop,
-        _predicate: Value | None,
-    ) -> FIFOPush | FIFOPop:
-        """Record a FIFO interaction driven by `module`.
-
-        The optional predicate is currently unused but retained for compatibility with
-        earlier analysis passes that thread conditional guards alongside interactions.
-        """
-        fifo_port = expr.fifo
-        metadata = self.metadata_for(fifo_port)
-        metadata.record_interaction(expr)
-        return expr
-
-    def freeze(self) -> None:
-        """Freeze all FIFO metadata managed by the registry."""
-        for metadata in self._metadata_by_fifo.values():
-            metadata.freeze()
+__all__ = [
+    "InteractionKind",
+    "InteractionMatrix",
+    "ModuleInteractionView",
+    "ArrayInteractionView",
+    "FIFOInteractionView",
+    "AsyncLedger",
+    "ModuleMetadata",
+    "ArrayMetadata",
+]

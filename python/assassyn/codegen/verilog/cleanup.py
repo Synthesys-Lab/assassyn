@@ -3,7 +3,6 @@
 from collections import defaultdict
 from typing import TYPE_CHECKING, Callable, Dict, List, NamedTuple, Optional, Sequence, TypeVar
 
-from .metadata import ArrayExposure
 from .utils import dump_type, dump_type_cast, get_sram_info
 
 from ...ir.module import Downstream
@@ -11,7 +10,7 @@ from ...ir.memory.sram import SRAM
 from ...ir.array import Slice
 from ...ir.memory.base import MemoryBase
 from ...ir.const import Const
-from ...ir.expr import Expr
+from ...ir.expr import Expr, FIFOPop, FIFOPush
 from ...utils import namify, unwrap_operand
 
 if TYPE_CHECKING:
@@ -49,18 +48,12 @@ def resolve_value_exposure_render(dumper, expr: Expr) -> ValueExposureRender:
     return ValueExposureRender(exposed_name=exposed_name, dtype_str=dtype_str, rval=rval)
 
 
-def generate_sram_control_signals(dumper, sram_info, module_exposure):
+def generate_sram_control_signals(dumper, sram_info, module_view):
     """Generate control signals for SRAM memory interface."""
 
     array = sram_info['array']
-    exposure: Optional[ArrayExposure] = module_exposure.arrays.get(array)
-
-    writes: List['ArrayWrite'] = []
-    reads: List['ArrayRead'] = []
-    if exposure is not None:
-        for entries in exposure.writes_by_module.values():
-            writes.extend(entries)
-        reads.extend(exposure.reads)
+    writes = list(module_view.writes.get(array, ()))
+    reads = list(module_view.reads.get(array, ()))
 
     if writes:
         first_write = writes[0]
@@ -184,7 +177,7 @@ def cleanup_post_generation(dumper):
         dumper.append_code(f"executed_wire = {executed_expr}")
 
     module_metadata = dumper.module_metadata[dumper.current_module]
-    module_exposure = module_metadata.exposures
+    module_view = module_metadata.interactions
 
     finish_terms = []
     for finish_site in module_metadata.finish_sites:
@@ -199,9 +192,11 @@ def cleanup_post_generation(dumper):
     if isinstance(dumper.current_module, SRAM):
         sram_info = get_sram_info(dumper.current_module)
         if sram_info:
-            generate_sram_control_signals(dumper, sram_info, module_exposure)
+            generate_sram_control_signals(dumper, sram_info, module_view)
 
-    for arr, array_exposure in module_exposure.arrays.items():
+    all_arrays = set(module_view.writes.keys()) | set(module_view.reads.keys())
+    for arr in all_arrays:
+        module_writes = list(module_view.writes.get(arr, ()))
         owner = arr.owner
         if isinstance(owner, MemoryBase) and arr.is_payload(owner):
             continue
@@ -212,71 +207,69 @@ def cleanup_post_generation(dumper):
 
         array_name = dumper.dump_rval(arr, False)
         array_dtype = arr.scalar_ty
-        port_mapping = metadata.write_ports
+        array_dtype_str = dump_type(array_dtype)
 
-        for writer_module, module_writes in array_exposure.writes_by_module.items():
-            if not module_writes:
-                continue
-            port_idx = port_mapping.get(writer_module)
-            if port_idx is None:
-                continue
-            port_suffix = f"_port{port_idx}"
-            array_dtype_str = dump_type(array_dtype)
+        if module_writes:
+            port_mapping = metadata.write_ports
+            port_idx = port_mapping.get(dumper.current_module)
+            if port_idx is not None:
+                port_suffix = f"_port{port_idx}"
 
-            def render_array_predicate(write: 'ArrayWrite') -> str:
-                return dumper.format_predicate(getattr(write, "meta_cond", None))
+                def render_array_predicate(write: 'ArrayWrite') -> str:
+                    return dumper.format_predicate(getattr(write, "meta_cond", None))
 
-            def render_array_value(
-                write: 'ArrayWrite',
-                dtype_str: str = array_dtype_str,
-                dtype=array_dtype,
-            ) -> str:
-                value_expr = dumper.dump_rval(write.val, False)
-                if dump_type(write.val.dtype) != dtype_str:
-                    value_expr = f"{value_expr}.{dump_type_cast(dtype)}"
-                return value_expr
+                def render_array_value(
+                    write: 'ArrayWrite',
+                    dtype_str: str = array_dtype_str,
+                    dtype=array_dtype,
+                ) -> str:
+                    value_expr = dumper.dump_rval(write.val, False)
+                    if dump_type(write.val.dtype) != dtype_str:
+                        value_expr = f"{value_expr}.{dump_type_cast(dtype)}"
+                    return value_expr
 
-            def aggregate_array(predicates: Sequence[str]) -> str:
-                return _format_reduction_expr(predicates, default_literal=None)
+                def aggregate_array(predicates: Sequence[str]) -> str:
+                    return _format_reduction_expr(predicates, default_literal=None)
 
-            wdata_expr, aggregated_predicates = _emit_predicate_mux_chain(
-                module_writes,
-                render_predicate=render_array_predicate,
-                render_value=render_array_value,
-                default_value=f"{array_dtype_str}(0)",
-                aggregate_predicates=aggregate_array,
-            )
+                wdata_expr, aggregated_predicates = _emit_predicate_mux_chain(
+                    module_writes,
+                    render_predicate=render_array_predicate,
+                    render_value=render_array_value,
+                    default_value=f"{array_dtype_str}(0)",
+                    aggregate_predicates=aggregate_array,
+                )
 
-            idx_default = f"{dump_type(module_writes[0].idx.dtype)}(0)"
+                idx_default = f"{dump_type(module_writes[0].idx.dtype)}(0)"
 
-            def render_array_index(write: 'ArrayWrite') -> str:
-                return dumper.dump_rval(write.idx, False)
+                def render_array_index(write: 'ArrayWrite') -> str:
+                    return dumper.dump_rval(write.idx, False)
 
-            def reuse_aggregated(
-                _predicates: Sequence[str],
-                combined: str = aggregated_predicates,
-            ) -> str:
-                return combined
+                def reuse_aggregated(
+                    _predicates: Sequence[str],
+                    combined: str = aggregated_predicates,
+                ) -> str:
+                    return combined
 
-            widx_expr, _ = _emit_predicate_mux_chain(
-                module_writes,
-                render_predicate=render_array_predicate,
-                render_value=render_array_index,
-                default_value=idx_default,
-                aggregate_predicates=reuse_aggregated,
-            )
+                widx_expr, _ = _emit_predicate_mux_chain(
+                    module_writes,
+                    render_predicate=render_array_predicate,
+                    render_value=render_array_index,
+                    default_value=idx_default,
+                    aggregate_predicates=reuse_aggregated,
+                )
 
-            dumper.append_code(
-                f'self.{array_name}_w{port_suffix} = executed_wire & ({aggregated_predicates})'
-            )
+                dumper.append_code(
+                    f'self.{array_name}_w{port_suffix} = executed_wire & ({aggregated_predicates})'
+                )
 
-            dumper.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata_expr}')
-            dumper.append_code(f'self.{array_name}_widx{port_suffix} = {widx_expr}.as_bits()')
+                dumper.append_code(f'self.{array_name}_wdata{port_suffix} = {wdata_expr}')
+                dumper.append_code(f'self.{array_name}_widx{port_suffix} = {widx_expr}.as_bits()')
 
-        if array_exposure.reads and arr.index_bits > 0:
+        module_reads = module_view.reads.get(arr, ())
+        if module_reads and arr.index_bits > 0:
             assigned_read_ports = set()
             index_bits = arr.index_bits
-            for expr in array_exposure.reads:
+            for expr in module_reads:
                 port_idx = dumper.array_metadata.read_port_index_for_expr(expr)
                 if port_idx is None or port_idx in assigned_read_ports:
                     continue
@@ -296,7 +289,7 @@ def cleanup_post_generation(dumper):
                 assigned_read_ports.add(port_idx)
 
     value_groups: Dict[Expr, List[Expr]] = defaultdict(list)
-    for expr in module_exposure.values:
+    for expr in module_metadata.value_exposures:
         value_groups[expr].append(expr)
 
     for expr, grouped_exposures in value_groups.items():
@@ -317,7 +310,8 @@ def cleanup_post_generation(dumper):
             f'self.valid_{render.exposed_name} = executed_wire & ({pred_condition})'
         )
 
-    for callee, trigger_entries in module_exposure.async_triggers.items():
+    async_groups = dumper.interactions.async_ledger.calls_for_module(dumper.current_module)
+    for callee, trigger_entries in async_groups.items():
         rval = dumper.dump_rval(callee, False)
         trigger_predicates = [
             dumper.format_predicate(getattr(call, "meta_cond", None))
@@ -333,10 +327,11 @@ def cleanup_post_generation(dumper):
         final_trigger_value = f"Mux(executed_wire, UInt(8)(0), {resized_sum})"
         dumper.append_code(f'self.{rval}_trigger = {final_trigger_value}')
 
-    for fifo_port, _, interactions in module_metadata.fifo.iter_channels():
+    for fifo_port in module_view.fifo_ports:
+        interactions = module_view.fifo_map[fifo_port]
         fifo_name = dumper.dump_rval(fifo_port, False)
-        local_pushes = [entry for entry in interactions if hasattr(type(entry), "FIFO_PUSH")]
-        local_pops = [entry for entry in interactions if hasattr(type(entry), "FIFO_POP")]
+        local_pushes = [entry for entry in interactions if isinstance(entry, FIFOPush)]
+        local_pops = [entry for entry in interactions if isinstance(entry, FIFOPop)]
 
         if local_pushes:
             fifo_default = f"{dump_type(fifo_port.dtype)}(0)"

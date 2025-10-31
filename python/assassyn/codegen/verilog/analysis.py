@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence, Set, Tuple, TYPE_CHECKING
+from typing import Dict, List, Sequence, Set, Tuple, TYPE_CHECKING
 
 from ...analysis.external_usage import expr_externally_used
 from ...ir.const import Const
@@ -12,7 +12,7 @@ from ...ir.expr import AsyncCall, Expr, FIFOPop, FIFOPush, Log
 from ...ir.expr.array import ArrayRead, ArrayWrite
 from ...ir.expr.intrinsic import ExternalIntrinsic, Intrinsic, PureIntrinsic
 from ...ir.visitor import Visitor
-from .metadata import FIFORegistry, ModuleMetadata
+from .metadata import InteractionKind, InteractionMatrix, ModuleMetadata
 from ...utils import unwrap_operand
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 def collect_fifo_metadata(
     sys: "SysBuilder",
     modules: Sequence["Module"] | None = None,
-) -> Tuple[Dict["Module", ModuleMetadata], FIFORegistry]:
+) -> Tuple[Dict["Module", ModuleMetadata], InteractionMatrix]:
     """Traverse modules in *sys* and build FIFO metadata.
 
     Args:
@@ -33,8 +33,8 @@ def collect_fifo_metadata(
             every module and downstream module in *sys*.
 
     Returns:
-        A tuple ``(module_metadata, fifo_registry)`` containing the populated
-        metadata map and the shared registry.
+        A tuple ``(module_metadata, interactions)`` containing the populated
+        metadata map and the shared interaction matrix.
     """
 
     if modules is None:
@@ -43,7 +43,7 @@ def collect_fifo_metadata(
         modules_to_visit = list(dict.fromkeys(modules))
 
     if not modules_to_visit:
-        return {}, FIFORegistry()
+        return {}, InteractionMatrix()
 
     system_members: Set["Module"] = set(sys.modules) | set(sys.downstreams)
     missing = [module for module in modules_to_visit if module not in system_members]
@@ -51,21 +51,19 @@ def collect_fifo_metadata(
         missing_names = ", ".join(module.name for module in missing)
         raise ValueError(f"Modules not present in the system: {missing_names}")
 
-    registry = FIFORegistry()
-    module_metadata: Dict["Module", ModuleMetadata] = {}
-    visitor = FIFOAnalysisVisitor(registry, module_metadata)
-
-    for module in modules_to_visit:
-        module_metadata[module] = ModuleMetadata(module, registry)
+    matrix = InteractionMatrix()
+    module_metadata: Dict["Module", ModuleMetadata] = {
+        module: ModuleMetadata(module, matrix) for module in modules_to_visit
+    }
+    visitor = FIFOAnalysisVisitor(matrix, module_metadata)
 
     visitor.analyse_modules(modules_to_visit)
 
+    matrix.freeze()
     for metadata in module_metadata.values():
         metadata.freeze()
 
-    registry.freeze()
-
-    return module_metadata, registry
+    return module_metadata, matrix
 
 
 class FIFOAnalysisVisitor(Visitor):
@@ -73,11 +71,11 @@ class FIFOAnalysisVisitor(Visitor):
 
     def __init__(
         self,
-        registry: FIFORegistry,
+        matrix: InteractionMatrix,
         module_metadata: Dict["Module", ModuleMetadata],
     ) -> None:
         super().__init__()
-        self._registry = registry
+        self._matrix = matrix
         self._module_metadata = module_metadata
 
     def analyse_modules(self, modules: Sequence["Module"]) -> None:
@@ -110,29 +108,38 @@ class FIFOAnalysisVisitor(Visitor):
             return
 
         if isinstance(node, (FIFOPush, FIFOPop)):
-            predicate_value = self._predicate_value(node)
-            interaction = self._registry.record_interaction(module, node, predicate_value)
-            metadata.record_fifo_interaction(node.fifo, interaction)
+            kind = (
+                InteractionKind.FIFO_PUSH
+                if isinstance(node, FIFOPush)
+                else InteractionKind.FIFO_POP
+            )
+            self._matrix.record(module=module, resource=node.fifo, kind=kind, expr=node)
             if isinstance(node, FIFOPop) and expr_externally_used(node, True):
-                metadata.exposures.record_value(node)
+                metadata.record_value(node)
             return
 
         if isinstance(node, AsyncCall):
-            metadata.calls.append(node)
+            metadata.record_call(node)
             callee = node.bind.callee
-            metadata.exposures.record_async_trigger(callee, node)
+            self._matrix.async_ledger.record(module, callee, node)
             return
 
         if isinstance(node, ArrayWrite):
-            metadata.exposures.record_array_write(
-                node.array,
-                node.module,
-                node,
+            self._matrix.record(
+                module=module,
+                resource=node.array,
+                kind=InteractionKind.ARRAY_WRITE,
+                expr=node,
             )
             return
 
         if isinstance(node, ArrayRead):
-            metadata.exposures.record_array_read(node.array, node)
+            self._matrix.record(
+                module=module,
+                resource=node.array,
+                kind=InteractionKind.ARRAY_READ,
+                expr=node,
+            )
             return
 
         if isinstance(node, Log):
@@ -160,7 +167,7 @@ class FIFOAnalysisVisitor(Visitor):
             if isinstance(unwrapped, Const):
                 return
 
-            metadata.exposures.record_value(node)
+            metadata.record_value(node)
 
     def _handle_intrinsic(self, metadata: ModuleMetadata, node: Intrinsic) -> None:
         intrinsic = node.opcode
@@ -177,16 +184,13 @@ class FIFOAnalysisVisitor(Visitor):
         # Other intrinsics (WAIT_UNTIL, predicate stack ops, etc.) do not
         # require additional metadata.
 
-    def _predicate_value(self, expr: Expr) -> Optional['Value']:
-        return getattr(expr, "meta_cond", None)
-
     def _record_value_exposure(self, metadata: ModuleMetadata, value) -> None:
         expr = unwrap_operand(value)
         if isinstance(expr, Const):
             return
         if not isinstance(expr, Expr):
             return
-        metadata.exposures.record_value(expr)
+        metadata.record_value(expr)
 
     def _record_log_exposures(self, metadata: ModuleMetadata, node: Log) -> None:
         self._record_value_exposure(metadata, node.meta_cond)

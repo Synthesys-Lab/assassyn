@@ -20,9 +20,7 @@ from assassyn.frontend import (  # type: ignore
 )
 from assassyn.codegen.verilog.analysis import collect_fifo_metadata  # type: ignore
 from assassyn.codegen.verilog.metadata import (  # type: ignore
-    FIFORegistry,
-    ModuleExposure,
-    ModuleMetadata,
+    InteractionKind,
 )
 from assassyn.ir.expr.call import AsyncCall, FIFOPush  # type: ignore
 from assassyn.ir.expr.expr import FIFOPop  # type: ignore
@@ -80,119 +78,129 @@ def test_metadata_exposures_capture():
         instance = ExposureModule()
         instance.build()
 
-    module_metadata, fifo_registry = collect_fifo_metadata(sys_builder)
+    module_metadata, interactions = collect_fifo_metadata(sys_builder)
     dumper_metadata = module_metadata[instance]
+    module_view = dumper_metadata.interactions
 
     finish_sites = dumper_metadata.finish_sites
     assert finish_sites, "expected finish sites to be recorded"
+    assert isinstance(finish_sites, tuple)
     assert all(site.opcode == Intrinsic.FINISH for site in finish_sites)
     assert all(site.meta_cond is not None for site in finish_sites)
     assert finish_sites[0].meta_cond is instance.finish_cond
-    assert len(dumper_metadata.calls) == 1
-    assert isinstance(dumper_metadata.calls[0], AsyncCall)
 
-    array_exposures = dumper_metadata.exposures.arrays
-    assert array_exposures, "expected array exposures to be recorded"
-    for exposure in array_exposures.values():
-        assert exposure.writes_by_module, "array exposures should capture writes per module"
-        for writer, writes in exposure.writes_by_module.items():
-            assert writer is instance
-            assert writes, "expected recorded array writes"
-            assert all(hasattr(write, "meta_cond") for write in writes)
-        # Reads are captured when gatherable; the current test exercises writes primarily.
+    assert dumper_metadata.calls, "expected async calls to be recorded"
+    assert isinstance(dumper_metadata.calls, tuple)
+    call = dumper_metadata.calls[0]
+    assert isinstance(call, AsyncCall)
 
-    async_triggers = dumper_metadata.exposures.async_triggers
-    assert async_triggers, "expected async trigger exposure metadata"
-    for entries in async_triggers.values():
-        assert entries, "async trigger entries should not be empty"
-        for call in entries:
-            assert call in dumper_metadata.calls
-            assert getattr(call, "meta_cond", None) is not None
+    array_resource = next(iter(module_view.writes))
+    writes = module_view.writes.get(array_resource, ())
+    assert writes, "expected array writes to be recorded"
+    assert isinstance(writes, tuple)
+    assert all(hasattr(write, "meta_cond") for write in writes)
+    assert module_view.writes[array_resource] is writes
+    assert tuple(module_view.writes.keys()) == (array_resource,)
+    assert tuple(module_view.reads.keys()) == ()
 
-    for expr in dumper_metadata.exposures.values:
+    array_view = interactions.array_view(array_resource)
+    writers = array_view.writers
+    assert instance in writers
+    assert writers[instance] == writes
+    assert array_view.reads == ()
+    assert array_view.reads_by_module.get(instance, ()) == ()
+
+    async_groups = interactions.async_ledger.calls_for_module(instance)
+    assert async_groups, "expected async trigger exposure metadata"
+    callee = call.bind.callee
+    assert callee in async_groups
+    callee_calls = async_groups[callee]
+    assert isinstance(callee_calls, tuple)
+    assert callee_calls and callee_calls[0] is call
+
+    value_exposures = dumper_metadata.value_exposures
+    assert isinstance(value_exposures, tuple)
+    assert value_exposures is dumper_metadata.value_exposures
+    for expr in value_exposures:
         assert getattr(expr, "meta_cond", None) is not None
 
-    metadata_pushes = dumper_metadata.fifo.pushes
+    metadata_pushes = module_view.pushes
+    metadata_pops = module_view.pops
     assert metadata_pushes, "FIFO push metadata should be recorded"
-    metadata_pops = dumper_metadata.fifo.pops
     assert metadata_pops, "FIFO pop metadata should be recorded"
+    assert isinstance(metadata_pushes, tuple)
+    assert isinstance(metadata_pops, tuple)
     for expr in metadata_pushes + metadata_pops:
         assert getattr(expr, "meta_cond", None) is not None
-    interactions_map = dumper_metadata.fifo.interactions_by_kind
-    assert interactions_map[FIFOPush] == metadata_pushes
-    assert interactions_map[FIFOPop] == metadata_pops
 
-    # Verify FIFO registry mirrors module metadata
-    fifo_ports = {expr.fifo for expr in metadata_pushes + metadata_pops}
+    fifo_ports = module_view.fifo_ports
+    assert fifo_ports
     for fifo_port in fifo_ports:
-        channel = fifo_registry.metadata_for(fifo_port)
-        assert channel.pushes or channel.pops
-        channel_map = channel.interactions_by_kind
-        if channel.pushes:
-            assert channel_map[FIFOPush] == channel.pushes
-        if channel.pops:
-            assert channel_map[FIFOPop] == channel.pops
+        fifo_bucket = interactions.fifo_view(fifo_port)
+        interactions_for_port = module_view.fifo_map[fifo_port]
+        assert isinstance(interactions_for_port, tuple)
+        for expr in interactions_for_port:
+            assert any(expr is candidate for candidate in metadata_pushes + metadata_pops)
+
+    for fifo_port in fifo_ports:
+        fifo_view = interactions.fifo_view(fifo_port)
+        pushes = fifo_view.pushes
+        pops = fifo_view.pops
+        if pushes:
+            assert pushes == tuple(expr for expr in metadata_pushes if expr.fifo is fifo_port)
+        if pops:
+            assert pops == tuple(expr for expr in metadata_pops if expr.fifo is fifo_port)
+
+    assert interactions.module_view(instance) is module_view
 
 
 def test_metadata_freeze_stabilizes_views():
     """Document why metadata stays mutable until frozen."""
 
-    exposure = ModuleExposure()
-    value_expr = SimpleNamespace(meta_cond=object())
-    exposure.record_value(value_expr)
-    assert exposure.values == (value_expr,)
-    pre_snapshot = exposure.values
-    assert pre_snapshot == (value_expr,)
+    sysb = SysBuilder("metadata_freeze_views")
+    with sysb:
 
-    exposure.freeze()
-    post_snapshot = exposure.values
-    assert post_snapshot is exposure.values
-    with pytest.raises(RuntimeError):
-        exposure.record_value(SimpleNamespace(meta_cond=None))
+        class FreezeModule(Module):
 
-    registry = FIFORegistry()
+            def __init__(self):
+                super().__init__(ports={
+                    'in0': Port(UInt(8)),
+                    'out0': Port(UInt(8)),
+                })
 
-    class _StubModule:
+            @module.combinational
+            def build(self):
+                data = self.in0.pop()
+                self.out0.push(data)
+                finish()
 
-        def __init__(self, name: str):
-            self.name = name
-            self.ports: tuple = ()
+        instance = FreezeModule()
+        instance.build()
 
-        def as_operand(self) -> str:
-            return self.name
+    module_metadata, interactions = collect_fifo_metadata(sysb)
+    metadata = module_metadata[instance]
+    module_view = metadata.interactions
 
-    dummy_module = _StubModule("dummy")
-    metadata = ModuleMetadata(dummy_module, registry)
+    pushes = module_view.pushes
+    pops = module_view.pops
+    finish_sites = metadata.finish_sites
+    assert finish_sites is metadata.finish_sites
+    assert isinstance(finish_sites, tuple)
+    assert isinstance(metadata.value_exposures, tuple)
+    assert metadata.value_exposures is metadata.value_exposures
+    for port in module_view.fifo_ports:
+        fifo_view = interactions.fifo_view(port)
+        interactions_for_port = module_view.fifo_map[port]
+        assert fifo_view.pushes is fifo_view.pushes
+        assert fifo_view.pops is fifo_view.pops
+        sample_interaction = interactions_for_port[0]
+        with pytest.raises(RuntimeError):
+            interactions.record(
+                module=instance,
+                resource=port,
+                kind=InteractionKind.FIFO_PUSH if isinstance(sample_interaction, FIFOPush) else InteractionKind.FIFO_POP,
+                expr=sample_interaction,
+            )
 
-    metadata.exposures.record_value(value_expr)
-    finish_expr = SimpleNamespace(opcode="FINISH", meta_cond=None)
-    metadata.record_finish(finish_expr)
-
-    fifo_port = Port(UInt(8))
-    fifo_port.name = "fifo0"
-
-    fifo_port.module = dummy_module
-
-    push_expr = FIFOPush(fifo_port, UInt(8)(0))
-    push_expr.parent = dummy_module
-    registry.record_interaction(dummy_module, push_expr, None)
-    metadata.record_fifo_interaction(fifo_port, push_expr)
-
-    metadata.freeze()
-    registry.freeze()
-
-    assert metadata.exposures.values is metadata.exposures.values
-    assert metadata.finish_sites is metadata.finish_sites
-    assert isinstance(metadata.finish_sites, tuple)
-    assert metadata.fifo.pushes is metadata.fifo.pushes
-    channel = registry.metadata_for(fifo_port)
-    assert channel.pushes is channel.pushes
-
-    with pytest.raises(RuntimeError):
-        metadata.exposures.record_value(SimpleNamespace(meta_cond=None))
-    with pytest.raises(RuntimeError):
-        metadata.record_finish(SimpleNamespace(opcode="FINISH", meta_cond=None))
-    with pytest.raises(RuntimeError):
-        metadata.record_fifo_interaction(fifo_port, push_expr)
-    with pytest.raises(RuntimeError):
-        registry.record_interaction(dummy_module, FIFOPush(fifo_port, UInt(8)(0)), None)
+    # The shared matrix returns the same view object for the module.
+    assert interactions.module_view(instance) is module_view

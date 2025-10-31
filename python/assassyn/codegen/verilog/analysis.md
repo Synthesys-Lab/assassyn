@@ -4,9 +4,9 @@
 
 The analysis module performs a read-only traversal of Assassyn IR before any Verilog code
 is emitted. The helper `collect_fifo_metadata` drives a visitor that mirrors the dumper’s
-predicate semantics and records every `FIFOPush`/`FIFOPop` interaction, FINISH intrinsic,
-async call, and cross-module exposure into immutable metadata structures. The resulting
-`module_metadata` map and `FIFORegistry` are passed to `CIRCTDumper` at construction time,
+predicate semantics and records every array read/write, FIFO push/pop, FINISH intrinsic,
+async call, and cross-module exposure into a unified `InteractionMatrix`. The resulting
+`module_metadata` map and matrix are passed to `CIRCTDumper` at construction time,
 ensuring downstream phases observe a stable snapshot without manipulating mutable global
 state during code emission.
 
@@ -20,7 +20,7 @@ The implementation resides in `python/assassyn/codegen/verilog/analysis.py`.
 def collect_fifo_metadata(
     sys: SysBuilder,
     modules: Sequence[Module] | None = None,
-) -> tuple[dict[Module, ModuleMetadata], FIFORegistry]:
+) -> tuple[dict[Module, ModuleMetadata], InteractionMatrix]:
     """Traverse modules and build FIFO metadata."""
 ```
 
@@ -34,18 +34,18 @@ generation.
    allowing incremental workflows to refresh subsets and merge the new results into an
    existing cache.
 2. **Visitor Execution**: Instantiates `FIFOAnalysisVisitor` with a fresh
-   `FIFORegistry` and a mutable `dict[Module, ModuleMetadata]`. The visitor walks each
-   module body, recording push/pop interactions, FINISH intrinsics, async calls, and any
+   `InteractionMatrix` and a mutable `dict[Module, ModuleMetadata]`. The visitor walks each
+   module body, recording array and FIFO interactions, FINISH intrinsics, async calls, and any
    valued expression that must be exposed outside the module. Predicates are read directly
    from the base `Expr` snapshot (`expr.meta_cond`), so the stored metadata contains raw IR values.
-3. **Metadata Construction**: For every visited module the helper creates a new
-   `ModuleMetadata` whose `ModuleFIFOView` references the shared registry and whose
-   `ModuleExposure` aggregates array, async-trigger, and general value exposures. Recorded
-   `FIFOPush`/`FIFOPop` expressions are owned by the registry and re-used inside the module
-   view so predicates and expression handles stay in sync for all consumers.
-4. **Result Delivery**: Returns `(module_metadata, fifo_registry)` for the caller to feed
+3. **Metadata Construction**: For every visited module the helper asks the matrix for the
+   module view and builds a `ModuleMetadata` carrying value exposures, async calls, FINISH sites,
+   and the shared `ModuleInteractionView`. Recorded `FIFOPush`/`FIFOPop` and array expressions are
+   owned by the matrix and referenced by both module and resource projections so predicates and handles
+   stay in sync for all consumers.
+4. **Result Delivery**: Returns `(module_metadata, interactions)` for the caller to feed
    into `CIRCTDumper`. Before returning, the helper calls `freeze()` on every
-   `ModuleMetadata` and on the shared `FIFORegistry`, converting the mutable accumulators
+   `ModuleMetadata` and on the shared matrix (including its async ledger), converting the mutable accumulators
    into immutable tuples so downstream phases observe a stable snapshot. The helper never
    mutates the caller’s existing metadata, making it safe to run in parallel with other
    analyses or to layer partial refreshes on top of cached data.
@@ -61,24 +61,21 @@ stitch the returned dictionaries into their own caches.
 `FIFOAnalysisVisitor` subclasses the generic IR `Visitor` and overrides only `visit_expr`.
 It receives two collaborators:
 
-- A shared `FIFORegistry` that owns every recorded `FIFOPush`/`FIFOPop` expression.
+- A shared `InteractionMatrix` that owns every recorded interaction and exposes the async ledger.
 - A mutable `dict[Module, ModuleMetadata]` populated on demand.
 
 `visit_expr` handles four categories:
 
 1. **FIFO interactions** – `FIFOPush` / `FIFOPop` nodes register their expressions in
-   `FIFORegistry` and the per-module `ModuleFIFOView`, capturing predicates from
-   the expression snapshot (`expr.meta_cond`). When a pop’s value escapes its defining module the visitor also
-   records a value exposure so downstream stages can surface the produced data without
-   revisiting the IR.
+   the matrix, which simultaneously updates the module-facing buckets and the FIFO resource bucket while
+   capturing predicates from the expression snapshot (`expr.meta_cond`). When a pop’s value escapes its defining module the visitor also
+   records a value exposure so downstream stages can surface the produced data without revisiting the IR.
 2. **FINISH intrinsics** – append the `Intrinsic.FINISH` expressions themselves to
    `ModuleMetadata.finish_sites` so downstream wiring can expose finish outputs without
    mutating state during emission.
 3. **Async calls** – append `AsyncCall` expressions to `ModuleMetadata.calls` and record
-   trigger exposure metadata (grouped per callee) with the associated predicate.
-4. **Exposure candidates** – arrays and valued expressions used outside the module are
-   captured in `ModuleExposure` structures so cleanup can emit wiring without revisiting
-   the IR.
+   trigger exposure metadata in the matrix’s `async_ledger`, preserving per-callee groupings together with the associated predicate.
+4. **Exposure candidates** – valued expressions used outside the module are captured directly on the module metadata so cleanup can emit wiring without revisiting the IR, while array interactions flow into the matrix buckets shared with array-aware emitters.
 
 Traversal of module bodies is delegated to the base visitor, keeping the class compact and
 ensuring new IR constructs automatically flow through analysis as long as they surface as

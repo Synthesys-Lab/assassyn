@@ -28,7 +28,7 @@ from .cleanup import cleanup_post_generation
 from .rval import dump_rval as dump_rval_impl
 from .module import generate_module_ports
 from .system import generate_system
-from .metadata import ModuleMetadata, FIFORegistry
+from .metadata import InteractionMatrix, ModuleMetadata
 from .analysis import collect_fifo_metadata
 from .array import ArrayMetadataRegistry
 
@@ -53,7 +53,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self,
         *,
         module_metadata: Dict[Module, ModuleMetadata] | None = None,
-        fifo_registry: FIFORegistry | None = None,
+        interactions: InteractionMatrix | None = None,
     ):
         super().__init__()
         self.wait_until = None
@@ -87,7 +87,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.module_metadata: Dict[Module, ModuleMetadata] = (
             module_metadata if module_metadata is not None else {}
         )
-        self.fifo_registry = fifo_registry if fifo_registry is not None else FIFORegistry()
+        self.interactions = interactions if interactions is not None else InteractionMatrix()
 
     def get_pred(self, expr: Expr) -> str:
         """Format the predicate guarding *expr* (or return the default literal)."""
@@ -173,11 +173,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
                 f"FIFO metadata missing for module {node.name}; run collect_fifo_metadata "
                 "and pass the results to CIRCTDumper."
             )
-        if metadata.registry is not self.fifo_registry:
-            raise RuntimeError(
-                f"FIFO metadata for module {node.name} is associated with a different registry."
-            )
-
         self.wait_until = None
         self.current_module = node
         previous_module_ctx = self.module_ctx
@@ -404,10 +399,10 @@ def generate_design(fname: Union[str, Path], sys: SysBuilder) -> None:
     with open(str(fname), 'w', encoding='utf-8') as fd:
         fd.write(HEADER)
 
-        module_metadata, fifo_registry = collect_fifo_metadata(sys)
+        module_metadata, interactions = collect_fifo_metadata(sys)
         dumper = CIRCTDumper(
             module_metadata=module_metadata,
-            fifo_registry=fifo_registry,
+            interactions=interactions,
         )
 
         # Generate sramBlackbox module definitions for each SRAM

@@ -23,14 +23,11 @@ def generate_module_ports(dumper, node: Module) -> None:
     is_sram = isinstance(node, SRAM)
     is_driver = node not in dumper.async_callees
 
-    metadata = dumper.module_metadata.get(node)
-    module_metadata = metadata
-    fifo_metadata = metadata.fifo
-    push_entries = fifo_metadata.pushes
-    pop_entries = fifo_metadata.pops
-    pushes = list(push_entries)
-    calls = module_metadata.calls
-    pops = list(pop_entries)
+    module_metadata = dumper.module_metadata[node]
+    module_view = module_metadata.interactions
+    pushes = list(module_view.pushes)
+    pops = list(module_view.pops)
+    calls = list(module_metadata.calls)
 
     dumper.append_code('clk = Clock()')
     dumper.append_code('rst = Reset()')
@@ -180,7 +177,7 @@ def generate_module_ports(dumper, node: Module) -> None:
 
     ordered_exposures: list[Expr] = []
     seen_ids: set[int] = set()
-    for expr in module_metadata.exposures.values:
+    for expr in module_metadata.value_exposures:
         expr_id = id(expr)
         if expr_id in seen_ids:
             continue

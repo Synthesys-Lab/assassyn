@@ -37,7 +37,7 @@ It then performs the following steps:
    - Direct externals (`node.externals`) still emit `<producer>_<value>` and `<producer>_<value>_valid` inputs for expressions that originate elsewhere (skipping bindings, constants, and the `ExternalIntrinsic` handles themselves). The implementation now resolves the producer by first checking whether `expr.parent` is already a module—reflecting the block-free IR—before falling back to legacy `.module` lookups.
 
 5. **FIFO Handshake Ports**:
-  - For pipeline modules, declares FIFO inputs (`port`, `port_valid`) and optional `port_pop_ready` outputs when the module pops from the FIFO, determined via the registry-backed `metadata.fifo.interactions_by_kind[FIFOPop]` view (with `metadata.fifo.pops` remaining as the convenience projection for common cases).
+  - For pipeline modules, declares FIFO inputs (`port`, `port_valid`) and optional `port_pop_ready` outputs when the module pops from the FIFO, determined via the matrix-backed `module_metadata.interactions.fifo_ports` tuple (with `module_metadata.interactions.pops` serving as the convenience projection for common cases).
   - Adds ready inputs for FIFO pushes and trigger counter deltas using push/call metadata collected during system analysis.
 
 6. **Output Handshakes**: Declares `<callee>_<fifo>_push_valid/data` outputs and `<callee>_trigger` outputs for each async call target, relying on system analysis to omit dormant integrations.
@@ -45,7 +45,8 @@ It then performs the following steps:
 7. **Array Interfaces**: For every array recorded in `dumper.array_metadata.users_for(arr)`, creates inputs for the array value (`_q_in`) and, when the current module writes to the array, outputs for the per-port write enable/data/index signals. Port indices come from `dumper.array_metadata.write_port_index(arr, node)`.
 
 8. **Exposed Ports**: Declares additional `expose_*` / `valid_*` ports derived from
-   `module_metadata.exposures.values` and async trigger exposures so cleanup can wire
+   `module_metadata.value_exposures` and async trigger exposures surfaced by
+   `dumper.interactions.async_ledger.calls_for_module(node)` so cleanup can wire
    producer outputs without mutating dumper state.
 
 The function accounts for several module categories:
