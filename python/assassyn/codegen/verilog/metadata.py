@@ -378,19 +378,6 @@ class FIFORegistry:
             self._metadata_by_fifo[fifo_port] = metadata
         return metadata
 
-    @staticmethod
-    def _is_push_expr(expr: FIFOPush | FIFOPop) -> bool:
-        """Return True when *expr* represents a FIFO push operation."""
-        expr_type = type(expr)
-        opcode = getattr(expr, "opcode", None)
-        push_opcode = getattr(expr_type, "FIFO_PUSH", None)
-        if push_opcode is not None and opcode == push_opcode:
-            return True
-        pop_opcode = getattr(expr_type, "FIFO_POP", None)
-        if pop_opcode is not None and opcode == pop_opcode:
-            return False
-        raise TypeError(f"Unsupported FIFO interaction: {expr!r} (opcode={opcode})")
-
     def record_interaction(
         self,
         module: Module,
@@ -403,7 +390,7 @@ class FIFORegistry:
             module=module,
             expr=expr,
             predicate=predicate,
-            is_push=self._is_push_expr(expr),
+            is_push=hasattr(type(expr), "FIFO_PUSH")
         )
         metadata = self.metadata_for(fifo_port)
         metadata.record_interaction(interaction)
