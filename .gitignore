@@ -24,3 +24,8 @@ Cargo.lock
 **/.wrapper-built
 
 *.sif
+
+
+# Agentic Plans and Reports
+todos/*
+dones/*
