@@ -123,11 +123,12 @@ During the cleanup pass the dumper feeds the precomputed metadata into `_emit_pr
 3. **Code Integration**: Combines the collected body statements with the module boilerplate and generator decorators.
 4. **Special Handling**: Resets external bookkeeping between modules, emits SRAM-specific prelude code, and avoids instantiating pure external stubs.
 
-**`visit_array`**: Generates multi-port array modules with:
-- Write port interfaces for each writing module (queried via `array_metadata.write_port_index()`)
-- Multi-port arbitration loops that prioritise the last matching port
-- Register-based storage with programmable reset values
-- Outputs that feed downstream module array readers
+**`visit_array`**: Generates multi-port register files by delegating to `assassyn.pycde_wrapper.build_register_file`:
+- Computes the wrapper name from `array.name` and derives the address width from `array.index_bits` (minimum 1) so single-entry arrays continue to use constant read indices.
+- Passes write/read port counts from `ArrayMetadataRegistry`, preserving reverse-priority arbitration for writers through the helper’s internal mux ordering.
+- Threads the IR initializer list through to the helper, which coerces values into the target PyCDE element type before constructing the reset literal.
+- Requests read-index ports only when the array exposes indexed reads, keeping generated signatures stable for width-one arrays while still wiring `ridx_port<i>` for larger memories.
+- The resulting module exposes the same `w*_port<i>`/`widx*_port<i>`/`wdata*_port<i>` and `ridx*_port<i>`/`rdata*_port<i>` interface consumed by `_connect_array`.
 
 **`visit_expr`**: Delegates expression generation to the expression dispatch system, emits helpful `#` comments with source locations, and defers wire reads to the external wiring machinery when applicable. Exposure decisions are made during the analysis pre-pass, so emission only formats code.
 
@@ -150,7 +151,7 @@ During the cleanup pass the dumper feeds the precomputed metadata into `_emit_pr
 
 **`_generate_external_module_wrapper`**: Creates PyCDE wrapper classes for external SystemVerilog modules. If the external metadata defines explicit wires (and their direction), the wrapper mirrors them; otherwise it falls back to treating the declared ports as inputs for backwards compatibility. Clock/reset ports are emitted when requested by the metadata.
 
-**`_connect_array`**: Handles multi-port array connections between modules by wiring each module’s per-port write enable/data/index signals into the shared array writer instance the dumper previously generated.
+**`_connect_array`**: Handles multi-port array connections between modules by wiring each module’s per-port write enable/data/index signals into the shared register-file instance produced by `build_register_file`. When an array’s address width is zero, the helper omits `ridx_port<i>` entirely, so `_connect_array` only drives the write triplets and surfaces each reader’s data output.
 
 Direct traversal of module bodies is performed inline where needed: since `DONE-remove-block` flattened every module’s `body` list, consumers iterate those statements directly and filter for `Expr` subclasses to perform per-expression analysis.
 

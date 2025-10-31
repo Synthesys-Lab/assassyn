@@ -224,7 +224,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         size = array.size
         dtype = array.scalar_ty
         index_bits = array.index_bits
-        index_bits_type = index_bits if index_bits > 0 else 1
 
         metadata = self.array_metadata.metadata_for(array)
         if metadata is None:
@@ -234,84 +233,24 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             num_write_ports = len(metadata.write_ports)
             num_read_ports = len(metadata.read_order)
 
-        dim_type = f"dim({dump_type(dtype)}, {size})"
         class_name = namify(array.name)
-
-        self.append_code(f'class {class_name}(Module):')
-        self.indent += 4
-        self.append_code('clk = Clock()')
-        self.append_code('rst = Reset()')
-        self.append_code('')
-
-        for i in range(num_write_ports):
-            port_suffix = f"_port{i}"
-            self.append_code(f'w{port_suffix} = Input(Bits(1))')
-            self.append_code(f'widx{port_suffix} = Input(Bits({index_bits_type}))')
-            self.append_code(f'wdata{port_suffix} = Input({dump_type(dtype)})')
-            self.append_code('')
-
-        for i in range(num_read_ports):
-            port_suffix = f"_port{i}"
-            if index_bits > 0:
-                self.append_code(f'ridx{port_suffix} = Input(Bits({index_bits_type}))')
-            self.append_code(f'rdata{port_suffix} = Output({dump_type(dtype)})')
-            self.append_code('')
-
-        self.append_code('')
-        self.append_code('@generator')
-        self.append_code('def construct(self):')
-        self.indent += 4
+        addr_width = index_bits if index_bits > 0 else 1
+        include_read_index = index_bits > 0
         initializer = array.initializer
+
+        self.append_code(f'{class_name} = build_register_file(')
+        self.indent += 4
+        self.append_code(f'{class_name!r},')
+        self.append_code(f'{dump_type(dtype)},')
+        self.append_code(f'{size},')
+        self.append_code(f'num_write_ports={num_write_ports},')
+        self.append_code(f'num_read_ports={num_read_ports},')
+        self.append_code(f'addr_width={addr_width},')
+        self.append_code(f'include_read_index={str(include_read_index)},')
         if initializer is not None:
-            rst_value_str = str(initializer)
-        else:
-            rst_value_str = f"[0] * {size}"
-
-        self.append_code(
-            f'data_reg = Reg({dim_type}, '
-            f'clk=self.clk, rst=self.rst, rst_value={rst_value_str})'
-        )
-        self.append_code('')
-        if num_write_ports != 0:
-            self.append_code('# Multi-port write logic')
-            self.append_code('next_data_values = []')
-            self.append_code(f'for i in range({size}):')
-            self.indent += 4
-            self.append_code('# Check each write port for this address')
-            self.append_code('element_value = data_reg[i]')
-            for port_idx in reversed(range(num_write_ports)):
-                port_suffix = f"_port{port_idx}"
-                self.append_code(
-                    f'# Port {port_idx} write check'
-                )
-                self.append_code(
-                    f'if_write_port{port_idx} = '
-                    f'(self.w{port_suffix} & '
-                    f'(self.widx{port_suffix} == Bits({index_bits_type})(i)))'
-                )
-                self.append_code(
-                    f'element_value = Mux(if_write_port{port_idx}, '
-                    f'element_value, self.wdata{port_suffix})'
-                )
-            self.append_code('next_data_values.append(element_value)')
-            self.indent -= 4
-            self.append_code(f'next_data = {dim_type}(next_data_values)')
-        else:
-            self.append_code('next_data = data_reg')
-        self.append_code('data_reg.assign(next_data)')
-
-        for port_idx in range(num_read_ports):
-            port_suffix = f"_port{port_idx}"
-            if index_bits > 0:
-                self.append_code(
-                    f'self.rdata{port_suffix} = data_reg[self.ridx{port_suffix}]'
-                )
-            else:
-                self.append_code(
-                    f'self.rdata{port_suffix} = data_reg[0]'
-                )
-
-        self.indent -= 8
+            self.append_code(f'initializer={repr(initializer)},')
+        self.indent -= 4
+        self.append_code(')')
         self.append_code('')
 
 

@@ -109,6 +109,6 @@ from pycde.signals import Struct, BitsSignal
 from pycde.dialects import comb,sv
 from functools import reduce
 from operator import or_, and_, add
-from assassyn.pycde_wrapper import FIFO, TriggerCounter
+from assassyn.pycde_wrapper import FIFO, TriggerCounter, build_register_file
 
 '''

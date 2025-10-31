@@ -30,6 +30,6 @@ def test_design_header_imports_pycde_wrapper(tmp_path):
 
     text = design_path.read_text(encoding="utf-8")
 
-    assert "from assassyn.pycde_wrapper import FIFO, TriggerCounter" in text
+    assert "from assassyn.pycde_wrapper import FIFO, TriggerCounter, build_register_file" in text
     assert "class FIFOImpl(Module):" not in text
     assert "class TriggerCounterImpl(Module):" not in text

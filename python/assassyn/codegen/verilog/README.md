@@ -49,13 +49,14 @@ from pycde import Input, Output, Module, System, Clock, Reset, dim
 from pycde import generator, modparams
 from pycde.constructs import Reg, Array, Mux, Wire
 from pycde.types import Bits, SInt, UInt
-from assassyn.pycde_wrapper import FIFO, TriggerCounter
+from assassyn.pycde_wrapper import FIFO, TriggerCounter, build_register_file
 ```
 
 `assassyn.pycde_wrapper` centralizes PyCDE helpers that back the credit-based pipeline. It exposes:
 
 - `FIFO`: Parameterized depth-tracking FIFO that maps to `fifo.sv`
 - `TriggerCounter`: Credit counter primitive that maps to `trigger_counter.sv`
+- `build_register_file`: Factory that produces multi-port register files matching the Verilog backend’s expectations (write-enable/index/data triplets plus optional read indices)
 
 Keeping these definitions in a runtime module ensures generated designs and user-authored helpers reuse the same implementations.
 

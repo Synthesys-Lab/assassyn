@@ -47,9 +47,31 @@ def TriggerCounter(WIDTH: int):
     return TriggerCounterImpl
 
 
-def build_register_file(module_name, data_type, depth, num_write_ports, num_read_ports):
+def build_register_file(  # pylint: disable=too-many-arguments
+    module_name,
+    data_type,
+    depth,
+    num_write_ports,
+    num_read_ports,
+    *,
+    addr_width=None,
+    include_read_index=True,
+    initializer=None,
+):
     """Create a parameterized register file module with the requested port counts."""
-    addr_width = max(1, (depth - 1).bit_length())
+    computed_addr_width = max(1, (depth - 1).bit_length()) if depth > 0 else 1
+    if addr_width is None:
+        addr_width = computed_addr_width
+    addr_width = max(1, addr_width)
+
+    initializer_values = None
+    if initializer is not None:
+        if len(initializer) != depth:
+            raise ValueError(
+                f"Initializer length {len(initializer)} does not match depth {depth}"
+            )
+        initializer_values = list(initializer)
+
     attrs = {
         "module_name": module_name,
         "clk": Clock(),
@@ -65,17 +87,30 @@ def build_register_file(module_name, data_type, depth, num_write_ports, num_read
         attrs[f"widx_port{w_idx}"] = Input(Bits(addr_width))
         attrs[f"wdata_port{w_idx}"] = Input(data_type)
 
+    if include_read_index:
+        for r_idx in range(num_read_ports):
+            attrs[f"ridx_port{r_idx}"] = Input(Bits(addr_width))
+
     for r_idx in range(num_read_ports):
-        attrs[f"ridx_port{r_idx}"] = Input(Bits(addr_width))
         attrs[f"rdata_port{r_idx}"] = Output(data_type)
 
     @generator
-    def construct(self):
+    def construct(self):  # pylint: disable=too-many-locals
+        if initializer_values is None:
+            reset_literal = [data_type(0) for _ in range(depth)]
+        else:
+            reset_literal = []
+            for value in initializer_values:
+                if hasattr(value, "dtype"):
+                    reset_literal.append(value)
+                else:
+                    reset_literal.append(data_type(value))
+
         data_reg = Reg(
             dim(data_type, depth),
             clk=self.clk,
             rst=self.rst,
-            rst_value=[data_type(0) for _ in range(depth)],
+            rst_value=reset_literal,
         )
 
         index_literals = [Bits(addr_width)(i) for i in range(depth)]
@@ -83,7 +118,7 @@ def build_register_file(module_name, data_type, depth, num_write_ports, num_read
 
         for element_idx, current_literal in enumerate(index_literals):
             element_value = data_reg[element_idx]
-            for port_idx in range(num_write_ports):
+            for port_idx in reversed(range(num_write_ports)):
                 write_en = getattr(self, f"w_port{port_idx}")
                 write_idx = getattr(self, f"widx_port{port_idx}")
                 write_data = getattr(self, f"wdata_port{port_idx}")
@@ -94,11 +129,12 @@ def build_register_file(module_name, data_type, depth, num_write_ports, num_read
         data_reg.assign(dim(data_type, depth)(next_data_values))
 
         for port_idx in range(num_read_ports):
-            read_idx = getattr(self, f"ridx_port{port_idx}")
             read_value = data_reg[0]
-            for element_idx, current_literal in enumerate(index_literals[1:], start=1):
-                match = (read_idx == current_literal).as_bits(1)
-                read_value = Mux(match, read_value, data_reg[element_idx])
+            if include_read_index:
+                read_idx = getattr(self, f"ridx_port{port_idx}")
+                for element_idx, current_literal in enumerate(index_literals[1:], start=1):
+                    match = (read_idx == current_literal).as_bits(1)
+                    read_value = Mux(match, read_value, data_reg[element_idx])
             setattr(self, f"rdata_port{port_idx}", read_value)
 
     attrs["construct"] = construct
