@@ -282,8 +282,10 @@ class FIFORegistry:
 
 The registry is the single owner of FIFO interaction data:
 
-- `record_push()` / `record_pop()` – Create a `FIFOInteraction` and append it to the port’s
-  `FIFOMetadata`.
+- `record_interaction()` – Normalises both push and pop events into a shared
+  `FIFOInteraction`, infers the direction, and appends it to the port’s `FIFOMetadata`.
+- `record_push()` / `record_pop()` – Thin compatibility wrappers that delegate to
+  `record_interaction()` while retaining the original call sites in analysis code.
 - `metadata_for(port)` – Fetch (or lazily create) the `FIFOMetadata` container for `port`.
 
 Because both the module-level view and downstream consumers reference the same

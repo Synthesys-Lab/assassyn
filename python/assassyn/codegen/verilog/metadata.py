@@ -378,6 +378,37 @@ class FIFORegistry:
             self._metadata_by_fifo[fifo_port] = metadata
         return metadata
 
+    @staticmethod
+    def _is_push_expr(expr: FIFOPush | FIFOPop) -> bool:
+        """Return True when *expr* represents a FIFO push operation."""
+        expr_type = type(expr)
+        opcode = getattr(expr, "opcode", None)
+        push_opcode = getattr(expr_type, "FIFO_PUSH", None)
+        if push_opcode is not None and opcode == push_opcode:
+            return True
+        pop_opcode = getattr(expr_type, "FIFO_POP", None)
+        if pop_opcode is not None and opcode == pop_opcode:
+            return False
+        raise TypeError(f"Unsupported FIFO interaction: {expr!r} (opcode={opcode})")
+
+    def record_interaction(
+        self,
+        module: Module,
+        expr: FIFOPush | FIFOPop,
+        predicate: Value | None,
+    ) -> FIFOInteraction:
+        """Record a FIFO interaction driven by `module`."""
+        fifo_port = expr.fifo
+        interaction = FIFOInteraction(
+            module=module,
+            expr=expr,
+            predicate=predicate,
+            is_push=self._is_push_expr(expr),
+        )
+        metadata = self.metadata_for(fifo_port)
+        metadata.record_interaction(interaction)
+        return interaction
+
     def record_push(
         self,
         module: Module,
@@ -385,16 +416,7 @@ class FIFORegistry:
         predicate: Value | None,
     ) -> FIFOInteraction:
         """Record a FIFO push performed by `module`."""
-        fifo_port = expr.fifo
-        interaction = FIFOInteraction(
-            module=module,
-            expr=expr,
-            predicate=predicate,
-            is_push=True,
-        )
-        metadata = self.metadata_for(fifo_port)
-        metadata.record_interaction(interaction)
-        return interaction
+        return self.record_interaction(module, expr, predicate)
 
     def record_pop(
         self,
@@ -403,13 +425,4 @@ class FIFORegistry:
         predicate: Value | None,
     ) -> FIFOInteraction:
         """Record a FIFO pop performed by `module`."""
-        fifo_port = expr.fifo
-        interaction = FIFOInteraction(
-            module=module,
-            expr=expr,
-            predicate=predicate,
-            is_push=False,
-        )
-        metadata = self.metadata_for(fifo_port)
-        metadata.record_interaction(interaction)
-        return interaction
+        return self.record_interaction(module, expr, predicate)

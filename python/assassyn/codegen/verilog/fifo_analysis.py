@@ -107,17 +107,11 @@ class FIFOAnalysisVisitor(Visitor):
             self._handle_intrinsic(metadata, node)
             return
 
-        if isinstance(node, FIFOPush):
+        if isinstance(node, (FIFOPush, FIFOPop)):
             predicate_value = self._predicate_value(node)
-            interaction = self._registry.record_push(module, node, predicate_value)
+            interaction = self._registry.record_interaction(module, node, predicate_value)
             metadata.record_fifo_interaction(node.fifo, interaction)
-            return
-
-        if isinstance(node, FIFOPop):
-            predicate_value = self._predicate_value(node)
-            interaction = self._registry.record_pop(module, node, predicate_value)
-            metadata.record_fifo_interaction(node.fifo, interaction)
-            if expr_externally_used(node, True):
+            if isinstance(node, FIFOPop) and expr_externally_used(node, True):
                 metadata.exposures.record_value(node, predicate_value)
             return
 
