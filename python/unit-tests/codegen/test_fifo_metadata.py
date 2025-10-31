@@ -92,6 +92,8 @@ def test_fifo_metadata_records_predicates():
     out_port = pipe_module.ports[1]
     assert fifo_registry.metadata_for(out_port).pushes == (push_expr,)
     assert fifo_registry.metadata_for(in_port).pops == (pop_expr,)
+    assert fifo_registry.metadata_for(out_port).interactions_by_kind[FIFOPush] == (push_expr,)
+    assert fifo_registry.metadata_for(in_port).interactions_by_kind[FIFOPop] == (pop_expr,)
     channel_view = list(metadata.fifo.iter_channels())
     assert {port for port, _, _ in channel_view} == {in_port, out_port}
     fifo_ports = list(metadata.fifo.ports)
@@ -99,6 +101,9 @@ def test_fifo_metadata_records_predicates():
     assert in_port in fifo_ports
     assert metadata.fifo.interactions_for(out_port) == (push_expr,)
     assert metadata.fifo.interactions_for(in_port) == (pop_expr,)
+    interactions_by_kind = metadata.fifo.interactions_by_kind
+    assert interactions_by_kind[FIFOPush] == (push_expr,)
+    assert interactions_by_kind[FIFOPop] == (pop_expr,)
     for port, fifo_metadata, interactions in channel_view:
         assert fifo_metadata is fifo_registry.metadata_for(port)
         assert interactions == metadata.fifo.interactions_for(port)
@@ -192,10 +197,17 @@ def test_fifo_registry_cross_module_sharing():
     assert isinstance(fifo_meta.pops[0], FIFOPop)
     assert fifo_meta.pushes[0].parent is producer_module
     assert fifo_meta.pops[0].parent is consumer_module
+    by_kind = fifo_meta.interactions_by_kind
+    assert by_kind[FIFOPush] == fifo_meta.pushes
+    assert by_kind[FIFOPop] == fifo_meta.pops
 
     # Module metadata still exposes aggregated views
     assert producer_md.fifo.pushes[0] is fifo_meta.pushes[0]
     assert consumer_md.fifo.pops[0] is fifo_meta.pops[0]
+    view_by_kind = producer_md.fifo.interactions_by_kind
+    consumer_view_by_kind = consumer_md.fifo.interactions_by_kind
+    assert view_by_kind[FIFOPush][0] is fifo_meta.pushes[0]
+    assert consumer_view_by_kind[FIFOPop][0] is fifo_meta.pops[0]
     producer_ports = list(producer_md.fifo.ports)
     consumer_ports = list(consumer_md.fifo.ports)
     assert producer_ports == [consumer_port]

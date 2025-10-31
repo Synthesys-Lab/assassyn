@@ -111,8 +111,9 @@ snapshots.
 **How Metadata is Consumed**
 
 - **Top-level harness generation** ([top.py](/python/assassyn/codegen/verilog/top.md)):
-  Reads `metadata.fifo.pushes` and `metadata.finish_sites` to compute FIFO wiring and finish
-  exposure.
+  Reads `metadata.fifo.interactions_by_kind[FIFOPush]` (mirrored by the
+  `metadata.fifo.pushes` shortcut) and `metadata.finish_sites` to compute FIFO wiring and
+  finish exposure.
 - **Module port generation** ([module.py](/python/assassyn/codegen/verilog/module.md)):
   Uses `metadata.fifo` for handshake ports and `metadata.exposures.values` to declare
   `expose_*` / `valid_*` outputs.
@@ -204,8 +205,9 @@ access to the registry-owned expressions.  It is the authoritative source for pe
 FIFO sets:
 
 - `ports` – Iterable of FIFO ports the module interacted with (preserving insertion order).
-- `pushes` / `pops` – Lists of `FIFOPush` / `FIFOPop` expressions produced by the module
-  (references to the registry-owned entries).
+- `interactions_by_kind` – Mapping from the interaction class (`FIFOPush` / `FIFOPop`) to
+  the tuples of expressions recorded for the module.  `pushes` / `pops` are thin
+  convenience projections that return the corresponding bucket from this mapping.
 - `interactions_for(port)` – Returns the expressions recorded for `port` that originate
   from the owning module, letting consumers wire ready/valid signals without re-filtering
   the registry.
@@ -227,12 +229,14 @@ class FIFOMetadata:
     """Per-FIFO channel metadata owned by the registry."""
 ```
 
-Each FIFO port is associated with a `FIFOMetadata` instance that stores ordered lists of
-raw expressions:
+Each FIFO port is associated with a `FIFOMetadata` instance that stores ordered tuples of
+raw expressions grouped by interaction kind:
 
-- `pushes` – Predicated `FIFOPush` expressions that drive the FIFO.
-- `pops` – Predicated `FIFOPop` expressions that consume from the FIFO.
-- `record_interaction()` – Adds the expression to the appropriate list, preserving
+- `interactions_by_kind` – Dictionary keyed by the interaction class (`FIFOPush` or
+  `FIFOPop`) whose values are the tuples of expressions captured during analysis.
+- `pushes` / `pops` – Convenience projections that surface the push/pop tuples without
+  forcing callers to index into the mapping.
+- `record_interaction()` – Adds the expression to the appropriate bucket, preserving
   encounter order so downstream muxing logic remains deterministic.
 
 ### `FIFORegistry`

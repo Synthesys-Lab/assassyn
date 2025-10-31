@@ -8,7 +8,7 @@ handoff).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Iterator, List, Sequence, TYPE_CHECKING, Tuple
+from typing import Dict, Iterator, List, Mapping, Sequence, TYPE_CHECKING, Tuple, Type
 
 if TYPE_CHECKING:
     from ...ir.array import Array
@@ -25,6 +25,10 @@ else:
 
 CallList = List[AsyncCall]
 ModuleList = List[Module]
+FIFOExpr = FIFOPush | FIFOPop
+FIFOInteractionCollection = list[FIFOExpr] | tuple[FIFOExpr, ...]
+FIFOInteractionKind = Type[FIFOPush] | Type[FIFOPop]
+FIFO_INTERACTION_KINDS: Tuple[FIFOInteractionKind, ...] = (FIFOPush, FIFOPop)
 
 
 @dataclass
@@ -156,42 +160,47 @@ class FIFOMetadata:
     """Per-FIFO metadata owned by the global registry."""
 
     def __init__(self) -> None:
-        self._pushes: list[FIFOPush] | tuple[FIFOPush, ...] = []
-        self._pops: list[FIFOPop] | tuple[FIFOPop, ...] = []
+        self._interactions_by_kind: Dict[FIFOInteractionKind, FIFOInteractionCollection] = {
+            kind: [] for kind in FIFO_INTERACTION_KINDS
+        }
         self._frozen = False
 
     @property
     def pushes(self) -> Tuple[FIFOPush, ...]:
         """Return FIFO push interactions for this channel."""
-        if isinstance(self._pushes, tuple):
-            return self._pushes
-        return tuple(self._pushes)
+        return self._bucket_as_tuple(FIFOPush)
 
     @property
     def pops(self) -> Tuple[FIFOPop, ...]:
         """Return FIFO pop interactions for this channel."""
-        if isinstance(self._pops, tuple):
-            return self._pops
-        return tuple(self._pops)
+        bucket = self._bucket_as_tuple(FIFOPop)
+        return bucket  # Help type inference
 
-    def record_interaction(self, expr: FIFOPush | FIFOPop) -> None:
-        """Append an interaction to the appropriate push/pop list."""
+    @property
+    def interactions_by_kind(self) -> Mapping[FIFOInteractionKind, Tuple[FIFOExpr, ...]]:
+        """Return FIFO interactions grouped by their expression type."""
+        return {
+            kind: self._bucket_as_tuple(kind)
+            for kind in FIFO_INTERACTION_KINDS
+        }
+
+    def record_interaction(self, expr: FIFOExpr) -> None:
+        """Append an interaction to the appropriate FIFO bucket."""
         self._ensure_mutable()
-        if isinstance(expr, FIFOPush):
-            assert not isinstance(self._pushes, tuple)
-            self._pushes.append(expr)
-        elif isinstance(expr, FIFOPop):
-            assert not isinstance(self._pops, tuple)
-            self._pops.append(expr)
-        else:
+        kind = type(expr)
+        bucket = self._interactions_by_kind.get(kind)
+        if bucket is None:
             raise TypeError(f"Unsupported FIFO expression: {expr!r}")
+        if isinstance(bucket, tuple):
+            raise RuntimeError("FIFOMetadata is frozen; cannot record new interactions")
+        bucket.append(expr)
 
-    def iter_interactions(self) -> Iterator[FIFOPush | FIFOPop]:
+    def iter_interactions(self) -> Iterator[FIFOExpr]:
         """Yield every interaction associated with this FIFO channel."""
-        yield from self.pushes
-        yield from self.pops
+        for kind in FIFO_INTERACTION_KINDS:
+            yield from self._bucket_as_tuple(kind)
 
-    def interactions_for_module(self, module: Module) -> Tuple[FIFOPush | FIFOPop, ...]:
+    def interactions_for_module(self, module: Module) -> Tuple[FIFOExpr, ...]:
         """Return the interactions emitted by the provided module."""
         return tuple(
             expr for expr in self.iter_interactions() if getattr(expr, "parent", None) is module
@@ -205,12 +214,17 @@ class FIFOMetadata:
         """Prevent further mutation and canonicalise collection types."""
         if self._frozen:
             return
-        if not isinstance(self._pushes, tuple):
-            # Tuples guarantee a stable snapshot and prevent accidental mutation post-analysis.
-            self._pushes = tuple(self._pushes)
-        if not isinstance(self._pops, tuple):
-            self._pops = tuple(self._pops)
+        for kind, bucket in list(self._interactions_by_kind.items()):
+            if isinstance(bucket, tuple):
+                continue
+            self._interactions_by_kind[kind] = tuple(bucket)
         self._frozen = True
+
+    def _bucket_as_tuple(self, kind: FIFOInteractionKind) -> Tuple[FIFOExpr, ...]:
+        bucket = self._interactions_by_kind.get(kind, ())
+        if isinstance(bucket, tuple):
+            return bucket
+        return tuple(bucket)
 
     def _ensure_mutable(self) -> None:
         if self._frozen:
@@ -227,8 +241,9 @@ class ModuleFIFOView:
         self._interactions_by_port: Dict[
             Port, list[FIFOPush | FIFOPop] | tuple[FIFOPush | FIFOPop, ...]
         ] = {}
-        self._pushes: list[FIFOPush] | tuple[FIFOPush, ...] = []
-        self._pops: list[FIFOPop] | tuple[FIFOPop, ...] = []
+        self._interactions_by_kind: Dict[FIFOInteractionKind, FIFOInteractionCollection] = {
+            kind: [] for kind in FIFO_INTERACTION_KINDS
+        }
         self._frozen = False
 
     @property
@@ -239,32 +254,36 @@ class ModuleFIFOView:
     @property
     def pushes(self) -> Tuple[FIFOPush, ...]:
         """Return the FIFO pushes recorded for this module."""
-        if isinstance(self._pushes, tuple):
-            return self._pushes
-        return tuple(self._pushes)
+        return self._bucket_as_tuple(FIFOPush)
 
     @property
     def pops(self) -> Tuple[FIFOPop, ...]:
         """Return the FIFO pops recorded for this module."""
-        if isinstance(self._pops, tuple):
-            return self._pops
-        return tuple(self._pops)
+        bucket = self._bucket_as_tuple(FIFOPop)
+        return bucket
 
-    def register(self, fifo_port: Port, expr: FIFOPush | FIFOPop) -> None:
+    @property
+    def interactions_by_kind(self) -> Mapping[FIFOInteractionKind, Tuple[FIFOExpr, ...]]:
+        """Return module interactions grouped by push/pop kind."""
+        return {
+            kind: self._bucket_as_tuple(kind)
+            for kind in FIFO_INTERACTION_KINDS
+        }
+
+    def register(self, fifo_port: Port, expr: FIFOExpr) -> None:
         """Record a FIFO interaction for the owning module."""
         self._ensure_mutable()
         self._ports.setdefault(fifo_port, None)
         bucket = self._interactions_by_port.setdefault(fifo_port, [])
         assert not isinstance(bucket, tuple)
         bucket.append(expr)
-        if isinstance(expr, FIFOPush):
-            assert not isinstance(self._pushes, tuple)
-            self._pushes.append(expr)
-        elif isinstance(expr, FIFOPop):
-            assert not isinstance(self._pops, tuple)
-            self._pops.append(expr)
-        else:
+        kind = type(expr)
+        kind_bucket = self._interactions_by_kind.get(kind)
+        if kind_bucket is None:
             raise TypeError(f"Unsupported FIFO expression: {expr!r}")
+        if isinstance(kind_bucket, tuple):
+            raise RuntimeError("ModuleFIFOView is frozen; cannot record new interactions")
+        kind_bucket.append(expr)
 
     def interactions_for(self, fifo_port: Port) -> Tuple[FIFOPush | FIFOPop, ...]:
         """Fetch the module's interactions associated with the given FIFO port."""
@@ -282,15 +301,20 @@ class ModuleFIFOView:
         """Freeze stored FIFO expressions to prevent further mutation."""
         if self._frozen:
             return
-        if not isinstance(self._pushes, tuple):
-            # Emitters query pushes repeatedly, so capture a stable tuple snapshot.
-            self._pushes = tuple(self._pushes)
-        if not isinstance(self._pops, tuple):
-            self._pops = tuple(self._pops)
         for port, interactions in list(self._interactions_by_port.items()):
             if not isinstance(interactions, tuple):
                 self._interactions_by_port[port] = tuple(interactions)
+        for kind, bucket in list(self._interactions_by_kind.items()):
+            if isinstance(bucket, tuple):
+                continue
+            self._interactions_by_kind[kind] = tuple(bucket)
         self._frozen = True
+
+    def _bucket_as_tuple(self, kind: FIFOInteractionKind) -> Tuple[FIFOExpr, ...]:
+        bucket = self._interactions_by_kind.get(kind, ())
+        if isinstance(bucket, tuple):
+            return bucket
+        return tuple(bucket)
 
     def _ensure_mutable(self) -> None:
         if self._frozen:

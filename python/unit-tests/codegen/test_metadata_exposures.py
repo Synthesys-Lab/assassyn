@@ -25,6 +25,7 @@ from assassyn.codegen.verilog.metadata import (  # type: ignore
     ModuleMetadata,
 )
 from assassyn.ir.expr.call import AsyncCall, FIFOPush  # type: ignore
+from assassyn.ir.expr.expr import FIFOPop  # type: ignore
 from assassyn.ir.expr.intrinsic import Intrinsic  # type: ignore
 
 
@@ -117,12 +118,20 @@ def test_metadata_exposures_capture():
     assert metadata_pops, "FIFO pop metadata should be recorded"
     for expr in metadata_pushes + metadata_pops:
         assert getattr(expr, "meta_cond", None) is not None
+    interactions_map = dumper_metadata.fifo.interactions_by_kind
+    assert interactions_map[FIFOPush] == metadata_pushes
+    assert interactions_map[FIFOPop] == metadata_pops
 
     # Verify FIFO registry mirrors module metadata
     fifo_ports = {expr.fifo for expr in metadata_pushes + metadata_pops}
     for fifo_port in fifo_ports:
         channel = fifo_registry.metadata_for(fifo_port)
         assert channel.pushes or channel.pops
+        channel_map = channel.interactions_by_kind
+        if channel.pushes:
+            assert channel_map[FIFOPush] == channel.pushes
+        if channel.pops:
+            assert channel_map[FIFOPop] == channel.pops
 
 
 def test_metadata_freeze_stabilizes_views():
@@ -142,31 +151,30 @@ def test_metadata_freeze_stabilizes_views():
         exposure.record_value(SimpleNamespace(meta_cond=None))
 
     registry = FIFORegistry()
-    dummy_module = SimpleNamespace(name="dummy", ports=())
+
+    class _StubModule:
+
+        def __init__(self, name: str):
+            self.name = name
+            self.ports: tuple = ()
+
+        def as_operand(self) -> str:
+            return self.name
+
+    dummy_module = _StubModule("dummy")
     metadata = ModuleMetadata(dummy_module, registry)
 
     metadata.exposures.record_value(value_expr)
     finish_expr = SimpleNamespace(opcode="FINISH", meta_cond=None)
     metadata.record_finish(finish_expr)
 
-    fifo_port = object()
+    fifo_port = Port(UInt(8))
+    fifo_port.name = "fifo0"
 
-    class DummyPush(FIFOPush):  # type: ignore[misc]
-        """Minimal FIFO push stub that satisfies isinstance checks without builder context."""
+    fifo_port.module = dummy_module
 
-        def __init__(self, fifo):
-            # Deliberately skip Expr.__init__ to avoid builder dependencies.
-            self.opcode = FIFOPush.FIFO_PUSH
-            self._operands = [fifo, None]
-            self.users = []
-            self.name = None
-            self.loc = None
-            self.parent = dummy_module
-            self._meta_cond = None  # Align with Expr.meta_cond property
-            self.bind = None
-            self.fifo_depth = None
-
-    push_expr = DummyPush(fifo_port)
+    push_expr = FIFOPush(fifo_port, UInt(8)(0))
+    push_expr.parent = dummy_module
     registry.record_push(dummy_module, push_expr, None)
     metadata.record_fifo_interaction(fifo_port, push_expr)
 
@@ -187,4 +195,4 @@ def test_metadata_freeze_stabilizes_views():
     with pytest.raises(RuntimeError):
         metadata.record_fifo_interaction(fifo_port, push_expr)
     with pytest.raises(RuntimeError):
-        registry.record_push(dummy_module, DummyPush(fifo_port), None)
+        registry.record_push(dummy_module, FIFOPush(fifo_port, UInt(8)(0)), None)
