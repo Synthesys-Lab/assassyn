@@ -175,7 +175,7 @@ def test_metadata_freeze_stabilizes_views():
 
     push_expr = FIFOPush(fifo_port, UInt(8)(0))
     push_expr.parent = dummy_module
-    registry.record_push(dummy_module, push_expr, None)
+    registry.record_interaction(dummy_module, push_expr, None)
     metadata.record_fifo_interaction(fifo_port, push_expr)
 
     metadata.freeze()
@@ -195,4 +195,4 @@ def test_metadata_freeze_stabilizes_views():
     with pytest.raises(RuntimeError):
         metadata.record_fifo_interaction(fifo_port, push_expr)
     with pytest.raises(RuntimeError):
-        registry.record_push(dummy_module, FIFOPush(fifo_port, UInt(8)(0)), None)
+        registry.record_interaction(dummy_module, FIFOPush(fifo_port, UInt(8)(0)), None)

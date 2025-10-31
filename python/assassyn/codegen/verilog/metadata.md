@@ -250,9 +250,7 @@ The registry is the single owner of FIFO interaction data:
 
 - `record_interaction()` – Normalises both push and pop events by appending the raw
   expression to the port’s `FIFOMetadata`, returning the same expression for module-level
-  bookkeeping.
-- `record_push()` / `record_pop()` – Thin compatibility wrappers that delegate to
-  `record_interaction()` while retaining the original call sites in analysis code.
+  bookkeeping.  All producers call this API directly.
 - `metadata_for(port)` – Fetch (or lazily create) the `FIFOMetadata` container for `port`.
 
 Calling `FIFORegistry.freeze()` walks every `FIFOMetadata` instance, converts internal

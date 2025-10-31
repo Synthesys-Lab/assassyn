@@ -399,29 +399,15 @@ class FIFORegistry:
         expr: FIFOPush | FIFOPop,
         _predicate: Value | None,
     ) -> FIFOPush | FIFOPop:
-        """Record a FIFO interaction driven by `module`."""
+        """Record a FIFO interaction driven by `module`.
+
+        The optional predicate is currently unused but retained for compatibility with
+        earlier analysis passes that thread conditional guards alongside interactions.
+        """
         fifo_port = expr.fifo
         metadata = self.metadata_for(fifo_port)
         metadata.record_interaction(expr)
         return expr
-
-    def record_push(
-        self,
-        _module: Module,
-        expr: FIFOPush,
-        predicate: Value | None,
-    ) -> FIFOPush:
-        """Record a FIFO push performed by `module`."""
-        return self.record_interaction(_module, expr, predicate)
-
-    def record_pop(
-        self,
-        _module: Module,
-        expr: FIFOPop,
-        predicate: Value | None,
-    ) -> FIFOPop:
-        """Record a FIFO pop performed by `module`."""
-        return self.record_interaction(_module, expr, predicate)
 
     def freeze(self) -> None:
         """Freeze all FIFO metadata managed by the registry."""
