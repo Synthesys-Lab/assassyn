@@ -70,7 +70,7 @@ def codegen_fifo_push(dumper: CIRCTDumper, expr: FIFOPush) -> Optional[str]:
 
 This function handles FIFO push operations without emitting Verilog immediately. Instead, it:
 
-1. **Metadata Collection**: Records a FIFO push entry in the module's metadata (see [metadata module](/python/assassyn/codegen/verilog/metadata.md)), capturing the producing module, the `FIFOPush` expression, and the predicate snapshot supplied by the base `Expr` (`expr.meta_cond` plus the ordered `(cond, carry)` tokens). This avoids redundant expression walking while preserving the control context for later wiring.
+1. **Metadata Collection**: Records a FIFO push entry in the module's metadata (see [metadata module](/python/assassyn/codegen/verilog/metadata.md)), capturing the producing module, the `FIFOPush` expression, and the predicate carry supplied by the base `Expr` (`expr.meta_cond`). This avoids redundant expression walking while preserving the control context for later wiring.
 2. **Deferred Processing**: Defers signal emission to the cleanup phase.
 
 The cleanup phase handles FIFO push operations by:

@@ -64,7 +64,7 @@ It receives two collaborators:
 
 1. **FIFO interactions** – `FIFOPush` / `FIFOPop` nodes register interactions in
    `FIFORegistry` and the per-module `ModuleFIFOView`, capturing predicates from
-   the expression snapshot (`expr.meta_cond` plus the ordered `(cond, carry)` tokens). When a pop’s value escapes its defining module the visitor also
+   the expression snapshot (`expr.meta_cond`). When a pop’s value escapes its defining module the visitor also
    records a value exposure so downstream stages can surface the produced data without
    revisiting the IR.
 2. **FINISH intrinsics** – append the `Intrinsic.FINISH` expressions themselves to

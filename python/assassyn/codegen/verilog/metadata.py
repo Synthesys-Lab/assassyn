@@ -33,6 +33,15 @@ CallList = List[AsyncCall]
 ModuleList = List[Module]
 
 
+def _is_fifo_push(expr: FIFOPush | FIFOPop) -> bool:
+    """Return True when *expr* represents a FIFO push."""
+    if hasattr(type(expr), "FIFO_PUSH"):
+        return True
+    if hasattr(type(expr), "FIFO_POP"):
+        return False
+    raise TypeError(f"Unsupported FIFO interaction expression: {expr!r}")
+
+
 @dataclass
 class ArrayExposure:
     """Aggregated exposure data for a given array within a module."""
@@ -157,14 +166,23 @@ class ArrayMetadata:
     users: ModuleList = field(default_factory=list)
 
 
-@dataclass
+@dataclass(frozen=True)
 class FIFOInteraction:
     """Single FIFO interaction captured during code generation."""
 
     module: Module
     expr: FIFOPush | FIFOPop
     predicate: Value | None
-    is_push: bool
+
+    @property
+    def is_push(self) -> bool:
+        """Return True when this interaction represents a FIFO push."""
+        return _is_fifo_push(self.expr)
+
+    @property
+    def is_pop(self) -> bool:
+        """Return True when this interaction represents a FIFO pop."""
+        return not self.is_push
 
 
 class FIFOMetadata:
@@ -322,7 +340,6 @@ class FIFORegistry:
             module=module,
             expr=expr,
             predicate=predicate,
-            is_push=hasattr(type(expr), "FIFO_PUSH")
         )
         metadata = self.metadata_for(fifo_port)
         metadata.record_interaction(interaction)

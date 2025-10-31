@@ -96,7 +96,11 @@ def _render_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
     fifo_name = None
     fifo_module_prefix = None
     for fifo_port, _, interactions in module_entry.fifo.iter_channels():
-        if any(entry.is_push for entry in interactions):
+        pushes = [entry for entry in interactions if entry.is_push]
+        pops = [entry for entry in interactions if entry.is_pop]
+        assert all(not entry.is_pop for entry in pushes)
+        assert all(entry.is_pop for entry in pops)
+        if pushes:
             fifo_name = dumper.dump_rval(fifo_port, False)
             fifo_module_prefix = namify(fifo_port.module.name)
             break
@@ -161,7 +165,11 @@ def _render_single_writer_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
     port_idx = 0 if array_meta is None else array_meta.write_ports.get(cleanup_module, 0)
     fifo_port = None
     for candidate, _, interactions in module_entry.fifo.iter_channels():
-        if any(entry.is_push for entry in interactions):
+        pushes = [entry for entry in interactions if entry.is_push]
+        pops = [entry for entry in interactions if entry.is_pop]
+        assert all(not entry.is_pop for entry in pushes)
+        assert all(entry.is_pop for entry in pops)
+        if pushes:
             fifo_port = candidate
             break
 

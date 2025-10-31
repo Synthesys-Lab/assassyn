@@ -336,7 +336,7 @@ def cleanup_post_generation(dumper):
     for fifo_port, _, interactions in module_metadata.fifo.iter_channels():
         fifo_name = dumper.dump_rval(fifo_port, False)
         local_pushes = [entry for entry in interactions if entry.is_push]
-        local_pops = [entry for entry in interactions if not entry.is_push]
+        local_pops = [entry for entry in interactions if entry.is_pop]
 
         if local_pushes:
             fifo_default = f"{dump_type(fifo_port.dtype)}(0)"

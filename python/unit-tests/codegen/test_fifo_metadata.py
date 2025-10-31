@@ -2,6 +2,7 @@
 
 import os
 import sys
+from dataclasses import FrozenInstanceError
 
 import pytest
 
@@ -65,6 +66,8 @@ def test_fifo_metadata_records_predicates():
     assert len(fifo_meta.pops) == 1
     pop_entry = fifo_meta.pops[0]
     assert pop_entry.module is pipe_module
+    assert pop_entry.is_pop
+    assert not pop_entry.is_push
     pop_predicate = unwrap_value(pop_entry.predicate)
     assert isinstance(pop_predicate, Const)
     assert pop_predicate.value == 1
@@ -72,6 +75,8 @@ def test_fifo_metadata_records_predicates():
     assert len(fifo_meta.pushes) == 1
     push_entry = fifo_meta.pushes[0]
     assert push_entry.module is pipe_module
+    assert push_entry.is_push
+    assert not push_entry.is_pop
     push_predicate = unwrap_value(push_entry.predicate)
     assert isinstance(push_predicate, BinaryOp)
     assert push_predicate.opcode == BinaryOp.BITWISE_AND
@@ -98,10 +103,16 @@ def test_fifo_metadata_records_predicates():
     for port, fifo_metadata, interactions in channel_view:
         assert fifo_metadata is fifo_registry.metadata_for(port)
         assert list(interactions) == list(metadata.fifo.interactions_for(port))
+        for entry in interactions:
+            assert entry.is_push != entry.is_pop
+            assert entry.is_push or entry.is_pop
 
     # Backwards compatibility accessors still expose expression lists
     assert [entry.expr for entry in fifo_meta.pushes] == metadata.pushes
     assert [entry.expr for entry in fifo_meta.pops] == metadata.pops
+
+    with pytest.raises(FrozenInstanceError):
+        push_entry.expr = None  # type: ignore[assignment]
 
     # Revisit the module in isolation to ensure FIFO operations skip the expose map
     isolated_metadata, isolated_registry = collect_fifo_metadata(sysb, modules=[pipe_module])
@@ -183,6 +194,8 @@ def test_fifo_registry_cross_module_sharing():
     assert len(fifo_meta.pops) == 1
     assert fifo_meta.pushes[0].module is producer_module
     assert fifo_meta.pops[0].module is consumer_module
+    assert fifo_meta.pushes[0].is_push
+    assert fifo_meta.pops[0].is_pop
 
     # Module metadata still exposes aggregated views
     assert producer_md.fifo.pushes[0] is fifo_meta.pushes[0]

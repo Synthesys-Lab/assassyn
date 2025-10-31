@@ -95,9 +95,8 @@ snapshots.
 
 1. `FIFOAnalysisVisitor` ensures a `ModuleMetadata` instance exists for the module,
    clearing any stale FIFO interactions and wiring the metadata to the shared registry.
-2. The visitor reads each interaction’s predicate snapshot so the recorded
-   `FIFOInteraction` entries carry both the original `Value` guard and the flattened
-   `(cond, carry)` tokens instead of backend-formatted strings.
+2. The visitor reads each interaction’s predicate carry (`expr.meta_cond`) so the recorded
+   `FIFOInteraction` entries retain the original `Value` guard captured at analysis time.
 3. Each fifo push/pop encountered during the pre-pass creates a shared `FIFOInteraction`,
    adds it to the registry, and registers it with the module’s `ModuleFIFOView`.
 4. When valued expressions require exposure (array writes/reads, async triggers, general
@@ -210,17 +209,25 @@ sets:
 ### `FIFOInteraction`
 
 ```python
-@dataclass
+@dataclass(frozen=True)
 class FIFOInteraction:
     module: Module
     expr: Union[FIFOPush, FIFOPop]
     predicate: Value | None
+
+    @property
+    def is_push(self) -> bool: ...
+
+    @property
+    def is_pop(self) -> bool: ...
 ```
 
-This unified record replaces the redundant `FIFOPushMetadata` / `FIFOPopMetadata`
-wrappers.  The interaction type is inferred from `expr`.  The record retains the final
-carry (`predicate`), mirroring the IR snapshot so later stages can dump predicates
-directly.
+This unified, immutable record replaces the redundant `FIFOPushMetadata` /
+`FIFOPopMetadata` wrappers.  The interaction direction is derived from `expr`, keeping a
+single source of truth for push/pop classification.  The record retains the final predicate
+carry (`predicate`), mirroring the IR snapshot so later stages can dump predicates without
+re-walking expressions.  Because the dataclass is frozen, downstream consumers cannot
+accidentally mutate the stored snapshots captured during analysis.
 
 ### `FIFOMetadata`
 
