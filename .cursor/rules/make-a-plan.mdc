@@ -1,0 +1,41 @@
+---
+alwaysApply: false
+description: Make a plan for all modifications to the code base
+glob:
+---
+
+When you are asked to make a plan, such a plan should follow these rules:
+
+0. The order of a plan matters:
+   - Test-driven development is prefered. Thus, it is preferred to develop the test cases before the features.
+      - However, DO NOT infinitely add new test cases. If it is a code base improvement, it typically means
+        most of the cases are already covered. CAREFULLY consider if additional test cases for such improvement is needed.
+   - Documents should be updated before the feature, so that your trace of thinking is fixed their as a reference.
+      - Think carefully and deeply before doing any code modification. Follow our good code standard.
+   - It is OK to update the documents when you realize there is some issue for the design itself afterward.
+1. Make intermediate commits to have your half-way result commited.
+   - If you are screwed you can also roll back more easily.
+   - You should CAREFULLY consider, which intermediate commit should be checked, and which need not.
+     - For example, when adding new test cases for a new feature, you should run the test first to make sure it fails as expected.
+       Then, you should commit with `--no-verify`.
+     - However, when finalizing a plan, you should always commit with pre-commit check.
+2. This plan should be more detailed, and it is better to gather everything in this plan in advance:
+   - DO NOT SAY: Find xxx in related files and make modifications.
+   - MAKE A LIST: In file1, file2 and file3, we need to modify xxx to achieve yyy.
+3. Read the [good code standard](./write-good-code.mdc) to make your own decision of refactoring good code without changing the semantics.
+4. When finalizing your changes, always trigger a `pre-commit` test to make sure you modifications are good.
+   - If you have on-going changes, just stage and commit as per [commit message standard](./git-message.mdc).
+   - If you already committed everything, use `git commit --no-edit --amend` to trigger it again!
+5. Leave a summary document in `dones/DONE-xxx.md`, where `xxx` briefly summarizes the title of the plan.
+   - If this folder does not exist, create `dones/`.
+   - This should include:
+     1. Briefly discuss your achievements in this plan;
+        - If it is a feature, briefly talk about the usage.
+        - If it is a bug, refer to the test case that replicates the bug.
+        - If it is a code base improvement, summarize the benefit of it.
+        - If it is not covered above, leave a summary for me to update this rule.
+     2. Based on your understandings suggest several further improvoments related to this plan;
+     3. Discuss the non-obivious technical insights and decisions you made;
+        - These decisions and insights should be left in the code comments too.
+        - If you did not do it, do it now, and re-stage-and-commit it.
+   - Stage and commit this summary document.
