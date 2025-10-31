@@ -74,9 +74,8 @@ snapshots.
 
 - `module: Module` – Owning module used to filter registry lookups.
 - `finish_sites: Tuple[FinishSite, ...]` – Ordered list of FINISH intrinsics recorded
-  during analysis; each entry preserves the intrinsic expression and the predicate value
-  active at the call site so cleanup/top wiring can gate `self.finish` without mutating
-  dumper state.
+  during analysis; each entry preserves the intrinsic expression so cleanup/top wiring can
+  query `expr.meta_cond` and gate `self.finish` without mutating dumper state.
 - `calls: List[AsyncCall]` – Populated during analysis when async calls are encountered
   in the module body.  Emission simply reads the preserved list.
 - `fifo: ModuleFIFOView` – Module-scoped view that references registry-owned FIFO
@@ -103,9 +102,9 @@ snapshots.
    adds it to the registry, and registers it with the module’s `ModuleFIFOView`.
 4. When valued expressions require exposure (array writes/reads, async triggers, general
    outputs) or FINISH/async-call nodes are encountered, the analysis visitor records them
-   directly in `ModuleMetadata`, preserving both the final predicate `Value`
-   (`expr.meta_cond`) and the flattened `(cond, carry)` tokens alongside expression handles.
-   FINISH intrinsics are stored as `FinishSite` entries instead of toggling a boolean.
+   directly in `ModuleMetadata`, trusting the expressions’ `meta_cond` metadata to capture
+   predicate carries alongside the expression handles.  FINISH intrinsics are stored as
+   `FinishSite` entries instead of toggling a boolean.
 5. During subsequent code generation the same `ModuleMetadata` object remains read-only;
    emission simply queries `ModuleMetadata` for FIFO interactions, FINISH flags, async
    calls, and exposure data without mutating state.
@@ -145,9 +144,9 @@ class ModuleExposure:
 ```
 
 This container replaces the dumper’s `_exposes` dictionary.  Entries are populated during
-analysis and stay immutable afterwards.  Each collection stores raw IR handles together
-with their predicate carries (`meta_cond`).  Cleanup and module generation format these
-values at emit time.
+analysis and stay immutable afterwards.  Each collection stores raw IR handles, relying on
+the expressions’ `meta_cond` metadata to recover predicate carries when formatting the
+final wiring.
 
 ### `ArrayExposure`
 
@@ -161,9 +160,9 @@ class ArrayExposure:
 
 `ArrayExposure` groups all array interactions performed by the owning module.  Writes are
 bucketed by source module so cleanup can derive per-port enable/data muxes while reads are
-listed in first-seen order for index wiring.  Each write retains the final carry
-(`predicate`) captured when the expression was materialised, so downstream passes can reuse
-the precise guard without replaying control flow.
+listed in first-seen order for index wiring.  Downstream passes format each write’s
+predicate using `write.expr.meta_cond`, mirroring the guard captured when the expression was
+materialised without duplicating the condition object.
 
 ### `ArrayWriteExposure`
 
@@ -171,11 +170,10 @@ the precise guard without replaying control flow.
 @dataclass
 class ArrayWriteExposure:
     expr: ArrayWrite
-    predicate: Value | None
 ```
 
-Captures a single `ArrayWrite` together with its predicate carry.  Cleanup converts the
-final guard via `format_predicate` while dumping values and indices.
+Captures a single `ArrayWrite`.  Cleanup converts the final guard via
+`format_predicate(write.expr.meta_cond)` while dumping values and indices.
 
 ### `ArrayReadExposure`
 
@@ -194,12 +192,12 @@ wrapper retains the expression handle so cleanup can recover addresses and types
 @dataclass
 class ValueExposure:
     expr: Expr
-    predicate: Value | None
 ```
 
 Records valued expressions that must surface as module outputs because they are consumed
-externally (`expr_externally_used(expr, True)`).  The recorded carry mirrors the runtime
-predicate behaviour captured on the IR node.
+externally (`expr_externally_used(expr, True)`).  Predicate handling defers to
+`expr.meta_cond`, ensuring the runtime guard observed by the IR node is preserved without
+storing a duplicate `Value`.
 
 ### `AsyncTriggerExposure`
 
@@ -207,12 +205,11 @@ predicate behaviour captured on the IR node.
 @dataclass
 class AsyncTriggerExposure:
     call: AsyncCall
-    predicate: Value | None
 ```
 
-Async trigger metadata keeps the originating `AsyncCall` plus the predicate carry.  Entries are
-grouped per callee module so cleanup can build the trigger-counter increments without
-re-scanning expression trees.
+Async trigger metadata keeps the originating `AsyncCall`.  Entries are grouped per callee
+module so cleanup can build the trigger-counter increments without re-scanning expression
+trees, reusing `call.meta_cond` to recover the predicate.
 
 **Project-specific Knowledge Required:**
 

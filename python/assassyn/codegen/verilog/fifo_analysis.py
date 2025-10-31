@@ -112,23 +112,20 @@ class FIFOAnalysisVisitor(Visitor):
             interaction = self._registry.record_interaction(module, node, predicate_value)
             metadata.record_fifo_interaction(node.fifo, interaction)
             if isinstance(node, FIFOPop) and expr_externally_used(node, True):
-                metadata.exposures.record_value(node, predicate_value)
+                metadata.exposures.record_value(node)
             return
 
         if isinstance(node, AsyncCall):
             metadata.calls.append(node)
             callee = node.bind.callee
-            predicate = self._predicate_value(node)
-            metadata.exposures.record_async_trigger(callee, node, predicate)
+            metadata.exposures.record_async_trigger(callee, node)
             return
 
         if isinstance(node, ArrayWrite):
-            predicate = self._predicate_value(node)
             metadata.exposures.record_array_write(
                 node.array,
                 node.module,
                 node,
-                predicate,
             )
             return
 
@@ -161,14 +158,13 @@ class FIFOAnalysisVisitor(Visitor):
             if isinstance(unwrapped, Const):
                 return
 
-            predicate = self._predicate_value(node)
-            metadata.exposures.record_value(node, predicate)
+            metadata.exposures.record_value(node)
 
     def _handle_intrinsic(self, metadata: ModuleMetadata, node: Intrinsic) -> None:
         intrinsic = node.opcode
 
         if intrinsic == Intrinsic.FINISH:
-            metadata.record_finish(node, self._predicate_value(node))
+            metadata.record_finish(node)
             return
 
         if intrinsic == Intrinsic.ASSERT:
@@ -188,8 +184,7 @@ class FIFOAnalysisVisitor(Visitor):
             return
         if not isinstance(expr, Expr):
             return
-        predicate = self._predicate_value(expr)
-        metadata.exposures.record_value(expr, predicate)
+        metadata.exposures.record_value(expr)
 
     def _record_log_exposures(self, metadata: ModuleMetadata, node: Log) -> None:
         self._record_value_exposure(metadata, node.meta_cond)

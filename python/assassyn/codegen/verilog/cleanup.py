@@ -62,7 +62,7 @@ def generate_sram_control_signals(dumper, sram_info, module_exposure):
     if writes:
         first_write = writes[0]
         write_addr = dumper.dump_rval(first_write.expr.idx, False)
-        write_pred_literal = dumper.format_predicate(first_write.predicate)
+        write_pred_literal = dumper.format_predicate(getattr(first_write.expr, "meta_cond", None))
         write_enable = f'executed_wire & ({write_pred_literal})'
         write_data = dumper.dump_rval(first_write.expr.val, False)
     else:
@@ -185,7 +185,7 @@ def cleanup_post_generation(dumper):
 
     finish_terms = []
     for finish_site in module_metadata.finish_sites:
-        predicate = dumper.format_predicate(finish_site.predicate)
+        predicate = dumper.format_predicate(getattr(finish_site.expr, "meta_cond", None))
         finish_terms.append(f"({predicate} & executed_wire)")
     finish_expr = _format_reduce_or(
         finish_terms,
@@ -221,7 +221,7 @@ def cleanup_post_generation(dumper):
             array_dtype_str = dump_type(array_dtype)
 
             def render_array_predicate(exposure: ArrayWriteExposure) -> str:
-                return dumper.format_predicate(exposure.predicate)
+                return dumper.format_predicate(getattr(exposure.expr, "meta_cond", None))
 
             def render_array_value(
                 exposure: ArrayWriteExposure,
@@ -304,7 +304,7 @@ def cleanup_post_generation(dumper):
         dumper.append_code(f'# Expose: {expr}')
         dumper.append_code(f'self.expose_{render.exposed_name} = {render.rval}')
         predicate_terms = [
-            f'({dumper.format_predicate(entry.predicate)})'
+            f'({dumper.format_predicate(getattr(entry.expr, "meta_cond", None))})'
             for entry in grouped_exposures
         ]
         pred_condition = _format_reduce_or(
@@ -317,7 +317,10 @@ def cleanup_post_generation(dumper):
 
     for callee, trigger_entries in module_exposure.async_triggers.items():
         rval = dumper.dump_rval(callee, False)
-        trigger_predicates = [dumper.format_predicate(entry.predicate) for entry in trigger_entries]
+        trigger_predicates = [
+            dumper.format_predicate(getattr(entry.call, "meta_cond", None))
+            for entry in trigger_entries
+        ]
         if not trigger_predicates:
             dumper.append_code(f'self.{rval}_trigger = UInt(8)(0)')
             continue

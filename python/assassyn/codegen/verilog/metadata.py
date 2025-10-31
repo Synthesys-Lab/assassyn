@@ -40,7 +40,6 @@ class ArrayWriteExposure:
     """Exposure metadata for a single array write expression."""
 
     expr: 'ArrayWrite'
-    predicate: 'Value | None'
 
 
 @dataclass(frozen=True)
@@ -55,7 +54,6 @@ class ValueExposure:
     """Metadata describing a valued expression that must be exposed externally."""
 
     expr: 'Expr'
-    predicate: 'Value | None'
 
 
 @dataclass(frozen=True)
@@ -63,7 +61,6 @@ class AsyncTriggerExposure:
     """Metadata describing an async call that contributes to a trigger sum."""
 
     call: 'AsyncCall'
-    predicate: 'Value | None'
 
 
 @dataclass(frozen=True)
@@ -71,7 +68,6 @@ class FinishSite:
     """Metadata describing a FINISH intrinsic encountered in a module."""
 
     expr: 'Intrinsic'
-    predicate: 'Value | None'
 
 
 @dataclass
@@ -134,13 +130,11 @@ class ModuleExposure:
         array: Array,
         module: Module,
         expr: 'ArrayWrite',
-        predicate: 'Value | None',
     ) -> None:
         """Capture an array write exposure for *array* performed by *module*."""
         self._ensure_mutable()
         exposure = ArrayWriteExposure(
             expr=expr,
-            predicate=predicate,
         )
         bucket = self._arrays.setdefault(array, ArrayExposure(array))
         bucket.add_write(module, exposure)
@@ -155,14 +149,12 @@ class ModuleExposure:
     def record_value(
         self,
         expr: 'Expr',
-        predicate: 'Value | None',
     ) -> None:
         """Capture a valued expression that must be exposed externally."""
         self._ensure_mutable()
         self._values.append(
             ValueExposure(
                 expr=expr,
-                predicate=predicate,
             )
         )
 
@@ -170,13 +162,11 @@ class ModuleExposure:
         self,
         callee: Module,
         call: 'AsyncCall',
-        predicate: 'Value | None',
     ) -> None:
         """Record an async trigger exposure for a specific callee module."""
         self._ensure_mutable()
         entry = AsyncTriggerExposure(
             call=call,
-            predicate=predicate,
         )
         self._async_triggers.setdefault(callee, []).append(entry)
 
@@ -343,14 +333,13 @@ class ModuleMetadata:
             return self._finish_sites
         return tuple(self._finish_sites)
 
-    def record_finish(self, expr: Intrinsic, predicate: Value | None) -> None:
+    def record_finish(self, expr: Intrinsic) -> None:
         """Record a FINISH intrinsic encountered during analysis."""
         if self._frozen:
             raise RuntimeError("ModuleMetadata is frozen; cannot record finish sites")
         self._finish_sites.append(
             FinishSite(
                 expr=expr,
-                predicate=predicate,
             )
         )
 
