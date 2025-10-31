@@ -147,6 +147,13 @@ analysis and stay immutable afterwards.  Each collection stores raw IR handles, 
 the expressions’ `meta_cond` metadata to recover predicate carries when formatting the
 final wiring.
 
+While the visitor runs these containers remain mutable so it can append entries without
+recreating the owning structures.  Property access therefore returns defensive tuples
+generated from the backing lists.  When `ModuleMetadata.freeze()` executes, the lists are
+converted in place to tuples, the containers refuse further mutation, and subsequent reads
+return the same tuple object.  The pattern both prevents accidental post-pass mutations and
+avoids per-access allocations once the snapshot is considered authoritative.
+
 ### `ArrayExposure`
 
 ```python
@@ -208,6 +215,11 @@ FIFO sets:
   `isinstance(expr, FIFOPush)` / `FIFOPop`, predicates via `expr.meta_cond`, and producer
   modules via the module metadata that owns the view (or `expr.parent` as a fallback).
 
+`ModuleMetadata.freeze()` snaps the module-scoped FIFO lists to tuples in lockstep with the
+shared `FIFORegistry` so emitters can cache lookups without repeatedly allocating
+defensive copies.  Any attempt to register a new interaction after freezing raises a
+`RuntimeError`, surfacing accidental late mutations immediately.
+
 ### `FIFOMetadata`
 
 ```python
@@ -238,6 +250,11 @@ The registry is the single owner of FIFO interaction data:
 - `record_push()` / `record_pop()` – Thin compatibility wrappers that delegate to
   `record_interaction()` while retaining the original call sites in analysis code.
 - `metadata_for(port)` – Fetch (or lazily create) the `FIFOMetadata` container for `port`.
+
+Calling `FIFORegistry.freeze()` walks every `FIFOMetadata` instance, converts internal
+lists to tuples, and flips their mutation guards.  This mirrors the per-module freeze so
+any post-pass attempt to write into the registry is rejected and repeated property access
+returns the same immutable tuple.
 
 Because both the module-level view and downstream consumers reference the same expression
 objects, predicates and handles stay perfectly in sync without two indices drifting apart.

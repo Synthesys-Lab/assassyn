@@ -44,9 +44,11 @@ generation.
    `FIFOPush`/`FIFOPop` expressions are owned by the registry and re-used inside the module
    view so predicates and expression handles stay in sync for all consumers.
 4. **Result Delivery**: Returns `(module_metadata, fifo_registry)` for the caller to feed
-   into `CIRCTDumper`. The helper never mutates the caller’s existing metadata, making it
-   safe to run in parallel with other analyses or to layer partial refreshes on top of
-   cached data.
+   into `CIRCTDumper`. Before returning, the helper calls `freeze()` on every
+   `ModuleMetadata` and on the shared `FIFORegistry`, converting the mutable accumulators
+   into immutable tuples so downstream phases observe a stable snapshot. The helper never
+   mutates the caller’s existing metadata, making it safe to run in parallel with other
+   analyses or to layer partial refreshes on top of cached data.
 
 Consumers typically call `collect_fifo_metadata(sys)` before creating a `CIRCTDumper` for
 full system emission. Tests or incremental tooling can analyse a subset of modules and

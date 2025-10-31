@@ -2,6 +2,9 @@
 
 import os
 import sys
+from types import SimpleNamespace
+
+import pytest
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -16,6 +19,11 @@ from assassyn.frontend import (  # type: ignore
     finish,
 )
 from assassyn.codegen.verilog.analysis import collect_fifo_metadata  # type: ignore
+from assassyn.codegen.verilog.metadata import (  # type: ignore
+    FIFORegistry,
+    ModuleExposure,
+    ModuleMetadata,
+)
 from assassyn.ir.expr.call import AsyncCall  # type: ignore
 from assassyn.ir.expr.intrinsic import Intrinsic  # type: ignore
 
@@ -115,3 +123,61 @@ def test_metadata_exposures_capture():
     for fifo_port in fifo_ports:
         channel = fifo_registry.metadata_for(fifo_port)
         assert channel.pushes or channel.pops
+
+
+def test_metadata_freeze_stabilizes_views():
+    """Document why metadata stays mutable until frozen."""
+
+    exposure = ModuleExposure()
+    value_expr = SimpleNamespace(meta_cond=object())
+    exposure.record_value(value_expr)
+    assert exposure.values == (value_expr,)
+    pre_snapshot = exposure.values
+    assert pre_snapshot == (value_expr,)
+
+    exposure.freeze()
+    post_snapshot = exposure.values
+    assert post_snapshot is exposure.values
+    with pytest.raises(RuntimeError):
+        exposure.record_value(SimpleNamespace(meta_cond=None))
+
+    registry = FIFORegistry()
+    dummy_module = SimpleNamespace(name="dummy", ports=())
+    metadata = ModuleMetadata(dummy_module, registry)
+
+    metadata.exposures.record_value(value_expr)
+    finish_expr = SimpleNamespace(opcode="FINISH", meta_cond=None)
+    metadata.record_finish(finish_expr)
+
+    fifo_port = object()
+
+    class DummyPush:
+        FIFO_PUSH = True
+
+        def __init__(self, fifo):
+            self.fifo = fifo
+            self.parent = dummy_module
+            self.meta_cond = None
+
+    push_expr = DummyPush(fifo_port)
+    registry.record_push(dummy_module, push_expr, None)
+    metadata.record_fifo_interaction(fifo_port, push_expr)
+
+    metadata.freeze()
+    registry.freeze()
+
+    assert metadata.exposures.values is metadata.exposures.values
+    assert metadata.finish_sites is metadata.finish_sites
+    assert isinstance(metadata.finish_sites, tuple)
+    assert metadata.fifo.pushes is metadata.fifo.pushes
+    channel = registry.metadata_for(fifo_port)
+    assert channel.pushes is channel.pushes
+
+    with pytest.raises(RuntimeError):
+        metadata.exposures.record_value(SimpleNamespace(meta_cond=None))
+    with pytest.raises(RuntimeError):
+        metadata.record_finish(SimpleNamespace(opcode="FINISH", meta_cond=None))
+    with pytest.raises(RuntimeError):
+        metadata.record_fifo_interaction(fifo_port, push_expr)
+    with pytest.raises(RuntimeError):
+        registry.record_push(dummy_module, DummyPush(fifo_port), None)

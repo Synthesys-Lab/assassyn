@@ -134,6 +134,7 @@ class ModuleExposure:
             }
             self._arrays[array] = exposure
         if not isinstance(self._values, tuple):
+            # Snap the list to a tuple so downstream property access does not rebuild copies.
             self._values = tuple(self._values)
         for module, entries in list(self._async_triggers.items()):
             if not isinstance(entries, tuple):
@@ -211,6 +212,7 @@ class FIFOMetadata:
         if self._frozen:
             return
         if not isinstance(self._pushes, tuple):
+            # Tuples guarantee a stable snapshot and prevent accidental mutation post-analysis.
             self._pushes = tuple(self._pushes)
         if not isinstance(self._pops, tuple):
             self._pops = tuple(self._pops)
@@ -287,6 +289,7 @@ class ModuleFIFOView:
         if self._frozen:
             return
         if not isinstance(self._pushes, tuple):
+            # Emitters query pushes repeatedly, so capture a stable tuple snapshot.
             self._pushes = tuple(self._pushes)
         if not isinstance(self._pops, tuple):
             self._pops = tuple(self._pops)
@@ -353,6 +356,7 @@ class ModuleMetadata:
         self.exposures.freeze()
         self.fifo.freeze()
         if not isinstance(self._finish_sites, tuple):
+            # Converting to tuple provides a deterministic, read-only view for emitters.
             self._finish_sites = tuple(self._finish_sites)
         self._frozen = True
 
