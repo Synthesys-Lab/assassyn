@@ -101,13 +101,13 @@ def generate_sram_control_signals(dumper, sram_info, module_exposure):
     dumper.append_code('self.mem_read_enable = Bits(1)(1)')  # Always enable reads
 
 
-def _format_reduce_or(
+def _format_reduction_expr(
     predicates: Sequence[str],
     *,
     default_literal: Optional[str],
     op: str = "or_",
 ) -> str:
-    """Format a reduction expression with an optional default literal and operator."""
+    """Format a reduction expression with configurable operator and default literal."""
 
     if not predicates:
         if default_literal is None:
@@ -166,7 +166,7 @@ def cleanup_post_generation(dumper):
                 for dep in dumper.downstream_dependencies[node]
             ]
 
-        executed_expr = _format_reduce_or(
+        executed_expr = _format_reduction_expr(
             dep_signals,
             default_literal="Bits(1)(0)",
         )
@@ -176,7 +176,7 @@ def cleanup_post_generation(dumper):
         if dumper.wait_until:
             exec_conditions.append(f"({dumper.wait_until})")
 
-        executed_expr = _format_reduce_or(
+        executed_expr = _format_reduction_expr(
             exec_conditions,
             default_literal="Bits(1)(1)",
             op="and_",
@@ -190,7 +190,7 @@ def cleanup_post_generation(dumper):
     for finish_site in module_metadata.finish_sites:
         predicate = dumper.format_predicate(getattr(finish_site, "meta_cond", None))
         finish_terms.append(f"({predicate} & executed_wire)")
-    finish_expr = _format_reduce_or(
+    finish_expr = _format_reduction_expr(
         finish_terms,
         default_literal="Bits(1)(0)",
     )
@@ -237,7 +237,7 @@ def cleanup_post_generation(dumper):
                 return value_expr
 
             def aggregate_array(predicates: Sequence[str]) -> str:
-                return _format_reduce_or(predicates, default_literal=None)
+                return _format_reduction_expr(predicates, default_literal=None)
 
             wdata_expr, aggregated_predicates = _emit_predicate_mux_chain(
                 module_writes,
@@ -309,7 +309,7 @@ def cleanup_post_generation(dumper):
             f'({dumper.format_predicate(getattr(entry, "meta_cond", None))})'
             for entry in grouped_exposures
         ]
-        pred_condition = _format_reduce_or(
+        pred_condition = _format_reduction_expr(
             predicate_terms,
             default_literal="Bits(1)(1)",
         )
@@ -349,7 +349,7 @@ def cleanup_post_generation(dumper):
 
             def aggregate_fifo(predicates: Sequence[str]) -> str:
                 wrapped = [f"({term})" for term in predicates]
-                return _format_reduce_or(wrapped, default_literal="Bits(1)(0)")
+                return _format_reduction_expr(wrapped, default_literal="Bits(1)(0)")
 
             fifo_data_expr, fifo_predicate_expr = _emit_predicate_mux_chain(
                 local_pushes,
@@ -376,7 +376,7 @@ def cleanup_post_generation(dumper):
                 f'({dumper.dump_rval(getattr(entry, "meta_cond", None), False)})'
                 for entry in local_pops
             ]
-            final_pop_condition = _format_reduce_or(
+            final_pop_condition = _format_reduction_expr(
                 pop_predicates,
                 default_literal="Bits(1)(0)",
             )
