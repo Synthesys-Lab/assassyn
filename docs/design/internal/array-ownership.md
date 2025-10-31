@@ -25,8 +25,10 @@ the payload detection logic that previously relied on ad hoc identity checks.
 - Memory constructors (`SRAM`, `DRAM`, or future subclasses) assign `owner = self`
   to their internal arrays.
 - Payload buffers are identified via `array.is_payload(memory)` (accepting either
-  the memory class or instance). Only these buffers are skipped by generic
-  register plumbing.
+  the memory class or instance). The helper normalises the argument into a
+  single validation path before checking ownership, so unsupported inputs raise
+  the same `TypeError` message no matter which form was used. Only payload
+  buffers are skipped by generic register plumbing.
 - Auxiliary registers such as the SRAM `dout` latch also reference the memory
   instance through `owner`, but they are treated like ordinary registers because
   they are not the payload array.

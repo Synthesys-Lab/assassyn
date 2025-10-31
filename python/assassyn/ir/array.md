@@ -486,10 +486,11 @@ documentation, and `assign_owner` provides the sanctioned hook for controlled
 refactors that need to re-home an array while keeping type validation in place.
 The `is_payload` helper is the canonical way to detect memory payload buffers:
 it accepts either a memory class (`SRAM`, `DRAM`) or an instance of those
-classes. Passing a class checks whether `self.owner` is an instance of the
-class and confirms the array is identical to the memory's `_payload`. Passing
-an instance performs the same comparison directly. Supplying any other type
-raises `TypeError`, keeping misuse obvious.
+classes. Internally the argument is normalised into a `(memory_cls,
+memory_instance)` pair so that type validation, owner comparison, and payload
+identity checks flow through the same code path. Supplying any other type
+raises the same `TypeError` regardless of whether the caller passed a class or
+an instance, keeping misuse obvious while avoiding duplicated logic.
 
 **Example:**
 

@@ -142,3 +142,25 @@ def test_is_payload_helper_detects_memory_payloads():
     assert sram.dout.is_payload(SRAM) is False
     assert reg_arr.is_payload(SRAM) is False
     assert reg_arr.is_payload(DRAM) is False
+
+
+def test_is_payload_rejects_non_memory_arguments():
+    """Array.is_payload should raise TypeError when the argument is not memory-related."""
+
+    sys = SysBuilder("array_is_payload_invalid")
+    with sys:
+        reg_arr = RegArray(UInt(8), 2, name="plain")
+
+    with pytest.raises(TypeError) as excinfo_cls:
+        reg_arr.is_payload(int)
+    assert (
+        str(excinfo_cls.value)
+        == "Array.is_payload expects a MemoryBase subclass or instance; got <class 'int'>"
+    )
+
+    with pytest.raises(TypeError) as excinfo_inst:
+        reg_arr.is_payload("memory")  # type: ignore[arg-type]
+    assert (
+        str(excinfo_inst.value)
+        == "Array.is_payload expects a MemoryBase subclass or instance; got <class 'str'>"
+    )

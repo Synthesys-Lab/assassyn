@@ -203,25 +203,26 @@ class Array:  #pylint: disable=too-many-instance-attributes
         from .memory.base import MemoryBase
 
         owner = self.owner
+        error_msg = 'Array.is_payload expects a MemoryBase subclass or instance; got {}'
+        memory_cls: 'type[MemoryBase] | None'
+        memory_instance: 'MemoryBase | None'
+        owner_matches: bool
 
         if isinstance(memory, type):
             if not issubclass(memory, MemoryBase):
-                raise TypeError(
-                    'Array.is_payload expects a MemoryBase subclass or instance; '
-                    f'got class {memory}'
-                )
-            if owner is None or not isinstance(owner, memory):
-                return False
-            memory_instance = owner
+                raise TypeError(error_msg.format(repr(memory)))
+            memory_cls = memory
+            owner_matches = isinstance(owner, memory_cls)
+            memory_instance = owner if owner_matches else None
+        elif isinstance(memory, MemoryBase):
+            memory_cls = type(memory)
+            owner_matches = owner is memory
+            memory_instance = memory if owner_matches else None
         else:
-            if not isinstance(memory, MemoryBase):
-                raise TypeError(
-                    'Array.is_payload expects a MemoryBase subclass or instance; '
-                    f'got {type(memory)}'
-                )
-            if owner is not memory:
-                return False
-            memory_instance = memory
+            raise TypeError(error_msg.format(type(memory)))
+
+        if not owner_matches or memory_instance is None:
+            return False
 
         return self is getattr(memory_instance, '_payload', None)
 
