@@ -18,7 +18,7 @@ def codegen_async_call(dumper, expr: AsyncCall) -> Optional[str]:
 Registers an async call with metadata-driven trigger bookkeeping. The helper
 does not emit Verilog immediately; instead it defers generation to the cleanup
 phase, where triggers for each callee are aggregated (using the immutable
-metadata populated by [`collect_fifo_metadata`](../fifo_analysis.md)) and
+metadata populated by [`collect_fifo_metadata`](../analysis.md)) and
 translated into credit updates. This mirrors the behaviour described in
 [`arch.md`](../../../docs/design/arch/arch.md).
 

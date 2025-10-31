@@ -29,7 +29,7 @@ from .rval import dump_rval as dump_rval_impl
 from .module import generate_module_ports
 from .system import generate_system
 from .metadata import ModuleMetadata, FIFORegistry
-from .fifo_analysis import collect_fifo_metadata
+from .analysis import collect_fifo_metadata
 from .array import ArrayMetadataRegistry
 
 

@@ -4,7 +4,7 @@ This module provides metadata structures for tracking information collected for 
 
 ## Summary
 
-The metadata module defines dataclasses that hold information about modules discovered during a dedicated FIFO analysis pass that precedes code emission. The pass is orchestrated by [`collect_fifo_metadata`](./fifo_analysis.md), which uses `FIFOAnalysisVisitor` to walk the requested modules, reading each interaction’s predicate carry (`expr.meta_cond`) so the recorded predicates mirror those consumed by the dumper.  Later phases consume the frozen metadata, eliminating the need for runtime bookkeeping and avoiding mismatches caused by incremental mutation.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
+The metadata module defines dataclasses that hold information about modules discovered during a dedicated FIFO analysis pass that precedes code emission. The pass is orchestrated by [`collect_fifo_metadata`](./analysis.md), which uses `FIFOAnalysisVisitor` to walk the requested modules, reading each interaction’s predicate carry (`expr.meta_cond`) so the recorded predicates mirror those consumed by the dumper.  Later phases consume the frozen metadata, eliminating the need for runtime bookkeeping and avoiding mismatches caused by incremental mutation.  A dedicated `FIFORegistry` keeps a FIFO-keyed view in lockstep with the per-module metadata so every consumer can choose the lookup that best fits its wiring task without recomputing groupings.
 
 ## FIFO Analysis Pre-pass
 

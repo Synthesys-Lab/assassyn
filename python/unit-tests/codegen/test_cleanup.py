@@ -22,7 +22,7 @@ from assassyn.codegen.verilog.cleanup import (  # type: ignore
     _format_reduce_or,
 )
 from assassyn.codegen.verilog.design import CIRCTDumper  # type: ignore
-from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata  # type: ignore
+from assassyn.codegen.verilog.analysis import collect_fifo_metadata  # type: ignore
 from assassyn.ir.expr.call import FIFOPush
 from assassyn.ir.expr.expr import FIFOPop
 from assassyn.utils import namify  # type: ignore

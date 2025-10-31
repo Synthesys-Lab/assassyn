@@ -15,7 +15,7 @@ from assassyn.frontend import (  # type: ignore
     module,
     finish,
 )
-from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata  # type: ignore
+from assassyn.codegen.verilog.analysis import collect_fifo_metadata  # type: ignore
 from assassyn.ir.expr.call import AsyncCall  # type: ignore
 from assassyn.ir.expr.intrinsic import Intrinsic  # type: ignore
 

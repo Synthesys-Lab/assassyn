@@ -29,7 +29,7 @@ Note on typing:
 
 This function generates the complete Verilog system by performing comprehensive analysis and orchestration. It executes the following phases:
 
-Before `generate_system` runs, the caller (typically [`generate_design`](./design.md)) invokes [`collect_fifo_metadata`](./fifo_analysis.md) and constructs `CIRCTDumper` with the returned `module_metadata` and `FIFORegistry`. The function assumes the metadata snapshot (FIFO interactions, FINISH flags, async calls, exposure data) is fixed for the duration of code generation and never mutates it.
+Before `generate_system` runs, the caller (typically [`generate_design`](./design.md)) invokes [`collect_fifo_metadata`](./analysis.md) and constructs `CIRCTDumper` with the returned `module_metadata` and `FIFORegistry`. The function assumes the metadata snapshot (FIFO interactions, FINISH flags, async calls, exposure data) is fixed for the duration of code generation and never mutates it.
 
 1. **System Analysis Phase**:
    - **SRAM Payload Identification**: Identifies SRAM payload arrays that need special handling.

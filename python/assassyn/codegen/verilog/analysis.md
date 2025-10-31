@@ -10,6 +10,8 @@ async call, and cross-module exposure into immutable metadata structures. The re
 ensuring downstream phases observe a stable snapshot without manipulating mutable global
 state during code emission.
 
+The implementation resides in `python/assassyn/codegen/verilog/analysis.py`.
+
 ## Exposed Interfaces
 
 ### `collect_fifo_metadata`

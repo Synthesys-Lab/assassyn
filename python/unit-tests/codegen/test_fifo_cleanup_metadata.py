@@ -17,7 +17,7 @@ from assassyn.frontend import (  # type: ignore
     pop_condition,
 )
 from assassyn.codegen.verilog.design import CIRCTDumper
-from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata
+from assassyn.codegen.verilog.analysis import collect_fifo_metadata
 from assassyn.utils import namify
 
 

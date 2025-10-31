@@ -98,7 +98,7 @@ This helper consolidates the predicate-driven mux logic shared by array writes a
 
 **Project-specific Knowledge Required**:
 - Understanding of [array write operations](/python/assassyn/ir/expr/array.md)
-- Knowledge of [FIFO metadata collection](/python/assassyn/codegen/verilog/fifo_analysis.md)
+- Knowledge of [FIFO metadata collection](/python/assassyn/codegen/verilog/analysis.md)
 - Familiarity with [type casting utilities](/python/assassyn/codegen/verilog/utils.md)
 
 ## Internal Helpers
