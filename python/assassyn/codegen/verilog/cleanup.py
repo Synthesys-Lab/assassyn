@@ -1,9 +1,9 @@
 """Post-generation cleanup and signal generation for Verilog codegen."""
 
 from collections import defaultdict
-from typing import Callable, Dict, List, NamedTuple, Optional, Sequence, TypeVar
+from typing import TYPE_CHECKING, Callable, Dict, List, NamedTuple, Optional, Sequence, TypeVar
 
-from .metadata import ArrayExposure, ArrayWriteExposure, FIFOInteraction, ValueExposure
+from .metadata import ArrayExposure, FIFOInteraction
 from .utils import dump_type, dump_type_cast, get_sram_info
 
 from ...ir.module import Downstream
@@ -13,6 +13,9 @@ from ...ir.memory.base import MemoryBase
 from ...ir.const import Const
 from ...ir.expr import Expr
 from ...utils import namify, unwrap_operand
+
+if TYPE_CHECKING:
+    from ...ir.expr.array import ArrayRead, ArrayWrite
 
 T = TypeVar("T")
 
@@ -52,8 +55,8 @@ def generate_sram_control_signals(dumper, sram_info, module_exposure):
     array = sram_info['array']
     exposure: Optional[ArrayExposure] = module_exposure.arrays.get(array)
 
-    writes: List[ArrayWriteExposure] = []
-    reads = []
+    writes: List['ArrayWrite'] = []
+    reads: List['ArrayRead'] = []
     if exposure is not None:
         for entries in exposure.writes_by_module.values():
             writes.extend(entries)
@@ -61,10 +64,10 @@ def generate_sram_control_signals(dumper, sram_info, module_exposure):
 
     if writes:
         first_write = writes[0]
-        write_addr = dumper.dump_rval(first_write.expr.idx, False)
-        write_pred_literal = dumper.format_predicate(getattr(first_write.expr, "meta_cond", None))
+        write_addr = dumper.dump_rval(first_write.idx, False)
+        write_pred_literal = dumper.format_predicate(getattr(first_write, "meta_cond", None))
         write_enable = f'executed_wire & ({write_pred_literal})'
-        write_data = dumper.dump_rval(first_write.expr.val, False)
+        write_data = dumper.dump_rval(first_write.val, False)
     else:
         write_addr = None
         write_enable = 'Bits(1)(0)'
@@ -72,7 +75,7 @@ def generate_sram_control_signals(dumper, sram_info, module_exposure):
 
     read_addr = None
     if reads:
-        read_expr = reads[0].expr
+        read_expr = reads[0]
         read_addr = dumper.dump_rval(read_expr.idx, False)
 
     dumper.append_code(f'self.mem_write_enable = {write_enable}')
@@ -185,7 +188,7 @@ def cleanup_post_generation(dumper):
 
     finish_terms = []
     for finish_site in module_metadata.finish_sites:
-        predicate = dumper.format_predicate(getattr(finish_site.expr, "meta_cond", None))
+        predicate = dumper.format_predicate(getattr(finish_site, "meta_cond", None))
         finish_terms.append(f"({predicate} & executed_wire)")
     finish_expr = _format_reduce_or(
         finish_terms,
@@ -220,16 +223,16 @@ def cleanup_post_generation(dumper):
             port_suffix = f"_port{port_idx}"
             array_dtype_str = dump_type(array_dtype)
 
-            def render_array_predicate(exposure: ArrayWriteExposure) -> str:
-                return dumper.format_predicate(getattr(exposure.expr, "meta_cond", None))
+            def render_array_predicate(write: 'ArrayWrite') -> str:
+                return dumper.format_predicate(getattr(write, "meta_cond", None))
 
             def render_array_value(
-                exposure: ArrayWriteExposure,
+                write: 'ArrayWrite',
                 dtype_str: str = array_dtype_str,
                 dtype=array_dtype,
             ) -> str:
-                value_expr = dumper.dump_rval(exposure.expr.val, False)
-                if dump_type(exposure.expr.val.dtype) != dtype_str:
+                value_expr = dumper.dump_rval(write.val, False)
+                if dump_type(write.val.dtype) != dtype_str:
                     value_expr = f"{value_expr}.{dump_type_cast(dtype)}"
                 return value_expr
 
@@ -244,10 +247,10 @@ def cleanup_post_generation(dumper):
                 aggregate_predicates=aggregate_array,
             )
 
-            idx_default = f"{dump_type(module_writes[0].expr.idx.dtype)}(0)"
+            idx_default = f"{dump_type(module_writes[0].idx.dtype)}(0)"
 
-            def render_array_index(exposure: ArrayWriteExposure) -> str:
-                return dumper.dump_rval(exposure.expr.idx, False)
+            def render_array_index(write: 'ArrayWrite') -> str:
+                return dumper.dump_rval(write.idx, False)
 
             def reuse_aggregated(
                 _predicates: Sequence[str],
@@ -273,8 +276,7 @@ def cleanup_post_generation(dumper):
         if array_exposure.reads and arr.index_bits > 0:
             assigned_read_ports = set()
             index_bits = arr.index_bits
-            for read_exposure in array_exposure.reads:
-                expr = read_exposure.expr
+            for expr in array_exposure.reads:
                 port_idx = dumper.array_metadata.read_port_index_for_expr(expr)
                 if port_idx is None or port_idx in assigned_read_ports:
                     continue
@@ -293,9 +295,9 @@ def cleanup_post_generation(dumper):
                 )
                 assigned_read_ports.add(port_idx)
 
-    value_groups: Dict[Expr, List[ValueExposure]] = defaultdict(list)
-    for exposure in module_exposure.values:
-        value_groups[exposure.expr].append(exposure)
+    value_groups: Dict[Expr, List[Expr]] = defaultdict(list)
+    for expr in module_exposure.values:
+        value_groups[expr].append(expr)
 
     for expr, grouped_exposures in value_groups.items():
         if isinstance(unwrap_operand(expr), Const):
@@ -304,7 +306,7 @@ def cleanup_post_generation(dumper):
         dumper.append_code(f'# Expose: {expr}')
         dumper.append_code(f'self.expose_{render.exposed_name} = {render.rval}')
         predicate_terms = [
-            f'({dumper.format_predicate(getattr(entry.expr, "meta_cond", None))})'
+            f'({dumper.format_predicate(getattr(entry, "meta_cond", None))})'
             for entry in grouped_exposures
         ]
         pred_condition = _format_reduce_or(
@@ -318,8 +320,8 @@ def cleanup_post_generation(dumper):
     for callee, trigger_entries in module_exposure.async_triggers.items():
         rval = dumper.dump_rval(callee, False)
         trigger_predicates = [
-            dumper.format_predicate(getattr(entry.call, "meta_cond", None))
-            for entry in trigger_entries
+            dumper.format_predicate(getattr(call, "meta_cond", None))
+            for call in trigger_entries
         ]
         if not trigger_predicates:
             dumper.append_code(f'self.{rval}_trigger = UInt(8)(0)')

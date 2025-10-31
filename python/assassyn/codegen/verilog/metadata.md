@@ -73,9 +73,9 @@ snapshots.
 **Fields**
 
 - `module: Module` – Owning module used to filter registry lookups.
-- `finish_sites: Tuple[FinishSite, ...]` – Ordered list of FINISH intrinsics recorded
-  during analysis; each entry preserves the intrinsic expression so cleanup/top wiring can
-  query `expr.meta_cond` and gate `self.finish` without mutating dumper state.
+- `finish_sites: Tuple[Intrinsic, ...]` – Ordered list of FINISH intrinsics recorded during
+  analysis; each entry preserves the intrinsic expression so cleanup/top wiring can query
+  `expr.meta_cond` and gate `self.finish` without mutating dumper state.
 - `calls: List[AsyncCall]` – Populated during analysis when async calls are encountered
   in the module body.  Emission simply reads the preserved list.
 - `fifo: ModuleFIFOView` – Module-scoped view that references registry-owned FIFO
@@ -103,8 +103,8 @@ snapshots.
 4. When valued expressions require exposure (array writes/reads, async triggers, general
    outputs) or FINISH/async-call nodes are encountered, the analysis visitor records them
    directly in `ModuleMetadata`, trusting the expressions’ `meta_cond` metadata to capture
-   predicate carries alongside the expression handles.  FINISH intrinsics are stored as
-   `FinishSite` entries instead of toggling a boolean.
+   predicate carries alongside the expression handles.  FINISH intrinsics are stored as raw
+   intrinsic expressions instead of toggling a boolean.
 5. During subsequent code generation the same `ModuleMetadata` object remains read-only;
    emission simply queries `ModuleMetadata` for FIFO interactions, FINISH flags, async
    calls, and exposure data without mutating state.
@@ -139,8 +139,8 @@ runtime mutation, making future additions (e.g., external memory handshakes) str
 @dataclass
 class ModuleExposure:
     arrays: Dict[Array, ArrayExposure]
-    values: List[ValueExposure]
-    async_triggers: Dict[Module, List[AsyncTriggerExposure]]
+    values: List[Expr]
+    async_triggers: Dict[Module, List[AsyncCall]]
 ```
 
 This container replaces the dumper’s `_exposes` dictionary.  Entries are populated during
@@ -154,62 +154,30 @@ final wiring.
 @dataclass
 class ArrayExposure:
     array: Array
-    writes_by_module: Dict[Module, Tuple[ArrayWriteExposure, ...]]
-    reads: Tuple[ArrayReadExposure, ...]
+    writes_by_module: Dict[Module, Tuple[ArrayWrite, ...]]
+    reads: Tuple[ArrayRead, ...]
 ```
 
 `ArrayExposure` groups all array interactions performed by the owning module.  Writes are
 bucketed by source module so cleanup can derive per-port enable/data muxes while reads are
 listed in first-seen order for index wiring.  Downstream passes format each write’s
-predicate using `write.expr.meta_cond`, mirroring the guard captured when the expression was
+predicate using `write.meta_cond`, mirroring the guard captured when the expression was
 materialised without duplicating the condition object.
 
-### `ArrayWriteExposure`
+### Value Exposures and Async Triggers
 
-```python
-@dataclass
-class ArrayWriteExposure:
-    expr: ArrayWrite
-```
+- **Values** – `ModuleExposure.values` stores bare `Expr` instances whose results must be
+  exposed because another module depends on them (`expr_externally_used(expr, True)`).  The
+  predicate for each expression is obtained from `expr.meta_cond` during cleanup.
+- **Async triggers** – `ModuleExposure.async_triggers` maps callee modules to lists of
+  `AsyncCall` expressions that contribute to trigger counters.  Cleanup sums each call’s
+  predicate via `call.meta_cond` when driving `<callee>_trigger` wires.
 
-Captures a single `ArrayWrite`.  Cleanup converts the final guard via
-`format_predicate(write.expr.meta_cond)` while dumping values and indices.
+### Finish Sites
 
-### `ArrayReadExposure`
-
-```python
-@dataclass
-class ArrayReadExposure:
-    expr: ArrayRead
-```
-
-`ArrayRead` exposures currently do not need explicit predicates (reads are free), but the
-wrapper retains the expression handle so cleanup can recover addresses and types.
-
-### `ValueExposure`
-
-```python
-@dataclass
-class ValueExposure:
-    expr: Expr
-```
-
-Records valued expressions that must surface as module outputs because they are consumed
-externally (`expr_externally_used(expr, True)`).  Predicate handling defers to
-`expr.meta_cond`, ensuring the runtime guard observed by the IR node is preserved without
-storing a duplicate `Value`.
-
-### `AsyncTriggerExposure`
-
-```python
-@dataclass
-class AsyncTriggerExposure:
-    call: AsyncCall
-```
-
-Async trigger metadata keeps the originating `AsyncCall`.  Entries are grouped per callee
-module so cleanup can build the trigger-counter increments without re-scanning expression
-trees, reusing `call.meta_cond` to recover the predicate.
+`ModuleMetadata.finish_sites` is recorded as a tuple of `Intrinsic` expressions whose opcode
+is `Intrinsic.FINISH`.  Each intrinsic already carries its predicate metadata, so downstream
+consumers simply read `expr.meta_cond` without touching auxiliary wrapper objects.
 
 **Project-specific Knowledge Required:**
 
@@ -267,8 +235,6 @@ Each FIFO port is associated with a `FIFOMetadata` instance that stores ordered 
 - `pushes` – Interactions whose expression is a `FIFOPush`.
 - `pops` – Interactions whose expression is a `FIFOPop`.
 - `record_interaction()` – Adds a new interaction to the appropriate list.
-- `remove_module(module)` – Purges all interactions produced by `module`, keeping the
-  registry consistent after regenerating a module.
 
 ### `FIFORegistry`
 

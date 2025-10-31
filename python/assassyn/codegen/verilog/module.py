@@ -5,7 +5,7 @@ from .utils import dump_type, get_sram_info
 from ...ir.module import Module, Downstream
 from ...ir.memory.sram import SRAM
 from ...ir.module.base import ModuleBase
-from ...ir.expr import Bind
+from ...ir.expr import Bind, Expr
 from ...ir.expr.intrinsic import ExternalIntrinsic
 from ...ir.const import Const
 from ...utils import namify, unwrap_operand
@@ -178,11 +178,16 @@ def generate_module_ports(dumper, node: Module) -> None:
                     f' Output(Bits({idx_type}))'
                 )
 
-    exposure_groups = {}
-    for exposure in module_metadata.exposures.values:
-        exposure_groups.setdefault(exposure.expr, []).append(exposure)
+    ordered_exposures: list[Expr] = []
+    seen_ids: set[int] = set()
+    for expr in module_metadata.exposures.values:
+        expr_id = id(expr)
+        if expr_id in seen_ids:
+            continue
+        seen_ids.add(expr_id)
+        ordered_exposures.append(expr)
 
-    for expr in exposure_groups:
+    for expr in ordered_exposures:
         render = resolve_value_exposure_render(dumper, expr)
         dumper.append_code(f'expose_{render.exposed_name} = Output({render.dtype_str})')
         dumper.append_code(f'valid_{render.exposed_name} = Output(Bits(1))')

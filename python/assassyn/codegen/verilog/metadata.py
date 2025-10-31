@@ -31,43 +31,6 @@ else:
 
 CallList = List[AsyncCall]
 ModuleList = List[Module]
-ArrayReadList = List['ArrayRead']
-ArrayWriteList = List['ArrayWrite']
-
-
-@dataclass(frozen=True)
-class ArrayWriteExposure:
-    """Exposure metadata for a single array write expression."""
-
-    expr: 'ArrayWrite'
-
-
-@dataclass(frozen=True)
-class ArrayReadExposure:
-    """Exposure metadata for an array read expression."""
-
-    expr: 'ArrayRead'
-
-
-@dataclass(frozen=True)
-class ValueExposure:
-    """Metadata describing a valued expression that must be exposed externally."""
-
-    expr: 'Expr'
-
-
-@dataclass(frozen=True)
-class AsyncTriggerExposure:
-    """Metadata describing an async call that contributes to a trigger sum."""
-
-    call: 'AsyncCall'
-
-
-@dataclass(frozen=True)
-class FinishSite:
-    """Metadata describing a FINISH intrinsic encountered in a module."""
-
-    expr: 'Intrinsic'
 
 
 @dataclass
@@ -75,16 +38,16 @@ class ArrayExposure:
     """Aggregated exposure data for a given array within a module."""
 
     array: Array
-    writes_by_module: Dict[Module, Tuple[ArrayWriteExposure, ...]] = field(default_factory=dict)
-    reads: Tuple[ArrayReadExposure, ...] = ()
+    writes_by_module: Dict[Module, Tuple['ArrayWrite', ...]] = field(default_factory=dict)
+    reads: Tuple['ArrayRead', ...] = ()
 
-    def add_write(self, module: Module, exposure: ArrayWriteExposure) -> None:
+    def add_write(self, module: Module, exposure: 'ArrayWrite') -> None:
         """Record an array write produced by *module*."""
         writes = list(self.writes_by_module.get(module, ()))
         writes.append(exposure)
         self.writes_by_module[module] = tuple(writes)
 
-    def add_read(self, exposure: ArrayReadExposure) -> None:
+    def add_read(self, exposure: 'ArrayRead') -> None:
         """Record an array read exposure."""
         self.reads = self.reads + (exposure,)
 
@@ -101,8 +64,8 @@ class ModuleExposure:
 
     def __init__(self) -> None:
         self._arrays: Dict[Array, ArrayExposure] = {}
-        self._values: List[ValueExposure] = []
-        self._async_triggers: Dict[Module, List[AsyncTriggerExposure]] = {}
+        self._values: List['Expr'] = []
+        self._async_triggers: Dict[Module, List['AsyncCall']] = {}
         self._frozen = False
 
     @property
@@ -111,14 +74,14 @@ class ModuleExposure:
         return self._arrays
 
     @property
-    def values(self) -> Tuple[ValueExposure, ...]:
+    def values(self) -> Tuple['Expr', ...]:
         """Return the value exposures that must surface as module outputs."""
         if isinstance(self._values, tuple):
             return self._values
         return tuple(self._values)
 
     @property
-    def async_triggers(self) -> Dict[Module, Tuple[AsyncTriggerExposure, ...]]:
+    def async_triggers(self) -> Dict[Module, Tuple['AsyncCall', ...]]:
         """Return async trigger exposures grouped by callee module."""
         return {
             module: tuple(entries) if not isinstance(entries, tuple) else entries
@@ -133,18 +96,14 @@ class ModuleExposure:
     ) -> None:
         """Capture an array write exposure for *array* performed by *module*."""
         self._ensure_mutable()
-        exposure = ArrayWriteExposure(
-            expr=expr,
-        )
         bucket = self._arrays.setdefault(array, ArrayExposure(array))
-        bucket.add_write(module, exposure)
+        bucket.add_write(module, expr)
 
     def record_array_read(self, array: Array, expr: 'ArrayRead') -> None:
         """Capture an array read exposure for *array*."""
         self._ensure_mutable()
-        exposure = ArrayReadExposure(expr=expr)
         bucket = self._arrays.setdefault(array, ArrayExposure(array))
-        bucket.add_read(exposure)
+        bucket.add_read(expr)
 
     def record_value(
         self,
@@ -152,11 +111,7 @@ class ModuleExposure:
     ) -> None:
         """Capture a valued expression that must be exposed externally."""
         self._ensure_mutable()
-        self._values.append(
-            ValueExposure(
-                expr=expr,
-            )
-        )
+        self._values.append(expr)
 
     def record_async_trigger(
         self,
@@ -165,10 +120,7 @@ class ModuleExposure:
     ) -> None:
         """Record an async trigger exposure for a specific callee module."""
         self._ensure_mutable()
-        entry = AsyncTriggerExposure(
-            call=call,
-        )
-        self._async_triggers.setdefault(callee, []).append(entry)
+        self._async_triggers.setdefault(callee, []).append(call)
 
     def freeze(self) -> None:
         """Prevent further mutation and canonicalise collection types."""
@@ -248,11 +200,6 @@ class FIFOMetadata:
         """Return the interactions emitted by the provided module."""
         return [entry for entry in self.iter_interactions() if entry.module is module]
 
-    def remove_module(self, module: Module) -> None:
-        """Drop all interactions that belong to the provided module."""
-        self._pushes[:] = [entry for entry in self._pushes if entry.module is not module]
-        self._pops[:] = [entry for entry in self._pops if entry.module is not module]
-
     def is_empty(self) -> bool:
         """Return True when no interactions remain for this FIFO."""
         return not self._pushes and not self._pops
@@ -304,7 +251,7 @@ class ModuleMetadata:
     calls: CallList = field(default_factory=list)
     exposures: ModuleExposure = field(default_factory=ModuleExposure)
     fifo: ModuleFIFOView = field(init=False)
-    _finish_sites: List[FinishSite] = field(init=False, default_factory=list)
+    _finish_sites: List[Intrinsic] = field(init=False, default_factory=list)
     _frozen: bool = field(init=False, default=False)
 
     def __post_init__(self) -> None:
@@ -327,7 +274,7 @@ class ModuleMetadata:
         self.fifo.register(fifo_port, interaction)
 
     @property
-    def finish_sites(self) -> Tuple[FinishSite, ...]:
+    def finish_sites(self) -> Tuple[Intrinsic, ...]:
         """Return recorded FINISH intrinsics for this module."""
         if isinstance(self._finish_sites, tuple):
             return self._finish_sites
@@ -337,11 +284,7 @@ class ModuleMetadata:
         """Record a FINISH intrinsic encountered during analysis."""
         if self._frozen:
             raise RuntimeError("ModuleMetadata is frozen; cannot record finish sites")
-        self._finish_sites.append(
-            FinishSite(
-                expr=expr,
-            )
-        )
+        self._finish_sites.append(expr)
 
     def freeze(self) -> None:
         """Prevent further mutation of metadata collections."""
