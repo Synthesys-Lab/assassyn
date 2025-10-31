@@ -14,7 +14,8 @@ When you are asked to make a plan, such a plan should follow these rules:
 1. Make intermediate commits to have your half-way result commited.
    - If you are screwed you can also roll back more easily.
    - You should CAREFULLY consider, which intermediate commit should be checked, and which need not.
-     - For example, when adding new test cases for a new feature, you should run the test first to make sure it fails as expected. Then, you should commit with `--no-verify`.
+     - For example, when adding new test cases for a new feature, you should run the test first to make sure it fails as expected.
+       Then, you should commit with `--no-verify`.
      - However, when finalizing a plan, you should always commit with pre-commit check.
 2. This plan should be more detailed, and it is better to gather everything in this plan in advance:
    - DO NOT SAY: Find xxx in related files and make modifications.
