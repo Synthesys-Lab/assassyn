@@ -8,7 +8,7 @@ handoff).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterator, List, Sequence, TYPE_CHECKING, Tuple, cast
+from typing import Dict, Iterator, List, Sequence, TYPE_CHECKING, Tuple
 
 if TYPE_CHECKING:
     from ...ir.array import Array
@@ -17,17 +17,11 @@ if TYPE_CHECKING:
     from ...ir.module import Module, Port
     from ...ir.value import Value
 else:
-    Array = Any  # type: ignore
-    ArrayRead = Any  # type: ignore
-    ArrayWrite = Any  # type: ignore
-    AsyncCall = Any  # type: ignore
-    Expr = Any  # type: ignore
-    FIFOPop = Any  # type: ignore
-    FIFOPush = Any  # type: ignore
-    Intrinsic = Any  # type: ignore
-    Module = Any  # type: ignore
-    Port = Any  # type: ignore
-    Value = Any  # type: ignore
+    from ...ir.array import Array  # type: ignore
+    from ...ir.expr import ArrayRead, ArrayWrite, AsyncCall, Expr, FIFOPop, FIFOPush  # type: ignore
+    from ...ir.expr.intrinsic import Intrinsic  # type: ignore
+    from ...ir.module import Module, Port  # type: ignore
+    from ...ir.value import Value  # type: ignore
 
 CallList = List[AsyncCall]
 ModuleList = List[Module]
@@ -38,16 +32,16 @@ class ArrayExposure:
     """Aggregated exposure data for a given array within a module."""
 
     array: Array
-    writes_by_module: Dict[Module, Tuple['ArrayWrite', ...]] = field(default_factory=dict)
-    reads: Tuple['ArrayRead', ...] = ()
+    writes_by_module: Dict[Module, Tuple[ArrayWrite, ...]] = field(default_factory=dict)
+    reads: Tuple[ArrayRead, ...] = ()
 
-    def add_write(self, module: Module, exposure: 'ArrayWrite') -> None:
+    def add_write(self, module: Module, exposure: ArrayWrite) -> None:
         """Record an array write produced by *module*."""
         writes = list(self.writes_by_module.get(module, ()))
         writes.append(exposure)
         self.writes_by_module[module] = tuple(writes)
 
-    def add_read(self, exposure: 'ArrayRead') -> None:
+    def add_read(self, exposure: ArrayRead) -> None:
         """Record an array read exposure."""
         self.reads = self.reads + (exposure,)
 
@@ -64,8 +58,8 @@ class ModuleExposure:
 
     def __init__(self) -> None:
         self._arrays: Dict[Array, ArrayExposure] = {}
-        self._values: List['Expr'] = []
-        self._async_triggers: Dict[Module, List['AsyncCall']] = {}
+        self._values: List[Expr] = []
+        self._async_triggers: Dict[Module, List[AsyncCall]] = {}
         self._frozen = False
 
     @property
@@ -74,14 +68,14 @@ class ModuleExposure:
         return self._arrays
 
     @property
-    def values(self) -> Tuple['Expr', ...]:
+    def values(self) -> Tuple[Expr, ...]:
         """Return the value exposures that must surface as module outputs."""
         if isinstance(self._values, tuple):
             return self._values
         return tuple(self._values)
 
     @property
-    def async_triggers(self) -> Dict[Module, Tuple['AsyncCall', ...]]:
+    def async_triggers(self) -> Dict[Module, Tuple[AsyncCall, ...]]:
         """Return async trigger exposures grouped by callee module."""
         return {
             module: tuple(entries) if not isinstance(entries, tuple) else entries
@@ -92,14 +86,14 @@ class ModuleExposure:
         self,
         array: Array,
         module: Module,
-        expr: 'ArrayWrite',
+        expr: ArrayWrite,
     ) -> None:
         """Capture an array write exposure for *array* performed by *module*."""
         self._ensure_mutable()
         bucket = self._arrays.setdefault(array, ArrayExposure(array))
         bucket.add_write(module, expr)
 
-    def record_array_read(self, array: Array, expr: 'ArrayRead') -> None:
+    def record_array_read(self, array: Array, expr: ArrayRead) -> None:
         """Capture an array read exposure for *array*."""
         self._ensure_mutable()
         bucket = self._arrays.setdefault(array, ArrayExposure(array))
@@ -107,7 +101,7 @@ class ModuleExposure:
 
     def record_value(
         self,
-        expr: 'Expr',
+        expr: Expr,
     ) -> None:
         """Capture a valued expression that must be exposed externally."""
         self._ensure_mutable()
@@ -116,7 +110,7 @@ class ModuleExposure:
     def record_async_trigger(
         self,
         callee: Module,
-        call: 'AsyncCall',
+        call: AsyncCall,
     ) -> None:
         """Record an async trigger exposure for a specific callee module."""
         self._ensure_mutable()
@@ -183,12 +177,12 @@ class FIFOMetadata:
     def record_interaction(self, expr: FIFOPush | FIFOPop) -> None:
         """Append an interaction to the appropriate push/pop list."""
         self._ensure_mutable()
-        if hasattr(type(expr), "FIFO_PUSH"):
+        if isinstance(expr, FIFOPush):
             assert not isinstance(self._pushes, tuple)
-            self._pushes.append(cast(FIFOPush, expr))
-        elif hasattr(type(expr), "FIFO_POP"):
+            self._pushes.append(expr)
+        elif isinstance(expr, FIFOPop):
             assert not isinstance(self._pops, tuple)
-            self._pops.append(cast(FIFOPop, expr))
+            self._pops.append(expr)
         else:
             raise TypeError(f"Unsupported FIFO expression: {expr!r}")
 
@@ -263,12 +257,12 @@ class ModuleFIFOView:
         bucket = self._interactions_by_port.setdefault(fifo_port, [])
         assert not isinstance(bucket, tuple)
         bucket.append(expr)
-        if hasattr(type(expr), "FIFO_PUSH"):
+        if isinstance(expr, FIFOPush):
             assert not isinstance(self._pushes, tuple)
-            self._pushes.append(cast(FIFOPush, expr))
-        elif hasattr(type(expr), "FIFO_POP"):
+            self._pushes.append(expr)
+        elif isinstance(expr, FIFOPop):
             assert not isinstance(self._pops, tuple)
-            self._pops.append(cast(FIFOPop, expr))
+            self._pops.append(expr)
         else:
             raise TypeError(f"Unsupported FIFO expression: {expr!r}")
 

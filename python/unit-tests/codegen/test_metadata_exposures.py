@@ -24,7 +24,7 @@ from assassyn.codegen.verilog.metadata import (  # type: ignore
     ModuleExposure,
     ModuleMetadata,
 )
-from assassyn.ir.expr.call import AsyncCall  # type: ignore
+from assassyn.ir.expr.call import AsyncCall, FIFOPush  # type: ignore
 from assassyn.ir.expr.intrinsic import Intrinsic  # type: ignore
 
 
@@ -151,13 +151,20 @@ def test_metadata_freeze_stabilizes_views():
 
     fifo_port = object()
 
-    class DummyPush:
-        FIFO_PUSH = True
+    class DummyPush(FIFOPush):  # type: ignore[misc]
+        """Minimal FIFO push stub that satisfies isinstance checks without builder context."""
 
         def __init__(self, fifo):
-            self.fifo = fifo
+            # Deliberately skip Expr.__init__ to avoid builder dependencies.
+            self.opcode = FIFOPush.FIFO_PUSH
+            self._operands = [fifo, None]
+            self.users = []
+            self.name = None
+            self.loc = None
             self.parent = dummy_module
-            self.meta_cond = None
+            self._meta_cond = None  # Align with Expr.meta_cond property
+            self.bind = None
+            self.fifo_depth = None
 
     push_expr = DummyPush(fifo_port)
     registry.record_push(dummy_module, push_expr, None)
