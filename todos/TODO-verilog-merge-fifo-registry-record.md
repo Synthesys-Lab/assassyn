@@ -12,7 +12,7 @@ Consolidate `FIFORegistry.record_push` and `FIFORegistry.record_pop` in `python/
 
 3. **Implement the shared interaction-recording pathway**
    - Modify `python/assassyn/codegen/verilog/metadata.py`:
-     - Add the new `record_interaction` method that infers `is_push` from the expression type, constructs the `FIFOInteraction`, forwards it to `FIFOMetadata.record_interaction`, and returns the shared interaction object.
+    - Add the new `record_interaction` method that infers the direction from the expression type, forwards the raw expression to `FIFOMetadata.record_interaction`, and returns that shared expression object.
      - Update `record_push` / `record_pop` to delegate to `record_interaction`, keeping their signatures for existing callers.
      - Tighten docstrings/comments where helpful to explain the unified flow.
    - Update `python/assassyn/codegen/verilog/fifo_analysis.py` so the analysis visitor calls the new helper instead of the duplicated pair, ensuring the refactor exercises the merged code path.

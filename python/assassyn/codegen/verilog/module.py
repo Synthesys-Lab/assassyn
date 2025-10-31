@@ -28,9 +28,9 @@ def generate_module_ports(dumper, node: Module) -> None:
     fifo_metadata = metadata.fifo
     push_entries = fifo_metadata.pushes
     pop_entries = fifo_metadata.pops
-    pushes = [entry.expr for entry in push_entries]
+    pushes = list(push_entries)
     calls = module_metadata.calls
-    pops = [entry.expr for entry in pop_entries]
+    pops = list(pop_entries)
 
     dumper.append_code('clk = Clock()')
     dumper.append_code('rst = Reset()')

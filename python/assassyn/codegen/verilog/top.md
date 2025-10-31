@@ -72,7 +72,7 @@ This function generates the complete top-level Verilog module that serves as the
    - **Memory Connections**: SRAM interface signal routing
 
 8. **Global Finish Signal**: Collects finish signals from all modules using metadata-based detection (O(1) lookup via `module_metadata`), avoiding redundant expression walking, and creates global finish. See [metadata module](/python/assassyn/codegen/verilog/metadata.md) for implementation details.
-  Additionally, FIFO depth selection no longer walks expressions; it computes depths from the predicated push records stored in `module_metadata.fifo.pushes` (the registry-backed `FIFOInteraction` objects captured during the FIFO analysis pre-pass).
+  Additionally, FIFO depth selection no longer walks expressions; it computes depths from the predicated push expressions stored in `module_metadata.fifo.pushes` (the registry-backed `FIFOPush` handles captured during the FIFO analysis pre-pass).
 
 9. **Unused Port Tie-off**: Ties off unused FIFO push ports to prevent floating signals
 

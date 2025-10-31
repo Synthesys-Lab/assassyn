@@ -184,8 +184,7 @@ def generate_top_harness(dumper: CIRCTDumper):
         metadata = dumper.module_metadata.get(module)
         if not metadata:
             continue
-        for push_entry in metadata.fifo.pushes:
-            push = push_entry.expr
+        for push in metadata.fifo.pushes:
             fifo_port = push.fifo
             owner = fifo_port.module
             if owner not in module_fifo_depths:
@@ -386,15 +385,14 @@ def generate_top_harness(dumper: CIRCTDumper):
 
         # Use metadata instead of walking expressions again
         metadata = dumper.module_metadata.get(module)
-        pushes = metadata.fifo.pushes if metadata else []
+        pushes = metadata.fifo.pushes if metadata else ()
         calls = metadata.calls if metadata else []
 
-        for entry in pushes:
-            p = entry.expr
+        for push in pushes:
             # Store the actual Port object that is the target of a push
-            all_driven_fifo_ports.add(p.fifo)
+            all_driven_fifo_ports.add(push.fifo)
 
-        unique_push_targets = {(entry.expr.fifo.module, entry.expr.fifo) for entry in pushes}
+        unique_push_targets = {(push.fifo.module, push.fifo) for push in pushes}
         unique_call_targets = {c.bind.callee for c in calls}
 
         for (callee_mod, callee_port) in unique_push_targets:
@@ -428,9 +426,7 @@ def generate_top_harness(dumper: CIRCTDumper):
                 f"{mod_name}_trigger_counter_pop_ready.assign(inst_{mod_name}.executed)"
             )
             metadata = dumper.module_metadata.get(module)
-            popped_fifos = {
-                entry.expr.fifo for entry in (metadata.fifo.pops if metadata else [])
-            }
+            popped_fifos = {pop.fifo for pop in (metadata.fifo.pops if metadata else ())}
             for port in module_ports:
                 if port in popped_fifos:
                     connection_lines.append(

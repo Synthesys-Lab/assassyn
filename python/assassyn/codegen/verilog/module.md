@@ -37,7 +37,7 @@ It then performs the following steps:
    - Direct externals (`node.externals`) still emit `<producer>_<value>` and `<producer>_<value>_valid` inputs for expressions that originate elsewhere (skipping bindings, constants, and the `ExternalIntrinsic` handles themselves). The implementation now resolves the producer by first checking whether `expr.parent` is already a module—reflecting the block-free IR—before falling back to legacy `.module` lookups.
 
 5. **FIFO Handshake Ports**:
-   - For pipeline modules, declares FIFO inputs (`port`, `port_valid`) and optional `port_pop_ready` outputs when the module pops from the FIFO, determined via the registry-backed `metadata.fifo.pops` view (`{entry.expr.fifo for entry in metadata.fifo.pops}`).
+  - For pipeline modules, declares FIFO inputs (`port`, `port_valid`) and optional `port_pop_ready` outputs when the module pops from the FIFO, determined via the registry-backed `metadata.fifo.pops` view (`{expr.fifo for expr in metadata.fifo.pops}`).
    - Adds ready inputs for FIFO pushes and trigger counter deltas using push/call metadata collected during system analysis.
 
 6. **Output Handshakes**: Declares `<callee>_<fifo>_push_valid/data` outputs and `<callee>_trigger` outputs for each async call target, relying on system analysis to omit dormant integrations.

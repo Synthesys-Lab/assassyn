@@ -13,7 +13,7 @@ The metadata module defines dataclasses that hold information about modules disc
 Key responsibilities:
 
 1. Instantiate `ModuleMetadata` for every visited module and attach a `ModuleFIFOView` pointing at the shared registry.
-2. Record every `FIFOPush`/`FIFOPop` interaction by constructing `FIFOInteraction` entries shared between the registry and the module view, preserving the original predicate `Value` captured in `expr.meta_cond`.
+2. Record every `FIFOPush`/`FIFOPop` interaction by storing the raw expressions in both the shared registry and the per-module view, preserving the original predicate `Value` captured in `expr.meta_cond`.
 
 ## Exposed Interfaces
 
@@ -95,10 +95,10 @@ snapshots.
 
 1. `FIFOAnalysisVisitor` ensures a `ModuleMetadata` instance exists for the module,
    clearing any stale FIFO interactions and wiring the metadata to the shared registry.
-2. The visitor reads each interaction’s predicate carry (`expr.meta_cond`) so the recorded
-   `FIFOInteraction` entries retain the original `Value` guard captured at analysis time.
-3. Each fifo push/pop encountered during the pre-pass creates a shared `FIFOInteraction`,
-   adds it to the registry, and registers it with the module’s `ModuleFIFOView`.
+2. The visitor reads each interaction’s predicate carry (`expr.meta_cond`) so the stored
+   expressions retain the original `Value` guard captured at analysis time.
+3. Each fifo push/pop encountered during the pre-pass stores the raw expression in the
+   registry and registers it with the module’s `ModuleFIFOView`.
 4. When valued expressions require exposure (array writes/reads, async triggers, general
    outputs) or FINISH/async-call nodes are encountered, the analysis visitor records them
    directly in `ModuleMetadata`, trusting the expressions’ `meta_cond` metadata to capture
@@ -193,41 +193,20 @@ class ModuleFIFOView:
 ```
 
 `ModuleFIFOView` keeps track of every FIFO port a module touched and provides filtered
-access to the shared interactions.  It is the authoritative source for per-module FIFO
-sets:
+access to the registry-owned expressions.  It is the authoritative source for per-module
+FIFO sets:
 
 - `ports` – Iterable of FIFO ports the module interacted with (preserving insertion order).
-- `pushes` / `pops` – Lists of `FIFOInteraction` objects produced by the module (references
-  to the registry-owned entries).
-- `interactions_for(port)` – Returns the interactions for `port` that originate from the
-  owning module, letting consumers wire ready/valid signals without re-filtering the
-  registry.
-- `iter_channels()` – Iterates `(Port, FIFOMetadata, Sequence[FIFOInteraction])` triples,
-  exposing the registry-owned channel metadata alongside the module’s filtered
-  interactions without relying on registry-maintained module maps.
-
-### `FIFOInteraction`
-
-```python
-@dataclass(frozen=True)
-class FIFOInteraction:
-    module: Module
-    expr: Union[FIFOPush, FIFOPop]
-    predicate: Value | None
-
-    @property
-    def is_push(self) -> bool: ...
-
-    @property
-    def is_pop(self) -> bool: ...
-```
-
-This unified, immutable record replaces the redundant `FIFOPushMetadata` /
-`FIFOPopMetadata` wrappers.  The interaction direction is derived from `expr`, keeping a
-single source of truth for push/pop classification.  The record retains the final predicate
-carry (`predicate`), mirroring the IR snapshot so later stages can dump predicates without
-re-walking expressions.  Because the dataclass is frozen, downstream consumers cannot
-accidentally mutate the stored snapshots captured during analysis.
+- `pushes` / `pops` – Lists of `FIFOPush` / `FIFOPop` expressions produced by the module
+  (references to the registry-owned entries).
+- `interactions_for(port)` – Returns the expressions recorded for `port` that originate
+  from the owning module, letting consumers wire ready/valid signals without re-filtering
+  the registry.
+- `iter_channels()` – Iterates `(Port, FIFOMetadata, Sequence[Expr])` triples, exposing the
+  registry-owned channel metadata alongside the module’s filtered expressions without
+  relying on registry-maintained module maps.  Direction is recovered via
+  `isinstance(expr, FIFOPush)` / `FIFOPop`, predicates via `expr.meta_cond`, and producer
+  modules via the module metadata that owns the view (or `expr.parent` as a fallback).
 
 ### `FIFOMetadata`
 
@@ -237,11 +216,12 @@ class FIFOMetadata:
 ```
 
 Each FIFO port is associated with a `FIFOMetadata` instance that stores ordered lists of
-`FIFOInteraction` objects:
+raw expressions:
 
-- `pushes` – Interactions whose expression is a `FIFOPush`.
-- `pops` – Interactions whose expression is a `FIFOPop`.
-- `record_interaction()` – Adds a new interaction to the appropriate list.
+- `pushes` – Predicated `FIFOPush` expressions that drive the FIFO.
+- `pops` – Predicated `FIFOPop` expressions that consume from the FIFO.
+- `record_interaction()` – Adds the expression to the appropriate list, preserving
+  encounter order so downstream muxing logic remains deterministic.
 
 ### `FIFORegistry`
 
@@ -252,12 +232,12 @@ class FIFORegistry:
 
 The registry is the single owner of FIFO interaction data:
 
-- `record_interaction()` – Normalises both push and pop events into a shared
-  `FIFOInteraction`, infers the direction, and appends it to the port’s `FIFOMetadata`.
+- `record_interaction()` – Normalises both push and pop events by appending the raw
+  expression to the port’s `FIFOMetadata`, returning the same expression for module-level
+  bookkeeping.
 - `record_push()` / `record_pop()` – Thin compatibility wrappers that delegate to
   `record_interaction()` while retaining the original call sites in analysis code.
 - `metadata_for(port)` – Fetch (or lazily create) the `FIFOMetadata` container for `port`.
 
-Because both the module-level view and downstream consumers reference the same
-`FIFOInteraction` objects, predicates and expression handles stay perfectly in sync without
-two indices drifting apart.
+Because both the module-level view and downstream consumers reference the same expression
+objects, predicates and handles stay perfectly in sync without two indices drifting apart.

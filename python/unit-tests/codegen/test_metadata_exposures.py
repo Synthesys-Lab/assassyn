@@ -107,11 +107,11 @@ def test_metadata_exposures_capture():
     assert metadata_pushes, "FIFO push metadata should be recorded"
     metadata_pops = dumper_metadata.fifo.pops
     assert metadata_pops, "FIFO pop metadata should be recorded"
-    for interaction in metadata_pushes + metadata_pops:
-        assert interaction.predicate is not None
+    for expr in metadata_pushes + metadata_pops:
+        assert getattr(expr, "meta_cond", None) is not None
 
     # Verify FIFO registry mirrors module metadata
-    fifo_ports = {entry.expr.fifo for entry in metadata_pushes + metadata_pops}
+    fifo_ports = {expr.fifo for expr in metadata_pushes + metadata_pops}
     for fifo_port in fifo_ports:
         channel = fifo_registry.metadata_for(fifo_port)
         assert channel.pushes or channel.pops

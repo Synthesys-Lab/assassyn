@@ -3,7 +3,7 @@
 from collections import defaultdict
 from typing import TYPE_CHECKING, Callable, Dict, List, NamedTuple, Optional, Sequence, TypeVar
 
-from .metadata import ArrayExposure, FIFOInteraction
+from .metadata import ArrayExposure
 from .utils import dump_type, dump_type_cast, get_sram_info
 
 from ...ir.module import Downstream
@@ -335,17 +335,17 @@ def cleanup_post_generation(dumper):
 
     for fifo_port, _, interactions in module_metadata.fifo.iter_channels():
         fifo_name = dumper.dump_rval(fifo_port, False)
-        local_pushes = [entry for entry in interactions if entry.is_push]
-        local_pops = [entry for entry in interactions if entry.is_pop]
+        local_pushes = [entry for entry in interactions if hasattr(type(entry), "FIFO_PUSH")]
+        local_pops = [entry for entry in interactions if hasattr(type(entry), "FIFO_POP")]
 
         if local_pushes:
             fifo_default = f"{dump_type(fifo_port.dtype)}(0)"
 
-            def render_fifo_predicate(entry: FIFOInteraction) -> str:
-                return dumper.dump_rval(entry.predicate, False)
+            def render_fifo_predicate(entry) -> str:
+                return dumper.dump_rval(getattr(entry, "meta_cond", None), False)
 
-            def render_fifo_value(entry: FIFOInteraction) -> str:
-                return dumper.dump_rval(entry.expr.val, False)
+            def render_fifo_value(entry) -> str:
+                return dumper.dump_rval(entry.val, False)
 
             def aggregate_fifo(predicates: Sequence[str]) -> str:
                 wrapped = [f"({term})" for term in predicates]
@@ -373,14 +373,14 @@ def cleanup_post_generation(dumper):
 
         if local_pops:
             pop_predicates = [
-                f'({dumper.dump_rval(entry.predicate, False)})'
+                f'({dumper.dump_rval(getattr(entry, "meta_cond", None), False)})'
                 for entry in local_pops
             ]
             final_pop_condition = _format_reduce_or(
                 pop_predicates,
                 default_literal="Bits(1)(0)",
             )
-            dumper.append_code(f'# {local_pops[0].expr}')
+            dumper.append_code(f'# {local_pops[0]}')
             dumper.append_code(
                 f"self.{fifo_name}_pop_ready = executed_wire & ({final_pop_condition})"
             )

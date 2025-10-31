@@ -23,6 +23,8 @@ from assassyn.codegen.verilog.cleanup import (  # type: ignore
 )
 from assassyn.codegen.verilog.design import CIRCTDumper  # type: ignore
 from assassyn.codegen.verilog.fifo_analysis import collect_fifo_metadata  # type: ignore
+from assassyn.ir.expr.call import FIFOPush
+from assassyn.ir.expr.expr import FIFOPop
 from assassyn.utils import namify  # type: ignore
 
 
@@ -96,10 +98,10 @@ def _render_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
     fifo_name = None
     fifo_module_prefix = None
     for fifo_port, _, interactions in module_entry.fifo.iter_channels():
-        pushes = [entry for entry in interactions if entry.is_push]
-        pops = [entry for entry in interactions if entry.is_pop]
-        assert all(not entry.is_pop for entry in pushes)
-        assert all(entry.is_pop for entry in pops)
+        pushes = [entry for entry in interactions if isinstance(entry, FIFOPush)]
+        pops = [entry for entry in interactions if isinstance(entry, FIFOPop)]
+        assert all(isinstance(entry, FIFOPush) for entry in pushes)
+        assert all(isinstance(entry, FIFOPop) for entry in pops)
         if pushes:
             fifo_name = dumper.dump_rval(fifo_port, False)
             fifo_module_prefix = namify(fifo_port.module.name)
@@ -165,10 +167,10 @@ def _render_single_writer_cleanup_lines() -> Tuple[List[str], Dict[str, str]]:
     port_idx = 0 if array_meta is None else array_meta.write_ports.get(cleanup_module, 0)
     fifo_port = None
     for candidate, _, interactions in module_entry.fifo.iter_channels():
-        pushes = [entry for entry in interactions if entry.is_push]
-        pops = [entry for entry in interactions if entry.is_pop]
-        assert all(not entry.is_pop for entry in pushes)
-        assert all(entry.is_pop for entry in pops)
+        pushes = [entry for entry in interactions if isinstance(entry, FIFOPush)]
+        pops = [entry for entry in interactions if isinstance(entry, FIFOPop)]
+        assert all(isinstance(entry, FIFOPush) for entry in pushes)
+        assert all(isinstance(entry, FIFOPop) for entry in pops)
         if pushes:
             fifo_port = candidate
             break

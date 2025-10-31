@@ -63,6 +63,8 @@ def collect_fifo_metadata(
     for metadata in module_metadata.values():
         metadata.freeze()
 
+    registry.freeze()
+
     return module_metadata, registry
 
 

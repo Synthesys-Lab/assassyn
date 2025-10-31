@@ -8,7 +8,7 @@ handoff).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterator, List, Sequence, TYPE_CHECKING, Tuple
+from typing import Any, Dict, Iterator, List, Sequence, TYPE_CHECKING, Tuple, cast
 
 if TYPE_CHECKING:
     from ...ir.array import Array
@@ -31,15 +31,6 @@ else:
 
 CallList = List[AsyncCall]
 ModuleList = List[Module]
-
-
-def _is_fifo_push(expr: FIFOPush | FIFOPop) -> bool:
-    """Return True when *expr* represents a FIFO push."""
-    if hasattr(type(expr), "FIFO_PUSH"):
-        return True
-    if hasattr(type(expr), "FIFO_POP"):
-        return False
-    raise TypeError(f"Unsupported FIFO interaction expression: {expr!r}")
 
 
 @dataclass
@@ -166,61 +157,68 @@ class ArrayMetadata:
     users: ModuleList = field(default_factory=list)
 
 
-@dataclass(frozen=True)
-class FIFOInteraction:
-    """Single FIFO interaction captured during code generation."""
-
-    module: Module
-    expr: FIFOPush | FIFOPop
-    predicate: Value | None
-
-    @property
-    def is_push(self) -> bool:
-        """Return True when this interaction represents a FIFO push."""
-        return _is_fifo_push(self.expr)
-
-    @property
-    def is_pop(self) -> bool:
-        """Return True when this interaction represents a FIFO pop."""
-        return not self.is_push
-
-
 class FIFOMetadata:
     """Per-FIFO metadata owned by the global registry."""
 
     def __init__(self) -> None:
-        self._pushes: List[FIFOInteraction] = []
-        self._pops: List[FIFOInteraction] = []
+        self._pushes: list[FIFOPush] | tuple[FIFOPush, ...] = []
+        self._pops: list[FIFOPop] | tuple[FIFOPop, ...] = []
+        self._frozen = False
 
     @property
-    def pushes(self) -> List[FIFOInteraction]:
+    def pushes(self) -> Tuple[FIFOPush, ...]:
         """Return FIFO push interactions for this channel."""
-        return self._pushes
+        if isinstance(self._pushes, tuple):
+            return self._pushes
+        return tuple(self._pushes)
 
     @property
-    def pops(self) -> List[FIFOInteraction]:
+    def pops(self) -> Tuple[FIFOPop, ...]:
         """Return FIFO pop interactions for this channel."""
-        return self._pops
+        if isinstance(self._pops, tuple):
+            return self._pops
+        return tuple(self._pops)
 
-    def record_interaction(self, interaction: FIFOInteraction) -> None:
+    def record_interaction(self, expr: FIFOPush | FIFOPop) -> None:
         """Append an interaction to the appropriate push/pop list."""
-        if interaction.is_push:
-            self._pushes.append(interaction)
+        self._ensure_mutable()
+        if hasattr(type(expr), "FIFO_PUSH"):
+            assert not isinstance(self._pushes, tuple)
+            self._pushes.append(cast(FIFOPush, expr))
+        elif hasattr(type(expr), "FIFO_POP"):
+            assert not isinstance(self._pops, tuple)
+            self._pops.append(cast(FIFOPop, expr))
         else:
-            self._pops.append(interaction)
+            raise TypeError(f"Unsupported FIFO expression: {expr!r}")
 
-    def iter_interactions(self) -> Iterator[FIFOInteraction]:
+    def iter_interactions(self) -> Iterator[FIFOPush | FIFOPop]:
         """Yield every interaction associated with this FIFO channel."""
-        yield from self._pushes
-        yield from self._pops
+        yield from self.pushes
+        yield from self.pops
 
-    def interactions_for_module(self, module: Module) -> List[FIFOInteraction]:
+    def interactions_for_module(self, module: Module) -> Tuple[FIFOPush | FIFOPop, ...]:
         """Return the interactions emitted by the provided module."""
-        return [entry for entry in self.iter_interactions() if entry.module is module]
+        return tuple(
+            expr for expr in self.iter_interactions() if getattr(expr, "parent", None) is module
+        )
 
     def is_empty(self) -> bool:
         """Return True when no interactions remain for this FIFO."""
-        return not self._pushes and not self._pops
+        return not self.pushes and not self.pops
+
+    def freeze(self) -> None:
+        """Prevent further mutation and canonicalise collection types."""
+        if self._frozen:
+            return
+        if not isinstance(self._pushes, tuple):
+            self._pushes = tuple(self._pushes)
+        if not isinstance(self._pops, tuple):
+            self._pops = tuple(self._pops)
+        self._frozen = True
+
+    def _ensure_mutable(self) -> None:
+        if self._frozen:
+            raise RuntimeError("FIFOMetadata is frozen; cannot record new interactions")
 
 
 class ModuleFIFOView:
@@ -230,34 +228,76 @@ class ModuleFIFOView:
         self._module = module
         self._registry = registry
         self._ports: Dict[Port, None] = {}
-        self._interactions_by_port: Dict[Port, List[FIFOInteraction]] = {}
-        self.pushes: List[FIFOInteraction] = []
-        self.pops: List[FIFOInteraction] = []
+        self._interactions_by_port: Dict[
+            Port, list[FIFOPush | FIFOPop] | tuple[FIFOPush | FIFOPop, ...]
+        ] = {}
+        self._pushes: list[FIFOPush] | tuple[FIFOPush, ...] = []
+        self._pops: list[FIFOPop] | tuple[FIFOPop, ...] = []
+        self._frozen = False
 
     @property
     def ports(self) -> Sequence[Port]:
         """Return the FIFO ports touched by the owning module."""
         return tuple(self._ports)
 
-    def register(self, fifo_port: Port, interaction: FIFOInteraction) -> None:
+    @property
+    def pushes(self) -> Tuple[FIFOPush, ...]:
+        """Return the FIFO pushes recorded for this module."""
+        if isinstance(self._pushes, tuple):
+            return self._pushes
+        return tuple(self._pushes)
+
+    @property
+    def pops(self) -> Tuple[FIFOPop, ...]:
+        """Return the FIFO pops recorded for this module."""
+        if isinstance(self._pops, tuple):
+            return self._pops
+        return tuple(self._pops)
+
+    def register(self, fifo_port: Port, expr: FIFOPush | FIFOPop) -> None:
         """Record a FIFO interaction for the owning module."""
+        self._ensure_mutable()
         self._ports.setdefault(fifo_port, None)
-        self._interactions_by_port.setdefault(fifo_port, []).append(interaction)
-        if interaction.is_push:
-            self.pushes.append(interaction)
+        bucket = self._interactions_by_port.setdefault(fifo_port, [])
+        assert not isinstance(bucket, tuple)
+        bucket.append(expr)
+        if hasattr(type(expr), "FIFO_PUSH"):
+            assert not isinstance(self._pushes, tuple)
+            self._pushes.append(cast(FIFOPush, expr))
+        elif hasattr(type(expr), "FIFO_POP"):
+            assert not isinstance(self._pops, tuple)
+            self._pops.append(cast(FIFOPop, expr))
         else:
-            self.pops.append(interaction)
+            raise TypeError(f"Unsupported FIFO expression: {expr!r}")
 
-    def interactions_for(self, fifo_port: Port) -> List[FIFOInteraction]:
+    def interactions_for(self, fifo_port: Port) -> Tuple[FIFOPush | FIFOPop, ...]:
         """Fetch the module's interactions associated with the given FIFO port."""
-        return list(self._interactions_by_port.get(fifo_port, ()))
+        interactions = self._interactions_by_port.get(fifo_port, ())
+        return tuple(interactions)
 
-    def iter_channels(self) -> Iterator[tuple[Port, FIFOMetadata, Sequence[FIFOInteraction]]]:
+    def iter_channels(self) -> Iterator[tuple[Port, FIFOMetadata, Tuple[FIFOPush | FIFOPop, ...]]]:
         """Yield `(fifo_port, metadata, interactions)` triples for the module."""
         for fifo_port in self._ports:
             metadata = self._registry.metadata_for(fifo_port)
-            interactions = self._interactions_by_port.get(fifo_port, [])
+            interactions = self._interactions_by_port.get(fifo_port, ())
             yield fifo_port, metadata, tuple(interactions)
+
+    def freeze(self) -> None:
+        """Freeze stored FIFO expressions to prevent further mutation."""
+        if self._frozen:
+            return
+        if not isinstance(self._pushes, tuple):
+            self._pushes = tuple(self._pushes)
+        if not isinstance(self._pops, tuple):
+            self._pops = tuple(self._pops)
+        for port, interactions in list(self._interactions_by_port.items()):
+            if not isinstance(interactions, tuple):
+                self._interactions_by_port[port] = tuple(interactions)
+        self._frozen = True
+
+    def _ensure_mutable(self) -> None:
+        if self._frozen:
+            raise RuntimeError("ModuleFIFOView is frozen; cannot record new interactions")
 
 
 @dataclass
@@ -278,18 +318,20 @@ class ModuleMetadata:
         self._frozen = False
 
     @property
-    def pushes(self) -> List[FIFOPush]:
+    def pushes(self) -> Tuple[FIFOPush, ...]:
         """Expose FIFO push expressions recorded for this module."""
-        return [entry.expr for entry in self.fifo.pushes]
+        return self.fifo.pushes
 
     @property
-    def pops(self) -> List[FIFOPop]:
+    def pops(self) -> Tuple[FIFOPop, ...]:
         """Expose FIFO pop expressions recorded for this module."""
-        return [entry.expr for entry in self.fifo.pops]
+        return self.fifo.pops
 
-    def record_fifo_interaction(self, fifo_port: Port, interaction: FIFOInteraction) -> None:
+    def record_fifo_interaction(self, fifo_port: Port, expr: FIFOPush | FIFOPop) -> None:
         """Track an interaction produced by this module on the given FIFO port."""
-        self.fifo.register(fifo_port, interaction)
+        if self._frozen:
+            raise RuntimeError("ModuleMetadata is frozen; cannot record FIFO interactions")
+        self.fifo.register(fifo_port, expr)
 
     @property
     def finish_sites(self) -> Tuple[Intrinsic, ...]:
@@ -309,6 +351,7 @@ class ModuleMetadata:
         if self._frozen:
             return
         self.exposures.freeze()
+        self.fifo.freeze()
         if not isinstance(self._finish_sites, tuple):
             self._finish_sites = tuple(self._finish_sites)
         self._frozen = True
@@ -330,35 +373,35 @@ class FIFORegistry:
 
     def record_interaction(
         self,
-        module: Module,
+        _module: Module,
         expr: FIFOPush | FIFOPop,
-        predicate: Value | None,
-    ) -> FIFOInteraction:
+        _predicate: Value | None,
+    ) -> FIFOPush | FIFOPop:
         """Record a FIFO interaction driven by `module`."""
         fifo_port = expr.fifo
-        interaction = FIFOInteraction(
-            module=module,
-            expr=expr,
-            predicate=predicate,
-        )
         metadata = self.metadata_for(fifo_port)
-        metadata.record_interaction(interaction)
-        return interaction
+        metadata.record_interaction(expr)
+        return expr
 
     def record_push(
         self,
-        module: Module,
+        _module: Module,
         expr: FIFOPush,
         predicate: Value | None,
-    ) -> FIFOInteraction:
+    ) -> FIFOPush:
         """Record a FIFO push performed by `module`."""
-        return self.record_interaction(module, expr, predicate)
+        return self.record_interaction(_module, expr, predicate)
 
     def record_pop(
         self,
-        module: Module,
+        _module: Module,
         expr: FIFOPop,
         predicate: Value | None,
-    ) -> FIFOInteraction:
+    ) -> FIFOPop:
         """Record a FIFO pop performed by `module`."""
-        return self.record_interaction(module, expr, predicate)
+        return self.record_interaction(_module, expr, predicate)
+
+    def freeze(self) -> None:
+        """Freeze all FIFO metadata managed by the registry."""
+        for metadata in self._metadata_by_fifo.values():
+            metadata.freeze()

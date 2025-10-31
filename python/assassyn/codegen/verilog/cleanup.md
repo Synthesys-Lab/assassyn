@@ -36,7 +36,7 @@ This is the main cleanup function that generates all the necessary control signa
    - Emits write-enable, write-data, and write-index signals per port, formatting each write’s `expr.meta_cond` with `dumper.format_predicate`. Multi-writer modules rely on `_emit_predicate_mux_chain` to both collapse predicates and thread prioritised mux chains for data and indices, guaranteeing consistent selection semantics.
 
 5. **FIFO Signal Generation**: Uses `module_metadata[current_module].fifo.iter_channels()` to visit each FIFO touched by the module:
-   - Pulls the per-port `FIFOMetadata` directly from the registry so push predicates, values, and pop predicates stay in sync with the module view, while the module view provides the filtered interactions.
+   - Pulls the per-port `FIFOMetadata` directly from the registry so the recorded `FIFOPush` / `FIFOPop` expressions (shared with the module view) stay in sync across consumers—predicates come from each expression’s `meta_cond`, push data from `expr.val`, and module ownership from the metadata view that registered the expression.
    - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata captured during the pre-pass.
    - Produces the module-local `*_pop_ready` backpressure signal without consulting dumper internals.
    - Reuses `_emit_predicate_mux_chain` so the push-valid reduction and push-data mux mirror the prioritisation used for array writes.

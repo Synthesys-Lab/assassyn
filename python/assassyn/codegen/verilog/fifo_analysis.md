@@ -39,8 +39,8 @@ generation.
 3. **Metadata Construction**: For every visited module the helper creates a new
    `ModuleMetadata` whose `ModuleFIFOView` references the shared registry and whose
    `ModuleExposure` aggregates array, async-trigger, and general value exposures. Recorded
-   `FIFOInteraction` instances are owned by the registry and re-used inside the module view
-   so predicates and expression handles stay in sync for all consumers.
+   `FIFOPush`/`FIFOPop` expressions are owned by the registry and re-used inside the module
+   view so predicates and expression handles stay in sync for all consumers.
 4. **Result Delivery**: Returns `(module_metadata, fifo_registry)` for the caller to feed
    into `CIRCTDumper`. The helper never mutates the caller’s existing metadata, making it
    safe to run in parallel with other analyses or to layer partial refreshes on top of
@@ -57,12 +57,12 @@ stitch the returned dictionaries into their own caches.
 `FIFOAnalysisVisitor` subclasses the generic IR `Visitor` and overrides only `visit_expr`.
 It receives two collaborators:
 
-- A shared `FIFORegistry` that owns every `FIFOInteraction`.
+- A shared `FIFORegistry` that owns every recorded `FIFOPush`/`FIFOPop` expression.
 - A mutable `dict[Module, ModuleMetadata]` populated on demand.
 
 `visit_expr` handles four categories:
 
-1. **FIFO interactions** – `FIFOPush` / `FIFOPop` nodes register interactions in
+1. **FIFO interactions** – `FIFOPush` / `FIFOPop` nodes register their expressions in
    `FIFORegistry` and the per-module `ModuleFIFOView`, capturing predicates from
    the expression snapshot (`expr.meta_cond`). When a pop’s value escapes its defining module the visitor also
    records a value exposure so downstream stages can surface the produced data without
