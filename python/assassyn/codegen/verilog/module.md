@@ -19,7 +19,7 @@ def generate_module_ports(dumper, node: Module) -> None:
 
 This function generates comprehensive port declarations for Verilog modules based on their role in the credit-based pipeline architecture. Rather than requiring callers to pre-compute module roles or FIFO metadata, it derives all inputs from the dumper:
 
-- `is_downstream`, `is_sram`, and `is_driver` are inferred via `isinstance` checks and the dumper’s `async_callees` registry.
+- `is_downstream`, `is_sram`, and `is_driver` are inferred via `isinstance` checks and the frozen async-call ledger surfaced through `dumper.async_callers()`.
 - FIFO and async-call behaviour is loaded from `dumper.module_metadata[node]`, which has already been populated by the FIFO analysis pre-pass (falling back to empty lists only for filtered stubs).
 
 It then performs the following steps:
@@ -27,7 +27,7 @@ It then performs the following steps:
 1. **Standard Ports**: Emits the common Assassyn ports (`clk`, `rst`, `executed`, `cycle_count`, `finish`).
 
 2. **Downstream Module Ports**: For downstream modules, generates:
-   - Dependency inputs for each upstream module recorded in `dumper.downstream_dependencies`.
+   - Dependency inputs for each upstream module returned by `analysis.get_upstreams(module)` (sorted for deterministic emission).
    - SRAM interface wires when the downstream is an SRAM wrapper (`mem_dataout`, `mem_address`, `mem_write_data`, `mem_write_enable`, `mem_read_enable`).
 
 3. **Pipeline Module Ports**: For regular pipeline modules (drivers or async callees), adds the trigger-counter backpressure input (`trigger_counter_pop_valid`).
@@ -73,10 +73,9 @@ The function uses several utility functions and data structures:
 - `get_external_port_name()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external port naming
 
 The function integrates with the CIRCTDumper's state management:
-- `downstream_dependencies`: Maps downstream modules to their dependencies
 - `array_metadata`: Registry supplying array usage and port assignments
 - `module_metadata`: Immutable per-module snapshot containing FIFO interactions, exposure
-  metadata, FINISH flags, and async calls
+  metadata, FINISH flags, and async calls (including lookup helpers that forward to the async ledger)
 
 **Project-specific Knowledge Required**:
 - Understanding of [CIRCTDumper integration](/python/assassyn/codegen/verilog/design.md)

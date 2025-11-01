@@ -40,13 +40,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
     indent: int
     code: List[str]
     logs: List[str]
-    connections: List[Tuple[Module, str, str]]
     current_module: Module
     sys: SysBuilder
-    async_callees: Dict[Module, List[Module]]
-    downstream_dependencies: Dict[Module, List[Module]]
     is_top_generation: bool
-    finish_body: list[str]
     memory_defs: set
 
     def __init__(
@@ -60,13 +56,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.indent = 0
         self.code = []
         self.logs = []
-        self.connections = []
         self.current_module = None
         self.sys = None
-        self.async_callees = {}
-        self.downstream_dependencies = {}
         self.is_top_generation = False
-        self.finish_body = []
         self.array_metadata = ArrayMetadataRegistry()
         self.memory_defs = set()
         self.expr_to_name = {}
@@ -78,11 +70,9 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.cross_module_external_reads = []
         self.external_outputs_by_instance = defaultdict(list)
         self.external_output_exposures = defaultdict(dict)
-        self.module_ctx = None
         self.external_wrapper_names = {}
         self.external_instance_names = {}
         self.external_instance_owners = {}
-        self.external_intrinsics = []
         self.external_classes = []
         self.module_metadata: Dict[Module, ModuleMetadata] = (
             module_metadata if module_metadata is not None else {}
@@ -99,6 +89,25 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             return "Bits(1)(1)"
         predicate_code = self.dump_rval(predicate, False)
         return ensure_bits(predicate_code)
+
+    def async_callers(self, module: Module) -> Tuple[Module, ...]:
+        """Return the async caller modules recorded for *module*."""
+        ledger = getattr(self.interactions, "async_ledger", None)
+        if ledger is None:
+            return ()
+        try:
+            calls = ledger.calls_by_callee(module)
+        except RuntimeError:
+            return ()
+
+        callers: list[Module] = []
+        for call in calls:
+            parent = getattr(call, "parent", None)
+            if parent is None:
+                continue
+            if parent not in callers:
+                callers.append(parent)
+        return tuple(callers)
 
     def get_external_port_name(self, node: Expr) -> str:
         """Get the mangled port name for an external value."""
@@ -175,10 +184,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             )
         self.wait_until = None
         self.current_module = node
-        previous_module_ctx = self.module_ctx
-        self.module_ctx = node
-        self.finish_body = []
-
         # For downstream modules, we still need to process the body
         if node.body is not None:
             self._visit_body(node.body)
@@ -210,7 +215,6 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             self.code.extend(construct_method_body)
         self.indent -= 4
         self.append_code('')
-        self.module_ctx = previous_module_ctx
 
     # pylint: disable=too-many-locals,R0912
     def visit_system(self, node: SysBuilder):

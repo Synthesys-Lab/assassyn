@@ -42,9 +42,7 @@ Before `generate_system` runs, the caller (typically [`generate_design`](./desig
    - **Array User Analysis**: Populates the registry with every module that reads or writes each array by iterating the flattened `module.body` lists directly, so downstream passes can query a single source of truth without relying on dumper-specific helpers.
 
 3. **Module Analysis Phase**:
-   - **Dependency Tracking**: Records downstream dependencies using `get_upstreams`.
-   - **Async Call Analysis**: Fills `dumper.async_callees` so trigger counters can sum incoming credits.
-   - **External Wiring**: Records which exposed values flow across module boundaries so the top-level harness can declare and route the corresponding wires; legacy `external_wire_assignments` have been retired in favour of the intrinsic-driven bookkeeping, which now includes both consumer-side port declarations and producer-side exposure planning.
+   - **External Wiring**: Records which exposed values flow across module boundaries so the top-level harness can declare and route the corresponding wires; legacy `external_wire_assignments` have been retired in favour of the intrinsic-driven bookkeeping, which now includes both consumer-side port declarations and producer-side exposure planning. Async-call and dependency information are now read back from the frozen metadata when needed rather than re-collecting them here.
 
 4. **Module Generation Phase**:
    - **Regular Module Generation**: Generates code for all recorded modules; pure external stubs are filtered out earlier when collecting external intrinsic metadata.
@@ -55,8 +53,8 @@ The function handles complex system-wide relationships:
 
 - **Multi-Port Array Management**: Ensures each array has unique write ports for each writing module and that shared array writer modules are emitted before they are referenced.
 - **External Module Integration**: Tracks which values need to cross between producers and external consumers, and records the wiring information needed by the top-level harness.
-- **Dependency Tracking**: Maintains proper dependency relationships for downstream modules.
-- **Async Call Relationships**: Tracks which modules call which other modules so trigger counters can aggregate requests.
+- **Dependency Tracking**: Relies on `analysis.get_upstreams` to drive downstream wiring without storing duplicated state.
+- **Async Call Relationships**: Reuses the frozen async-call ledger exposed through `dumper.async_callers()` when trigger counters need to aggregate requests.
 
 **Project-specific Knowledge Required**:
 - Understanding of [system builder](/python/assassyn/builder.md)
@@ -79,14 +77,11 @@ Expression traversal now happens inline: each analysis iterates the flattened `m
 
 The function manages several CIRCTDumper state variables:
 
-- `external_intrinsics`: List of `ExternalIntrinsic` nodes encountered in the system
 - `external_classes`: Unique set of external classes that require PyCDE wrappers
 - `cross_module_external_reads`: Consumer-side records of external register outputs read from another module
 - `external_outputs_by_instance`: Producer-side grouping of the external outputs that must be exposed for other modules
 - `external_output_exposures`: Per-module cache populated during instantiation to drive `cleanup_post_generation`
 - `array_metadata`: `ArrayMetadataRegistry` instance with write/read port assignments and user membership. Arrays whose owner is a memory instance and satisfy `array.is_payload(owner)` are skipped during collection because they are handled by dedicated memory generators.
-- `downstream_dependencies`: Maps downstream modules to their dependencies
-- `async_callees`: Maps modules to their callers
 
 **Project-specific Knowledge Required**:
 - Understanding of [CIRCTDumper state management](/python/assassyn/codegen/verilog/design.md)

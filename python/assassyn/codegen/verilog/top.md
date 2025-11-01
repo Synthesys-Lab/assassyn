@@ -108,7 +108,7 @@ The function uses several utility functions and data structures:
 - `dump_type()` and `dump_type_cast()` from [utils module](/python/assassyn/codegen/verilog/utils.md) for type handling
 - `get_sram_info()` from [utils module](/python/assassyn/codegen/verilog/utils.md) for SRAM information
 - `namify()` and `unwrap_operand()` from [utils module](/python/assassyn/utils.md) for name generation
-- `topo_downstream_modules()` from [analysis module](/python/assassyn/analysis/external_usage.md) for topological ordering
+- `topo_downstream_modules()` and `get_upstreams()` from [analysis module](/python/assassyn/analysis/external_usage.md) for topological ordering and dependency discovery
 - `get_external_port_name()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external port naming
 - Metadata-driven checks for `FIFOPop` readiness: the predicated pop entries surfaced from `module_metadata.interactions.pops` (backed by the same tuples returned from `dumper.interactions.fifo_view(port).pops`) determine whether `<port>_pop_ready` connections should be emitted, replacing the legacy dumper helper traversal.
 - `_connect_array()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for array connections
@@ -117,8 +117,7 @@ The function manages several CIRCTDumper state variables:
 
 - `memory_defs`: SRAM memory definitions
 - `array_metadata`: Registry containing array write/read port assignments and usage
-- `downstream_dependencies`: Downstream module dependencies
-- `async_callees`: Async call relationships
+- `async_callers(module)`: Helper forwarding to the async-call ledger for trigger aggregation and driver detection
 
 **Project-specific Knowledge Required**:
 - Understanding of [CIRCTDumper state management](/python/assassyn/codegen/verilog/design.md)

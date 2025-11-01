@@ -2,6 +2,7 @@
 
 from .cleanup import resolve_value_exposure_render
 from .utils import dump_type, get_sram_info
+from ...analysis.topo import get_upstreams
 from ...ir.module import Module, Downstream
 from ...ir.memory.sram import SRAM
 from ...ir.module.base import ModuleBase
@@ -21,7 +22,8 @@ def generate_module_ports(dumper, node: Module) -> None:
     """
     is_downstream = isinstance(node, Downstream)
     is_sram = isinstance(node, SRAM)
-    is_driver = node not in dumper.async_callees
+    async_callers = list(dumper.async_callers(node))
+    is_driver = not async_callers
 
     module_metadata = dumper.module_metadata[node]
     module_view = module_metadata.interactions
@@ -36,9 +38,9 @@ def generate_module_ports(dumper, node: Module) -> None:
     dumper.append_code('finish = Output(Bits(1))')
 
     if is_downstream:
-        if node in dumper.downstream_dependencies:
-            for dep_mod in dumper.downstream_dependencies[node]:
-                dumper.append_code(f'{namify(dep_mod.name)}_executed = Input(Bits(1))')
+        upstream_modules = sorted(get_upstreams(node), key=lambda mod: mod.name)
+        for dep_mod in upstream_modules:
+            dumper.append_code(f'{namify(dep_mod.name)}_executed = Input(Bits(1))')
         if is_sram:
             sram_info = get_sram_info(node)
             if sram_info:
@@ -50,7 +52,7 @@ def generate_module_ports(dumper, node: Module) -> None:
                 dumper.append_code('mem_write_enable = Output(Bits(1))')
                 dumper.append_code('mem_read_enable = Output(Bits(1))')
 
-    elif is_driver or node in dumper.async_callees:
+    elif is_driver or async_callers:
         dumper.append_code('trigger_counter_pop_valid = Input(Bits(1))')
 
     added_external_ports = set()

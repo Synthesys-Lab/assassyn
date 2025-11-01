@@ -3,9 +3,8 @@
 from typing import TYPE_CHECKING, Any
 
 from ...ir.memory.base import MemoryBase
-from ...ir.expr import AsyncCall, Expr
+from ...ir.expr import Expr
 from ...ir.expr.intrinsic import PureIntrinsic
-from ...analysis import get_upstreams
 from ..simulator.external import collect_external_intrinsics
 from ...utils import unwrap_operand
 from ...builder import SysBuilder
@@ -31,7 +30,6 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
     dumper.sys = sys
 
     external_intrinsics = collect_external_intrinsics(sys)
-    dumper.external_intrinsics = external_intrinsics
     dumper.external_classes = []
     dumper.cross_module_external_reads = []
     dumper.external_outputs_by_instance.clear()
@@ -89,23 +87,6 @@ def generate_system(dumper: CIRCTDumper, node: SysBuilder):
             continue
         dumper.visit_array(arr_container)
 
-    for ds_module in sys.downstreams:
-        dumper.downstream_dependencies[ds_module] = get_upstreams(ds_module)
-
-    all_modules = dumper.sys.modules + dumper.sys.downstreams
-    for module in all_modules:
-        body = getattr(module, "body", None)
-        if body is None:
-            continue
-        filtered_exprs = (entry for entry in body if isinstance(entry, Expr))
-        for expr in filtered_exprs:
-            if isinstance(expr, AsyncCall):
-                callee = expr.bind.callee
-                if callee not in dumper.async_callees:
-                    dumper.async_callees[callee] = []
-
-                if module not in dumper.async_callees[callee]:
-                    dumper.async_callees[callee].append(module)
     # Process every module from sys.modules
     for elem in sys.modules:
         dumper.current_module = elem

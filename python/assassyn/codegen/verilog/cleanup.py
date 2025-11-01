@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Callable, Dict, List, NamedTuple, Optional, Se
 
 from .utils import dump_type, dump_type_cast, get_sram_info
 
+from ...analysis.topo import get_upstreams
 from ...ir.module import Downstream
 from ...ir.memory.sram import SRAM
 from ...ir.array import Slice
@@ -152,12 +153,11 @@ def cleanup_post_generation(dumper):
 
     if isinstance(dumper.current_module, Downstream):
         node = dumper.current_module
-        dep_signals = []
-        if dumper.current_module in dumper.downstream_dependencies:
-            dep_signals = [
-                f'self.{namify(dep.name)}_executed'
-                for dep in dumper.downstream_dependencies[node]
-            ]
+        upstream_modules = sorted(get_upstreams(node), key=lambda mod: mod.name)
+        dep_signals = [
+            f'self.{namify(dep.name)}_executed'
+            for dep in upstream_modules
+        ]
 
         executed_expr = _format_reduction_expr(
             dep_signals,

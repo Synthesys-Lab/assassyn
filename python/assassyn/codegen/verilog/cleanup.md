@@ -20,7 +20,7 @@ def cleanup_post_generation(dumper):
 This is the main cleanup function that generates all the necessary control signals and interconnections after the primary Verilog code generation is complete. It performs the following steps:
 
 1. **Execution Signal Generation**: Creates the `executed_wire` signal that determines when a module should execute:
-   - For downstream modules: Gathers upstream dependencies from `dumper.downstream_dependencies` and ORs their `executed` flags via `_format_reduction_expr(..., op="or_", default_literal="Bits(1)(0)")`.
+   - For downstream modules: Gathers upstream dependencies with `analysis.get_upstreams(module)` and ORs their `executed` flags via `_format_reduction_expr(..., op="or_", default_literal="Bits(1)(0)")`.
    - For regular modules: ANDs the trigger-counter pop-valid input with any active `wait_until` predicate recorded during expression lowering using the same helper with `op="and_"` and a `Bits(1)(1)` default.
 
 2. **Finish Signal Generation**: Reduces every FINISH site captured in

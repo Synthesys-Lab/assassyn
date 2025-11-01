@@ -11,7 +11,7 @@ from .utils import (
     get_sram_info,
 )
 
-from ...analysis import topo_downstream_modules
+from ...analysis import topo_downstream_modules, get_upstreams
 from ...ir.memory.base import MemoryBase
 from ...ir.module import Downstream
 from ...ir.module.base import ModuleBase
@@ -347,10 +347,10 @@ def generate_top_harness(dumper: CIRCTDumper):
             _attach_external_values(module, port_map, handled_ports)
 
         else:
-            if module in dumper.downstream_dependencies:
-                for dep_mod in dumper.downstream_dependencies[module]:
-                    dep_name = namify(dep_mod.name)
-                    port_map.append(f"{dep_name}_executed=inst_{dep_name}.executed")
+            upstream_modules = sorted(get_upstreams(module), key=lambda mod: mod.name)
+            for dep_mod in upstream_modules:
+                dep_name = namify(dep_mod.name)
+                port_map.append(f"{dep_name}_executed=inst_{dep_name}.executed")
 
             handled_ports = _attach_consumer_external_entries(module, port_map)
             _attach_external_values(module, port_map, handled_ports)
@@ -507,11 +507,11 @@ def generate_top_harness(dumper: CIRCTDumper):
     dumper.append_code('\n# --- Trigger Counter Delta Connections ---')
     for module in dumper.sys.modules:
         mod_name = namify(module.name)
-        if module in dumper.async_callees:
-            callers_of_this_module = dumper.async_callees[module]
+        async_callers = dumper.async_callers(module)
+        if async_callers:
             trigger_terms = [
                 f"inst_{namify(c.name)}.{mod_name}_trigger"
-                for c in callers_of_this_module
+                for c in async_callers
             ]
             summed_triggers = f"reduce(add, [{', '.join(trigger_terms)}])"
 
