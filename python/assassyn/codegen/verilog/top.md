@@ -94,7 +94,7 @@ The function handles complex system-wide relationships:
 - **External Module Integration**: Properly integrates external SystemVerilog modules
   by:
   - Declaring shared wires once per exposed external value (data + valid), using the normalised wire keys emitted by the intrinsic lowering pass
-  - Routing assignments based on the intrinsic-derived `node.externals` list and the additional consumer wiring recorded in `cross_module_external_reads` so instantiations stay in emission order and each producer drives a single pair of signals
+  - Routing assignments based on the intrinsic-derived `node.externals` list and the additional consumer wiring recorded in `external_metadata.cross_module_reads` so instantiations stay in emission order and each producer drives a single pair of signals
 - **Dependency Management**: Handles downstream module dependencies
 - **Credit-based Pipeline**: Implements proper trigger counter and credit management
 

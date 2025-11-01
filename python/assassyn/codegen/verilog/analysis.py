@@ -12,8 +12,15 @@ from ...ir.expr import AsyncCall, Expr, FIFOPop, FIFOPush, Log
 from ...ir.expr.array import ArrayRead, ArrayWrite
 from ...ir.expr.intrinsic import ExternalIntrinsic, Intrinsic, PureIntrinsic
 from ...ir.visitor import Visitor
-from .metadata import InteractionKind, InteractionMatrix, ModuleMetadata
+from ..simulator.external import collect_external_intrinsics
 from ...utils import unwrap_operand
+from .metadata import (
+    ExternalRead,
+    ExternalRegistry,
+    InteractionKind,
+    InteractionMatrix,
+    ModuleMetadata,
+)
 
 if TYPE_CHECKING:
     from ...builder import SysBuilder
@@ -196,3 +203,57 @@ class FIFOAnalysisVisitor(Visitor):
         self._record_value_exposure(metadata, node.meta_cond)
         for operand in node.values:
             self._record_value_exposure(metadata, operand)
+
+
+def collect_external_metadata(sys: "SysBuilder") -> ExternalRegistry:
+    """Analyse *sys* to gather external module metadata for Verilog codegen."""
+
+    registry = ExternalRegistry()
+    external_intrinsics = collect_external_intrinsics(sys)
+    for intrinsic in external_intrinsics:
+        owner = getattr(intrinsic, "parent", None)
+        if owner is None:
+            continue
+        registry.record_instance(intrinsic, owner)
+
+    modules_to_scan: List["Module"] = list(sys.modules) + list(sys.downstreams)
+    for module in modules_to_scan:
+        body = getattr(module, "body", None)
+        if body is None:
+            continue
+        for expr in body:
+            if (
+                not isinstance(expr, PureIntrinsic)
+                or expr.opcode != PureIntrinsic.EXTERNAL_OUTPUT_READ
+            ):
+                continue
+
+            instance_operand = unwrap_operand(expr.args[0])
+            if not isinstance(instance_operand, ExternalIntrinsic):
+                continue
+
+            producer = registry.owner_for(instance_operand)
+            if producer is None or producer is module:
+                continue
+
+            port_operand = expr.args[1]
+            port_name = (
+                port_operand.value
+                if hasattr(port_operand, "value")
+                else port_operand
+            )
+            index_operand = expr.args[2] if len(expr.args) > 2 else None
+
+            registry.record_cross_module_read(
+                ExternalRead(
+                    expr=expr,
+                    producer=producer,
+                    consumer=module,
+                    instance=instance_operand,
+                    port_name=port_name,
+                    index_operand=index_operand,
+                )
+            )
+
+    registry.freeze()
+    return registry

@@ -50,6 +50,8 @@ metadata.ModuleInteractionView
 metadata.ArrayInteractionView
 metadata.FIFOInteractionView
 metadata.ArrayMetadata
+metadata.ExternalRegistry
+metadata.ExternalRead
 ```
 
 All public types are re-exported by the package root; consumers do not need to
@@ -165,6 +167,31 @@ class FIFOInteractionView(NamedTuple):
 The FIFO view provides the resource-level counterpart to the module view.
 Downstream emitters fetch cross-module traffic without re-walking the IR by
 consulting the matrix for a port and reading these tuples directly.
+
+## `metadata.external` – external module metadata
+
+```python
+@dataclass
+class ExternalRead:
+    expr: PureIntrinsic
+    producer: Module
+    consumer: Module
+    instance: ExternalIntrinsic
+    port_name: str
+    index_operand: Value | None
+
+class ExternalRegistry:
+    def record_instance(self, instance: ExternalIntrinsic, owner: Module) -> None: ...
+    def record_cross_module_read(self, *, expr, producer, consumer, instance, port_name, index_operand) -> None: ...
+    def freeze(self) -> None: ...
+    def reads_for_consumer(self, module: Module) -> tuple[ExternalRead, ...]: ...
+```
+
+- `ExternalRegistry` stores the external classes encountered during analysis,
+  the owning module for each `ExternalIntrinsic`, and every cross-module read of
+  external outputs.  After `freeze()` the registry serves immutable views so
+  module emitters, cleanup, and top-level wiring can reuse a single source of
+  truth when synthesising exposed data/valid ports.
 
 ## `metadata.__init__` – public surface
 

@@ -4,7 +4,7 @@ This module provides system-level code generation utilities that orchestrate the
 
 ## Summary
 
-The system generation module is responsible for coordinating the generation of the entire Verilog system from an Assassyn system builder. It performs comprehensive analysis of the system structure, manages array write port assignments, handles external module integration (including FFI wiring), and orchestrates the generation of all modules and the top-level harness.
+The system generation module is responsible for coordinating the generation of the entire Verilog system from an Assassyn system builder. It performs comprehensive analysis of the system structure, manages array write port assignments, handles external module integration (including FFI wiring) using the precomputed external metadata registry, and orchestrates the generation of all modules and the top-level harness.
 
 Frozen metadata consumed by this module comes from the
 `python.assassyn.codegen.verilog.metadata` package; although imported through the familiar
@@ -39,7 +39,7 @@ Before `generate_system` runs, the caller (typically [`generate_design`](./desig
 1. **System Analysis Phase**:
    - **SRAM Payload Identification**: Identifies SRAM payload arrays that need special handling.
    - **External Module Collection**: Harvests every `ExternalIntrinsic` in the system, records per-instance metadata, and generates PyCDE wrapper classes for each unique external class upfront.
-   - **Cross-Module External Reads**: Scans every module body for `PureIntrinsic.EXTERNAL_OUTPUT_READ` operations whose producer lives in a different module, storing both the consumer-facing entries (`cross_module_external_reads`) and the producer-facing grouping (`external_outputs_by_instance`). Producer lookup first checks whether the intrinsic’s parent is already a module—supporting the block-free IR—before falling back to legacy `.module` handles when present.
+   - **Cross-Module External Reads**: Relies on the frozen `ExternalRegistry` populated during analysis to determine which modules consume external outputs produced elsewhere, avoiding any re-traversal of the IR during generation.
 
 2. **Array Management Phase**:
    - **Write Port Assignment**: Assigns unique port indices to each module writing to an array, recording them inside `dumper.array_metadata`.
@@ -82,9 +82,7 @@ Expression traversal now happens inline: each analysis iterates the flattened `m
 
 The function manages several CIRCTDumper state variables:
 
-- `external_classes`: Unique set of external classes that require PyCDE wrappers
-- `cross_module_external_reads`: Consumer-side records of external register outputs read from another module
-- `external_outputs_by_instance`: Producer-side grouping of the external outputs that must be exposed for other modules
+- `external_metadata`: Registry containing external classes, instance ownership, and cross-module read records collected during the analysis pre-pass
 - `external_output_exposures`: Per-module cache populated during instantiation to drive `cleanup_post_generation`
 - `array_metadata`: `ArrayMetadataRegistry` instance with write/read port assignments and user membership. Arrays whose owner is a memory instance and satisfy `array.is_payload(owner)` are skipped during collection because they are handled by dedicated memory generators.
 

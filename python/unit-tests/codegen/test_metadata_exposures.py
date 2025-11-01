@@ -230,6 +230,10 @@ def test_metadata_package_reexports():
 
     assert pkg.FIFOInteractionView is fifo_pkg.FIFOInteractionView
 
+    external_pkg = importlib.import_module("assassyn.codegen.verilog.metadata.external")
+    assert pkg.ExternalRegistry is external_pkg.ExternalRegistry
+    assert pkg.ExternalRead is external_pkg.ExternalRead
+
     # The package should expose the canonical public surface via __all__.
     expected = {
         "InteractionKind",
@@ -241,5 +245,7 @@ def test_metadata_package_reexports():
         "ArrayInteractionView",
         "ArrayMetadata",
         "FIFOInteractionView",
+        "ExternalRegistry",
+        "ExternalRead",
     }
     assert expected.issubset(set(pkg.__all__)), "__all__ missing expected metadata exports"

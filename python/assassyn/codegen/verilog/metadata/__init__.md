@@ -10,6 +10,7 @@ implementation so callers can continue to import from
 - `ModuleBundle`, `ModuleInteractionView`, `ModuleMetadata` – forwarded from `module.py`.
 - `ArrayInteractionView`, `ArrayMetadata` – forwarded from `array.py`.
 - `FIFOInteractionView` – forwarded from `fifo.py`.
+- `ExternalRegistry`, `ExternalRead` – forwarded from `external.py`.
 
 Consumers should continue to import from the package root; specific submodules
 are documented independently to keep responsibilities clear.

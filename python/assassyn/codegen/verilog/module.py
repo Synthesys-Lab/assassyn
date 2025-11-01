@@ -57,15 +57,12 @@ def generate_module_ports(dumper, node: Module) -> None:
 
     added_external_ports = set()
 
-    consumer_entries = [
-        entry for entry in getattr(dumper, 'cross_module_external_reads', [])
-        if entry['consumer'] is node
-    ]
+    consumer_entries = dumper.external_metadata.reads_for_consumer(node)
     for entry in consumer_entries:
-        port_name = dumper.get_external_port_name(entry['expr'])
+        port_name = dumper.get_external_port_name(entry.expr)
         if port_name in added_external_ports:
             continue
-        dtype = dump_type(entry['expr'].dtype)
+        dtype = dump_type(entry.expr.dtype)
         dumper.append_code(f'{port_name} = Input({dtype})')
         dumper.append_code(f'{port_name}_valid = Input(Bits(1))')
         added_external_ports.add(port_name)

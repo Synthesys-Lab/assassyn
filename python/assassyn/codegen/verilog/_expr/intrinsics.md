@@ -108,7 +108,7 @@ This function generates Verilog code for block intrinsic operations, which are c
 
 4. **EXTERNAL_INSTANTIATE / ExternalIntrinsic**: Creates and wires external modules in-line
    - `ExternalIntrinsic` instances are handled before the opcode switch, generating calls to `<wrapper>::new()` and wiring all inputs
-   - Updates the dumper's bookkeeping (`external_instance_names`, `external_instance_owners`) so later passes can reference the external wrapper consistently
+   - Updates the dumper's bookkeeping (`external_instance_names`, `external_wrapper_names`, `external_output_exposures`) while consulting the shared `ExternalRegistry` for instance owners and cross-module consumers
 
 The function integrates with the credit-based pipeline architecture by managing execution conditions and finish signals.
 

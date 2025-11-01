@@ -12,6 +12,10 @@ state during code emission.
 
 The implementation resides in `python/assassyn/codegen/verilog/analysis.py`.
 
+`collect_external_metadata(sys)` complements the FIFO pass by aggregating
+external module information into `ExternalRegistry`, recording external classes,
+instance ownership, and cross-module reads before code generation begins.
+
 `InteractionMatrix`, `ModuleMetadata`, and `InteractionKind` are imported from the
 `python.assassyn.codegen.verilog.metadata` package (implemented across
 `metadata.core`, `metadata.module`, and related submodules) but remain available via the

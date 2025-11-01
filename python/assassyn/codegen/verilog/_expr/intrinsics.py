@@ -158,7 +158,7 @@ def _handle_external_output(dumper, expr, intrinsic, rval):
     index_operand = expr.args[2] if len(expr.args) > 2 else None
 
     result = None
-    instance_owner = dumper.external_instance_owners.get(instance)
+    instance_owner = dumper.external_metadata.owner_for(instance)
     if instance_owner and instance_owner != dumper.current_module:
         # Cross-module access: use the exposed port value provided on inputs.
         port_name_for_read = dumper.get_external_port_name(expr)
@@ -244,30 +244,29 @@ def codegen_external_intrinsic(dumper, expr: ExternalIntrinsic) -> Optional[str]
 
     call = f"{wrapper_name}({', '.join(connections)})" if connections else f"{wrapper_name}()"
     dumper.external_instance_names[expr] = rval
-    dumper.external_instance_owners[expr] = dumper.current_module
 
-    entries = dumper.external_outputs_by_instance.get(expr, [])
+    entries = dumper.external_metadata.reads_for_instance(expr)
     if entries:
         exposures = dumper.external_output_exposures[dumper.current_module]
         seen_keys = set()
         for entry in entries:
             wire_key = dumper.get_external_wire_key(
                 expr,
-                entry['port_name'],
-                entry['index_operand'],
+                entry.port_name,
+                entry.index_operand,
             )
             if wire_key in seen_keys:
                 continue
             seen_keys.add(wire_key)
-            output_name = f"{rval}_{entry['port_name']}"
+            output_name = f"{rval}_{entry.port_name}"
             dumper.external_wire_outputs[wire_key] = output_name
             current_pred = dumper.get_pred(expr)
             exposures.setdefault(wire_key, {
                 'output_name': output_name,
-                'dtype': entry['expr'].dtype,
+                'dtype': entry.expr.dtype,
                 'instance_name': rval,
-                'port_name': entry['port_name'],
-                'index_operand': entry['index_operand'],
+                'port_name': entry.port_name,
+                'index_operand': entry.index_operand,
                 'index_key': wire_key[2],
                 'condition': current_pred,
             })

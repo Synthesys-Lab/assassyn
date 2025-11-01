@@ -28,8 +28,8 @@ from .cleanup import cleanup_post_generation
 from .rval import dump_rval as dump_rval_impl
 from .module import generate_module_ports
 from .system import generate_system
-from .metadata import InteractionMatrix, ModuleMetadata
-from .analysis import collect_fifo_metadata
+from .metadata import ExternalRegistry, InteractionMatrix, ModuleMetadata
+from .analysis import collect_external_metadata, collect_fifo_metadata
 from .array import ArrayMetadataRegistry
 
 
@@ -50,6 +50,7 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         *,
         module_metadata: Dict[Module, ModuleMetadata] | None = None,
         interactions: InteractionMatrix | None = None,
+        external_metadata: ExternalRegistry | None = None,
     ):
         super().__init__()
         self.wait_until = None
@@ -63,21 +64,22 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         self.memory_defs = set()
         self.expr_to_name = {}
         self.name_counters = defaultdict(int)
-        # Track external module usage for downstream modules
+        # Track external module wiring during emission
         self.external_wire_assignments = []
         self.external_wire_assignment_keys = set()
         self.external_wire_outputs = {}
-        self.cross_module_external_reads = []
-        self.external_outputs_by_instance = defaultdict(list)
         self.external_output_exposures = defaultdict(dict)
         self.external_wrapper_names = {}
         self.external_instance_names = {}
-        self.external_instance_owners = {}
-        self.external_classes = []
         self.module_metadata: Dict[Module, ModuleMetadata] = (
             module_metadata if module_metadata is not None else {}
         )
         self.interactions = interactions if interactions is not None else InteractionMatrix()
+        self.external_metadata = (
+            external_metadata if external_metadata is not None else ExternalRegistry()
+        )
+        if not self.external_metadata.frozen:
+            self.external_metadata.freeze()
 
     def get_pred(self, expr: Expr) -> str:
         """Format the predicate guarding *expr* (or return the default literal)."""
@@ -343,9 +345,11 @@ def generate_design(fname: Union[str, Path], sys: SysBuilder) -> None:
         fd.write(HEADER)
 
         module_metadata, interactions = collect_fifo_metadata(sys)
+        external_metadata = collect_external_metadata(sys)
         dumper = CIRCTDumper(
             module_metadata=module_metadata,
             interactions=interactions,
+            external_metadata=external_metadata,
         )
 
         # Generate sramBlackbox module definitions for each SRAM
