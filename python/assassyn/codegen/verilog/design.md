@@ -2,6 +2,12 @@
 
 This module provides the main Verilog design generation functionality, including the CIRCTDumper class that converts Assassyn IR into CIRCT-compatible Verilog code and the generate_design function that orchestrates the complete design generation process. The generator also accumulates the metadata required to stitch together external SystemVerilog modules and multi-port array writers.
 
+Metadata consumed by the dumper (`InteractionMatrix`, `ModuleMetadata`, `ArrayMetadata`,
+and the various interaction views) is sourced from the
+`python.assassyn.codegen.verilog.metadata` package.  The package re-exports the legacy
+symbols while housing their implementations across `metadata.core`, `metadata.module`,
+`metadata.array`, and `metadata.fifo`, keeping imports stable for callers.
+
 ## Design Documents
 
 - [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation

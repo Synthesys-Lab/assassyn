@@ -6,6 +6,10 @@ This module provides utilities for generating Verilog module port declarations, 
 
 The module port generation utilities handle the creation of comprehensive module interfaces for Verilog modules. They manage the complex port requirements of the credit-based pipeline architecture, including execution control signals, FIFO handshaking, array read/write interfaces, external module connections, and special handling for downstream modules and SRAM modules. FIFO information consumed here is already frozen by the analysis pre-pass, so port declarations never depend on codegen-time side effects.
 
+All metadata inputs originate from the `python.assassyn.codegen.verilog.metadata`
+package; implementations live in the `metadata.core`, `metadata.module`, `metadata.array`,
+and `metadata.fifo` submodules, though callers continue to import through the package root.
+
 ## Exposed Interfaces
 
 ### `generate_module_ports`

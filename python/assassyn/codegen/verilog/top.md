@@ -20,6 +20,11 @@ This module provides top-level harness generation for Verilog designs, creating 
 
 The top-level harness generation module creates the complete system-level Verilog module that serves as the top-level of the design. It handles the instantiation and connection of all system components, including regular modules, downstream modules, SRAM modules, multi-port arrays, FIFOs, trigger counters, and external modules, while managing the complex interconnections required by the credit-based pipeline architecture.
 
+Metadata lookups referenced throughout (array usage, module interactions, FIFO
+projections) flow from the `python.assassyn.codegen.verilog.metadata` package, whose
+submodules (`metadata.core`, `metadata.array`, `metadata.module`, `metadata.fifo`)
+provide the concrete implementations behind the familiar `metadata` namespace imports.
+
 ## Exposed Interfaces
 
 ### `generate_top_harness`

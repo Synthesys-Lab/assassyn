@@ -6,6 +6,11 @@ This module provides system-level code generation utilities that orchestrate the
 
 The system generation module is responsible for coordinating the generation of the entire Verilog system from an Assassyn system builder. It performs comprehensive analysis of the system structure, manages array write port assignments, handles external module integration (including FFI wiring), and orchestrates the generation of all modules and the top-level harness.
 
+Frozen metadata consumed by this module comes from the
+`python.assassyn.codegen.verilog.metadata` package; although imported through the familiar
+`metadata` namespace, implementations live in the `metadata.core`, `metadata.array`,
+`metadata.module`, and `metadata.fifo` submodules after the package split.
+
 ## Exposed Interfaces
 
 ### `generate_system`

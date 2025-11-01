@@ -3,6 +3,7 @@
 import os
 import sys
 from types import SimpleNamespace
+import importlib
 
 import pytest
 
@@ -204,3 +205,41 @@ def test_metadata_freeze_stabilizes_views():
 
     # The shared matrix returns the same view object for the module.
     assert interactions.module_view(instance) is module_view
+
+
+def test_metadata_package_reexports():
+    """Ensure the verilog metadata package re-exports the split submodules."""
+
+    pkg = importlib.import_module("assassyn.codegen.verilog.metadata")
+
+    core = importlib.import_module("assassyn.codegen.verilog.metadata.core")
+    array_pkg = importlib.import_module("assassyn.codegen.verilog.metadata.array")
+    module_pkg = importlib.import_module("assassyn.codegen.verilog.metadata.module")
+    fifo_pkg = importlib.import_module("assassyn.codegen.verilog.metadata.fifo")
+
+    assert pkg.InteractionKind is core.InteractionKind
+    assert pkg.InteractionMatrix is core.InteractionMatrix
+    assert pkg.AsyncLedger is core.AsyncLedger
+
+    assert pkg.ModuleBundle is module_pkg.ModuleBundle
+    assert pkg.ModuleInteractionView is module_pkg.ModuleInteractionView
+    assert pkg.ModuleMetadata is module_pkg.ModuleMetadata
+
+    assert pkg.ArrayInteractionView is array_pkg.ArrayInteractionView
+    assert pkg.ArrayMetadata is array_pkg.ArrayMetadata
+
+    assert pkg.FIFOInteractionView is fifo_pkg.FIFOInteractionView
+
+    # The package should expose the canonical public surface via __all__.
+    expected = {
+        "InteractionKind",
+        "InteractionMatrix",
+        "AsyncLedger",
+        "ModuleBundle",
+        "ModuleInteractionView",
+        "ModuleMetadata",
+        "ArrayInteractionView",
+        "ArrayMetadata",
+        "FIFOInteractionView",
+    }
+    assert expected.issubset(set(pkg.__all__)), "__all__ missing expected metadata exports"

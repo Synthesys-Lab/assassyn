@@ -1,17 +1,25 @@
-# Verilog Code Generation Metadata
+# Verilog Metadata Package
 
-This module owns the data structures that capture how IR modules interact with
-arrays, FIFOs, and async callees during Verilog code generation.  The previous
-design relied on separate containers (`ModuleExposure`, `ModuleFIFOView`,
-`FIFORegistry`) that stored parallel views of the same expressions and guarded
-each list with bespoke `_ensure_mutable` helpers.  The refactor replaces those
-containers with a single `InteractionMatrix` plus lightweight view adapters,
-eliminating redundant bookkeeping while keeping downstream emitters on fully
-frozen tuples.
+The `python.assassyn.codegen.verilog.metadata` package owns the data structures
+that capture how IR modules interact with arrays, FIFOs, and async callees
+during Verilog code generation.  It folds the legacy monolithic
+`metadata.py` file into focused submodules while preserving the public API
+exposed through the package `__init__`.
+
+- `metadata.core` – shared enums, the `InteractionMatrix`, and `AsyncLedger`.
+- `metadata.module` – module-scoped helpers (`ModuleBundle`,
+  `ModuleInteractionView`, and `ModuleMetadata`).
+- `metadata.array` – array projections and the `ArrayMetadata` registry.
+- `metadata.fifo` – FIFO-centric projections consumed by downstream emitters.
+
+Existing call sites continue to import from
+`python.assassyn.codegen.verilog.metadata` without code changes thanks to the
+package re-exports.  Only the implementation layout shifts; behaviour and
+interfaces remain the same.
 
 ## Summary
 
-The metadata pre-pass now records every interaction in a cross-product matrix
+The metadata pre-pass records every interaction in a cross-product matrix
 indexed by `(module, resource, role)`:
 
 - **module** – the IR `Module` that emitted the expression.
@@ -19,16 +27,36 @@ indexed by `(module, resource, role)`:
 - **role** – `InteractionKind.ARRAY_READ`, `ARRAY_WRITE`, `FIFO_PUSH`,
   or `FIFO_POP`.
 
-Each interaction is captured exactly once as an `InteractionRecord` that carries
-the raw IR expression (and therefore its predicate via `expr.meta_cond`).  The
-matrix exposes immutable module- and resource-scoped views after `freeze()`
-runs, so every downstream phase can query the same snapshot without defensive
-copying.  An `AsyncLedger` complements the matrix by grouping async calls by
-caller and callee, and `ModuleMetadata` keeps the remaining module-scoped data
-(FINISH intrinsics, async call list, value exposures) together with the module
-view returned by the matrix.
+Each interaction is captured exactly once as an IR expression (carrying its
+predicate via `expr.meta_cond`).  The matrix exposes immutable module- and
+resource-scoped views after `freeze()` runs, so every downstream phase can query
+the same snapshot without defensive copying.  An `AsyncLedger` complements the
+matrix by grouping async calls by caller and callee, and `ModuleMetadata` keeps
+the remaining module-scoped data (FINISH intrinsics, async call list, value
+exposures) together with the module view returned by the matrix.
 
-## Exposed Interfaces
+## Package Exports
+
+```python
+from python.assassyn.codegen.verilog import metadata
+
+metadata.InteractionKind
+metadata.InteractionMatrix
+metadata.FIFOExpr
+metadata.ModuleMetadata
+metadata.AsyncLedger
+metadata.ModuleBundle
+metadata.ModuleInteractionView
+metadata.ArrayInteractionView
+metadata.FIFOInteractionView
+metadata.ArrayMetadata
+```
+
+All public types are re-exported by the package root; consumers do not need to
+change their import statements.  The following sections document the owning
+submodule for each class.
+
+## `metadata.core` – shared types
 
 ### `InteractionKind`
 
@@ -42,23 +70,13 @@ class InteractionKind(Enum):
 
 The enum labels the role an expression plays relative to a resource.  It
 provides a stable set of keys the matrix uses internally when recording
-interactions and its consumers rely on consistent naming when selecting data
-from the projections.
+interactions, and downstream consumers rely on consistent naming when selecting
+data from the projections.
 
-### `InteractionRecord`
+### `FIFOExpr`
 
-```python
-@dataclass(frozen=True)
-class InteractionRecord:
-    module: Module
-    resource: Array | Port
-    kind: InteractionKind
-    expr: Expr
-```
-
-Each record is created by the analysis pass and stored inside the matrix.  The
-record itself is immutable; view adapters expose only the `expr` handles so
-callers interact with familiar IR nodes.
+Alias for the union of `FIFOPush` and `FIFOPop`.  The shared type keeps FIFO
+helpers consistent across the module and matrix implementations.
 
 ### `InteractionMatrix`
 
@@ -74,48 +92,11 @@ class InteractionMatrix:
 The matrix is the central accumulator.  During analysis the visitor calls
 `record()` for every interaction; the matrix stores the interaction once and
 updates the necessary module/resource buckets so both projections stay in sync.
-Until `freeze()` runs, buckets are simple append-only lists.  `freeze()` snaps
-those lists to tuples, memoises the view adapters, and flips an internal flag
-that prevents further mutation.  After freezing, `module_view`, `array_view`,
-and `fifo_view` return cached adapters backed by the same immutable tuples—
-callers never allocate new containers or duplicate expression references.
-
-The matrix also exposes the shared `async_ledger` attribute and keeps track of
-`finish_sites` registered for each module so `ModuleMetadata` can surface the
-same tuple the visitor collected.
-
-### `ModuleInteractionView`
-
-`ModuleInteractionView` is a lightweight named tuple with attributes:
-
-- `pushes` / `pops` – tuples of FIFO expressions emitted by the module.
-- `fifo_ports` – FIFO ports touched by the module in encounter order.
-- `fifo_map` – mapping from FIFO port to the ordered tuple of interactions the
-  module emitted for that port.
-- `writes` / `reads` – mappings from arrays to tuples of write/read expressions
-  produced by the module.
-- `matrix` – back-reference to the owning `InteractionMatrix` so helpers can
-  look up resource-scoped projections.
-
-Code that previously asked for `resources(kind)` now inspects
-`module_view.writes.keys()`, `module_view.reads.keys()`, or `module_view.fifo_ports`
-directly.  Iterating FIFO channels simply walks `module_view.fifo_ports` and
-consults both the module map and `matrix.fifo_view(port)`.
-
-### `ArrayInteractionView`
-
-The array projection is a named tuple with attributes `reads`, `writers`, and
-`reads_by_module`.  Each attribute is a tuple or mapping of tuples, all frozen
-after `freeze()`.  Consumers such as `ArrayMetadataRegistry` reuse these results
-when assigning port indices, guaranteeing that numbering reflects the same
-encounter order reported by the module view.
-
-### `FIFOInteractionView`
-
-`FIFOInteractionView` is a named tuple exposing `pushes` and `pops` tuples.  It
-serves as the resource-level counterpart to the module view.  Downstream
-emitters fetch cross-module traffic without re-walking the IR by consulting the
-matrix for a port and reading these tuples directly.
+Until `freeze()` runs, buckets are append-only lists.  `freeze()` snaps those
+lists to tuples, memoises the view adapters, and flips an internal flag that
+prevents further mutation.  After freezing, `module_view`, `array_view`, and
+`fifo_view` return cached adapters backed by the same immutable tuples—callers
+never allocate new containers or duplicate expression references.
 
 ### `AsyncLedger`
 
@@ -129,48 +110,76 @@ class AsyncLedger:
 
 Async calls are tracked separately from array/FIFO interactions so trigger
 accounting remains explicit.  The ledger groups calls by caller (for cleanup)
-and by callee (for trigger aggregation analytics).  All queries require the
-ledger to be frozen; attempting to inspect an unfrozen ledger raises an error.
-When `freeze()` runs, each list is converted to a tuple, lookup mappings become
+and by callee (for trigger aggregation).  All queries require the ledger to be
+frozen; attempting to inspect an unfrozen ledger raises an error.  When
+`freeze()` runs, lists are converted to tuples, lookup mappings become
 `MappingProxyType` instances, and the ledger refuses further mutation.
 
-### `ModuleMetadata`
+## `metadata.module` – module-scoped helpers
 
 ```python
 @dataclass
 class ModuleMetadata:
     module: Module
-    interactions: ModuleInteractionView
-    value_exposures: tuple[Expr, ...]
-    finish_sites: tuple[Intrinsic, ...]
-    calls: tuple[AsyncCall, ...]
+    matrix: InteractionMatrix
+    ...
 ```
 
-`ModuleMetadata` packages module-scoped metadata that is not already embedded in
-the matrix.  The analysis visitor appends value exposures, FINISH intrinsics,
-and async calls to mutable lists while visiting the module; when the snapshot
-is finalised it asks the matrix for the module view, freezes the ledger, and
-converts the lists to tuples.  Downstream code therefore consumes a read-only
-object:
+- `ModuleBundle` accumulates mutable buckets per module while the matrix remains
+  unfrozen.
+- `ModuleInteractionView` is an immutable named tuple exposing FIFO pushes/pops,
+  FIFO maps, and array read/write groupings scoped to the module.
+- `ModuleMetadata` packages module-scoped metadata (value exposures, FINISH
+  intrinsics, async calls) alongside the module view obtained from the matrix.
+  Callers must invoke `ModuleMetadata.freeze()` before inspecting
+  `interactions`, `finish_sites`, or `calls`; attempting to read them prior to
+  freezing raises an exception.
 
-- `interactions` gives access to arrays and FIFOs through the unified API.
-- `value_exposures` replaces `ModuleExposure.values`.
-- `finish_sites` carries the recorded FINISH intrinsics.
-- `calls` mirrors the async call list used for wiring trigger counters.
+## `metadata.array` – array projections
 
-The class no longer owns a registry pointer or bespoke `_ensure_mutable`
-helpers—the matrix guarantees immutability once `freeze()` completes.
+```python
+@dataclass
+class ArrayMetadata:
+    array: Array
+    write_ports: dict[Module, int]
+    read_ports_by_module: dict[Module, list[int]]
+    read_order: list[tuple[Module, ArrayRead]]
+    read_expr_port: dict[ArrayRead, int]
+    users: list[Module]
+```
 
-## Internal Helpers and Freeze Semantics
+- `ArrayInteractionView` exposes immutable tuples of read expressions, per-writer
+  mappings of array writes, and per-module read buckets.
+- `ArrayMetadataRegistry` (in `python/assassyn/codegen/verilog/array.py`)
+  consumes this data to assign port indices; rebuilds pull from the shared view
+  to keep numbering consistent with the traversal order captured by the matrix.
 
-The module defines small helper classes (`_ModuleBuckets`, `_ArrayBuckets`,
-`_FIFOBuckets`) that accumulate interactions while the matrix is mutable.  They
-store plain Python lists and `OrderedDict` instances so encounter order is
-naturally preserved.  `InteractionMatrix.freeze()` walks each bucket, converts
-lists to tuples, and replaces mutable dictionaries with read-only mappings.
-Attempting to call `record()` after freezing raises `RuntimeError`, preventing
-accidental post-pass mutation.
+## `metadata.fifo` – FIFO projections
 
-The refactor reduces `metadata.py` by more than 100 lines by removing the
-legacy `ModuleExposure`, `FIFOMetadata`, and `_ensure_mutable` boilerplate while
-retaining the deterministic ordering guarantees required by Verilog emission.
+```python
+class FIFOInteractionView(NamedTuple):
+    pushes: tuple[FIFOPush, ...]
+    pops: tuple[FIFOPop, ...]
+```
+
+The FIFO view provides the resource-level counterpart to the module view.
+Downstream emitters fetch cross-module traffic without re-walking the IR by
+consulting the matrix for a port and reading these tuples directly.
+
+## `metadata.__init__` – public surface
+
+The package entry point re-exports all the classes above along with the shared
+`FIFOExpr` alias so existing imports (`from .metadata import ...`) continue to
+resolve without modification.  Consumers can opt into submodule imports for
+more granular dependencies when desired.
+
+## Implementation Notes
+
+- Submodules rely on `typing.TYPE_CHECKING` to avoid import cycles while keeping
+  type hints precise.  Shared aliases live in `metadata.core`.
+- `InteractionMatrix.freeze()` must run before any consumer inspects module or
+  resource views.  Attempting to mutate the matrix (or module metadata) after
+  freezing raises a `RuntimeError`.
+- The package layout reduces the maintenance burden by assigning
+  responsibilities to self-contained modules while retaining deterministic
+  ordering guarantees required by Verilog emission.

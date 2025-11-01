@@ -1,4 +1,5 @@
 ```python
+# The metadata implementation now lives in python.assassyn.codegen.verilog.metadata.[core|module|array|fifo]
 
 class InteractionMatrix:
     modules: dict[Module, ModuleBucket]

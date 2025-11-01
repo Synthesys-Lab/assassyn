@@ -1,29 +1,35 @@
-"""Shared metadata structures for Verilog code generation."""
+"""Core metadata structures shared across Verilog code generation."""
+
+# pylint: disable=import-outside-toplevel, cyclic-import
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from enum import Enum, auto
 from types import MappingProxyType
-from typing import (
-    Dict,
-    Mapping,
-    NamedTuple,
-    Tuple,
-    List,
-    TYPE_CHECKING,
-)
+from typing import Dict, Mapping, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ...ir.array import Array
-    from ...ir.expr import ArrayRead, ArrayWrite, AsyncCall, Expr, FIFOPop, FIFOPush
-    from ...ir.expr.intrinsic import Intrinsic
-    from ...ir.module import Module, Port
+    from ....ir.array import Array
+    from ....ir.expr import (
+        ArrayRead,
+        ArrayWrite,
+        AsyncCall,
+        Expr,
+        FIFOPop,
+        FIFOPush,
+    )
+    from ....ir.module import Module, Port
 else:  # pragma: no cover - runtime imports only for type checking
-    from ...ir.array import Array  # type: ignore
-    from ...ir.expr import ArrayRead, ArrayWrite, AsyncCall, Expr, FIFOPop, FIFOPush  # type: ignore
-    from ...ir.expr.intrinsic import Intrinsic  # type: ignore
-    from ...ir.module import Module, Port  # type: ignore
+    from ....ir.array import Array  # type: ignore
+    from ....ir.expr import (  # type: ignore
+        ArrayRead,
+        ArrayWrite,
+        AsyncCall,
+        Expr,
+        FIFOPop,
+        FIFOPush,
+    )
+    from ....ir.module import Module, Port  # type: ignore
 
 FIFOExpr = FIFOPush | FIFOPop
 
@@ -35,29 +41,6 @@ class InteractionKind(Enum):
     ARRAY_WRITE = auto()
     FIFO_PUSH = auto()
     FIFO_POP = auto()
-
-
-@dataclass
-class ModuleBundle:
-    """Mutable bucket of interactions gathered while analysing a module."""
-
-    pushes: list[FIFOPush] = field(default_factory=list)
-    pops: list[FIFOPop] = field(default_factory=list)
-    fifo: dict[Port, list[FIFOExpr]] = field(default_factory=dict)
-    writes: dict[Array, list[ArrayWrite]] = field(default_factory=dict)
-    reads: dict[Array, list[ArrayRead]] = field(default_factory=dict)
-
-
-@dataclass
-class ArrayMetadata:
-    """Compatibility container used by ArrayMetadataRegistry."""
-
-    array: Array
-    write_ports: Dict[Module, int] = field(default_factory=dict)
-    read_ports_by_module: Dict[Module, List[int]] = field(default_factory=dict)
-    read_order: List[Tuple[Module, ArrayRead]] = field(default_factory=list)
-    read_expr_port: Dict[ArrayRead, int] = field(default_factory=dict)
-    users: List[Module] = field(default_factory=list)
 
 
 class AsyncLedger:
@@ -73,8 +56,7 @@ class AsyncLedger:
 
     def record(self, module: Module, callee: Module, call: AsyncCall) -> None:
         """Record an async call issued by *module* to *callee*."""
-        if self._frozen:
-            raise RuntimeError("AsyncLedger is frozen; cannot record new entries")
+        self._ensure_mutable()
         self._by_module.setdefault(module, {}).setdefault(callee, []).append(call)
         self._by_callee.setdefault(callee, []).append(call)
 
@@ -101,44 +83,20 @@ class AsyncLedger:
         self._callee_view = {callee: tuple(calls) for callee, calls in self._by_callee.items()}
         self._frozen = True
 
-
-class ModuleInteractionView(NamedTuple):
-    """Immutable projection of interactions scoped to a module."""
-
-    module: Module
-    matrix: InteractionMatrix
-    pushes: Tuple[FIFOPush, ...]
-    pops: Tuple[FIFOPop, ...]
-    fifo_ports: Tuple[Port, ...]
-    fifo_map: Mapping[Port, Tuple[FIFOExpr, ...]]
-    writes: Mapping[Array, Tuple[ArrayWrite, ...]]
-    reads: Mapping[Array, Tuple[ArrayRead, ...]]
-
-
-class ArrayInteractionView(NamedTuple):
-    """Array-centric view of recorded reads and writes."""
-
-    reads: Tuple[ArrayRead, ...]
-    writers: Mapping[Module, Tuple[ArrayWrite, ...]]
-    reads_by_module: Mapping[Module, Tuple[ArrayRead, ...]]
-
-
-class FIFOInteractionView(NamedTuple):
-    """FIFO-centric view of pushes and pops recorded in the matrix."""
-
-    pushes: Tuple[FIFOPush, ...]
-    pops: Tuple[FIFOPop, ...]
+    def _ensure_mutable(self) -> None:
+        if self._frozen:
+            raise RuntimeError("AsyncLedger is frozen; cannot record new entries")
 
 
 class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
     """Centralised interaction store keyed by (module, resource, role)."""
 
     def __init__(self) -> None:
-        self._modules: Dict[Module, ModuleBundle] = {}
+        self._modules: Dict[Module, "ModuleBundle"] = {}
         self._fifos: Dict[Port, dict[str, list[FIFOExpr]]] = {}
-        self._module_views: Dict[Module, ModuleInteractionView] | None = None
-        self._array_views: Dict[Array, ArrayInteractionView] | None = None
-        self._fifo_views: Dict[Port, FIFOInteractionView] | None = None
+        self._module_views: Dict[Module, "ModuleInteractionView"] | None = None
+        self._array_views: Dict[Array, "ArrayInteractionView"] | None = None
+        self._fifo_views: Dict[Port, "FIFOInteractionView"] | None = None
         self.async_ledger = AsyncLedger()
         self._frozen = False
 
@@ -148,11 +106,16 @@ class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
         module: Module,
         resource: Array | Port,
         kind: InteractionKind,
-        expr: Expr,
+        expr: "Expr",
     ) -> None:
         """Record a single interaction emitted during analysis."""
         self._ensure_mutable()
-        bundle = self._modules.setdefault(module, ModuleBundle())
+        bundle = self._modules.get(module)
+        if bundle is None:
+            from .module import ModuleBundle  # local import to avoid circular dependency
+
+            bundle = ModuleBundle()
+            self._modules[module] = bundle
         if isinstance(resource, Port):
             fifo = bundle.fifo.setdefault(resource, [])
             fifo.append(expr)
@@ -171,12 +134,14 @@ class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
         else:
             raise TypeError(f"Unsupported array interaction kind: {kind}")
 
-    def module_view(self, module: Module) -> ModuleInteractionView:
+    def module_view(self, module: Module) -> "ModuleInteractionView":
         """Return the frozen view for *module*."""
         if not self._frozen or self._module_views is None:
             raise RuntimeError("InteractionMatrix is not frozen; module view unavailable")
         view = self._module_views.get(module)
         if view is None:
+            from .module import ModuleInteractionView  # local import
+
             empty = ModuleInteractionView(
                 module,
                 self,
@@ -191,7 +156,7 @@ class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
             return empty
         return view
 
-    def array_view(self, array: Array) -> ArrayInteractionView:
+    def array_view(self, array: Array) -> "ArrayInteractionView":
         """Return the frozen array-level view for *array*."""
         if not self._frozen or self._array_views is None:
             raise RuntimeError("InteractionMatrix is not frozen; array view unavailable")
@@ -200,7 +165,7 @@ class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
             raise KeyError(f"Array {array} has no recorded interactions")
         return view
 
-    def fifo_view(self, port: Port) -> FIFOInteractionView:
+    def fifo_view(self, port: Port) -> "FIFOInteractionView":
         """Return the frozen FIFO-level view for *port*."""
         if not self._frozen or self._fifo_views is None:
             raise RuntimeError("InteractionMatrix is not frozen; FIFO view unavailable")
@@ -213,6 +178,10 @@ class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
         """Snapshot all recorded interactions into immutable views."""
         if self._frozen:
             return
+
+        from .array import ArrayInteractionView
+        from .fifo import FIFOInteractionView
+        from .module import ModuleInteractionView
 
         self.async_ledger.freeze()
         self._module_views = {
@@ -244,9 +213,9 @@ class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
             for module, bundle in self._modules.items()
         }
 
-        array_reads: Dict[Array, list[ArrayRead]] = {}
-        array_writers: Dict[Array, Dict[Module, list[ArrayWrite]]] = {}
-        array_reads_by_mod: Dict[Array, Dict[Module, list[ArrayRead]]] = {}
+        array_reads: Dict[Array, list["ArrayRead"]] = {}
+        array_writers: Dict[Array, Dict[Module, list["ArrayWrite"]]] = {}
+        array_reads_by_mod: Dict[Array, Dict[Module, list["ArrayRead"]]] = {}
         for module, bundle in self._modules.items():
             for array, writes in bundle.writes.items():
                 array_writers.setdefault(array, {}).setdefault(module, []).extend(writes)
@@ -286,90 +255,9 @@ class InteractionMatrix:  # pylint: disable=too-many-instance-attributes
             raise RuntimeError("InteractionMatrix is frozen; cannot record new interactions")
 
 
-@dataclass
-class ModuleMetadata:  # pylint: disable=too-many-instance-attributes
-    """Module-scoped metadata that decorates InteractionMatrix records."""
-
-    module: Module
-    matrix: InteractionMatrix
-    _value_exposures: list[Expr] = field(default_factory=list)
-    _finish_sites: list[Intrinsic] = field(default_factory=list)
-    _calls: list[AsyncCall] = field(default_factory=list)
-    _value_snapshot: Tuple[Expr, ...] | None = field(init=False, default=None)
-    _finish_snapshot: Tuple[Intrinsic, ...] | None = field(init=False, default=None)
-    _calls_snapshot: Tuple[AsyncCall, ...] | None = field(init=False, default=None)
-    _interactions: ModuleInteractionView | None = field(init=False, default=None)
-    _frozen: bool = field(init=False, default=False)
-
-    def record_value(self, expr: Expr) -> None:
-        """Track a value exposure encountered during analysis."""
-        self._ensure_mutable()
-        self._value_exposures.append(expr)
-
-    def record_finish(self, expr: Intrinsic) -> None:
-        """Record a FINISH intrinsic so cleanup can emit completion logic."""
-        self._ensure_mutable()
-        self._finish_sites.append(expr)
-
-    def record_call(self, call: AsyncCall) -> None:
-        """Register an async call issued by this module."""
-        self._ensure_mutable()
-        self._calls.append(call)
-
-    def freeze(self) -> None:
-        """Finalise the metadata and snapshot interaction projections."""
-        if self._frozen:
-            return
-        self.matrix.freeze()
-        self._value_snapshot = tuple(self._value_exposures)
-        self._finish_snapshot = tuple(self._finish_sites)
-        self._calls_snapshot = tuple(self._calls)
-        self._value_exposures.clear()
-        self._finish_sites.clear()
-        self._calls.clear()
-        self._interactions = self.matrix.module_view(self.module)
-        self._frozen = True
-
-    @property
-    def value_exposures(self) -> Tuple[Expr, ...]:
-        """Return the value exposures recorded for the module."""
-        if self._value_snapshot is not None:
-            return self._value_snapshot
-        return tuple(self._value_exposures)
-
-    @property
-    def finish_sites(self) -> Tuple[Intrinsic, ...]:
-        """Return the FINISH intrinsics that terminate the module."""
-        if self._finish_snapshot is not None:
-            return self._finish_snapshot
-        return tuple(self._finish_sites)
-
-    @property
-    def calls(self) -> Tuple[AsyncCall, ...]:
-        """Return async calls issued by the module."""
-        if self._calls_snapshot is not None:
-            return self._calls_snapshot
-        return tuple(self._calls)
-
-    @property
-    def interactions(self) -> ModuleInteractionView:
-        """Return the frozen interaction view for the module."""
-        if self._interactions is None:
-            raise RuntimeError("Module interactions are unavailable before freeze()")
-        return self._interactions
-
-    def _ensure_mutable(self) -> None:
-        if self._frozen:
-            raise RuntimeError("ModuleMetadata is frozen; cannot record new entries")
-
-
-__all__ = [
+__all__ = (
+    "FIFOExpr",
     "InteractionKind",
     "InteractionMatrix",
-    "ModuleInteractionView",
-    "ArrayInteractionView",
-    "FIFOInteractionView",
     "AsyncLedger",
-    "ModuleMetadata",
-    "ArrayMetadata",
-]
+)

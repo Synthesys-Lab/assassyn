@@ -6,6 +6,11 @@ This module provides post-generation cleanup utilities for Verilog code generati
 
 The cleanup module is responsible for generating the final control signals and interconnections after the main Verilog code generation is complete. It handles complex signal routing for arrays, ports, modules, and memory interfaces, ensuring proper connectivity between generated modules according to the credit-based pipeline architecture. As part of the external module flow, it also materialises producer-side `expose_*`/`valid_*` ports for any external register outputs that are consumed by another module, so cross-module reads can be wired up without duplicating logic.  FIFO wiring now consumes the metadata snapshot produced by the pre-pass instead of mutating registries during emission.
 
+Metadata consumed here (`ModuleMetadata`, `ModuleInteractionView`, `ArrayMetadata`,
+and `FIFOInteractionView`) is provided by the `python.assassyn.codegen.verilog.metadata`
+package.  Implementations live in the `metadata.module`, `metadata.array`, and
+`metadata.fifo` submodules but remain accessible via the `metadata` namespace for callers.
+
 ## Exposed Interfaces
 
 ### `cleanup_post_generation`
