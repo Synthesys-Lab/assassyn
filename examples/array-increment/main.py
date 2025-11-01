@@ -95,8 +95,17 @@ def main():
 
     simulator_path, verilator_path = elaborate(sys, **config)
     raw = utils.run_simulator(simulator_path)
-    loop_count = sum(1 for line in raw.split('\n') if 'i=' in line and 'b[i]=' in line)
 
+    expected_a = {}
+    for line in raw.split('\n'):
+        if 'i=' in line and 'b[i]=' in line:
+            parts = line.split()
+            b_val = int(parts[-2].split('=')[1].rstrip(','))
+            a_val = int(parts[-1].split('=')[1])
+            expected_a[b_val] = expected_a.get(b_val, 0) + 1
+            assert a_val == expected_a[b_val]
+
+    assert len([l for l in raw.split('\n') if 'i=' in l and 'b[i]=' in l]) == LOOP_COUNT + 1
 
     print("\nAccumulation results:")
     for line in raw.split('\n'):

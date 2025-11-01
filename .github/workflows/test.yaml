@@ -43,6 +43,10 @@ jobs:
         run: |
           . setup.sh && make test-all
 
+      - name: Run Array Increment Example Test
+        run: |
+          . setup.sh && python examples/array-increment/main.py
+
       - name: Clean CMake Cache
         run: |
           find . -name "CMakeCache.txt" -delete
