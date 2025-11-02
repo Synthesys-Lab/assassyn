@@ -15,6 +15,7 @@ LOOP_COUNT = 100
 INDEX_BITS = 7
 
 
+
 class ArrayIncrementFSM(Module):
     def __init__(self):
         super().__init__(ports={})
