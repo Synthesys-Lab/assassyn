@@ -16,7 +16,7 @@ if typing.TYPE_CHECKING:
     from .dtype import DType
     from .module.base import ModuleBase
     from .memory.base import MemoryBase
-    OwnerType = ModuleBase | MemoryBase | None
+    OwnerType = typing.Union[ModuleBase, MemoryBase, None]
 else:
     OwnerType = typing.Any
 

@@ -6,7 +6,11 @@ from __future__ import annotations
 
 from typing import Dict, List, Sequence, Set, Tuple, TYPE_CHECKING
 
-from ...analysis.external_usage import expr_externally_used
+from ...analysis.external_usage import (
+    ExternalUsageIndex,
+    build_external_usage_index,
+    expr_externally_used,
+)
 from ...ir.const import Const
 from ...ir.expr import AsyncCall, Expr, FIFOPop, FIFOPush, Log
 from ...ir.expr.array import ArrayRead, ArrayWrite
@@ -62,7 +66,8 @@ def collect_fifo_metadata(
     module_metadata: Dict["Module", ModuleMetadata] = {
         module: ModuleMetadata(module, matrix) for module in modules_to_visit
     }
-    visitor = FIFOAnalysisVisitor(matrix, module_metadata)
+    usage_index = build_external_usage_index(modules_to_visit)
+    visitor = FIFOAnalysisVisitor(matrix, module_metadata, usage_index)
 
     visitor.analyse_modules(modules_to_visit)
 
@@ -80,10 +85,12 @@ class FIFOAnalysisVisitor(Visitor):
         self,
         matrix: InteractionMatrix,
         module_metadata: Dict["Module", ModuleMetadata],
+        usage_index: ExternalUsageIndex | None = None,
     ) -> None:
         super().__init__()
         self._matrix = matrix
         self._module_metadata = module_metadata
+        self._usage_index = usage_index
 
     def analyse_modules(self, modules: Sequence["Module"]) -> None:
         """Analyse the provided modules and populate FIFO metadata."""
@@ -121,8 +128,8 @@ class FIFOAnalysisVisitor(Visitor):
                 else InteractionKind.FIFO_POP
             )
             self._matrix.record(module=module, resource=node.fifo, kind=kind, expr=node)
-            if isinstance(node, FIFOPop) and expr_externally_used(node, True):
-                metadata.record_value(node)
+            if isinstance(node, FIFOPop):
+                self._record_exposure_if_needed(metadata, node)
             return
 
         if isinstance(node, AsyncCall):
@@ -147,6 +154,7 @@ class FIFOAnalysisVisitor(Visitor):
                 kind=InteractionKind.ARRAY_READ,
                 expr=node,
             )
+            self._record_exposure_if_needed(metadata, node)
             return
 
         if isinstance(node, Log):
@@ -166,15 +174,7 @@ class FIFOAnalysisVisitor(Visitor):
                 instance_owner = getattr(instance_operand, "parent", None)
                 if instance_owner is module:
                     return
-
-            if not expr_externally_used(node, True):
-                return
-
-            unwrapped = unwrap_operand(node)
-            if isinstance(unwrapped, Const):
-                return
-
-            metadata.record_value(node)
+            self._record_exposure_if_needed(metadata, node)
 
     def _handle_intrinsic(self, metadata: ModuleMetadata, node: Intrinsic) -> None:
         intrinsic = node.opcode
@@ -203,6 +203,24 @@ class FIFOAnalysisVisitor(Visitor):
         self._record_value_exposure(metadata, node.meta_cond)
         for operand in node.values:
             self._record_value_exposure(metadata, operand)
+
+    def _record_exposure_if_needed(self, metadata: ModuleMetadata, node: Expr) -> None:
+        if not self._is_externally_used(node):
+            return
+        unwrapped = unwrap_operand(node)
+        if isinstance(unwrapped, Const):
+            return
+        metadata.record_value(node)
+
+    def _is_externally_used(self, expr: Expr) -> bool:
+        module = self.current_module
+        if module is None:
+            return False
+        if self._usage_index is not None:
+            return self._usage_index.is_externally_used(
+                expr, module, exclude_push=True
+            )
+        return expr_externally_used(expr, True)
 
 
 def collect_external_metadata(sys: "SysBuilder") -> ExternalRegistry:

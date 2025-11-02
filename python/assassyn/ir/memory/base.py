@@ -1,4 +1,6 @@
-'''Base memory module with common functionality for SRAM and DRAM.'''
+"""Base memory module with common functionality for SRAM and DRAM."""
+
+from __future__ import annotations
 
 import math
 from ..module.downstream import Downstream

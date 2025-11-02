@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from types import MappingProxyType
-from typing import Dict, Mapping, Tuple, TYPE_CHECKING
+from typing import Dict, Mapping, Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from ....ir.array import Array
@@ -31,7 +31,7 @@ else:  # pragma: no cover - runtime imports only for type checking
     )
     from ....ir.module import Module, Port  # type: ignore
 
-FIFOExpr = FIFOPush | FIFOPop
+FIFOExpr = Union[FIFOPush, FIFOPop]
 
 
 class InteractionKind(Enum):

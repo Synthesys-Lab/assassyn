@@ -1,69 +1,66 @@
 # External Usage Analysis
 
-This module provides utilities for analyzing external usage patterns of expressions and operands across different modules in the Assassyn IR.
+This module centralises the bookkeeping needed to determine whether an `Expr`
+escapes its defining module. The data is consumed by both the Verilog and
+simulator back-ends to decide which values must be surfaced as exposed ports.
 
-## Section 1. Exposed Interfaces
+## Overview
+
+1. **Preprocessing** – `build_external_usage_index` walks every module's
+   `ModuleBase.externals` and records which modules consume a given expression.
+   The resulting :class:`ExternalUsageIndex` is a lightweight, read-only
+   registry that can be shared across multiple analysis passes.
+2. **On-demand queries** – `ExternalUsageIndex.is_externally_used` answers
+   cross-module usage checks in `O(1)` time by consulting the registry and, if
+   needed, falling back to the expression's user list. The function caches the
+   fallback result per `(expr, module)` to avoid repeated traversals.
+3. **Legacy compatibility** – `expr_externally_used` retains its original
+   signature and behaviour. When an index is supplied it delegates to
+   `ExternalUsageIndex`, otherwise it performs the original user-list scan. This
+   keeps existing callers working while enabling incremental adoption of the
+   precomputed registry.
+
+## Exposed Interfaces
 
 ### `get_module(operand: Operand) -> ModuleBase | None`
 
-```python
-def get_module(operand: Operand) -> ModuleBase | None:
-    """Get the module that contains the given operand."""
-```
+Returns the module that owns the provided operand by peeking at the operand's
+user and its `parent` attribute. This helper underpins both the registry and the
+legacy `expr_externally_used` function.
 
-**Parameters:**
-- `operand`: The operand whose containing module needs to be determined
-
-**Returns:**
-- `ModuleBase | None`: The module that contains the operand, or `None` if the operand's user is not an `Expr`
-
-**Behavior:**
-This function determines which module contains a given operand by examining the operand's user. If the user is an `Expr`, it returns the module recorded on the expression's `parent` field. Otherwise, it returns `None`.
-
-### `expr_externally_used(expr: Expr, exclude_push: bool) -> bool`
+### `class ExternalUsageIndex`
 
 ```python
-def expr_externally_used(expr: Expr, exclude_push: bool) -> bool:
-    """Check if an expression is used outside its module."""
+index = ExternalUsageIndex()
+index.record_module_externals(module)
+is_used = index.is_externally_used(expr, module)
 ```
 
-**Parameters:**
-- `expr`: The expression to check for external usage
-- `exclude_push`: If `True`, `FIFOPush` expressions are excluded from external usage analysis
+Stores a precomputed mapping from producer expressions to consumer modules.
 
-**Returns:**
-- `bool`: `True` if the expression is used outside its containing module, `False` otherwise
+- `record_module_externals(module)` extracts every external value referenced by
+  `module` (including nested operands) and records the dependency.
+- `is_externally_used(expr, owning_module, *, exclude_push=True)` returns
+  `True` when the expression is consumed by a different module. The optional
+  `exclude_push` flag mirrors the legacy API and suppresses `FIFOPush`
+  expressions when requested.
 
-**Behavior:**
-This function analyzes whether an expression is used by other modules outside its own module. It iterates through all users of the expression and checks if any user belongs to a different module than the expression's owning module. When `exclude_push` is `True`, `FIFOPush` expressions are automatically considered as not externally used.
+### `build_external_usage_index(modules: Iterable[ModuleBase])`
 
-## Section 2. Internal Helpers
+Convenience helper that instantiates an :class:`ExternalUsageIndex`, feeds it
+all provided modules, and returns the populated registry.
 
-This module does not contain internal helper functions. All functionality is exposed through the two main functions described above.
+### `expr_externally_used(expr: Expr, exclude_push: bool, index: ExternalUsageIndex | None = None)`
 
-## Usage Context
+Backwards-compatible facade that either defers to the supplied registry or
+falls back to scanning `expr.users`. All existing call sites continue to operate
+without modification, while new code can supply a precomputed index for better
+performance.
 
-### Code Generation Integration
+## Usage
 
-The `expr_externally_used` function is primarily used in code generation phases to determine whether expressions need to be exposed as module interfaces:
-
-1. **Simulator Code Generation** (`codegen/simulator/modules.py`): Used to determine if a valued expression needs exposure when generating simulator modules.
-
-2. **Verilog Code Generation** (`codegen/verilog/design.py`): Used to determine if expressions should be exposed in the generated Verilog design, particularly for non-constant expressions that are used externally.
-
-### Module Analysis
-
-The functions work together to analyze cross-module dependencies and usage patterns, which is essential for:
-- Determining module interface requirements
-- Optimizing code generation by identifying expressions that need to be exposed
-- Understanding data flow across module boundaries
-
-## Dependencies
-
-This module depends on the following IR components:
-- `Expr`, `Operand`, and `FIFOPush` from `ir.expr`
-- `ModuleBase` from `ir.module.base`
-
-## Technical Notes
-
-The analysis is based on the IR's user-definer relationships, where each expression maintains a list of its users (operands that reference it). The module containment is determined through the parent-child relationships in the IR structure.
+The Verilog FIFO metadata pass now invokes `build_external_usage_index` ahead of
+its IR walk and passes the registry into `FIFOAnalysisVisitor`. This ensures
+cross-module exposure checks are consistent, avoids repeatedly scanning the full
+module list, and removes the need for ad-hoc introspection of other modules'
+`externals` dictionaries within the visitor itself.

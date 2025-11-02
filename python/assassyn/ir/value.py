@@ -1,4 +1,6 @@
-'''The base node module for the overloaded frontend'''
+"""The base node module for the overloaded frontend."""
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 

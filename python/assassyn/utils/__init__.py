@@ -1,5 +1,7 @@
 """Utility functions and decorators for Assassyn."""
 
+from __future__ import annotations
+
 # Standard library imports
 import os
 import subprocess

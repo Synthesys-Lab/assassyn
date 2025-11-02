@@ -1,5 +1,7 @@
 """Runtime PyCDE helpers shared between generated and hand-authored designs."""
-# pylint: disable=invalid-name,unused-argument
+
+from __future__ import annotations
+# pylint: disable=invalid-name,unused-argument,import-error,too-few-public-methods
 
 from pycde import Clock, Input, Module, Output, Reset, dim, generator
 from pycde import modparams

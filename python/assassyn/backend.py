@@ -1,4 +1,6 @@
-'''The programming interfaces involing assassyn backends'''
+"""The programming interfaces involing assassyn backends."""
+
+from __future__ import annotations
 
 import os
 from pathlib import Path

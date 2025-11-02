@@ -1,4 +1,6 @@
-'''SRAM memory module implementation.'''
+"""SRAM memory module implementation."""
+
+from __future__ import annotations
 
 from .base import MemoryBase
 from ..module.downstream import combinational
