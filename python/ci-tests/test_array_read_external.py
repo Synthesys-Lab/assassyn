@@ -34,11 +34,14 @@ class Consumer(Downstream):
         super().__init__()
 
     @downstream.combinational
-    def build(self, external_value: Value):
+    def build(self, external_value: Value,pass_valid:Value):
         # Use the external value (which is an ArrayRead from Producer)
         result = external_value.optional(UInt(32)(0))
         incremented = result + UInt(32)(1)
         log("Consumer received: {}, incremented: {}", result, incremented)
+
+        with Condition(pass_valid.valid()):
+            log("Pass valid")
 
 
 class Driver(Module):
@@ -48,7 +51,7 @@ class Driver(Module):
         super().__init__(ports={})
 
     @module.combinational
-    def build(self, producer: Producer, data_array: Array):
+    def build(self, producer: Producer, data_array: Array ):
         # Initialize the data array
         (data_array & self)[0] <= UInt(32)(42)
 
@@ -56,10 +59,12 @@ class Driver(Module):
         counter = RegArray(UInt(32), 1)
         current = counter[0]
         next_val = current + UInt(32)(1)
-        (counter & self)[0] <= next_val
-
+        (counter & self)[0] <=  next_val
+        with Condition(counter[0] < UInt(32)(2)):
+            pass_valid = counter[0]
         # Call the producer
         producer.async_called()
+        return pass_valid
 
 
 def build_system():
@@ -73,17 +78,23 @@ def build_system():
 
     # Create consumer that uses the ArrayRead as external
     consumer = Consumer()
-    consumer.build(array_read_value)
 
     # Create driver
     driver = Driver()
-    driver.build(producer, data_array)
+    pass_valid = driver.build(producer, data_array)
+
+    consumer.build(array_read_value,pass_valid)
 
 
 def check(raw):
     """Verify the output contains expected log messages."""
     found_logs = 0
+    valid_logs = 0
     for line in raw.split('\n'):
+        if "Pass valid" in line:
+            valid_logs += 1
+            if valid_logs > 2:
+                raise AssertionError("Received more 'Pass valid' logs than expected")
         if 'Consumer received:' in line:
             found_logs += 1
             # Extract the values from the log

@@ -298,14 +298,22 @@ def cleanup_post_generation(dumper):
         render = resolve_value_exposure_render(dumper, expr)
         dumper.append_code(f'# Expose: {expr}')
         dumper.append_code(f'self.expose_{render.exposed_name} = {render.rval}')
-        predicate_terms = [
-            f'({dumper.format_predicate(getattr(entry, "meta_cond", None))})'
-            for entry in grouped_exposures
-        ]
-        pred_condition = _format_reduction_expr(
-            predicate_terms,
-            default_literal="Bits(1)(1)",
-        )
+        predicate_terms: list[str] = []
+        for entry in grouped_exposures:
+            predicate = getattr(entry, "meta_cond", None)
+            if predicate is None:
+                continue
+            formatted = f'({dumper.format_predicate(predicate)})'
+            if formatted == '(Bits(1)(1))':
+                continue
+            predicate_terms.append(formatted)
+        if predicate_terms:
+            pred_condition = _format_reduction_expr(
+                predicate_terms,
+                default_literal="Bits(1)(0)",
+            )
+        else:
+            pred_condition = "Bits(1)(1)"
         dumper.append_code(
             f'self.valid_{render.exposed_name} = executed_wire & ({pred_condition})'
         )
