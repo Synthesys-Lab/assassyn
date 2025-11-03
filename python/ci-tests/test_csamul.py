@@ -2,7 +2,7 @@ from assassyn.frontend import *
 from assassyn.test import run_test
 import random
 # Stage 3: full adder
-class MulStage3(Module):
+class FinalAdder(Module):
     def __init__(self):
         super().__init__(ports={
             'a': Port(Int(32)),
@@ -21,7 +21,7 @@ class MulStage3(Module):
             
             
 # MulStage 2: CSA + Pseudo-Wallace Tree
-class MulStage2(Module):
+class CSATree(Module):
     def __init__(self):
         super().__init__(
             ports={
@@ -48,7 +48,7 @@ class MulStage2(Module):
         )
 
     @module.combinational
-    def build(self, mulstage3: MulStage3):
+    def build(self, finaladder: FinalAdder):
         a, b, cnt, booth0, booth1, booth2, booth3, booth4, booth5, booth6, booth7, \
         booth8, booth9, booth10, booth11, booth12, booth13, booth14, booth15 = self.pop_all_ports(True)
     
@@ -102,11 +102,11 @@ class MulStage2(Module):
 
         final_s = current_pps[0]
         final_carry = current_pps[1]
-        log("Mulstage2: sum = {:?}, carry = {:?}",final_s,final_carry)
-        mulstage3.async_called(a=a, b=b, cnt=cnt, s=final_s, carry=final_carry)
+        log("CSATree: sum = {:?}, carry = {:?}",final_s,final_carry)
+        finaladder.async_called(a=a, b=b, cnt=cnt, s=final_s, carry=final_carry)
 
 # MulStage 1: radix-4 booth encoding
-class MulStage1(Module):
+class BoothEncoder(Module):
     def __init__(self):
         super().__init__(
             ports={
@@ -117,7 +117,7 @@ class MulStage1(Module):
         )
 
     @module.combinational
-    def build(self, mulstage2: MulStage2):
+    def build(self, csatree: CSATree):
         a, b, cnt = self.pop_all_ports(True)
 
         b_unsigned = b.bitcast(Bits(32))
@@ -191,8 +191,8 @@ class MulStage1(Module):
         b1 = ((b_shift_unsigned >> Bits(32)(1)) & Bits(32)(1)).bitcast(Int(32))
         booth15 = (((b5 + b0) * a + b1 * a_comp) << Int(32)(30)).bitcast(Int(64)) 
 
-        log("MulStage1: DONE booth coding for {:?} * {:?}", a, b)
-        mulstage2.async_called(a=a, b=b, cnt=cnt, booth0=booth0, booth1=booth1, booth2=booth2, booth3=booth3, booth4=booth4, booth5=booth5,
+        log("BoothEncoder: DONE booth coding for {:?} * {:?}", a, b)
+        csatree.async_called(a=a, b=b, cnt=cnt, booth0=booth0, booth1=booth1, booth2=booth2, booth3=booth3, booth4=booth4, booth5=booth5,
             booth6=booth6, booth7=booth7, booth8=booth8, booth9=booth9, booth10=booth10, booth11=booth11, booth12=booth12, booth13=booth13,
             booth14=booth14, booth15=booth15,)
 
@@ -201,7 +201,7 @@ class Driver(Module):
         super().__init__(ports={})
 
     @module.combinational
-    def build(self, mulstage1: MulStage1):
+    def build(self, boothencoder: BoothEncoder):
         cnt = RegArray(Int(32), 1)
         (cnt & self)[0] <= cnt[0] + Int(32)(1)
         cond = cnt[0] < Int(32)(95)
@@ -211,23 +211,23 @@ class Driver(Module):
         (input_a & self)[0] <= input_a[0] + Int(32)(1)
         (input_b & self)[0] <= input_b[0] + Int(32)(1)
         with Condition(cond):
-            mulstage1.async_called(a=input_a[0], b=input_b[0], cnt=cnt[0])
+            boothencoder.async_called(a=input_a[0], b=input_b[0], cnt=cnt[0])
 
 def build_system():
 
-    mulstage3 = MulStage3()
-    mulstage3.build()
-    mulstage2 = MulStage2()
-    mulstage2.build(mulstage3)
-    mulstage1 = MulStage1()
-    mulstage1.build(mulstage2)
+    finaladder = FinalAdder()
+    finaladder.build()
+    csatree = CSATree()
+    csatree.build(finaladder)
+    boothencoder = BoothEncoder()
+    boothencoder.build(csatree)
     driver = Driver()
-    driver.build(mulstage1)
+    driver.build(boothencoder)
 
 def check_raw(raw):
     cnt = 0
     for i in raw.split('\n'):
-        if 'Final' in i:
+        if 'Final result' in i:
             line_toks = i.split()
             c = line_toks[-1]
             b = line_toks[-3]
