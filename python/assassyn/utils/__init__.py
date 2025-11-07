@@ -7,9 +7,14 @@ import os
 import subprocess
 import sys
 import re
-
+import glob
+import hashlib
+import json
 # Local imports
 from .enforce_type import enforce_type, validate_arguments, check_type
+
+# Cache coordination data between elaborate() and build_simulator()
+CACHE_PENDING = None # pylint: disable=invalid-name
 
 def identifierize(obj):
     '''The helper function to get the identifier of the given object. You can change `id_slice`
@@ -115,15 +120,20 @@ def get_simulator_binary_path(manifest_path):
 
 
 def build_simulator(manifest_path, offline=False):
-    '''Build the simulator binary using cargo build.
+    '''Build the simulator binary using cargo build, or return cached binary.
 
     Args:
-        manifest_path: Path to Cargo.toml
+        manifest_path: Path to Cargo.toml OR path to cached binary
         offline: Whether to use offline mode
 
     Returns:
         str: Path to the compiled binary
     '''
+    # If it's already a binary (from cache), just return it
+    if os.path.exists(manifest_path) and not str(manifest_path).endswith('.toml'):
+        print(f"[Cache] Using cached binary: {manifest_path}")
+        return manifest_path
+
     def _build(off):
         cmd = ['cargo', 'build', '--release', '--manifest-path', manifest_path]
         if off:
@@ -141,7 +151,18 @@ def build_simulator(manifest_path, offline=False):
         except subprocess.CalledProcessError as retry_err:
             raise err from retry_err
 
-    return get_simulator_binary_path(manifest_path)
+    binary_path = get_simulator_binary_path(manifest_path)
+
+    # Save cache if elaborate() set up cache info
+    # pylint: disable=global-statement
+    global CACHE_PENDING
+    if CACHE_PENDING is not None:
+        source_dir, cache_key, verilog_path = CACHE_PENDING  # pylint: disable=unpacking-non-sequence
+        save_build_cache(source_dir, cache_key, binary_path, verilog_path)
+        print("[Cache Saved] Build cached for future use")
+        CACHE_PENDING = None
+
+    return binary_path
 
 
 def run_simulator(manifest_path=None, offline=False, release=True, binary_path=None):
@@ -255,6 +276,46 @@ def namify(name: str) -> str:
     """
     return ''.join(c if c.isalnum() or c == '_' else '_' for c in name)
 
+def check_build_cache(src_dir: str, cache_key: str):
+    """Check if cached build exists and is valid.
+
+    Args:
+        src_dir: Directory where cache file is stored
+        cache_key: Combined IR hash + config hash key
+    """
+
+    cache_file = f'{src_dir}/.build_cache.json'
+    if not os.path.exists(cache_file):
+        return None
+    try:
+        with open(cache_file, 'r', encoding='utf-8') as f:
+            cache = json.load(f)
+        if cache.get('key') == cache_key:
+            binary = cache.get('binary')
+            if binary and os.path.exists(binary):
+                return binary, cache.get('verilog')
+    except (json.JSONDecodeError, KeyError, OSError):
+        pass
+    return None
+
+def save_build_cache(src_dir: str, cache_key: str, binary: str, verilog: str):
+    """Save build cache metadata.
+
+    Args:
+        src_dir: Directory where cache file will be stored
+        cache_key: Combined IR hash + config hash key
+        binary: Path to built simulator binary
+        verilog: Path to generated verilog (optional)
+    """
+    cache_data = {
+        'key': cache_key,
+        'binary': str(binary),
+        'verilog': str(verilog) if verilog else None
+    }
+    cache_file = f'{src_dir}/.build_cache.json'
+    with open(cache_file, 'w', encoding='utf-8') as f:
+        json.dump(cache_data, f)
+
 __all__ = [
     # Type enforcement utilities
     'enforce_type', 'validate_arguments', 'check_type',
@@ -262,5 +323,7 @@ __all__ = [
     'identifierize', 'unwrap_operand', 'repo_path', 'package_path',
     'patch_fifo', 'run_simulator', 'build_simulator', 'get_simulator_binary_path',
     'run_verilator', 'parse_verilator_cycle',
-    'parse_simulator_cycle', 'has_verilator', 'create_dir', 'namify'
+    'parse_simulator_cycle', 'has_verilator', 'create_dir', 'namify',
+    # Build caching
+    'check_build_cache', 'save_build_cache'
 ]
