@@ -14,7 +14,7 @@ import json
 from .enforce_type import enforce_type, validate_arguments, check_type
 
 # Cache coordination data between elaborate() and build_simulator()
-CACHE_PENDING = None # pylint: disable=invalid-name
+CACHE_PENDING: tuple[str, str, str] | None = None
 
 def identifierize(obj):
     '''The helper function to get the identifier of the given object. You can change `id_slice`
@@ -156,8 +156,9 @@ def build_simulator(manifest_path, offline=False):
     # Save cache if elaborate() set up cache info
     # pylint: disable=global-statement
     global CACHE_PENDING
-    if CACHE_PENDING is not None:
-        source_dir, cache_key, verilog_path = CACHE_PENDING  # pylint: disable=unpacking-non-sequence
+    cache_data = CACHE_PENDING
+    if cache_data is not None:
+        source_dir, cache_key, verilog_path = cache_data
         save_build_cache(source_dir, cache_key, binary_path, verilog_path)
         print("[Cache Saved] Build cached for future use")
         CACHE_PENDING = None
