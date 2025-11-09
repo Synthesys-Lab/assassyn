@@ -120,10 +120,10 @@ def get_simulator_binary_path(manifest_path):
 
 
 def build_simulator(manifest_path, offline=False):
-    '''Build the simulator binary using cargo build, or return cached binary.
+    '''Build the simulator binary using cargo build.
 
     Args:
-        manifest_path: Path to Cargo.toml OR path to cached binary
+        manifest_path: Path to Cargo.toml
         offline: Whether to use offline mode
 
     Returns:

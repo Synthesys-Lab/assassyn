@@ -81,15 +81,7 @@ def _generate_cache_key(sys_name: str, config_dict: dict) -> str:
 def elaborate(# pylint: disable=too-many-locals
         sys: SysBuilder, **kwargs):
     '''
-    Invoke the elaboration process of the given system with automatic build caching.
-
-    This function automatically:
-    1. Detects the caller's source directory for cache hashing
-    2. Generates a cache key from the system name and configuration
-    3. Checks if a cached build exists and is valid
-    4. If cache hit: returns the cached binary immediately
-    5. If cache miss: generates code, builds binary, saves cache, and returns binary
-
+    Invoke the elaboration process of the given system.
     Args:
         sys (SysBuilder): The assassyn system to be elaborated.
         path (Path): The directory where the Rust project will be dumped.
@@ -100,10 +92,6 @@ def elaborate(# pylint: disable=too-many-locals
         idle_threshold (int): The threshold for the idle state to terminate the simulation.
         sim_threshold (int): The threshold for the simulation to terminate.
         **kwargs: The optional arguments that will be passed to the code generator.
-
-    Returns:
-        [binary_path, verilog_path]: Paths to the built simulator binary and verilog code.
-            The binary is always ready to run (either from cache or freshly built).
     '''
 
     real_config = config()
@@ -113,16 +101,10 @@ def elaborate(# pylint: disable=too-many-locals
             raise ValueError(f'Invalid config key: {k}')
         real_config[k] = v
 
-    # Auto-detect source directory from caller's file location for cache storage
-    try:
-        frame = inspect.stack()[1]
-        caller_file = frame.filename
-        source_dir = os.path.dirname(os.path.abspath(caller_file))
-    except (IndexError, AttributeError):
-        # If we can't detect caller, disable caching
-        source_dir = None
+    frame = inspect.stack()[1]
+    caller_file = frame.filename
+    source_dir = os.path.dirname(os.path.abspath(caller_file))
 
-    # Generate cache key from IR representation and configuration
     ir_hash = hashlib.sha256(repr(sys).encode()).hexdigest()[:16]
     config_hash = _generate_cache_key(sys.name, real_config)
     cache_key = f"{ir_hash}_{config_hash}"
