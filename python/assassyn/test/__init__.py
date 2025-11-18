@@ -20,8 +20,7 @@ def run_test(name: str, top: callable, checker: callable, **kwargs):
             (e.g., sim_threshold, idle_threshold, random)
     """
     # Generate unique system name to avoid conflicts in parallel test execution
-    unique_name = name
-    sys = SysBuilder(unique_name)
+    sys = SysBuilder(name)
     with sys:
         # Check if top() accepts a parameter
         sig = inspect.signature(top)
@@ -57,8 +56,7 @@ def dump_ir(name: str, builder: callable, checker: callable, print_dump: bool = 
         print_dump: Whether to print IR dump to stdout (default True)
     """
     # Generate unique system name to avoid conflicts in parallel test execution
-    unique_name = _make_unique_name(name)
-    sys = SysBuilder(unique_name)
+    sys = SysBuilder(name)
     with sys:
         builder(sys)
 
