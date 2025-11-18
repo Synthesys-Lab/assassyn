@@ -25,7 +25,7 @@ def test_driver():
         driver = Driver()
         driver.build()
 
-    run_test('driver', top, check)
+    run_test('naming', top, check)
 
 
 if __name__ == '__main__':
