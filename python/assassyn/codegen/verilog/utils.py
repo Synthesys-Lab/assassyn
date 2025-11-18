@@ -109,7 +109,6 @@ from pycde.signals import Struct, BitsSignal
 from pycde.dialects import comb,sv
 from functools import reduce
 import operator
-from operator import add
 from assassyn.pycde_wrapper import FIFO, TriggerCounter, build_register_file
 
 '''

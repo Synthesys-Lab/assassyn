@@ -328,7 +328,7 @@ def cleanup_post_generation(dumper):
             continue
         dumper.append_code(f'# Summing triggers for {rval}')
         add_terms = [f"Mux({pred}, UInt(8)(0), UInt(8)(1))" for pred in trigger_predicates]
-        sum_expression = f"reduce(add, [{', '.join(add_terms)}])"
+        sum_expression = f"reduce(operator.add, [{', '.join(add_terms)}])"
         resized_sum = f"(({sum_expression}).as_bits()[0:8].as_uint())"
         final_trigger_value = f"Mux(executed_wire, UInt(8)(0), {resized_sum})"
         dumper.append_code(f'self.{rval}_trigger = {final_trigger_value}')

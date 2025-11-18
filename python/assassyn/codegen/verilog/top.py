@@ -516,7 +516,7 @@ def generate_top_harness(dumper: CIRCTDumper):
                 f"inst_{namify(c.name)}.{mod_name}_trigger"
                 for c in async_callers
             ]
-            summed_triggers = f"reduce(add, [{', '.join(trigger_terms)}])"
+            summed_triggers = f"reduce(operator.add, [{', '.join(trigger_terms)}])"
 
             dumper.append_code(
                 f"{mod_name}_trigger_counter_delta.assign({summed_triggers}.as_bits(8))"
