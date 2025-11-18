@@ -190,6 +190,13 @@ def run_verilator(path):
     patch_fifo("sv/hw/Top.sv")
     cmd_tb = ['python', 'tb.py']
     res = _cmd_wrapper(cmd_tb)
+    # Filter infrastructure logs (e.g., INFO: Running command …) so checker
+    # routines downstream only see the simulated waveform prints.
+    filtered_lines = [
+        line for line in res.splitlines()
+        if not line.startswith('INFO:')
+    ]
+    res = '\n'.join(filtered_lines)
     os.chdir(restore)
     return res
 

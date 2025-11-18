@@ -218,7 +218,7 @@ def test_array_write_mux_matches_reference_rendering():
     expected = {
         base: (
             f"{base} = executed_wire & "
-            "(reduce(or_, [self.pred0.as_bits(), self.pred1.as_bits()]))"
+            "(reduce(operator.or_, [self.pred0.as_bits(), self.pred1.as_bits()]))"
         ),
         f"{base.replace('_w', '_wdata')}": (
             f"{base.replace('_w', '_wdata')} = Mux("
@@ -247,7 +247,7 @@ def test_fifo_push_mux_matches_reference_rendering():
     expected = {
         f"{fifo_prefix}_push_valid": (
             f"{fifo_prefix}_push_valid = executed_wire & "
-            "(reduce(or_, [(self.pred0), (self.pred1)], Bits(1)(0))) & "
+            "(reduce(operator.or_, [(self.pred0), (self.pred1)], Bits(1)(0))) & "
             f"{ready_signal}"
         ),
         f"{fifo_prefix}_push_data": (
@@ -291,7 +291,7 @@ def test_fifo_push_single_entry_passthrough():
     expected = {
         f"{fifo_prefix}_push_valid": (
             f"{fifo_prefix}_push_valid = executed_wire & "
-            "(reduce(or_, [(self.pred)], Bits(1)(0))) & "
+            "(reduce(operator.or_, [(self.pred)], Bits(1)(0))) & "
             f"{ready_signal}"
         ),
         f"{fifo_prefix}_push_data": (
@@ -305,16 +305,16 @@ def test_fifo_push_single_entry_passthrough():
 def test_format_reduction_expr_supports_and_operator_with_defaults():
     """Generalised helper emits AND reductions and surfaces defaults."""
     assert (
-        _format_reduction_expr([], default_literal="Bits(1)(1)", op="and_")
+        _format_reduction_expr([], default_literal="Bits(1)(1)", op="operator.and_")
         == "Bits(1)(1)"
     )
     assert (
-        _format_reduction_expr(["lhs"], default_literal="Bits(1)(1)", op="and_")
-        == "reduce(and_, [lhs], Bits(1)(1))"
+        _format_reduction_expr(["lhs"], default_literal="Bits(1)(1)", op="operator.and_")
+        == "reduce(operator.and_, [lhs], Bits(1)(1))"
     )
     assert (
-        _format_reduction_expr(["lhs", "rhs"], default_literal="Bits(1)(1)", op="and_")
-        == "reduce(and_, [lhs, rhs], Bits(1)(1))"
+        _format_reduction_expr(["lhs", "rhs"], default_literal="Bits(1)(1)", op="operator.and_")
+        == "reduce(operator.and_, [lhs, rhs], Bits(1)(1))"
     )
 
 
@@ -333,11 +333,11 @@ def test_emit_predicate_mux_chain_preserves_custom_reduce():
         aggregate_predicates=lambda preds: _format_reduction_expr(
             preds,
             default_literal="Bits(1)(1)",
-            op="and_",
+            op="operator.and_",
         ),
     )
 
-    assert predicate_expr == "reduce(and_, [v0_pred, v1_pred], Bits(1)(1))"
+    assert predicate_expr == "reduce(operator.and_, [v0_pred, v1_pred], Bits(1)(1))"
     assert mux_expr == "Mux(v1_pred, Mux(v0_pred, DEFAULT, v0), v1)"
 
 

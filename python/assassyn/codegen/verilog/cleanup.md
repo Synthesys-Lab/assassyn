@@ -25,8 +25,8 @@ def cleanup_post_generation(dumper):
 This is the main cleanup function that generates all the necessary control signals and interconnections after the primary Verilog code generation is complete. It performs the following steps:
 
 1. **Execution Signal Generation**: Creates the `executed_wire` signal that determines when a module should execute:
-   - For downstream modules: Gathers upstream dependencies with `analysis.get_upstreams(module)` and ORs their `executed` flags via `_format_reduction_expr(..., op="or_", default_literal="Bits(1)(0)")`.
-   - For regular modules: ANDs the trigger-counter pop-valid input with any active `wait_until` predicate recorded during expression lowering using the same helper with `op="and_"` and a `Bits(1)(1)` default.
+   - For downstream modules: Gathers upstream dependencies with `analysis.get_upstreams(module)` and ORs their `executed` flags via `_format_reduction_expr(..., op="operator.or_", default_literal="Bits(1)(0)")`.
+   - For regular modules: ANDs the trigger-counter pop-valid input with any active `wait_until` predicate recorded during expression lowering using the same helper with `op="operator.and_"` and a `Bits(1)(1)` default.
 
 2. **Finish Signal Generation**: Reduces every FINISH site captured in
    `module_metadata.finish_sites`, formatting each intrinsic’s `expr.meta_cond` and gating it with
@@ -113,7 +113,7 @@ The module uses several internal helper functions and imports utilities from oth
 - `dump_type()` and `dump_type_cast()` from [utils](/python/assassyn/codegen/verilog/utils.md) for type handling
 - `get_sram_info()` from [utils](/python/assassyn/codegen/verilog/utils.md) for SRAM information extraction
 - `namify()` and `unwrap_operand()` from [utils](/python/assassyn/utils.md) for name generation and operand handling
-- `_format_reduction_expr(predicates, *, default_literal, op="or_")` canonicalises OR/AND-style predicate reductions, emitting caller-provided defaults for empty sequences while allowing any reducer supported by the dumper runtime.
+- `_format_reduction_expr(predicates, *, default_literal, op="operator.or_")` canonicalises OR/AND-style predicate reductions, emitting caller-provided defaults for empty sequences while allowing any reducer supported by the dumper runtime. Callers pass `operator.and_` when AND semantics are required, keeping generated code consistent with the `operator` module import in the Verilog header.
 - `_emit_predicate_mux_chain()` centralises predicate-driven mux construction so callers reuse ordering and reduction semantics.
 
 The cleanup process is tightly integrated with the [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) class and is called as the final step in module generation to ensure all interconnections are properly established.

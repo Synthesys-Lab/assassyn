@@ -481,7 +481,10 @@ def generate_top_harness(dumper: CIRCTDumper):
             finish_signals.append(f'inst_{mod_name}.finish')
 
     if finish_signals:
-        dumper.append_code(f'self.global_finish = reduce(or_, [{", ".join(finish_signals)}])')
+        joined_signals = ", ".join(finish_signals)
+        dumper.append_code(
+            f'self.global_finish = reduce(operator.or_, [{joined_signals}])'
+        )
     else:
         dumper.append_code('self.global_finish = Bits(1)(0)')
 

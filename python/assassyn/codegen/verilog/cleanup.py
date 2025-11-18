@@ -99,7 +99,7 @@ def _format_reduction_expr(
     predicates: Sequence[str],
     *,
     default_literal: Optional[str],
-    op: str = "or_",
+    op: str = "operator.or_",
 ) -> str:
     """Format a reduction expression with configurable operator and default literal."""
 
@@ -172,7 +172,7 @@ def cleanup_post_generation(dumper):
         executed_expr = _format_reduction_expr(
             exec_conditions,
             default_literal="Bits(1)(1)",
-            op="and_",
+            op="operator.and_",
         )
         dumper.append_code(f"executed_wire = {executed_expr}")
 

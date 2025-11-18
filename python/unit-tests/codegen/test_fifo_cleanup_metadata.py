@@ -63,7 +63,7 @@ def test_fifo_cleanup_metadata_drives_handshakes():
 
     code = "\n".join(dumper.code)
     module_prefix = namify(pipe_module.name)
-    assert "reduce(or_, [" in code
+    assert "reduce(operator.or_, [" in code
     push_valid_pattern = (
         rf"self\.{module_prefix}_out0_push_valid = executed_wire & "
         rf"\(.+\) & self\.fifo_{module_prefix}_out0_push_ready"

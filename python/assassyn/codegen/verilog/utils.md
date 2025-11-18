@@ -150,10 +150,10 @@ This function is used to ensure type consistency in Verilog signal assignments a
 
 The `HEADER` constant contains the standard Python CIRCT imports plus a reference to shared runtime helpers used in generated Verilog code:
 
-- **Imports**: Essential CIRCT modules and types
+- **Imports**: Essential CIRCT modules and types together with `import operator`, so generated reductions explicitly call `operator.and_` / `operator.or_` instead of shadowing those identifiers via `from operator import …`.
 - **Runtime wrappers**: Imports `FIFO`, `TriggerCounter`, and `build_register_file` from `assassyn.pycde_wrapper`, ensuring generated designs reuse the shared FIFO, trigger counter, and register-file primitives instead of emitting bespoke definitions
 
-This header is included in all generated Verilog modules to provide the necessary infrastructure for the credit-based pipeline architecture while avoiding duplicate class definitions.
+This header is included in all generated Verilog modules to provide the necessary infrastructure for the credit-based pipeline architecture while avoiding duplicate class definitions and identifier collisions with user-defined naming artifacts.
 
 **Project-specific Knowledge Required**:
 - Understanding of [CIRCT framework](/docs/design/internal/pipeline.md)
