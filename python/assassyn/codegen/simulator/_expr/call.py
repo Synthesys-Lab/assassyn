@@ -28,13 +28,14 @@ def codegen_fifo_pop(node: FIFOPop, module_ctx):
     fifo = node.fifo
     fifo_id = fifo_name(fifo)
     module_name = module_ctx.name
+    loc_info = str(getattr(node, "loc", "<unknown location>")).replace('"', '\\"')
 
     return f"""{{
               let stamp = sim.stamp - sim.stamp % 100 + 50;
               sim.{fifo_id}.pop.push(FIFOPop::new(stamp, "{module_name}"));
               match sim.{fifo_id}.payload.front() {{
                 Some(value) => value.clone(),
-                None => return false,
+                None => panic!("{loc_info} is trying to pop an empty FIFO"),
               }}
             }}"""
 
