@@ -105,19 +105,28 @@ def build_simulator(manifest_path: str, offline: bool = False) -> str
 Build the simulator binary using cargo build.
 
 **Parameters:**
-- `manifest_path`: Path to the Cargo.toml manifest file
+- `manifest_path`: Path to the Cargo.toml manifest file or a cached binary path
 - `offline`: Whether to run cargo in offline mode (default: False)
 
 **Returns:**
 - The path to the compiled binary executable
 
 **Explanation:**
-This function compiles the Rust-based simulator once using `cargo build --release`, returning the path to the
-compiled binary. It constructs the appropriate cargo build command with the provided manifest path and optional
-flags. If the initial build fails and `offline` was not explicitly requested, it retries automatically with
-`--offline` to support environments without network access. This is useful when you need to run the same
-simulator multiple times with different workloads - build once with this function, then use `run_simulator()`
-with `binary_path` parameter to run the binary directly without recompiling.
+This function compiles the Rust-based simulator using `cargo build --release` and manages the build cache. It 
+performs the following steps:
+
+1. **Cache Check**: If `manifest_path` is already a binary (from a cache hit in `elaborate()`), it immediately 
+   returns the path without compilation
+2. **Compilation**: If `manifest_path` is a Cargo.toml file, it constructs the appropriate cargo build command 
+   and compiles the simulator. If the initial build fails and `offline` was not explicitly requested, it retries 
+   automatically with `--offline` to support environments without network access
+3. **Cache Saving**: After successful compilation, if [`backend.elaborate()`](../backend.py) set the global 
+   `CACHE_PENDING` variable, this function calls `save_build_cache()` to store the build metadata for future runs
+
+The build cache coordination between `elaborate()` and this function enables significant speedup in development 
+workflows by eliminating redundant compilation when the IR and configuration haven't changed. For scenarios 
+requiring multiple runs with the same simulator (e.g., different test workloads), build once with this function, 
+then use `run_simulator()` with the `binary_path` parameter to run the binary directly without recompiling.
 
 ### get_simulator_binary_path
 
@@ -288,6 +297,59 @@ This function converts an arbitrary string to a valid identifier by replacing al
 (except underscore) with underscores. This matches the Rust implementation in `src/backend/simulator/utils.rs` 
 and ensures consistency across language boundaries. It's used extensively in code generation to create valid 
 variable and module names.
+
+### check_build_cache
+
+```python
+def check_build_cache(src_dir: str, cache_key: str) -> tuple[str, str] | None
+```
+
+Check if cached build exists and is valid.
+
+**Parameters:**
+- `src_dir`: Directory where cache file is stored (typically the test file's directory)
+- `cache_key`: Combined IR hash + config hash key
+
+**Returns:**
+- A tuple `(binary_path, verilog_path)` if cache exists and is valid, `None` otherwise
+
+**Explanation:**
+This function checks for a cached build by reading the `.build_cache.json` file in the source directory. It 
+verifies that:
+1. The cache file exists
+2. The cache key matches the current build
+3. The cached binary still exists on disk
+
+If all conditions are met, it returns the paths to the cached binary and Verilog output. Otherwise, it returns 
+`None` to indicate a cache miss. This function is called by [`backend.elaborate()`](../backend.py) to check for 
+cached builds before performing expensive IR processing and code generation.
+
+### save_build_cache
+
+```python
+def save_build_cache(src_dir: str, cache_key: str, binary: str, verilog: str) -> None
+```
+
+Save build cache metadata.
+
+**Parameters:**
+- `src_dir`: Directory where cache file will be stored
+- `cache_key`: Combined IR hash + config hash key
+- `binary`: Path to built simulator binary
+- `verilog`: Path to generated verilog (optional, can be None)
+
+**Returns:**
+- None
+
+**Explanation:**
+This function saves cache metadata to a `.build_cache.json` file in the source directory. The cache file stores:
+- `key`: The combined IR and configuration hash for cache validation
+- `binary`: Absolute path to the compiled simulator binary
+- `verilog`: Absolute path to generated Verilog directory (if any)
+
+This function is called by `build_simulator()` after successful compilation to cache the build for future runs. 
+The cache enables significant speedup in development workflows by eliminating redundant compilation when the IR 
+and configuration haven't changed.
 
 ---
 

@@ -32,6 +32,8 @@ def run_test(name: str, top: callable, checker: callable, **kwargs):
     # Set defaults, allow overrides
     if 'verilog' not in kwargs:
         kwargs['verilog'] = utils.has_verilator()
+    if 'enable_cache' not in kwargs:
+        kwargs['enable_cache'] = False
     cfg = config()
     cfg.update(kwargs)
 

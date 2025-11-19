@@ -22,7 +22,8 @@ def config( # pylint: disable=too-many-arguments
         sim_threshold=100,
         idle_threshold=100,
         fifo_depth=4,
-        random=False):
+        random=False,
+        enable_cache=True):
     '''The helper function to dump the default configuration of elaboration.'''
     res = {
         'path': path,
@@ -34,7 +35,8 @@ def config( # pylint: disable=too-many-arguments
         'sim_threshold': sim_threshold,
         'idle_threshold': idle_threshold,
         'fifo_depth': fifo_depth,
-        'random': random
+        'random': random,
+        'enable_cache': enable_cache
     }
     return res.copy()
 
@@ -105,12 +107,12 @@ def elaborate(# pylint: disable=too-many-locals
     caller_file = frame.filename
     source_dir = os.path.dirname(os.path.abspath(caller_file))
 
-    ir_hash = hashlib.sha256(repr(sys).encode()).hexdigest()[:16]
+    ir_hash = hashlib.sha256(repr(sys).encode()).hexdigest()[:24]
     config_hash = _generate_cache_key(sys.name, real_config)
     cache_key = f"{ir_hash}_{config_hash}"
 
-    # Check cache if source directory was detected
-    if source_dir and real_config.get('simulator', True):
+    # Check cache if source directory was detected and caching is enabled
+    if source_dir and real_config.get('simulator', True) and real_config.get('enable_cache', True):
         cached = utils.check_build_cache(source_dir, cache_key)
         if cached:
             binary_path, verilog_path = cached
@@ -136,7 +138,7 @@ def elaborate(# pylint: disable=too-many-locals
     simulator_manifest, verilog_path = codegen.codegen(sys, **real_config)
 
     # Store cache info globally for build_simulator to use after building
-    if source_dir:
+    if source_dir and real_config.get('enable_cache', True):
         utils.CACHE_PENDING = (source_dir, cache_key, verilog_path)
 
     return [simulator_manifest, verilog_path]
