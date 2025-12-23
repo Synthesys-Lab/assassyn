@@ -110,15 +110,19 @@ def generate_top_harness(dumper: CIRCTDumper):
     for module in dumper.sys.modules:
         depth_map = module_fifo_depths.get(module, {})
         if not depth_map:
-            width = default_fifo_depth
+            depth_log2 = default_fifo_depth
         else:
             depths = list(depth_map.values())
-            width = depths[0]
-            if any(d != width for d in depths):
+            depth_log2 = depths[0]
+            if any(d != depth_log2 for d in depths):
                 raise RuntimeError(
                     f"Inconsistent FIFO depths for module {module.name}: {depths}"
                 )
-        module_trigger_widths[module] = width
+
+        # Trigger counters track the number of outstanding enqueued operations.
+        # For a FIFO with size 2**DEPTH_LOG2, the counter must represent values
+        # up to at least that size, so use DEPTH_LOG2+1 bits (min 1).
+        module_trigger_widths[module] = max(1, int(depth_log2) + 1)
 
     # --- 1. Wire Declarations (Generic) ---
     dumper.append_code('# --- Wires for FIFOs, Triggers, and Arrays ---')
@@ -402,17 +406,21 @@ def generate_top_harness(dumper: CIRCTDumper):
 
         # Use metadata instead of walking expressions again
         metadata = dumper.module_metadata.get(module)
-        pushes = metadata.interactions.pushes if metadata else ()
+        pushes = [
+            p
+            for p in (metadata.interactions.pushes if metadata else ())
+            if getattr(p, "parent", None) is module
+        ]
         calls = metadata.calls if metadata else []
 
         for push in pushes:
             # Store the actual Port object that is the target of a push
             all_driven_fifo_ports.add(push.fifo)
 
-        unique_push_targets = {(push.fifo.module, push.fifo) for push in pushes}
+        unique_output_push_targets = {(push.fifo.module, push.fifo) for push in pushes}
         unique_call_targets = {c.bind.callee for c in calls}
 
-        for (callee_mod, callee_port) in unique_push_targets:
+        for (callee_mod, callee_port) in unique_output_push_targets:
             port_map.append(
                 f"fifo_{namify(callee_mod.name)}_{namify(callee_port.name)}_push_ready="
                 f"fifo_{namify(callee_mod.name)}_{namify(callee_port.name)}_push_ready"
@@ -457,7 +465,7 @@ def generate_top_harness(dumper: CIRCTDumper):
                     f"{fifo_name}_pop_ready.assign(Bits(1)(1))"
                 )
 
-        for (callee_mod, callee_port) in unique_push_targets:
+        for (callee_mod, callee_port) in unique_output_push_targets:
             callee_mod_name = namify(callee_mod.name)
             callee_port_name = namify(callee_port.name)
             connection_lines.append(

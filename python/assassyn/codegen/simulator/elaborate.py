@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .modules import dump_modules
 from .simulator import dump_simulator
-from .verilator import emit_external_sv_ffis
+from .verilator import emit_external_sv_ffis, write_external_ffis_rs
 
 from ...utils import repo_path
 
@@ -29,9 +29,6 @@ def _write_manifest(simulator_path: Path, sys_name: str, ffi_specs) -> Path:
         cargo.write('edition = "2021"\n')
         cargo.write('[dependencies]\n')
         cargo.write(f'sim-runtime = {{ path = "{runtime_path}" }}\n')
-        for spec in ffi_specs:
-            rel_path = os.path.relpath(spec.crate_path, simulator_path).replace(os.sep, '/')
-            cargo.write(f'{spec.crate_name} = {{ path = "{rel_path}" }}\n')
     return manifest_path
 
 
@@ -55,10 +52,12 @@ def elaborate_impl(sys, config):
     (simulator_path / "src").mkdir(exist_ok=True)
 
     ffi_specs = emit_external_sv_ffis(sys, config, simulator_path, verilator_root)
+    write_external_ffis_rs(simulator_path, ffi_specs)
 
     print(f"Writing simulator code to rust project: {simulator_path}")
 
-    manifest_path = _write_manifest(simulator_path, sys.name, ffi_specs)
+    crate_name = config.get('simulator_crate_name') or sys.name
+    manifest_path = _write_manifest(simulator_path, crate_name, ffi_specs)
 
     shutil.copy(Path(repo_path()) / "rustfmt.toml", simulator_path / "rustfmt.toml")
 

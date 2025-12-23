@@ -226,10 +226,11 @@ def generate_register_file_sv_files(sys: SysBuilder, path: Path) -> List[str]:
             lines.append("      end")
         else:
             if len(initializer) != depth:
-                raise ValueError(
-                    f"Initializer length {len(initializer)} does not match "
-                    f"depth {depth} for {module_name}"
+                msg = (
+                    f"Initializer length {len(initializer)} does not match depth {depth} "
+                    f"for {module_name}"
                 )
+                raise ValueError(msg)
             for idx, value in enumerate(initializer):
                 lines.append(
                     f"      mem[{idx}] <= {_sv_literal_for_initializer(int(value), data_width)};"

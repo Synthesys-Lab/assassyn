@@ -101,7 +101,7 @@ Keeping these definitions in a runtime module ensures generated designs and user
   - `<C>_<p>_push_valid = executed_wire & predicate & fifo_<C>_<p>_push_ready`
   - `<C>_<p>_push_data = mux(predicates, values)`
 - FIFO pop (consumer’s own `<p>`): `<p>_pop_ready = executed_wire & predicate`
-- Async calls: caller outputs `<C>_trigger` (8‑bit sum of call fires). `Top` wires the sum into `<C>_trigger_counter_delta`, truncating or extending to the module’s trigger counter width (derived from the module’s FIFO depth configuration). Callee sees `trigger_counter_pop_valid` to advance.
+- Async calls: caller outputs `<C>_trigger` (8‑bit sum of call fires, gated by the callee input FIFO `*_push_ready` signals) so the callee’s trigger counter stays aligned with FIFO occupancy. `Top` wires the sum into `<C>_trigger_counter_delta`, truncating or extending to the module’s trigger counter width (derived from the module’s FIFO depth configuration). Callee sees `trigger_counter_pop_valid` to advance.
 - Exposed values: producer emits `expose_<name>` and `valid_<name> = executed_wire`; downstream modules consume `<producer>_<name>` and `<producer>_<name>_valid`.
 
 ## Top‑Level Harness

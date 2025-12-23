@@ -27,7 +27,7 @@ def generate_module_ports(dumper, node: Module) -> None:
 
     module_metadata = dumper.module_metadata[node]
     module_view = module_metadata.interactions
-    pushes = list(module_view.pushes)
+    pushes = [p for p in module_view.pushes if getattr(p, "parent", None) is node]
     pops = list(module_view.pops)
     calls = list(module_metadata.calls)
 

@@ -65,6 +65,24 @@ def package_path() -> str:
 def _cmd_wrapper(cmd):
     env = os.environ.copy()
     env.pop('RUSTC_WRAPPER', None)  # sccache fails under some sandboxed runners
+
+    # Cargo/rustc sometimes writes temp artifacts then renames them into
+    # `CARGO_TARGET_DIR`. If the temp dir is on a different filesystem, the rename
+    # can fail with EXDEV ("Invalid cross-device link"). Prefer placing TMPDIR
+    # under CARGO_TARGET_DIR to keep it on the same filesystem.
+    cargo_target_dir = env.get('CARGO_TARGET_DIR')
+    if cargo_target_dir and 'TMPDIR' not in env:
+        tmpdir = os.path.join(cargo_target_dir, 'tmp')
+        os.makedirs(tmpdir, exist_ok=True)
+        env['TMPDIR'] = tmpdir
+
+    # In CI / sandboxed runners, network access may be restricted. If tests are
+    # running, prefer offline to avoid Cargo trying to touch crates.io.
+    if 'CARGO_NET_OFFLINE' not in env and (
+        'PYTEST_CURRENT_TEST' in env or env.get('ASSASSYN_CARGO_NET_OFFLINE') == '1'
+    ):
+        env['CARGO_NET_OFFLINE'] = 'true'
+
     return subprocess.check_output(cmd, env=env).decode('utf-8')
 
 def patch_fifo(file_path):
@@ -218,21 +236,35 @@ def run_simulator(manifest_path=None, offline=False, release=True, binary_path=N
 def run_verilator(path):
     '''The helper function to run the verilator'''
     restore = os.getcwd()
-    os.chdir(path)
-    cmd_design = ['python', 'design.py']
-    subprocess.check_output(cmd_design)
-    patch_fifo("sv/hw/Top.sv")
-    cmd_tb = ['python', 'tb.py']
-    res = _cmd_wrapper(cmd_tb)
-    # Filter infrastructure logs (e.g., INFO: Running command …) so checker
-    # routines downstream only see the simulated waveform prints.
-    filtered_lines = [
-        line for line in res.splitlines()
-        if not line.startswith('INFO:')
-    ]
-    res = '\n'.join(filtered_lines)
-    os.chdir(restore)
-    return res
+    try:
+        os.chdir(path)
+        cmd_design = ['python', 'design.py']
+        _cmd_wrapper(cmd_design)
+        patch_fifo("sv/hw/Top.sv")
+        cmd_tb = ['python', 'tb.py']
+        res = _cmd_wrapper(cmd_tb)
+        # Filter infrastructure logs (verilator/cocotb build + runner chatter) so
+        # checkers downstream only see the simulated prints.
+        def _is_infra_line(line: str) -> bool:
+            stripped = line.strip()
+            if not stripped:
+                return True
+            if stripped.startswith(("INFO:", "WARNING:", "ERROR:")):
+                return True
+            if stripped.startswith(("- V e r i l a t i o n", "- Verilator:")):
+                return True
+            if stripped.startswith(("make:", "g++", "ar ", "echo ", "rm ")):
+                return True
+            if re.match(r"^[\\d\\.-]+ns\\s+(INFO|WARNING|ERROR)\\s", stripped):
+                return True
+            if "cocotb" in stripped or "gpi" in stripped:
+                return True
+            return False
+
+        filtered_lines = [line for line in res.splitlines() if not _is_infra_line(line)]
+        return "\n".join(filtered_lines)
+    finally:
+        os.chdir(restore)
 
 def parse_verilator_cycle(toks):
     '''Helper function to parse verilator dumped cycle'''
