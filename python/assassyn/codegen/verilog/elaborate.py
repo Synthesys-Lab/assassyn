@@ -158,6 +158,7 @@ def _sv_literal_for_initializer(value: int, width: int) -> str:
     return f"{width}'h{value:0{hex_digits}x}"
 
 
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def generate_register_file_sv_files(sys: SysBuilder, path: Path) -> List[str]:
     """Generate synthesizable multi-port register-file SV modules for non-payload arrays.
 
@@ -226,7 +227,8 @@ def generate_register_file_sv_files(sys: SysBuilder, path: Path) -> List[str]:
         else:
             if len(initializer) != depth:
                 raise ValueError(
-                    f"Initializer length {len(initializer)} does not match depth {depth} for {module_name}"
+                    f"Initializer length {len(initializer)} does not match "
+                    f"depth {depth} for {module_name}"
                 )
             for idx, value in enumerate(initializer):
                 lines.append(

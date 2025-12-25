@@ -24,12 +24,12 @@ class TestConstantFolding(Module):
 
         # Test bit 0 selection
         one_hot_0 = Bits(4)(1 << 0)
-        result_0 = one_hot_0.select1hot(Bits(8)(100), Bits(8)(200), Bits(8)(300), Bits(8)(400))
+        result_0 = one_hot_0.select1hot(Bits(8)(100), Bits(8)(200), Bits(8)(50), Bits(8)(150))
         log('Test bit 0: {}', result_0)
 
         # Test bit 3 selection (last bit in 4-bit selector)
         one_hot_3 = Bits(4)(1 << 3)
-        result_3 = one_hot_3.select1hot(Bits(8)(100), Bits(8)(200), Bits(8)(300), Bits(8)(400))
+        result_3 = one_hot_3.select1hot(Bits(8)(100), Bits(8)(200), Bits(8)(50), Bits(8)(150))
         log('Test bit 3: {}', result_3)
 
         # Test bit 1 selection
@@ -70,7 +70,7 @@ def check(raw: str):
             assert result == 100, f"Expected 100, got {result}"
         elif 'Test bit 3:' in line:
             result = int(line.split()[-1])
-            assert result == 400, f"Expected 400, got {result}"
+            assert result == 150, f"Expected 150, got {result}"
         elif 'Test bit 1:' in line:
             result = int(line.split()[-1])
             assert result == 20, f"Expected 20, got {result}"

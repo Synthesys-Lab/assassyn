@@ -166,6 +166,25 @@ class Value(ABC):
     def select1hot(self, *args):
         '''The frontend API to create a select1hot operation'''
         from .expr import Select1Hot
+        from .const import Const
+
+        # Check if condition is constant - if so, we can fold the selection
+        if isinstance(self, Const):
+            cond_value = self.value
+
+            # Verify one-hot property: exactly one bit should be set
+            bit_count = bin(cond_value).count('1')
+            assert bit_count == 1, (
+                f"select1hot requires one-hot selector, "
+                f"got {bit_count} bits set in {cond_value}"
+            )
+
+            # Find which bit is set and return that value directly
+            for i, arg in enumerate(args):
+                if (cond_value >> i) & 1:
+                    return arg
+
+        # Fallback to creating the Select1Hot node
         return Select1Hot(Select1Hot.SELECT_1HOT, self, args)
 
     @ir_builder
