@@ -370,11 +370,25 @@ def select1hot(self, *args):
     Creates one-hot selection operation.
 
     @param args Variable number of values to select from
-    @return Select1Hot node for one-hot selection
+    @return Select1Hot node for one-hot selection, or Const if folded
     '''
 ```
 
-**Explanation**: Performs one-hot selection, creating a `Select1Hot` node. `self` is a one-hot encoded selector, and `args` are the values to select from.
+**Explanation**: Performs one-hot selection. When both the selector (`self`) and all values in `args` are constants, the operation is **automatically constant-folded** at compile time, returning the selected `Const` directly without creating IR nodes. Otherwise, creates a `Select1Hot` node. The i-th value is selected if bit i of `self` is set.
+
+**Constant Folding**: This method follows the same constant folding pattern used by `Const.concat()` and `Const.__getitem__()`. When all operands are compile-time constants, the result is computed immediately, eliminating code generation overhead and simplifying the IR.
+
+**Example:**
+```python
+# Runtime select1hot (generates hardware)
+selector = some_signal.zext(Bits(4))
+result = selector.select1hot(val0, val1, val2, val3)
+
+# Compile-time folded select1hot (no hardware generated)
+selector = Bits(4)(1 << 2)  # Constant: bit 2 is set
+result = selector.select1hot(Bits(8)(10), Bits(8)(20), Bits(8)(30), Bits(8)(40))
+# result is Const(30), no Select1Hot node created
+```
 
 #### `valid`
 

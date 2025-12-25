@@ -29,3 +29,4 @@ Cargo.lock
 # Agentic Plans and Reports
 todos/*
 dones/*
+.milestones/*

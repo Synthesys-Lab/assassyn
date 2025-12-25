@@ -147,6 +147,8 @@ A specialized multiplexer controlled by a one-hot encoded signal.
 - `values` - Get the list of possible values (property)
 - `dtype` - Get the data type of this operation (property)
 
+**Note**: When constructed through the `Value.select1hot()` method, constant folding is automatically applied. If both the selector and all values are constants, the operation is evaluated at compile time and this node is not created. Direct construction of `Select1Hot` bypasses constant folding.
+
 #### `class Log(Expr)`
 
 A non-synthesizable node that functions as a print statement for debugging during simulation.
