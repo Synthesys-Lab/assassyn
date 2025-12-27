@@ -148,6 +148,13 @@ class Value(ABC):
     def select(self, true_value, false_value):
         '''The frontend API to create a select operation'''
         from .expr import Select
+        from .const import Const
+
+        # Constant folding: if condition is constant, return the selected value directly
+        if isinstance(self, Const):
+            return true_value if self.value else false_value
+
+        # Fallback: create Select IR node for non-constant conditions
         return Select(Select.SELECT, self, true_value, false_value)
 
     def case(self, cases: dict['Value', 'Value']):
