@@ -469,8 +469,8 @@ def _generate_lib_rs(
     crate: ExternalFFIModule,
     *,
     lib_path_suffix: str = "/.verilator-lib-path",
-) -> str:  # pylint: disable=too-many-branches
-    # pylint: disable=too-many-locals, too-many-statements
+) -> str:
+    # pylint: disable=too-many-branches, too-many-locals, too-many-statements
     struct_name = camelize(crate.symbol_prefix) or "ExternalModule"
     struct_name = struct_name[0].upper() + struct_name[1:]
     crate.struct_name = struct_name

@@ -76,6 +76,16 @@ def _cmd_wrapper(cmd):
         os.makedirs(tmpdir, exist_ok=True)
         env['TMPDIR'] = tmpdir
 
+    # Verilator builds may invoke C/C++ toolchains through ccache. In sandboxed
+    # runners, the OS default cache directory (e.g. ~/Library/Caches/ccache) may
+    # not be writable; prefer a workspace-local cache.
+    if 'CCACHE_DIR' not in env:
+        assassyn_home = env.get('ASSASSYN_HOME')
+        if assassyn_home:
+            ccache_dir = os.path.join(assassyn_home, 'workspace', '.ccache')
+            os.makedirs(ccache_dir, exist_ok=True)
+            env['CCACHE_DIR'] = ccache_dir
+
     # In CI / sandboxed runners, network access may be restricted. If tests are
     # running, prefer offline to avoid Cargo trying to touch crates.io.
     if 'CARGO_NET_OFFLINE' not in env and (
@@ -249,17 +259,23 @@ def run_verilator(path):
             stripped = line.strip()
             if not stripped:
                 return True
-            if stripped.startswith(("INFO:", "WARNING:", "ERROR:")):
-                return True
-            if stripped.startswith(("- V e r i l a t i o n", "- Verilator:")):
-                return True
-            if stripped.startswith(("make:", "g++", "ar ", "echo ", "rm ")):
-                return True
-            if re.match(r"^[\\d\\.-]+ns\\s+(INFO|WARNING|ERROR)\\s", stripped):
-                return True
-            if "cocotb" in stripped or "gpi" in stripped:
-                return True
-            return False
+
+            prefixes = (
+                "INFO:",
+                "WARNING:",
+                "ERROR:",
+                "- V e r i l a t i o n",
+                "- Verilator:",
+                "make:",
+                "g++",
+                "ar ",
+                "echo ",
+                "rm ",
+            )
+            is_prefixed = stripped.startswith(prefixes)
+            is_timestamped = bool(re.match(r"^[\\d\\.-]+ns\\s+(INFO|WARNING|ERROR)\\s", stripped))
+            is_tool_noise = "cocotb" in stripped or "gpi" in stripped
+            return is_prefixed or is_timestamped or is_tool_noise
 
         filtered_lines = [line for line in res.splitlines() if not _is_infra_line(line)]
         return "\n".join(filtered_lines)

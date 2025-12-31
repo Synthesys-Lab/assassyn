@@ -18,7 +18,7 @@ if typing.TYPE_CHECKING:
     from ...builder import SysBuilder
 
 
-def _write_manifest(simulator_path: Path, sys_name: str, ffi_specs) -> Path:
+def _write_manifest(simulator_path: Path, sys_name: str) -> Path:
     """Write the Cargo manifest for the generated simulator crate."""
     manifest_path = simulator_path / "Cargo.toml"
     runtime_path = Path(repo_path()) / "tools" / "rust-sim-runtime"
@@ -57,7 +57,7 @@ def elaborate_impl(sys, config):
     print(f"Writing simulator code to rust project: {simulator_path}")
 
     crate_name = config.get('simulator_crate_name') or sys.name
-    manifest_path = _write_manifest(simulator_path, crate_name, ffi_specs)
+    manifest_path = _write_manifest(simulator_path, crate_name)
 
     shutil.copy(Path(repo_path()) / "rustfmt.toml", simulator_path / "rustfmt.toml")
 

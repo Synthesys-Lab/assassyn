@@ -219,10 +219,13 @@ def cleanup_post_generation(dumper):
                     fifo_push_groups[(namify(fifo.module.name), namify(fifo.name))].append(push)
 
             for (callee_mod_name, fifo_port_name), pushes in fifo_push_groups.items():
-                predicate_terms = [
-                    f"({dumper.format_predicate(getattr(push, 'meta_cond', None), extra_conditions=_expr_wait_conditions(dumper, push))})"
-                    for push in pushes
-                ]
+                predicate_terms = []
+                for push in pushes:
+                    predicate = dumper.format_predicate(
+                        getattr(push, "meta_cond", None),
+                        extra_conditions=_expr_wait_conditions(dumper, push),
+                    )
+                    predicate_terms.append(f"({predicate})")
                 any_push = _format_reduction_expr(
                     predicate_terms,
                     default_literal="Bits(1)(0)",
@@ -233,10 +236,13 @@ def cleanup_post_generation(dumper):
             # Guard async call trigger credits (delta_ready) separately.
             async_groups = dumper.interactions.async_ledger.calls_for_module(dumper.current_module)
             for callee, calls in async_groups.items():
-                predicate_terms = [
-                    f"({dumper.format_predicate(getattr(call, 'meta_cond', None), extra_conditions=_expr_wait_conditions(dumper, call))})"
-                    for call in calls
-                ]
+                predicate_terms = []
+                for call in calls:
+                    predicate = dumper.format_predicate(
+                        getattr(call, "meta_cond", None),
+                        extra_conditions=_expr_wait_conditions(dumper, call),
+                    )
+                    predicate_terms.append(f"({predicate})")
                 any_call = _format_reduction_expr(
                     predicate_terms,
                     default_literal="Bits(1)(0)",
@@ -451,12 +457,18 @@ def cleanup_post_generation(dumper):
         local_pushes = [
             entry
             for entry in interactions
-            if isinstance(entry, FIFOPush) and getattr(entry, "parent", None) is dumper.current_module
+            if (
+                isinstance(entry, FIFOPush)
+                and getattr(entry, "parent", None) is dumper.current_module
+            )
         ]
         local_pops = [
             entry
             for entry in interactions
-            if isinstance(entry, FIFOPop) and getattr(entry, "parent", None) is dumper.current_module
+            if (
+                isinstance(entry, FIFOPop)
+                and getattr(entry, "parent", None) is dumper.current_module
+            )
         ]
 
         if local_pushes:
