@@ -165,6 +165,9 @@ def cleanup_post_generation(dumper):
     dumper.append_code('')
     completion_guard = "Bits(1)(1)"
 
+    module_metadata = dumper.module_metadata[dumper.current_module]
+    module_view = module_metadata.interactions
+
     if isinstance(dumper.current_module, Downstream):
         node = dumper.current_module
         upstream_modules = sorted(get_upstreams(node), key=lambda mod: mod.name)
@@ -177,23 +180,89 @@ def cleanup_post_generation(dumper):
             dep_signals,
             default_literal="Bits(1)(0)",
         )
-        dumper.append_code(f"executed_wire = {executed_expr}")
     else:
         # Note: wait_until should NOT gate executed_wire because it should only
         # block operations that come AFTER it in the IR sequence, not ALL operations.
         # Operations before wait_until should still execute.
         exec_conditions = ["self.trigger_counter_pop_valid"]
+        completion_guard = dumper.format_predicate(None)
+
+        # If this module consumes from any FIFO(s), treat its execution as an atomic
+        # transaction: only "execute" (and thus pop inputs / decrement trigger counter)
+        # when all downstream handshakes required by its side-effecting outputs can
+        # accept the work. Otherwise, we can drop tokens (pop without push) and
+        # desynchronize trigger counters from FIFO occupancy.
+        #
+        # Producer-only modules (no FIFO pops) are allowed to execute even when some
+        # downstream FIFOs are full, because they may update independent state that
+        # eventually releases backpressure (gating them can deadlock designs).
+        if getattr(module_view, "pops", ()):
+            guard_terms = []
+
+            # Guard FIFO pushes (including those implied by async calls / binds).
+            fifo_push_groups: Dict[tuple[str, str], list[Expr]] = defaultdict(list)
+
+            for push in getattr(module_view, "pushes", ()):
+                if getattr(push, "parent", None) is not dumper.current_module:
+                    continue
+                fifo = push.fifo
+                fifo_push_groups[(namify(fifo.module.name), namify(fifo.name))].append(push)
+
+            for call in getattr(module_metadata, "calls", ()):
+                bind = getattr(call, "bind", None)
+                if bind is None:
+                    continue
+                for push in getattr(bind, "pushes", ()):
+                    if getattr(push, "parent", None) is not dumper.current_module:
+                        continue
+                    fifo = push.fifo
+                    fifo_push_groups[(namify(fifo.module.name), namify(fifo.name))].append(push)
+
+            for (callee_mod_name, fifo_port_name), pushes in fifo_push_groups.items():
+                predicate_terms = []
+                for push in pushes:
+                    predicate = dumper.format_predicate(
+                        getattr(push, "meta_cond", None),
+                        extra_conditions=_expr_wait_conditions(dumper, push),
+                    )
+                    predicate_terms.append(f"({predicate})")
+                any_push = _format_reduction_expr(
+                    predicate_terms,
+                    default_literal="Bits(1)(0)",
+                )
+                ready = f"self.fifo_{callee_mod_name}_{fifo_port_name}_push_ready"
+                guard_terms.append(f"(~({any_push}) | {ready})")
+
+            # Guard async call trigger credits (delta_ready) separately.
+            async_groups = dumper.interactions.async_ledger.calls_for_module(dumper.current_module)
+            for callee, calls in async_groups.items():
+                predicate_terms = []
+                for call in calls:
+                    predicate = dumper.format_predicate(
+                        getattr(call, "meta_cond", None),
+                        extra_conditions=_expr_wait_conditions(dumper, call),
+                    )
+                    predicate_terms.append(f"({predicate})")
+                any_call = _format_reduction_expr(
+                    predicate_terms,
+                    default_literal="Bits(1)(0)",
+                )
+                callee_ready = f"self.{namify(callee.name)}_trigger_counter_delta_ready"
+                guard_terms.append(f"(~({any_call}) | {callee_ready})")
+
+            stall_guard = _format_reduction_expr(
+                guard_terms,
+                default_literal="Bits(1)(1)",
+                op="operator.and_",
+            )
+            exec_conditions.append(stall_guard)
 
         executed_expr = _format_reduction_expr(
             exec_conditions,
             default_literal="Bits(1)(1)",
             op="operator.and_",
         )
-        dumper.append_code(f"executed_wire = {executed_expr}")
-        completion_guard = dumper.format_predicate(None)
-
-    module_metadata = dumper.module_metadata[dumper.current_module]
-    module_view = module_metadata.interactions
+    dumper.append_code(f"executed_wire = {executed_expr}")
 
     finish_terms = []
     for finish_site in module_metadata.finish_sites:
@@ -347,16 +416,34 @@ def cleanup_post_generation(dumper):
     async_groups = dumper.interactions.async_ledger.calls_for_module(dumper.current_module)
     for callee, trigger_entries in async_groups.items():
         rval = dumper.dump_rval(callee, False)
-        trigger_predicates = [
-            dumper.format_predicate(
-                getattr(call, "meta_cond", None),
-                extra_conditions=_expr_wait_conditions(dumper, call),
-            )
-            for call in trigger_entries
-        ]
-        if not trigger_predicates:
+        if not trigger_entries:
             dumper.append_code(f'self.{rval}_trigger = UInt(8)(0)')
             continue
+
+        callee_ready = f"self.{namify(callee.name)}_trigger_counter_delta_ready"
+        trigger_predicates = []
+        for call in trigger_entries:
+            # Async calls enqueue values into the callee’s input FIFOs (one per bound port).
+            # The trigger counter delta must remain aligned with FIFO occupancy; otherwise the
+            # callee can pop when no data was enqueued (e.g., caller ran while callee FIFO full).
+            extra_conditions = list(_expr_wait_conditions(dumper, call))
+            extra_conditions.append(callee_ready)
+
+            bind = getattr(call, "bind", None)
+            if bind is not None:
+                push_ready_terms = {
+                    f"self.fifo_{namify(push.fifo.module.name)}_{namify(push.fifo.name)}_push_ready"
+                    for push in getattr(bind, "pushes", ())
+                    if getattr(push, "parent", None) is dumper.current_module
+                }
+                extra_conditions.extend(sorted(push_ready_terms))
+
+            trigger_predicates.append(
+                dumper.format_predicate(
+                    getattr(call, "meta_cond", None),
+                    extra_conditions=extra_conditions,
+                )
+            )
         dumper.append_code(f'# Summing triggers for {rval}')
         add_terms = [f"Mux({pred}, UInt(8)(0), UInt(8)(1))" for pred in trigger_predicates]
         sum_expression = f"reduce(operator.add, [{', '.join(add_terms)}])"
@@ -367,8 +454,22 @@ def cleanup_post_generation(dumper):
     for fifo_port in module_view.fifo_ports:
         interactions = module_view.fifo_map[fifo_port]
         fifo_name = dumper.dump_rval(fifo_port, False)
-        local_pushes = [entry for entry in interactions if isinstance(entry, FIFOPush)]
-        local_pops = [entry for entry in interactions if isinstance(entry, FIFOPop)]
+        local_pushes = [
+            entry
+            for entry in interactions
+            if (
+                isinstance(entry, FIFOPush)
+                and getattr(entry, "parent", None) is dumper.current_module
+            )
+        ]
+        local_pops = [
+            entry
+            for entry in interactions
+            if (
+                isinstance(entry, FIFOPop)
+                and getattr(entry, "parent", None) is dumper.current_module
+            )
+        ]
 
         if local_pushes:
             fifo_default = f"{dump_type(fifo_port.dtype)}(0)"

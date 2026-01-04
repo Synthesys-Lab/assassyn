@@ -19,6 +19,7 @@ def config( # pylint: disable=too-many-arguments
         verbose=True,
         simulator=True,
         verilog=False,
+        simulator_crate_name=None,
         sim_threshold=100,
         idle_threshold=100,
         fifo_depth=4,
@@ -32,6 +33,7 @@ def config( # pylint: disable=too-many-arguments
         'verbose': verbose,
         'simulator': simulator,
         'verilog': verilog,
+        'simulator_crate_name': simulator_crate_name,
         'sim_threshold': sim_threshold,
         'idle_threshold': idle_threshold,
         'fifo_depth': fifo_depth,
@@ -65,6 +67,7 @@ def _generate_cache_key(sys_name: str, config_dict: dict) -> str:
     '''
     # Include only build-relevant parameters in cache key
     cache_params = {
+        'cache_version': 2,
         'system': sys_name,
         'simulator': config_dict.get('simulator', True),
         'verilog': config_dict.get('verilog', False),
@@ -110,6 +113,13 @@ def elaborate(# pylint: disable=too-many-locals
     ir_hash = hashlib.sha256(repr(sys).encode()).hexdigest()[:24]
     config_hash = _generate_cache_key(sys.name, real_config)
     cache_key = f"{ir_hash}_{config_hash}"
+
+    # Avoid collisions in global `CARGO_TARGET_DIR` by using a unique simulator
+    # crate/binary name per (IR, config). Without this, two different systems
+    # with the same `sys.name` can overwrite each other's simulator binaries.
+    if real_config.get('simulator', True) and real_config.get('simulator_crate_name') is None:
+        config_suffix = config_hash.split('_')[-1]
+        real_config['simulator_crate_name'] = f"{sys.name}_{ir_hash[:8]}_{config_suffix}"
 
     # Check cache if source directory was detected and caching is enabled
     if source_dir and real_config.get('simulator', True) and real_config.get('enable_cache', True):

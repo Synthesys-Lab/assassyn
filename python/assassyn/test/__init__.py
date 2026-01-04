@@ -3,6 +3,7 @@
 import inspect
 import os
 import time
+import uuid
 
 from assassyn.frontend import SysBuilder
 from assassyn.backend import elaborate, config
@@ -13,14 +14,15 @@ def run_test(name: str, top: callable, checker: callable, **kwargs):
     Lightweight test utility for assassyn systems.
 
     Args:
-        name: Base system name (unique suffix added per invocation)
+        name: Base system name (unique suffix appended per invocation)
         top: Callable that builds the system (receives no args or sys, uses sys context)
         checker: Callable that validates simulator output (receives raw string)
         **config: Additional config passed to elaborate()
             (e.g., sim_threshold, idle_threshold, random)
     """
     # Generate unique system name to avoid conflicts in parallel test execution
-    sys = SysBuilder(name)
+    sys_name = f"{name}_{uuid.uuid4().hex[:8]}"
+    sys = SysBuilder(sys_name)
     with sys:
         # Check if top() accepts a parameter
         sig = inspect.signature(top)

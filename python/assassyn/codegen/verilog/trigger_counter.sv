@@ -20,27 +20,35 @@ module trigger_counter #(
 );
 
 logic [WIDTH-1:0] count;
-logic [WIDTH-1:0] temp;
-logic [WIDTH-1:0] new_count;
+logic             pop_fire;
+logic [WIDTH:0]   sum;
+logic [WIDTH:0]   next;
+logic [WIDTH-1:0] depth;
 
-// If pop_ready is high, counter -= 1
-assign temp = count + delta;
-// To avoid overflow minus
-assign new_count = temp >= (pop_ready ? 1 : 0) ? temp - (pop_ready ? 1 : 0) : 0;
+assign pop_valid = (count != '0);
+assign pop_fire = pop_ready && pop_valid;
 
-always @(posedge clk or negedge rst_n) begin
+// The trigger counter is used as a "credit counter" for FIFO-like pipelines where
+// the enqueue depth is a power-of-two FIFO. For DEPTH_LOG2=N, the FIFO depth is
+// (1<<N) and the counter width is sized as (N+1) bits so it can represent the
+// full state (count == depth).
+//
+// Recover the corresponding FIFO depth from WIDTH: depth = 1 << (WIDTH-1).
+assign depth = {1'b1, {WIDTH-1{1'b0}}};
+
+// Ready unless full (count == depth), or if we're going to pop this cycle
+// (freeing one slot).
+assign delta_ready = (count != depth) || pop_fire;
+
+assign sum = {1'b0, count} + {1'b0, delta};
+assign next = sum - {{WIDTH{1'b0}}, pop_fire};
+
+always_ff @(posedge clk or negedge rst_n) begin
   if (!rst_n) begin
     count <= '0;
   end else begin
-    // If the counter is gonna overflow, this counter cannot accept any new
-    // deltas.
-    delta_ready <= new_count != {WIDTH{1'b1}};
-    // Assign the new counter value.
-    count <= new_count;
-    pop_valid <= (new_count != 0 || delta != 0);
+    count <= next[WIDTH-1:0];
   end
 end
 
 endmodule
-
-

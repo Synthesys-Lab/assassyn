@@ -175,7 +175,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
             handle_field = external_handle_field(module.name)
             spec = external_specs.get(module.name)
             if spec is not None:
-                field_type = f"{spec.crate_name}::{spec.struct_name}"
+                field_type = f"crate::external_ffis::{spec.crate_name}::{spec.struct_name}"
                 fd.write(f"pub {handle_field} : {field_type}, ")
                 simulator_init.append(f"{handle_field} : {field_type}::new(),")
                 if getattr(spec, "has_clock", False):
@@ -193,7 +193,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         # Try to find the FFI spec for this external class
         spec = external_specs.get(cls_name)
         if spec is not None:
-            field_type = f"{spec.crate_name}::{spec.struct_name}"
+            field_type = f"crate::external_ffis::{spec.crate_name}::{spec.struct_name}"
             fd.write(f"pub {field_name} : {field_type}, ")
             simulator_init.append(f"{field_name} : {field_type}::new(),")
         else:
