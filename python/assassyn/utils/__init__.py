@@ -65,6 +65,34 @@ def package_path() -> str:
 def _cmd_wrapper(cmd):
     env = os.environ.copy()
     env.pop('RUSTC_WRAPPER', None)  # sccache fails under some sandboxed runners
+
+    # Cargo/rustc sometimes writes temp artifacts then renames them into
+    # `CARGO_TARGET_DIR`. If the temp dir is on a different filesystem, the rename
+    # can fail with EXDEV ("Invalid cross-device link"). Prefer placing TMPDIR
+    # under CARGO_TARGET_DIR to keep it on the same filesystem.
+    cargo_target_dir = env.get('CARGO_TARGET_DIR')
+    if cargo_target_dir and 'TMPDIR' not in env:
+        tmpdir = os.path.join(cargo_target_dir, 'tmp')
+        os.makedirs(tmpdir, exist_ok=True)
+        env['TMPDIR'] = tmpdir
+
+    # Verilator builds may invoke C/C++ toolchains through ccache. In sandboxed
+    # runners, the OS default cache directory (e.g. ~/Library/Caches/ccache) may
+    # not be writable; prefer a workspace-local cache.
+    if 'CCACHE_DIR' not in env:
+        assassyn_home = env.get('ASSASSYN_HOME')
+        if assassyn_home:
+            ccache_dir = os.path.join(assassyn_home, 'workspace', '.ccache')
+            os.makedirs(ccache_dir, exist_ok=True)
+            env['CCACHE_DIR'] = ccache_dir
+
+    # In CI / sandboxed runners, network access may be restricted. If tests are
+    # running, prefer offline to avoid Cargo trying to touch crates.io.
+    if 'CARGO_NET_OFFLINE' not in env and (
+        'PYTEST_CURRENT_TEST' in env or env.get('ASSASSYN_CARGO_NET_OFFLINE') == '1'
+    ):
+        env['CARGO_NET_OFFLINE'] = 'true'
+
     return subprocess.check_output(cmd, env=env).decode('utf-8')
 
 def patch_fifo(file_path):
@@ -218,21 +246,41 @@ def run_simulator(manifest_path=None, offline=False, release=True, binary_path=N
 def run_verilator(path):
     '''The helper function to run the verilator'''
     restore = os.getcwd()
-    os.chdir(path)
-    cmd_design = ['python', 'design.py']
-    subprocess.check_output(cmd_design)
-    patch_fifo("sv/hw/Top.sv")
-    cmd_tb = ['python', 'tb.py']
-    res = _cmd_wrapper(cmd_tb)
-    # Filter infrastructure logs (e.g., INFO: Running command …) so checker
-    # routines downstream only see the simulated waveform prints.
-    filtered_lines = [
-        line for line in res.splitlines()
-        if not line.startswith('INFO:')
-    ]
-    res = '\n'.join(filtered_lines)
-    os.chdir(restore)
-    return res
+    try:
+        os.chdir(path)
+        cmd_design = ['python', 'design.py']
+        _cmd_wrapper(cmd_design)
+        patch_fifo("sv/hw/Top.sv")
+        cmd_tb = ['python', 'tb.py']
+        res = _cmd_wrapper(cmd_tb)
+        # Filter infrastructure logs (verilator/cocotb build + runner chatter) so
+        # checkers downstream only see the simulated prints.
+        def _is_infra_line(line: str) -> bool:
+            stripped = line.strip()
+            if not stripped:
+                return True
+
+            prefixes = (
+                "INFO:",
+                "WARNING:",
+                "ERROR:",
+                "- V e r i l a t i o n",
+                "- Verilator:",
+                "make:",
+                "g++",
+                "ar ",
+                "echo ",
+                "rm ",
+            )
+            is_prefixed = stripped.startswith(prefixes)
+            is_timestamped = bool(re.match(r"^[\\d\\.-]+ns\\s+(INFO|WARNING|ERROR)\\s", stripped))
+            is_tool_noise = "cocotb" in stripped or "gpi" in stripped
+            return is_prefixed or is_timestamped or is_tool_noise
+
+        filtered_lines = [line for line in res.splitlines() if not _is_infra_line(line)]
+        return "\n".join(filtered_lines)
+    finally:
+        os.chdir(restore)
 
 def parse_verilator_cycle(toks):
     '''Helper function to parse verilator dumped cycle'''

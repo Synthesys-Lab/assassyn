@@ -1,0 +1,116 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo FILE OPERATIONS - Reading and viewing files)",
+      "Read(//tmp/**)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(tree:*)",
+      "Bash(tee:*)",
+      "Bash(awk:*)",
+      "Bash(xargs ls:*)",
+      "Bash(xargs wc:*)",
+      "Bash(echo BUILD TOOLS - Compilation and build system)",
+      "Bash(ninja:*)",
+      "Bash(cmake:*)",
+      "Bash(mkdir:*)",
+      "Bash(make all:*)",
+      "Bash(make env:*)",
+      "Bash(make build:*)",
+      "Bash(make check:*)",
+      "Bash(make lint:*)",
+      "Bash(make env:*)",
+      "Bash(make setup:*)",
+      "Bash(make test:*)",
+
+      "Bash(echo ENVIRONMENT - Module system and runtime)",
+      "Bash(module load:*)",
+
+      "Bash(echo SKILL - Agent skills)",
+      "Skill(pr-templates)",
+      "Skill(issue-templates)",
+
+      "Bash(echo GIT READ OPERATIONS - Non-destructive git commands)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+
+      "Bash(echo GITHUB READ OPERATIONS - Viewing GitHub resources)",
+      "Bash(gh search:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh label list:*)",
+      "Bash(gh project list:*)",
+      "Bash(gh project field-list:*)",
+      "Bash(gh project view:*)",
+      "Bash(gh project item-list:*)"
+    ],
+    "deny": [
+      "Bash(echo BAN cd command saves your token usage)",
+      "Bash(cd:*)",
+      "Bash(echo DESTRUCTIVE OPERATIONS - Potentially dangerous commands)",
+      "Bash(git reset:*)",
+      "Bash(git restore:*)",
+      "Bash(echo AI should never read secrets)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/licenses/**)",
+      "Read(**/secret/**)",
+      "Read(**/secrets/**)",
+      "Read(**/config/credentials.json)",
+      "Read(**/.*.key)",
+      "Read(**/*.pem)"
+    ],
+    "ask": [
+      "Bash(echo GIT WRITE OPERATIONS - Modifying git state)",
+      "Bash(git add:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+
+      "Bash(echo KIND OF TOO GENERAL COMMANDS)",
+      "Bash(python3:*)",
+      "Bash(test:*)",
+
+      "Bash(echo GITHUB WRITE OPERATIONS - Creating/modifying GitHub resources)",
+      "Bash(gh project field-create:*)",
+      "Bash(gh project item-add:*)",
+      "Bash(gh api:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh project item-edit:*)",
+      "Bash(gh pr create:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-init.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

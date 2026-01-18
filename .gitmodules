@@ -7,3 +7,6 @@
 [submodule "3rd-party/ramulator2"]
 	path = 3rd-party/ramulator2
 	url = https://github.com/CMU-SAFARI/ramulator2.git
+[submodule "3rd-party/agentize"]
+	path = 3rd-party/agentize
+	url = https://github.com/synthesys-lab/agentize

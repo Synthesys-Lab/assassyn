@@ -1,0 +1,3 @@
+- Use `docs/llms.txt` to check the Claude related documentations when needed.
+- When devloping commands/skills, please make sure a command has no skill with the same name.
+  - `Claude Code` prioritizes skills over commands, while skills cannot be directly invoked by the users using `/skill-name`.

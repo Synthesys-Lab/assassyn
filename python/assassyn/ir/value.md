@@ -342,11 +342,32 @@ def select(self, true_value, false_value):
 
     @param true_value Value returned when self is true
     @param false_value Value returned when self is false
-    @return Select node implementing ternary selection
+    @return Select node implementing ternary selection, or Const if folded
     '''
 ```
 
-**Explanation**: Implements ternary selection, creating a `Select` node. Returns `true_value` if `self` evaluates to true, otherwise `false_value`. Equivalent to `self ? true_value : false_value` in C.
+**Explanation**: Implements ternary selection. Returns `true_value` if `self` evaluates to true, otherwise `false_value`. Equivalent to `self ? true_value : false_value` in C.
+
+**Constant Folding**: When the condition (`self`) is a compile-time constant (`Const` instance), the operation is **automatically constant-folded** at compile time, returning the selected value directly without creating IR nodes:
+- Non-zero constants (truthy): Returns `true_value`
+- Zero constant (falsy): Returns `false_value`
+
+This optimization is transparent to users and improves generated code quality by eliminating unnecessary conditional operations. The pattern follows the same approach used by `select1hot()`, `Const.concat()`, and `Const.__getitem__()`.
+
+**Example:**
+```python
+# Runtime select (generates hardware)
+condition = (counter == UInt(5)(10))
+result = condition.select(signal_a, signal_b)
+
+# Compile-time folded select (no hardware generated)
+result = Bits(1)(1).select(signal_a, signal_b)  # Returns signal_a directly
+result = Bits(1)(0).select(signal_a, signal_b)  # Returns signal_b directly
+
+# Multi-bit constant (non-zero is truthy)
+result = UInt(5)(7).select(signal_a, signal_b)  # Returns signal_a directly
+result = UInt(5)(0).select(signal_a, signal_b)  # Returns signal_b directly
+```
 
 #### `case`
 
@@ -370,11 +391,25 @@ def select1hot(self, *args):
     Creates one-hot selection operation.
 
     @param args Variable number of values to select from
-    @return Select1Hot node for one-hot selection
+    @return Select1Hot node for one-hot selection, or Const if folded
     '''
 ```
 
-**Explanation**: Performs one-hot selection, creating a `Select1Hot` node. `self` is a one-hot encoded selector, and `args` are the values to select from.
+**Explanation**: Performs one-hot selection. When both the selector (`self`) and all values in `args` are constants, the operation is **automatically constant-folded** at compile time, returning the selected `Const` directly without creating IR nodes. Otherwise, creates a `Select1Hot` node. The i-th value is selected if bit i of `self` is set.
+
+**Constant Folding**: This method follows the same constant folding pattern used by `Const.concat()` and `Const.__getitem__()`. When all operands are compile-time constants, the result is computed immediately, eliminating code generation overhead and simplifying the IR.
+
+**Example:**
+```python
+# Runtime select1hot (generates hardware)
+selector = some_signal.zext(Bits(4))
+result = selector.select1hot(val0, val1, val2, val3)
+
+# Compile-time folded select1hot (no hardware generated)
+selector = Bits(4)(1 << 2)  # Constant: bit 2 is set
+result = selector.select1hot(Bits(8)(10), Bits(8)(20), Bits(8)(30), Bits(8)(40))
+# result is Const(30), no Select1Hot node created
+```
 
 #### `valid`
 
