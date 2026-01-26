@@ -107,7 +107,8 @@ This function generates Verilog code for block intrinsic operations, which are c
    - The cleanup phase incorporates these stored predicates into post-wait assignments and triggers via `get_pred`
 
 4. **EXTERNAL_INSTANTIATE / ExternalIntrinsic**: Creates and wires external modules in-line
-   - `ExternalIntrinsic` instances are handled before the opcode switch, generating calls to `<wrapper>::new()` and wiring all inputs
+   - `ExternalIntrinsic` instances are handled before the opcode switch, generating calls to `@modparams` wrappers and wiring all inputs
+   - Parameter overrides from `ExternalSV.metadata()["parameters"]` are formatted and passed into the wrapper factory before port connections
    - Updates the dumper's bookkeeping (`external_instance_names`, `external_wrapper_names`, `external_output_exposures`) while consulting the shared `ExternalRegistry` for instance owners and cross-module consumers
 
 The function integrates with the credit-based pipeline architecture by managing execution conditions and finish signals.

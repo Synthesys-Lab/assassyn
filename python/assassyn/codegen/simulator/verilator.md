@@ -49,7 +49,7 @@ Dataclass capturing the direction, type information, and host language types for
 
 ### `ExternalFFIModule`
 
-Dataclass that tracks all information for a generated crate: crate name, paths, symbol prefix, IO port descriptors, clock/reset flags, and the produced shared library metadata.
+Dataclass that tracks all information for a generated crate: crate name, paths, symbol prefix, IO port descriptors, clock/reset flags, parameter overrides, and the produced shared library metadata.
 
 These types appear in `__all__`, making them available to other generator components.
 
@@ -72,7 +72,8 @@ Creates an `ExternalFFIModule` spec from an `ExternalSV` **class** (rather than 
 3. Allocates unique crate and dynamic library names
 4. Copies the SystemVerilog source to the crate's `rtl/` directory
 5. Calls `_collect_ports_from_class` to partition ports into inputs and outputs
-6. Returns a fully populated `ExternalFFIModule` with the class name as `original_module_name`
+6. Copies `metadata["parameters"]` (if any) into the spec so Verilator can apply `-G` overrides
+7. Returns a fully populated `ExternalFFIModule` with the class name as `original_module_name`
 
 ### `_collect_ports` / `_collect_ports_from_class` / `_dtype_to_port`
 
@@ -97,14 +98,14 @@ Writes `Cargo.toml`, `src/lib.rs`, and `src/wrapper.cpp` for a given spec before
 
 Runs the full native toolchain:
   1. Ensures the `.sv` file is present (`_ensure_sv_source`).
-  2. Calls Verilator (`_run_verilator_compile`) into `build/verilated`.
+  2. Calls Verilator (`_run_verilator_compile`) into `build/verilated`, passing any `ExternalSV` parameter overrides via `-G`.
   3. Collects all generated C++ sources (`_gather_source_files`).
   4. Builds the shared library via `_build_compile_command` and `_run_subprocess`.
   5. Writes `.verilator-lib-path` so the Rust wrapper knows where to load the artifact.
 
 ### `_write_manifest_file`
 
-Takes a manifest path plus a list of specs and rewrites the JSON summary in a single helper. This avoids duplicating the `json.dumps(..., indent=2)` call across the different generation entry points.
+Takes a manifest path plus a list of specs and rewrites the JSON summary (including `parameters`) in a single helper. This avoids duplicating the `json.dumps(..., indent=2)` call across the different generation entry points.
 
 ### `_record_used_name_hints`
 

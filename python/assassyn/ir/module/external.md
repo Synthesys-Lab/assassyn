@@ -39,7 +39,7 @@ result = inst.y          # wire output → PureIntrinsic(EXTERNAL_OUTPUT_READ)
 
   * The decorator validates that the class extends `ExternalSV`, walks `__annotations__`, and gathers all `WireIn`/`WireOut`/`RegOut` definitions into the `_wires` metadata table.
   * Configuration fields such as `__source__`, `__module_name__`, `__has_clock__`, and `__has_reset__` are captured so code generation stages can decide how to wrap and clock the external block.
-  * `__parameters__` (optional dict) captures SystemVerilog parameter overrides; values may be `int`/`bool`/`str` (or `PathLike`, converted to `str`) and are surfaced to both Verilator (`-G`) and PyCDE wrapper generation.
+  * `__parameters__` (optional dict) captures SystemVerilog parameter overrides; values may be `int`/`bool`/`str` (or `PathLike`, converted to `str`, with `bool` coerced to `int`) and are surfaced to both Verilator (`-G`) and PyCDE wrapper generation.
   * The decorated class remains callable; invoking it runs through the metaclass and returns an `ExternalIntrinsic` instead of a Python object. There is no longer a mutable Python instance that exposes setters/getters.
 
 -----
@@ -49,6 +49,7 @@ result = inst.y          # wire output → PureIntrinsic(EXTERNAL_OUTPUT_READ)
   * **Construction**: The metaclass intercepts calls to the class and routes them to `_create_external_intrinsic`, which wraps the request in an `ExternalIntrinsic`.
   * **Metadata**: `_wires` stores port declarations (direction + kind + dtype) while `_metadata` records auxiliary fields such as `module_name`, `source`, clock/reset booleans, etc. Downstream code generation stages read these tables directly.
   * **Parameters**: `__parameters__` is folded into `_metadata["parameters"]` so simulator + Verilog backends can apply SV parameter overrides consistently.
+  * **Parameter Access**: `ExternalSV.parameters()` returns a copy of the normalized parameter map.
   * **No Mutable Instance**: The descriptor no longer inherits from `Downstream` or exposes mutation APIs like `in_assign`. All connectivity is described by the returned intrinsic and its operands.
   * **Debugging Support**: `__repr__` is implemented on the Python side for better logging, but day-to-day interaction happens through the intrinsic nodes.
 

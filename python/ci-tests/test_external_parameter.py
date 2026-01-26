@@ -12,13 +12,13 @@ ROM_INIT_PATH = Path(__file__).resolve().parent / "resources" / "init_1.hex"
 class ExternalRom(ExternalSV):
     """Parameterized ROM external module."""
 
-    addr: WireIn[UInt(8)]
+    addr: WireIn[UInt(9)]
     data: WireOut[UInt(32)]
 
     __source__: str = "python/ci-tests/resources/rom.sv"
     __module_name__: str = "rom"
     __parameters__ = {
-        "ADDR_WIDTH": 8,
+        "ADDR_WIDTH": 9,
         "DATA_WIDTH": 32,
         "INIT_FILE": ROM_INIT_PATH,
     }
@@ -31,9 +31,9 @@ class Driver(Module):
 
     @module.combinational
     def build(self):
-        cnt = RegArray(UInt(8), 1)
+        cnt = RegArray(UInt(9), 1)
         addr = cnt[0]
-        cnt[0] = cnt[0] + UInt(8)(1)
+        cnt[0] = cnt[0] + UInt(9)(1)
 
         rom = ExternalRom(addr=addr)
         data = rom.data
