@@ -386,19 +386,17 @@ def _create_external_spec_from_class(
     metadata = external_class.metadata()
     top_module = metadata.get("module_name")
     if not top_module:
-        msg = (
+        raise ValueError(
             f"ExternalSV class {external_class.__name__} "
             "must specify '__module_name__'"
         )
-        raise ValueError(msg)
 
     file_path = metadata.get("source")
     if not file_path:
-        msg = (
+        raise ValueError(
             f"ExternalSV class {external_class.__name__} "
             "must specify '__source__'"
         )
-        raise ValueError(msg)
 
     crate_name = _unique_name(
         f"verilated_{_sanitize_base_name(top_module, external_class.__name__)}",
