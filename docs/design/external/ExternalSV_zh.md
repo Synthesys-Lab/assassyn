@@ -9,6 +9,7 @@
 - `python/assassyn/ir/module/external.py` 解析注解构造 `_ExternalConfig`，并通过元类直接构造 `ExternalIntrinsic`，兼容属性访问与 `[]` 操作。
 - `Singleton.peek_builder()` 提供的构建器上下文确保在缺失 `with SysBuilder` 的情况下也能生成合法的 `ExternalIntrinsic`/`PureIntrinsic` 节点，并延迟应用构造阶段的输入默认值 (`_apply_pending_connections`)。
 - `ExternalIntrinsic` 与 `PureIntrinsic.EXTERNAL_OUTPUT_READ` 定义在 `python/assassyn/ir/expr/intrinsic.py`，由后端统一调度。
+- `ExternalSV` 支持通过 `__parameters__` 提供 SystemVerilog 参数覆盖（`int/bool/str` 或 `PathLike`），供 Verilator 编译与 PyCDE wrapper 统一使用。
 
 ## Verilog 生成
 - `python/assassyn/codegen/verilog/design.py:_generate_external_module_wrapper` 基于 ExternalSV 声明生成 PyCDE wrapper。

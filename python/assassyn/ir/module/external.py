@@ -5,10 +5,46 @@ from __future__ import annotations
 # pylint: disable=duplicate-code,too-few-public-methods
 
 from dataclasses import dataclass
+from os import fspath
 from typing import Any, Dict, Generic, TypeVar, Literal
 
 
 T = TypeVar('T')
+
+
+def _normalize_external_parameters(parameters: Any) -> Dict[str, Any]:
+    """Normalize ExternalSV parameter overrides into a plain dict.
+
+    Accepted parameter values:
+      - int/bool (bool coerced to int)
+      - str
+      - PathLike (converted via os.fspath)
+    """
+    if parameters is None:
+        return {}
+    if not isinstance(parameters, dict):
+        raise TypeError("ExternalSV __parameters__ must be a dict of name -> value")
+
+    normalized: Dict[str, Any] = {}
+    for name, value in parameters.items():
+        if not isinstance(name, str):
+            raise TypeError("ExternalSV parameter names must be strings")
+        if isinstance(value, bool):
+            normalized[name] = int(value)
+            continue
+        if isinstance(value, int):
+            normalized[name] = value
+            continue
+        if hasattr(value, "__fspath__"):
+            normalized[name] = fspath(value)
+            continue
+        if isinstance(value, str):
+            normalized[name] = value
+            continue
+        raise TypeError(
+            "ExternalSV parameter values must be int/bool/str or PathLike"
+        )
+    return normalized
 
 
 def _create_external_intrinsic(cls, **input_connections):
@@ -160,6 +196,7 @@ def external(cls):
         'module_name': getattr(cls, '__module_name__', cls.__name__),
         'has_clock': getattr(cls, '__has_clock__', False),
         'has_reset': getattr(cls, '__has_reset__', False),
+        'parameters': _normalize_external_parameters(getattr(cls, '__parameters__', None)),
     })
 
     return cls
@@ -206,3 +243,9 @@ class ExternalSV(metaclass=ExternalSVMeta):
     def metadata(cls) -> Dict[str, Any]:
         """Return metadata dictionary for the external module."""
         return cls._metadata
+
+    @classmethod
+    def parameters(cls) -> Dict[str, Any]:
+        """Return a copy of the normalized external parameter overrides."""
+        params = cls._metadata.get("parameters", {})
+        return dict(params)

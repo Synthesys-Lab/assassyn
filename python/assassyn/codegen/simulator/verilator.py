@@ -51,6 +51,7 @@ class ExternalFFIModule:  # pylint: disable=too-many-instance-attributes
     sv_rel_path: str
     inputs: List[FFIPort] = field(default_factory=list)
     outputs: List[FFIPort] = field(default_factory=list)
+    parameters: Dict[str, object] = field(default_factory=dict)
     has_clock: bool = False
     has_reset: bool = False
     original_module_name: str = ""
@@ -190,7 +191,27 @@ def _run_verilator_compile(crate: ExternalFFIModule, sv_source: Path, obj_dir: P
         "--Mdir",
         str(obj_dir),
     ]
+    if crate.parameters:
+        for name in sorted(crate.parameters):
+            verilator_cmd.append(_format_verilator_parameter(name, crate.parameters[name]))
     _run_subprocess(verilator_cmd)
+
+
+def _format_verilator_parameter(name: str, value: object) -> str:
+    """Format a SystemVerilog parameter override for Verilator's -G flag."""
+    if isinstance(value, bool):
+        literal = "1" if value else "0"
+    elif isinstance(value, int):
+        literal = str(value)
+    elif hasattr(value, "__fspath__"):
+        literal = json.dumps(os.fspath(value))
+    elif isinstance(value, str):
+        literal = json.dumps(value)
+    else:
+        raise TypeError(
+            f"Unsupported ExternalSV parameter type for {name}: {type(value)}"
+        )
+    return f"-G{name}={literal}"
 
 
 def _resolve_verilator_paths() -> tuple[Path, Path]:
@@ -348,6 +369,7 @@ def _create_external_spec(
         sv_rel_path=os.path.join("rtl", src_sv_path.name),
         inputs=ports_in,
         outputs=ports_out,
+        parameters={},
         has_clock=getattr(module, "has_clock", False),
         has_reset=getattr(module, "has_reset", False),
         original_module_name=module.name,
@@ -364,19 +386,17 @@ def _create_external_spec_from_class(
     metadata = external_class.metadata()
     top_module = metadata.get("module_name")
     if not top_module:
-        msg = (
+        raise ValueError(
             f"ExternalSV class {external_class.__name__} "
             "must specify '__module_name__'"
         )
-        raise ValueError(msg)
 
     file_path = metadata.get("source")
     if not file_path:
-        msg = (
+        raise ValueError(
             f"ExternalSV class {external_class.__name__} "
             "must specify '__source__'"
         )
-        raise ValueError(msg)
 
     crate_name = _unique_name(
         f"verilated_{_sanitize_base_name(top_module, external_class.__name__)}",
@@ -398,6 +418,7 @@ def _create_external_spec_from_class(
     shutil.copy(src_sv_path, crate_path / "rtl" / src_sv_path.name)
 
     ports_in, ports_out = _collect_ports_from_class(external_class)
+    parameters = metadata.get("parameters", {}) or {}
 
     return ExternalFFIModule(
         crate_name=crate_name,
@@ -409,6 +430,7 @@ def _create_external_spec_from_class(
         sv_rel_path=os.path.join("rtl", src_sv_path.name),
         inputs=ports_in,
         outputs=ports_out,
+        parameters=dict(parameters),
         has_clock=metadata.get("has_clock", False),
         has_reset=metadata.get("has_reset", False),
         original_module_name=external_class.__name__,
@@ -428,6 +450,7 @@ def _spec_manifest_entry(spec: ExternalFFIModule, simulator_root: Path) -> Dict[
         "has_reset": spec.has_reset,
         "lib_filename": spec.lib_filename,
         "lib_path": str(spec.lib_path) if spec.lib_path else "",
+        "parameters": dict(spec.parameters),
         "inputs": [
             {
                 "name": port.name,

@@ -5,6 +5,7 @@ This module contains functions to generate Verilog code for intrinsic operations
 including PureIntrinsic, Intrinsic, and Log.
 """
 
+import os
 from typing import Optional, TYPE_CHECKING
 from string import Formatter
 
@@ -202,6 +203,19 @@ def _handle_external_output(dumper, expr, intrinsic, rval):
     return result
 
 
+def _format_external_param_value(name: str, value: object) -> str:
+    """Format ExternalSV parameter values for PyCDE wrapper instantiation."""
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, int):
+        return str(value)
+    if hasattr(value, "__fspath__"):
+        return repr(os.fspath(value))
+    if isinstance(value, str):
+        return repr(value)
+    raise TypeError(f"Unsupported ExternalSV parameter type for {name}: {type(value)}")
+
+
 def codegen_pure_intrinsic(dumper, expr: PureIntrinsic) -> Optional[str]:
     """Generate code for pure intrinsic operations."""
     intrinsic = expr.opcode
@@ -233,6 +247,14 @@ def codegen_external_intrinsic(dumper, expr: ExternalIntrinsic) -> Optional[str]
         wrapper_name = f"{ext_class.__name__}_ffi"
         dumper.external_wrapper_names[ext_class] = wrapper_name
 
+    parameters = metadata.get("parameters", {}) or {}
+    param_args = []
+    if parameters:
+        for name in sorted(parameters):
+            param_args.append(
+                f"{name}={_format_external_param_value(name, parameters[name])}"
+            )
+
     connections = []
     if metadata.get('has_clock'):
         connections.append('clk=self.clk')
@@ -242,7 +264,14 @@ def codegen_external_intrinsic(dumper, expr: ExternalIntrinsic) -> Optional[str]
         value_code = dumper.dump_rval(value, False)
         connections.append(f"{port_name}={value_code}")
 
-    call = f"{wrapper_name}({', '.join(connections)})" if connections else f"{wrapper_name}()"
+    wrapper_factory = (
+        f"{wrapper_name}({', '.join(param_args)})" if param_args else f"{wrapper_name}()"
+    )
+    call = (
+        f"{wrapper_factory}({', '.join(connections)})"
+        if connections
+        else f"{wrapper_factory}()"
+    )
     dumper.external_instance_names[expr] = rval
 
     entries = dumper.external_metadata.reads_for_instance(expr)

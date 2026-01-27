@@ -294,10 +294,19 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         class_name = f"{ext_class.__name__}_ffi"
         metadata = ext_class.metadata()
         module_name = metadata.get('module_name', ext_class.__name__)
+        parameters = metadata.get("parameters", {}) or {}
+        param_names = sorted(parameters)
 
         self.external_wrapper_names[ext_class] = class_name
 
-        self.append_code(f'class {class_name}(Module):')
+        self.append_code('@modparams')
+        if param_names:
+            self.append_code(f'def {class_name}({", ".join(param_names)}):')
+        else:
+            self.append_code(f'def {class_name}():')
+        self.indent += 4
+        impl_name = f"{class_name}Impl"
+        self.append_code(f'class {impl_name}(Module):')
         self.indent += 4
 
         # Set the module name for PyCDE
@@ -315,6 +324,8 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
             else:
                 self.append_code(f'{wire_name} = Output({wire_type})')
 
+        self.indent -= 4
+        self.append_code(f'return {impl_name}')
         self.indent -= 4
         self.append_code('')
 
