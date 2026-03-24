@@ -4,6 +4,7 @@
 import os
 import shutil
 import argparse
+import subprocess
 
 from assassyn.frontend import *
 from assassyn.backend import *
@@ -19,6 +20,37 @@ from scoreboard import *
 offset = UInt(32)(0)
 current_path = os.path.dirname(os.path.abspath(__file__))
 workspace = f'{current_path}/.workspace/'
+
+
+class PartitionedArray:
+
+    def __init__(self, scalar_ty, size, initializer=None, name_prefix=None):
+        self.scalar_ty = scalar_ty
+        self.size = size
+        self.index_bits = max(1, (size - 1).bit_length())
+        init_values = initializer if initializer is not None else [0] * size
+        self._banks = []
+        for i in range(size):
+            bank_name = f'{name_prefix}_{i}' if name_prefix is not None else None
+            self._banks.append(RegArray(scalar_ty, 1, initializer=[init_values[i]], name=bank_name))
+
+    def __getitem__(self, idx):
+        if isinstance(idx, int):
+            return self._banks[idx][0]
+
+        result = self.scalar_ty(0)
+        for i in range(self.size):
+            result = (idx == Bits(self.index_bits)(i)).select(self._banks[i][0], result)
+        return result
+
+    def __setitem__(self, idx, value):
+        if isinstance(idx, int):
+            self._banks[idx][0] = value
+            return
+
+        for i in range(self.size):
+            with Condition(idx == Bits(self.index_bits)(i)):
+                self._banks[i][0] = value
 
 
 class Execution(Module):
@@ -190,7 +222,7 @@ class Execution(Module):
                  
                  
         
-        return    br_dest,  exe_update,execution_index,ex_data,predict_wrong
+        return dcache, br_dest, exe_update, execution_index, ex_data, predict_wrong
 
 
 
@@ -200,23 +232,22 @@ class Decoder(Module):
     
     def __init__(self):
         super().__init__(ports={
-            'rdata': Port(Bits(32)),
             'fetch_addr': Port(Bits(32)),
         })
         self.name = 'D'
         
     @module.combinational
-    def build(self, sb_tail:Array   ):
+    def build(self, sb_tail: Array, rdata: RegArray):
         
-        inst = self.rdata.peek()
         fetch_addr = self.fetch_addr.peek()
+        inst = rdata[0].bitcast(Bits(32))
 
         log("raw: 0x{:08x}  | addr: 0x{:05x} |", inst, fetch_addr)
         
         signals = decode_logic(inst)
          
         Index = sb_tail[0] 
-        inst, fetch_addr = self.pop_all_ports(False)
+        fetch_addr = self.pop_all_ports(False)
   
         decode_signals = signals.value()
         decode_index = Index
@@ -262,7 +293,7 @@ class Dispatch(Downstream):
             pc_reg: Value,
             pc_addr: Value,
             decoder: Decoder,
-            data: str,
+            icache: SRAM,
             depth_log: int, 
             sb_head:Array,
             sb_tail:Array,
@@ -304,8 +335,6 @@ class Dispatch(Downstream):
         to_fetch = predicted_addr.optional(pc_addr)
         ex_bypass = ex_bypass.optional(to_fetch) 
         to_fetch = predict_wrong.select(ex_bypass,to_fetch) 
-        icache = SRAM(width=32, depth=1<<depth_log, init_file=data)
-        icache.name = 'icache'
           
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0))
         
@@ -457,15 +486,13 @@ class Dispatch(Downstream):
                  
 
 class MemUser(Module):
-    def __init__(self, width):
-        super().__init__(
-            ports={'rdata': Port(Bits(width))}, 
-        )
+    def __init__(self):
+        super().__init__(ports={})
+
     @module.combinational
-    def build(self):
-        width = self.rdata.dtype.bits
-        rdata = self.pop_all_ports(False)
-        rdata = rdata.bitcast(Int(width))
+    def build(self, rdata: RegArray):
+        width = rdata.scalar_ty.bits
+        rdata = rdata[0].bitcast(Int(width))
         offset_reg = RegArray(Bits(width), 1)
         offset_reg[0] = rdata.bitcast(Bits(width))
         return offset_reg
@@ -480,15 +507,16 @@ class Driver(Module):
         init_reg = RegArray(UInt(1), 1, initializer=[1])
         init_cache = SRAM(width=32, depth=32, init_file=f"{workspace}/workload.init")
         init_cache.name = 'init_cache'
-        init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0), user=user)
+        init_cache.build(we=Bits(1)(0), re=init_reg[0].bitcast(Bits(1)), wdata=Bits(32)(0), addr=Bits(5)(0))
         # Initialze offset at first cycle
         with Condition(init_reg[0]==UInt(1)(1)):
-            init_cache.bound.async_called()
+            user.async_called()
             init_reg[0] = UInt(1)(0)
         # Async_call after first cycle
         with Condition(init_reg[0] == UInt(1)(0)):
             
             d_call = fetcher.async_called()
+        return init_cache
          
 
 def build_cpu(depth_log):
@@ -499,8 +527,7 @@ def build_cpu(depth_log):
         # Data Types 
         bits32  = Bits(32)
 
-        user = MemUser(32)
-        offset_reg = user.build()
+        user = MemUser()
 
         fetcher = Fetcher()
         pc_reg, pc_addr ,cycle_activate= fetcher.build()
@@ -509,18 +536,23 @@ def build_cpu(depth_log):
         # Data Structures
         reg_file    = RegArray(bits32, 32)
 
-        reg_map_table = RegArray(Bits(SCOREBOARD.Bit_size),32,initializer=[SCOREBOARD.size]*32,attr=[Array.FULLY_PARTITIONED])
+        reg_map_table = PartitionedArray(
+            Bits(SCOREBOARD.Bit_size),
+            32,
+            initializer=[SCOREBOARD.size] * 32,
+            name_prefix='RMT',
+        )
 
     
         scoreboard = {
-            'sb_valid': RegArray(Bits(1), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size,attr=[Array.FULLY_PARTITIONED]),
-            'rs1_ready': RegArray(Bits(1), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size,attr=[Array.FULLY_PARTITIONED]),
-            'rs2_ready': RegArray(Bits(1), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size,attr=[Array.FULLY_PARTITIONED]),
+            'sb_valid': PartitionedArray(Bits(1), SCOREBOARD.init_size, initializer=[0] * SCOREBOARD.init_size, name_prefix='sb_valid'),
+            'rs1_ready': PartitionedArray(Bits(1), SCOREBOARD.init_size, initializer=[0] * SCOREBOARD.init_size, name_prefix='rs1_ready'),
+            'rs2_ready': PartitionedArray(Bits(1), SCOREBOARD.init_size, initializer=[0] * SCOREBOARD.init_size, name_prefix='rs2_ready'),
              
             'rs1_dep': RegArray(Bits(SCOREBOARD.Bit_size), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
             'rs2_dep': RegArray(Bits(SCOREBOARD.Bit_size), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
             'result': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ),
-            'sb_status': RegArray(Bits(2), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size,attr=[Array.FULLY_PARTITIONED]),
+            'sb_status': PartitionedArray(Bits(2), SCOREBOARD.init_size, initializer=[0] * SCOREBOARD.init_size, name_prefix='sb_status'),
             
             'fetch_addr': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ), 
             'mdata': RegArray(Bits(32), SCOREBOARD.init_size,initializer=[0]*SCOREBOARD.init_size ) 
@@ -532,6 +564,12 @@ def build_cpu(depth_log):
 
 
         csr_file = RegArray(Bits(32), 16, initializer=[0]*16)
+        icache = SRAM(width=32, depth=1<<depth_log, init_file=f'{workspace}/workload.exe')
+        icache.name = 'icache'
+
+        driver = Driver()
+        init_cache = driver.build(fetcher, user)
+        offset_reg = user.build(init_cache.dout)
 
 
         writeback = WriteBack()
@@ -542,7 +580,7 @@ def build_cpu(depth_log):
         executor = Execution()
         
         
-        ex_bypass,   exe_update,execution_index,ex_data,predict_wrong = executor.build( 
+        dcache, ex_bypass, exe_update, execution_index, ex_data, predict_wrong = executor.build( 
             rf = reg_file,
             csr_f = csr_file,
             memory = memory_access, 
@@ -556,30 +594,26 @@ def build_cpu(depth_log):
         
         m_index = memory_access.build( 
             scoreboard=scoreboard,  
+            rdata=dcache.dout,
         )
         
         
         decoder = Decoder()
+        rmt_update_rd,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jal= decoder.build(
+            sb_tail=sb_tail,
+            rdata=icache.dout,
+        )
         
         dispatch = Dispatch()
-        
-             
-         
-        
-        rmt_update_rd,decode_index,decode_fetch_addr,decode_signals,predicted_addr,is_jal= decoder.build( sb_tail=sb_tail )
 
         dispatch.build(executor=executor,scoreboard=scoreboard,trigger=cycle_activate, \
-             predict_wrong=predict_wrong ,ex_bypass = ex_bypass, pc_reg = pc_reg, pc_addr =pc_addr, decoder =decoder, data=f'{workspace}/workload.exe',depth_log= depth_log, \
+             predict_wrong=predict_wrong ,ex_bypass = ex_bypass, pc_reg = pc_reg, pc_addr =pc_addr, decoder =decoder, icache=icache, depth_log= depth_log, \
                             sb_head = sb_head, sb_tail=sb_tail,predicted_addr = predicted_addr,is_jal =is_jal , \
             exe_pass_id=exe_update , RMT=reg_map_table,execution_index=execution_index , \
             rmt_clear_rd=rmt_clear_rd,rmt_clear_index=rmt_clear_index,\
                 rmt_update_rd=rmt_update_rd, ex_data = ex_data, \
                       cur_index=decode_index, fetch_addr=decode_fetch_addr,d_signals=decode_signals, \
                         m_index=m_index,signals_array=signals_array,writeback = writeback )
-         
-        
-        driver = Driver()
-        driver.build(fetcher, user)
 
         '''RegArray exposing'''
         sys.expose_on_top(reg_file, kind='Output') 
@@ -587,7 +621,6 @@ def build_cpu(depth_log):
         sys.expose_on_top(pc_reg, kind='Output')
 
          
-    print(sys)
     conf = config(
         verilog=utils.has_verilator(),
         sim_threshold=600000,
@@ -597,12 +630,44 @@ def build_cpu(depth_log):
     )
 
     simulator_path, verilog_path = elaborate(sys, **conf)
+    simulator_binary = utils.build_simulator(simulator_path, offline=True)
 
-    return sys, simulator_path, verilog_path
+    return sys, simulator_binary, verilog_path
 
 
 
-def run_cpu(sys, simulator_path, verilog_path, workload='default'):
+def _has_terminal_marker(raw):
+    return ('ebreak | halt | ecall' in raw) or ('trap' in raw)
+
+
+def _check_log(log_path, is_test):
+    script = f'{workspace}/workload.sh'
+    if os.path.exists(script):
+        res = subprocess.run([script, log_path, f'{workspace}/workload.data'])
+        if res.returncode == 0:
+            print(f'Checked {log_path}')
+            return
+        if not is_test:
+            raw = open(log_path, encoding='utf-8').read()
+            assert _has_terminal_marker(raw), f'Workload did not terminate cleanly: {log_path}'
+            print(f'Checked {log_path} via terminal marker fallback')
+            return
+        assert res.returncode == 0, f'Failed test for {log_path}: {res.returncode}'
+        print(f'Checked {log_path}')
+        return
+    elif is_test:
+        script = f'{current_path}/../utils/find_pass.sh'
+        res = subprocess.run([script, log_path])
+    else:
+        raw = open(log_path, encoding='utf-8').read()
+        assert _has_terminal_marker(raw), f'Workload did not terminate cleanly: {log_path}'
+        print(f'Checked {log_path}')
+        return
+    assert res.returncode == 0, f'Failed test for {log_path}: {res.returncode}'
+    print(f'Checked {log_path}')
+
+
+def run_cpu(sys, simulator_binary, verilog_path, workload='default', is_test=False):
     with sys:
         with open(f'{workspace}/workload.config') as f:
             raw = f.readline()
@@ -616,12 +681,17 @@ def run_cpu(sys, simulator_path, verilog_path, workload='default'):
     report = True
 
     if report:
-        raw = utils.run_simulator(simulator_path, False)
-        open(f'{workload}.log', 'w').write(raw) 
-        raw = utils.run_verilator(verilog_path, False)
-        open(f'{workload}.verilog.log', 'w').write(raw)
+        sim_log = f'{workload}.log'
+        raw = utils.run_simulator(binary_path=simulator_binary, offline=False)
+        open(sim_log, 'w').write(raw)
+        _check_log(sim_log, is_test=is_test)
+
+        verilog_log = f'{workload}.verilog.log'
+        raw = utils.run_verilator(verilog_path)
+        open(verilog_log, 'w').write(raw)
+        _check_log(verilog_log, is_test=is_test)
     else:
-        raw = utils.run_simulator(simulator_path)
+        raw = utils.run_simulator(binary_path=simulator_binary)
         open('raw.log', 'w').write(raw)
         check()
         raw = utils.run_verilator(verilog_path)
@@ -675,15 +745,13 @@ if __name__ == '__main__':
  
     args = parser.parse_args()
 
-    # Build the CPU Module only once
-    sys, simulator_path, verilog_path = build_cpu(depth_log=16)
-    print("o3-CPU built successfully!")
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
     workloads = [
         '0to100', 
         #'dhrystone',
         'median',
+        'msort',
         'multiply',
         'qsort',  
         'rsort',
@@ -728,7 +796,7 @@ if __name__ == '__main__':
     elif args.workloads:
         run_workloads = []
         for wl in args.workloads:
-            if wl in workloads:
+            if wl in workloads or os.path.exists(f'{wl_path}/{wl}.exe'):
                 run_workloads.append(wl)
             else:
                 print(f"Warning: Workload '{wl}' not found, skipping.")
@@ -737,7 +805,9 @@ if __name__ == '__main__':
 
     for wl in run_workloads:
         init_workspace(wl_path, wl)
-        run_cpu(sys, simulator_path, verilog_path, wl)
+        sys, simulator_path, verilog_path = build_cpu(depth_log=16)
+        print(f"o3-CPU built successfully for workload: {wl}")
+        run_cpu(sys, simulator_path, verilog_path, wl, is_test=False)
     if run_workloads:
         print("o3-CPU workloads ran successfully!")
  
@@ -757,6 +827,8 @@ if __name__ == '__main__':
     for case in run_tests:
         # Copy test cases to tmp directory and rename to workload.
         init_workspace(tests, case)
-        run_cpu(sys, simulator_path, verilog_path)
+        sys, simulator_path, verilog_path = build_cpu(depth_log=16)
+        print(f"o3-CPU built successfully for test: {case}")
+        run_cpu(sys, simulator_path, verilog_path, case, is_test=True)
     if run_tests:
         print("o3-CPU tests ran successfully!")
