@@ -3,8 +3,6 @@
 import os
 import shutil
 import subprocess
-import csv
-import re
 
 from assassyn.frontend import *
 from assassyn.backend import *
@@ -19,24 +17,6 @@ import sys as py_sys
 offset = UInt(32)(0)
 current_path = os.path.dirname(os.path.abspath(__file__))
 workspace = f'{current_path}/.workspace/'
-
-
-CYCLE_RE = re.compile(r'Cycle @(\d+)\.00:')
-PC_RE = re.compile(r'Cycle @(\d+)\.00:.*pc:\s*0x([0-9a-fA-F]+)')
-DE_BY_RE = re.compile(r'de_by:\s*([01])')
-FETCH_RE = re.compile(r'fetch:\s*([01])')
-MEM_WRITE_RE = re.compile(
-    r'Cycle @(\d+)\.00:.*mem-write.*addr:\s*0x([0-9a-fA-F]+).*wdada:\s*0x([0-9a-fA-F]+)'
-)
-ALT_WRITE_RE = re.compile(
-    r'Cycle @(\d+)\.00:.*addr=0x([0-9a-fA-F]+).*final=0x([0-9a-fA-F]+)'
-)
-CSR_IMM_RE = re.compile(r'Cycle @(\d+)\.00:.*imm:\s*0x([0-9a-fA-F]+)')
-STAT_LABEL_ADDR_RE = re.compile(r'#\s*([0-9a-fA-F]+)\s*<([^>]+)>')
-STAT_INLINE_LABEL_RE = re.compile(r'<([^>]+)>:')
-PERF_REASON_RE = re.compile(
-    r'Cycle @(\d+)\.00:.*PERF reason base=([01]) load_use=([01]) branch_ctrl=([01]) structural=([01])'
-)
 
 class Execution(Module):
     
@@ -350,26 +330,11 @@ class FetcherImpl(Downstream):
         #to_fetch = should_fetch.select(pc_addr, to_fetch)
         to_fetch = (jump_flag).select(ex_bypass[0].bitcast(Bits(32)), pc_addr)
         real_fetch = should_fetch & (new_cnt < Int(8)(3))
-        ex_valid_now = ex_valid.optional(Bits(1)(0))
-        perf_base = ex_valid_now
-        perf_load_use = Bits(1)(0)
-        perf_branch_ctrl = (~perf_base) & (~should_fetch)
-        perf_structural = (~perf_base) & (~perf_branch_ctrl)
         log("on_br: {}         | br_sm: {}     | br_jump: {}      | fetch: {}      | ex_bypass: 0x{:05x} | ongoing: {} | jump_flag: {}",
              on_branch, br_sm[0], br_jump[0], should_fetch, ex_bypass[0], ongoing[0],jump_flag)
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0))
         log("on_br: {}         | de_by: {}     | fetch: {}      | addr: 0x{:05x} | new_cnt: {}",
             on_branch, ex_valid.optional(Bits(1)(0)), real_fetch, to_fetch, new_cnt)
-        log(
-            "PERF reason base={} load_use={} branch_ctrl={} structural={} should_fetch={} real_fetch={} backlogged={}",
-            perf_base,
-            perf_load_use,
-            perf_branch_ctrl,
-            perf_structural,
-            should_fetch,
-            real_fetch,
-            Bits(1)(0),
-        )
 
         with Condition(real_fetch):
             decoder.async_called(fetch_addr=to_fetch)
@@ -568,25 +533,14 @@ def run_cpu(sys, simulator_binary, verilog_path, workload='default'):
             value = value[2:]
             open(f'{workspace}/workload.init', 'w').write(value)
 
-    report = True
+    report = False
 
     if report:
-        sim_raw = utils.run_simulator(binary_path=simulator_binary, offline=False)
-        open(f'{workload}.log', 'w').write(sim_raw)
+        raw = utils.run_simulator(binary_path=simulator_binary, offline=False)
+        open(f'{workload}.log', 'w').write(raw)
         #open(f'{workload}.sim.time', 'w').write(str(tt))
         raw = utils.run_verilator(verilog_path)
         open(f'{workload}.verilog.log', 'w').write(raw)
-        stats = analyze_workload(sim_raw, workload, f'{workspace}/workload.exe')
-        print(
-            f"[workload:{workload}] source={stats['kernel_source']} "
-            f"window=({stats['start_cycle']},{stats['end_cycle']}] "
-            f"cycles={stats['total_cycles']} "
-            f"base={stats['base_cycles']} load/use={stats['load_use_stall']} "
-            f"branch/control={stats['branch_control_stall']} "
-            f"structural={stats['structural_stall']} "
-            f"ipc={stats['ipc']:.6f}"
-        )
-        return stats
     else:
         raw = utils.run_simulator(binary_path=simulator_binary)
         open('raw.log', 'w').write(raw)
@@ -595,292 +549,6 @@ def run_cpu(sys, simulator_binary, verilog_path, workload='default'):
         open('raw.log', 'w').write(raw)
         check()
         os.remove('raw.log')
-        return None
-
-def _addr_aliases(addr):
-    return {
-        addr & 0xFFFFFFFF,
-        addr & 0xFFFFF,
-        addr & 0xFFFF,
-    }
-
-
-def _parse_stat_marker_addresses(exe_path):
-    start_addrs = set()
-    end_addrs = set()
-    if not os.path.exists(exe_path):
-        return start_addrs, end_addrs
-
-    offset = 0
-    config_path = exe_path[:-4] + 'config'
-    if os.path.exists(config_path):
-        with open(config_path, encoding='utf-8') as config_handle:
-            raw = config_handle.readline()
-            raw = raw.replace('offset:', "'offset':").replace('data_offset:', "'data_offset':")
-            offset = int(eval(raw)['offset'])
-
-    with open(exe_path, encoding='utf-8') as handle:
-        for index, line in enumerate(handle):
-            match = STAT_LABEL_ADDR_RE.search(line)
-            if match is None:
-                inline_match = STAT_INLINE_LABEL_RE.search(line)
-                if inline_match is None:
-                    continue
-                addr = offset + index * 4
-                symbol = inline_match.group(1).lower()
-            else:
-                addr = int(match.group(1), 16)
-                symbol = match.group(2).lower()
-                if '+' in symbol:
-                    continue
-            if symbol == 'stat_start':
-                start_addrs.add(addr)
-            if symbol == 'stat_end':
-                end_addrs.add(addr)
-    return start_addrs, end_addrs
-
-
-def _detect_kernel_window(exe_path, store_events, pc_events, csr_cycles, full_start, full_end):
-    start_addrs, end_addrs = _parse_stat_marker_addresses(exe_path)
-    if start_addrs and end_addrs:
-        start_alias = set()
-        end_alias = set()
-        for addr in start_addrs:
-            start_alias |= _addr_aliases(addr)
-        for addr in end_addrs:
-            end_alias |= _addr_aliases(addr)
-
-        start_cycles = sorted(
-            cycle
-            for cycle, addr, value in store_events
-            if value == 1 and addr in start_alias
-        )
-        end_cycles = sorted(
-            cycle
-            for cycle, addr, value in store_events
-            if value == 2 and addr in end_alias
-        )
-        if start_cycles and end_cycles:
-            start_cycle = start_cycles[0]
-            end_cycle = next((cycle for cycle in end_cycles if cycle > start_cycle), end_cycles[0])
-            if start_cycle != end_cycle:
-                return start_cycle, end_cycle, 'marker'
-
-        start_cycles = sorted(
-            cycle
-            for cycle, pc in pc_events
-            if pc in start_alias
-        )
-        end_cycles = sorted(
-            cycle
-            for cycle, pc in pc_events
-            if pc in end_alias
-        )
-        if start_cycles and end_cycles:
-            start_cycle = start_cycles[0]
-            end_cycle = next((cycle for cycle in end_cycles if cycle > start_cycle), end_cycles[0])
-            if start_cycle != end_cycle:
-                return start_cycle, end_cycle, 'pc_marker'
-
-    for imm in (0xB00, 0xB02):
-        imm_cycles = csr_cycles.get(imm, [])
-        if len(imm_cycles) >= 2 and imm_cycles[0] != imm_cycles[1]:
-            return imm_cycles[0], imm_cycles[1], f'csr_{imm:x}'
-
-    return full_start, full_end, 'missing'
-
-
-def analyze_workload(sim_raw, workload, exe_path):
-    cycles = set()
-    de_by = {}
-    should_fetch = {}
-    backlogged_cycles = set()
-    perf_reason_by_cycle = {}
-    store_events = []
-    pc_events = []
-    csr_cycles = {0xB00: [], 0xB02: []}
-    completed = 0
-
-    for line in sim_raw.splitlines():
-        cycle_match = CYCLE_RE.search(line)
-        if cycle_match is None:
-            continue
-        cycle = int(cycle_match.group(1))
-        cycles.add(cycle)
-
-        reason_match = PERF_REASON_RE.search(line)
-        if reason_match is not None:
-            perf_reason_by_cycle[int(reason_match.group(1))] = (
-                int(reason_match.group(2)),
-                int(reason_match.group(3)),
-                int(reason_match.group(4)),
-                int(reason_match.group(5)),
-            )
-
-        pc_match = PC_RE.search(line)
-        if pc_match is not None:
-            pc_events.append((int(pc_match.group(1)), int(pc_match.group(2), 16)))
-
-        if '[F1]' in line and 'de_by:' in line:
-            match = DE_BY_RE.search(line)
-            if match is not None:
-                de_by[cycle] = int(match.group(1))
-        elif '[F1]' in line and 'on_br:' in line and 'fetch:' in line:
-            match = FETCH_RE.search(line)
-            if match is not None:
-                should_fetch[cycle] = int(match.group(1))
-        elif '[E]' in line and 'backlogged' in line:
-            backlogged_cycles.add(cycle)
-
-        store_match = MEM_WRITE_RE.search(line)
-        if store_match is not None:
-            store_events.append((
-                int(store_match.group(1)),
-                int(store_match.group(2), 16),
-                int(store_match.group(3), 16),
-            ))
-        else:
-            alt_match = ALT_WRITE_RE.search(line)
-            if alt_match is not None:
-                store_events.append((
-                    int(alt_match.group(1)),
-                    int(alt_match.group(2), 16),
-                    int(alt_match.group(3), 16),
-                ))
-
-        csr_match = CSR_IMM_RE.search(line)
-        if csr_match is not None:
-            imm = int(csr_match.group(2), 16)
-            if imm in csr_cycles:
-                csr_cycles[imm].append(int(csr_match.group(1)))
-
-        if '[E]' in line and 'ebreak | halt | ecall' in line:
-            completed = 1
-
-    if not cycles:
-        raise RuntimeError(f'No cycle information found in simulator log for workload: {workload}')
-
-    program_start_cycle = min(cycles)
-    program_end_cycle = max(cycles)
-    start_cycle, end_cycle, kernel_source = _detect_kernel_window(
-        exe_path,
-        store_events,
-        pc_events,
-        csr_cycles,
-        program_start_cycle,
-        program_end_cycle,
-    )
-    if kernel_source == 'missing':
-        return {
-            'workload': workload,
-            'completed': completed,
-            'kernel_source': kernel_source,
-            'start_cycle': program_start_cycle,
-            'end_cycle': program_end_cycle,
-            'total_cycles': 0,
-            'base_cycles': 0,
-            'load_use_stall': 0,
-            'branch_control_stall': 0,
-            'structural_stall': 0,
-            'ipc': 0.0,
-            'issue_slot_util': 0.0,
-        }
-    if start_cycle > end_cycle:
-        start_cycle, end_cycle = end_cycle, start_cycle
-
-    # Kernel counters use end-start semantics; count cycles in (start, end].
-    cycle_window = range(start_cycle + 1, end_cycle + 1)
-    total_cycles = end_cycle - start_cycle
-
-    base_cycles = 0
-    load_use_stall = 0
-    branch_control_stall = 0
-    structural_stall = 0
-    stall_source = 'explicit_logs' if perf_reason_by_cycle else 'heuristic'
-
-    for cycle in cycle_window:
-        reason = perf_reason_by_cycle.get(cycle)
-        if reason is not None:
-            base_bit, _, branch_bit, structural_bit = reason
-            if base_bit + branch_bit + structural_bit != 1:
-                raise RuntimeError(
-                    f'Non-mutually-exclusive PERF reason at cycle {cycle} for {workload}: '
-                    f'{reason}'
-                )
-            if base_bit == 1:
-                base_cycles += 1
-            elif cycle in backlogged_cycles:
-                load_use_stall += 1
-            elif branch_bit == 1:
-                branch_control_stall += 1
-            elif structural_bit == 1:
-                structural_stall += 1
-            else:
-                raise RuntimeError(
-                    f'Unable to classify cycle {cycle} for {workload}: '
-                    f'reason={reason}'
-                )
-            continue
-
-        if de_by.get(cycle, 0) == 1:
-            base_cycles += 1
-            continue
-        if cycle in backlogged_cycles:
-            load_use_stall += 1
-            continue
-        if should_fetch.get(cycle, 1) == 0:
-            branch_control_stall += 1
-            continue
-        structural_stall += 1
-
-    accounted = base_cycles + load_use_stall + branch_control_stall + structural_stall
-    if accounted != total_cycles:
-        raise RuntimeError(
-            f'Cycle accounting mismatch for {workload}: '
-            f'{accounted} != {total_cycles}'
-        )
-
-    ipc = base_cycles / total_cycles
-    return {
-        'workload': workload,
-        'completed': completed,
-        'kernel_source': kernel_source,
-        'start_cycle': start_cycle,
-        'end_cycle': end_cycle,
-        'total_cycles': total_cycles,
-        'base_cycles': base_cycles,
-        'load_use_stall': load_use_stall,
-        'branch_control_stall': branch_control_stall,
-        'structural_stall': structural_stall,
-        'ipc': ipc,
-        'issue_slot_util': ipc,
-        'stall_source': stall_source,
-    }
-
-
-def write_workload_breakdown(rows, csv_path):
-    if not rows:
-        return
-
-    fieldnames = [
-        'workload',
-        'completed',
-        'kernel_source',
-        'start_cycle',
-        'end_cycle',
-        'total_cycles',
-        'base_cycles',
-        'load_use_stall',
-        'branch_control_stall',
-        'structural_stall',
-        'ipc',
-        'issue_slot_util',
-        'stall_source',
-    ]
-    with open(csv_path, 'w', newline='', encoding='utf-8') as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
 
 
 def check():
@@ -914,7 +582,6 @@ if __name__ == '__main__':
     # Build the CPU Module only once
     sys, simulator_binary, verilog_path = build_cpu(depth_log=16)
     args = py_sys.argv[1:]
-    breakdown_rows = []
     print("minor-CPU built successfully!")
     # Define workloads
     wl_path = f'{utils.repo_path()}/examples/minor-cpu/workloads'
@@ -932,10 +599,7 @@ if __name__ == '__main__':
         for wl in workloads:
             # Copy workloads to tmp directory and rename to workload.
             init_workspace(wl_path, wl)
-            stats = run_cpu(sys, simulator_binary, verilog_path, wl)
-            if stats is not None:
-                breakdown_rows.append(stats)
-        write_workload_breakdown(breakdown_rows, 'workload_ipc_stall_breakdown.csv')
+            run_cpu(sys, simulator_binary, verilog_path, wl)
         print("minor-CPU workloads ran successfully!")
 
         # ========================================================================================
@@ -982,8 +646,5 @@ if __name__ == '__main__':
         # If user DID specify workloads, run exactly those, skipping default & tests:
         for wl in args:
             init_workspace(wl_path, wl)
-            stats = run_cpu(sys, simulator_binary, verilog_path, wl)
-            if stats is not None:
-                breakdown_rows.append(stats)
-        write_workload_breakdown(breakdown_rows, 'workload_ipc_stall_breakdown.csv')
+            run_cpu(sys, simulator_binary, verilog_path, wl)
         print("Done running user-specified workload(s)!")
