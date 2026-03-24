@@ -31,7 +31,7 @@ jobs:
           path: |
             .cargo-home/registry
             .cargo-home/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('tools/rust-sim-runtime/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('tools/rust-sim-runtime/Cargo.toml', 'tools/rust-sim-runtime/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
       
@@ -48,7 +48,7 @@ jobs:
 
       - name: Prefetch Rust Dependencies
         run: |
-          . setup.sh && cargo fetch --manifest-path tools/rust-sim-runtime/Cargo.toml --locked
+          . setup.sh && cargo fetch --manifest-path tools/rust-sim-runtime/Cargo.toml
 
       - name: Build All Components
         run: |
