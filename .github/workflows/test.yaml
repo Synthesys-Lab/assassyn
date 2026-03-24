@@ -12,6 +12,8 @@ jobs:
   test:
     name: Test
     runs-on: self-hosted
+    env:
+      CARGO_HOME: ${{ github.workspace }}/.cargo-home
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,6 +24,16 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
           override: true
+
+      - name: Cache Cargo Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cargo-home/registry
+            .cargo-home/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('tools/rust-sim-runtime/Cargo.toml', 'tools/rust-sim-runtime/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
       
       - name: Apply Patches
         run: |
@@ -34,12 +46,18 @@ jobs:
           echo "verilator-hash=$(git rev-parse HEAD:3rd-party/verilator)" >> $GITHUB_OUTPUT
           echo "ramulator2-hash=$(git rev-parse HEAD:3rd-party/ramulator2)" >> $GITHUB_OUTPUT
 
+      - name: Prefetch Rust Dependencies
+        run: |
+          . setup.sh && cargo fetch --manifest-path tools/rust-sim-runtime/Cargo.toml
+
       - name: Build All Components
         run: |
           echo "Building all components"
           . setup.sh && make build-all
       
       - name: Run All Tests
+        env:
+          ASSASSYN_CARGO_NET_OFFLINE: "1"
         run: |
           . setup.sh && make test-all
 

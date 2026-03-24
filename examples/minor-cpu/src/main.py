@@ -242,7 +242,7 @@ class Execution(Module):
         with Condition(rd != Bits(5)(0)):
             log("own x{:02}          |", rd)
 
-        return  rd, ex_valid ,exec_br_jump,dcache
+        return rd, ex_valid, exec_br_jump, dcache
 
 class Decoder(Module):
     
@@ -319,7 +319,7 @@ class FetcherImpl(Downstream):
         with Condition(~fetch_valid[0]):
             fetch_valid[0] = Bits(1)(1)
 
-        should_fetch =  (~ on_branch) & (~ br_sm[0] ) & fetch_valid[0]
+        should_fetch = (~on_branch) & (~br_sm[0]) & fetch_valid[0]
 
 
         jump_flag = br_jump[0] & br_no_jump[0]
@@ -329,7 +329,7 @@ class FetcherImpl(Downstream):
         to_fetch = Bits(32)(0)
         #to_fetch = should_fetch.select(pc_addr, to_fetch)
         to_fetch = (jump_flag).select(ex_bypass[0].bitcast(Bits(32)), pc_addr)
-        real_fetch = (should_fetch  )& (new_cnt < Int(8)(3))
+        real_fetch = should_fetch & (new_cnt < Int(8)(3))
         log("on_br: {}         | br_sm: {}     | br_jump: {}      | fetch: {}      | ex_bypass: 0x{:05x} | ongoing: {} | jump_flag: {}",
              on_branch, br_sm[0], br_jump[0], should_fetch, ex_bypass[0], ongoing[0],jump_flag)
         icache.build(Bits(1)(0), real_fetch, to_fetch[2:2+depth_log-1].bitcast(Int(depth_log)), Bits(32)(0))
@@ -424,7 +424,6 @@ def build_cpu(depth_log):
 
         wb_bypass_reg = RegArray(bits5, 1)
         wb_bypass_data = RegArray(bits32, 1)
-
         exec_br_dest = RegArray(Bits(32), 1)
         exec_br_jumped = RegArray(Bits(1), 1)
         mem_br_no_jump = RegArray(Bits(1), 1)
@@ -443,7 +442,7 @@ def build_cpu(depth_log):
         executor = Execution()
         offset_reg = user.build(init_cache.dout)
 
-        exec_rd, ex_valid, exec_br_jump,dcache = executor.build(
+        exec_rd, ex_valid, exec_br_jump, dcache = executor.build(
             pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
             exec_bypass_data = exec_bypass_data,
