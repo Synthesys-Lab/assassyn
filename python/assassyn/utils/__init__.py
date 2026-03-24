@@ -86,11 +86,8 @@ def _cmd_wrapper(cmd):
             os.makedirs(ccache_dir, exist_ok=True)
             env['CCACHE_DIR'] = ccache_dir
 
-    # In CI / sandboxed runners, network access may be restricted. If tests are
-    # running, prefer offline to avoid Cargo trying to touch crates.io.
-    if 'CARGO_NET_OFFLINE' not in env and (
-        'PYTEST_CURRENT_TEST' in env or env.get('ASSASSYN_CARGO_NET_OFFLINE') == '1'
-    ):
+    # Only force Cargo offline when CI or the caller opts in explicitly.
+    if 'CARGO_NET_OFFLINE' not in env and env.get('ASSASSYN_CARGO_NET_OFFLINE') == '1':
         env['CARGO_NET_OFFLINE'] = 'true'
 
     return subprocess.check_output(cmd, env=env).decode('utf-8')
