@@ -1,0 +1,8 @@
+Baseline Performance - main.py
+======================================================================
+Date: 2025-11-25 23:14:26
+Elements: 2048
+Passes: 1
+Total Cycles: 6,178
+Cycles per Element: 3.02
+Wall-clock Time: 1.67s

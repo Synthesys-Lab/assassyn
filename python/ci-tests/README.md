@@ -18,6 +18,7 @@
 |                                                              |                                        |
 | `test_fifo1, test_bind, `<br>`test_eager_bind, test_imbalance, `<br>`test_fifo_valid, test_wait_until` | sth about **Pure Sequential Logic**    |
 | `test_comb_expose, test_toposort`<br />`test_downstream, `   | sth about **Pure Combinational Logic** |
+| `test_radix_sort`                                            | FSM, SRAM, Complex Algorithm           |
 
 
 ## Testcase detail
@@ -64,3 +65,13 @@
     + An alternative method for reading port data.
 15. `test_peek`
     + Similar to the operation of viewing the top of a queue in a `Queue`. It corresponds to the `front()` operation in the STL of C++ queues. Essentially, it is looking at the top element of the queue without removing it.
+16. `test_radix_sort`
+    + Demonstrates a complete hardware radix sort implementation using FSM abstraction.
+    + Tests FSM (Finite State Machine) state transitions with nested FSMs.
+    + Tests SRAM memory operations with ping-pong buffering technique.
+    + Implements radix-16 sort algorithm (processing 4 bits at a time) for 32-bit integers.
+    + Key features tested:
+      1. Main FSM with 4 states: reset, read, prefix sum, write.
+      2. Nested MemImpl FSM for write-back operations.
+      3. Histogram building and prefix sum computation.
+      4. Stable sorting with in-place array operations.
