@@ -15,6 +15,7 @@
 | `test_select, test_select1hot`                               | gramme : `select`                      |
 | `test_testbench`                                             | Usage of `with Cycle(1):`              |
 | `test_explict_pop, test_peek`                                | gramme in `Port`                       |
+| `test_sram, test_sram_masked`                                | SRAM full-word access and masked write |
 |                                                              |                                        |
 | `test_fifo1, test_bind, `<br>`test_eager_bind, test_imbalance, `<br>`test_fifo_valid, test_wait_until` | sth about **Pure Sequential Logic**    |
 | `test_comb_expose, test_toposort`<br />`test_downstream, `   | sth about **Pure Combinational Logic** |
@@ -64,3 +65,6 @@
     + An alternative method for reading port data.
 15. `test_peek`
     + Similar to the operation of viewing the top of a queue in a `Queue`. It corresponds to the `front()` operation in the STL of C++ queues. Essentially, it is looking at the top element of the queue without removing it.
+16. `test_sram, test_sram_masked`
+    + `test_sram` covers the original full-word SRAM read/write behavior.
+    + `test_sram_masked` adds regression coverage for masked writes, including zero mask, each byte lane, both halfword lanes, a non-byte-aligned bit mask, and cross-address isolation.

@@ -44,7 +44,7 @@ Initialize SRAM module with read data buffer.
 **Explanation:**
 This constructor calls the parent `MemoryBase.__init__()` method to inherit base memory functionality, then creates an additional `dout` register buffer. Both arrays record the SRAM instance as their owner: `_payload` is created in the base class with `owner=self`, and `dout` uses the same override. Downstream passes rely on `Array.is_payload(SRAM)` to distinguish the payload buffer from auxiliary registers. Using `Bits` type ensures compatibility with array read operations that return raw bit values.
 
-### `def build(self, we, re, addr, wdata)`
+### `def build(self, we, re, addr, wdata, wmask=None)`
 
 Build the SRAM module with combinational logic for synchronous memory operations.
 
@@ -53,6 +53,7 @@ Build the SRAM module with combinational logic for synchronous memory operations
 - `re: Value` - Read enable signal
 - `addr: Value` - Address signal  
 - `wdata: Value` - Write data signal
+- `wmask: Value | None` - Optional per-bit write mask. `None` preserves full-word writes.
 
 **Returns:** None
 
@@ -61,7 +62,7 @@ This method implements the core SRAM functionality using the `@combinational` de
 
 1. **Signal Assignment:** All input signals are stored as instance attributes for memory operations
 2. **Mutual Exclusion:** Uses `assume(~(we & re))` from [intrinsic.py](../expr/intrinsic.md) to enforce that read and write operations cannot be enabled simultaneously
-3. **Write Operation:** When `we` is enabled, writes `wdata` to `_payload[addr]` using conditional execution
+3. **Write Operation:** When `we` is enabled, either writes `wdata` directly to `_payload[addr]` or merges it with the previous word using `wmask`
 4. **Read Operation:** When `re` is enabled, reads `_payload[addr]` and stores the result in `dout[0]` for downstream modules to access
 
 **SRAM Read Data Timing:** The relationship between read enable timing and `dout` buffer update:
@@ -73,6 +74,7 @@ This method implements the core SRAM functionality using the `@combinational` de
 **Technical Details:**
 - Uses `Condition` blocks for conditional execution of read/write operations
 - Enforces mutual exclusion between read and write operations using `assume` intrinsic
+- Supports optional masked writes with `merged = (old_data & ~wmask) | (wdata & wmask)`
 - Provides immediate data access without request/response cycles
 - Read data is buffered in `dout` register for downstream module consumption
 - Follows the combinational downstream module pattern for same-cycle signal processing

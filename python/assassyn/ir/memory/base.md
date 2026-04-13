@@ -33,6 +33,7 @@ Base class for memory modules that provides common functionality for SRAM and DR
 - `re: Value` - Read enable signal (combinational input)  
 - `addr: Value` - Address signal (combinational input)
 - `wdata: Value` - Write data signal (combinational input)
+- `wmask: Value | None` - Optional per-bit write mask for partial writes
 - `addr_width: int` - Width of the address in bits (derived as log2(depth))
 - `_payload: Array` - Array holding the memory contents (private, not for direct access, owned by the memory instance)
 
@@ -48,7 +49,7 @@ Initialize memory base class with validation and setup.
 **Returns:** None
 
 **Explanation:**
-This constructor validates all input parameters and sets up the memory module infrastructure. It enforces that depth must be a power of 2 to enable efficient address decoding using log2 operations. The constructor creates a `RegArray` instance with the specified width and depth to serve as the memory payload, using the instance name for proper identification in generated code. All signal attributes are initialized to None and will be assigned during the `build()` method of concrete implementations.
+This constructor validates all input parameters and sets up the memory module infrastructure. It enforces that depth must be a power of 2 to enable efficient address decoding using log2 operations. The constructor creates a `RegArray` instance with the specified width and depth to serve as the memory payload, using the instance name for proper identification in generated code. All signal attributes are initialized to None and will be assigned during the `build()` method of concrete implementations. `wmask` defaults to `None`, so existing memories keep the original full-word write behavior unless masked writes are explicitly requested.
 
 **Address Width Derivation Logic:** The address width is calculated as `addr_width = log2(depth)` because:
 1. **Power-of-2 Constraint**: Depth must be a power of 2 to enable efficient address decoding
