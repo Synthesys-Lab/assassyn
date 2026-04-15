@@ -3,6 +3,10 @@
 
 .PHONY: build-verilator clean-verilator patch-verilator
 
+# Bound Verilator parallelism so hosted CI runners do not get swamped by an
+# unlimited "make -j" build. Allow callers to override when needed.
+VERILATOR_BUILD_JOBS ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
 # Patch target for verilator
 patch-verilator: 3rd-party/verilator/.patch-applied
 
@@ -27,10 +31,11 @@ build-verilator: 3rd-party/verilator/.verilator-built
 	else \
 		echo "Building Verilator..."; \
 		echo "Installing Verilator by building it from source..."; \
+		echo "Using $(VERILATOR_BUILD_JOBS) parallel job(s) for Verilator build..."; \
 		cd 3rd-party/verilator && \
 			autoconf && \
 			./configure && \
-			make -j; \
+			$(MAKE) -j$(VERILATOR_BUILD_JOBS); \
 		echo "Verilator build completed successfully."; \
 		touch $(CURDIR)/$@; \
 	fi
