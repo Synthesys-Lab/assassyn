@@ -4,10 +4,7 @@
 .PHONY: install-circt clean-circt patch-circt build-pycde-source verify-pycde-installation check-wheel-exists install-pycde-wheel
 
 # Patch target for circt
-patch-circt: 3rd-party/circt/.patch-applied
-
-# Marker file to track patch application
-3rd-party/circt/.patch-applied:
+patch-circt:
 	@echo "Checking circt patch status..."
 	@cd 3rd-party/circt && \
 		if bash ../../scripts/patch-apply.sh check ../../scripts/init/patches/circt.patch 2>/dev/null; then \
@@ -15,8 +12,7 @@ patch-circt: 3rd-party/circt/.patch-applied
 		else \
 			echo "Applying CIRCT patch..."; \
 			bash ../../scripts/patch-apply.sh apply ../../scripts/init/patches/circt.patch; \
-		fi && \
-		touch $(CURDIR)/3rd-party/circt/.patch-applied
+		fi
 
 install-circt: install-py-package 3rd-party/circt/.circt-built
 
@@ -40,6 +36,10 @@ verify-pycde-installation:
 # Check if wheel exists
 check-wheel-exists:
 	@if [ ! -d "3rd-party/circt/frontends/PyCDE/dist" ] || [ -z "$$(ls 3rd-party/circt/frontends/PyCDE/dist/*.whl 2>/dev/null)" ]; then \
+		if [ ! -f "3rd-party/circt/llvm/llvm/CMakeLists.txt" ]; then \
+			echo "Missing 3rd-party/circt/llvm checkout. Run 'git submodule update --init --recursive' and retry." >&2; \
+			exit 1; \
+		fi; \
 		echo "No wheel found, building PyCDE from source..."; \
 		$(MAKE) build-pycde-source; \
 	fi

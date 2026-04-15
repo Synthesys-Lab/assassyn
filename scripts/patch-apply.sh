@@ -25,8 +25,11 @@ apply_patch() {
     local original_line=""
     local replacement_lines=()
     local in_replacement=false
+    local line=""
     
-    while IFS= read -r line; do
+    exec 3< "$PATCH_FILE"
+    while IFS= read -r line <&3 || [ -n "$line" ]; do
+        line="${line%$'\r'}"
         # Skip empty lines
         if [ -z "$line" ]; then
             continue
@@ -62,7 +65,7 @@ apply_patch() {
         fi
         
         # Check if this is a replacement line
-        if [[ "$line" =~ ^+ ]]; then
+        if [[ "$line" =~ ^\+ ]]; then
             if [ "$in_replacement" = true ]; then
                 replacement_lines+=("${line:1}")  # Remove the + prefix
             else
@@ -70,7 +73,8 @@ apply_patch() {
                 exit 1
             fi
         fi
-    done < "$PATCH_FILE"
+    done
+    exec 3<&-
     
     # Process the last file
     if [ -n "$current_file" ] && [ -n "$original_line" ]; then
@@ -84,6 +88,7 @@ process_file() {
     local original="$2"
     shift 2
     local replacements=("$@")
+    local line=""
     
     if [ ! -f "$file_path" ]; then
         echo "Error: Target file '$file_path' not found" >&2
@@ -93,23 +98,18 @@ process_file() {
     # Create temporary file
     local temp_file=$(mktemp)
     
-    # Find and replace the original line
+    # Find and replace the first matching original line.
     local found=false
-    local in_replacement=false
-    local replacement_count=0
     
-    while IFS= read -r line; do
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="${line%$'\r'}"
         if [ "$found" = false ] && [ "$line" = "$original" ]; then
-            # Found the original line, replace with all replacement lines
+            # Found the original line, replace it with all replacement lines.
             found=true
             for replacement in "${replacements[@]}"; do
                 echo "$replacement" >> "$temp_file"
             done
-        elif [ "$found" = true ] && [ "$replacement_count" -lt "${#replacements[@]}" ]; then
-            # Skip lines that match our replacements (they're already in the file)
-            replacement_count=$((replacement_count + 1))
         else
-            # Normal line, copy as-is
             echo "$line" >> "$temp_file"
         fi
     done < "$file_path"
@@ -131,8 +131,11 @@ reverse_patch() {
     local original_line=""
     local replacement_lines=()
     local in_replacement=false
+    local line=""
     
-    while IFS= read -r line; do
+    exec 3< "$PATCH_FILE"
+    while IFS= read -r line <&3 || [ -n "$line" ]; do
+        line="${line%$'\r'}"
         # Skip empty lines
         if [ -z "$line" ]; then
             continue
@@ -168,7 +171,7 @@ reverse_patch() {
         fi
         
         # Check if this is a replacement line
-        if [[ "$line" =~ ^+ ]]; then
+        if [[ "$line" =~ ^\+ ]]; then
             if [ "$in_replacement" = true ]; then
                 replacement_lines+=("${line:1}")  # Remove the + prefix
             else
@@ -176,7 +179,8 @@ reverse_patch() {
                 exit 1
             fi
         fi
-    done < "$PATCH_FILE"
+    done
+    exec 3<&-
     
     # Process the last file
     if [ -n "$current_file" ] && [ -n "$original_line" ]; then
@@ -196,43 +200,45 @@ reverse_file() {
         exit 1
     fi
     
-    # Create temporary file
     local temp_file=$(mktemp)
-    
-    # Find consecutive replacement lines and replace with original
     local found=false
-    local replacement_count=0
-    local skip_count=0
-    
-    while IFS= read -r line; do
-        if [ "$found" = false ] && [ "$replacement_count" -lt "${#replacements[@]}" ]; then
-            # Check if this line matches the first replacement
-            if [ "$line" = "${replacements[$replacement_count]}" ]; then
-                if [ "$replacement_count" -eq 0 ]; then
-                    # Found start of replacement block
-                    found=true
-                    skip_count=1
-                    replacement_count=1
-                    # Write the original line instead
-                    echo "$original" >> "$temp_file"
-                else
-                    # This shouldn't happen if we're tracking correctly
-                    echo "Error: Unexpected replacement line found" >&2
-                    rm -f "$temp_file"
-                    exit 1
+    local lines=()
+    local i=0
+    local j=0
+    local matches=true
+
+    mapfile -t lines < "$file_path"
+    for i in "${!lines[@]}"; do
+        lines[$i]="${lines[$i]%$'\r'}"
+    done
+
+    i=0
+
+    while [ "$i" -lt "${#lines[@]}" ]; do
+        matches=true
+
+        if [ "$found" = false ] && [ "${#replacements[@]}" -gt 0 ] && \
+           [ $((i + ${#replacements[@]})) -le "${#lines[@]}" ]; then
+            j=0
+            while [ "$j" -lt "${#replacements[@]}" ]; do
+                if [ "${lines[$((i + j))]}" != "${replacements[$j]}" ]; then
+                    matches=false
+                    break
                 fi
-            else
-                # Normal line, copy as-is
-                echo "$line" >> "$temp_file"
+                j=$((j + 1))
+            done
+
+            if [ "$matches" = true ]; then
+                echo "$original" >> "$temp_file"
+                found=true
+                i=$((i + ${#replacements[@]}))
+                continue
             fi
-        elif [ "$found" = true ] && [ "$skip_count" -lt "${#replacements[@]}" ]; then
-            # Skip the remaining replacement lines
-            skip_count=$((skip_count + 1))
-        else
-            # Normal line, copy as-is
-            echo "$line" >> "$temp_file"
         fi
-    done < "$file_path"
+
+        echo "${lines[$i]}" >> "$temp_file"
+        i=$((i + 1))
+    done
     
     if [ "$found" = false ]; then
         echo "Error: Replacement lines not found in '$file_path'" >&2
@@ -252,8 +258,11 @@ check_patch() {
     local replacement_lines=()
     local in_replacement=false
     local all_applied=true
+    local line=""
     
-    while IFS= read -r line; do
+    exec 3< "$PATCH_FILE"
+    while IFS= read -r line <&3 || [ -n "$line" ]; do
+        line="${line%$'\r'}"
         # Skip empty lines
         if [ -z "$line" ]; then
             continue
@@ -293,7 +302,7 @@ check_patch() {
         fi
         
         # Check if this is a replacement line
-        if [[ "$line" =~ ^+ ]]; then
+        if [[ "$line" =~ ^\+ ]]; then
             if [ "$in_replacement" = true ]; then
                 replacement_lines+=("${line:1}")  # Remove the + prefix
             else
@@ -301,7 +310,8 @@ check_patch() {
                 exit 1
             fi
         fi
-    done < "$PATCH_FILE"
+    done
+    exec 3<&-
     
     # Process the last file
     if [ -n "$current_file" ] && [ -n "$original_line" ]; then
@@ -332,38 +342,46 @@ check_file() {
         return 1
     fi
     
-    # Look for the replacement lines in sequence
-    local replacement_count=0
-    local found_original=false
-    
-    # Use a subshell to avoid file descriptor conflicts
-    (
-        while IFS= read -r line; do
-            if [ "$replacement_count" -lt "${#replacements[@]}" ]; then
-                if [ "$line" = "${replacements[$replacement_count]}" ]; then
-                    replacement_count=$((replacement_count + 1))
-                elif [ "$line" = "$original" ]; then
-                    found_original=true
+    local lines=()
+    local i=0
+    local j=0
+    local matches=true
+
+    mapfile -t lines < "$file_path"
+    for i in "${!lines[@]}"; do
+        lines[$i]="${lines[$i]%$'\r'}"
+    done
+
+    i=0
+
+    while [ "$i" -lt "${#lines[@]}" ]; do
+        matches=true
+
+        if [ "${#replacements[@]}" -gt 0 ] && \
+           [ $((i + ${#replacements[@]})) -le "${#lines[@]}" ]; then
+            j=0
+            while [ "$j" -lt "${#replacements[@]}" ]; do
+                if [ "${lines[$((i + j))]}" != "${replacements[$j]}" ]; then
+                    matches=false
                     break
                 fi
-            elif [ "$line" = "$original" ]; then
-                found_original=true
-                break
+                j=$((j + 1))
+            done
+
+            if [ "$matches" = true ]; then
+                return 0
             fi
-        done < "$file_path"
-        
-        if [ "$replacement_count" -eq "${#replacements[@]}" ]; then
-            # All replacement lines found in sequence
-            exit 0
-        elif [ "$found_original" = true ]; then
-            # Original line found, patch not applied
-            exit 1
-        else
-            # Neither found, file might be in unexpected state
-            echo "Warning: Neither original nor replacement lines found in '$file_path'" >&2
-            exit 1
         fi
-    )
+
+        if [ "${lines[$i]}" = "$original" ]; then
+            return 1
+        fi
+
+        i=$((i + 1))
+    done
+
+    echo "Warning: Neither original nor replacement lines found in '$file_path'" >&2
+    return 1
 }
 
 # Main execution

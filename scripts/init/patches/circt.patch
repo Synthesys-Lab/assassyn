@@ -1,3 +1,7 @@
 frontends/PyCDE/setup.py
 -      cmake_args += ["-DESI_RUNTIME=ON"]
++      # Assassyn disables ESI runtime for local PyCDE builds.
 +      cmake_args += ["-DESI_RUNTIME=OFF"]
+-    targets = ["check-pycde"]
++    # Assassyn skips upstream PyCDE self-tests during local bootstrap.
++    targets = ["install-PyCDE"]
