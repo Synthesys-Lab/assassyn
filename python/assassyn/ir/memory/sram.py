@@ -34,7 +34,7 @@ class SRAM(MemoryBase):  # pylint: disable=too-many-instance-attributes
         )
 
     @combinational
-    def build(self, we, re, addr, wdata):  # pylint: disable=too-many-arguments
+    def build(self, we, re, addr, wdata, wmask=None):  # pylint: disable=too-many-arguments
         '''The constructor for the SRAM module.
 
         Args:
@@ -42,17 +42,24 @@ class SRAM(MemoryBase):  # pylint: disable=too-many-instance-attributes
             re: Value: The read enable signal.
             addr: Value: The address signal.
             wdata: Value: The write data signal.
+            wmask: Optional per-bit write mask. `None` keeps full-word writes.
         '''
         self.we = we
         self.re = re
         self.addr = addr
         self.wdata = wdata
+        self.wmask = wmask
 
         # Enforce that we and re cannot be both enabled
         assume(~(we & re))
 
         with Condition(we):
-            self._payload[addr] = wdata
+            if wmask is None:
+                self._payload[addr] = wdata
+            else:
+                old_data = self._payload[addr]
+                merged = (old_data & (~self.wmask)) | (wdata & self.wmask)
+                self._payload[addr] = merged
         with Condition(re):
             self.dout[0] = self._payload[addr]
 

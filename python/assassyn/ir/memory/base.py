@@ -24,6 +24,7 @@ class MemoryBase(Downstream):
     re: Value       # Read enable signal
     addr: Value     # Address signal
     wdata: Value    # Write data signal
+    wmask: Value | None  # Optional write mask signal
     
     # Derived Values
     addr_width: int # Width of the address in bits
@@ -70,3 +71,4 @@ class MemoryBase(Downstream):
         self.re = None
         self.addr = None
         self.wdata = None
+        self.wmask = None
