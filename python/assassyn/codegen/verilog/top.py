@@ -546,7 +546,7 @@ def generate_top_harness(dumper: CIRCTDumper):
 
             dumper.append_code(
                 f"{mod_name}_trigger_counter_delta.assign("
-                f"{summed_triggers}.as_bits()[0:{width}])"
+                f"{summed_triggers}.as_bits().pad_or_truncate({width}))"
                 )
         else:
             dumper.append_code(

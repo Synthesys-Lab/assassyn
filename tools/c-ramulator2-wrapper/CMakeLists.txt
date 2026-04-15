@@ -33,6 +33,10 @@ find_library(RAMULATOR_LIBRARY
   NO_DEFAULT_PATH
 )
 
+if(NOT RAMULATOR_LIBRARY)
+  message(FATAL_ERROR "Could not find libramulator. Build 3rd-party/ramulator2 first.")
+endif()
+
 # Add wrapper shared library
 add_library(wrapper SHARED CRamualator2Wrapper.cpp)
 
@@ -49,4 +53,18 @@ add_executable(test test.cpp)
 target_link_libraries(main wrapper ${RAMULATOR_LIBRARY})
 target_link_libraries(test wrapper ${RAMULATOR_LIBRARY})
 
+if(APPLE)
+  set_target_properties(
+    wrapper
+    PROPERTIES
+      BUILD_RPATH "${CMAKE_CURRENT_SOURCE_DIR}/../../3rd-party/ramulator2"
+      INSTALL_RPATH "${CMAKE_CURRENT_SOURCE_DIR}/../../3rd-party/ramulator2"
+  )
+  set_target_properties(
+    main test
+    PROPERTIES
+      BUILD_RPATH "${CMAKE_BINARY_DIR}/lib;${CMAKE_CURRENT_SOURCE_DIR}/../../3rd-party/ramulator2"
+      INSTALL_RPATH "${CMAKE_BINARY_DIR}/lib;${CMAKE_CURRENT_SOURCE_DIR}/../../3rd-party/ramulator2"
+  )
+endif()
 
