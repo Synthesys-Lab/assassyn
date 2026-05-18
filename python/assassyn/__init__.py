@@ -1,11 +1,29 @@
-"""Assassyn's python frontend."""
+"""Assassyn's Python frontend package."""
 
-from . import frontend
-from . import utils
+from importlib import import_module
+from types import ModuleType
+
 from . import backend
+from . import builder
+from . import frontend
 from . import ir
-from . import builder as _builder
+from . import utils
 
-# Keep heavyweight optional integrations lazy.  Importing the base package should
-# not require the Ramulator2 C wrapper when a design only uses the core frontend
-# and backend.
+# Optional integrations stay out of __all__ so wildcard imports do not load C
+# wrappers or require external simulator libraries.
+__all__ = [
+    "backend",
+    "builder",
+    "frontend",
+    "ir",
+    "utils",
+]
+
+
+def __getattr__(name: str) -> ModuleType:
+    """Load optional top-level integrations without affecting base imports."""
+    if name == "ramulator2":
+        module = import_module(f"{__name__}.ramulator2")
+        globals()[name] = module
+        return module
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

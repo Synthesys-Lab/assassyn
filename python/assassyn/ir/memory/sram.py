@@ -58,6 +58,8 @@ class SRAM(MemoryBase):  # pylint: disable=too-many-instance-attributes
                 self._payload[addr] = wdata
             else:
                 old_data = self._payload[addr]
+                # `wmask` is per bit: masked-in bits come from `wdata`, while
+                # masked-out bits preserve the existing SRAM word.
                 merged = (old_data & (~self.wmask)) | (wdata & self.wmask)
                 self._payload[addr] = merged
         with Condition(re):
