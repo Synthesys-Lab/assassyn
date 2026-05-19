@@ -26,6 +26,14 @@ record the report identifier, owning module, IR symbol, timing role, local
 delay, opcode, source location, and printable IR expression. `to_dict()`
 returns the JSON schema used by `critical_paths.json`.
 
+### `CRITICAL_PATHS_REPORT`
+
+```python
+CRITICAL_PATHS_REPORT = "critical_paths.json"
+```
+
+Shared report filename used by the backend and code-generation entrypoints.
+
 ### `TimingEdge`
 
 ```python
@@ -142,10 +150,11 @@ def _collect_boundaries(
 ) -> _Boundaries:
 ```
 
-Reads `ModuleMetadata.interactions`, `InteractionMatrix.array_view()`,
-`InteractionMatrix.fifo_view()`, and the async ledger to classify expressions as
-timing sources or sinks. It also scans module bodies for ExternalSV registered
-output reads.
+Reads each module's frozen `ModuleMetadata.interactions` view plus the async
+ledger to classify expressions as timing sources or sinks. The module view is
+already scoped to the current module, so the helper does not need to re-filter
+global array or FIFO views. It also scans module bodies for ExternalSV
+registered output reads.
 
 ### `_collect_nodes`
 

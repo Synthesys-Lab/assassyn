@@ -11,7 +11,7 @@ This section describes all the function interfaces and data structures in this s
 ### config
 
 ```python
-def config(path='./workspace', resource_base=None, pretty_printer=True, verbose=True, simulator=True, verilog=False, sim_threshold=100, idle_threshold=100, fifo_depth=4, random=False, enable_cache=True, timing_report=False) -> dict
+def config(path='./workspace', resource_base=None, pretty_printer=True, verbose=True, simulator=True, verilog=False, simulator_crate_name=None, sim_threshold=100, idle_threshold=100, fifo_depth=4, random=False, enable_cache=True, timing_report=False) -> dict
 ```
 
 The helper function to create the default configuration for system elaboration. This function provides a centralized way to configure all aspects of the elaboration process.
@@ -23,6 +23,7 @@ The helper function to create the default configuration for system elaboration. 
 - `verbose` (bool): Whether to print verbose output during elaboration (default: True)
 - `simulator` (bool): Whether to generate simulator code (default: True)
 - `verilog` (bool): Whether to generate Verilog code (default: False)
+- `simulator_crate_name` (str, optional): Override for the generated Rust simulator crate and binary name. When omitted, `elaborate()` derives a cache-safe name from the system and configuration hashes.
 - `sim_threshold` (int): Maximum simulation cycles before termination (default: 100)
 - `idle_threshold` (int): Maximum idle cycles before termination (default: 100)
 - `fifo_depth` (int): Default FIFO depth for pipeline stages (default: 4)

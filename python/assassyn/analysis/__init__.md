@@ -22,6 +22,7 @@ escapes its defining module.
 
 ```python
 from .timing import (
+    CRITICAL_PATHS_REPORT,
     CriticalPath,
     TimingEdge,
     TimingNode,
@@ -30,9 +31,9 @@ from .timing import (
 )
 ```
 
-These names come from [timing.py](./timing.py). They expose the pre-synthesis
-critical-path analyzer and the JSON report writer used by backend
-`timing_report` generation.
+These names come from [timing.py](./timing.py). They expose the shared report
+filename, the pre-synthesis critical-path analyzer, and the JSON report writer
+used by backend `timing_report` generation.
 
 ### Topology Re-exports
 

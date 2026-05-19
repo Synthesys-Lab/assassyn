@@ -1,5 +1,6 @@
 """CI test for SRAM masked-write support."""
 
+from dataclasses import dataclass
 import re
 
 from assassyn.frontend import *
@@ -8,35 +9,50 @@ from assassyn.test import run_test
 
 ADDR0 = 0x12
 ADDR1 = 0x34
+WRITE = "write"
+READ = "read"
 
-OPS = [
-    {"kind": "write", "addr": ADDR0, "wdata": 0x11223344, "wmask": 0xFFFFFFFF},
-    {"kind": "read", "addr": ADDR0, "expected": 0x11223344},
-    {"kind": "write", "addr": ADDR0, "wdata": 0xFFFFFFFF, "wmask": 0x00000000},
-    {"kind": "read", "addr": ADDR0, "expected": 0x11223344},
-    {"kind": "write", "addr": ADDR0, "wdata": 0x000000AA, "wmask": 0x000000FF},
-    {"kind": "read", "addr": ADDR0, "expected": 0x112233AA},
-    {"kind": "write", "addr": ADDR0, "wdata": 0x0000BB00, "wmask": 0x0000FF00},
-    {"kind": "read", "addr": ADDR0, "expected": 0x1122BBAA},
-    {"kind": "write", "addr": ADDR0, "wdata": 0x00CC0000, "wmask": 0x00FF0000},
-    {"kind": "read", "addr": ADDR0, "expected": 0x11CCBBAA},
-    {"kind": "write", "addr": ADDR0, "wdata": 0xDD000000, "wmask": 0xFF000000},
-    {"kind": "read", "addr": ADDR0, "expected": 0xDDCCBBAA},
-    {"kind": "write", "addr": ADDR0, "wdata": 0x0000EEFF, "wmask": 0x0000FFFF},
-    {"kind": "read", "addr": ADDR0, "expected": 0xDDCCEEFF},
-    {"kind": "write", "addr": ADDR0, "wdata": 0xA1B20000, "wmask": 0xFFFF0000},
-    {"kind": "read", "addr": ADDR0, "expected": 0xA1B2EEFF},
-    {"kind": "write", "addr": ADDR1, "wdata": 0x55667788, "wmask": 0xFFFFFFFF},
-    {"kind": "read", "addr": ADDR1, "expected": 0x55667788},
-    {"kind": "write", "addr": ADDR1, "wdata": 0x00990000, "wmask": 0x00FF0000},
-    {"kind": "read", "addr": ADDR1, "expected": 0x55997788},
-    {"kind": "write", "addr": ADDR1, "wdata": 0xAA5500CC, "wmask": 0x0F0F00F0},
-    {"kind": "read", "addr": ADDR1, "expected": 0x5A9577C8},
-    {"kind": "read", "addr": ADDR0, "expected": 0xA1B2EEFF},
-]
+
+@dataclass(frozen=True)
+class MaskedOp:
+    """One static SRAM transaction used by the masked-write regression."""
+
+    kind: str
+    addr: int
+    wdata: int = 0
+    wmask: int = 0
+    expected: int = 0
+
+
+OPS = (
+    MaskedOp(WRITE, ADDR0, wdata=0x11223344, wmask=0xFFFFFFFF),
+    MaskedOp(READ, ADDR0, expected=0x11223344),
+    MaskedOp(WRITE, ADDR0, wdata=0xFFFFFFFF, wmask=0x00000000),
+    MaskedOp(READ, ADDR0, expected=0x11223344),
+    MaskedOp(WRITE, ADDR0, wdata=0x000000AA, wmask=0x000000FF),
+    MaskedOp(READ, ADDR0, expected=0x112233AA),
+    MaskedOp(WRITE, ADDR0, wdata=0x0000BB00, wmask=0x0000FF00),
+    MaskedOp(READ, ADDR0, expected=0x1122BBAA),
+    MaskedOp(WRITE, ADDR0, wdata=0x00CC0000, wmask=0x00FF0000),
+    MaskedOp(READ, ADDR0, expected=0x11CCBBAA),
+    MaskedOp(WRITE, ADDR0, wdata=0xDD000000, wmask=0xFF000000),
+    MaskedOp(READ, ADDR0, expected=0xDDCCBBAA),
+    MaskedOp(WRITE, ADDR0, wdata=0x0000EEFF, wmask=0x0000FFFF),
+    MaskedOp(READ, ADDR0, expected=0xDDCCEEFF),
+    MaskedOp(WRITE, ADDR0, wdata=0xA1B20000, wmask=0xFFFF0000),
+    MaskedOp(READ, ADDR0, expected=0xA1B2EEFF),
+    MaskedOp(WRITE, ADDR1, wdata=0x55667788, wmask=0xFFFFFFFF),
+    MaskedOp(READ, ADDR1, expected=0x55667788),
+    MaskedOp(WRITE, ADDR1, wdata=0x00990000, wmask=0x00FF0000),
+    MaskedOp(READ, ADDR1, expected=0x55997788),
+    MaskedOp(WRITE, ADDR1, wdata=0xAA5500CC, wmask=0x0F0F00F0),
+    MaskedOp(READ, ADDR1, expected=0x5A9577C8),
+    MaskedOp(READ, ADDR0, expected=0xA1B2EEFF),
+)
 
 
 class ReadObserver(Module):
+    """Log completed SRAM reads with the test step that requested them."""
 
     def __init__(self):
         super().__init__(
@@ -58,6 +74,7 @@ class ReadObserver(Module):
 
 
 class Launcher(Module):
+    """Issue the first async call into the driver pipeline."""
 
     def __init__(self, target):
         super().__init__(ports={})
@@ -69,6 +86,7 @@ class Launcher(Module):
 
 
 class MaskedDriver(Module):
+    """Replay the static masked SRAM transaction table one operation per cycle."""
 
     def __init__(self, observer):
         super().__init__(ports={})
@@ -91,13 +109,16 @@ class MaskedDriver(Module):
 
         for idx, op in enumerate(OPS):
             is_step = state == UInt(phase_bits)(idx)
-            addr_bits = Bits(9)(op["addr"])
+            addr_bits = Bits(9)(op.addr)
             addr = is_step.select(addr_bits, addr)
 
-            if op["kind"] == "write":
+            # This Python branch chooses the static row shape during
+            # elaboration; cycle-dependent hardware selection stays in
+            # select/Condition expressions.
+            if op.kind == WRITE:
                 we = is_step.select(Bits(1)(1), we)
-                wdata = is_step.select(Bits(32)(op["wdata"]), wdata)
-                wmask = is_step.select(Bits(32)(op["wmask"]), wmask)
+                wdata = is_step.select(Bits(32)(op.wdata), wdata)
+                wmask = is_step.select(Bits(32)(op.wmask), wmask)
             else:
                 re = is_step.select(Bits(1)(1), re)
                 with Condition(is_step):
@@ -118,10 +139,11 @@ READ_RE = re.compile(
 
 
 def check(raw):
+    """Compare observed masked SRAM reads against the static transaction table."""
     expected_reads = [
-        (idx, op["addr"], op["expected"])
+        (idx, op.addr, op.expected)
         for idx, op in enumerate(OPS)
-        if op["kind"] == "read"
+        if op.kind == READ
     ]
 
     actual_reads = []
@@ -146,7 +168,9 @@ def check(raw):
 
 
 def test_sram_masked_write():
+    """Run the masked SRAM regression through the Rust simulator."""
     def top():
+        """Build the driver, SRAM, launcher, and read observer modules."""
         observer = ReadObserver()
         driver = MaskedDriver(observer)
         sram = driver.build()

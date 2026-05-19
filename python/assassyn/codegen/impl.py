@@ -4,7 +4,7 @@ from pathlib import Path
 
 from . import simulator
 from . import verilog
-from ..analysis.timing import write_critical_paths_report
+from ..analysis.timing import CRITICAL_PATHS_REPORT, write_critical_paths_report
 from ..builder import SysBuilder
 
 def codegen(sys: SysBuilder, **kwargs):
@@ -26,7 +26,7 @@ def codegen(sys: SysBuilder, **kwargs):
     # We'll handle simulator generation separately using the Python implementation
 
     if kwargs.get('timing_report'):
-        report_path = Path(kwargs['path']) / "critical_paths.json"
+        report_path = Path(kwargs['path']) / CRITICAL_PATHS_REPORT
         write_critical_paths_report(sys, report_path)
 
     simulator_manifest = None

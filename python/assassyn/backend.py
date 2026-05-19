@@ -8,7 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from .analysis.timing import write_critical_paths_report
+from .analysis.timing import CRITICAL_PATHS_REPORT, write_critical_paths_report
 from .builder import SysBuilder
 from . import codegen
 from . import utils
@@ -28,7 +28,7 @@ def config( # pylint: disable=too-many-arguments
         enable_cache=True,
         timing_report=False):
     '''The helper function to dump the default configuration of elaboration.'''
-    res = {
+    return {
         'path': path,
         'resource_base': resource_base,
         'pretty_printer': pretty_printer,
@@ -43,7 +43,6 @@ def config( # pylint: disable=too-many-arguments
         'enable_cache': enable_cache,
         'timing_report': timing_report,
     }
-    return res.copy()
 
 def make_existing_dir(path):
     '''
@@ -54,8 +53,6 @@ def make_existing_dir(path):
         os.makedirs(path)
     except FileExistsError:
         print(f'[WARN] {path} already exists, please make sure we did not override anything.')
-    except Exception as e:
-        raise e
 
 def _generate_cache_key(sys_name: str, config_dict: dict) -> str:
     '''
@@ -97,6 +94,10 @@ def elaborate(# pylint: disable=too-many-locals
         verbose (bool): Whether dump the IR of the system to be elaborated.
         simulator (bool): Whether to generate the Rust code for the simulator.
         verilog (bool): Whether to generate the SystemVerilog code.
+        simulator_crate_name (str): Optional generated Rust simulator crate name.
+        fifo_depth (int): Default FIFO depth used by generated hardware queues.
+        random (bool): Whether to randomize simulator module execution order.
+        enable_cache (bool): Whether to reuse and save simulator build cache entries.
         idle_threshold (int): The threshold for the idle state to terminate the simulation.
         sim_threshold (int): The threshold for the simulation to terminate.
         timing_report (bool): Whether to emit critical_paths.json.
@@ -133,7 +134,7 @@ def elaborate(# pylint: disable=too-many-locals
         cached = utils.check_build_cache(source_dir, cache_key)
         if cached:
             if real_config.get('timing_report'):
-                write_critical_paths_report(sys, sys_dir / "critical_paths.json")
+                write_critical_paths_report(sys, sys_dir / CRITICAL_PATHS_REPORT)
             binary_path, verilog_path = cached
             print(f"[Cache Hit] Using cached build from {source_dir}")
             print(f"Binary: {binary_path}")

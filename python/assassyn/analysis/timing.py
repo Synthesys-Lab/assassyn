@@ -27,6 +27,8 @@ else:
 
 DelayModel = Callable[[Expr], float | int | None] | Mapping[object, float | int]
 
+CRITICAL_PATHS_REPORT = "critical_paths.json"
+
 _SOURCE_ARRAY_READ = "regarray_read"
 _SOURCE_FIFO_POP = "fifo_pop"
 _SOURCE_EXTERNAL_REG = "external_reg_output"
@@ -251,31 +253,14 @@ def _collect_boundaries(
             source_kinds[pop] = _SOURCE_FIFO_POP
         for push in view.pushes:
             sink_kinds[push] = _SINK_FIFO_PUSH
-        for array, reads in view.reads.items():
-            try:
-                array_view = interactions.array_view(array)
-                read_entries = array_view.reads_by_module.get(module, reads)
-            except (KeyError, RuntimeError):
-                read_entries = reads
-            for read in read_entries:
+        for reads in view.reads.values():
+            for read in reads:
                 source_kinds[read] = _SOURCE_ARRAY_READ
-        for array, writes in view.writes.items():
-            try:
-                array_view = interactions.array_view(array)
-                write_entries = array_view.writers.get(module, writes)
-            except (KeyError, RuntimeError):
-                write_entries = writes
-            for write in write_entries:
+        for writes in view.writes.values():
+            for write in writes:
                 sink_kinds[write] = _SINK_ARRAY_WRITE
-        for port in view.fifo_ports:
-            try:
-                fifo_view = interactions.fifo_view(port)
-            except (KeyError, RuntimeError):
-                continue
-            for pop in fifo_view.pops:
-                source_kinds[pop] = _SOURCE_FIFO_POP
-            for push in fifo_view.pushes:
-                sink_kinds[push] = _SINK_FIFO_PUSH
+        # Async calls are not resource interactions, so they stay in the
+        # ledger rather than the module-scoped FIFO/array view.
         for calls in interactions.async_ledger.calls_for_module(module).values():
             for call in calls:
                 sink_kinds[call] = _SINK_ASYNC_CALL
@@ -378,6 +363,8 @@ def _collect_wait_dependencies(modules: list[Module]) -> dict[Expr, tuple[Expr, 
         if not isinstance(body, list):
             continue
         for expr in body:
+            # wait_until gates every later expression in the module trace; this
+            # mirrors CIRCTDumper.wait_conditions during Verilog generation.
             if (
                 isinstance(expr, Intrinsic)
                 and not isinstance(expr, ExternalIntrinsic)
@@ -468,7 +455,7 @@ def _resolve_delay(
             return float(value)
     elif isinstance(delay_model, Mapping):
         for key in (expr, type(expr), type(expr).__name__, getattr(expr, "opcode", None)):
-            if key in delay_model:
+            if key is not None and key in delay_model:
                 return float(delay_model[key])
     return _default_delay(expr, boundaries)
 
@@ -577,6 +564,7 @@ def _is_external_reg_output(expr: object) -> bool:
 
 __all__ = [
     "CriticalPath",
+    "CRITICAL_PATHS_REPORT",
     "TimingEdge",
     "TimingNode",
     "critical_paths",

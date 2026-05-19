@@ -5,6 +5,7 @@ from .external_usage import (
     expr_externally_used,
 )
 from .timing import (
+    CRITICAL_PATHS_REPORT,
     CriticalPath,
     TimingEdge,
     TimingNode,
