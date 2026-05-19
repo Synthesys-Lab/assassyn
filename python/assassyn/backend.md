@@ -11,7 +11,7 @@ This section describes all the function interfaces and data structures in this s
 ### config
 
 ```python
-def config(path='./workspace', resource_base=None, pretty_printer=True, verbose=True, simulator=True, verilog=False, sim_threshold=100, idle_threshold=100, fifo_depth=4, random=False, enable_cache=True) -> dict
+def config(path='./workspace', resource_base=None, pretty_printer=True, verbose=True, simulator=True, verilog=False, sim_threshold=100, idle_threshold=100, fifo_depth=4, random=False, enable_cache=True, timing_report=False) -> dict
 ```
 
 The helper function to create the default configuration for system elaboration. This function provides a centralized way to configure all aspects of the elaboration process.
@@ -28,6 +28,7 @@ The helper function to create the default configuration for system elaboration. 
 - `fifo_depth` (int): Default FIFO depth for pipeline stages (default: 4)
 - `random` (bool): Whether to randomize module execution order (default: False)
 - `enable_cache` (bool): Whether to enable build caching (default: True)
+- `timing_report` (bool): Whether to write `critical_paths.json` with the pre-synthesis timing estimate (default: False)
 
 **Returns:**
 - A dictionary containing the configuration parameters
@@ -36,6 +37,8 @@ The helper function to create the default configuration for system elaboration. 
 This function creates a default configuration dictionary that can be customized and passed to the `elaborate` function. It provides sensible defaults for all elaboration parameters while allowing users to override specific settings. The configuration follows the credit-based pipeline architecture described in the [pipeline design document](../../docs/design/internal/pipeline.md).
 
 The `enable_cache` parameter controls whether the build cache is used. When enabled (default), the system caches compiled binaries to speed up repeated builds with unchanged IR and configuration. This is automatically disabled in CI tests (via [`test.run_test()`](./test/__init__.py)) to prevent interference with parallel test execution.
+
+The `timing_report` parameter enables the IR-level critical-path analyzer documented in [timing.md](./analysis/timing.md). The report is written to `critical_paths.json` in the system output directory even when simulator caching returns an existing binary.
 
 ### make_existing_dir
 
@@ -76,12 +79,13 @@ This is the main elaboration function that orchestrates the entire code generati
 
 1. **Configuration Management**: Merges user-provided configuration with default settings, validating all configuration keys
 2. **Cache Key Generation**: Computes an IR hash from the system representation and generates a cache key using `_generate_cache_key()` to uniquely identify this build configuration
-3. **Cache Check**: If a source directory is detected and simulator generation is enabled, checks for a cached build using [`utils.check_build_cache()`](./utils/__init__.py). On cache hit, immediately returns the cached binary and Verilog paths, skipping all code generation and compilation
-4. **System Inspection**: Prints the system IR if verbose mode is enabled and no cache hit occurred
-5. **Directory Setup**: Creates the output directory structure for the generated files
-6. **Code Generation**: Delegates to the `codegen.codegen` function to generate simulator and/or Verilog code
-7. **Cache Coordination**: Sets the global `utils.CACHE_PENDING` variable with cache information for [`build_simulator()`](./utils/__init__.py) to save after successful compilation
-8. **Return Results**: Returns paths to the generated artifacts (Cargo.toml on cache miss, binary path on cache hit)
+3. **Output Directory Resolution**: Determines the per-system output directory before cache lookup so optional reports have a stable destination
+4. **Cache Check**: If a source directory is detected and simulator generation is enabled, checks for a cached build using [`utils.check_build_cache()`](./utils/__init__.py). On cache hit, emits `critical_paths.json` when requested and returns the cached binary and Verilog paths, skipping simulator and Verilog regeneration
+5. **System Inspection**: Prints the system IR if verbose mode is enabled and no cache hit occurred
+6. **Directory Setup**: Creates the output directory structure for the generated files
+7. **Code Generation**: Delegates to the `codegen.codegen` function to generate timing reports, simulator code, and/or Verilog code
+8. **Cache Coordination**: Sets the global `utils.CACHE_PENDING` variable with cache information for [`build_simulator()`](./utils/__init__.py) to save after successful compilation
+9. **Return Results**: Returns paths to the generated artifacts (Cargo.toml on cache miss, binary path on cache hit)
 
 The cache mechanism significantly improves development iteration speed by skipping redundant IR processing, code generation, and compilation when the system and configuration are unchanged. The cache key combines both the IR hash and configuration hash to ensure cache validity across different build parameters.
 

@@ -1,7 +1,10 @@
 '''The module to generate the assassyn IR builder for the given system'''
 
+from pathlib import Path
+
 from . import simulator
 from . import verilog
+from ..analysis.timing import write_critical_paths_report
 from ..builder import SysBuilder
 
 def codegen(sys: SysBuilder, **kwargs):
@@ -17,9 +20,14 @@ def codegen(sys: SysBuilder, **kwargs):
         random: Whether to randomize module execution order
         resource_base: Path to resource files
         fifo_depth: Default FIFO depth
+        timing_report: Whether to emit a pre-synthesis critical-path report
     '''
     # Create a CodeGen object but exclude simulator generation flag
     # We'll handle simulator generation separately using the Python implementation
+
+    if kwargs.get('timing_report'):
+        report_path = Path(kwargs['path']) / "critical_paths.json"
+        write_critical_paths_report(sys, report_path)
 
     simulator_manifest = None
     # If simulator flag is set, use the Python implementation to generate it

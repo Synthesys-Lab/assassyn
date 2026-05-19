@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from .analysis.timing import write_critical_paths_report
 from .builder import SysBuilder
 from . import codegen
 from . import utils
@@ -24,7 +25,8 @@ def config( # pylint: disable=too-many-arguments
         idle_threshold=100,
         fifo_depth=4,
         random=False,
-        enable_cache=True):
+        enable_cache=True,
+        timing_report=False):
     '''The helper function to dump the default configuration of elaboration.'''
     res = {
         'path': path,
@@ -38,7 +40,8 @@ def config( # pylint: disable=too-many-arguments
         'idle_threshold': idle_threshold,
         'fifo_depth': fifo_depth,
         'random': random,
-        'enable_cache': enable_cache
+        'enable_cache': enable_cache,
+        'timing_report': timing_report,
     }
     return res.copy()
 
@@ -96,6 +99,7 @@ def elaborate(# pylint: disable=too-many-locals
         verilog (bool): Whether to generate the SystemVerilog code.
         idle_threshold (int): The threshold for the idle state to terminate the simulation.
         sim_threshold (int): The threshold for the simulation to terminate.
+        timing_report (bool): Whether to emit critical_paths.json.
         **kwargs: The optional arguments that will be passed to the code generator.
     '''
 
@@ -121,10 +125,15 @@ def elaborate(# pylint: disable=too-many-locals
         config_suffix = config_hash.split('_')[-1]
         real_config['simulator_crate_name'] = f"{sys.name}_{ir_hash[:8]}_{config_suffix}"
 
+    proj_root = Path(real_config['path'])
+    sys_dir = proj_root / sys.name
+
     # Check cache if source directory was detected and caching is enabled
     if source_dir and real_config.get('simulator', True) and real_config.get('enable_cache', True):
         cached = utils.check_build_cache(source_dir, cache_key)
         if cached:
+            if real_config.get('timing_report'):
+                write_critical_paths_report(sys, sys_dir / "critical_paths.json")
             binary_path, verilog_path = cached
             print(f"[Cache Hit] Using cached build from {source_dir}")
             print(f"Binary: {binary_path}")
@@ -134,10 +143,6 @@ def elaborate(# pylint: disable=too-many-locals
 
     if real_config['verbose']:
         print(sys)
-
-    proj_root = Path(real_config['path'])
-
-    sys_dir = proj_root / sys.name
 
     make_existing_dir(sys_dir)
 

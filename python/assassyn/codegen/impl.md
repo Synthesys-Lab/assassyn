@@ -24,6 +24,7 @@ def codegen(sys: SysBuilder, **kwargs):
         random: Whether to randomize module execution order
         resource_base: Path to resource files
         fifo_depth: Default FIFO depth
+        timing_report: Whether to emit a pre-synthesis critical-path report
     '''
 ```
 
@@ -33,11 +34,13 @@ This function serves as the main entry point for code generation in Assassyn. It
 
 The function performs the following steps:
 
-1. **Simulator Generation**: If the `simulator` flag is set in kwargs, it calls `simulator.elaborate()` to generate a Rust-based simulator implementation. This creates a complete simulator project with Rust source files and returns a manifest path.
+1. **Timing Report Generation**: If `timing_report` is set in kwargs, it calls [`write_critical_paths_report`](/python/assassyn/analysis/timing.py) and writes `critical_paths.json` into the configured output directory. This report is generated directly from the IR and the Verilog metadata pre-pass, so it does not require PyCDE, Verilator, or simulator compilation.
 
-2. **Verilog Generation**: If the `verilog` flag is set in kwargs, it calls `verilog.elaborate()` to generate Verilog source files for hardware synthesis. This creates SystemVerilog modules implementing the credit-based pipeline architecture described in the [pipeline design document](/docs/design/internal/pipeline.md).
+2. **Simulator Generation**: If the `simulator` flag is set in kwargs, it calls `simulator.elaborate()` to generate a Rust-based simulator implementation. This creates a complete simulator project with Rust source files and returns a manifest path.
 
-3. **Return Artifacts**: Returns a tuple containing:
+3. **Verilog Generation**: If the `verilog` flag is set in kwargs, it calls `verilog.elaborate()` to generate Verilog source files for hardware synthesis. This creates SystemVerilog modules implementing the credit-based pipeline architecture described in the [pipeline design document](/docs/design/internal/pipeline.md).
+
+4. **Return Artifacts**: Returns a tuple containing:
    - `simulator_manifest`: Path to the simulator manifest file (if generated)
    - `verilog_path`: Path to the generated Verilog directory (if generated)
 
@@ -45,6 +48,7 @@ The function respects the architectural design decisions documented in [arch.md]
 
 **Project-specific Knowledge Required**:
 - Understanding of [SysBuilder](/python/assassyn/builder.md) for system representation
+- Understanding of [timing analysis](/python/assassyn/analysis/timing.md) for the optional critical-path report
 - Knowledge of [simulator elaboration](/python/assassyn/codegen/simulator/elaborate.md) process
 - Understanding of [Verilog elaboration](/python/assassyn/codegen/verilog/elaborate.md) process
 - Reference to [backend configuration](/python/assassyn/backend.md) for parameter usage
