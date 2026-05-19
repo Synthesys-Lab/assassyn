@@ -1,125 +1,114 @@
-# Unsigned Multiplier IP Module
+# Carry-Save Multiplier IP
 
-This module implements a pipelined unsigned 32-bit multiplier that computes the product of two 32-bit integers, producing a 64-bit result. The implementation uses a three-stage pipeline architecture that processes multiplication bit-by-bit using shift-and-add operations.
+`multiply.py` implements the shared Assassyn unsigned 32 by 32 multiplier IP.
+The design replaces the previous bit-serial shift/add pipeline with a fixed
+three-stage carry-save pipeline:
 
-## Section 0. Summary
+1. Generate and register 32 shifted partial-product rows.
+2. Compress those rows through a 3:2 carry-save tree and register the two
+   remaining rows.
+3. Add the sum and carry rows, then register the 64-bit product.
 
-The unsigned multiplier implements a classic shift-and-add multiplication algorithm using three pipeline stages. Each stage processes one bit of the multiplier operand, computing the partial product and accumulating it into the final result. The design demonstrates the use of Assassyn's credit-based pipeline architecture for implementing arithmetic operations with proper timing and resource management.
+The implementation intentionally does not use the Assassyn multiply operator
+inside the IP. Radix-4 Booth recoding is not part of this replacement; it is a
+future optimization after the CSA baseline is measured.
 
-## Section 1. Exposed Interfaces
+## Interface Exposed
 
-### multiply
+### `multiply(a, b, cnt, debug=False)`
 
-```python
-def multiply(a, b, cnt):
-    """Compute the product of two 32-bit unsigned integers using a pipelined multiplier.
+Builds one instance of the multiplier pipeline and asynchronously calls each
+stage from the current module.
 
-    Args:
-        a: First 32-bit unsigned integer operand
-        b: Second 32-bit unsigned integer operand  
-        cnt: Counter value indicating the current multiplication step
+- `a`: 32-bit operand. It is bitcast to `UInt(32)` before entering the IP.
+- `b`: 32-bit operand. It is bitcast to `UInt(32)` before entering the IP.
+- `cnt`: 32-bit tag passed through the pipeline for debug correlation.
+- `debug`: Python elaboration-time flag that enables stage logs.
+- Returns: the registered `UInt(64)` product from the final stage.
 
-    Returns:
-        The accumulated 64-bit result stored in stage3_reg[0]
-    """
-```
+The returned value is the pipeline output register. A caller that changes
+operands every cycle must account for the stage latency in its own control
+logic.
 
-**Explanation:**
+## Internal Helpers
 
-This function orchestrates the three-stage multiplication pipeline. It creates the necessary register arrays for inter-stage communication and instantiates the three multiplication stages. The function uses a cycle counter to control the multiplication process, ensuring that all 32 bits of the multiplier are processed sequentially.
+### `_as_uint(value, width)`
 
-The multiplication algorithm works by:
-1. Processing each bit of operand `b` sequentially from bit 0 to bit 31
-2. For each bit, computing the partial product and applying the appropriate bit weight
-3. Accumulating all partial products to form the final 64-bit result
+Views an Assassyn value as `UInt(width)` using a bitcast when needed. This keeps
+the public helper tolerant of signed or raw-bit callers while the IP internals
+remain unsigned.
 
-The function demonstrates the use of Assassyn's asynchronous module calling mechanism, where each stage is triggered based on the cycle counter condition.
+### `shifted_partial_product(a, b, bit_index)`
 
-## Section 2. Internal Helpers
+Builds one 64-bit partial-product row by selecting bit `bit_index` from operand
+`b`, zero-extending operand `a`, shifting it by the selected weight, and using a
+`select` to choose either the shifted row or zero.
 
-### MulStage1
+### `carry_save_add(lhs, rhs, third)`
 
-```python
-class MulStage1(Module):
-    def __init__(self):
-        super().__init__(
-            ports={
-                'a': Port(Int(32)),
-                'b': Port(Int(32)),
-                'cnt': Port(Int(32)),
-            }
-        )
+Implements one product-width 3:2 compressor:
 
-    @module.combinational
-    def build(self, stage1_reg: Array):
-        a, b, cnt = self.pop_all_ports(True)
+- sum row: bitwise xor of the three inputs
+- carry row: bitwise majority of the three inputs shifted left by one
 
-        with Condition(cnt < Int(32)(32)):# avoid overflow
-            b_bit = ((b >> cnt) & Int(32)(1)).bitcast(Int(32))  # to get the cnt-th bit from the right
-            stage1_reg[0] = a * b_bit  # 'a' multiply b[cnt-1]
-            log("MulStage1: {:?} * {:?} = {:?}", a, b_bit, a * b_bit)
-```
+Both outputs are returned as `UInt(64)`.
 
-**Explanation:**
+### `carry_save_reduce(rows)`
 
-The first stage extracts the current bit from operand `b` and multiplies it with operand `a`. This implements the bit-wise multiplication step of the shift-and-add algorithm. The stage uses bit manipulation operations to extract the `cnt`-th bit from the right of operand `b`, then performs a simple multiplication to compute the partial product.
+Builds a static compressor tree over the supplied product rows. Each Python
+elaboration pass groups rows in threes, emits one `carry_save_add`, and carries
+one or two leftover rows forward until only two rows remain.
 
-The condition `cnt < Int(32)(32)` ensures that only valid bit positions (0-31) are processed, preventing overflow conditions.
+## Pipeline Stages
 
-### MulStage2
+### `PartialProductStage`
 
-```python
-class MulStage2(Module):
-    def __init__(self):
-        super().__init__(
-            ports={
-                'cnt': Port(Int(32))
-            }
-        )
+Ports:
 
-    @module.combinational
-    def build(self, stage1_reg: Array, stage2_reg: Array):
-        cnt = self.pop_all_ports(True)
+- `a: UInt(32)`
+- `b: UInt(32)`
+- `tag: UInt(32)`
 
-        with Condition(cnt > Int(32)(0)):
-            bit_num = cnt - Int(32)(1)   # avoid overflow
-            with Condition(bit_num < Int(32)(32)):
-                stage2_reg[0] = stage1_reg[0] << bit_num  # left shift as multiplying weights
-                log("MulStage2: {:?}", stage2_reg[0])
-```
+Writes:
 
-**Explanation:**
+- `partial_products`: 32 one-entry `RegArray(UInt(64), 1)` rows
+- `stage1_a`, `stage1_b`, `stage1_tag`: one-entry metadata registers
 
-The second stage applies the appropriate bit weight to the partial product by performing a left shift operation. This implements the "shift" part of the shift-and-add multiplication algorithm. The shift amount is determined by the bit position, where bit `i` has weight `2^i`.
+### `CarrySaveStage`
 
-The stage reads the partial product from `stage1_reg` and shifts it left by `bit_num` positions, effectively multiplying by `2^bit_num`. The condition checks ensure that only valid bit positions are processed and that the shift amount doesn't exceed the bit width.
+Ports:
 
-### MulStage3
+- `valid: UInt(1)`
 
-```python
-class MulStage3(Module):
-    def __init__(self):
-        super().__init__(ports={
-            'cnt': Port(Int(32)),
-            'a': Port(Int(32)),
-            'b': Port(Int(32))
-        }
-        )
+Reads the stage-1 partial products and metadata registers, compresses the
+partial products to two rows, and writes:
 
-    @module.combinational
-    def build(self, stage2_reg: Array, stage3_reg: Array):
-        cnt, a, b = self.pop_all_ports(True)
-        stage3_reg[0] = stage2_reg[0] + stage3_reg[0]
-        log("Temp result {:?} of {:?} * {:?} = {:?}", cnt, a, b, stage3_reg[0])
+- `stage2_sum: RegArray(UInt(64), 1)`
+- `stage2_carry: RegArray(UInt(64), 1)`
+- `stage2_a`, `stage2_b`, `stage2_tag`: one-entry metadata registers
 
-        with Condition(cnt == Int(32)(34)):  # output final result
-            log("Final result {:?} * {:?} = {:?}", a, b, stage3_reg[0])
-```
+### `FinalAddStage`
 
-**Explanation:**
+Ports:
 
-The third stage accumulates the weighted partial products into the final result. This implements the "add" part of the shift-and-add multiplication algorithm. The stage adds the current weighted partial product from `stage2_reg` to the accumulated result in `stage3_reg`.
+- `valid: UInt(1)`
 
-The accumulation continues for all 32 bits of the multiplier, with the final result being available when `cnt == Int(32)(34)`. The extra cycles (32-34) account for the pipeline latency and ensure that all partial products have been processed and accumulated.
+Reads the stage-2 sum and carry rows, computes the final carry-propagate sum,
+and writes:
 
-The stage demonstrates the use of Assassyn's logging mechanism for debugging and verification purposes, providing visibility into the intermediate and final computation results.
+- `result: RegArray(UInt(64), 1)`
+
+With `debug=True`, this stage logs `CsaMultiplierResult` with the pipelined tag,
+operands, and product.
+
+## Data Structures
+
+- `PRODUCT_WIDTH = 64`: product and CSA row width.
+- `OPERAND_WIDTH = 32`: input operand and debug tag width.
+- `PARTIAL_PRODUCT_COUNT = 32`: number of generated unsigned partial-product
+  rows.
+- Stage boundary arrays: the IP uses register arrays for all data moving
+  between stages, while `async_called` stage invocations provide the FIFO
+  trigger boundaries required by Assassyn's module model. The partial-product
+  boundary uses one register array per row so the generator emits parallel
+  single-write registers instead of multiple writes through one array port.
