@@ -92,6 +92,15 @@ code generation:
 interaction views. These views prevent the timing pass from rediscovering
 shared-resource roles with separate heuristics.
 
+The boundary model intentionally cuts paths at storage or inter-stage transfer
+points. A register-array read begins the combinational window for the current
+cycle, while a register-array write ends that window because the written value
+is not observable until a later cycle. FIFO pops and registered external
+outputs are treated as values already supplied by sequential state; FIFO
+pushes and async stage transfers are treated as the next sequential capture
+points. Downstream modules remain inside the same combinational window and are
+ordered with the downstream topology pass before graph construction.
+
 The default delay model is a coarse IR-level estimate: sources and sinks have
 zero delay, most valued expressions have unit delay, multiplication has delay
 `4`, division and modulo have delay `8`, and pure FIFO status reads have zero
@@ -118,6 +127,71 @@ Writes a JSON report with this top-level schema:
   "paths": []
 }
 ```
+
+Each path entry has the following shape:
+
+```json
+{
+  "rank": 1,
+  "delay": 4.0,
+  "source": {
+    "id": "Module.value",
+    "module": "Module",
+    "symbol": "value",
+    "kind": "regarray_read",
+    "delay": 0.0,
+    "opcode": 400,
+    "loc": null,
+    "expr": "value = regs[(0:u1)]"
+  },
+  "sink": {
+    "id": "Module.regs_wt",
+    "module": "Module",
+    "symbol": "regs_wt",
+    "kind": "regarray_write",
+    "delay": 0.0,
+    "opcode": 401,
+    "loc": null,
+    "expr": "regs[(0:u1)] <= value /* Module */"
+  },
+  "nodes": [
+    {
+      "id": "Module.value",
+      "module": "Module",
+      "symbol": "value",
+      "kind": "regarray_read",
+      "delay": 0.0,
+      "opcode": 400,
+      "loc": null,
+      "expr": "value = regs[(0:u1)]"
+    },
+    {
+      "id": "Module.regs_wt",
+      "module": "Module",
+      "symbol": "regs_wt",
+      "kind": "regarray_write",
+      "delay": 0.0,
+      "opcode": 401,
+      "loc": null,
+      "expr": "regs[(0:u1)] <= value /* Module */"
+    }
+  ],
+  "edges": [
+    {
+      "source": "Module.value",
+      "sink": "Module.regs_wt"
+    }
+  ]
+}
+```
+
+`nodes` contains every source, combinational, and sink node on the selected
+path in source-to-sink order. `edges` contains adjacent `TimingNode.id`
+relationships for the same ordered path. Path `rank` is one-based and sorted
+by descending accumulated delay, with deterministic node identifiers breaking
+ties. Node `kind` is one of `regarray_read`, `fifo_pop`,
+`external_reg_output`, `combinational`, `regarray_write`, `fifo_push`, or
+`async_stage_transfer`.
 
 The backend uses this helper when `backend.config(timing_report=True)` is
 enabled and writes `critical_paths.json` in the system output directory.

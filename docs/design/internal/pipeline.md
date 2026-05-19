@@ -21,6 +21,38 @@ This separation removes runtime bookkeeping from code emission and guarantees th
 
 Cleanup now routes both array writes and FIFO pushes through a shared `_emit_predicate_mux_chain` helper, so the metadata-derived predicates feed a single implementation of the reduction-and-mux pattern. The helper collapses single-entry collections to a passthrough assignment and lets callers supply deterministic defaults for the empty case, keeping enable signals and data selection aligned with the prioritisation defined during IR construction without sprinkling ad-hoc guards across call sites.
 
+### Pre-Synthesis Critical-Path Model
+
+The pipeline generator also supports an IR-level critical-path report before
+Verilog or PyCDE lowering. The report is intentionally a structural estimate:
+it ranks paths through Assassyn expressions and sequential boundaries, not
+technology-mapped gates.
+
+Sequential boundaries define where one combinational timing window starts or
+ends:
+
+- Register-array reads are sources because the value is supplied by storage at
+  the beginning of the cycle.
+- Register-array writes are sinks because the written value is captured and is
+  not visible until a later cycle.
+- FIFO pops are sources and FIFO pushes are sinks for inter-stage dataflow.
+- Async stage transfers are sinks because they enqueue work for another
+  module.
+- Registered external outputs are sources because they are driven by external
+  sequential state.
+
+Downstream modules are treated as combinational logic inside the same timing
+window. Their data dependencies are sorted topologically before path ranking,
+so a downstream chain contributes one source-to-sink path even when the module
+objects were constructed in a different order.
+
+When timing reporting is enabled, the generated report is named
+`critical_paths.json`. The top-level schema contains `schema`, `top_n`, and
+`paths` fields. Each path records `rank`, accumulated `delay`, source and sink
+node descriptions, ordered `nodes`, and adjacent `edges`. Node descriptions
+record the node identifier, module, symbol, timing kind, local delay, opcode,
+source location when available, and printable IR expression.
+
 ## Credit-based Flow Control Implementation
 
 The credit system is implemented using counters and control logic. Each pipeline stage has:
