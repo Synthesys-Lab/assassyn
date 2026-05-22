@@ -161,6 +161,9 @@ def critical_paths(
             best_path[node] = (node,)
             continue
 
+        # The graph is already acyclic, so one forward pass is enough to solve
+        # the longest source-to-node path. Ties prefer the earlier IR node to
+        # keep reports deterministic across equivalent dependency shapes.
         chosen = max(
             preds,
             key=lambda pred: (best_delay[pred], -order_index[pred]),
