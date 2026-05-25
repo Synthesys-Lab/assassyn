@@ -1,4 +1,5 @@
 """Utility functions for the Verilog backend."""
+import hashlib
 import re
 from typing import Optional
 
@@ -7,6 +8,8 @@ from ...ir.memory.sram import SRAM
 from ...ir.expr import Intrinsic
 from ...ir.dtype import Int, UInt, Bits, DType, Record
 from ...utils import namify
+
+MAX_VERILOG_IDENTIFIER_LEN = 96
 
 def get_sram_info(node: SRAM) -> dict:
     """Extract SRAM-specific information."""
@@ -65,6 +68,26 @@ def ensure_bits(expr_str: str) -> str:
            ["executed_wire", "_valid", "_pop_valid", "_push_valid"]):
         return expr_str
     return f"{expr_str}.as_bits()"
+
+
+def bounded_verilog_identifier(
+    raw_name: str,
+    *,
+    fallback: str = "tmp",
+    max_length: int = MAX_VERILOG_IDENTIFIER_LEN,
+) -> str:
+    """Return a stable Verilog/PyCDE identifier no longer than *max_length*."""
+
+    identifier = namify(raw_name)
+    if not identifier or identifier == "_":
+        identifier = fallback
+
+    if len(identifier) <= max_length:
+        return identifier
+
+    digest = hashlib.blake2s(identifier.encode("utf-8"), digest_size=6).hexdigest()
+    prefix_len = max(1, max_length - len(digest) - 1)
+    return f"{identifier[:prefix_len]}_{digest}"
 
 
 

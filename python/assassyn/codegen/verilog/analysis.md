@@ -55,7 +55,11 @@ generation.
    and the shared `ModuleInteractionView`. Recorded `FIFOPush`/`FIFOPop` and array expressions are
    owned by the matrix and referenced by both module and resource projections so predicates and handles
    stay in sync for all consumers.
-5. **Result Delivery**: Returns `(module_metadata, interactions)` for the caller to feed
+5. **Top exposure recording**: Expressions registered through
+   `SysBuilder.expose_on_top(...)` are added to their producer module's value
+   exposures before snapshots are frozen, so top-only observability ports do
+   not need a fake consumer.
+6. **Result Delivery**: Returns `(module_metadata, interactions)` for the caller to feed
    into `CIRCTDumper`. Before returning, the helper calls `freeze()` on every
    `ModuleMetadata` and on the shared matrix (including its async ledger), converting the mutable accumulators
    into immutable tuples so downstream phases observe a stable snapshot. The helper never
@@ -89,6 +93,9 @@ It receives three collaborators:
 3. **Async calls** – append `AsyncCall` expressions to `ModuleMetadata.calls` and record
    trigger exposure metadata in the matrix’s `async_ledger`, preserving per-callee groupings together with the associated predicate.
 4. **Exposure candidates** – valued expressions used outside the module are captured directly on the module metadata using the shared `ExternalUsageIndex` to avoid re-scanning other modules, while array interactions flow into the matrix buckets shared with array-aware emitters.
+5. **Builder top exposures** – top-level values requested by
+   `expose_on_top` are recorded after the visitor pass, ensuring module ports
+   are generated even when the value is not otherwise used outside its module.
 
 Traversal of module bodies is delegated to the base visitor, keeping the class compact and
 ensuring new IR constructs automatically flow through analysis as long as they surface as

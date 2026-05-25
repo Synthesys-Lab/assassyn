@@ -142,7 +142,7 @@ During the cleanup pass the dumper feeds the precomputed metadata into `_emit_pr
 
 **`get_pred(expr)`**: Formats the predicate metadata attached to `expr`. The dumper combines `expr.meta_cond` with the wait predicates that were active when the expression was visited (recorded in `expr_wait_conditions`), so only statements located after a `wait_until` see the additional gating. Expressions without a predicate still contribute the per-wait guard, while pre-wait expressions evaluate with the default `Bits(1)(1)` carry.
 
-**`get_external_port_name`**: Creates mangled port names for external values to avoid naming conflicts
+**`get_external_port_name`**: Creates mangled port names for external values to avoid naming conflicts. The method bounds expression-derived port names with the same deterministic hash helper used by rvalue generation, so external expose/valid ports remain parser-safe even when the source expression text is a large mux tree.
 
 **`get_external_wire_key`**: Normalises `(instance, port, index)` access into a hashable key that downstream phases reuse when declaring wires or caching producer exposures, ensuring multi-reader scenarios do not duplicate ports or assignments.
 

@@ -7,7 +7,15 @@ from ...ir.dtype import RecordValue
 from ...ir.expr import Expr, FIFOPop
 from ...ir.expr.intrinsic import ExternalIntrinsic
 from ...utils import namify, unwrap_operand
-from .utils import dump_type
+from .utils import (
+    MAX_VERILOG_IDENTIFIER_LEN,
+    bounded_verilog_identifier,
+    dump_type,
+)
+
+_MAX_EXPR_BASE_IDENTIFIER_LEN = 72
+
+
 def _dump_fifo_pop(_dumper, node, with_namespace: bool, _module_name: str = None) -> str:
     if not with_namespace:
         return f'self.{namify(node.fifo.name)}'
@@ -26,13 +34,17 @@ def _dump_str(_dumper, node, _with_namespace: bool, _module_name: str = None) ->
 
 def _dump_expr(dumper, node, with_namespace: bool, module_name: str = None) -> str:
     if node not in dumper.expr_to_name:
-        base_name = namify(node.as_operand())
-        # Handle anonymous expressions which namify to '_' or an empty string.
-        if not base_name or base_name == '_':
-            base_name = 'tmp'
+        base_name = bounded_verilog_identifier(
+            node.as_operand(),
+            max_length=_MAX_EXPR_BASE_IDENTIFIER_LEN,
+        )
 
         count = dumper.name_counters[base_name]
-        unique_name = f"{base_name}_{count}" if count > 0 else base_name
+        counted_name = f"{base_name}_{count}" if count > 0 else base_name
+        unique_name = bounded_verilog_identifier(
+            counted_name,
+            max_length=_MAX_EXPR_BASE_IDENTIFIER_LEN,
+        )
         dumper.name_counters[base_name] += 1
         dumper.expr_to_name[node] = unique_name
 
@@ -42,7 +54,10 @@ def _dump_expr(dumper, node, with_namespace: bool, module_name: str = None) -> s
         owner_module_name = namify(node.parent.name)
         if owner_module_name is None:
             owner_module_name = module_name
-        return f"{owner_module_name}_{unique_name}"
+        return bounded_verilog_identifier(
+            f"{owner_module_name}_{unique_name}",
+            max_length=MAX_VERILOG_IDENTIFIER_LEN,
+        )
     return unique_name
 
 

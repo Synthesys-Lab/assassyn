@@ -70,12 +70,29 @@ def collect_fifo_metadata(
     visitor = FIFOAnalysisVisitor(matrix, module_metadata, usage_index)
 
     visitor.analyse_modules(modules_to_visit)
+    _record_top_value_exposures(sys, module_metadata)
 
     matrix.freeze()
     for metadata in module_metadata.values():
         metadata.freeze()
 
     return module_metadata, matrix
+
+
+def _record_top_value_exposures(
+    sys: "SysBuilder",
+    module_metadata: Dict["Module", ModuleMetadata],
+) -> None:
+    """Record builder-requested top outputs as producer-module exposures."""
+
+    for value in getattr(sys, "exposed_nodes", {}):
+        expr = unwrap_operand(value)
+        if isinstance(expr, Const) or not isinstance(expr, Expr):
+            continue
+        producer = getattr(expr, "parent", None)
+        metadata = module_metadata.get(producer)
+        if metadata is not None:
+            metadata.record_value(expr)
 
 
 class FIFOAnalysisVisitor(Visitor):

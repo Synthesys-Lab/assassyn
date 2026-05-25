@@ -3,7 +3,7 @@
 from collections import defaultdict
 from typing import TYPE_CHECKING, Callable, Dict, List, NamedTuple, Optional, Sequence, TypeVar
 
-from .utils import dump_type, dump_type_cast, get_sram_info
+from .utils import bounded_verilog_identifier, dump_type, dump_type_cast, get_sram_info
 
 from ...analysis.topo import get_upstreams
 from ...ir.module import Downstream
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from ...ir.expr.array import ArrayRead, ArrayWrite
 
 T = TypeVar("T")
+_MAX_LINEAR_MUX_CHAIN = 8
 
 
 class ValueExposureRender(NamedTuple):
@@ -138,6 +139,7 @@ def _emit_predicate_mux_chain(
     render_value: Callable[[T], str],
     default_value: str,
     aggregate_predicates: Callable[[Sequence[str]], str],
+    materialize_mux: Callable[[str], str] | None = None,
 ) -> tuple[str, str]:
     """Return both the mux chain and aggregate predicate for *entries*."""
 
@@ -152,11 +154,76 @@ def _emit_predicate_mux_chain(
     if len(value_terms) == 1:
         return value_terms[0], aggregate_expr
 
-    mux_expr = default_value
-    for predicate_expr, value_expr in zip(predicate_terms, value_terms):
-        mux_expr = f"Mux({predicate_expr}, {mux_expr}, {value_expr})"
+    mux_expr = _emit_priority_mux_tree(
+        predicate_terms,
+        value_terms,
+        default_value,
+        materialize_mux=(
+            materialize_mux
+            if len(value_terms) > _MAX_LINEAR_MUX_CHAIN
+            else None
+        ),
+    )
 
     return mux_expr, aggregate_expr
+
+
+def _emit_priority_mux_tree(
+    predicate_terms: Sequence[str],
+    value_terms: Sequence[str],
+    default_value: str,
+    *,
+    materialize_mux: Callable[[str], str] | None = None,
+) -> str:
+    """Return a parser-safe priority mux expression where later entries win."""
+
+    def maybe_materialize(expr: str) -> str:
+        if materialize_mux is None:
+            return expr
+        return materialize_mux(expr)
+
+    mux_expr = default_value
+    if len(value_terms) <= _MAX_LINEAR_MUX_CHAIN:
+        for predicate_expr, value_expr in zip(predicate_terms, value_terms):
+            mux_expr = f"Mux({predicate_expr}, {mux_expr}, {value_expr})"
+            mux_expr = maybe_materialize(mux_expr)
+        return mux_expr
+
+    midpoint = len(value_terms) // 2
+    lower_expr = _emit_priority_mux_tree(
+        predicate_terms[:midpoint],
+        value_terms[:midpoint],
+        default_value,
+        materialize_mux=materialize_mux,
+    )
+    higher_expr = _emit_priority_mux_tree(
+        predicate_terms[midpoint:],
+        value_terms[midpoint:],
+        default_value,
+        materialize_mux=materialize_mux,
+    )
+    higher_predicate = _format_reduction_expr(
+        predicate_terms[midpoint:],
+        default_literal="Bits(1)(0)",
+    )
+    return maybe_materialize(f"Mux({higher_predicate}, {lower_expr}, {higher_expr})")
+
+
+def _make_mux_materializer(dumper, base_name: str, dtype_expr: str) -> Callable[[str], str]:
+    """Return a callback that emits named mux temporaries for large trees."""
+
+    prefix = bounded_verilog_identifier(f"cleanup_{base_name}", max_length=64)
+    counter = 0
+
+    def materialize(expr: str) -> str:
+        nonlocal counter
+        name = f"{prefix}_mux_{counter}"
+        counter += 1
+        dumper.append_code(f"{name} = Wire({dtype_expr})")
+        dumper.append_code(f"{name}.assign({expr})")
+        return name
+
+    return materialize
 
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements,too-many-nested-blocks
@@ -328,6 +395,11 @@ def cleanup_post_generation(dumper):
                     render_value=render_array_value,
                     default_value=f"{array_dtype_str}(0)",
                     aggregate_predicates=aggregate_array,
+                    materialize_mux=_make_mux_materializer(
+                        dumper,
+                        f"{array_name}_wdata{port_suffix}",
+                        array_dtype_str,
+                    ),
                 )
 
                 idx_default = f"{dump_type(module_writes[0].idx.dtype)}(0)"
@@ -347,6 +419,11 @@ def cleanup_post_generation(dumper):
                     render_value=render_array_index,
                     default_value=idx_default,
                     aggregate_predicates=reuse_aggregated,
+                    materialize_mux=_make_mux_materializer(
+                        dumper,
+                        f"{array_name}_widx{port_suffix}",
+                        dump_type(module_writes[0].idx.dtype),
+                    ),
                 )
 
                 dumper.append_code(
@@ -494,6 +571,11 @@ def cleanup_post_generation(dumper):
                 render_value=render_fifo_value,
                 default_value=fifo_default,
                 aggregate_predicates=aggregate_fifo,
+                materialize_mux=_make_mux_materializer(
+                    dumper,
+                    f"{namify(fifo_port.module.name)}_{fifo_name}_push_data",
+                    dump_type(fifo_port.dtype),
+                ),
             )
 
             dumper.append_code(f'# Push logic for port: {fifo_name}')

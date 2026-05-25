@@ -32,7 +32,14 @@ This function generates Verilog code for binary operations. It handles different
    - Converts operands to unsigned integers for comparison
    - Uses standard comparison operators (==, !=, <, >, <=, >=)
 
-4. **Standard Binary Operations**:
+4. **Computational Binary Operations**:
+   - Normalizes operands to integer signals before using Python/PyCDE
+     arithmetic operators. This keeps arithmetic valid when upstream IR, such
+     as shifts, produces `Bits`-typed signals that still feed `+`, `-`, `*`, or
+     `/`.
+   - Casts the arithmetic result back to the IR result type.
+
+5. **Standard Binary Operations**:
    - Handles type mismatches by casting the right operand to match the left operand
    - Special handling for bitwise AND operations
    - Uses standard arithmetic operators (+, -, *, /, &, |, ^)
@@ -43,6 +50,8 @@ The function generates assignments in the format `rval = operation_result` where
 - Understanding of [binary operations](/python/assassyn/ir/expr/arith.md)
 - Knowledge of [CIRCT combinational operations](/docs/design/internal/pipeline.md)
 - Understanding of [type casting utilities](/python/assassyn/codegen/verilog/utils.md)
+- Awareness that PyCDE arithmetic operators require integer signal types rather
+  than raw `BitsSignal` operands.
 
 ### `codegen_unary_op`
 

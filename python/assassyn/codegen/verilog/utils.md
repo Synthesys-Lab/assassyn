@@ -144,7 +144,27 @@ This function is used to ensure type consistency in Verilog signal assignments a
 - Understanding of [Verilog type system](/docs/design/lang/type.md)
 - Knowledge of [signal generation](/python/assassyn/codegen/verilog/cleanup.md)
 
+### `bounded_verilog_identifier`
+
+```python
+def bounded_verilog_identifier(
+    raw_name: str,
+    *,
+    fallback: str = "tmp",
+    max_length: int = MAX_VERILOG_IDENTIFIER_LEN,
+) -> str:
+    """Return a stable Verilog/PyCDE identifier no longer than *max_length*."""
+```
+
+**Explanation**
+
+This helper normalizes a raw name through `namify()` and caps the resulting identifier with a deterministic hash suffix. It is used for expression-derived signal and external port names, where the original operand text can contain an entire nested mux expression. Keeping those names bounded prevents downstream parsers such as Surelog from rejecting generated SystemVerilog for identifiers that exceed their maximum length.
+
 ## Internal Constants
+
+### `MAX_VERILOG_IDENTIFIER_LEN`
+
+The default maximum length for generated Verilog/PyCDE identifiers. The value is intentionally conservative so generated signals remain well below frontend parser limits even after prefixes such as `expose_` or `valid_` are added.
 
 ### `HEADER`
 

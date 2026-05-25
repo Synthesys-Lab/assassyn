@@ -38,7 +38,7 @@ This is the main cleanup function that generates all the necessary control signa
    `module_metadata.interactions.writes`:
    - Filters out arrays whose owner is a memory instance and satisfy `array.is_payload(owner)`, because those are handled by dedicated memory logic.
    - Uses the module view’s `writes(array)` tuples (which mirror the global array view maintained by the `InteractionMatrix`) to map interactions onto the precomputed port indices stored in the `ArrayMetadataRegistry`.
-   - Emits write-enable, write-data, and write-index signals per port, formatting each write’s `expr.meta_cond` with `dumper.format_predicate`. Multi-writer modules rely on `_emit_predicate_mux_chain` to collapse predicates and thread prioritised mux chains for data and indices, guaranteeing consistent selection semantics.
+   - Emits write-enable, write-data, and write-index signals per port, formatting each write’s `expr.meta_cond` with `dumper.format_predicate`. Multi-writer modules rely on `_emit_predicate_mux_chain` to collapse predicates and thread prioritised mux chains for data and indices, guaranteeing consistent selection semantics. Large mux trees are split into named temporaries via `_make_mux_materializer` so PyCDE/CIRCT does not infer oversized operation names from nested operand text.
 
 5. **FIFO Signal Generation**: Walks `module_metadata.interactions.fifo_ports` to visit each FIFO touched by the module:
    - Pulls the per-port `FIFOInteractionView` directly from the shared matrix so the recorded `FIFOPush` / `FIFOPop` expressions stay in sync across consumers—predicates come from each expression’s `meta_cond`, push data from `expr.val`, and module ownership from the metadata view that registered the expression.
@@ -89,7 +89,15 @@ This function generates the control signals specifically for SRAM memory interfa
 ### `_emit_predicate_mux_chain`
 
 ```python
-def _emit_predicate_mux_chain(entries, *, render_predicate, render_value, default_value, aggregate_predicates):
+def _emit_predicate_mux_chain(
+    entries,
+    *,
+    render_predicate,
+    render_value,
+    default_value,
+    aggregate_predicates,
+    materialize_mux=None,
+):
     """Return both the mux chain and aggregate predicate for *entries*."""
 ```
 
@@ -98,8 +106,15 @@ def _emit_predicate_mux_chain(entries, *, render_predicate, render_value, defaul
 This helper consolidates the predicate-driven mux logic shared by array writes and FIFO pushes. Callers provide renderers for predicates and values alongside a default expression and reduction strategy; the helper then:
 
 1. Collects predicate literals via `render_predicate` and feeds them into `aggregate_predicates`, allowing array writers to omit a default literal while FIFO pushes supply `Bits(1)(0)`.
-2. Threads a nested `Mux` chain seeded with `default_value`, preserving iteration order so later entries win, matching the legacy manual loops. A single-entry list simply returns that entry’s value (no redundant `Mux` is introduced), while an empty list yields the caller-supplied default value.
-3. Returns a `(mux_expr, aggregated_predicate)` tuple so enable reductions, data muxes, and index muxes can reuse the same predicate formatting without duplication. When no entries exist, callers receive the reduction produced by `aggregate_predicates([])` (for example, `Bits(1)(0)` in the FIFO case), keeping zero-writer scenarios explicit and consistent across call sites.
+2. Threads a prioritised `Mux` expression seeded with `default_value`,
+   preserving iteration order so later entries win, matching the legacy manual
+   loops. Small writer sets keep the original linear rendering; larger sets are
+   emitted as balanced priority trees so generated `design.py` files stay below
+   Python parser nesting limits. A single-entry list simply returns that
+   entry’s value (no redundant `Mux` is introduced), while an empty list yields
+   the caller-supplied default value.
+3. Optionally calls `materialize_mux(expr)` for large trees. Cleanup call sites use this hook to append named temporary assignments and return the temporary name, preventing downstream SV frontends from seeing auto-generated identifiers based on the entire nested mux tree.
+4. Returns a `(mux_expr, aggregated_predicate)` tuple so enable reductions, data muxes, and index muxes can reuse the same predicate formatting without duplication. When no entries exist, callers receive the reduction produced by `aggregate_predicates([])` (for example, `Bits(1)(0)` in the FIFO case), keeping zero-writer scenarios explicit and consistent across call sites.
 
 **Project-specific Knowledge Required**:
 - Understanding of [array write operations](/python/assassyn/ir/expr/array.md)
@@ -115,5 +130,13 @@ The module uses several internal helper functions and imports utilities from oth
 - `namify()` and `unwrap_operand()` from [utils](/python/assassyn/utils.md) for name generation and operand handling
 - `_format_reduction_expr(predicates, *, default_literal, op="operator.or_")` canonicalises OR/AND-style predicate reductions, emitting caller-provided defaults for empty sequences while allowing any reducer supported by the dumper runtime. Callers pass `operator.and_` when AND semantics are required, keeping generated code consistent with the `operator` module import in the Verilog header.
 - `_emit_predicate_mux_chain()` centralises predicate-driven mux construction so callers reuse ordering and reduction semantics.
+- `_emit_priority_mux_tree()` is the parser-safe implementation detail used by
+  `_emit_predicate_mux_chain()` for large multi-writer muxes; it balances the
+  expression while preserving later-entry priority through grouped predicate
+  reductions.
+- `_make_mux_materializer(dumper, base_name, dtype_expr)` returns a callback
+  that appends bounded, named `cleanup_<base>_mux_<n>` `Wire(dtype_expr)`
+  temporaries for large mux trees, drives them with `.assign(...)`, and returns
+  the temporary signal name to the caller.
 
 The cleanup process is tightly integrated with the [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) class and is called as the final step in module generation to ensure all interconnections are properly established.

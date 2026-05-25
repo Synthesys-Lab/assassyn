@@ -35,6 +35,7 @@ def generate_top_harness(dumper: CIRCTDumper):
     Generates a generic Top-level harness that connects all modules based on
     the analyzed dependencies (async calls, array usage).
     """
+    top_exposures = _top_exposure_entries(dumper)
 
     dumper.append_code('class Top(Module):')
     dumper.indent += 4
@@ -42,6 +43,10 @@ def generate_top_harness(dumper: CIRCTDumper):
     dumper.append_code('rst = Reset()')
     dumper.append_code('global_cycle_count = Output(UInt(64))')
     dumper.append_code('global_finish = Output(Bits(1))')
+    for exposure in top_exposures:
+        dumper.append_code(
+            f"expose_{exposure['top_name']} = Output({exposure['dtype']})"
+        )
     dumper.append_code('')
     dumper.append_code('@generator')
     dumper.append_code('def construct(self):')
@@ -433,6 +438,13 @@ def generate_top_harness(dumper: CIRCTDumper):
 
         dumper.append_code(f"inst_{mod_name} = {mod_name}({', '.join(port_map)})")
 
+        for exposure in top_exposures:
+            if exposure['producer'] is module:
+                connection_lines.append(
+                    f"self.expose_{exposure['top_name']} = "
+                    f"inst_{mod_name}.expose_{exposure['module_port']}"
+                )
+
         if is_sram:
             sram_info = get_sram_info(module)
             array = sram_info['array']
@@ -556,7 +568,41 @@ def generate_top_harness(dumper: CIRCTDumper):
     dumper.indent -= 8
     dumper.append_code('')
     dumper.append_code('system = System([Top], name="Top", output_directory="sv")')
+    dumper.append_code('System.FINAL_LOWERING_PASSES = [')
+    dumper.append_code('    entry for entry in System.FINAL_LOWERING_PASSES')
+    dumper.append_code('    if "lower-esi-" not in str(entry)')
+    dumper.append_code(']')
 
     # Copying of external SystemVerilog files occurs during elaboration.
 
     dumper.append_code('system.compile()')
+
+
+def _top_exposure_entries(dumper: CIRCTDumper) -> list[dict[str, Any]]:
+    """Return top-level output metadata requested through ``expose_on_top``."""
+
+    entries: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for value in getattr(dumper.sys, "exposed_nodes", {}):
+        expr = unwrap_operand(value)
+        if isinstance(expr, Const) or not hasattr(expr, "dtype"):
+            continue
+        expr_id = id(expr)
+        if expr_id in seen:
+            continue
+        seen.add(expr_id)
+        producer = getattr(expr, "parent", None)
+        if not isinstance(producer, ModuleBase):
+            continue
+        top_name = dumper.dump_rval(expr, False)
+        module_port = dumper.dump_rval(expr, True)
+        entries.append(
+            {
+                "expr": expr,
+                "producer": producer,
+                "top_name": top_name,
+                "module_port": module_port,
+                "dtype": dump_type(expr.dtype),
+            }
+        )
+    return entries

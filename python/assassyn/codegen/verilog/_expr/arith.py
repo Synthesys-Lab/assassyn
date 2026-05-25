@@ -79,12 +79,27 @@ def codegen_binary_op(dumper, expr: BinaryOp) -> Optional[str]:
         op_body = f"(({a} {op_str} {b}).{dump_type_cast(dtype)})"
         return f'{rval} = {op_body}'
 
+    if expr.is_computational():
+        width = max(expr.lhs.dtype.bits, expr.rhs.dtype.bits)
+        a = _cast_for_computational_op(a, expr.lhs.dtype, width)
+        b = _cast_for_computational_op(b, expr.rhs.dtype, width)
+        op_str = BinaryOp.OPERATORS[expr.opcode]
+        op_body = f"(({a} {op_str} {b}).{dump_type_cast(dtype)})"
+        return f'{rval} = {op_body}'
+
     # Default case for other binary operations
     op_str = BinaryOp.OPERATORS[expr.opcode]
     if expr.lhs.dtype != expr.rhs.dtype:
         b = f"{b}.{dump_type_cast(expr.lhs.dtype)}"
     op_body = f"(({a} {op_str} {b}).{dump_type_cast(dtype)})"
     return f'{rval} = {op_body}'
+
+
+def _cast_for_computational_op(value: str, dtype, width: int) -> str:
+    """Return ``value`` as an integer signal suitable for arithmetic operators."""
+
+    cast = "as_sint" if dtype.is_signed() else "as_uint"
+    return f"{value}.{cast}({width})"
 
 
 def codegen_unary_op(dumper, expr: UnaryOp) -> Optional[str]:

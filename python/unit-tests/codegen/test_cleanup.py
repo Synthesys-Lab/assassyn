@@ -22,9 +22,10 @@ from assassyn.codegen.verilog.cleanup import (  # type: ignore
     _format_reduction_expr,
 )
 from assassyn.codegen.verilog.design import CIRCTDumper  # type: ignore
+from assassyn.codegen.verilog.utils import MAX_VERILOG_IDENTIFIER_LEN  # type: ignore
 from assassyn.codegen.verilog.analysis import collect_fifo_metadata  # type: ignore
 from assassyn.ir.expr.call import FIFOPush
-from assassyn.ir.expr.expr import FIFOPop
+from assassyn.ir.expr.expr import Expr, FIFOPop
 from assassyn.utils import namify  # type: ignore
 
 
@@ -341,6 +342,55 @@ def test_emit_predicate_mux_chain_preserves_custom_reduce():
     assert mux_expr == "Mux(v1_pred, Mux(v0_pred, DEFAULT, v0), v1)"
 
 
+def test_emit_predicate_mux_chain_balances_large_expressions():
+    """Large mux chains should stay below Python parser nesting limits."""
+    entries = [f"v{i}" for i in range(32)]
+
+    mux_expr, predicate_expr = _emit_predicate_mux_chain(
+        entries,
+        render_predicate=lambda entry: f"{entry}_pred",
+        render_value=lambda entry: entry,
+        default_value="DEFAULT",
+        aggregate_predicates=lambda preds: _format_reduction_expr(
+            preds,
+            default_literal="Bits(1)(0)",
+        ),
+    )
+
+    assert predicate_expr.startswith("reduce(operator.or_, [v0_pred")
+    assert mux_expr.startswith("Mux(reduce(operator.or_, [v16_pred")
+    assert "Mux(v31_pred" in mux_expr
+    assert _max_parenthesis_depth(mux_expr) < 24
+
+
+def test_emit_predicate_mux_chain_can_materialize_large_expressions():
+    """Large mux trees can be split into named temporaries for PyCDE."""
+    entries = [f"v{i}" for i in range(16)]
+    emitted = []
+
+    def materialize(expr):
+        name = f"mux_tmp_{len(emitted)}"
+        emitted.append((name, expr))
+        return name
+
+    mux_expr, _predicate_expr = _emit_predicate_mux_chain(
+        entries,
+        render_predicate=lambda entry: f"{entry}_pred",
+        render_value=lambda entry: entry,
+        default_value="DEFAULT",
+        aggregate_predicates=lambda preds: _format_reduction_expr(
+            preds,
+            default_literal="Bits(1)(0)",
+        ),
+        materialize_mux=materialize,
+    )
+
+    assert emitted
+    assert mux_expr == emitted[-1][0]
+    assert all(expr.startswith("Mux(") for _name, expr in emitted)
+    assert "Mux(" not in mux_expr
+
+
 def test_emit_predicate_mux_chain_empty_sequence_defaults():
     """Helper should surface the caller's defaults when no entries are provided."""
     default_value = "UInt(8)(0)"
@@ -358,3 +408,45 @@ def test_emit_predicate_mux_chain_empty_sequence_defaults():
 
     assert mux_expr == default_value
     assert predicate_expr == "Bits(1)(0)"
+
+
+def test_expression_names_are_bounded_for_verilog_import():
+    """Derived expression names should not exceed frontend parser limits."""
+
+    class Parent:
+        name = "producer_module"
+
+    class LongNameExpr(Expr):
+        @property
+        def dtype(self):
+            return UInt(1)
+
+    expr = LongNameExpr(200, [])
+    expr.parent = Parent()
+    expr.name = "mux_" + ("flush_active_rdata_port_and_committed_valid_" * 20)
+
+    dumper = CIRCTDumper()
+
+    local_name = dumper.dump_rval(expr, False)
+    namespaced_name = dumper.dump_rval(expr, True)
+    port_name = dumper.get_external_port_name(expr)
+
+    assert local_name.startswith("mux_")
+    assert len(local_name) < len(expr.name)
+    assert len(namespaced_name) <= MAX_VERILOG_IDENTIFIER_LEN
+    assert len(port_name) <= MAX_VERILOG_IDENTIFIER_LEN
+    assert dumper.dump_rval(expr, False) == local_name
+
+
+def _max_parenthesis_depth(text: str) -> int:
+    """Return the maximum parenthesis nesting depth in *text*."""
+
+    depth = 0
+    maximum = 0
+    for character in text:
+        if character == "(":
+            depth += 1
+            maximum = max(maximum, depth)
+        elif character == ")":
+            depth -= 1
+    return maximum

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .utils import (
     HEADER,
+    bounded_verilog_identifier,
     dump_type,
     extract_sram_params,
     ensure_bits,
@@ -143,10 +144,13 @@ class CIRCTDumper(Visitor):  # pylint: disable=too-many-instance-attributes,too-
         """Get the mangled port name for an external value."""
         producer_module = node.parent
         producer_name = namify(producer_module.name)
-        base_port_name = namify(node.as_operand())
+        base_port_name = bounded_verilog_identifier(
+            node.as_operand(),
+            max_length=72,
+        )
         if base_port_name.startswith("_"):
             base_port_name = f"port{base_port_name}"
-        port_name = f"{producer_name}_{base_port_name}"
+        port_name = bounded_verilog_identifier(f"{producer_name}_{base_port_name}")
         return port_name
 
     def get_external_wire_key(self, instance, port_name, index_operand):

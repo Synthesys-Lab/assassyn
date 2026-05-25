@@ -32,7 +32,7 @@ This is the main function for converting Assassyn IR nodes into Verilog signal r
 1. **Operand Unwrapping**: Uses `unwrap_operand()` to handle wrapped operands and get the actual node
 2. **External Expression Handling**: Checks if the node is an external expression and generates appropriate port references (`self.<producer>_<value>`), while explicitly skipping `ExternalIntrinsic` handles so that only the underlying `PureIntrinsic.EXTERNAL_OUTPUT_READ` nodes are surfaced as ports.
 3. **Type Dispatch**: Uses a dispatch table to route different node types to their specific dump functions.
-4. **Expression Handling**: For expression nodes, generates unique names (using `expr_to_name`/`name_counters`) and handles namespace requirements.
+4. **Expression Handling**: For expression nodes, generates unique bounded names (using `expr_to_name`/`name_counters`) and handles namespace requirements.
 5. **Fallback Handling**: Provides fallback mechanisms for subclasses not explicitly handled.
 
 The function supports two modes:
@@ -59,8 +59,9 @@ Handles the generation of names for expression nodes. It performs the following 
 
 1. **Name Generation**: Creates unique names for expressions using a counter system
 2. **Anonymous Expression Handling**: Handles expressions that don't have meaningful names by using 'tmp' as base
-3. **Namespace Handling**: Adds module namespace when required
-4. **Name Caching**: Maintains a mapping of expressions to their generated names
+3. **Identifier Bounding**: Routes expression-derived names through `bounded_verilog_identifier()` so nested expression text cannot become overlong PyCDE/SystemVerilog identifiers.
+4. **Namespace Handling**: Adds module namespace when required and bounds the final namespaced identifier
+5. **Name Caching**: Maintains a mapping of expressions to their generated names
 
 ### `_dump_fifo_pop`
 

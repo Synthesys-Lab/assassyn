@@ -46,6 +46,8 @@ This function generates the complete top-level Verilog module that serves as the
    - `rst = Reset()`: System reset
    - `global_cycle_count = Output(UInt(64))`: Global cycle counter for testbench
    - `global_finish = Output(Bits(1))`: Global finish signal
+   - `expose_* = Output(...)`: Optional top-level observability outputs
+     requested through `SysBuilder.expose_on_top(...)`.
 
 2. **SRAM Memory Blackbox Instantiation**: For each SRAM module:
    - Generates memory interface wires (dataout, address, write_data, write_enable, read_enable)
@@ -75,6 +77,8 @@ This function generates the complete top-level Verilog module that serves as the
    - **Trigger Connections**: Async call trigger signal routing
    - **Array Connections**: Write signal routing to array instances
    - **Memory Connections**: SRAM interface signal routing
+   - **Top Exposure Connections**: Assigns top-level `expose_*` outputs from
+     the producer module's generated exposure ports.
 
 8. **Global Finish Signal**: Collects finish signals from all modules using metadata-based detection (O(1) lookup via `module_metadata`), avoiding redundant expression walking, and creates global finish. See [metadata module](/python/assassyn/codegen/verilog/metadata.md) for implementation details.
   Additionally, FIFO depth selection no longer walks expressions; it computes depths from the predicated push expressions stored in the shared `InteractionMatrix` (queried via `dumper.interactions.fifo_view(port).pushes`), with `module_metadata.interactions.pushes` serving as the module-scoped projection of the same tuples.
@@ -85,7 +89,12 @@ This function generates the complete top-level Verilog module that serves as the
 
 11. **Trigger Counter Delta Connections**: Routes trigger signals to trigger counters
 
-12. **System Compilation**: Creates the PyCDE system and compiles it
+12. **System Compilation**: Creates the PyCDE system and compiles it. The
+    generated script removes PyCDE/CIRCT final lowering entries whose names
+    contain `lower-esi-` before compilation; Assassyn's generated harness uses
+    explicit FIFO/trigger wires rather than ESI services, and this keeps large
+    synthesis-only designs from tripping a CIRCT ESI folding assertion while
+    still allowing split Verilog export.
 
 The function handles complex system-wide relationships:
 
@@ -115,6 +124,8 @@ The function uses several utility functions and data structures:
 - `namify()` and `unwrap_operand()` from [utils module](/python/assassyn/utils.md) for name generation
 - `topo_downstream_modules()` and `get_upstreams()` from [analysis module](/python/assassyn/analysis/external_usage.md) for topological ordering and dependency discovery
 - `get_external_port_name()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external port naming
+- `_top_exposure_entries()` converts builder-level `expose_on_top` requests
+  into top output declarations and producer-module connection metadata.
 - Metadata-driven checks for `FIFOPop` readiness: the predicated pop entries surfaced from `module_metadata.interactions.pops` (backed by the same tuples returned from `dumper.interactions.fifo_view(port).pops`) determine whether `<port>_pop_ready` connections should be emitted, replacing the legacy dumper helper traversal.
 - `_connect_array()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for array connections
 
