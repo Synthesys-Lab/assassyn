@@ -1,14 +1,123 @@
-10000093 //  0: addi x1, x0, 256
-04000113 //  4: addi x2, x0, 64
-00000193 //  8: addi x3, x0, 0
-0000a203 // 12: lw x4, 0(x1)
-004181b3 // 16: add x3, x3, x4
-00408093 // 20: addi x1, x1, 4
-fff10113 // 24: addi x2, x2, -1
-fe0118e3 // 28: bne x2, x0, -16
-00000513 // 32: addi x10, x0, 0
-00100073 // 36: ebreak
-00000033 // 40: add x0, x0, x0, pad the ebreak with noops.
-00000033 // 44: add x0, x0, x0
-00000033 // 48: add x0, x0, x0
-00000033 // 52: add x0, x0, x0
+40000213 //    0: mm real fixture
+00000a93 //    4: mm real fixture
+00022303 //    8: mm real fixture
+05022383 //   12: mm real fixture
+000387b3 //   16: mm real fixture
+00078863 //   20: mm real fixture
+006a8ab3 //   24: mm real fixture
+fff78793 //   28: mm real fixture
+fe079ce3 //   32: mm real fixture
+00422303 //   36: mm real fixture
+05422383 //   40: mm real fixture
+000387b3 //   44: mm real fixture
+00078863 //   48: mm real fixture
+006a8ab3 //   52: mm real fixture
+fff78793 //   56: mm real fixture
+fe079ce3 //   60: mm real fixture
+00822303 //   64: mm real fixture
+05822383 //   68: mm real fixture
+000387b3 //   72: mm real fixture
+00078863 //   76: mm real fixture
+006a8ab3 //   80: mm real fixture
+fff78793 //   84: mm real fixture
+fe079ce3 //   88: mm real fixture
+00c22303 //   92: mm real fixture
+05c22383 //   96: mm real fixture
+000387b3 //  100: mm real fixture
+00078863 //  104: mm real fixture
+006a8ab3 //  108: mm real fixture
+fff78793 //  112: mm real fixture
+fe079ce3 //  116: mm real fixture
+07522823 //  120: mm real fixture
+00000a93 //  124: mm real fixture
+01022303 //  128: mm real fixture
+05022383 //  132: mm real fixture
+000387b3 //  136: mm real fixture
+00078863 //  140: mm real fixture
+006a8ab3 //  144: mm real fixture
+fff78793 //  148: mm real fixture
+fe079ce3 //  152: mm real fixture
+01422303 //  156: mm real fixture
+05422383 //  160: mm real fixture
+000387b3 //  164: mm real fixture
+00078863 //  168: mm real fixture
+006a8ab3 //  172: mm real fixture
+fff78793 //  176: mm real fixture
+fe079ce3 //  180: mm real fixture
+01822303 //  184: mm real fixture
+05822383 //  188: mm real fixture
+000387b3 //  192: mm real fixture
+00078863 //  196: mm real fixture
+006a8ab3 //  200: mm real fixture
+fff78793 //  204: mm real fixture
+fe079ce3 //  208: mm real fixture
+01c22303 //  212: mm real fixture
+05c22383 //  216: mm real fixture
+000387b3 //  220: mm real fixture
+00078863 //  224: mm real fixture
+006a8ab3 //  228: mm real fixture
+fff78793 //  232: mm real fixture
+fe079ce3 //  236: mm real fixture
+07522a23 //  240: mm real fixture
+00000a93 //  244: mm real fixture
+02022303 //  248: mm real fixture
+05022383 //  252: mm real fixture
+000387b3 //  256: mm real fixture
+00078863 //  260: mm real fixture
+006a8ab3 //  264: mm real fixture
+fff78793 //  268: mm real fixture
+fe079ce3 //  272: mm real fixture
+02422303 //  276: mm real fixture
+05422383 //  280: mm real fixture
+000387b3 //  284: mm real fixture
+00078863 //  288: mm real fixture
+006a8ab3 //  292: mm real fixture
+fff78793 //  296: mm real fixture
+fe079ce3 //  300: mm real fixture
+02822303 //  304: mm real fixture
+05822383 //  308: mm real fixture
+000387b3 //  312: mm real fixture
+00078863 //  316: mm real fixture
+006a8ab3 //  320: mm real fixture
+fff78793 //  324: mm real fixture
+fe079ce3 //  328: mm real fixture
+02c22303 //  332: mm real fixture
+05c22383 //  336: mm real fixture
+000387b3 //  340: mm real fixture
+00078863 //  344: mm real fixture
+006a8ab3 //  348: mm real fixture
+fff78793 //  352: mm real fixture
+fe079ce3 //  356: mm real fixture
+07522c23 //  360: mm real fixture
+00000a93 //  364: mm real fixture
+03022303 //  368: mm real fixture
+05022383 //  372: mm real fixture
+000387b3 //  376: mm real fixture
+00078863 //  380: mm real fixture
+006a8ab3 //  384: mm real fixture
+fff78793 //  388: mm real fixture
+fe079ce3 //  392: mm real fixture
+03422303 //  396: mm real fixture
+05422383 //  400: mm real fixture
+000387b3 //  404: mm real fixture
+00078863 //  408: mm real fixture
+006a8ab3 //  412: mm real fixture
+fff78793 //  416: mm real fixture
+fe079ce3 //  420: mm real fixture
+03822303 //  424: mm real fixture
+05822383 //  428: mm real fixture
+000387b3 //  432: mm real fixture
+00078863 //  436: mm real fixture
+006a8ab3 //  440: mm real fixture
+fff78793 //  444: mm real fixture
+fe079ce3 //  448: mm real fixture
+03c22303 //  452: mm real fixture
+05c22383 //  456: mm real fixture
+000387b3 //  460: mm real fixture
+00078863 //  464: mm real fixture
+006a8ab3 //  468: mm real fixture
+fff78793 //  472: mm real fixture
+fe079ce3 //  476: mm real fixture
+07522e23 //  480: mm real fixture
+00000513 //  484: mm real fixture
+00100073 //  488: mm real fixture

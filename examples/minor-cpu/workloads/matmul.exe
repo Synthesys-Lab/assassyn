@@ -1,14 +1,67 @@
-10000093 //  0: addi x1, x0, 256
-04000113 //  4: addi x2, x0, 64
-00000193 //  8: addi x3, x0, 0
-0000a203 // 12: lw x4, 0(x1)
-004181b3 // 16: add x3, x3, x4
-00408093 // 20: addi x1, x1, 4
-fff10113 // 24: addi x2, x2, -1
-fe0118e3 // 28: bne x2, x0, -16
-00000513 // 32: addi x10, x0, 0
-00100073 // 36: ebreak
-00000033 // 40: add x0, x0, x0, pad the ebreak with noops.
-00000033 // 44: add x0, x0, x0
-00000033 // 48: add x0, x0, x0
-00000033 // 52: add x0, x0, x0
+40000213 //    0: matmul real fixture
+00000a93 //    4: matmul real fixture
+00022303 //    8: matmul real fixture
+02022383 //   12: matmul real fixture
+000387b3 //   16: matmul real fixture
+00078863 //   20: matmul real fixture
+006a8ab3 //   24: matmul real fixture
+fff78793 //   28: matmul real fixture
+fe079ce3 //   32: matmul real fixture
+00422303 //   36: matmul real fixture
+02822383 //   40: matmul real fixture
+000387b3 //   44: matmul real fixture
+00078863 //   48: matmul real fixture
+006a8ab3 //   52: matmul real fixture
+fff78793 //   56: matmul real fixture
+fe079ce3 //   60: matmul real fixture
+05522023 //   64: matmul real fixture
+00000a93 //   68: matmul real fixture
+00022303 //   72: matmul real fixture
+02422383 //   76: matmul real fixture
+000387b3 //   80: matmul real fixture
+00078863 //   84: matmul real fixture
+006a8ab3 //   88: matmul real fixture
+fff78793 //   92: matmul real fixture
+fe079ce3 //   96: matmul real fixture
+00422303 //  100: matmul real fixture
+02c22383 //  104: matmul real fixture
+000387b3 //  108: matmul real fixture
+00078863 //  112: matmul real fixture
+006a8ab3 //  116: matmul real fixture
+fff78793 //  120: matmul real fixture
+fe079ce3 //  124: matmul real fixture
+05522223 //  128: matmul real fixture
+00000a93 //  132: matmul real fixture
+00822303 //  136: matmul real fixture
+02022383 //  140: matmul real fixture
+000387b3 //  144: matmul real fixture
+00078863 //  148: matmul real fixture
+006a8ab3 //  152: matmul real fixture
+fff78793 //  156: matmul real fixture
+fe079ce3 //  160: matmul real fixture
+00c22303 //  164: matmul real fixture
+02822383 //  168: matmul real fixture
+000387b3 //  172: matmul real fixture
+00078863 //  176: matmul real fixture
+006a8ab3 //  180: matmul real fixture
+fff78793 //  184: matmul real fixture
+fe079ce3 //  188: matmul real fixture
+05522423 //  192: matmul real fixture
+00000a93 //  196: matmul real fixture
+00822303 //  200: matmul real fixture
+02422383 //  204: matmul real fixture
+000387b3 //  208: matmul real fixture
+00078863 //  212: matmul real fixture
+006a8ab3 //  216: matmul real fixture
+fff78793 //  220: matmul real fixture
+fe079ce3 //  224: matmul real fixture
+00c22303 //  228: matmul real fixture
+02c22383 //  232: matmul real fixture
+000387b3 //  236: matmul real fixture
+00078863 //  240: matmul real fixture
+006a8ab3 //  244: matmul real fixture
+fff78793 //  248: matmul real fixture
+fe079ce3 //  252: matmul real fixture
+05522623 //  256: matmul real fixture
+00000513 //  260: matmul real fixture
+00100073 //  264: matmul real fixture

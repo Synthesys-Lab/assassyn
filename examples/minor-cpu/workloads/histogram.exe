@@ -1,14 +1,19 @@
-10000093 //  0: addi x1, x0, 256
-04000113 //  4: addi x2, x0, 64
-00000193 //  8: addi x3, x0, 0
-0000a203 // 12: lw x4, 0(x1)
-004181b3 // 16: add x3, x3, x4
-00408093 // 20: addi x1, x1, 4
-fff10113 // 24: addi x2, x2, -1
-fe0118e3 // 28: bne x2, x0, -16
-00000513 // 32: addi x10, x0, 0
-00100073 // 36: ebreak
-00000033 // 40: add x0, x0, x0, pad the ebreak with noops.
-00000033 // 44: add x0, x0, x0
-00000033 // 48: add x0, x0, x0
-00000033 // 52: add x0, x0, x0
+40000213 //    0: histogram real fixture
+00020293 //    4: histogram real fixture
+01000313 //    8: histogram real fixture
+08020613 //   12: histogram real fixture
+00000693 //   16: histogram real fixture
+0002a383 //   20: histogram real fixture
+0033f413 //   24: histogram real fixture
+00241493 //   28: histogram real fixture
+00c484b3 //   32: histogram real fixture
+0004a503 //   36: histogram real fixture
+00150513 //   40: histogram real fixture
+00a4a023 //   44: histogram real fixture
+007686b3 //   48: histogram real fixture
+00428293 //   52: histogram real fixture
+fff30313 //   56: histogram real fixture
+fc031ce3 //   60: histogram real fixture
+0ad22023 //   64: histogram real fixture
+00000513 //   68: histogram real fixture
+00100073 //   72: histogram real fixture

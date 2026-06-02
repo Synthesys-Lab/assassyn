@@ -1,14 +1,75 @@
-10000093 //  0: addi x1, x0, 256
-04000113 //  4: addi x2, x0, 64
-00000193 //  8: addi x3, x0, 0
-0000a203 // 12: lw x4, 0(x1)
-004181b3 // 16: add x3, x3, x4
-00408093 // 20: addi x1, x1, 4
-fff10113 // 24: addi x2, x2, -1
-fe0118e3 // 28: bne x2, x0, -16
-00000513 // 32: addi x10, x0, 0
-00100073 // 36: ebreak
-00000033 // 40: add x0, x0, x0, pad the ebreak with noops.
-00000033 // 44: add x0, x0, x0
-00000033 // 48: add x0, x0, x0
-00000033 // 52: add x0, x0, x0
+40000213 //    0: spmv real fixture
+00022283 //    4: spmv real fixture
+00422303 //    8: spmv real fixture
+00000393 //   12: spmv real fixture
+00229413 //   16: spmv real fixture
+008204b3 //   20: spmv real fixture
+0404a503 //   24: spmv real fixture
+0204a583 //   28: spmv real fixture
+00259613 //   32: spmv real fixture
+00c206b3 //   36: spmv real fixture
+0606a703 //   40: spmv real fixture
+000707b3 //   44: spmv real fixture
+00078863 //   48: spmv real fixture
+00a383b3 //   52: spmv real fixture
+fff78793 //   56: spmv real fixture
+fe079ce3 //   60: spmv real fixture
+00128293 //   64: spmv real fixture
+fc6296e3 //   68: spmv real fixture
+08722023 //   72: spmv real fixture
+00422283 //   76: spmv real fixture
+00822303 //   80: spmv real fixture
+00000393 //   84: spmv real fixture
+00229413 //   88: spmv real fixture
+008204b3 //   92: spmv real fixture
+0404a503 //   96: spmv real fixture
+0204a583 //  100: spmv real fixture
+00259613 //  104: spmv real fixture
+00c206b3 //  108: spmv real fixture
+0606a703 //  112: spmv real fixture
+000707b3 //  116: spmv real fixture
+00078863 //  120: spmv real fixture
+00a383b3 //  124: spmv real fixture
+fff78793 //  128: spmv real fixture
+fe079ce3 //  132: spmv real fixture
+00128293 //  136: spmv real fixture
+fc6296e3 //  140: spmv real fixture
+08722223 //  144: spmv real fixture
+00822283 //  148: spmv real fixture
+00c22303 //  152: spmv real fixture
+00000393 //  156: spmv real fixture
+00229413 //  160: spmv real fixture
+008204b3 //  164: spmv real fixture
+0404a503 //  168: spmv real fixture
+0204a583 //  172: spmv real fixture
+00259613 //  176: spmv real fixture
+00c206b3 //  180: spmv real fixture
+0606a703 //  184: spmv real fixture
+000707b3 //  188: spmv real fixture
+00078863 //  192: spmv real fixture
+00a383b3 //  196: spmv real fixture
+fff78793 //  200: spmv real fixture
+fe079ce3 //  204: spmv real fixture
+00128293 //  208: spmv real fixture
+fc6296e3 //  212: spmv real fixture
+08722423 //  216: spmv real fixture
+00c22283 //  220: spmv real fixture
+01022303 //  224: spmv real fixture
+00000393 //  228: spmv real fixture
+00229413 //  232: spmv real fixture
+008204b3 //  236: spmv real fixture
+0404a503 //  240: spmv real fixture
+0204a583 //  244: spmv real fixture
+00259613 //  248: spmv real fixture
+00c206b3 //  252: spmv real fixture
+0606a703 //  256: spmv real fixture
+000707b3 //  260: spmv real fixture
+00078863 //  264: spmv real fixture
+00a383b3 //  268: spmv real fixture
+fff78793 //  272: spmv real fixture
+fe079ce3 //  276: spmv real fixture
+00128293 //  280: spmv real fixture
+fc6296e3 //  284: spmv real fixture
+08722623 //  288: spmv real fixture
+00000513 //  292: spmv real fixture
+00100073 //  296: spmv real fixture
