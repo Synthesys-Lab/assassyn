@@ -29,9 +29,26 @@ the generated trigger-counter width.
 
 Describes an async call and the bound FIFO IDs it should align with.
 
+### `struct ArrayWritePortTransition`
+
+Describes one generated RegArray write port, including write enable, write
+index, write data, and the selected payload value that must contain the write
+data on the following cycle.
+
+### `struct ArrayReadPortTransition`
+
+Describes one generated RegArray read port, including the optional read index
+and read data signal. Size-one arrays do not have generated read-index ports.
+
+### `struct ArrayTransition`
+
+Describes one RegArray relation, including depth, index width, data width,
+write ports, and read ports.
+
 ### `struct ValidationModel`
 
-Owns the dictionaries of module, FIFO, trigger, and async-call transitions.
+Owns the dictionaries of module, FIFO, trigger, async-call, and RegArray
+transitions.
 
 #### `to_json_dict`
 
@@ -50,3 +67,11 @@ def _fifo_to_dict(value: FIFOTransition) -> dict[str, Any]
 ```
 
 Converts a FIFO transition and nested RTL signal map to JSON data.
+
+### `_array_to_dict`
+
+```python
+def _array_to_dict(value: ArrayTransition) -> dict[str, Any]
+```
+
+Converts an array transition and nested read/write port metadata to JSON data.

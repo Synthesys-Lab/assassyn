@@ -3,7 +3,7 @@
 import json
 
 from assassyn import backend
-from assassyn.frontend import Int, Module, Port, SysBuilder, module
+from assassyn.frontend import Int, Module, Port, RegArray, SysBuilder, UInt, module
 
 
 class Target(Module):
@@ -29,6 +29,8 @@ class Driver(Module):
     def build(self, target: Target):
         """Send one deterministic async call to the target."""
 
+        state = RegArray(UInt(8), 2, initializer=[0, 0], name="validation_state")
+        (state & self)[UInt(1)(0)] <= state[UInt(1)(0)] + UInt(8)(1)
         target.async_called(data=Int(32)(13))
 
 
@@ -68,8 +70,11 @@ def test_translation_validation_json_is_written(tmp_path):
     assert validation["schema"] == "assassyn.translation_validation.v1"
     assert "module:Target" in validation["modules"]
     assert "fifo:Target.data" in validation["fifos"]
+    assert "array:state" in validation["arrays"]
 
     monitor = monitor_path.read_text(encoding="utf-8")
     assert "bind Top translation_validation_monitor" in monitor
     assert "FIFO pop without valid" in monitor
     assert "fifo_Target_data_count" in monitor
+    assert "array_state_w0_we" in monitor
+    assert "next-cycle payload mismatch" in monitor

@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ..codegen.verilog.array import ArrayMetadataRegistry
 from ..codegen.verilog.schedule import compute_fifo_depths, compute_trigger_widths
+from ..ir.memory.base import MemoryBase
 from ..utils import namify
 from .model import (
+    ArrayReadPortTransition,
+    ArrayTransition,
+    ArrayWritePortTransition,
     AsyncCallTransition,
     FIFOTransition,
     ModuleTransition,
@@ -34,6 +39,7 @@ def build_validation_model(
     trigger_widths = compute_trigger_widths(sys, fifo_depths, default_fifo_depth)
     _add_module_transitions(model, sys, trigger_widths)
     _add_fifo_transitions(model, fifo_depths)
+    _add_array_transitions(model, sys)
     _add_async_call_transitions(model, sys, interactions)
     return model
 
@@ -127,6 +133,87 @@ def _add_async_call_transitions(
                 callee=callee_name,
                 fifo_ids=fifo_ids,
             )
+
+
+def _add_array_transitions(
+    model: ValidationModel,
+    sys: "SysBuilder",
+) -> None:
+    """Add RegArray read/write commit-boundary relations."""
+
+    registry = ArrayMetadataRegistry()
+    registry.collect(sys)
+    for array in sys.arrays:
+        owner = getattr(array, "owner", None)
+        if isinstance(owner, MemoryBase) and array.is_payload(owner):
+            continue
+
+        metadata = registry.metadata_for(array)
+        if metadata is None:
+            continue
+        if not metadata.write_ports and not metadata.read_order:
+            continue
+
+        array_name = namify(array.name)
+        array_id = f"array:{array.name}"
+        source_index_width = int(array.index_bits)
+        index_width = max(1, source_index_width)
+        write_ports = tuple(
+            _array_write_port(array_name, module, port_idx)
+            for module, port_idx in metadata.write_ports.items()
+        )
+        read_ports = tuple(
+            _array_read_port(array_name, module, port_idx, source_index_width)
+            for port_idx, (module, _expr) in enumerate(metadata.read_order)
+        )
+        model.arrays[array_id] = ArrayTransition(
+            coverage_id=array_id,
+            array=array.name,
+            depth=int(array.size),
+            index_width=index_width,
+            data_width=int(array.scalar_ty.bits),
+            write_ports=write_ports,
+            read_ports=read_ports,
+        )
+
+
+def _array_write_port(
+    array_name: str,
+    module: "Module",
+    port_idx: int,
+) -> ArrayWritePortTransition:
+    """Return the generated RTL mapping for one RegArray write port."""
+
+    suffix = f"port{port_idx}"
+    instance = f"array_writer_{array_name}"
+    return ArrayWritePortTransition(
+        writer=_source_module_name(module),
+        port_index=int(port_idx),
+        write_enable_signal=f"{instance}.w_{suffix}",
+        write_index_signal=f"{instance}.widx_{suffix}",
+        write_data_signal=f"{instance}.wdata_{suffix}",
+        next_value_signal=f"{instance}.mem[{instance}.widx_{suffix}]",
+    )
+
+
+def _array_read_port(
+    array_name: str,
+    module: "Module",
+    port_idx: int,
+    source_index_width: int,
+) -> ArrayReadPortTransition:
+    """Return the generated RTL mapping for one RegArray read port."""
+
+    suffix = f"port{port_idx}"
+    instance = f"array_writer_{array_name}"
+    return ArrayReadPortTransition(
+        reader=_source_module_name(module),
+        port_index=int(port_idx),
+        read_index_signal=(
+            f"{instance}.ridx_{suffix}" if source_index_width > 0 else None
+        ),
+        read_data_signal=f"{instance}.rdata_{suffix}",
+    )
 
 
 def _source_module_name(module: "Module") -> str:

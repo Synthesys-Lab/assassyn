@@ -65,6 +65,41 @@ class AsyncCallTransition:
     fifo_ids: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class ArrayWritePortTransition:
+    """Normalized RegArray write-port commit-boundary metadata."""
+
+    writer: str
+    port_index: int
+    write_enable_signal: str
+    write_index_signal: str
+    write_data_signal: str
+    next_value_signal: str
+
+
+@dataclass(frozen=True)
+class ArrayReadPortTransition:
+    """Normalized RegArray read-port metadata."""
+
+    reader: str
+    port_index: int
+    read_index_signal: str | None
+    read_data_signal: str
+
+
+@dataclass(frozen=True)
+class ArrayTransition:
+    """Normalized RegArray read/write relation metadata."""
+
+    coverage_id: str
+    array: str
+    depth: int
+    index_width: int
+    data_width: int
+    write_ports: tuple[ArrayWritePortTransition, ...]
+    read_ports: tuple[ArrayReadPortTransition, ...] = ()
+
+
 @dataclass
 class ValidationModel:
     """Container for all normalized validation relations."""
@@ -74,6 +109,7 @@ class ValidationModel:
     fifos: dict[str, FIFOTransition] = field(default_factory=dict)
     triggers: dict[str, TriggerTransition] = field(default_factory=dict)
     async_calls: dict[str, AsyncCallTransition] = field(default_factory=dict)
+    arrays: dict[str, ArrayTransition] = field(default_factory=dict)
 
     def to_json_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation of the model."""
@@ -96,6 +132,10 @@ class ValidationModel:
                 key: vars(value)
                 for key, value in self.async_calls.items()
             },
+            "arrays": {
+                key: _array_to_dict(value)
+                for key, value in self.arrays.items()
+            },
         }
 
 
@@ -104,4 +144,13 @@ def _fifo_to_dict(value: FIFOTransition) -> dict[str, Any]:
 
     data = vars(value).copy()
     data["rtl"] = vars(value.rtl)
+    return data
+
+
+def _array_to_dict(value: ArrayTransition) -> dict[str, Any]:
+    """Convert an array transition to JSON data."""
+
+    data = vars(value).copy()
+    data["write_ports"] = [vars(port) for port in value.write_ports]
+    data["read_ports"] = [vars(port) for port in value.read_ports]
     return data

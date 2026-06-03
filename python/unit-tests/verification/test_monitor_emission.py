@@ -5,6 +5,9 @@ from copy import deepcopy
 from assassyn.verification.checks import check_model_consistency  # type: ignore
 from assassyn.verification.emit import render_monitor  # type: ignore
 from assassyn.verification.model import (  # type: ignore
+    ArrayReadPortTransition,
+    ArrayTransition,
+    ArrayWritePortTransition,
     AsyncCallTransition,
     FIFOTransition,
     ModuleTransition,
@@ -54,6 +57,33 @@ def build_model() -> ValidationModel:
         callee="Target",
         fifo_ids=("fifo:Target.data",),
     )
+    model.arrays["array:state"] = ArrayTransition(
+        coverage_id="array:state",
+        array="state",
+        depth=4,
+        index_width=2,
+        data_width=8,
+        write_ports=(
+            ArrayWritePortTransition(
+                writer="Driver",
+                port_index=0,
+                write_enable_signal="array_writer_state.w_port0",
+                write_index_signal="array_writer_state.widx_port0",
+                write_data_signal="array_writer_state.wdata_port0",
+                next_value_signal=(
+                    "array_writer_state.mem[array_writer_state.widx_port0]"
+                ),
+            ),
+        ),
+        read_ports=(
+            ArrayReadPortTransition(
+                reader="Driver",
+                port_index=0,
+                read_index_signal="array_writer_state.ridx_port0",
+                read_data_signal="array_writer_state.rdata_port0",
+            ),
+        ),
+    )
     return model
 
 
@@ -68,6 +98,10 @@ def test_monitor_emits_bind_and_fifo_assertions():
     assert "FIFO push without ready" in monitor
     assert "FIFO pop without valid" in monitor
     assert "module:Target trigger count overflow" in monitor
+    assert "array_writer_state.w_port0" in monitor
+    assert "array_writer_state.mem[array_writer_state.widx_port0]" in monitor
+    assert "next-cycle payload mismatch" in monitor
+    assert "same-cycle write visible through read port" in monitor
 
 
 def test_model_consistency_catches_mutated_missing_fifo():

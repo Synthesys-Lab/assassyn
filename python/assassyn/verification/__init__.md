@@ -14,7 +14,8 @@ importing simulator or Verilog elaboration modules.
 - `render_monitor`
 - `write_monitor_stub`
 - `write_validation_json`
-- validation model dataclasses from `model.py`
+- validation model dataclasses from `model.py`, including the RegArray
+  `ArrayTransition` records.
 
 ## Internal Helpers
 

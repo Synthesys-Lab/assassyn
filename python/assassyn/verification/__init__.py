@@ -8,6 +8,9 @@ from .coverage import (
 from .emit import render_monitor, write_monitor_stub, write_validation_json
 from .extract import build_validation_model
 from .model import (
+    ArrayReadPortTransition,
+    ArrayTransition,
+    ArrayWritePortTransition,
     AsyncCallTransition,
     FIFOTransition,
     ModuleTransition,
@@ -17,6 +20,9 @@ from .model import (
 )
 
 __all__ = (
+    "ArrayReadPortTransition",
+    "ArrayTransition",
+    "ArrayWritePortTransition",
     "AsyncCallTransition",
     "FIFOTransition",
     "ModuleTransition",
