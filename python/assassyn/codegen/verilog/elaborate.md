@@ -6,6 +6,7 @@ This module provides the main elaboration function for Verilog code generation, 
 
 - [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
 - [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Translation Validation](../../../docs/design/internal/translation-validation.md) - Validation artifact design
 - [External SystemVerilog Integration](../../../docs/design/external/ExternalSV_zh.md) - External module integration
 - [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
 
@@ -38,6 +39,7 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
             - idle_threshold: Idle threshold
             - random: Whether to randomize execution
             - fifo_depth: Default FIFO depth
+            - verification: Whether to emit translation-validation artifacts
 
     Returns:
         Path to the generated Verilog files
@@ -55,6 +57,7 @@ This function is the main entry point for Verilog code generation, orchestrating
 5. **Testbench Generation**: Calls `generate_testbench()` with the discovered alias list and external file names, ensuring the Cocotb harness imports every required HDL artifact.
 6. **SRAM Blackbox Generation**: Invokes `generate_sram_blackbox_files()` so each SRAM downstream module receives a behavioural blackbox wrapper.
 7. **Resource File Management**: Copies core support files (`fifo.sv`, `trigger_counter.sv`), materialises alias copies when required, and copies user-supplied SystemVerilog sources (resolving relative paths via `repo_path()`).
+8. **Validation Resource Management**: When `verification=True`, includes `translation_validation_monitor.sv` in the generated testbench source list and leaves `translation_validation.json` beside `design.py`.
 
 The function handles complex file management:
 
@@ -112,6 +115,7 @@ The elaboration process handles several file types:
 - **External Files**: User-provided SystemVerilog modules
 - **SRAM Files**: Generated memory blackbox modules
 - **Alias Files**: Parameterized module aliases
+- **Validation Files**: Optional translation-validation JSON and monitor scaffold
 
 **Project-specific Knowledge Required**:
 - Understanding of [CIRCT framework](/docs/design/internal/pipeline.md)

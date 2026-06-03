@@ -3,6 +3,7 @@
 This module provides helper functions to generate Rust code for array read and write operations for the simulator backend. These functions are part of the [simulator code generation pipeline](../simulator.md) and handle the translation of [ArrayRead](../../../ir/expr/array.md) and [ArrayWrite](../../../ir/expr/array.md) IR nodes into executable Rust simulation code.
 
 The generated code follows the [simulator architecture](../simulator.md) with half-cycle timing for register updates and port-based write management for multi-writer arrays.
+When semantic coverage is enabled, generated reads and writes record source-level array counters.
 
 ## Exposed Interfaces
 
@@ -22,9 +23,16 @@ def codegen_array_read(node, module_ctx) -> str:
     """
 ```
 
-**Generated Code**: `sim.<array_name>.payload[<index> as usize].clone()`
+**Generated Code**:
 
-**Explanation**: This function generates a simple array access expression that reads from the `payload` field of the array structure. The `clone()` ensures the value is copied for use in the simulation. The index is cast to `usize` as required by Rust's Vec indexing.
+```rust
+{
+    coverage.record_array_read(...);
+    sim.<array_name>.payload[<index> as usize].clone()
+}
+```
+
+**Explanation**: This function generates a simple array access expression that reads from the `payload` field of the array structure. The `clone()` ensures the value is copied for use in the simulation. The index is cast to `usize` as required by Rust's Vec indexing. The optional coverage probe records the read under `array:<array>`.
 
 ### codegen_array_write
 
@@ -50,7 +58,8 @@ def codegen_array_write(node, module_ctx, module_name) -> str:
     let write = ArrayWrite::new(stamp, <index> as usize,
                                <value>.clone(), "<module_name>");
     sim.<array_name>.write(<port_idx>, write);
+    coverage.record_array_write(...);
 }
 ```
 
-**Explanation**: This function generates a code block that creates a timestamped write operation. The timestamp calculation (`sim.stamp - sim.stamp % 100 + 50`) aligns the write to the half-cycle boundary as described in the [simulator timing model](../simulator.md). The write uses a port index assigned by the [port manager](../port_mapper.md) to enable multiple modules to write to the same array efficiently. The actual write is deferred until the next half-cycle when `tick_registers()` is called.
+**Explanation**: This function generates a code block that creates a timestamped write operation. The timestamp calculation (`sim.stamp - sim.stamp % 100 + 50`) aligns the write to the half-cycle boundary as described in the [simulator timing model](../simulator.md). The write uses a port index assigned by the [port manager](../port_mapper.md) to enable multiple modules to write to the same array efficiently. The actual write is deferred until the next half-cycle when `tick_registers()` is called. The optional coverage probe records the write under `array:<array>`.

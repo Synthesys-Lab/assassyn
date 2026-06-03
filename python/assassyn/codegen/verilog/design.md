@@ -12,6 +12,7 @@ symbols while housing their implementations across `metadata.core`, `metadata.mo
 
 - [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
 - [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
+- [Translation Validation](../../../docs/design/internal/translation-validation.md) - Normalized cycle semantics and validation artifacts
 - [External SystemVerilog Integration](../../../docs/design/external/ExternalSV_zh.md) - External module integration
 - [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
 
@@ -71,7 +72,7 @@ These inconsistencies are documented as potential improvements for future refact
 ### `generate_design`
 
 ```python
-def generate_design(fname: Union[str, Path], sys: SysBuilder):
+def generate_design(fname: Union[str, Path], sys: SysBuilder, *, default_fifo_depth: int = 1, verification: bool = False):
     """Generate a complete Verilog design file for the system."""
 ```
 
@@ -83,7 +84,8 @@ This function generates a complete Verilog design file for an Assassyn system. I
 2. **SRAM Module Generation**: Generates SRAM blackbox module definitions for each SRAM in the system
 3. **System Processing**: Uses CIRCTDumper to visit and generate code for all modules in the system
 4. **Code Output**: Writes the generated code to the file
-5. **Log Return**: Returns the generated log statements for testbench integration
+5. **Validation Artifacts**: When `verification` is true, extracts the normalized validation model and writes `translation_validation.json` plus `translation_validation_monitor.sv`
+6. **Log Return**: Returns the generated log statements for testbench integration
 
 The function handles SRAM modules specially by:
 - Extracting SRAM parameters (data width, address width, array name)

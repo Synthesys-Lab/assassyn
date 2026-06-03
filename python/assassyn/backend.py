@@ -26,7 +26,11 @@ def config( # pylint: disable=too-many-arguments
         fifo_depth=4,
         random=False,
         enable_cache=True,
-        timing_report=False):
+        timing_report=False,
+        coverage=False,
+        coverage_path=None,
+        coverage_roi=None,
+        verification=False):
     '''The helper function to dump the default configuration of elaboration.'''
     return {
         'path': path,
@@ -42,6 +46,10 @@ def config( # pylint: disable=too-many-arguments
         'random': random,
         'enable_cache': enable_cache,
         'timing_report': timing_report,
+        'coverage': coverage,
+        'coverage_path': coverage_path,
+        'coverage_roi': coverage_roi,
+        'verification': verification,
     }
 
 def make_existing_dir(path):
@@ -75,6 +83,10 @@ def _generate_cache_key(sys_name: str, config_dict: dict) -> str:
         'idle_threshold': config_dict.get('idle_threshold'),
         'fifo_depth': config_dict.get('fifo_depth'),
         'random': config_dict.get('random', False),
+        'coverage': config_dict.get('coverage', False),
+        'coverage_path': config_dict.get('coverage_path'),
+        'coverage_roi': config_dict.get('coverage_roi'),
+        'verification': config_dict.get('verification', False),
     }
 
     # Create a stable string representation and hash it
@@ -101,6 +113,10 @@ def elaborate(# pylint: disable=too-many-locals
         idle_threshold (int): The threshold for the idle state to terminate the simulation.
         sim_threshold (int): The threshold for the simulation to terminate.
         timing_report (bool): Whether to emit critical_paths.json.
+        coverage (bool): Whether to emit semantic coverage from the Rust simulator.
+        coverage_path (str): Optional semantic coverage JSON path.
+        coverage_roi (tuple): Optional inclusive coverage cycle interval.
+        verification (bool): Whether to emit translation-validation artifacts.
         **kwargs: The optional arguments that will be passed to the code generator.
     '''
 

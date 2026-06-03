@@ -11,7 +11,7 @@ This section describes all the function interfaces and data structures in this s
 ### config
 
 ```python
-def config(path='./workspace', resource_base=None, pretty_printer=True, verbose=True, simulator=True, verilog=False, simulator_crate_name=None, sim_threshold=100, idle_threshold=100, fifo_depth=4, random=False, enable_cache=True, timing_report=False) -> dict
+def config(path='./workspace', resource_base=None, pretty_printer=True, verbose=True, simulator=True, verilog=False, simulator_crate_name=None, sim_threshold=100, idle_threshold=100, fifo_depth=4, random=False, enable_cache=True, timing_report=False, coverage=False, coverage_path=None, coverage_roi=None, verification=False) -> dict
 ```
 
 The helper function to create the default configuration for system elaboration. This function provides a centralized way to configure all aspects of the elaboration process.
@@ -30,6 +30,10 @@ The helper function to create the default configuration for system elaboration. 
 - `random` (bool): Whether to randomize module execution order (default: False)
 - `enable_cache` (bool): Whether to enable build caching (default: True)
 - `timing_report` (bool): Whether to write `critical_paths.json` with the pre-synthesis timing estimate (default: False)
+- `coverage` (bool): Whether the Rust simulator records semantic coverage (default: False)
+- `coverage_path` (str, optional): Output path for semantic coverage JSON
+- `coverage_roi` (tuple, optional): Inclusive `(start_cycle, end_cycle)` coverage region
+- `verification` (bool): Whether Verilog generation emits translation-validation artifacts (default: False)
 
 **Returns:**
 - A dictionary containing the configuration parameters
@@ -40,6 +44,10 @@ This function creates a default configuration dictionary that can be customized 
 The `enable_cache` parameter controls whether the build cache is used. When enabled (default), the system caches compiled binaries to speed up repeated builds with unchanged IR and configuration. This is automatically disabled in CI tests (via [`test.run_test()`](./test/__init__.py)) to prevent interference with parallel test execution.
 
 The `timing_report` parameter enables the IR-level critical-path analyzer documented in [timing.md](./analysis/timing.md). The report is written to `critical_paths.json` in the system output directory even when simulator caching returns an existing binary.
+
+The `coverage` parameters enable source-level semantic coverage in the Rust simulator. The generated simulator records module, FIFO, async-call, predicate, and array events during the configured region of interest and writes `coverage.json` at the configured path. This follows the design in [simulation-coverage.md](../../docs/design/internal/simulation-coverage.md).
+
+The `verification` parameter enables translation-validation artifacts during Verilog generation. The generated artifacts follow [translation-validation.md](../../docs/design/internal/translation-validation.md).
 
 ### make_existing_dir
 
@@ -118,7 +126,7 @@ Generate a stable cache key from system name and configuration.
 **Explanation:**
 This internal helper function generates a stable, deterministic cache key by combining the system name with a hash of build-relevant configuration parameters. The function:
 
-1. **Extracts Build-Relevant Parameters**: Selects only configuration parameters that affect the generated code (simulator, verilog, sim_threshold, idle_threshold, fifo_depth, random), excluding parameters like `verbose` or `path` that don't affect the build output
+1. **Extracts Build-Relevant Parameters**: Selects only configuration parameters that affect the generated code (simulator, verilog, sim_threshold, idle_threshold, fifo_depth, random, coverage, coverage_path, coverage_roi, verification), excluding parameters like `verbose` or `path` that don't affect the build output
 2. **Creates Stable Representation**: Uses `json.dumps()` with `sort_keys=True` to ensure consistent key generation regardless of dictionary insertion order
 3. **Generates Hash**: Computes a SHA256 hash and truncates to 12 characters for a compact but collision-resistant identifier
 4. **Formats Cache Key**: Returns a key in the format `{sys_name}_{config_hash}` for human-readable cache file names

@@ -388,6 +388,7 @@ def generate_design(
     sys: SysBuilder,
     *,
     default_fifo_depth: int = 1,
+    verification: bool = False,
 ) -> None:
     """Generate a complete Verilog design file for the system."""
     with open(str(fname), 'w', encoding='utf-8') as fd:
@@ -433,6 +434,23 @@ def sramBlackbox_{array_name}():
         code = '\n'.join(dumper.code)
         code = code.replace('system.compile()")', 'system.compile()')
         fd.write(code)
+        if verification:
+            # pylint: disable=import-outside-toplevel
+            from ...verification.emit import (
+                write_monitor_stub,
+                write_validation_json,
+            )
+            from ...verification.extract import build_validation_model
+
+            model = build_validation_model(
+                sys,
+                module_metadata,
+                interactions,
+                default_fifo_depth,
+            )
+            output_dir = Path(fname).parent
+            write_validation_json(model, output_dir / "translation_validation.json")
+            write_monitor_stub(model, output_dir / "translation_validation_monitor.sv")
     logs = dumper.logs
     return logs
 

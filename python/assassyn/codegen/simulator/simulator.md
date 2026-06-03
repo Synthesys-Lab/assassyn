@@ -5,6 +5,7 @@ This module generates Rust-based simulators from Assassyn systems. It implements
 ## Design Documents
 
 - [Simulator Design](../../../docs/design/internal/simulator.md) - Simulator design and code generation
+- [Semantic Coverage](../../../docs/design/internal/simulation-coverage.md) - Source-level simulator coverage
 - [Pipeline Architecture](../../../docs/design/internal/pipeline.md) - Credit-based pipeline system
 - [Architecture Overview](../../../docs/design/arch/arch.md) - Overall system architecture
 - [Memory System Architecture](../../../docs/design/arch/memory.md) - Memory system design
@@ -18,7 +19,7 @@ This module generates Rust-based simulators from Assassyn systems. It implements
 
 ## Section 0. Summary
 
-The simulator generation process creates a complete Rust project that faithfully executes the high-level execution model of Assassyn hardware designs. The generated simulator implements the credit-based pipeline architecture where pipeline stages communicate through event queues and FIFOs, while downstream modules execute as pure combinational logic driven by upstream stage triggers. Beyond array port arbitration and DRAM simulation, the generator now wires in external SystemVerilog FFIs by discovering `ExternalIntrinsic` nodes, auto-generating Rust structs per external class, and ticking those handles alongside the internal register model.
+The simulator generation process creates a complete Rust project that faithfully executes the high-level execution model of Assassyn hardware designs. The generated simulator implements the credit-based pipeline architecture where pipeline stages communicate through event queues and FIFOs, while downstream modules execute as pure combinational logic driven by upstream stage triggers. Beyond array port arbitration and DRAM simulation, the generator now wires in external SystemVerilog FFIs by discovering `ExternalIntrinsic` nodes, auto-generating Rust structs per external class, and ticking those handles alongside the internal register model. When configured, the generated simulator owns an optional semantic coverage recorder that emits source-level module, FIFO, async-call, wait, and array counters.
 
 ## Section 1. Exposed Interfaces
 
@@ -87,6 +88,9 @@ def dump_simulator(sys: SysBuilder, config, fd):
             - random: Whether to randomize module execution order
             - resource_base: Path to resource files
             - fifo_depth: Default FIFO depth
+            - coverage: Whether semantic coverage is enabled
+            - coverage_path: Optional coverage JSON path
+            - coverage_roi: Optional inclusive coverage cycle interval
         fd: File descriptor to write to
     """
 ```
@@ -106,17 +110,20 @@ This function generates the complete Rust simulator implementation by writing to
    - Per-DRAM `MemoryInterface` instances and `Response` buffers
    - Register arrays with ports sized according to the port manager
    - Module trigger flags, event queues, and FIFO buffers
+   - Optional semantic coverage recorder and flush helper
    - One field per `ExternalIntrinsic` instance (e.g., `external_<uid>: <Class>_FFI`)
    - Optional `<expr>_value` slots for every IR value that must be visible outside its defining module (computed via `gather_expr_validities`)
 
 5. **Implementation Generation**: Generates the `impl Simulator` block with methods for:
    - Constructor (`new`) that initialises DRAM interfaces, arrays, FIFOs, external handles, and expression caches
    - `event_valid`, `reset_downstream`, `tick_registers`, and `reset_dram` helpers. `tick_registers` now also pulses any external handles flagged with registered outputs.
+   - `flush_coverage` and small coverage wrapper helpers that keep generated module files independent of recorder internals.
 
 6. **Module Simulation Functions**: Emits `simulate_<module_name>` methods that:
    - Guard execution based on event queues or upstream triggers
    - Call into `modules::<module_name>` and interpret the boolean return (popping events on success, clearing exposed values on failure)
    - Track `triggered` flags so the top-level loop can detect activity
+   - Record source-level `eligible`, `fire`, `blocked_wait`, and downstream-triggered coverage events when coverage is enabled
 
 7. **Main Simulation Loop**: Generates the `simulate()` function which:
    - Instantiates `Simulator::new()` and initialises each DRAM interface with a configuration file
@@ -131,6 +138,9 @@ This function generates the complete Rust simulator implementation by writing to
 - **`random`**: Boolean flag to randomize module execution order for better testing coverage
 - **`resource_base`**: Path to resource files (initialization files, configuration files)
 - **`fifo_depth`**: Default FIFO depth for pipeline stage communication
+- **`coverage`**: Enable semantic coverage recording
+- **`coverage_path`**: Output path for `coverage.json`
+- **`coverage_roi`**: Inclusive coverage cycle region
 
 **Python-Rust Consistency Requirements:** The generated simulator must maintain consistency with the Python implementation:
 - **Data Type Mapping**: Assassyn data types are mapped to corresponding Rust types (UInt → u32/u64, Bits → bool, etc.)
@@ -158,6 +168,38 @@ This internal visitor class is used by `analyze_and_register_ports` to traverse 
 - **Module Visiting**: When visiting modules, it identifies `DRAM` instances and adds them to the collection for later use in memory interface generation.
 
 The visitor pattern ensures that all array writes and DRAM modules are discovered regardless of their location in the system hierarchy, providing comprehensive coverage for port allocation and memory interface setup.
+
+### `_rust_string_literal`
+
+```python
+def _rust_string_literal(value: str) -> str
+```
+
+Formats Python strings as escaped Rust string literals used in generated coverage paths and IDs.
+
+### `_coverage_option`
+
+```python
+def _coverage_option(value) -> str
+```
+
+Formats optional cycle bounds as Rust `Option<usize>` expressions.
+
+### `_coverage_roi`
+
+```python
+def _coverage_roi(config) -> tuple[object, object]
+```
+
+Validates and returns the configured semantic coverage cycle interval.
+
+### `_coverage_module_name`
+
+```python
+def _coverage_module_name(module) -> str
+```
+
+Returns the source-level class name used in coverage IDs. Generated module instance names can include suffixes such as `Instance`, while coverage IDs should point back to the source module class.
 
 ### Configuration Parameters
 

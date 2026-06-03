@@ -130,7 +130,9 @@ explicit finite capacity. Generated RTL FIFOs are bounded. Semantic coverage
 therefore tracks both the actual simulator occupancy and a replay against the
 configured RTL depth.
 
-For a FIFO with configured depth `D`, each covered cycle applies:
+For a FIFO with configured depth `D`, every simulated FIFO operation updates the
+replayed occupancy so an ROI may begin in the middle of a run. Covered cycles
+then publish the counters and overflow observations:
 
 ```text
 occupancy' = occupancy + push_fire - pop_fire

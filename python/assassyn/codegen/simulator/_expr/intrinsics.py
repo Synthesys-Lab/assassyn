@@ -110,12 +110,20 @@ def codegen_pure_intrinsic(node: PureIntrinsic, module_ctx):
 def _codegen_wait_until(node, module_ctx):
     """Generate code for WAIT_UNTIL intrinsic."""
     value = dump_rval_ref(module_ctx, node.args[0])
-    return f"if !{value} {{ return false; }}"
+    module_name = module_ctx.__class__.__name__
+    coverage_id = f"module:{module_name}:wait:{namify(node.as_operand())}"
+    return f"""{{
+      let wait_condition = {value};
+      if let Some(coverage) = sim.coverage.as_mut() {{
+        coverage.record_wait("{coverage_id}", "{module_name}", wait_condition, sim.stamp / 100);
+      }}
+      if !wait_condition {{ return false; }}
+    }}"""
 
 
 def _codegen_finish(node, module_ctx):
     """Generate code for FINISH intrinsic."""
-    return "std::process::exit(0);"
+    return "sim.flush_coverage(); std::process::exit(0);"
 
 
 def _codegen_assert(node, module_ctx):

@@ -13,7 +13,13 @@ def codegen_array_read(node, module_ctx):
     idx = node.idx
     array_name = namify(array.name)
     idx_val = dump_rval_ref(module_ctx, idx)
-    return f"sim.{array_name}.payload[{idx_val} as usize].clone()"
+    coverage_id = f"array:{array.name}"
+    return f"""{{
+              if let Some(coverage) = sim.coverage.as_mut() {{
+                coverage.record_array_read("{coverage_id}", "{array.name}", sim.stamp / 100);
+              }}
+              sim.{array_name}.payload[{idx_val} as usize].clone()
+            }}"""
 
 
 def codegen_array_write(node, module_ctx, module_name):
@@ -36,4 +42,7 @@ def codegen_array_write(node, module_ctx, module_name):
               let write = ArrayWrite::new(stamp, {idx_val} as usize,
                                          {value_val}.clone(), "{module_writer}");
               sim.{array_name}.write({port_idx}, write);
+              if let Some(coverage) = sim.coverage.as_mut() {{
+                coverage.record_array_write("array:{array.name}", "{array.name}", sim.stamp / 100);
+              }}
             }}"""

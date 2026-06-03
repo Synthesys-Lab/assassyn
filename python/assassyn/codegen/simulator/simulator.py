@@ -24,6 +24,43 @@ from .port_mapper import get_port_manager
 from ...utils.enforce_type import enforce_type
 
 
+def _rust_string_literal(value: str) -> str:
+    """Render *value* as a Rust string literal."""
+
+    escaped = (
+        str(value)
+        .replace('\\', '\\\\')
+        .replace('"', '\\"')
+        .replace('\n', '\\n')
+    )
+    return f'"{escaped}"'
+
+
+def _coverage_option(value) -> str:
+    """Render an optional integer as a Rust Option<usize> expression."""
+
+    if value is None:
+        return "None"
+    return f"Some({int(value)}usize)"
+
+
+def _coverage_roi(config) -> tuple[object, object]:
+    """Return the configured inclusive coverage ROI bounds."""
+
+    roi = config.get('coverage_roi')
+    if roi is None:
+        return None, None
+    if not isinstance(roi, (tuple, list)) or len(roi) != 2:
+        raise ValueError("coverage_roi must be None or a (start_cycle, end_cycle) pair")
+    return roi[0], roi[1]
+
+
+def _coverage_module_name(module) -> str:
+    """Return the source-level module name used in coverage IDs."""
+
+    return module.__class__.__name__
+
+
 @enforce_type
 def analyze_and_register_ports(sys: SysBuilder) -> None:
     """Analyze system and register all array write ports and DRAM modules.
@@ -120,6 +157,21 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
     # Begin simulator struct definition
     fd.write("pub struct Simulator { pub stamp: usize, ")
     fd.write("pub request_stamp_map_table: HashMap<i64, usize>,\n")
+    fd.write("pub coverage: Option<CoverageRecorder>,\n")
+
+    coverage_path = config.get('coverage_path')
+    if coverage_path is None:
+        coverage_path = os.path.join(config.get('path', '.'), "coverage.json")
+    coverage_start, coverage_end = _coverage_roi(config)
+    if config.get('coverage', False):
+        coverage_init = (
+            "Some(CoverageRecorder::new("
+            f"{_coverage_option(coverage_start)}, {_coverage_option(coverage_end)}"
+            "))"
+        )
+    else:
+        coverage_init = "None"
+    simulator_init.append(f"coverage: {coverage_init},")
     home = repo_path()
     # Add per-DRAM memory interfaces and response fields
     for dram in dram_modules:
@@ -291,6 +343,25 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
         fd.write(f"    self.{dram_name}_response.write_succ = false;\n")
     fd.write("  }\n\n")
 
+    fd.write("  pub fn flush_coverage(&mut self) {\n")
+    fd.write("    if let Some(coverage) = self.coverage.as_mut() {\n")
+    fd.write(
+        "      let coverage_result = coverage.flush("
+        f"{_rust_string_literal(coverage_path)}, "
+        f"{config.get('sim_threshold', 100)}"
+        ");\n"
+    )
+    fd.write("      coverage_result.expect(\"failed to write semantic coverage\");\n")
+    fd.write("    }\n")
+    fd.write("  }\n\n")
+
+    fd.write("  pub fn record_fifo_push_coverage(&mut self,\n")
+    fd.write("      id: &str, module: &str, port: &str, cycle: usize, depth: usize) {\n")
+    fd.write("    if let Some(coverage) = self.coverage.as_mut() {\n")
+    fd.write("      coverage.record_fifo_push(id, module, port, cycle, depth);\n")
+    fd.write("    }\n")
+    fd.write("  }\n\n")
+
     # Get topological order for downstream modules
     downstreams = topo_downstream_modules(sys)
 
@@ -316,6 +387,25 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
             conds = " || ".join(upstream_conds) if upstream_conds else "false"
             fd.write(f"    if {conds} {{\n")
 
+        source_module_name = _coverage_module_name(module)
+        module_id = f"module:{source_module_name}"
+        fd.write("      let coverage_cycle = self.stamp / 100;\n")
+        fd.write("      if let Some(coverage) = self.coverage.as_mut() {\n")
+        fd.write(
+            "        coverage.record_module("
+            f"{_rust_string_literal(module_id)}, "
+            f"{_rust_string_literal(source_module_name)}, "
+            "\"eligible\", coverage_cycle);\n"
+        )
+        if isinstance(module, Downstream):
+            fd.write(
+                "        coverage.record_module("
+                f"{_rust_string_literal(module_id)}, "
+                f"{_rust_string_literal(source_module_name)}, "
+                "\"downstream_triggered\", coverage_cycle);\n"
+            )
+        fd.write("      }\n")
+
         # Call module function and handle result
         fd.write(f"      let succ = modules::{module_name}::{module_name}(self);\n")
 
@@ -335,9 +425,28 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
                 fd.write(f"        self.{name}_value = None;\n")
 
             fd.write("      }\n")
+            fd.write("      if let Some(coverage) = self.coverage.as_mut() {\n")
+            fd.write("        let event = if succ { \"fire\" } else { \"blocked_wait\" };\n")
+            fd.write(
+                "        coverage.record_module("
+                f"{_rust_string_literal(module_id)}, "
+                f"{_rust_string_literal(source_module_name)}, "
+                "event, coverage_cycle);\n"
+            )
+            fd.write("      }\n")
             simulators.append(module_name)
 
         # Update trigger state and close condition
+        if isinstance(module, Downstream):
+            fd.write("      if let Some(coverage) = self.coverage.as_mut() {\n")
+            fd.write("        let event = if succ { \"fire\" } else { \"blocked_wait\" };\n")
+            fd.write(
+                "        coverage.record_module("
+                f"{_rust_string_literal(module_id)}, "
+                f"{_rust_string_literal(source_module_name)}, "
+                "event, coverage_cycle);\n"
+            )
+            fd.write("      }\n")
         fd.write(f"      self.{module_name}_triggered = succ;\n")
         fd.write("    } // close event condition\n")
         fd.write("  } // close function\n\n")
@@ -462,6 +571,7 @@ def dump_simulator( #pylint: disable=too-many-locals, too-many-branches, too-man
 
     fd.write("        }\n")
     fd.write("      }\n")
+    fd.write("      sim.flush_coverage();\n")
     fd.write("    ")
 
     # Close simulate function

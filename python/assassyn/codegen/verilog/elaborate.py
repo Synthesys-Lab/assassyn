@@ -289,6 +289,7 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
         path / "design.py",
         sys,
         default_fifo_depth=kwargs.get('fifo_depth', 2),
+        verification=kwargs.get('verification', False),
     )
 
     files_to_copy = ["fifo.sv", "trigger_counter.sv"]
@@ -303,6 +304,8 @@ def elaborate(sys: SysBuilder, **kwargs) -> str:
             + [f"{alias}.sv" for _, alias in alias_resource_files]
         )
     )
+    if kwargs.get('verification', False):
+        additional_files.append("translation_validation_monitor.sv")
 
     generate_testbench(
         path / "tb.py",
