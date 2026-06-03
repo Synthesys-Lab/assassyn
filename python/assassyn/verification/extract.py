@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..codegen.verilog.schedule import compute_fifo_depths
+from ..codegen.verilog.schedule import compute_fifo_depths, compute_trigger_widths
 from ..utils import namify
 from .model import (
     AsyncCallTransition,
@@ -31,13 +31,18 @@ def build_validation_model(
 
     model = ValidationModel()
     fifo_depths = compute_fifo_depths(sys, module_metadata, default_fifo_depth)
-    _add_module_transitions(model, sys)
+    trigger_widths = compute_trigger_widths(sys, fifo_depths, default_fifo_depth)
+    _add_module_transitions(model, sys, trigger_widths)
     _add_fifo_transitions(model, fifo_depths)
     _add_async_call_transitions(model, sys, interactions)
     return model
 
 
-def _add_module_transitions(model: ValidationModel, sys: "SysBuilder") -> None:
+def _add_module_transitions(
+    model: ValidationModel,
+    sys: "SysBuilder",
+    trigger_widths: dict["Module", int],
+) -> None:
     """Add module fire and trigger-counter relations."""
 
     for module in list(sys.modules) + list(sys.downstreams):
@@ -48,14 +53,20 @@ def _add_module_transitions(model: ValidationModel, sys: "SysBuilder") -> None:
             coverage_id=module_id,
             module=source_name,
             fire_signal=f"inst_{module_name}.executed",
-            event_count_signal=f"{module_name}_trigger_count",
+            event_count_signal=(
+                f"{module_name}_trigger_counter_inst.count"
+                if module in sys.modules
+                else None
+            ),
         )
         if module in sys.modules:
+            width = int(trigger_widths[module])
             model.triggers[module_id] = TriggerTransition(
                 coverage_id=module_id,
                 module=source_name,
-                rtl_count_signal=f"{module_name}_trigger_count",
+                rtl_count_signal=f"{module_name}_trigger_counter_inst.count",
                 rtl_delta_signal=f"{module_name}_trigger_counter_delta",
+                width=width,
             )
 
 
@@ -78,10 +89,14 @@ def _add_fifo_transitions(
                 configured_depth_log2=int(depth_log2),
                 configured_depth=1 << int(depth_log2),
                 rtl=RTLSignalMap(
-                    count_signal=f"fifo_{module_name}_{port_name}_count",
+                    count_signal=_fifo_count_signal(module_name, port_name, depth_log2),
+                    count_width=max(1, int(depth_log2) + 1),
+                    push_valid_signal=f"fifo_{module_name}_{port_name}_push_valid",
                     valid_signal=f"fifo_{module_name}_{port_name}_pop_valid",
                     ready_signal=f"fifo_{module_name}_{port_name}_push_ready",
+                    pop_ready_signal=f"fifo_{module_name}_{port_name}_pop_ready",
                     data_signal=f"fifo_{module_name}_{port_name}_pop_data",
+                    data_width=int(port.dtype.bits),
                 ),
             )
 
@@ -118,3 +133,12 @@ def _source_module_name(module: "Module") -> str:
     """Return the source-level class name used for validation IDs."""
 
     return module.__class__.__name__
+
+
+def _fifo_count_signal(module_name: str, port_name: str, depth_log2: int) -> str:
+    """Return the generated FIFO occupancy signal path."""
+
+    prefix = f"fifo_{module_name}_{port_name}_inst"
+    if int(depth_log2) == 0:
+        return f"{prefix}.single_element_fifo.full"
+    return f"{prefix}.multi_element_fifo.count"

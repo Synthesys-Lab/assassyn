@@ -50,4 +50,8 @@ def test_validation_model_extracts_async_fifo_and_trigger_relations():
     assert "fifo:Consumer.data" in model.fifos
     assert "async:Producer->Consumer:0" in model.async_calls
     assert model.fifos["fifo:Consumer.data"].configured_depth == 4
-    assert model.triggers["module:Consumer"].rtl_count_signal.endswith("_count")
+    assert model.modules["module:Consumer"].event_count_signal.endswith(".count")
+    assert model.triggers["module:Consumer"].rtl_count_signal.endswith(".count")
+    assert model.triggers["module:Consumer"].width == 3
+    assert model.fifos["fifo:Consumer.data"].rtl.count_signal.endswith(".count")
+    assert model.fifos["fifo:Consumer.data"].rtl.data_width == 32

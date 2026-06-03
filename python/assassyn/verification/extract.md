@@ -23,9 +23,12 @@ coverage identifiers.
 
 ## Internal Helpers
 
-- `_add_module_transitions`: adds module fire and trigger-counter relations.
+- `_add_module_transitions`: adds module fire and trigger-counter relations with
+  trigger-counter widths from shared schedule equations.
 - `_add_fifo_transitions`: adds FIFO queue relations from shared schedule depth
   equations.
 - `_add_async_call_transitions`: adds async-call to FIFO alignment relations.
 - `_source_module_name`: converts module instances to source-level class names
   used by coverage and validation IDs.
+- `_fifo_count_signal`: resolves the generated FIFO instance occupancy signal
+  path for single-element and multi-element FIFOs.

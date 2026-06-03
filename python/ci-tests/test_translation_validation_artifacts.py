@@ -14,6 +14,8 @@ class Target(Module):
 
     @module.combinational
     def build(self):
+        """Consume all ports so the target has FIFO pop logic."""
+
         self.pop_all_ports(True)
 
 
@@ -25,6 +27,8 @@ class Driver(Module):
 
     @module.combinational
     def build(self, target: Target):
+        """Send one deterministic async call to the target."""
+
         target.async_called(data=Int(32)(13))
 
 
@@ -64,3 +68,8 @@ def test_translation_validation_json_is_written(tmp_path):
     assert validation["schema"] == "assassyn.translation_validation.v1"
     assert "module:Target" in validation["modules"]
     assert "fifo:Target.data" in validation["fifos"]
+
+    monitor = monitor_path.read_text(encoding="utf-8")
+    assert "bind Top translation_validation_monitor" in monitor
+    assert "FIFO pop without valid" in monitor
+    assert "fifo_Target_data_count" in monitor

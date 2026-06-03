@@ -11,6 +11,9 @@ importing simulator or Verilog elaboration modules.
 - `summarize_fifo_occupancy`
 - `validate_coverage_schema`
 - `build_validation_model`
+- `render_monitor`
+- `write_monitor_stub`
+- `write_validation_json`
 - validation model dataclasses from `model.py`
 
 ## Internal Helpers

@@ -9,13 +9,17 @@ VALIDATION_SCHEMA = "assassyn.translation_validation.v1"
 
 
 @dataclass(frozen=True)
-class RTLSignalMap:
+class RTLSignalMap:  # pylint: disable=too-many-instance-attributes
     """RTL signal names corresponding to one semantic object."""
 
     count_signal: str | None = None
+    count_width: int | None = None
+    push_valid_signal: str | None = None
     valid_signal: str | None = None
     ready_signal: str | None = None
+    pop_ready_signal: str | None = None
     data_signal: str | None = None
+    data_width: int | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +52,7 @@ class TriggerTransition:
     module: str
     rtl_count_signal: str
     rtl_delta_signal: str
+    width: int
 
 
 @dataclass(frozen=True)

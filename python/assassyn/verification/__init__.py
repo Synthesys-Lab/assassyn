@@ -5,6 +5,7 @@ from .coverage import (
     summarize_fifo_occupancy,
     validate_coverage_schema,
 )
+from .emit import render_monitor, write_monitor_stub, write_validation_json
 from .extract import build_validation_model
 from .model import (
     AsyncCallTransition,
@@ -24,6 +25,9 @@ __all__ = (
     "ValidationModel",
     "build_validation_model",
     "load_coverage",
+    "render_monitor",
     "summarize_fifo_occupancy",
     "validate_coverage_schema",
+    "write_monitor_stub",
+    "write_validation_json",
 )

@@ -9,7 +9,8 @@ validation relations.
 
 ### `struct RTLSignalMap`
 
-Maps one semantic object to generated RTL signal names.
+Maps one semantic object to generated RTL signal names, FIFO handshake signals,
+and signal widths used by generated monitors.
 
 ### `struct ModuleTransition`
 
@@ -21,7 +22,8 @@ Describes a FIFO queue relation and configured depth.
 
 ### `struct TriggerTransition`
 
-Describes a trigger-counter relation.
+Describes a trigger-counter relation, including RTL count/delta signal names and
+the generated trigger-counter width.
 
 ### `struct AsyncCallTransition`
 
