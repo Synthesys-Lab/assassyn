@@ -67,20 +67,18 @@ def build_model() -> ValidationModel:
             ArrayWritePortTransition(
                 writer="Driver",
                 port_index=0,
-                write_enable_signal="array_writer_state.w_port0",
-                write_index_signal="array_writer_state.widx_port0",
-                write_data_signal="array_writer_state.wdata_port0",
-                next_value_signal=(
-                    "array_writer_state.mem[array_writer_state.widx_port0]"
-                ),
+                write_enable_signal="_Driver_state_w_port0",
+                write_index_signal="_Driver_state_widx_port0",
+                write_data_signal="_Driver_state_wdata_port0",
+                next_value_signal="state.mem[_Driver_state_widx_port0]",
             ),
         ),
         read_ports=(
             ArrayReadPortTransition(
                 reader="Driver",
                 port_index=0,
-                read_index_signal="array_writer_state.ridx_port0",
-                read_data_signal="array_writer_state.rdata_port0",
+                read_index_signal="_Driver_state_ridx_port0",
+                read_data_signal="_state_rdata_port0",
             ),
         ),
     )
@@ -93,15 +91,19 @@ def test_monitor_emits_bind_and_fifo_assertions():
     monitor = render_monitor(build_model())
 
     assert "bind Top translation_validation_monitor" in monitor
-    assert "target_trigger_counter_inst.count" in monitor
-    assert "fifo_target_data_inst.multi_element_fifo.count" in monitor
-    assert "FIFO push without ready" in monitor
-    assert "FIFO pop without valid" in monitor
-    assert "module:Target trigger count overflow" in monitor
-    assert "array_writer_state.w_port0" in monitor
-    assert "array_writer_state.mem[array_writer_state.widx_port0]" in monitor
+    assert "bind fifo translation_validation_fifo_monitor" in monitor
+    assert "bind trigger_counter translation_validation_trigger_monitor" in monitor
+    assert "fifo push_valid unknown" in monitor
+    assert "fifo pop_data unknown" in monitor
+    assert "trigger_counter trigger count overflow" in monitor
+    assert "_Driver_state_w_port0" in monitor
+    assert "state.mem[_Driver_state_widx_port0]" in monitor
     assert "next-cycle payload mismatch" in monitor
     assert "same-cycle write visible through read port" in monitor
+    assert "longint unsigned tv_assert_0_activations" in monitor
+    assert "translation_validation_assertion name=fifo.push_valid_known" in monitor
+    assert "translation_validation_assertion name=array:state.w0.next_cycle_payload" in monitor
+    assert "translation_validation_assertion name=trigger_counter.count_bounded" in monitor
 
 
 def test_model_consistency_catches_mutated_missing_fifo():

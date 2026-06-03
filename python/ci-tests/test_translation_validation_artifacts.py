@@ -74,7 +74,8 @@ def test_translation_validation_json_is_written(tmp_path):
 
     monitor = monitor_path.read_text(encoding="utf-8")
     assert "bind Top translation_validation_monitor" in monitor
-    assert "FIFO pop without valid" in monitor
-    assert "fifo_Target_data_count" in monitor
+    assert "bind fifo translation_validation_fifo_monitor" in monitor
+    assert "fifo pop_data unknown" in monitor
     assert "array_state_w0_we" in monitor
     assert "next-cycle payload mismatch" in monitor
+    assert "translation_validation_assertion name=" in monitor
