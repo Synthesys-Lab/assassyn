@@ -91,9 +91,12 @@ def _trigger_assertions(model: ValidationModel) -> list[str]:
         lines.extend([
             _assert_known(f"{prefix}_count", trigger_id),
             _assert_known(f"{prefix}_delta", trigger_id),
-            (
-                f"      assert ({prefix}_count <= {_sv_literal(trigger.width, max_depth)}) "
-                f"else $error(\"{_sv_string(trigger_id)} trigger count overflow\");"
+            _assert_bounded(
+                f"{prefix}_count",
+                trigger.width,
+                max_depth,
+                trigger_id,
+                "trigger count overflow",
             ),
         ])
     return lines
@@ -117,10 +120,12 @@ def _fifo_assertions(model: ValidationModel) -> list[str]:
                 f"!$isunknown({prefix}_pop_data)) "
                 f"else $error(\"{_sv_string(fifo_id)} FIFO pop data unknown\");"
             ),
-            (
-                f"      assert ({prefix}_count <= "
-                f"{_sv_literal(count_width, fifo.configured_depth)}) "
-                f"else $error(\"{_sv_string(fifo_id)} FIFO count overflow\");"
+            _assert_bounded(
+                f"{prefix}_count",
+                count_width,
+                fifo.configured_depth,
+                fifo_id,
+                "FIFO count overflow",
             ),
             (
                 f"      assert (!({prefix}_push_valid && !{prefix}_push_ready)) "
@@ -184,6 +189,21 @@ def _assert_known(signal: str, source_id: str) -> str:
     return (
         f"      assert (!$isunknown({signal})) "
         f"else $error(\"{_sv_string(source_id)} {signal} unknown\");"
+    )
+
+
+def _assert_bounded(
+    signal: str,
+    width: int,
+    bound: int,
+    source_id: str,
+    message: str,
+) -> str:
+    """Return an assertion that bounds an unsigned signal."""
+
+    return (
+        f"      assert ({signal} <= {_sv_literal(width, bound)}) "
+        f"else $error(\"{_sv_string(source_id)} {message}\");"
     )
 
 

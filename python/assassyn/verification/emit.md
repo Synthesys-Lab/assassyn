@@ -41,6 +41,7 @@ count bound checks, FIFO push/pop handshake checks, and X checks.
 - `_fifo_bind_connections`: emits bind connections for one FIFO.
 - `_format_ports`: formats SystemVerilog port declarations.
 - `_assert_known`: emits X/Z rejection assertions.
+- `_assert_bounded`: emits unsigned bound assertions.
 - `_sv_width`: renders packed vector widths.
 - `_sv_literal`: renders fixed-width decimal literals.
 - `_sv_identifier`: converts source IDs to SystemVerilog identifiers.
