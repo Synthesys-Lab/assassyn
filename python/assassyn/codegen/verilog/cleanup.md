@@ -10,6 +10,9 @@ Metadata consumed here (`ModuleMetadata`, `ModuleInteractionView`, `ArrayMetadat
 and `FIFOInteractionView`) is provided by the `python.assassyn.codegen.verilog.metadata`
 package.  Implementations live in the `metadata.module`, `metadata.array`, and
 `metadata.fifo` submodules but remain accessible via the `metadata` namespace for callers.
+FIFO push groups and async-trigger groups are now resolved through
+`schedule.py`, matching the equations used by the top harness and validation
+model extraction.
 
 ## Exposed Interfaces
 
@@ -42,11 +45,11 @@ This is the main cleanup function that generates all the necessary control signa
 
 5. **FIFO Signal Generation**: Walks `module_metadata.interactions.fifo_ports` to visit each FIFO touched by the module:
    - Pulls the per-port `FIFOInteractionView` directly from the shared matrix so the recorded `FIFOPush` / `FIFOPop` expressions stay in sync across consumers—predicates come from each expression’s `meta_cond`, push data from `expr.val`, and module ownership from the metadata view that registered the expression.
-   - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata captured during the pre-pass.
+   - Applies backpressure via the parent module's `fifo_*_push_ready` signals and emits valid/data assignments driven purely from metadata captured during the pre-pass. Backpressure guard grouping uses `schedule.group_fifo_pushes` so cleanup and translation-validation extraction share the same FIFO ownership keys.
    - Produces the module-local `*_pop_ready` backpressure signal without consulting dumper internals.
    - Reuses `_emit_predicate_mux_chain` so the push-valid reduction and push-data mux mirror the prioritisation used for array writes.
 
-6. **Module Trigger Signal Generation**: Reads async trigger exposures from `dumper.interactions.async_ledger.calls_for_module(current_module)`, sums all predicates (each taken from the call’s `meta_cond` and converted to an 8-bit increment), and routes the result into `<callee>_trigger` (currently represented as an 8‑bit unsigned value; the top‑level harness narrows this to the trigger counter width derived from FIFO depth).
+6. **Module Trigger Signal Generation**: Reads async trigger exposures through `schedule.group_async_triggers`, sums all predicates (each taken from the call’s `meta_cond` and converted to an 8-bit increment), and routes the result into `<callee>_trigger` (currently represented as an 8‑bit unsigned value; the top‑level harness narrows this to the trigger counter width derived from FIFO depth).
 
 7. **External Exposure Generation**: For every value exposure in `module_metadata.value_exposures`:
    - Schedules `expose_<name>`/`valid_<name>` port declarations for the module generator.

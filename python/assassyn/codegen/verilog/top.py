@@ -10,6 +10,12 @@ from .utils import (
     dump_type_cast,
     get_sram_info,
 )
+from .schedule import (
+    compute_fifo_depths,
+    compute_trigger_widths,
+    group_async_triggers,
+    group_fifo_pushes,
+)
 
 from ...analysis import topo_downstream_modules, get_upstreams
 from ...ir.memory.base import MemoryBase
@@ -87,47 +93,17 @@ def generate_top_harness(dumper: CIRCTDumper):
         )
     dumper.append_code('self.global_cycle_count = cycle_count')
 
-    # Precompute FIFO depths and per-module trigger widths
-    module_fifo_depths = {}
-    all_modules = dumper.sys.modules + dumper.sys.downstreams
     default_fifo_depth = getattr(dumper, "default_fifo_depth", 2)
-    for mod in all_modules:
-        module_fifo_depths[mod] = \
-            {port: default_fifo_depth for port in getattr(mod, 'ports', [])}
-
-    # Use metadata-driven pushes to compute FIFO depths, avoiding expression walking
-    for module in dumper.sys.modules + dumper.sys.downstreams:
-        metadata = dumper.module_metadata.get(module)
-        if metadata is None:
-            continue
-        for push in metadata.interactions.pushes:
-            fifo_port = push.fifo
-            owner = fifo_port.module
-            if owner not in module_fifo_depths:
-                continue
-            depth = push.fifo_depth
-            if not isinstance(depth, int) or depth <= 0:
-                depth = default_fifo_depth
-            current = module_fifo_depths[owner].get(fifo_port, default_fifo_depth)
-            module_fifo_depths[owner][fifo_port] = max(current, depth)
-
-    module_trigger_widths = {}
-    for module in dumper.sys.modules:
-        depth_map = module_fifo_depths.get(module, {})
-        if not depth_map:
-            depth_log2 = default_fifo_depth
-        else:
-            depths = list(depth_map.values())
-            depth_log2 = depths[0]
-            if any(d != depth_log2 for d in depths):
-                raise RuntimeError(
-                    f"Inconsistent FIFO depths for module {module.name}: {depths}"
-                )
-
-        # Trigger counters track the number of outstanding enqueued operations.
-        # For a FIFO with size 2**DEPTH_LOG2, the counter must represent values
-        # up to at least that size, so use DEPTH_LOG2+1 bits (min 1).
-        module_trigger_widths[module] = max(1, int(depth_log2) + 1)
+    module_fifo_depths = compute_fifo_depths(
+        dumper.sys,
+        dumper.module_metadata,
+        default_fifo_depth,
+    )
+    module_trigger_widths = compute_trigger_widths(
+        dumper.sys,
+        module_fifo_depths,
+        default_fifo_depth,
+    )
 
     # --- 1. Wire Declarations (Generic) ---
     dumper.append_code('# --- Wires for FIFOs, Triggers, and Arrays ---')
@@ -259,7 +235,6 @@ def generate_top_harness(dumper: CIRCTDumper):
 
     dumper.append_code('\n# --- Module Instantiations and Connections ---')
 
-    all_modules = dumper.sys.modules + dumper.sys.downstreams
     downstream_order = topo_downstream_modules(dumper.sys)
     instantiation_modules = list(dumper.sys.modules) + downstream_order
     module_connection_map = {}
@@ -416,14 +391,16 @@ def generate_top_harness(dumper: CIRCTDumper):
             for p in (metadata.interactions.pushes if metadata else ())
             if getattr(p, "parent", None) is module
         ]
-        calls = metadata.calls if metadata else []
 
         for push in pushes:
             # Store the actual Port object that is the target of a push
             all_driven_fifo_ports.add(push.fifo)
 
-        unique_output_push_targets = {(push.fifo.module, push.fifo) for push in pushes}
-        unique_call_targets = {c.bind.callee for c in calls}
+        unique_output_push_targets = set(group_fifo_pushes(pushes).keys())
+        unique_call_targets = set(group_async_triggers(
+            dumper.interactions.async_ledger,
+            module,
+        ).keys())
 
         for (callee_mod, callee_port) in unique_output_push_targets:
             port_map.append(

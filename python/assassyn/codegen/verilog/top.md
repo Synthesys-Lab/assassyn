@@ -24,6 +24,9 @@ Metadata lookups referenced throughout (array usage, module interactions, FIFO
 projections) flow from the `python.assassyn.codegen.verilog.metadata` package, whose
 submodules (`metadata.core`, `metadata.array`, `metadata.module`, `metadata.fifo`)
 provide the concrete implementations behind the familiar `metadata` namespace imports.
+FIFO depth selection, trigger-counter width selection, FIFO push grouping, and
+async-trigger grouping are centralized in `schedule.py` so the generated RTL and
+translation-validation model share the same equations.
 
 ## Exposed Interfaces
 
@@ -99,7 +102,7 @@ This function generates the complete top-level Verilog module that serves as the
 The function handles complex system-wide relationships:
 
 - **Multi-Port Array Management**: Ensures proper write port assignment and connection
-- **FIFO Depth Configuration**: Determines FIFO depths from `dumper.interactions.fifo_view(port).pushes` (no expression walking, predicate context preserved for downstream analysis, and the data is mirrored by the module-scoped interaction view)
+- **FIFO Depth Configuration**: Determines FIFO depths through `schedule.compute_fifo_depths` from metadata-backed push expressions (no expression walking, predicate context preserved for downstream analysis, and the data is mirrored by the module-scoped interaction view)
 - **External Module Integration**: Properly integrates external SystemVerilog modules
   by:
   - Declaring shared wires once per exposed external value (data + valid), using the normalised wire keys emitted by the intrinsic lowering pass
@@ -121,6 +124,9 @@ The function uses several utility functions and data structures:
 
 - `dump_type()` and `dump_type_cast()` from [utils module](/python/assassyn/codegen/verilog/utils.md) for type handling
 - `get_sram_info()` from [utils module](/python/assassyn/codegen/verilog/utils.md) for SRAM information
+- `compute_fifo_depths()`, `compute_trigger_widths()`, `group_fifo_pushes()`,
+  and `group_async_triggers()` from [schedule module](./schedule.md) for shared
+  Verilog and validation schedule equations.
 - `namify()` and `unwrap_operand()` from [utils module](/python/assassyn/utils.md) for name generation
 - `topo_downstream_modules()` and `get_upstreams()` from [analysis module](/python/assassyn/analysis/external_usage.md) for topological ordering and dependency discovery
 - `get_external_port_name()` from [CIRCTDumper](/python/assassyn/codegen/verilog/design.md) for external port naming

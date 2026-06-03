@@ -3,6 +3,7 @@
 from collections import defaultdict
 from typing import TYPE_CHECKING, Callable, Dict, List, NamedTuple, Optional, Sequence, TypeVar
 
+from .schedule import group_async_triggers, group_fifo_pushes
 from .utils import bounded_verilog_identifier, dump_type, dump_type_cast, get_sram_info
 
 from ...analysis.topo import get_upstreams
@@ -267,13 +268,12 @@ def cleanup_post_generation(dumper):
             guard_terms = []
 
             # Guard FIFO pushes (including those implied by async calls / binds).
-            fifo_push_groups: Dict[tuple[str, str], list[Expr]] = defaultdict(list)
+            local_fifo_pushes = []
 
             for push in getattr(module_view, "pushes", ()):
                 if getattr(push, "parent", None) is not dumper.current_module:
                     continue
-                fifo = push.fifo
-                fifo_push_groups[(namify(fifo.module.name), namify(fifo.name))].append(push)
+                local_fifo_pushes.append(push)
 
             for call in getattr(module_metadata, "calls", ()):
                 bind = getattr(call, "bind", None)
@@ -282,10 +282,10 @@ def cleanup_post_generation(dumper):
                 for push in getattr(bind, "pushes", ()):
                     if getattr(push, "parent", None) is not dumper.current_module:
                         continue
-                    fifo = push.fifo
-                    fifo_push_groups[(namify(fifo.module.name), namify(fifo.name))].append(push)
+                    local_fifo_pushes.append(push)
 
-            for (callee_mod_name, fifo_port_name), pushes in fifo_push_groups.items():
+            for (callee_module, fifo_port), pushes in group_fifo_pushes(
+                    local_fifo_pushes).items():
                 predicate_terms = []
                 for push in pushes:
                     predicate = dumper.format_predicate(
@@ -297,11 +297,17 @@ def cleanup_post_generation(dumper):
                     predicate_terms,
                     default_literal="Bits(1)(0)",
                 )
-                ready = f"self.fifo_{callee_mod_name}_{fifo_port_name}_push_ready"
+                ready = (
+                    f"self.fifo_{namify(callee_module.name)}_"
+                    f"{namify(fifo_port.name)}_push_ready"
+                )
                 guard_terms.append(f"(~({any_push}) | {ready})")
 
             # Guard async call trigger credits (delta_ready) separately.
-            async_groups = dumper.interactions.async_ledger.calls_for_module(dumper.current_module)
+            async_groups = group_async_triggers(
+                dumper.interactions.async_ledger,
+                dumper.current_module,
+            )
             for callee, calls in async_groups.items():
                 predicate_terms = []
                 for call in calls:
@@ -490,7 +496,10 @@ def cleanup_post_generation(dumper):
             f'self.valid_{render.exposed_name} = executed_wire & ({pred_condition})'
         )
 
-    async_groups = dumper.interactions.async_ledger.calls_for_module(dumper.current_module)
+    async_groups = group_async_triggers(
+        dumper.interactions.async_ledger,
+        dumper.current_module,
+    )
     for callee, trigger_entries in async_groups.items():
         rval = dumper.dump_rval(callee, False)
         if not trigger_entries:

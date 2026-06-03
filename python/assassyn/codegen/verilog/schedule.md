@@ -2,7 +2,8 @@
 
 ## Summary
 
-`schedule.py` centralizes schedule equations shared by Verilog lowering and
+`schedule.py` centralizes schedule equations shared by Verilog lowering,
+cleanup backpressure generation, top-harness construction, and
 translation-validation extraction.
 
 ## Exposed Interfaces
