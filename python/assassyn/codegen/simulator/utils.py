@@ -69,8 +69,9 @@ def int_imm_dumper_impl(ty: DType, value: int) -> str:
     if ty.bits <= 64:
         return f"{value}{dtype_to_rust_type(ty)}"
 
-    scalar_ty = "i64" if ty.is_signed() else "u64"
-    return f"ValueCastTo::<{dtype_to_rust_type(ty)}>::cast(&({value} as {scalar_ty}))"
+    if ty.is_signed():
+        return f'bigint_from_decimal("{value}")'
+    return f'biguint_from_decimal("{value}")'
 
 
 def fifo_name(fifo: Port):

@@ -34,6 +34,15 @@ width-free cast.
 
 ## Helpers
 
+`bigint_from_decimal` and `biguint_from_decimal` parse generated decimal
+literals for values wider than Rust's primitive integer range. They are used by
+the simulator code generator to avoid lossy `as i64` or `as u64` casts for
+wide immediates.
+
+`biguint_mask` builds an unsigned mask with the low `bits` bits set. Generated
+wide slice code uses it instead of parsing a long `"111..."` string in the
+simulator hot path.
+
 `low_u64_from_biguint` reads the low limb with `iter_u64_digits()` so scalar
 casts do not allocate a full digit vector.
 

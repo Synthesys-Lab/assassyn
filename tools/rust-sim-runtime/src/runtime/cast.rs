@@ -4,6 +4,21 @@ pub trait ValueCastTo<T> {
   fn cast(&self) -> T;
 }
 
+pub fn bigint_from_decimal(value: &str) -> BigInt {
+  BigInt::parse_bytes(value.as_bytes(), 10).expect("invalid BigInt decimal literal")
+}
+
+pub fn biguint_from_decimal(value: &str) -> BigUint {
+  BigUint::parse_bytes(value.as_bytes(), 10).expect("invalid BigUint decimal literal")
+}
+
+pub fn biguint_mask(bits: usize) -> BigUint {
+  if bits == 0 {
+    return BigUint::from(0u8);
+  }
+  (BigUint::from(1u8) << bits) - BigUint::from(1u8)
+}
+
 #[inline]
 fn low_u64_from_biguint(value: &BigUint) -> u64 {
   value.iter_u64_digits().next().unwrap_or(0)

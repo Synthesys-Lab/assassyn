@@ -28,7 +28,10 @@ The function maps the node's opcode to the corresponding Rust operator (e.g., `+
 **Generated Code Structure:** `ValueCastTo::<Type>::cast(&lhs) op ValueCastTo::<Type>::cast(&rhs)`
 
 **Special Handling:**
-- For signed right-shift (`SHR`) operations, operands are cast to signed types (`i32`, `i64`, or `BigInt`) to ensure arithmetic shift behavior
+- For signed right-shift (`SHR`) operations, operands are cast to the signed
+  Rust type selected by `dtype_to_rust_type`, such as `i32`, `i64`, or
+  `BigInt`. This keeps non-power-of-two widths like `i24` on valid rounded Rust
+  scalar types instead of emitting invalid types.
 - Intrinsic operations in operands are handled by calling `codegen_intrinsic` from the intrinsics module
 - Type casting uses `ValueCastTo` trait to ensure proper Rust type conversion
 

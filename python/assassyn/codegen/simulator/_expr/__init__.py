@@ -55,14 +55,14 @@ def codegen_slice(node: Slice, module_ctx):
     r = node.r.value.value
     dtype = node.dtype
     num_bits = r - l + 1
-    mask_bits = "1" * num_bits
 
     if l < 64 and r < 64:
+        mask = "u64::MAX" if num_bits == 64 else f"((1u64 << {num_bits}) - 1)"
         result_a = f'''let a = ValueCastTo::<u64>::cast(&{a});
-        let mask = u64::from_str_radix("{mask_bits}", 2).unwrap();'''
+        let mask = {mask};'''
     else:
         result_a = f'''let a = ValueCastTo::<BigUint>::cast(&{a});
-        let mask = BigUint::parse_bytes("{mask_bits}".as_bytes(), 2).unwrap();'''
+        let mask = biguint_mask({num_bits});'''
 
     return f"""{{
                 {result_a}
@@ -77,6 +77,14 @@ def codegen_concat(node: Concat, module_ctx):
     a = dump_rval_ref(module_ctx, node.msb)
     b = dump_rval_ref(module_ctx, node.lsb)
     b_bits = node.lsb.dtype.bits
+
+    if dtype.bits <= 64:
+        return f"""{{
+                let a = ValueCastTo::<u64>::cast(&{a});
+                let b = ValueCastTo::<u64>::cast(&{b});
+                let c = (a << {b_bits}) | b;
+                ValueCastTo::<{dtype_to_rust_type(dtype)}>::cast(&c)
+            }}"""
 
     return f"""{{
                 let a = ValueCastTo::<BigUint>::cast(&{a});

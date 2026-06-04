@@ -66,7 +66,10 @@ This function generates Rust code for integer immediate values, handling differe
 
 2. **Small integers**: Values up to 64 bits are converted to Rust integer literals with appropriate type suffixes.
 
-3. **Large integers**: Values larger than 64 bits are converted using the `ValueCastTo` trait to ensure proper type conversion and avoid overflow issues.
+3. **Large integers**: Values larger than 64 bits are emitted through
+   `bigint_from_decimal` or `biguint_from_decimal`. This preserves the full
+   Python integer value and avoids lossy generated Rust casts such as
+   `as i64` or `as u64`.
 
 The function ensures that immediate values are properly represented in the generated Rust code, maintaining type safety and avoiding potential overflow or underflow issues.
 

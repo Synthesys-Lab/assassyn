@@ -48,8 +48,9 @@ def codegen_binary_op(node: BinaryOp, module_ctx):
     if node.opcode == BinaryOp.SHR and node.lhs.dtype.is_signed():
         # For signed right shift, cast to signed type first
         if node.lhs.dtype.bits <= 64:
-            lhs = f"ValueCastTo::<i{node.lhs.dtype.bits}>::cast(&{lhs})"
-            rhs = f"ValueCastTo::<i{node.lhs.dtype.bits}>::cast(&{rhs})"
+            signed_ty = dtype_to_rust_type(node.lhs.dtype)
+            lhs = f"ValueCastTo::<{signed_ty}>::cast(&{lhs})"
+            rhs = f"ValueCastTo::<{signed_ty}>::cast(&{rhs})"
         else:
             lhs = f"ValueCastTo::<BigInt>::cast(&{lhs})"
             rhs = f"ValueCastTo::<BigInt>::cast(&{rhs})"
