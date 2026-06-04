@@ -77,21 +77,20 @@ def codegen_concat(node: Concat, module_ctx):
     a = dump_rval_ref(module_ctx, node.msb)
     b = dump_rval_ref(module_ctx, node.lsb)
     b_bits = node.lsb.dtype.bits
-
-    if dtype.bits <= 64:
-        return f"""{{
-                let a = ValueCastTo::<u64>::cast(&{a});
-                let b = ValueCastTo::<u64>::cast(&{b});
-                let c = (a << {b_bits}) | b;
-                ValueCastTo::<{dtype_to_rust_type(dtype)}>::cast(&c)
-            }}"""
+    value_type = _concat_value_type(dtype)
 
     return f"""{{
-                let a = ValueCastTo::<BigUint>::cast(&{a});
-                let b = ValueCastTo::<BigUint>::cast(&{b});
+                let a = ValueCastTo::<{value_type}>::cast(&{a});
+                let b = ValueCastTo::<{value_type}>::cast(&{b});
                 let c = (a << {b_bits}) | b;
                 ValueCastTo::<{dtype_to_rust_type(dtype)}>::cast(&c)
             }}"""
+
+
+def _concat_value_type(dtype):
+    """Return the generated intermediate type for a concat expression."""
+
+    return "u64" if dtype.bits <= 64 else "BigUint"
 
 
 def codegen_select(node: Select, module_ctx):

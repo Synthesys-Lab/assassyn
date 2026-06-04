@@ -36,3 +36,8 @@ their lowering needs the writer port context.
 `_EXPR_CODEGEN_DISPATCH` maps IR expression classes to their lowering
 functions. The table keeps expression dispatch centralized while arithmetic,
 array, call, and intrinsic lowering live in focused sibling modules.
+
+## Internal Helpers
+
+`_concat_value_type` selects the generated intermediate type for concat. Results
+up to 64 bits use `u64`; wider results use `BigUint`.
