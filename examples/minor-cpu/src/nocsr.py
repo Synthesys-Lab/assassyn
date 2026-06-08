@@ -197,6 +197,7 @@ class Execution(Module):
 
         # This `is_memory` hack is to evade rust's overflow check.
         addr = (result.bitcast(UInt(32)) - is_memory.select(offset_reg[0].bitcast(UInt(32)), UInt(32)(0))).bitcast(Bits(32))
+        addr_lsb = addr[0:1]
         request_addr = is_memory.select(addr[2:2+depth_log-1].bitcast(UInt(depth_log)), UInt(depth_log)(0))
 
         with Condition(memory_read):
@@ -205,10 +206,34 @@ class Execution(Module):
         with Condition(memory_write):
             log("mem-write        | addr: 0x{:05x}| line: 0x{:05x} | value: 0x{:08x} | wdada: 0x{:08x}", result, request_addr, a, b)
 
+        byte_wmask = Bits(32)(0x000000ff)
+        byte_wdata = Bits(24)(0).concat(b[0:7])
+        byte_wmask = (addr_lsb == Bits(2)(1)).select(Bits(32)(0x0000ff00), byte_wmask)
+        byte_wdata = (addr_lsb == Bits(2)(1)).select(Bits(16)(0).concat(b[0:7]).concat(Bits(8)(0)), byte_wdata)
+        byte_wmask = (addr_lsb == Bits(2)(2)).select(Bits(32)(0x00ff0000), byte_wmask)
+        byte_wdata = (addr_lsb == Bits(2)(2)).select(Bits(8)(0).concat(b[0:7]).concat(Bits(16)(0)), byte_wdata)
+        byte_wmask = (addr_lsb == Bits(2)(3)).select(Bits(32)(0xff000000), byte_wmask)
+        byte_wdata = (addr_lsb == Bits(2)(3)).select(b[0:7].concat(Bits(24)(0)), byte_wdata)
+
+        half_wmask = addr_lsb[1:1].select(Bits(32)(0xffff0000), Bits(32)(0x0000ffff))
+        half_wdata = addr_lsb[1:1].select(b[0:15].concat(Bits(16)(0)), Bits(16)(0).concat(b[0:15]))
+
+        is_half = signals.mem_size == Bits(2)(1)
+        is_byte = signals.mem_size == Bits(2)(2)
+        store_wmask = is_byte.select(byte_wmask, is_half.select(half_wmask, Bits(32)(0xffffffff)))
+        store_wdata = is_byte.select(byte_wdata, is_half.select(half_wdata, b))
+
         dcache = SRAM(width=32, depth=1<<depth_log, init_file=data)
         dcache.name = 'dcache'
-        dcache.build(we=memory_write, re=memory_read, wdata=b, addr=request_addr)
-        bound = memory.bind(rd = rd,result = signals.link_pc.select(pc0, result), mem_ext = signals.mem_ext)
+        dcache.build(we=memory_write, re=memory_read, wdata=store_wdata, addr=request_addr, wmask=store_wmask)
+        bound = memory.bind(
+            rd=rd,
+            result=signals.link_pc.select(pc0, result),
+            mem_size=signals.mem_size,
+            mem_unsigned=signals.mem_unsigned,
+            addr_lsb=addr_lsb,
+            is_mem_read=memory_read,
+        )
         bound.async_called()
         # with Condition(signals.csr_write):
         #     csr_f[csr_id] = csr_new

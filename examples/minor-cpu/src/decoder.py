@@ -82,10 +82,14 @@ def decode_logic(inst):
         assume(Bits(1)(0))
 
     # Extract all the signals
-    # For now, write is always disabled.
-    memory = concat(eqs['sw'], eqs['lw'] | eqs['lbu'])
-    # [ unsigned (signed), byte(word) ]
-    mem_ext = concat(eqs['lbu'], eqs['lbu']) 
+    is_load = eqs['lb'] | eqs['lh'] | eqs['lw'] | eqs['lbu'] | eqs['lhu']
+    is_store = eqs['sb'] | eqs['sh'] | eqs['sw']
+    memory = concat(is_store, is_load)
+
+    mem_size = Bits(2)(0)
+    mem_size = (eqs['lh'] | eqs['lhu'] | eqs['sh']).select(Bits(2)(1), mem_size)
+    mem_size = (eqs['lb'] | eqs['lbu'] | eqs['sb']).select(Bits(2)(2), mem_size)
+    mem_unsigned = eqs['lbu'] | eqs['lhu']
 
     # BInst and JInst are designed for branches.
     is_branch = is_type[BInst] | is_type[JInst] | eqs['jalr'] | eqs['mret']
@@ -142,10 +146,11 @@ def decode_logic(inst):
         rd_valid=rd_valid,
         imm=imm,
         imm_valid=imm_valid,
+        mem_size=mem_size,
+        mem_unsigned=mem_unsigned,
         is_pc_calc = is_pc_calc,
         csr_read=csr_read,
         csr_write=csr_write,
         csr_calculate=csr_calculate,
         is_zimm = is_zimm,
-        is_mepc = is_mepc,
-        mem_ext = mem_ext)
+        is_mepc = is_mepc)
