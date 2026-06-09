@@ -545,10 +545,12 @@ def generate_top_harness(dumper: CIRCTDumper):
     dumper.indent -= 8
     dumper.append_code('')
     dumper.append_code('system = System([Top], name="Top", output_directory="sv")')
-    dumper.append_code('System.FINAL_LOWERING_PASSES = [')
-    dumper.append_code('    entry for entry in System.FINAL_LOWERING_PASSES')
-    dumper.append_code('    if "lower-esi-" not in str(entry)')
-    dumper.append_code(']')
+    dumper.append_code('for _passes_attr in ("FINAL_LOWERING_PASSES", "PASS_PHASES"):')
+    dumper.append_code('    if hasattr(System, _passes_attr):')
+    dumper.append_code('        setattr(System, _passes_attr, [')
+    dumper.append_code('            entry for entry in getattr(System, _passes_attr)')
+    dumper.append_code('            if "lower-esi-" not in str(entry)')
+    dumper.append_code('        ])')
 
     # Copying of external SystemVerilog files occurs during elaboration.
 
