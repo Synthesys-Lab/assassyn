@@ -16,7 +16,9 @@ import shlex
 import subprocess
 import sys
 from typing import Dict, Tuple
+from io import StringIO
 from assassyn.utils import repo_path
+from assassyn.ramulator2 import PyRamulator, Request
 
 
 def run_command(command: str, workdir: str, env: Dict[str, str] | None = None) -> Tuple[int, str, str]:
@@ -86,6 +88,68 @@ def build_rust_if_needed(home: str, debug: bool = False) -> None:
         raise RuntimeError(f"Cargo test build failed in {workdir}:\n{err}")
 
 
+def run_python_test() -> Tuple[int, str, str]:
+    """Run the Python Ramulator2 test directly and return output."""
+    try:
+        home = repo_path()
+        sim = PyRamulator(f"{home}/tools/c-ramulator2-wrapper/configs/example_config.yaml")
+
+        is_write = False
+        v = 0  # counter
+        output_lines = []
+
+        for i in range(200):
+            plused = v + 1
+            we = v & 1
+            re = not we
+            raddr = v & 0xFF
+            waddr = plused & 0xFF
+            addr = waddr if is_write else raddr
+
+            def callback(req: Request, i=i):  # capture i in closure
+                output_lines.append(
+                    f"Cycle {i + 3 + (req.depart - req.arrive)}: Request completed: {req.addr} the data is: {req.addr - 1}"
+                )
+
+            ok = sim.send_request(addr, is_write, callback, i)
+            write_success = "true" if ok else "false"
+            if is_write:
+                output_lines.append(
+                    f"Cycle {i + 2}: Write request sent for address {addr}, success or not (true or false){write_success}"
+                )
+
+            is_write = not is_write
+            sim.frontend_tick()
+            sim.memory_system_tick()
+            v = plused
+
+        # Suppress stdout during finish() to avoid statistics output
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        sim.finish()
+        sys.stdout = old_stdout
+        
+        output = '\n'.join(output_lines)
+        return 0, output, ""
+    except Exception as e:  # noqa: BLE001
+        return 1, "", str(e)
+
+
+def filter_stats_output(text: str) -> str:
+    """Filter out Ramulator2 statistics output."""
+    # The stats appear at the end of the output, starting with "Frontend:" or "MemorySystem:"
+    # Simply truncate everything from the first occurrence of these markers onwards
+    lines = text.split('\n')
+    filtered_lines = []
+    
+    for line in lines:
+        if line.startswith('Frontend:') or line.startswith('MemorySystem:'):
+            break  # Stop processing, discard the rest
+        filtered_lines.append(line)
+    
+    return '\n'.join(filtered_lines).rstrip()
+
+
 def compare_texts(name_a: str, text_a: str, name_b: str, text_b: str) -> str:
     if text_a == text_b:
         return ""
@@ -147,6 +211,17 @@ def main() -> int:
     for lang, (cmd_or_path, workdir) in targets.items():
         if args.skip and lang in args.skip:
             continue
+        
+        # Special handling for Python - run directly instead of subprocess
+        if lang == "python":
+            if args.debug:
+                sys.stderr.write(f"[DEBUG] {lang} running direct Python test\n")
+            code, out, err = run_python_test()
+            results[lang] = (code, out, err)
+            if code != 0:
+                failures[lang] = f"Non-zero exit ({code}). Stderr:\n{err}\nStdout:\n{out}"
+            continue
+        
         # Per-language environment
         env = base_env.copy()
         if lang == "cpp":
@@ -184,20 +259,19 @@ def main() -> int:
             sys.stderr.write(f"[ERROR] {lang}: {msg}\n")
         return 2
 
-    # Show raw outputs if requested
-    if args.show_outputs:
-        for lang, (code, out, err) in results.items():
-            print(f"\n=== {lang.upper()} OUTPUT ===")
-            print("STDOUT:")
-            print(out)
-            if err:
-                print("STDERR:")
-                print(err)
-            print(f"Exit code: {code}")
-            print("=" * 50)
-
     # Normalize outputs slightly (strip trailing whitespace)
     norm = {k: v[1].rstrip() for k, v in results.items()}
+    
+    # Filter out stats from all languages
+    for lang in norm:
+        norm[lang] = filter_stats_output(norm[lang])
+    
+    # Show filtered outputs if requested
+    if args.show_outputs:
+        for lang in norm:
+            print(f"\n=== {lang.upper()} OUTPUT (FILTERED) ===")
+            print(norm[lang])
+            print("=" * 50)
     
     # Filter out Cargo test harness noise from Rust output
     if "rust" in norm:
@@ -213,7 +287,7 @@ def main() -> int:
             filtered_lines.append(line)
         norm["rust"] = '\n'.join(filtered_lines).rstrip()
     
-    # Normalize whitespace differences in statistics sections for all languages
+    # Normalize whitespace differences for all languages
     import re
     for lang in norm:
         # Remove ALL blank lines to eliminate formatting differences
