@@ -243,7 +243,18 @@ def _codegen_finish(node, module_ctx, **_kwargs) -> str
 
 Generates code to terminate the simulation.
 
-**Generated Code:** `std::process::exit(0);`
+**Generated Code:**
+```rust
+let _ = std::io::Write::flush(&mut std::io::stdout());
+std::process::exit(0);
+```
+
+The explicit flush makes the final trace visible before process termination,
+including output without a trailing newline. A flush error does not change the
+existing successful termination status. This flushes Rust's standard stdout,
+not arbitrary application-owned buffers. See
+`python/unit-tests/codegen/test_finish_stdout.py` for ordering and executable
+Rust regressions.
 
 #### `_codegen_assert`
 

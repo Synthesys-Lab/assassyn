@@ -115,7 +115,13 @@ def _codegen_wait_until(node, module_ctx):
 
 def _codegen_finish(node, module_ctx):
     """Generate code for FINISH intrinsic."""
-    return "std::process::exit(0);"
+    # `process::exit` skips Rust destructors, including stdout's buffered
+    # writer.  Flush first so a final architectural marker (or test result)
+    # is not lost when the simulator terminates through `finish()`.
+    return (
+        "let _ = std::io::Write::flush(&mut std::io::stdout()); "
+        "std::process::exit(0);"
+    )
 
 
 def _codegen_assert(node, module_ctx):
