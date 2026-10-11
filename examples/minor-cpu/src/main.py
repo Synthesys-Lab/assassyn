@@ -41,7 +41,6 @@ class Execution(Module):
     @module.combinational
     def build(
         self, 
-        pc: Array, 
         exec_bypass_reg: Array,
         exec_bypass_data: Array,
         mem_bypass_reg: Array,
@@ -74,21 +73,7 @@ class Execution(Module):
                             & (exec_br_epoch[0] == fetch_epoch[0]))
         next_live_epoch = (fetch_epoch[0].bitcast(UInt(8)) + UInt(8)(1)).bitcast(Bits(8))
         live_epoch = pending_redirect.select(next_live_epoch, fetch_epoch[0])
-        is_redirect_target = pending_redirect & (fetch_addr_peek == exec_br_dest[0])
         is_live = inst_epoch == live_epoch
-
-        with Condition(pending_redirect | ~is_live):
-            log(
-                "epoch.chk       | pc: 0x{:08x} | inst: 0x{:02x} | fetch: 0x{:02x} | live: 0x{:02x} | pend: {} | taken: {} | dest: 0x{:08x} | tgt: {}",
-                fetch_addr_peek,
-                inst_epoch,
-                fetch_epoch[0],
-                live_epoch,
-                pending_redirect,
-                exec_br_taken[0],
-                exec_br_dest[0],
-                is_redirect_target,
-            )
 
         rs1 = signals.rs1
         rs2 = signals.rs2
@@ -492,7 +477,7 @@ class Driver(Module):
             init_reg[0] = UInt(1)(0)
         # Async_call after first cycle
         with Condition(init_reg[0] == UInt(1)(0)):
-            d_call = fetcher.async_called()
+            fetcher.async_called()
         return init_cache
 
 def build_cpu(depth_log, *, sim_only=False, sim_threshold=600000):
@@ -500,7 +485,6 @@ def build_cpu(depth_log, *, sim_only=False, sim_threshold=600000):
 
     with sys:
         # Data Types
-        bits1   = Bits(1)
         bits5   = Bits(5)
         bits32  = Bits(32)
 
@@ -546,7 +530,6 @@ def build_cpu(depth_log, *, sim_only=False, sim_threshold=600000):
         offset_reg = user.build(init_cache.dout)
 
         exec_rd, ex_valid, dcache = executor.build(
-            pc = pc_reg,
             exec_bypass_reg = exec_bypass_reg,
             exec_bypass_data = exec_bypass_data,
             reg_onwrite = reg_onwrite,
@@ -668,7 +651,7 @@ def measure_cycles(raw):
     return extract_last_cycle(raw), 'full'
 
 
-def run_cpu(sys, simulator_binary, verilog_path, workload='default', run_verilator_check=True):
+def run_cpu(sys, simulator_binary, verilog_path, *, run_verilator_check=True):
     with sys:
         with open(f'{workspace}/workload.config') as f:
             raw = f.readline()
@@ -679,25 +662,14 @@ def run_cpu(sys, simulator_binary, verilog_path, workload='default', run_verilat
             value = value[2:]
             open(f'{workspace}/workload.init', 'w').write(value)
 
-    report = False
-    sim_raw = ''
-
-    if report:
-        sim_raw = utils.run_simulator(binary_path=simulator_binary, offline=False)
-        open(f'{workload}.log', 'w').write(sim_raw)
-        #open(f'{workload}.sim.time', 'w').write(str(tt))
-        if run_verilator_check and verilog_path:
-            raw = utils.run_verilator(verilog_path)
-            open(f'{workload}.verilog.log', 'w').write(raw)
-    else:
-        sim_raw = utils.run_simulator(binary_path=simulator_binary)
-        open('raw.log', 'w').write(sim_raw)
+    sim_raw = utils.run_simulator(binary_path=simulator_binary)
+    open('raw.log', 'w').write(sim_raw)
+    check()
+    if run_verilator_check and verilog_path:
+        raw = utils.run_verilator(verilog_path)
+        open('raw.log', 'w').write(raw)
         check()
-        if run_verilator_check and verilog_path:
-            raw = utils.run_verilator(verilog_path)
-            open('raw.log', 'w').write(raw)
-            check()
-        os.remove('raw.log')
+    os.remove('raw.log')
     return measure_cycles(sim_raw)
 
 
@@ -733,39 +705,6 @@ def init_workspace(base_path, case):
     cp_required(f'{base_path}/{case}.config', f'{workspace}/workload.config')
     cp_if_exists(f'{base_path}/{case}.sh', f'{workspace}/workload.sh', False)
 
-def is_coremark_source_tree(path):
-    required = [
-        'core_list_join.c',
-        'core_main.c',
-        'core_matrix.c',
-        'core_state.c',
-        'core_util.c',
-    ]
-    return os.path.isdir(path) and all(os.path.exists(os.path.join(path, name)) for name in required)
-
-def build_coremark_workload(coremark_src, workloads_path):
-    script = os.path.join(workloads_path, 'build_coremark.sh')
-    if not os.path.isfile(script):
-        raise FileNotFoundError(f'CoreMark packaging helper is not installed: {script}')
-    env = os.environ.copy()
-    env['COREMARK_SRC'] = os.path.abspath(coremark_src)
-    print(f'Packaging CoreMark from {env["COREMARK_SRC"]}')
-    subprocess.run(['bash', script], check=True, env=env)
-    return 'coremark'
-
-def is_coremark_baremetal_source(path):
-    return os.path.isfile(path) and os.path.basename(path) == 'coremark_baremetal.c'
-
-def build_coremark_baremetal_workload(coremark_src, workloads_path):
-    script = os.path.join(workloads_path, 'build_coremark_baremetal.sh')
-    if not os.path.isfile(script):
-        raise FileNotFoundError(f'CoreMark packaging helper is not installed: {script}')
-    env = os.environ.copy()
-    env['COREMARK_BAREMETAL_SRC'] = os.path.abspath(coremark_src)
-    print(f'Packaging bare-metal CoreMark from {env["COREMARK_BAREMETAL_SRC"]}')
-    subprocess.run(['bash', script], check=True, env=env)
-    return 'coremark_baremetal'
-
 def resolve_workload_case(workloads_path, spec):
     spec = WORKLOAD_ALIASES.get(spec, spec)
     packaged_exe = os.path.join(workloads_path, f'{spec}.exe')
@@ -774,21 +713,16 @@ def resolve_workload_case(workloads_path, spec):
         return spec
 
     abs_spec = os.path.abspath(spec)
-    if is_coremark_source_tree(abs_spec):
-        return build_coremark_workload(abs_spec, workloads_path)
-    if is_coremark_baremetal_source(abs_spec):
-        return build_coremark_baremetal_workload(abs_spec, workloads_path)
-
     if os.path.exists(abs_spec):
         if abs_spec.endswith('.ds'):
             raise ValueError(
                 f'Unsupported workload path: {abs_spec}. '
                 'This is DISC assembly, while examples/minor-cpu executes RV32I images. '
-                'Use the packaged coremark/coremask workload or pass a CoreMark source tree.'
+                'Use a packaged RV32I workload name.'
             )
         raise ValueError(
             f'Unsupported workload path: {abs_spec}. '
-            'Currently only packaged workload names and CoreMark source trees are supported.'
+            'Only packaged workload names are supported; source compilation is not provided.'
         )
 
     return spec
@@ -812,8 +746,7 @@ def run_workloads(sys, simulator_binary, verilog_path, base_path, workloads, run
             sys,
             simulator_binary,
             verilog_path,
-            workload,
-            run_verilator_check,
+            run_verilator_check=run_verilator_check,
         )
         rows.append((workload, cycles, cycle_source))
         print(f'{workload}: cycles={cycles} source={cycle_source}')
@@ -831,7 +764,7 @@ def positive_int(value: str) -> int:
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(
-        description='Run packaged minor-CPU workloads (optional CoreMark packaging requires external helpers).'
+        description='Run packaged minor-CPU workloads.'
     )
     parser.add_argument(
         '--sim-only',
@@ -845,7 +778,7 @@ def parse_args(argv):
     parser.add_argument(
         'workloads',
         nargs='*',
-        help='Packaged workload names; CoreMark source paths require an installed packaging helper.',
+        help='Packaged workload names (source paths are not supported).',
     )
     return parser.parse_args(argv)
 

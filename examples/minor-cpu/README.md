@@ -37,10 +37,10 @@ cycles can require a large event queue even before execution starts.
   store followed by a halfword comparison against an untruncated word). These
   remain disabled in the default list; the self-contained regression explicitly
   checks LB/LBU/LH/LHU/SB/SH instead. Do not relax the CPU to match invalid fixtures.
-- `coremask` aliases the packaged name `coremark`. Automatic CoreMark source
-  packaging is optional and requires externally supplied `build_coremark.sh` or
-  `build_coremark_baremetal.sh` in `workloads/`; these scripts are not bundled.
-  Missing helpers fail explicitly. No full CoreMark validation is claimed.
+- `coremask` aliases the packaged name `coremark`. The runner accepts packaged
+  RV32I workload names only; source compilation and CoreMark source packaging
+  are not provided. Prepare executable/configuration assets and a correctness
+  checker separately. No full CoreMark validation is claimed.
 - `kernel_cycles.csv` records either first-to-last executed CSR cycle-read marker
   distance (`csr_b00`, also recognizing CSR 0xc00) or the full last logged cycle.
   Decode/stall messages are not counted as committed markers. This is a trace
