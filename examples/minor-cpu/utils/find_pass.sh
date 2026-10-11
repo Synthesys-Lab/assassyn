@@ -1,12 +1,6 @@
-#!/bin/bash
-
-# 读取日志文件路径
+#!/bin/sh
+# The legacy RV32I success branch must execute, not merely be prefetched.
+set -eu
 logfile=$1
-
-if grep -q "02301063" "$logfile"; then
-    # bne     zero,gp,800001ec <pass>
-    exit 0
-else
-    # fail
-    exit 1
-fi
+grep -Eq '\[E\].*decoded[[:space:]]+\|[[:space:]]+raw: 0x02301063([[:space:]]|$)' "$logfile" &&
+    grep -Eq '\[E\].*(ebreak \| halt \| ecall|[[:space:]]trap[[:space:]]*$)' "$logfile"

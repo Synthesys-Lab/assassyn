@@ -235,17 +235,23 @@ supported_opcodes = [
 
   ('add'   , (0b0110011, 0b000, 0b0000000, RV32I_ALU.ALU_ADD), RInst),
   ('sub'   , (0b0110011, 0b000, 0b0100000, RV32I_ALU.ALU_SUB), RInst),
+  ('xor'   , (0b0110011, 0b100, 0b0000000, RV32I_ALU.ALU_XOR), RInst),
   ('or'    , (0b0110011, 0b110, 0b0000000, RV32I_ALU.ALU_OR) , RInst),
 
   ('jalr'  , (0b1100111, 0b000, RV32I_ALU.ALU_ADD, (RV32I_ALU.ALU_TRUE, False), None, None), IInst),
   ('addi'  , (0b0010011, 0b000, RV32I_ALU.ALU_ADD, None, None, None), IInst),
 
 
+  ('lb'    , (0b0000011, 0b000, RV32I_ALU.ALU_ADD, None, None, None), IInst),
+  ('lh'    , (0b0000011, 0b001, RV32I_ALU.ALU_ADD, None, None, None), IInst),
   ('lw'    , (0b0000011, 0b010, RV32I_ALU.ALU_ADD, None, None, None), IInst),
   ('lbu'   , (0b0000011, 0b100, RV32I_ALU.ALU_ADD, None, None, None), IInst),
+  ('lhu'   , (0b0000011, 0b101, RV32I_ALU.ALU_ADD, None, None, None), IInst),
 
   ('ebreak', (0b1110011, 0b000, RV32I_ALU.ALU_NONE, None,0b000000000001,None), IInst),
 
+  ('sb'    , (0b0100011, 0b000, RV32I_ALU.ALU_ADD), SInst),
+  ('sh'    , (0b0100011, 0b001, RV32I_ALU.ALU_ADD), SInst),
   ('sw'    , (0b0100011, 0b010, RV32I_ALU.ALU_ADD), SInst),
 
   # mn,       opcode,    funct3,cmp,                  flip
@@ -263,6 +269,7 @@ supported_opcodes = [
 
   ('slli' , (0b0010011, 0b001, RV32I_ALU.ALU_SLL, None, None , 0b000000), IInst),
   ('sll'  , (0b0110011, 0b001, 0b0000000, RV32I_ALU.ALU_SLL), RInst),
+  ('slt'  , (0b0110011, 0b010, 0b0000000, RV32I_ALU.ALU_CMP_LT), RInst),
   ('srai' , (0b0010011, 0b101, RV32I_ALU.ALU_SRA,  None,None , 0b010000), IInst),#signed
   ('srli' , (0b0010011, 0b101, RV32I_ALU.ALU_SRA_U,  None, None , 0b000000), IInst),#0
   ('sltu' , (0b0110011, 0b011, 0b0000000, RV32I_ALU.ALU_CMP_LTU), RInst),
@@ -300,6 +307,10 @@ deocder_signals = Record(
   imm_valid=Bits(1),
   # memory[0:0] is read, and memory[1:1] is write.
   memory=Bits(2),
+  # memory access width: 0=word, 1=halfword, 2=byte.
+  mem_size=Bits(2),
+  # unsigned load flag for subword loads.
+  mem_unsigned=Bits(1),
   # bit vector of ALU operations, which result should be selected.
   alu=Bits(RV32I_ALU.CNT),
   # bit vector of conditions, which should be selected to write or branch.
@@ -313,7 +324,6 @@ deocder_signals = Record(
   is_offset_br=Bits(1),
   # should we link the pc to rd
   link_pc=Bits(1),
-  mem_ext=Bits(2),
 )
 
 #TODO(@were): Add `SInst` to the supported types later.
