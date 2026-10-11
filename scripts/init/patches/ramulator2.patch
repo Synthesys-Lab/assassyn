@@ -3,9 +3,24 @@ src/base/param.h
 +          return _config[_name].template as<T>();
 
 src/dram_controller/impl/generic_dram_controller.cpp
+-    std::deque<Request> pending;          // A queue for read requests that are about to finish (callback after RL)
++    std::deque<Request> pending;          // Issued reads and writes awaiting callbacks.
+-      s_read_queue_len += m_read_buffer.size() + pending.size();
++      const auto pending_reads = std::count_if(pending.begin(), pending.end(),
++          [](const Request& req) { return req.type_id == Request::Type::Read; });
++      s_read_queue_len += m_read_buffer.size() + pending_reads;
+-      s_write_queue_len += m_write_buffer.size();
++      s_write_queue_len += m_write_buffer.size() + pending.size() - pending_reads;
 -            // TODO: Add code to update statistics
-+            // NEW: mirror read handling for writes
-+            // Prefer a dedicated write latency if your DRAM model exposes it; else reuse read latency for now.
-+            auto write_lat = m_dram->m_read_latency; // fallback for POC
-+            req_it->depart = m_clk + write_lat;
++            // External consumers require a completion callback for writes.
++            // Reuse read latency as a compatibility acknowledgement delay;
++            // this is not a model of physical write-recovery timing.
++            req_it->depart = m_clk + m_dram->m_read_latency;
 +            pending.push_back(*req_it);
+-     * @brief    Helper function to serve the completed read requests
++     * @brief    Serve completed read and write requests (historical helper name).
+-          if (req.depart - req.arrive > 1) {
++          if (req.type_id == Request::Type::Read && req.depart - req.arrive > 1) {
+-      s_avg_read_latency = (float) s_read_latency / (float) s_num_read_reqs;
++      s_avg_read_latency = s_num_read_reqs
++          ? (float) s_read_latency / (float) s_num_read_reqs : 0.0f;
